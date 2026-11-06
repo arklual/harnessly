@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
@@ -24,6 +25,7 @@ import (
 //	POST <platform>/apps/storage   hl.storage.<scope>.get|set|delete|keys
 //	POST <platform>/apps/tool      hl.tools.call: a tool of the app's own remote MCP server
 //	POST <platform>/apps/files     hl.files.read|write: a file of the chat's workspace, inside the app's masks
+//	GET  <platform>/apps/events    a stream of the keys the app storage changed (no values), for the page's views
 //
 // Both are the person's page session only; a view never reaches them itself (it has no cookie of the page's origin).
 
@@ -35,8 +37,10 @@ type bridgeBody struct {
 	Scope   string          `json:"scope"`
 	Key     string          `json:"key"`
 	Value   json.RawMessage `json:"value"`
-	Name    string          `json:"name"`
-	Args    map[string]any  `json:"args"`
+	// IfVersion makes a set conditional: it is made only if the key is at that version (hl.storage.<scope>.set).
+	IfVersion *int64         `json:"ifVersion"`
+	Name      string         `json:"name"`
+	Args      map[string]any `json:"args"`
 	// Path and Text are a file of the chat's workspace (hl.files): a path relative to it, and what to write.
 	Path string  `json:"path"`
 	Text *string `json:"text"`
@@ -52,6 +56,7 @@ type bridgeBody struct {
 // bridgeRefused is the answer to a refused call: the status and the code the page and the view read.
 func bridgeRefused(err error) (int, any) {
 	var be *apps.BridgeError
+	var conflict *apps.ConflictError
 	switch {
 	case errors.As(err, &be):
 		if be.Detail != "" {
@@ -69,8 +74,10 @@ func bridgeRefused(err error) (int, any) {
 		return http.StatusNotFound, map[string]string{"error": "not-found"}
 	case errors.Is(err, apps.ErrUnknownMethod), errors.Is(err, apps.ErrStorageArgs):
 		return http.StatusBadRequest, map[string]string{"error": apps.CodeInvalidParams}
+	case errors.As(err, &conflict):
+		return http.StatusConflict, map[string]any{"error": apps.CodeConflict, "message": "the key changed since it was read", "version": conflict.Current}
 	case errors.Is(err, apps.ErrQuota):
-		return http.StatusRequestEntityTooLarge, map[string]string{"error": "quota"}
+		return http.StatusRequestEntityTooLarge, map[string]string{"error": apps.CodeQuotaExceeded, "message": "the storage area is full"}
 	}
 	agent.Log("warn", "apps: bridge: "+err.Error())
 	return http.StatusInternalServerError, map[string]string{"error": "failed"}
@@ -146,6 +153,9 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 			return refused(err)
 		}
 		m := app.Manifest
+		if apps.IsSlot(b.Target) && !uiSlotsOn() {
+			return http.StatusForbidden, map[string]string{"error": "slots-off", "message": "the interface slots are off (HARNESSLY_UI_SLOTS)"}
+		}
 		if m == nil || !m.HasTarget(b.Target) {
 			return refused(&apps.BridgeError{Code: apps.CodeNotInTarget, Message: "the app does not work in " + b.Target})
 		}
@@ -225,18 +235,23 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		}
 		switch b.Op {
 		case "get":
-			v, ok, err := storage.Get(sess.App, scope, owner, b.Key)
+			v, version, ok, err := storage.GetVersioned(sess.App, scope, owner, b.Key)
 			if err != nil {
 				return refused(err)
 			}
 			if !ok {
-				return http.StatusOK, map[string]any{"value": nil}
+				return http.StatusOK, map[string]any{"value": nil, "version": version}
 			}
-			return http.StatusOK, map[string]any{"value": v}
+			return http.StatusOK, map[string]any{"value": v, "version": version}
 		case "set":
-			if err := storage.Set(sess.App, scope, owner, b.Key, b.Value); err != nil {
+			if b.IfVersion != nil && *b.IfVersion < 0 {
+				return refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: "ifVersion is 0 or more"})
+			}
+			version, err := storage.SetIf(sess.App, scope, owner, b.Key, b.Value, b.IfVersion)
+			if err != nil {
 				return refused(err)
 			}
+			return http.StatusOK, map[string]any{"ok": true, "version": version}
 		case "delete":
 			if err := storage.Delete(sess.App, scope, owner, b.Key); err != nil {
 				return refused(err)
@@ -269,9 +284,16 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		if err != nil {
 			return refused(err)
 		}
+		if decl := pkg.MCP[server]; decl.Connection != "" {
+			result, err := callConnectionTool(ctx, mcpFor(d), reg.ConnectionGranted(sess.App, decl.Connection), decl, name, b.Args)
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"result": result}
+		}
 		// The machine fills the app's secrets into the server's headers; the view never holds one. A server whose secret
 		// has no value is not called: the app waits for it.
-		srv, missing := pkg.MCP[server].Filled(revealApp(safeFor(d).store, sess.App, pkg.MCP[server].Secrets()))
+		srv, missing := pkg.MCP[server].Filled(revealApp(safeFor(d).store.Local, sess.App, pkg.MCP[server].Secrets()))
 		if len(missing) > 0 {
 			return refused(&apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a secret"})
 		}
@@ -344,6 +366,57 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		return http.StatusOK, map[string]any{"ok": true}
 	})
 
+	// events: the changes of the app storage as they happen, for the person's page to tell the views that are open. A
+	// change carries where it happened (app, scope, the chat or document of the area, key) and never the value; the
+	// page hands it only to the views of that app, and an area per chat or document only to the views of that chat or
+	// document (app-views/storage-events.ts).
+	events := func(w http.ResponseWriter, r *http.Request) {
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		if r.Method != http.MethodGet {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			secretJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed"})
+			return
+		}
+		// A page too slow to keep up loses changes rather than holding the writers up.
+		changes := make(chan apps.Change, 256)
+		stop := storage.OnChange(func(c apps.Change) {
+			select {
+			case changes <- c:
+			default:
+			}
+		})
+		defer stop()
+		h := w.Header()
+		h.Set("Content-Type", "text/event-stream; charset=utf-8")
+		h.Set("Cache-Control", "no-store, no-transform")
+		h.Set("X-Accel-Buffering", "no")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(": ok\n\n"))
+		flusher.Flush()
+		beat := time.NewTicker(15 * time.Second)
+		defer beat.Stop()
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case c := <-changes:
+				raw, _ := json.Marshal(map[string]string{"app": c.App, "scope": string(c.Scope), "owner": c.Owner, "key": c.Key})
+				_, _ = w.Write(append(append([]byte("data: "), raw...), '\n', '\n'))
+				flusher.Flush()
+			case <-beat.C:
+				_, _ = w.Write([]byte(": ping\n\n"))
+				flusher.Flush()
+			}
+		}
+	}
+
 	is := func(p string) func(*http.Request) bool { return func(r *http.Request) bool { return pathIs(r, p) } }
 	return []gate.Route{
 		{Match: is(platformAPI + "/apps/files"), Handler: files},
@@ -355,6 +428,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		{Match: is(platformAPI + "/apps/settings"), Handler: settings},
 		{Match: is("/agents" + platformAPI + "/apps/settings"), Handler: settings},
 		{Match: is(platformAPI + "/apps/storage"), Handler: store},
+		{Match: is(platformAPI + "/apps/events"), Handler: http.HandlerFunc(events)},
 		{Match: is(platformAPI + "/apps/tool"), Handler: tool},
 		{Match: is("/agents" + platformAPI + "/apps/storage"), Handler: store},
 		{Match: is("/agents" + platformAPI + "/apps/tool"), Handler: tool},

@@ -15,6 +15,7 @@ export const SETUP_KIND = {
   repo: 'repo',
   claude: 'claude-settings',
   plugin: 'plugin',
+  app: 'app',
   script: 'script',
 } as const;
 export type TSetupKind = (typeof SETUP_KIND)[keyof typeof SETUP_KIND];

@@ -12,6 +12,8 @@ import type {
   ApplyResponse,
   GroupResponse,
   MeEnvGroup,
+  MeEnvPresetResponse,
+  PresetResponse,
   MeMachinesResponse,
   MeRunResponse,
   MeRunsResponse,
@@ -30,6 +32,8 @@ const withSpace = (path: string, space?: string): string =>
   space ? `${path}?space=${encodeURIComponent(space)}` : path;
 
 const group = (org: string, id: string): string => orgPath(org, `/env/groups/${encodeURIComponent(id)}`);
+
+const preset = (org: string, id: string): string => orgPath(org, `/env/presets/${encodeURIComponent(id)}`);
 
 const entry = (org: string, id: string): string => orgPath(org, `/env/entries/${encodeURIComponent(id)}`);
 
@@ -64,6 +68,15 @@ export const liveEnv = (): EnvApi => ({
     (await http.patch<GroupResponse>(group(org, groupId), req)).group,
   envGroupRemove: async (org, groupId) => {
     await http.del(group(org, groupId));
+  },
+  envMinePreset: (presetId, space) =>
+    http.put<MeEnvPresetResponse>(`/api/me/env/presets/${encodeURIComponent(presetId)}`, { space }),
+  envPresetAdd: async (org, req) =>
+    (await http.post<PresetResponse>(orgPath(org, '/env/presets'), req)).preset,
+  envPresetPatch: async (org, presetId, req) =>
+    (await http.patch<PresetResponse>(preset(org, presetId), req)).preset,
+  envPresetRemove: async (org, presetId) => {
+    await http.del(preset(org, presetId));
   },
   envApply: (org, req) => http.post<ApplyResponse>(orgPath(org, '/env/apply'), req),
   catalogPatch: async (org, itemId, req) =>

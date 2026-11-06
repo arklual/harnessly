@@ -2,6 +2,7 @@
 // order; `:name` takes one segment. Links are real anchors (middle-click and "open in a new tab" work); a plain click
 // is handled here.
 import { type AnchorHTMLAttributes, type MouseEvent, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { withBase, withoutBase } from './base';
 
 export interface Match {
   route: string;
@@ -51,7 +52,7 @@ const listeners = new Set<() => void>();
 let snapshot: Loc | null = null;
 
 const read = (): Loc => {
-  const path = location.pathname;
+  const path = withoutBase(location.pathname);
   const search = location.search;
   if (!snapshot || snapshot.path !== path || snapshot.search !== search) snapshot = { path, search };
   return snapshot;
@@ -69,12 +70,12 @@ const subscribe = (fn: () => void) => {
 /** Goes to a path of the hub UI. */
 export const navigate = (to: string, opts: { replace?: boolean } = {}) => {
   if (isOutside(to)) {
-    if (opts.replace) location.replace(to);
-    else location.assign(to);
+    if (opts.replace) location.replace(withBase(to));
+    else location.assign(withBase(to));
     return;
   }
-  if (opts.replace) history.replaceState(null, '', to);
-  else history.pushState(null, '', to);
+  if (opts.replace) history.replaceState(null, '', withBase(to));
+  else history.pushState(null, '', withBase(to));
   listeners.forEach((fn) => fn());
   window.scrollTo(0, 0);
 };
@@ -101,7 +102,7 @@ export const Link = ({ to, replace, onClick, children, ...rest }: LinkProps) => 
     else navigate(to);
   };
   return (
-    <a {...rest} href={to} onClick={onLink}>
+    <a {...rest} href={withBase(to)} onClick={onLink}>
       {children}
     </a>
   );

@@ -30,6 +30,7 @@
       ],
       "access": [],
       "problems": ["offline"],
+      "opensRuntime": true,
       "cloud": null,
       "hardware": null,
       "load": null,
@@ -57,6 +58,7 @@
       "people": [],
       "access": [],
       "problems": ["disabled"],
+      "opensRuntime": true,
       "cloud": null,
       "hardware": null,
       "load": null,
@@ -94,6 +96,7 @@
         }
       ],
       "problems": [],
+      "opensRuntime": true,
       "cloud": {
         "provider": "example-cloud",
         "plan": "4 / 16",
@@ -184,6 +187,7 @@
         }
       ],
       "problems": [],
+      "opensRuntime": true,
       "cloud": null,
       "hardware": {
         "cores": 2,

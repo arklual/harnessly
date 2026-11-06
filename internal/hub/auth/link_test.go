@@ -294,3 +294,29 @@ func requestWithSession(t *testing.T, e *testEnv, c *http.Client) *http.Request 
 	}
 	return r
 }
+
+// A deployment that runs its own identity provider can say that provider's addresses are proven: then the first
+// sign-in through it is the administrator even when the provider does not send email_verified.
+func TestOIDCEmailTrustedLetsTheFirstAccountThrough(t *testing.T) {
+	f := newFakeIdP(t)
+	e := oauthEnv(t, f, withEnv("HUB_SIGNUP", "invite"), withEnv("HUB_OIDC_EMAIL_TRUSTED", "on"))
+	c := e.newClient()
+	cb, _ := e.oauth(c, f, "oidc-kc", "?intent=signup", profile{sub: "kc-1", email: "first@example.com"}, nil)
+	if location(cb) == "/signin?error=first_account_unverified" {
+		t.Fatalf("refused despite HUB_OIDC_EMAIL_TRUSTED=on: %s", location(cb))
+	}
+	var me struct{ User UserView }
+	e.do(c, "GET", "/api/me", nil).json(&me)
+	if !me.User.IsAdmin {
+		t.Error("the first account is not the administrator")
+	}
+}
+
+func TestOIDCEmailNotTrustedByDefault(t *testing.T) {
+	f := newFakeIdP(t)
+	e := oauthEnv(t, f, withEnv("HUB_SIGNUP", "invite"))
+	cb, _ := e.oauth(e.newClient(), f, "oidc-kc", "?intent=signup", profile{sub: "kc-1", email: "first@example.com"}, nil)
+	if location(cb) != "/signin?error=first_account_unverified" {
+		t.Fatalf("%s", location(cb))
+	}
+}

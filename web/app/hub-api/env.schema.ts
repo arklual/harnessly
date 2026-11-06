@@ -1,6 +1,16 @@
-import { arr, bool, lit, nullable, num, obj, opt, str, time, day } from './schema';
+import { arr, bool, lit, nullable, num, obj, opt, str, time, day, unknownValue } from './schema';
 
-const catalogKind = lit('skill', 'mcp', 'repo', 'doc', 'script', 'access', 'plugin', 'claude-settings');
+const catalogKind = lit(
+  'skill',
+  'mcp',
+  'repo',
+  'doc',
+  'script',
+  'access',
+  'plugin',
+  'claude-settings',
+  'app',
+);
 const layerKind = lit('org', 'tenant', 'team');
 const lockedReason = nullable(lit('pinned_by_org', 'pinned_by_tenant', 'no_rights', 'built_in'));
 const kindCounts = obj({
@@ -12,6 +22,7 @@ const kindCounts = obj({
   access: opt(num),
   plugin: opt(num),
   'claude-settings': opt(num),
+  app: opt(num),
 });
 const audience = obj({ mode: lit('tenant', 'teams', 'off'), teams: arr(str) });
 
@@ -50,6 +61,13 @@ export const envGroup = obj({
   position: num,
   builtIn: bool,
 });
+export const envPreset = obj({
+  id: str,
+  name: str,
+  hint: str,
+  groupIds: arr(str),
+  position: num,
+});
 export const envLayer = obj({
   layer: layerKind,
   scopeId: str,
@@ -61,6 +79,7 @@ export const envLayer = obj({
   counts: kindCounts,
   items: arr(envEntryRow),
   groups: arr(envGroup),
+  presets: arr(envPreset),
 });
 export const teamRef = obj({ id: str, name: str, tenantId: str });
 export const observedTool = obj({
@@ -125,6 +144,11 @@ const source = obj({
   rerun: opt(lit('once', 'check')),
   check: opt(str),
   secrets: opt(arr(str)),
+  marketplace: opt(str),
+  plugin: opt(str),
+  always: opt(unknownValue),
+  ifAbsent: opt(unknownValue),
+  claudeMd: opt(str),
 });
 const catalogOwner = obj({ layer: layerKind, scopeId: str });
 export const catalogItem = obj({
@@ -155,6 +179,14 @@ export const meEnvItem = obj({
   off: bool,
   canToggle: bool,
   groupId: str,
+});
+export const meEnvPreset = obj({
+  id: str,
+  name: str,
+  hint: str,
+  layer: layerKind,
+  groupIds: arr(str),
+  active: bool,
 });
 export const meEnvGroup = obj({
   id: str,
@@ -212,6 +244,7 @@ export const meEnvResponse = obj({
   org: obj({ id: str, name: str }),
   items: arr(meEnvItem),
   groups: arr(meEnvGroup),
+  presets: arr(meEnvPreset),
   outdated: bool,
   machines: arr(meMachine),
 });

@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -56,6 +57,8 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 	var req struct {
 		Emails []string
 		Role   string
+		// TeamID is a team of the space the people join with their invitation.
+		TeamID string
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -90,6 +93,9 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 	ctx := r.Context()
 	spaceID := r.PathValue("spaceId")
 	if err := s.Owner(ctx, p.User.ID, spaceID); err != nil {
+		return err
+	}
+	if err := s.checkTeam(ctx, spaceID, req.TeamID); err != nil {
 		return err
 	}
 	// Mail leaves the hub on the owner's word: bound how much of it one owner can make.
@@ -144,7 +150,10 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 					}
 				}
 			}
-			return tx.CreateInvite(ctx, &iv)
+			if err := tx.CreateInvite(ctx, &iv); err != nil {
+				return err
+			}
+			return s.setInviteTeam(ctx, tx, iv.ID, req.TeamID)
 		})
 		if err != nil {
 			return err
@@ -170,6 +179,7 @@ func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, p *auth.P
 	var req struct {
 		MaxUses *int
 		Days    *int
+		TeamID  string
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -192,15 +202,24 @@ func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, p *auth.P
 	if err := s.Owner(ctx, p.User.ID, spaceID); err != nil {
 		return err
 	}
+	if err := s.checkTeam(ctx, spaceID, req.TeamID); err != nil {
+		return err
+	}
 	st := s.db.S()
 	now := s.now().UTC()
 	active, err := st.ActiveInvites(ctx, spaceID, now)
 	if err != nil {
 		return err
 	}
-	if req.MaxUses == nil && req.Days == nil {
+	// The remembered link is the space's plain one: a link into a team is always a new one.
+	if req.MaxUses == nil && req.Days == nil && req.TeamID == "" {
 		for _, iv := range active {
 			if iv.Kind != "link" {
+				continue
+			}
+			if t, err := st.InviteTeam(ctx, iv.ID); err != nil {
+				return err
+			} else if t != "" {
 				continue
 			}
 			v := inviteView(iv)
@@ -217,7 +236,12 @@ func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, p *auth.P
 		SpaceID: spaceID, Kind: "link", TokenHash: store.HashToken(token), Role: store.RoleMember, MaxUses: &maxUses,
 		ExpiresAt: now.Add(time.Duration(days) * 24 * time.Hour), CreatedBy: p.User.ID, CreatedAt: now,
 	}
-	if err := st.CreateInvite(ctx, &iv); err != nil {
+	if err := s.db.Tx(ctx, func(tx store.Store) error {
+		if err := tx.CreateInvite(ctx, &iv); err != nil {
+			return err
+		}
+		return s.setInviteTeam(ctx, tx, iv.ID, req.TeamID)
+	}); err != nil {
 		return err
 	}
 	link := s.inviteURL(token)
@@ -228,6 +252,25 @@ func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, p *auth.P
 	v.URL = link
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"invite": v})
 	return nil
+}
+
+// checkTeam says that teamID, when given, is a team of the space.
+func (s *Service) checkTeam(ctx context.Context, spaceID, teamID string) error {
+	if teamID == "" {
+		return nil
+	}
+	t, err := s.db.S().TeamByID(ctx, teamID)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && t.SpaceID != spaceID) {
+		return httpx.Invalid("teamId", "Такой команды нет в этом пространстве")
+	}
+	return err
+}
+
+func (s *Service) setInviteTeam(ctx context.Context, tx store.Store, inviteID, teamID string) error {
+	if teamID == "" {
+		return nil
+	}
+	return tx.SetInviteTeam(ctx, inviteID, teamID)
 }
 
 func (s *Service) rememberURL(id, url string) {
@@ -346,9 +389,15 @@ func (s *Service) peekInvite(w http.ResponseWriter, r *http.Request) error {
 		m := maskEmail(iv.Email)
 		email = &m
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+	out := map[string]any{
 		"spaceName": sp.Name, "inviterName": inviter, "kind": iv.Kind, "email": email, "valid": valid(iv, s.now()),
-	})
+	}
+	if teamID, err := st.InviteTeam(ctx, iv.ID); err != nil {
+		return err
+	} else if t, err := st.TeamByID(ctx, teamID); teamID != "" && err == nil && t.SpaceID == sp.ID {
+		out["teamName"] = t.Name
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil
 }
 
@@ -397,7 +446,20 @@ func (s *Service) acceptInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 		} else if !ok {
 			return httpx.ErrExpired
 		}
-		return tx.AddMember(ctx, sp.ID, p.User.ID, iv.Role)
+		if err := tx.AddMember(ctx, sp.ID, p.User.ID, iv.Role); err != nil {
+			return err
+		}
+		// The team of the invitation, if it still exists in the space: a team deleted since is no reason to refuse.
+		teamID, err := tx.InviteTeam(ctx, iv.ID)
+		if err != nil || teamID == "" {
+			return err
+		}
+		if t, err := tx.TeamByID(ctx, teamID); err == nil && t.SpaceID == sp.ID {
+			return tx.AddTeamMember(ctx, t.ID, p.User.ID, false, now)
+		} else if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return err
+		}
+		return nil
 	})
 	if store.IsUnique(err) {
 		// Accepted twice at once: the other request won, the person is in.

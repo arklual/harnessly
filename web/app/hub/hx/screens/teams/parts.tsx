@@ -1,10 +1,11 @@
 // The pieces both team screens draw: the loading skeleton, the failure row, the four tiles, the people table.
-import { type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode, useState } from 'react';
 
 import { orgErrorText } from '../../../org/api/errors';
 import type { Person, TeamsView } from '../../../org/api/teams';
 import { MiniBars, SegmentStrip, StatTile, StatTiles } from '../../charts/stat-tile';
 import { Btn, Icon, initial } from '../../ui';
+import { canMove, DRAG_TYPE, type Manage, onDragStartOf, RowMenu, TeamFoot } from './manage';
 import { type Group, rowOf, tilesOf } from './model';
 
 /** The shimmering boxes of the screen while the hub answers. */
@@ -101,15 +102,29 @@ const PersonRowButton = ({
   now,
   team,
   onOpen,
+  m,
 }: {
   p: Person;
   now: number;
   team: string | null;
   onOpen: (id: string) => void;
+  m?: Manage;
 }) => {
   const r = rowOf(p, now, team);
+  const drag = m && canMove(p);
+  const open = () => onOpen(p.id);
   return (
-    <button type="button" className="pt-row" data-idle={r.idle ? '1' : '0'} onClick={() => onOpen(p.id)}>
+    <div
+      role="button"
+      tabIndex={0}
+      className="pt-row"
+      data-idle={r.idle ? '1' : '0'}
+      data-act={m ? '1' : undefined}
+      draggable={drag || undefined}
+      onDragStart={drag ? onDragStartOf(p) : undefined}
+      onClick={open}
+      onKeyDown={onKey(open)}
+    >
       <span className="pt-name">
         <span className="hx-avatar pt-av">{r.ini}</span>
         <span className="mt-name__t">
@@ -131,7 +146,8 @@ const PersonRowButton = ({
       </span>
       <span className="mt-num">{r.chats}</span>
       <span className="mt-num">{r.mr}</span>
-    </button>
+      {m && <RowMenu p={p} m={m} />}
+    </div>
   );
 };
 
@@ -140,16 +156,18 @@ export const PeopleTable = ({
   now,
   onOpen,
   inGroup,
+  manage,
 }: {
   items: { person: Person; team: string | null }[];
   now: number;
   onOpen: (id: string) => void;
   inGroup?: boolean;
+  manage?: Manage;
 }) => (
   <div className={inGroup ? 'mt mt--in' : 'mt'}>
     {HEAD}
     {items.map((x) => (
-      <PersonRowButton key={x.person.id} p={x.person} now={now} team={x.team} onOpen={onOpen} />
+      <PersonRowButton key={x.person.id} p={x.person} now={now} team={x.team} onOpen={onOpen} m={manage} />
     ))}
   </div>
 );
@@ -171,6 +189,7 @@ export const GroupCard = ({
   onToggle,
   onGear,
   onOpenPerson,
+  manage,
 }: {
   g: Group;
   i: number;
@@ -179,63 +198,96 @@ export const GroupCard = ({
   onToggle: () => void;
   onGear?: () => void;
   onOpenPerson: (id: string) => void;
-}) => (
-  <div className="mo-g tg" aria-expanded={open} style={{ '--i': i } as CSSProperties}>
+  manage?: Manage;
+}) => {
+  const [over, setOver] = useState(false);
+  // A row dragged here goes to this team (a card with no team takes it out of its team).
+  const drop = manage
+    ? {
+        onDragOver: (e: DragEvent) => {
+          if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setOver(true);
+        },
+        onDragLeave: (e: DragEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+        },
+        onDrop: (e: DragEvent) => {
+          setOver(false);
+          const id = e.dataTransfer.getData(DRAG_TYPE);
+          if (!id) return;
+          e.preventDefault();
+          if (!g.people.some((x) => x.id === id)) manage.move(id, g.teamId);
+        },
+      }
+    : {};
+  return (
     <div
-      className="mo-g__head tg-head"
-      role="button"
-      tabIndex={0}
-      aria-expanded={open}
-      onClick={onToggle}
-      onKeyDown={onKey(onToggle)}
+      className="mo-g tg"
+      aria-expanded={open || over}
+      data-drop={over ? '1' : undefined}
+      style={{ '--i': i } as CSSProperties}
+      {...drop}
     >
-      <Icon i="chevron-right" size="sm" className="mo-g__chev" />
-      <span className="ad-dot tg-dot" style={{ '--c': g.color } as CSSProperties}>
-        {g.initial}
-      </span>
-      <span className="mo-g__t">
-        <b>{g.name}</b>
-        <small>{g.sub}</small>
-      </span>
-      <span className="mo-g__flag tg-flag" data-show={g.hasFlag} data-tone={g.tone}>
-        {g.flag}
-      </span>
-      <span className="tg-bar" data-tone={g.tone}>
-        <i style={{ '--w': g.w } as CSSProperties} />
-      </span>
-      <span className="mo-g__s tg-sum">{g.sum}</span>
-      {g.hasLimit && onGear ? (
-        <Btn
-          variant="ghost"
-          size="sm"
-          shape="icon"
-          className="tg-gear"
-          aria-label="Настройки команды"
-          title="Настройки команды"
-          onClick={(e) => {
-            e.stopPropagation();
-            onGear();
-          }}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <Icon i="settings" size="sm" />
-        </Btn>
-      ) : (
-        <span />
-      )}
-    </div>
-    <div className="mo-g__body">
-      <div>
-        <PeopleTable
-          inGroup
-          items={g.people.map((person) => ({ person, team: null }))}
-          now={now}
-          onOpen={onOpenPerson}
-        />
+      <div
+        className="mo-g__head tg-head"
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={onToggle}
+        onKeyDown={onKey(onToggle)}
+      >
+        <Icon i="chevron-right" size="sm" className="mo-g__chev" />
+        <span className="ad-dot tg-dot" style={{ '--c': g.color } as CSSProperties}>
+          {g.initial}
+        </span>
+        <span className="mo-g__t">
+          <b>{g.name}</b>
+          <small>{g.sub}</small>
+        </span>
+        <span className="mo-g__flag tg-flag" data-show={g.hasFlag} data-tone={g.tone}>
+          {g.flag}
+        </span>
+        <span className="tg-bar" data-tone={g.tone}>
+          <i style={{ '--w': g.w } as CSSProperties} />
+        </span>
+        <span className="mo-g__s tg-sum">{g.sum}</span>
+        {g.hasLimit && onGear ? (
+          <Btn
+            variant="ghost"
+            size="sm"
+            shape="icon"
+            className="tg-gear"
+            aria-label="Настройки команды"
+            title="Настройки команды"
+            onClick={(e) => {
+              e.stopPropagation();
+              onGear();
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <Icon i="settings" size="sm" />
+          </Btn>
+        ) : (
+          <span />
+        )}
+      </div>
+      <div className="mo-g__body">
+        <div>
+          <PeopleTable
+            inGroup
+            items={g.people.map((person) => ({ person, team: null }))}
+            now={now}
+            onOpen={onOpenPerson}
+            manage={manage}
+          />
+          {manage && g.teamId && <TeamFoot teamId={g.teamId} m={manage} />}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const Empty = ({ children }: { children: ReactNode }) => <div className="mo-empty">{children}</div>;
 

@@ -294,7 +294,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 			return "", "", err
 		}
 		var err error
-		if apps, err = c.Apps.Claude(launch.Apps, settingsFile); err != nil {
+		if apps, err = c.Apps.ClaudeFor(launch.Conversation, launch.Apps, settingsFile); err != nil {
 			return "", "", err
 		}
 		settings = agents.ShellQuote(apps.Settings)

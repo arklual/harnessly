@@ -66,7 +66,7 @@ func TestComputeKPIs(t *testing.T) {
 	good := many(6, "a", map[string]float64{"turns": 5, "mrs": 1, "mrsMerged": 1, "toolCalls": 10, "toolErrors": 1})
 	bad := many(6, "a", map[string]float64{"turns": 5, "mrs": 0, "toolCalls": 10, "toolErrors": 5})
 	out := computeKPIs(good, 7, bad, 7, nil)
-	if len(out) != 12 {
+	if len(out) != 15 {
 		t.Fatalf("%d KPI", len(out))
 	}
 	c := find(out, "completion")
@@ -117,5 +117,30 @@ func TestParallelism(t *testing.T) {
 	v := find(computeKPIs(ss, 7, nil, 7, nil), "parallelism")
 	if v.Value == nil || math.Abs(*v.Value-1.25) > 1e-12 {
 		t.Errorf("parallelism = %+v", v)
+	}
+}
+
+// The KPI that older sessions cannot answer (the cache write split, the p90 of the waits, the survival of merged
+// requests) count only the sessions that carry their numbers.
+func TestComputeKPIsGapMetrics(t *testing.T) {
+	old := many(3, "a", map[string]float64{"turns": 5, "waits": 4})
+	fresh := many(3, "a", map[string]float64{
+		"turns": 5, "waits": 2, "waitP90Ms": 600_000, "cacheWrite5mTokens": 300, "cacheWrite1hTokens": 100,
+		"mrsMature": 4, "mrsSurvived": 3,
+	})
+	out := computeKPIs(append(old, fresh...), 7, nil, 7, nil)
+	want := map[string]float64{"cache_write_1h": 0.25, "mr_survival": 0.75, "waiting_p90": 600_000}
+	for k, w := range want {
+		v := find(out, k)
+		if v.Value == nil || *v.Value != w {
+			t.Errorf("%s = %v, want %v", k, v.Value, w)
+		}
+	}
+	// Sessions without the numbers give no value, not zero.
+	none := computeKPIs(old, 7, nil, 7, nil)
+	for k := range want {
+		if v := find(none, k); v.Value != nil {
+			t.Errorf("%s of old sessions = %v", k, *v.Value)
+		}
 	}
 }

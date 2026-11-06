@@ -24,6 +24,7 @@ const STAGES: readonly { kind: TSetupKind; key: string }[] = [
   { kind: SETUP_KIND.repo, key: 'next.setup.stage.code' },
   { kind: SETUP_KIND.claude, key: 'next.setup.stage.claude' },
   { kind: SETUP_KIND.plugin, key: 'next.setup.stage.plugins' },
+  { kind: SETUP_KIND.app, key: 'next.setup.stage.apps' },
   { kind: SETUP_KIND.script, key: 'next.setup.stage.scripts' },
 ];
 
@@ -33,6 +34,7 @@ const RUN_KEY: Record<TSetupKind, string> = {
   repo: 'next.setup.run.repo',
   'claude-settings': 'next.setup.run.claude',
   plugin: 'next.setup.run.plugin',
+  app: 'next.setup.run.app',
   script: 'next.setup.run.script',
 };
 

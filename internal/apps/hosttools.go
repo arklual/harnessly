@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -57,10 +58,14 @@ func (HostTools) Tools() []any {
 	return append([]any{
 		tool("open", "Open an app's view in the person's right pane.",
 			jsvalue.NewObject("app", app, "view", str("A view of the app for the pane; omit for its first one."))),
-		tool("data_get", "Read what the app keeps for this chat under a key (the same data its view reads with hl.storage.chat).",
+		tool("data_get", "Read what the app keeps for this chat under a key (the same data its view reads with hl.storage.chat). "+
+			`Answers {"value": <the value, null if none>, "version": <number>}; the version goes up with every write of the key (0: never written).`,
 			jsvalue.NewObject("app", app, "key", str("The key.")), "key"),
-		tool("data_set", "Write what the app keeps for this chat under a key; the value is any JSON. The area is small (256 KB).",
-			jsvalue.NewObject("app", app, "key", str("The key."), "value", jsvalue.NewObject("description", "Any JSON value.")), "key", "value"),
+		tool("data_set", "Write what the app keeps for this chat under a key; the value is any JSON. The area is small (256 KB). "+
+			"Pass ifVersion (the version data_get gave) to write only if nobody changed the key since: otherwise the answer is `conflict` with the current version and nothing is written. "+
+			"A full area is `quota_exceeded`. Answers {\"version\": <the new version>}.",
+			jsvalue.NewObject("app", app, "key", str("The key."), "value", jsvalue.NewObject("description", "Any JSON value."),
+				"ifVersion", jsvalue.NewObject("type", "integer", "minimum", 0, "description", "Write only if the key is at this version (0: not written yet).")), "key", "value"),
 		tool("settings_get", "Read the app's settings: the values the person saved in its form over the defaults (the same a view reads with hl.settings.get()). Secrets are not among them and cannot be read.",
 			jsvalue.NewObject("app", app)),
 		tool("ask", "Put a choice to the person in the app's view and wait for the answer (up to ten minutes). Returns the option picked, or 'cancelled'.",
@@ -129,31 +134,49 @@ func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) 
 		raw, _ := json.Marshal(values)
 		return mcpserver.TextResult(string(raw), false)
 	case "data_get":
-		raw, ok, err := t.Storage.Get(app, ScopeChat, t.Conv, text("key"))
+		raw, version, ok, err := t.Storage.GetVersioned(app, ScopeChat, t.Conv, text("key"))
 		switch {
 		case errors.Is(err, ErrStorageArgs):
 			return refuse("the key must be a text of up to 256 characters")
 		case err != nil:
 			return refuse("the app's data could not be read")
-		case !ok:
-			return mcpserver.TextResult("null", false)
 		}
-		return mcpserver.TextResult(string(raw), false)
+		value := json.RawMessage("null")
+		if ok {
+			value = raw
+		}
+		out, _ := json.Marshal(struct {
+			Value   json.RawMessage `json:"value"`
+			Version int64           `json:"version"`
+		}{value, version})
+		return mcpserver.TextResult(string(out), false)
 	case "data_set":
 		v, _ := args.Get("value")
 		raw := jsvalue.Stringify(v, "")
 		if !json.Valid(raw) {
 			return refuse("the value is not JSON")
 		}
-		switch err := t.Storage.Set(app, ScopeChat, t.Conv, text("key"), raw); {
+		var ifVersion *int64
+		if n, has := args.Number("ifVersion"); has {
+			if n < 0 || n != float64(int64(n)) {
+				return refuse("ifVersion is a whole number, 0 or more")
+			}
+			iv := int64(n)
+			ifVersion = &iv
+		}
+		version, err := t.Storage.SetIf(app, ScopeChat, t.Conv, text("key"), raw, ifVersion)
+		var conflict *ConflictError
+		switch {
+		case errors.As(err, &conflict):
+			return refuse(fmt.Sprintf("%s: the key is at version %d, not the version you read; read it again and decide. Nothing was written", CodeConflict, conflict.Current))
 		case errors.Is(err, ErrQuota):
-			return refuse("the app's data of this chat is full")
+			return refuse(CodeQuotaExceeded + ": the app's data of this chat is full")
 		case errors.Is(err, ErrStorageArgs):
 			return refuse("the key must be a text of up to 256 characters")
 		case err != nil:
 			return refuse("the app's data could not be written")
 		}
-		return mcpserver.TextResult("saved", false)
+		return mcpserver.TextResult(fmt.Sprintf(`{"version":%d}`, version), false)
 	case "widget_show":
 		return t.widgetShow(installed, args)
 	case "ask":

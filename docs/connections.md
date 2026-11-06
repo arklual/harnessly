@@ -87,6 +87,7 @@ origin; the CLI's want the cli-token and only read.
 | `GET <platform>/connections/<id>/projects` | `{projects}` |
 | `GET <platform>/connections/<id>/issues?q=&mine=1&open=1&project=&native=&limit=` | `{issues}` |
 | `GET <platform>/connections/<id>/issue?key=` | `{issue}` |
+| `GET <platform>/connections/<id>/mrs?q=&state=opened\|merged\|closed\|all&limit=` | `{mrs}`: merge requests of a connection with the `code` capability (GitLab), up to 10, each with the pipeline at its head |
 | `GET <platform>/connections/<id>/pages?q=&limit=` | `{pages}` |
 | `GET <platform>/connections/<id>/page?id=` | `{page}` |
 | `GET <platform>/connections/resolve?url=` | `{connection, target: {kind, key}, issue?, page?}`; 404 when no connection owns the link |
@@ -110,6 +111,7 @@ harnessly issues --mine --open              my open issues in the primary tracke
 harnessly issues --conn ID --project ABC login bug
 harnessly issue ABC-12                      one issue with its description and last comments
 harnessly issue https://acme.atlassian.net/browse/ABC-12   a link is read by the connection that owns it
+harnessly mrs --state opened HRN-796        merge requests that name a task, with their pipelines (GitLab, capability code)
 harnessly pages onboarding                  search the primary wiki
 harnessly page ID|URL                       read one page
 ```

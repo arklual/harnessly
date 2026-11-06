@@ -55,3 +55,24 @@
 
 /* Вкладка в фоне — бесконечные анимации стоят (спиннеры, переливы, пульсы) */
 .hx-root[data-hidden] *, .hx-root[data-hidden] *::before, .hx-root[data-hidden] *::after { animation-play-state: paused !important; }
+
+/* Общие ключи, на которые перешли экраны хаба (раньше у каждого файла был свой дубль). */
+@keyframes hx-pop-in   { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
+@keyframes hx-pop-out  { to   { opacity: 0; transform: translateY(-4px) scale(.97); } }
+@keyframes hx-pop-down  { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes hx-rise     { from { opacity: 0; transform: translateY(8px); } }
+@keyframes hx-out-fade { to   { opacity: 0; } }
+@keyframes hx-slide-in { from { opacity: 0; transform: translateX(24px); } }
+@keyframes hx-slide-out { to  { opacity: 0; transform: translateX(24px); } }
+@keyframes hx-dialog-in  { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+@keyframes hx-dialog-out { to   { opacity: 0; transform: translateY(10px) scale(.98); } }
+@keyframes hx-sheet-in { from { opacity: 0; transform: translateY(24px); } }
+
+@keyframes hx-sheet-out { to { opacity: 0; transform: translateY(20px); } }
+
+/* board.css */
+@keyframes anm-reveal{to{clip-path:inset(0 0 0 0)}}
+@keyframes anm-fade{to{opacity:.07}}
+@keyframes anc-grow{from{transform:scaleX(0)}}
+@keyframes anh-in{from{opacity:0;transform:scale(.9)}}
+@keyframes hx-blink { 50% { opacity: .45; } }

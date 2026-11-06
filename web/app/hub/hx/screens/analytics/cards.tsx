@@ -5,6 +5,8 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import type { Change, DetailRow, Peers, Signal, Waste } from '../../../org/api/analytics';
 import { goSignal } from '../../go';
+import { useLive } from '../../live';
+import { nextSort, readSort, sortRows, useParams } from '../../sort';
 import { Icon } from '../../ui';
 import {
   barWidths,
@@ -25,7 +27,7 @@ import { teamHex, WASTE_HEX } from './colors';
 
 const idx = (n: number): CSSProperties => ({ '--i': n }) as CSSProperties;
 
-const Card = ({
+export const Card = ({
   title,
   count,
   lead,
@@ -225,59 +227,94 @@ export const WasteCard = ({ waste }: { waste: Waste }) => (
 
 const MEAN = 'Среднее по тенанту';
 
-export const PeersCard = ({ peers, teamOrder }: { peers: Peers; teamOrder: readonly string[] }) => (
-  <Card title={peers.title} lead={peers.sub}>
-    <div
-      className="anh"
-      style={
-        peers.columns.length === 8
-          ? undefined
-          : { gridTemplateColumns: `minmax(110px,1.2fr) repeat(${peers.columns.length},minmax(0,1fr))` }
-      }
-    >
-      <span />
-      {peers.columns.map((c) => (
-        <span key={c} className="anh__c">
-          {c}
-        </span>
-      ))}
-      {peers.rows.flatMap((r, ri) => [
-        <span key={`${r.id}-name`} className="anh__r">
-          <span className="anh__sw" style={{ '--c': teamHex(teamOrder, r.name) } as CSSProperties} />
-          {r.name}
-        </span>,
-        ...peerCells(r, peers.columns).map((cell, ci) => {
-          const heat = heatOf(cell.score);
-          const col = peers.columns[ci] ?? DASH;
-          return (
-            <span
-              key={`${r.id}-${col}`}
-              className="anh__x anx-hov"
-              data-t={heat}
-              style={idx(ri * peers.columns.length + ci)}
-            >
-              {cell.text}
-              <Bubble
-                title={`${r.name} · ${col}`}
-                rows={[
-                  { label: 'Команда', value: cell.text },
-                  { label: MEAN, value: cell.mean ?? DASH },
-                ]}
-                note={HEAT_NOTE[heat]}
-              />
-            </span>
-          );
-        }),
-      ])}
-    </div>
-    <div className="anh-leg">
-      <small>хуже среднего</small>
-      <span data-t="r2" />
-      <span data-t="r1" />
-      <span data-t="n" />
-      <span data-t="g1" />
-      <span data-t="g2" />
-      <small>лучше среднего</small>
-    </div>
-  </Card>
-);
+export const PeersCard = ({ peers, teamOrder }: { peers: Peers; teamOrder: readonly string[] }) => {
+  const live = useLive();
+  const p = useParams();
+  const keys = ['name', ...peers.columns.map((_, i) => `c${i}`)];
+  const sort = readSort(p.search, keys, { key: null, dir: 'desc' });
+  const pick = (k: string) => {
+    const n = nextSort(sort, k, k === 'name' ? 'asc' : 'desc');
+    p.set({ sort: n.key, dir: n.dir });
+  };
+  const rows = live
+    ? sortRows(peers.rows, sort, {
+        name: (r) => r.name,
+        ...Object.fromEntries(
+          peers.columns.map((_, i) => [
+            `c${i}`,
+            (r: Peers['rows'][number]) => peerCells(r, peers.columns)[i]?.score ?? 0,
+          ]),
+        ),
+      })
+    : peers.rows;
+  const head = (k: string, label: ReactNode) =>
+    live ? (
+      <button
+        type="button"
+        className="live-sort"
+        aria-sort={sort.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+        onClick={() => pick(k)}
+      >
+        {label}
+        <i aria-hidden="true">↓</i>
+      </button>
+    ) : (
+      label
+    );
+  return (
+    <Card title={peers.title} lead={peers.sub}>
+      <div
+        className="anh"
+        style={
+          peers.columns.length === 8
+            ? undefined
+            : { gridTemplateColumns: `minmax(110px,1.2fr) repeat(${peers.columns.length},minmax(0,1fr))` }
+        }
+      >
+        <span>{head('name', live ? 'Команда' : null)}</span>
+        {peers.columns.map((c, i) => (
+          <span key={c} className="anh__c">
+            {head(`c${i}`, c)}
+          </span>
+        ))}
+        {rows.flatMap((r, ri) => [
+          <span key={`${r.id}-name`} className="anh__r">
+            <span className="anh__sw" style={{ '--c': teamHex(teamOrder, r.name) } as CSSProperties} />
+            {r.name}
+          </span>,
+          ...peerCells(r, peers.columns).map((cell, ci) => {
+            const heat = heatOf(cell.score);
+            const col = peers.columns[ci] ?? DASH;
+            return (
+              <span
+                key={`${r.id}-${col}`}
+                className="anh__x anx-hov"
+                data-t={heat}
+                style={idx(ri * peers.columns.length + ci)}
+              >
+                {cell.text}
+                <Bubble
+                  title={`${r.name} · ${col}`}
+                  rows={[
+                    { label: 'Команда', value: cell.text },
+                    { label: MEAN, value: cell.mean ?? DASH },
+                  ]}
+                  note={HEAT_NOTE[heat]}
+                />
+              </span>
+            );
+          }),
+        ])}
+      </div>
+      <div className="anh-leg">
+        <small>хуже среднего</small>
+        <span data-t="r2" />
+        <span data-t="r1" />
+        <span data-t="n" />
+        <span data-t="g1" />
+        <span data-t="g2" />
+        <small>лучше среднего</small>
+      </div>
+    </Card>
+  );
+};

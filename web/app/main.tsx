@@ -155,7 +155,8 @@ const App = () => {
         </Suspense>
       )}
       <ThemedToaster />
-      <PushBridge />
+      {/* The documentation page opens no chat: a push's click and the "looking at the app" signal belong to the shell. */}
+      {pathname !== '/docs/[slug]' && <PushBridge />}
     </>
   );
 };

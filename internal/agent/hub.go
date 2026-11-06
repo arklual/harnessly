@@ -436,7 +436,7 @@ func (h *hub) hello() hubproto.Hello {
 	// The runtime ships in the same release and does the setup; an own link takes it only under the policy's `setup`.
 	offered := h.setupOffered()
 	if offered {
-		features = append(features, hubproto.FeatureEnvSetup, hubproto.FeatureEnvClaude)
+		features = append(features, hubproto.FeatureEnvSetup, hubproto.FeatureEnvClaude, hubproto.FeatureEnvApps)
 	}
 	h.mu.Lock()
 	h.setupSaid = offered

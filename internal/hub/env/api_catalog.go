@@ -128,6 +128,9 @@ const consentMsg = "Токены из сейфа и доступы подклю�
 // claudeMsg: a plugin brings hooks that run with every tool call, settings change every chat of the person.
 const claudeMsg = "Плагины и настройки Claude подключает админ организации"
 
+// appMsg: an app works in every chat of the people it reaches, with the rights it asks.
+const appMsg = "Приложения в окружение ставит админ организации"
+
 // CheckConsent refuses the items only an organization admin may write: an access, and a script that takes secrets from
 // the safe. It is asked for every item a team or a tenant owns.
 func CheckConsent(kind string, src json.RawMessage) error {
@@ -136,6 +139,8 @@ func CheckConsent(kind string, src json.RawMessage) error {
 		return httpx.Invalid("kind", consentMsg)
 	case store.CatalogPlugin, store.CatalogClaudeSettings:
 		return httpx.Invalid("kind", claudeMsg)
+	case store.CatalogApp:
+		return httpx.Invalid("kind", appMsg)
 	case store.CatalogScript:
 		var s struct {
 			Secrets []string `json:"secrets"`

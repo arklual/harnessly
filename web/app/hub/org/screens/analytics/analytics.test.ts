@@ -87,7 +87,7 @@ describe('what each role gets', () => {
   };
   it('gives a participant their own work, without money of others or peers', async () => {
     const d = await createOrgApi('mock', 'member').analytics(q);
-    expect(d.kpis).toHaveLength(12);
+    expect(d.kpis).toHaveLength(15);
     expect(d.waste).toBeNull();
     expect(d.peers).toBeNull();
     expect(d.signals).toEqual([]);

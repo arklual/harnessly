@@ -45,6 +45,15 @@ func glServer(t *testing.T, prefix string, anonymousVersion bool) (*httptest.Ser
 			provJSON(w, 200, `[{"id":7,"path_with_namespace":"acme/web/app","name_with_namespace":"Acme / Web / App","web_url":"`+srv.URL+prefix+`/acme/web/app"}]`)
 		case path == "/api/v4/issues", path == "/api/v4/projects/acme%2Fweb%2Fapp/issues":
 			provJSON(w, 200, "["+body+"]")
+		case path == "/api/v4/merge_requests":
+			provJSON(w, 200, `[{"iid":3,"project_id":7,"title":"Draft: HRN-796 mrs","state":"opened","draft":true,"web_url":"`+srv.URL+prefix+`/acme/web/app/-/merge_requests/3",
+"source_branch":"agent/hrn-796","updated_at":"2026-11-05T10:00:00Z","detailed_merge_status":"draft_status","head_pipeline":null,"references":{"full":"acme/web/app!3"}},
+{"iid":4,"project_id":7,"title":"HRN-796 docs","state":"merged","web_url":"`+srv.URL+prefix+`/acme/web/app/-/merge_requests/4",
+"source_branch":"docs","updated_at":"2026-11-04T10:00:00Z","references":{"full":"acme/web/app!4"}}]`)
+		case path == "/api/v4/projects/7/merge_requests/3":
+			provJSON(w, 200, `{"iid":3,"detailed_merge_status":"ci_still_running","head_pipeline":{"status":"running","web_url":"`+srv.URL+prefix+`/acme/web/app/-/pipelines/99"}}`)
+		case path == "/api/v4/projects/7/merge_requests/4":
+			provJSON(w, 404, `{"message":"404 Not Found"}`)
 		case path == "/api/v4/projects/acme%2Fweb%2Fapp/issues/12":
 			provJSON(w, 200, body)
 		case path == "/api/v4/projects/acme%2Fweb%2Fapp/issues/12/notes":
@@ -278,5 +287,41 @@ func TestGitLabLink(t *testing.T) {
 		if (c.key == "") == ok || (ok && (got.Key != c.key || got.Kind != "issue")) {
 			t.Errorf("%s: %v %v, want %q", c.link, got, ok, c.key)
 		}
+	}
+}
+
+func TestGitLabMergeRequests(t *testing.T) {
+	srv, seen := glServer(t, "", false)
+	c := glOpen(t, srv, "", "glpat-good").(CodeSource)
+	list, err := c.MergeRequests(context.Background(), Query{Text: "HRN-796", State: "all", Limit: 50})
+	if err != nil || len(list) != 2 {
+		t.Fatalf("list = %+v, %v", list, err)
+	}
+	mr := list[0]
+	if mr.IID != 3 || !mr.Draft || mr.State != "opened" || mr.Project != "acme/web/app" || mr.SourceBranch != "agent/hrn-796" ||
+		mr.DetailedMergeStatus != "ci_still_running" || mr.Updated.IsZero() || !strings.HasSuffix(mr.URL, "/acme/web/app/-/merge_requests/3") ||
+		mr.Pipeline == nil || mr.Pipeline.Status != "running" || !strings.HasSuffix(mr.Pipeline.URL, "/pipelines/99") {
+		t.Errorf("first = %+v", mr)
+	}
+	// The detail of the second cannot be read: it is still listed, without a pipeline.
+	if list[1].IID != 4 || list[1].Pipeline != nil || list[1].Project != "acme/web/app" {
+		t.Errorf("second = %+v", list[1])
+	}
+	var asked string
+	for _, s := range *seen {
+		if strings.HasPrefix(s, "/api/v4/merge_requests?") {
+			asked = s
+		}
+	}
+	for _, want := range []string{"scope=all", "state=all", "search=HRN-796", "in=title%2Cdescription", "order_by=updated_at", "per_page=10"} {
+		if !strings.Contains(asked, want) {
+			t.Errorf("%s lacks %s", asked, want)
+		}
+	}
+	if _, err := c.MergeRequests(context.Background(), Query{State: "bogus"}); Reason(err) != "not-found" {
+		t.Errorf("a state GitLab does not know: %v", err)
+	}
+	if _, err := glOpen(t, srv, "", "bad").(CodeSource).MergeRequests(context.Background(), Query{}); Reason(err) != "denied" {
+		t.Errorf("bad token: %v", err)
 	}
 }

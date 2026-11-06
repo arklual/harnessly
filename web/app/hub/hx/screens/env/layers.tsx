@@ -8,6 +8,7 @@ import { Help } from './bits';
 import { type DragLock, keyMove, startDrag } from './drag';
 import { type GroupActions, GroupHead, MoveTo, NewGroup } from './groups';
 import { KIND } from './model';
+import { type PresetActions, PresetChips, PresetsEditor } from './presets';
 import { type Block, blocksOf, type LayerMeta } from './scope';
 
 const onKey = (fn: () => void) => (e: KeyboardEvent) => {
@@ -38,6 +39,7 @@ export interface LayerActions {
   /** Asks the hub for a new order of the layer's scripts; true: kept. */
   onReorder: (entryIds: string[]) => Promise<boolean>;
   groups: GroupActions;
+  presets: PresetActions;
 }
 
 const SCRIPT_TIP = (edit: boolean): string =>
@@ -50,6 +52,7 @@ const Row = ({
   fresh,
   drag,
   scriptIds,
+  inGroup,
 }: {
   r: EnvEntryRow;
   vm: LayerVM;
@@ -57,6 +60,8 @@ const Row = ({
   fresh: boolean;
   drag: DragLock;
   scriptIds: string[];
+  /** In a group the group says who gets the item: the row has no switch of its own. */
+  inGroup: boolean;
 }) => {
   const canEdit = vm.edit && !r.locked;
   const canDrag = canEdit && r.kind === 'script' && scriptIds.length > 1;
@@ -94,24 +99,26 @@ const Row = ({
       </span>
       {canEdit ? (
         <>
-          <span className="ev-req hx-tipped" onClick={(e) => e.stopPropagation()}>
-            <span className="ev-req__l">{r.pinned ? 'обязательно' : 'по желанию'}</span>
-            <button
-              type="button"
-              className="hx-switch"
-              role="switch"
-              aria-checked={r.pinned ? 'true' : 'false'}
-              aria-label="Обязательно"
-              onClick={() => a.onPin(r)}
-            >
-              <i />
-            </button>
-            <span className="hx-tip pz-tip" data-align="end">
-              {r.pinned
-                ? 'Поставится всем. Выключите — человек сможет пропустить'
-                : 'Человек может пропустить. Включите — поставится всем'}
+          {!inGroup && (
+            <span className="ev-req hx-tipped" onClick={(e) => e.stopPropagation()}>
+              <span className="ev-req__l">{r.pinned ? 'обязательно' : 'по желанию'}</span>
+              <button
+                type="button"
+                className="hx-switch"
+                role="switch"
+                aria-checked={r.pinned ? 'true' : 'false'}
+                aria-label="Обязательно"
+                onClick={() => a.onPin(r)}
+              >
+                <i />
+              </button>
+              <span className="hx-tip pz-tip" data-align="end">
+                {r.pinned
+                  ? 'Поставится всем. Выключите — человек сможет пропустить'
+                  : 'Человек может пропустить. Включите — поставится всем'}
+              </span>
             </span>
-          </span>
+          )}
           {vm.layer.groups.length > 0 && <MoveTo row={r} groups={vm.layer.groups} a={a.groups} />}
           <span className="ev-pen-w hx-tipped">
             <button
@@ -135,7 +142,7 @@ const Row = ({
         </>
       ) : (
         <>
-          <span className="ev-req__ro">{roLabel(r)}</span>
+          {!inGroup && <span className="ev-req__ro">{roLabel(r)}</span>}
           {a.onOpen && (
             <span className="ev-go">
               <Icon i="chevron-right" size="sm" />
@@ -153,6 +160,9 @@ const roLabel = (r: EnvEntryRow): string => {
   return r.pinned ? 'обязательно' : 'по желанию';
 };
 
+/** How long a group's items take to fold away (matches .ev-grp__items[data-closing]). */
+const GROUP_CLOSE_MS = 140;
+
 export const LayerCard = ({
   vm,
   rows,
@@ -167,6 +177,26 @@ export const LayerCard = ({
   fresh: ReadonlySet<string>;
 }) => {
   const [drag] = useState<DragLock>(() => ({ busy: false }));
+  const [shut, setShut] = useState<ReadonlySet<string>>(() => new Set());
+  const [closing, setClosing] = useState<ReadonlySet<string>>(() => new Set());
+  const flip = (set: ReadonlySet<string>, id: string, on: boolean) => {
+    const next = new Set(set);
+    if (on) next.add(id);
+    else next.delete(id);
+    return next;
+  };
+  const toggle = (id: string) => {
+    if (shut.has(id)) {
+      setShut((cur) => flip(cur, id, false));
+      return;
+    }
+    // Closing plays out before the items go.
+    setClosing((cur) => flip(cur, id, true));
+    window.setTimeout(() => {
+      setShut((cur) => flip(cur, id, true));
+      setClosing((cur) => flip(cur, id, false));
+    }, GROUP_CLOSE_MS);
+  };
   const { layer, meta, edit } = vm;
   const scriptIds = layer.items.filter((r) => r.enabled && r.kind === 'script').map((r) => r.entryId);
   const groupIds = new Set(layer.groups.map((g) => g.id));
@@ -178,7 +208,7 @@ export const LayerCard = ({
     .map((g) => ({ g, rows: rows.flatMap((b) => b.rows.filter((r) => r.groupId === g.id)) }))
     .filter((x) => x.rows.length > 0 || (edit && q.trim() === ''));
   const empty = rows.length === 0 && q.trim() === '';
-  const row = (r: EnvEntryRow) => (
+  const row = (r: EnvEntryRow, inGroup = false) => (
     <Row
       key={r.entryId}
       r={r}
@@ -187,6 +217,7 @@ export const LayerCard = ({
       fresh={fresh.has(r.entryId)}
       drag={drag}
       scriptIds={q.trim() === '' ? scriptIds : []}
+      inGroup={inGroup}
     />
   );
   return (
@@ -218,19 +249,39 @@ export const LayerCard = ({
       </div>
       <div className="ev-layer__body">
         <div>
-          {grouped.map(({ g, rows: gr }) => (
-            <div key={g.id} className="ev-grp-w">
-              <GroupHead g={g} count={gr.length} edit={edit} a={a.groups} />
-              {gr.map(row)}
-            </div>
-          ))}
+          {edit && q.trim() === '' && (
+            <PresetsEditor presets={layer.presets} groups={layer.groups} a={a.presets} />
+          )}
+          {!edit && layer.presets.length > 0 && <PresetChips presets={layer.presets} a={a.presets} />}
+          {grouped.map(({ g, rows: gr }) => {
+            // A search shows what it found inside a closed group too.
+            const open = !shut.has(g.id) || q.trim() !== '';
+            const shown = open && !closing.has(g.id);
+            return (
+              <div key={g.id} className="ev-grp-w" data-open={open ? 'true' : undefined}>
+                <GroupHead
+                  g={g}
+                  count={gr.length}
+                  edit={edit}
+                  open={shown}
+                  onToggle={() => toggle(g.id)}
+                  a={a.groups}
+                />
+                {open && gr.length > 0 && (
+                  <div className="ev-grp__items" data-closing={closing.has(g.id) ? 'true' : undefined}>
+                    {gr.map((r) => row(r, true))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {loose.map((b) => (
             <div key={b.kind}>
               <div className="ev-kindh">
                 <span>{KIND[b.kind].many}</span>
                 {b.kind === 'script' && <Help text={SCRIPT_TIP(edit && q.trim() === '')} />}
               </div>
-              {b.rows.map(row)}
+              {b.rows.map((r) => row(r))}
             </div>
           ))}
           {empty && (

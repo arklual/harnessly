@@ -1,6 +1,7 @@
 package apps
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -45,6 +46,88 @@ type Call struct {
 	Tool string
 	// Input is the call's arguments: for Bash, command; for the file tools, file_path.
 	Input map[string]any
+	// Cwd is the agent's folder now (the hook's cwd): a file tool's relative path is taken from it, as the tool takes it.
+	Cwd string
+	// Root is the folder the chat started in (Claude Code's CLAUDE_PROJECT_DIR of the hook): a rule's relative mask is
+	// taken from it. The agent moves Cwd with a cd, never Root, so a rule stays on the folders it named; "" takes Cwd.
+	Root string
+}
+
+// editTools are the tools an Edit rule names: every built-in tool that writes a file, as Claude Code's own Edit rules do.
+var editTools = map[string]bool{"Edit": true, "Write": true, "MultiEdit": true, "NotebookEdit": true}
+
+// fileTools are the tools whose rule argument is a path.
+var fileTools = map[string]bool{"Edit": true, "Write": true, "MultiEdit": true, "NotebookEdit": true, "Read": true}
+
+// toolNamed says whether a rule's tool name names the call's tool: itself, or Edit for any tool that writes a file.
+func toolNamed(rule, tool string) bool {
+	return rule == tool || rule == "Edit" && editTools[tool]
+}
+
+// filePath is a file tool's path as the rules read it: absolute and clean, a relative one taken from the chat's folder.
+func filePath(p, cwd string) string {
+	if p == "" {
+		return ""
+	}
+	if !filepath.IsAbs(p) && cwd != "" {
+		p = filepath.Join(cwd, p)
+	}
+	return filepath.Clean(p)
+}
+
+// filePattern is a file rule's mask as an absolute one: //x is the absolute /x (Claude Code's spelling), ~/x is under
+// the home folder, ./x and a bare x are under the folder the chat started in; an absolute mask and one that starts with a * stay.
+func filePattern(pattern, cwd string) string {
+	switch {
+	case strings.HasPrefix(pattern, "//"):
+		return pattern[1:]
+	case strings.HasPrefix(pattern, "~/"):
+		if home, err := os.UserHomeDir(); err == nil {
+			return joinMask(home, pattern[2:])
+		}
+		return pattern
+	case strings.HasPrefix(pattern, "/"), strings.HasPrefix(pattern, "*"), cwd == "":
+		return pattern
+	}
+	return joinMask(cwd, strings.TrimPrefix(pattern, "./"))
+}
+
+// joinMask puts a relative mask under dir without cleaning it: a mask's ** and * stay as written.
+func joinMask(dir, mask string) string {
+	return strings.TrimSuffix(dir, "/") + "/" + mask
+}
+
+// fileGlob matches a path against a file mask. A mask with ** reads as file masks do: * is any run within one folder
+// name, ** is any run across folders. A mask without ** keeps the rules' old reading, * across folders too, so the deny
+// rules of apps written before stay as wide as they were.
+func fileGlob(pattern, p string) bool {
+	if !strings.Contains(pattern, "**") {
+		return glob(pattern, p)
+	}
+	// By runes, not bytes: a byte of a Cyrillic letter quoted alone is another letter, and the mask would name nothing.
+	rs := []rune(pattern)
+	var re strings.Builder
+	re.WriteString("^")
+	for i := 0; i < len(rs); i++ {
+		switch c := rs[i]; {
+		case c == '*' && i+1 < len(rs) && rs[i+1] == '*':
+			i++
+			if i+1 < len(rs) && rs[i+1] == '/' {
+				// a/**/b: any folders between, none too.
+				i++
+				re.WriteString("(?:.*/)?")
+			} else {
+				re.WriteString(".*")
+			}
+		case c == '*':
+			re.WriteString("[^/]*")
+		default:
+			re.WriteString(regexp.QuoteMeta(string(c)))
+		}
+	}
+	re.WriteString("$")
+	ok, err := regexp.MatchString(re.String(), p)
+	return err == nil && ok
 }
 
 // Verdict is the decision with the app and the rule that made it, for the reason the agent reads.
@@ -115,11 +198,21 @@ func match(rule string, d Decision, plugin string, call Call) (int, Decision) {
 		return -1, d
 	}
 	if name, arg, ok := strings.Cut(rule, "("); ok && strings.HasSuffix(arg, ")") {
-		if name != call.Tool {
+		if !toolNamed(name, call.Tool) {
 			return -1, d
 		}
 		pattern := strings.TrimSuffix(arg, ")")
 		score := 1000 + len(strings.TrimRight(pattern, "*"))
+		if fileTools[call.Tool] {
+			root := call.Root
+			if root == "" {
+				root = call.Cwd
+			}
+			if !fileGlob(filePattern(pattern, root), filePath(ruleInput(call), call.Cwd)) {
+				return -1, d
+			}
+			return score, d
+		}
 		if call.Tool != "Bash" {
 			if !glob(pattern, ruleInput(call)) {
 				return -1, d
@@ -143,7 +236,7 @@ func match(rule string, d Decision, plugin string, call Call) (int, Decision) {
 		name = server + "." + tool
 	}
 	if !strings.HasSuffix(rule, "*") {
-		if rule == name {
+		if rule == name || !isMCP && toolNamed(rule, name) {
 			return 500 + len(rule), d
 		}
 		return -1, d
@@ -276,7 +369,7 @@ func mcpParts(tool string) (server, name, plugin string, ok bool) {
 
 // ruleInput is what a rule in parentheses is matched against: Bash's command, a file tool's path, a fetch's address.
 func ruleInput(call Call) string {
-	for _, key := range []string{"command", "file_path", "notebook_path", "path", "url", "pattern"} {
+	for _, key := range []string{"command", "file_path", "notebook_path", "path", "url", "pattern", "query"} {
 		if v, ok := call.Input[key].(string); ok {
 			return strings.TrimSpace(v)
 		}
@@ -321,6 +414,9 @@ type SnapshotApp struct {
 	Tools *ToolPolicy `json:"tools,omitempty"`
 	// Context are the items the context hook sends (context.go).
 	Context []ContextItem `json:"context,omitempty"`
+	// Dir and Validators are the package folder and the checks of the turn the validate hook runs (validate.go).
+	Dir        string      `json:"dir,omitempty"`
+	Validators []Validator `json:"validators,omitempty"`
 }
 
 // The subcommands of `harnessly app` (with their aliases, internal/hlcli app.go) that change what is on: the agent of a
@@ -330,7 +426,7 @@ type SnapshotApp struct {
 // rolls a channel back, installs for the team, or hands an app out by link.
 var selfCommands = map[string]bool{"enable": true, "on": true, "disable": true, "off": true, "install": true,
 	"dev": true, "remove": true, "rm": true, "uninstall": true,
-	"promote": true, "rollback": true, "team": true, "public": true, "share": true, "unshare": true, "follow": true, "sync": true, "update": true}
+	"promote": true, "rollback": true, "team": true, "public": true, "share": true, "unshare": true, "follow": true, "sync": true, "update": true, "connect": true}
 
 // publishesWide says whether the words after `publish` aim it past dev and beta: at the team's catalog or a space (a
 // --team or --space flag with any value, spelled `--team x` or `--team=x`, with one dash or two), or at any channel but

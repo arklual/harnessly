@@ -16,6 +16,9 @@ export const SAFE_REASONS = [
   'not-found',
   'key-lost',
   'failed',
+  'denied',
+  'unavailable',
+  'read-only',
 ] as const;
 
 /** What a secret's name may be: as the runtime checks it (secrets.ValidName). */
@@ -38,6 +41,16 @@ export interface ISecret {
   usedBy: readonly ISecretUse[];
   origins?: string[];
   projects?: string[];
+  /** Which store holds it, only when the safe is on a server: 'vault' there, 'local' in the machine's file. */
+  where?: 'local' | 'vault';
+}
+
+/** Where the safe keeps its values, sent only when it is not the machine's file alone. */
+export interface ISafeStore {
+  mode: string;
+  addr: string;
+  /** Why the server cannot be used; the safe then takes no new secrets. */
+  error: string;
 }
 
 /** An agent's request to put a secret in the safe. */
@@ -100,9 +113,17 @@ export const readSecret = (v: unknown): ISecret => {
     updatedAt: num(o.updatedAt, 'updatedAt'),
     lastUsedAt: num(o.lastUsedAt, 'lastUsedAt'),
     usedBy: o.usedBy === null || o.usedBy === undefined ? [] : list(o.usedBy, 'usedBy', readUse),
+    ...(o.where === 'local' || o.where === 'vault' ? { where: o.where } : {}),
     ...(o.origins === undefined ? {} : { origins: list(o.origins, 'origins', (v) => str(v, 'origin')) }),
     ...(o.projects === undefined ? {} : { projects: list(o.projects, 'projects', (v) => str(v, 'project')) }),
   };
+};
+
+const readStore = (v: unknown): ISafeStore | null => {
+  if (v === undefined || v === null) return null;
+  const o = obj(v, 'store');
+  const opt = (x: unknown) => (typeof x === 'string' ? x : '');
+  return { mode: str(o.mode, 'mode'), addr: opt(o.addr), error: opt(o.error) };
 };
 
 export const readAsk = (v: unknown): ISecretAsk => {
@@ -134,11 +155,14 @@ const orRefusal =
 export interface ISafeList {
   secrets: ISecret[];
   asks: ISecretAsk[];
+  /** null: the machine's file, as without a server. */
+  store: ISafeStore | null;
 }
 
 const readList = orRefusal((o): ISafeList => ({
   secrets: list(o.secrets, 'secrets', readSecret),
   asks: list(o.asks, 'asks', readAsk),
+  store: readStore(o.store),
 }));
 const readAsks = orRefusal((o) => list(o.asks, 'asks', readAsk));
 const readOne = orRefusal((o) => readSecret(o.secret));

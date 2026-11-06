@@ -28,10 +28,17 @@ const (
 	MachineResources = "machine.resources"
 	// OrgEvents is the organization's live stream (GET /api/orgs/{org}/events).
 	OrgEvents = "org.events"
+	// UIHXLive is the lively hub: the common motion on every screen, free periods, sortable tables and the tools screen.
+	UIHXLive = "ui.hx.live"
+	// RuntimeFleet is one runtime for all of a person's machines: GET /api/me/machines and the /api/v2 proxy of the hub.
+	RuntimeFleet = "runtime.fleet"
+	// SecretsVault is the hub's safe: the machines of the organization keep their secrets on the hub's server
+	// (HUB_SECRETS_VAULT_*, docs/safe.md).
+	SecretsVault = "secrets.vault"
 )
 
 // Known are the flag names in the order they are shown.
-var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents}
+var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents, UIHXLive, RuntimeFleet, SecretsVault}
 
 // IsKnown says that name is a flag of the hub.
 func IsKnown(name string) bool { return slices.Contains(Known, name) }

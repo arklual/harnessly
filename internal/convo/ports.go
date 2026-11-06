@@ -77,7 +77,7 @@ type LaunchRequest struct {
 	// First is the text the agent starts with as its first prompt (a message the conversation carries by the launch,
 	// never typed); "" for none.
 	First string
-	// Apps are the apps on in the conversation, which its agent starts with (internal/apps); Claude Code only.
+	// Apps are the apps on in the conversation, which its agent starts with (internal/apps); Claude Code and Codex.
 	Apps []string
 }
 
@@ -262,7 +262,7 @@ type Deps struct {
 	// It answers the id of the first that is not, or "". nil: no app can be turned on (refused{unsupported}).
 	AppsOK func(ids []string) string
 
-	// AlwaysApps are the apps a new Claude chat starts with: the installed ones that ask to be on in every chat. nil or
+	// AlwaysApps are the apps a new chat starts with: the installed ones that ask to be on in every chat. nil or
 	// empty: a new chat has none.
 	AlwaysApps func() []string
 }

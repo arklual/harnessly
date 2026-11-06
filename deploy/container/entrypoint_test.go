@@ -313,3 +313,25 @@ func TestEntrypointOddBasePathIsRefused(t *testing.T) {
 		t.Fatalf("status %d\n%s", got, out)
 	}
 }
+
+func TestEntrypointHandsBothToTheSupervisorWhenAsked(t *testing.T) {
+	t.Parallel()
+	r := newRig(t)
+	r.registered()
+	r.write("harnessly", "#!/bin/sh\necho \"$*|BASE=$RUNTIME_APP_BASE_PATH|PORT=$RUNTIME_PORT\" > \"$(dirname \"$0\")/supervise.out\"\n")
+	if err := os.Chmod(filepath.Join(r.bin, "harnessly"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd, out := r.start("HARNESSLY_SUPERVISE=1", "HARNESSLY_BIN="+filepath.Join(r.bin, "harnessly"))
+	if code := r.wait(cmd, 20*time.Second); code != 0 {
+		t.Fatalf("status %d\n%s", code, out)
+	}
+	want := "supervise --runtime " + filepath.Join(r.bin, "runtime") + " --agent " + filepath.Join(r.bin, "agent") +
+		"|BASE=/m/abcdefghijklmnopqrst|PORT=18022"
+	if got := strings.TrimSpace(r.file("supervise.out")); got != want {
+		t.Errorf("supervisor was run as %q, want %q", got, want)
+	}
+	if r.file("runtime.pid") != "" || r.file("agent.pid") != "" {
+		t.Error("the entrypoint started the programs itself")
+	}
+}

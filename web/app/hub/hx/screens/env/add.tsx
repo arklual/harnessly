@@ -6,7 +6,17 @@ import { Btn, Icon } from '../../ui';
 import { Search, Seg } from './bits';
 import type { SheetCtx, SheetMode } from './ctx';
 import { BAD, detect, detWord } from './detect';
-import { blankDraft, type Draft, type Fields, ADD_KINDS, KIND, lastSeg, valid, viewOf } from './model';
+import {
+  blankDraft,
+  type Draft,
+  type Fields,
+  ADD_KINDS,
+  ADMIN_KINDS,
+  KIND,
+  lastSeg,
+  valid,
+  viewOf,
+} from './model';
 import { fitsLayer } from './actions';
 import { ItemForm } from './itemform';
 import { useTry } from './sandbox';
@@ -55,7 +65,7 @@ export const AddHome = ({ ctx }: { ctx: SheetCtx }) => {
       <Title text="Что добавить" />
       <To ctx={ctx} />
       <div className="ev-pick">
-        {ADD_KINDS.filter((k) => k !== 'access' || ctx.orgAdmin).map((k) => (
+        {ADD_KINDS.filter((k) => !ADMIN_KINDS.includes(k) || ctx.orgAdmin).map((k) => (
           <button
             type="button"
             className="ev-pick__i"

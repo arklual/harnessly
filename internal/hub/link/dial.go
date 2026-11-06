@@ -183,6 +183,19 @@ func (d *Dialer) AdmitSites(r *http.Request) (store.Machine, error) {
 	return m, err
 }
 
+// AdmitSecrets checks the signed request of a machine to its safe (POST /agent/secrets), signed over body, and returns
+// the machine. A machine switched off by an administrator reads no secrets either.
+func (d *Dialer) AdmitSecrets(r *http.Request, body []byte) (store.Machine, error) {
+	verify := func(pub ed25519.PublicKey, a hubproto.DialAuth, host string, now time.Time) error {
+		return hubproto.VerifySecrets(pub, a, host, now, body)
+	}
+	m, err := d.admit(r, verify, false, "secrets:")
+	if err == nil && m.DisabledAt != nil {
+		err = errDisabled
+	}
+	return m, err
+}
+
 // AdmitPeers checks the signed request of a machine about messages between machines (POST /agent/peers/send and
 // /agent/peers/directory) and returns the machine. Its nonces are kept apart from the dial's: a chatty machine must not
 // fill the table its own link's dial needs.

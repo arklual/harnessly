@@ -36,6 +36,9 @@ export const KNOWN_CHECKS = [
   'voice_download',
   'disk',
   'apps_boundary',
+  'pane_shell',
+  'pane_program',
+  'pane_keys',
   'https',
   'mic',
 ] as const;

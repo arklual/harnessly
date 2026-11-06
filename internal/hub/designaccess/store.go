@@ -31,13 +31,14 @@ var (
 
 // txn is one request's reading or writing: a transaction (or the database), the machine, the clock, its team answers.
 type txn struct {
-	ctx context.Context
-	st  store.Store
-	q   store.Q
-	pg  bool
-	m   store.Machine
-	w   *world
-	now time.Time
+	ctx  context.Context
+	st   store.Store
+	q    store.Q
+	pg   bool
+	m    store.Machine
+	w    *world
+	now  time.Time
+	seal *sealer // nil: link addresses are not kept
 }
 
 func (s *Service) read(ctx context.Context, m store.Machine) (*txn, error) {
@@ -46,7 +47,7 @@ func (s *Service) read(ctx context.Context, m store.Machine) (*txn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now()}, nil
+	return &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal}, nil
 }
 
 func (s *Service) write(ctx context.Context, m store.Machine, fn func(t *txn) error) error {
@@ -55,7 +56,7 @@ func (s *Service) write(ctx context.Context, m store.Machine, fn func(t *txn) er
 		if err != nil {
 			return err
 		}
-		return fn(&txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now()})
+		return fn(&txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal})
 	})
 	if err == nil {
 		s.kick(m.ID)
@@ -698,6 +699,73 @@ func (t *txn) decide(id, requestID, actor, decision, role string, term ttl) (req
 }
 
 // ---- team grants --------------------------------------------------------------------------------------------------
+
+func (t *txn) grantTeam(id, actor, team, role string, canShare bool, term ttl) error {
+	if !teamIDRe.MatchString(team) {
+		return fail("bad_request", "Некорректная команда")
+	}
+	if role != roleView && role != roleComment && role != roleEdit {
+		return fail("bad_request", "Роль: view, comment или edit")
+	}
+	expires, err := expiry(term, t.now)
+	if err != nil {
+		return err
+	}
+	sharing := role == roleEdit && canShare
+	p, err := t.lockProject(id)
+	if err != nil {
+		return err
+	}
+	if p.HomeTeam == team {
+		return fail("conflict", "Это своя команда: её доступ меняется в первой строке")
+	}
+	if _, ok := t.w.team(team); !ok {
+		return fail("not_found", "Команда не найдена")
+	}
+	var existed int
+	if err := t.q.QueryRow(t.ctx, `SELECT COUNT(*) FROM design_team_grants WHERE machine_id = ? AND project_id = ? AND team_id = ?`, t.m.ID, id, team).Scan(&existed); err != nil {
+		return err
+	}
+	if _, err := t.q.Exec(t.ctx, `INSERT INTO design_team_grants (machine_id, project_id, team_id, role, can_share, granted_by, granted_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (machine_id, project_id, team_id) DO UPDATE SET
+		role = excluded.role, can_share = excluded.can_share, granted_by = excluded.granted_by, granted_at = excluded.granted_at, expires_at = excluded.expires_at`,
+		t.m.ID, id, team, role, boolInt(sharing), actor, ms(t.now), nullTime(expires)); err != nil {
+		return err
+	}
+	action := "team_grant"
+	if existed > 0 {
+		action = "team_change"
+	}
+	return t.writeLog(id, actor, action, "team:"+team, map[string]any{"role": role, "canShare": sharing, "until": iso(expires)})
+}
+
+func (t *txn) teamGrantShares(id, team string) (bool, error) {
+	grants, err := t.teamGrants(id)
+	if err != nil {
+		return false, err
+	}
+	for _, g := range grants {
+		if g.Team == team && live(g.Expires, t.now) {
+			return g.CanShare, nil
+		}
+	}
+	return false, nil
+}
+
+func (t *txn) revokeTeam(id, actor, team string) error {
+	if _, err := t.lockProject(id); err != nil {
+		return err
+	}
+	res, err := t.q.Exec(t.ctx, `DELETE FROM design_team_grants WHERE machine_id = ? AND project_id = ? AND team_id = ?`, t.m.ID, id, team)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fail("not_found", "У команды нет доступа")
+	}
+	return t.writeLog(id, actor, "team_revoke", "team:"+team, nil)
+}
 
 // ---- invites (old API) --------------------------------------------------------------------------------------------
 

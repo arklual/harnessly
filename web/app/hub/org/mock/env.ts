@@ -7,6 +7,7 @@ import type {
   AddCatalogRequest,
   AddEntryRequest,
   AddGroupRequest,
+  AddPresetRequest,
   ApplyRequest,
   CatalogItem,
   CatalogKind,
@@ -17,11 +18,14 @@ import type {
   EnvGroup,
   EnvLayer,
   EnvLayerKind,
+  EnvPreset,
   EnvResponse,
   EnvRunRow,
   EnvRunStep,
   LockedReason,
+  MeEnvGroup,
   MeEnvItem,
+  MeEnvPreset,
   MeEnvResponse,
   MeMachine,
   PatchCatalogRequest,
@@ -289,6 +293,11 @@ const SEED_ENTRIES: [EnvLayerKind, string, string, boolean][] = [
 const items = new Map<string, Item>();
 let entries: Entry[] = [];
 let groups: Group[] = [];
+interface Preset extends EnvPreset {
+  layer: EnvLayerKind;
+  scopeId: string;
+}
+let presets: Preset[] = [];
 /** The member's own choices of optional groups. */
 const groupOn = new Map<string, boolean>();
 let runs: EnvRunRow[] = [];
@@ -335,6 +344,26 @@ const seed = () => {
       defaultOn: false,
       position: 1 << 20,
       builtIn: true,
+    },
+  ];
+  presets = [
+    {
+      id: 'p-dev',
+      layer: 'org',
+      scopeId: ORG_ID,
+      name: 'Разработчик',
+      hint: 'сервисы и рекомендованное',
+      groupIds: ['g-back', RECOMMENDED],
+      position: 0,
+    },
+    {
+      id: 'p-back',
+      layer: 'org',
+      scopeId: ORG_ID,
+      name: 'Только бэкенд',
+      hint: '',
+      groupIds: ['g-back'],
+      position: 1,
     },
   ];
   groupOn.clear();
@@ -467,6 +496,50 @@ const findGroup = (id: string): Group => {
   return g;
 };
 
+const presetView = ({ layer: _l, scopeId: _s, ...p }: Preset): EnvPreset => p;
+
+/** The groups the person's items are in, and the presets they can pick, as the hub lists them. */
+const mineGroups = (mine: Entry[]): MeEnvGroup[] =>
+  groups
+    .filter((g) => mine.some((e) => e.groupId === g.id))
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      hint: g.hint,
+      layer: g.layer,
+      required: g.required,
+      on: isOn(g),
+      canToggle: !g.required,
+      items: mine.filter((e) => e.groupId === g.id).length,
+      builtIn: g.builtIn,
+    }));
+
+const minePresets = (mine: MeEnvGroup[]): MeEnvPreset[] =>
+  presets
+    .filter((p) => p.groupIds.some((id) => mine.some((g) => g.id === id)))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      hint: p.hint,
+      layer: p.layer,
+      groupIds: p.groupIds,
+      active: mine
+        .filter((g) => !g.required && g.layer === p.layer)
+        .every((g) => g.on === p.groupIds.includes(g.id)),
+    }));
+
+const findPreset = (id: string): Preset => {
+  const p = presets.find((x) => x.id === id);
+  if (!p) throw new OrgApiError('not_found', 'preset not found');
+  return p;
+};
+
+/** Every group of a preset is a group of its own layer. */
+const checkPresetGroups = (layer: EnvLayerKind, scopeId: string, ids: string[]): void => {
+  if (ids.some((id) => !groups.some((g) => g.id === id && g.layer === layer && g.scopeId === scopeId)))
+    throw new OrgApiError('invalid_request', 'Группа должна быть из этого же слоя');
+};
+
 const view = (ctx: MockCtx): EnvResponse => {
   const order: { layer: EnvLayerKind; scopeId: string }[] = [
     { layer: 'org', scopeId: ORG_ID },
@@ -488,6 +561,7 @@ const view = (ctx: MockCtx): EnvResponse => {
         .filter((e) => e.layer === o.layer && e.scopeId === o.scopeId)
         .map((e) => rowOf(ctx.role, e)),
       groups: groups.filter((g) => g.layer === o.layer && g.scopeId === o.scopeId).map(groupView),
+      presets: presets.filter((p) => p.layer === o.layer && p.scopeId === o.scopeId).map(presetView),
     }));
   const base: EnvResponse = {
     summary: {
@@ -978,23 +1052,13 @@ export const envMock = (ctx: MockCtx): EnvApi => ({
         (e.layer === 'org' || e.layer === 'tenant' || (e.layer === 'team' && e.scopeId === MY_TEAM)),
     );
     const m = myMachine();
+    const groups = mineGroups(mine);
     return later({
       space: { id: TENANT_ID, slug: 'product', name: tenantName() },
       org: { id: ORG_ID, name: 'Акме' },
       items: mine.map(mineOf),
-      groups: groups
-        .filter((g) => mine.some((e) => e.groupId === g.id))
-        .map((g) => ({
-          id: g.id,
-          name: g.name,
-          hint: g.hint,
-          layer: g.layer,
-          required: g.required,
-          on: isOn(g),
-          canToggle: !g.required,
-          items: mine.filter((e) => e.groupId === g.id).length,
-          builtIn: g.builtIn,
-        })),
+      groups,
+      presets: minePresets(groups),
       outdated: !m.current || m.failed > 0,
       machines: [m],
     });
@@ -1064,9 +1128,71 @@ export const envMock = (ctx: MockCtx): EnvApi => ({
       throw new OrgApiError('built_in', 'Группу платформы в хабе не меняют: каждый включает её у себя');
     guard(ctx.role, g.layer, g.scopeId);
     groups = groups.filter((x) => x.id !== groupId);
+    for (const p of presets) p.groupIds = p.groupIds.filter((id) => id !== groupId);
     for (const e of entries) if (e.groupId === groupId) e.groupId = '';
     machineCurrent = false;
     return later(undefined, 300);
+  },
+
+  envPresetAdd: async (_org, req: AddPresetRequest) => {
+    guard(ctx.role, req.layer, req.scopeId);
+    const name = req.name.trim();
+    if (!name) throw new OrgApiError('invalid_request', 'Нужно название');
+    if (presets.some((p) => p.layer === req.layer && p.scopeId === req.scopeId && p.name === name))
+      throw new OrgApiError('name_taken', 'Такой пресет уже есть');
+    const groupIds = req.groupIds ?? [];
+    checkPresetGroups(req.layer, req.scopeId, groupIds);
+    serial += 1;
+    const p: Preset = {
+      id: `p${serial}`,
+      layer: req.layer,
+      scopeId: req.scopeId,
+      name,
+      hint: req.hint ?? '',
+      groupIds,
+      position: presets.length,
+    };
+    presets = [...presets, p];
+    return later(presetView(p), 300);
+  },
+
+  envPresetPatch: async (_org, presetId, req) => {
+    const p = findPreset(presetId);
+    guard(ctx.role, p.layer, p.scopeId);
+    const name = req.name?.trim();
+    if (
+      name &&
+      presets.some((o) => o.id !== p.id && o.layer === p.layer && o.scopeId === p.scopeId && o.name === name)
+    )
+      throw new OrgApiError('name_taken', 'Такой пресет уже есть');
+    if (req.groupIds) checkPresetGroups(p.layer, p.scopeId, req.groupIds);
+    if (name) p.name = name;
+    if (req.hint !== undefined) p.hint = req.hint;
+    if (req.groupIds) p.groupIds = req.groupIds;
+    if (req.position !== undefined) p.position = req.position;
+    return later(presetView(p), 300);
+  },
+
+  envPresetRemove: async (_org, presetId) => {
+    const p = findPreset(presetId);
+    guard(ctx.role, p.layer, p.scopeId);
+    presets = presets.filter((x) => x.id !== presetId);
+    return later(undefined, 300);
+  },
+
+  envMinePreset: async (presetId) => {
+    const p = findPreset(presetId);
+    const mine = entries.filter(
+      (e) =>
+        e.enabled &&
+        (e.layer === 'org' || e.layer === 'tenant' || (e.layer === 'team' && e.scopeId === MY_TEAM)),
+    );
+    for (const g of mineGroups(mine)) {
+      if (!g.required && g.layer === p.layer) groupOn.set(g.id, p.groupIds.includes(g.id));
+    }
+    machineCurrent = false;
+    const groups = mineGroups(mine);
+    return later({ presets: minePresets(groups), groups }, 300);
   },
 
   envApply: async (_org, req: ApplyRequest) => {

@@ -53,8 +53,29 @@ before the switch is turned on.
 
 The hub keeps only a hash of each link's token: a stolen database does not open the links.
 
-## Not there yet
+## The access dialog
 
-- No notifications: being added to a project does not send a letter or a message.
-- The newer access dialog (`/access`) is not answered by the hub; the page falls back to the older dialog, which has
-  the same abilities.
+The newer «Share» dialog speaks `/m/<id><platform api>/access/design/<project>` (and `/access/me`,
+`/access/directory?q=`); the hub answers it from the same records and rules as the older routes:
+
+- `GET` is the view: the person's role, whether they run the access, the owner, the home team and its level, and for
+  those who run the access the grants to people and teams, the open requests and the links.
+- `PUT team`, `PUT grants/user/<email>`, `PUT grants/team/<id>` (and `DELETE`), `PUT settings` (`editorsCanShare`,
+  owner only), `POST owner` (hand the project over), `GET log`.
+- `POST requests` asks for `comment` or `edit`; `POST requests/<id>` allows (with a role and a term) or denies.
+- `GET`/`POST links`, `PATCH links/<id>` (`disabled` switches a link off and on), `GET links/<id>/address` (the
+  address again), `POST links/<id>/address` (a new address; the old one stops opening at once).
+
+The directory lists the people and teams of the machine's space only, and nothing to someone outside every team. Other
+kinds than `design` are not answered, so the page keeps its older dialog for them.
+
+## Notifications
+
+With mail set up (`HUB_SMTP_URL`), a request for access mails the owner and those who may share the project, with a link
+to the project's requests; a decision mails the person who asked. Nobody is mailed about their own action.
+
+## Kept addresses
+
+A link's address is kept sealed (AES-256-GCM, a key derived from `HUB_SECRET_KEY` or the `secret_key` file of the data
+folder), so it can be copied again from the dialog. A hub whose key changed cannot open the older addresses: those
+links keep opening, and a new address is issued from the dialog when one is needed.

@@ -1,0 +1,32 @@
+{
+  "profiles": [
+    {
+      "id": "glm-byok",
+      "label": "GLM · свой ключ",
+      "vendor": "glm",
+      "api": "anthropic",
+      "base_url": "https://api.z.ai/api/anthropic",
+      "hint": "Ключ Z.ai из сейфа",
+      "key_ref": "glm-api-key",
+      "env": { "API_TIMEOUT_MS": "3000000" },
+      "small": "glm-5.3-flash",
+      "models": [
+        { "id": "glm-5.3", "label": "GLM 5.3", "window": 1048576, "efforts": ["low", "high", "max"], "default_effort": "max",
+          "price": { "input": 0.6, "output": 2.2, "cached_input": 0.11 } },
+        { "id": "glm-5.3-flash", "label": "GLM 5.3 Flash", "window": 1048576,
+          "price": { "input": 0.1, "output": 0.4 } }
+      ]
+    },
+    {
+      "id": "corp-llm",
+      "label": "Корпоративный LLM-прокси",
+      "vendor": "gpt",
+      "api": "anthropic",
+      "base_url": "https://corp-llm-proxy.example.com/anthropic",
+      "key_ref": "corp-llm-key",
+      "models": [
+        { "id": "corp-large", "label": "Large", "window": 200000, "price": { "input": 3, "output": 15, "cached_input": 0.3 } }
+      ]
+    }
+  ]
+}

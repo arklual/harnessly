@@ -1,0 +1,160 @@
+{{- if .Values.docs.enabled }}
+{{- if not .Values.docs.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "hub.docsName" . }}
+  labels:
+    {{- include "hub.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  {{- /* Kept across upgrades, like the Postgres password: what is already there, else a new one. */}}
+  {{- $existing := lookup "v1" "Secret" .Release.Namespace (include "hub.docsName" .) }}
+  {{- if and $existing $existing.data (hasKey $existing.data "token") }}
+  token: {{ index $existing.data "token" | b64dec | quote }}
+  {{- else }}
+  token: {{ randAlphaNum 40 | quote }}
+  {{- end }}
+---
+{{- end }}
+{{- range $svc := list "artifacts" "boards" }}
+{{- $v := index $.Values.docs $svc }}
+{{- if $v.bundled }}
+{{- $name := printf "%s-%s" (include "hub.fullname" $) $svc }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hub.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with $v.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $v.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hub.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc }}
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    {{- include "hub.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hub.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc }}
+spec:
+  # Files on a volume of one node: one replica, replaced and not rolled. Several replicas want the S3 driver of the
+  # artifacts service and a service you run yourself (docs.artifacts.url).
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hub.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $svc }}
+  template:
+    metadata:
+      labels:
+        {{- include "hub.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $svc }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $svc }}
+          image: "{{ $v.image.repository }}:{{ $v.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: NODE_ENV
+              value: production
+            {{- if eq $svc "artifacts" }}
+            - name: ARTIFACTS_PUBLIC_URL
+              value: {{ include "hub.publicUrl" $ | quote }}
+            - name: ARTIFACTS_STORAGE
+              value: fs
+            - name: ARTIFACTS_DATA_DIR
+              value: /data
+            - name: ARTIFACTS_AUTH
+              value: token
+            - name: ARTIFACTS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hub.docsSecretName" $ }}
+                  key: token
+            {{- else }}
+            - name: BOARDS_BASE_URL
+              value: {{ include "hub.publicUrl" $ | quote }}
+            - name: BOARDS_STORAGE
+              value: fs
+            - name: BOARDS_DATA_DIR
+              value: /data
+            - name: BOARDS_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hub.docsSecretName" $ }}
+                  key: token
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $name }}
+        - name: tmp
+          emptyDir: {}
+---
+{{- end }}
+{{- end }}
+{{- end }}

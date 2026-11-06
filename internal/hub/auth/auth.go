@@ -83,7 +83,7 @@ func New(d Deps) (*Service, error) {
 		wa, err := webauthn.New(&webauthn.Config{
 			RPID:          s.cfg.RPID,
 			RPDisplayName: s.cfg.RPName,
-			RPOrigins:     []string{s.cfg.PublicURL},
+			RPOrigins:     []string{s.cfg.Origin},
 		})
 		if err != nil {
 			// WebAuthn needs a domain name for the RP ID: a hub reached by an IP address has no passkeys.
@@ -99,10 +99,7 @@ func New(d Deps) (*Service, error) {
 
 // CookieName is the session cookie of the hub's origin.
 func (s *Service) CookieName() string {
-	if s.cfg.Secure {
-		return "__Host-hl_session"
-	}
-	return "hl_session"
+	return s.cfg.CookiePrefix() + "hl_session"
 }
 
 // RunCookieName is the cookie of a machine's own origin (subdomain mode). On https it is `__Host-hl_run`: a browser
@@ -182,14 +179,14 @@ func (s *Service) startSession(ctx context.Context, w http.ResponseWriter, r *ht
 		return nil
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: s.CookieName(), Value: token, Path: "/", HttpOnly: true, Secure: s.cfg.Secure,
+		Name: s.CookieName(), Value: token, Path: s.cfg.CookiePath(), HttpOnly: true, Secure: s.cfg.Secure,
 		SameSite: http.SameSiteLaxMode, MaxAge: int(sessionAbsolute.Seconds()),
 	})
 	return nil
 }
 
 func (s *Service) clearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: s.CookieName(), Value: "", Path: "/", HttpOnly: true, Secure: s.cfg.Secure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.CookieName(), Value: "", Path: s.cfg.CookiePath(), HttpOnly: true, Secure: s.cfg.Secure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
 
 // Audit writes a line of the sign-in trail. A failure to write it is logged and never blocks the request.

@@ -118,6 +118,11 @@ type personTeams struct {
 	admin map[string]bool
 }
 
+type teamRef struct {
+	ID, Name, OrgID, OrgName string
+	Members                  int
+}
+
 // world answers team questions for one machine during one request; it caches what it read.
 type world struct {
 	ctx     context.Context
@@ -260,6 +265,43 @@ func (w *world) orgOf(team string) string {
 	}
 	w.orgs[team] = org
 	return org
+}
+
+func (w *world) orgName(org string) string {
+	if strings.HasPrefix(org, implicitPrefix) {
+		if sp, err := w.spaceOf(strings.TrimPrefix(org, implicitPrefix)); err == nil {
+			return sp.Name
+		}
+		return ""
+	}
+	if o, err := w.s.OrgByID(w.ctx, org); err == nil {
+		return o.Name
+	}
+	return ""
+}
+
+// team is what the page shows of a team; false when there is no such team.
+func (w *world) team(id string) (teamRef, bool) {
+	if strings.HasPrefix(id, implicitPrefix) {
+		sp, err := w.spaceOf(strings.TrimPrefix(id, implicitPrefix))
+		if err != nil {
+			return teamRef{}, false
+		}
+		members, _ := w.s.Members(w.ctx, sp.ID)
+		org := orgKey(sp)
+		return teamRef{ID: id, Name: sp.Name, OrgID: org, OrgName: w.orgName(org), Members: len(members)}, true
+	}
+	t, err := w.s.TeamByID(w.ctx, id)
+	if err != nil {
+		return teamRef{}, false
+	}
+	sp, err := w.spaceOf(t.SpaceID)
+	if err != nil {
+		return teamRef{}, false
+	}
+	members, _ := w.s.TeamMembers(w.ctx, t.ID)
+	org := orgKey(sp)
+	return teamRef{ID: t.ID, Name: t.Name, OrgID: org, OrgName: w.orgName(org), Members: len(members)}, true
 }
 
 // displayName is the person's name as the hub knows it, else the local part of the address.

@@ -101,6 +101,26 @@ func exerciseUsage(t *testing.T, db *DB) {
 		}
 	}
 
+	// Cycles: one row per reset time with the highest use, jitter of the reset time within ten minutes is one cycle, an older
+	// measurement still counts, an empty one does not.
+	jitter := w
+	jitter.UsedPct, jitter.ResetsAt, jitter.MeasuredAt = f(60), i64(9000+90_000), 7000
+	if _, err := s.PutWindow(ctx, jitter); err != nil {
+		t.Fatal(err)
+	}
+	next := w
+	next.UsedPct, next.ResetsAt, next.MeasuredAt = f(5), i64(9000+18_000_000), 9600
+	if _, err := s.PutWindow(ctx, next); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := s.WindowCycles(ctx, []string{acc.ID}, 0, 1<<40)
+	if err != nil || len(cs) != 2 || cs[0].PeakPct != 60 || cs[0].Measures != 4 || cs[0].FirstAt != 5000 || cs[0].LastAt != 7000 || cs[1].PeakPct != 5 {
+		t.Fatalf("cycles %+v %v", cs, err)
+	}
+	if cs, err := s.WindowCycles(ctx, []string{acc.ID}, 0, 9000); err != nil || len(cs) != 1 {
+		t.Fatalf("cycles in range %+v %v", cs, err)
+	}
+
 	// Balances: a failed poll keeps the last good value beside its error.
 	if err := s.PutBalance(ctx, AccountBalance{AccountID: acc.ID, Currency: "USD", Available: f(41.5), MeasuredAt: 100, Source: "openrouter-key"}); err != nil {
 		t.Fatal(err)

@@ -11,5 +11,10 @@ export interface LooseSpace {
 export interface OnboardingApi {
   looseSpaces(): Promise<LooseSpace[]>;
   /** Makes the organization with the author as its admin; resolves with its slug. */
-  createOrg(input: { name: string; spaceIds: string[] }): Promise<{ slug: string }>;
+  createOrg(input: {
+    name: string;
+    spaceIds: string[];
+    /** The first tenant, made when no space moves in (empty: the hub's default name); an organization is never empty. */
+    tenantName?: string;
+  }): Promise<{ slug: string }>;
 }

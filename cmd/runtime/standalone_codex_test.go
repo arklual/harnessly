@@ -111,12 +111,12 @@ func TestCodexArgsFollowTheSandboxSetting(t *testing.T) {
 	for _, container := range []bool{false, true} {
 		a := newCoreAgents(coreAgentsConfig{DataDir: filepath.Join(root, "data"), Home: root, ConfigFile: filepath.Join(root, "config.json"), Port: 8022,
 			CodexContainerSandbox: container})
-		args, err := a.CodexArgs("", "", nil)
+		start, err := a.CodexArgs("", "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if has := strings.Contains(strings.Join(args, " "), `sandbox_mode="danger-full-access" -c approval_policy="never"`); has != container {
-			t.Errorf("container=%v: %q", container, args)
+		if has := strings.Contains(strings.Join(start.Args, " "), `sandbox_mode="danger-full-access" -c approval_policy="never"`); has != container {
+			t.Errorf("container=%v: %q", container, start.Args)
 		}
 	}
 }

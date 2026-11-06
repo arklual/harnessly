@@ -27,6 +27,7 @@ import { PeersPage } from '@/next/bindings/settings-peers';
 import { ConnectionsPage } from '@/next/bindings/settings-connections';
 import { SafePage } from '@/next/bindings/settings-safe';
 import { TakesPage } from '@/next/bindings/settings-takes';
+import { ExtensionsPage, useHasExtensions } from '@/next/features/app-views/slot-pages';
 import SettingsShell from '@/next/features/settings/settings-shell';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
@@ -61,6 +62,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
   const view = useMachine(machine);
   const now = useClock();
   const pending = usePendingList();
+  const hasExtensions = useHasExtensions(machine);
   const pages = useAgentPages(machine, {
     claude: active === 'claude' || active === 'accounts' || active === 'skills',
     codex: active === 'codex' || active === 'accounts' || active === 'skills',
@@ -116,6 +118,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
     );
   else if (active === 'connections') body = <ConnectionsPage machine={machine} />;
   else if (active === 'design') body = <DesignPage machine={machine} />;
+  else if (active === 'extensions') body = <ExtensionsPage machine={machine} />;
   else if (active === 'beta') body = <BetaPage />;
   else body = <AppsPage machine={machine} />;
 
@@ -124,6 +127,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
       section={active}
       pageOpen={section !== null}
       lead={lead}
+      hidden={hasExtensions ? [] : ['extensions']}
       onPick={(next) => goTo({ kind: ROUTE.settings, section: next })}
       onBack={() => goTo({ kind: ROUTE.settings, section: null })}
       onOpenDrawer={onOpenDrawer}

@@ -2,12 +2,12 @@
 import type { CatalogItem, EnvLayer, EnvResponse } from '../../../../hub-api/env';
 import type { Role } from '../../../org/types';
 import type { Actions } from './actions';
-import type { Draft, RepoRef } from './model';
+import type { AddKind, Draft, RepoRef } from './model';
 import type { LayerMeta, Target } from './scope';
 
 export type SheetMode =
   | { mode: 'add'; step: 'home' | 'link' }
-  | { mode: 'add'; step: 'kind'; kind: 'access' | 'repo' | 'script' | 'skill' | 'mcp'; draft?: Draft }
+  | { mode: 'add'; step: 'kind'; kind: AddKind; draft?: Draft }
   | { mode: 'edit'; entryId: string }
   | { mode: 'view'; entryId: string }
   | { mode: 'copy' }

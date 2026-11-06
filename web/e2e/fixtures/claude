@@ -65,6 +65,57 @@ deliver_held() {
     printf '{"type":"attachment","attachment":{"type":"queued_command","prompt":"%s","commandMode":"prompt","timestamp":"%s"},"uuid":"q-%s-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$(json "${held[$i]}")" "${heldat[$i]}" "$RANDOM" "$i" "$(now)" "$sid" "$cwd" >> "$transcript"
   done
 }
+# A message asking «askquestions» makes it call AskUserQuestion with two questions (one choice, then several) and wait
+# on the dialog Claude draws: a digit picks or toggles, Right leaves the several-choice tab, «1» on the review submits.
+# The answer reaches the transcript as the tool's result, and the agent says what it got.
+ask_draw() {
+  printf '\033[H\033[2J'
+  if [ "$1" = 2 ]; then
+    printf '  Review your answers\n\n  Which crust? -> %s\n  Which toppings? -> %s\n\n  Ready to submit your answers?\n\n' "$a1" "$a2"
+    printf '❯ 1. Submit answers\n  2. Cancel\n'
+    return
+  fi
+  if [ "$1" = 0 ]; then
+    printf '← ☐ Which crust?  ☐ Which toppings?  ✔ Submit →\n\nWhich crust?\n\n❯ 1. Thin\n  2. Thick\n  3. Stuffed\n  4. Type something.\n'
+  else
+    printf '← ☒ Which crust?  ☐ Which toppings?  ✔ Submit →\n\nWhich toppings?\n\n❯ 1. [ ] Cheese\n  2. [ ] Olives\n  3. [ ] Basil\n  4. [ ] Type something.\n'
+  fi
+  printf '%s\n  5. Chat about this\nEnter to select · ↑/↓ to navigate · Esc to cancel\n' "$rule"
+}
+ask_turn() {
+  local n="$1" step=0 ch rest crust=(Thin Thick Stuffed) top=(Cheese Olives Basil) picked=() i label
+  a1=""; a2=""
+  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_%s","name":"AskUserQuestion","input":{"questions":[{"question":"Which crust?","header":"Crust","multiSelect":false,"options":[{"label":"Thin","description":"crisp"},{"label":"Thick","description":"soft"},{"label":"Stuffed","description":"cheesy"}]},{"question":"Which toppings?","header":"Toppings","multiSelect":true,"options":[{"label":"Cheese","description":"extra"},{"label":"Olives","description":"salty"},{"label":"Basil","description":"fresh"}]}]}}]},"uuid":"t-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  ask_draw 0
+  while [ $step -lt 3 ]; do
+    IFS= read -rsn1 ch || break
+    if [ "$ch" = $'\e' ]; then
+      IFS= read -rsn2 -t 0.2 rest
+      [ "$rest" = "[C" ] && [ $step = 1 ] && [ ${#picked[@]} -gt 0 ] && { step=2; ask_draw 2; }
+      continue
+    fi
+    case "$ch" in
+      [1-3])
+        i=$(( ch - 1 ))
+        if [ $step = 0 ]; then a1="${crust[$i]}"; step=1; ask_draw 1
+        elif [ $step = 1 ]; then
+          label="${top[$i]}"
+          if [[ " ${picked[*]} " == *" $label "* ]]; then
+            local kept=(); for p in "${picked[@]}"; do [ "$p" != "$label" ] && kept+=("$p"); done; picked=("${kept[@]}")
+          else picked+=("$label"); fi
+          a2=$(IFS=,; printf '%s' "${picked[*]}" | sed 's/,/, /g')
+          ask_draw 1
+        fi ;;
+    esac
+    if [ $step = 2 ] && [ "$ch" = 1 ]; then step=3; fi
+  done
+  out="User has answered your questions: \"Which crust?\"=\"$a1\", \"Which toppings?\"=\"$a2\". You can now continue."
+  printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%s","content":"%s"}]},"uuid":"r-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$(printf '%s' "$out" | sed 's/\\/\\\\/g; s/"/\\"/g')" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  reply="Fake agent reply: got crust $a1 and toppings $a2"
+  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"%s"}]},"uuid":"a-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$(json "$reply")" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  sleep 0.3
+  echo "{\"session_id\":\"$sid\"}" | hook stop
+}
 turn() {
   text=$(json "$1"); n=$RANDOM
   printf '{"type":"user","message":{"role":"user","content":"%s"},"uuid":"u-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$text" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
@@ -73,6 +124,7 @@ turn() {
   # A message asking for a long task runs a tool for a while: its call stands in the transcript without a result.
   case "$1" in *long*) long=1 ;; *) long=0 ;; esac
   if [ $long = 0 ]; then wait_for 1000; fi
+  case "$1" in *askquestions*) ask_turn "$n"; return ;; esac
   # Asked for a widget, it draws one with the real CLI: «widget N» shows the number N in the widget «sales», so the
   # same message with another number changes that widget where it stands.
   command='ls -la'; widget=0

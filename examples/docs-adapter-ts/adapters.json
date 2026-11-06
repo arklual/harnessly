@@ -1,0 +1,9 @@
+[
+  {
+    "name": "example-docs",
+    "kind": "docs",
+    "url": "http://127.0.0.1:8080",
+    "tokenFile": "/etc/harnessly/example-docs.token",
+    "protocol": "harnessly.docs/v1"
+  }
+]

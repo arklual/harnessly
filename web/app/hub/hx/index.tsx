@@ -18,6 +18,8 @@ const SCREENS: Record<Section, ReturnType<typeof lazy>> = {
   team: lazy(() => import('./screens/team')),
   env: lazy(() => import('./screens/env')),
   accounts: lazy(() => import('./screens/accounts')),
+  efficiency: lazy(() => import('./screens/efficiency')),
+  tools: lazy(() => import('./screens/tools')),
 };
 
 const Screen = () => {

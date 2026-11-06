@@ -3,12 +3,18 @@
 import { type CSSProperties, useEffect, useMemo, useRef } from 'react';
 
 import type { ChangeRef, FrameWeek } from '../../../org/api/analytics';
+import { useLive } from '../../live';
 import { Icon, usePop } from '../../ui';
 import {
   type PickerState,
   compareNameOf,
   hintOf,
-  nameOf,
+  periodNameOf,
+  lastDays,
+  pickFree,
+  QUICK,
+  quickOn,
+  setFreeDay,
   pickPreset,
   pickWeek,
   presetsOf,
@@ -25,6 +31,7 @@ export interface PeriodControlsProps {
 }
 
 export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControlsProps) => {
+  const live = useLive();
   const root = useRef<HTMLDivElement>(null);
   const pop = usePop(root);
   const presets = useMemo(() => presetsOf(weeks, change), [weeks, change]);
@@ -34,7 +41,7 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
   useEffect(() => {
     if (pop.mounted && strip.current) strip.current.scrollLeft = strip.current.scrollWidth;
   }, [pop.mounted]);
-  const now = nameOf(weeks, state.a, { month: true });
+  const now = periodNameOf(weeks, state);
   const prev = compareNameOf(weeks, state);
 
   const openTab = (k: 'a' | 'b') => {
@@ -48,6 +55,21 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
 
   return (
     <div className="ad-tools">
+      {live && (
+        <div className="hx-set__seg an-quick" role="group" aria-label="Быстрый период">
+          {QUICK.map((q) => (
+            <button
+              key={q.id}
+              type="button"
+              className="hx-set__seg-item"
+              aria-pressed={quickOn(state) === q.id}
+              onClick={() => onChange(pickFree(state, lastDays(q.days), true))}
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="anx-per" ref={root}>
         <div className="anx-per__row">
           <label className="anx-per__f">
@@ -135,13 +157,33 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
                   key={p.id}
                   type="button"
                   className="anx-wp__preset"
-                  aria-pressed={sameRange(p.a, state.a) && sameRange(p.b, state.b)}
+                  aria-pressed={!state.free && sameRange(p.a, state.a) && sameRange(p.b, state.b)}
                   onClick={() => onChange(pickPreset(state, p))}
                 >
                   {p.label}
                 </button>
               ))}
             </div>
+            {live && (
+              <div className="an-dates" role="group" aria-label="Даты">
+                {(['from', 'to'] as const).map((end) => {
+                  const w = state.free?.[state.edit] ?? null;
+                  return (
+                    <label key={end} className="an-dates__f">
+                      <span>{end === 'from' ? 'С' : 'По'}</span>
+                      <input
+                        type="date"
+                        className="hx-set__input"
+                        value={w?.[end] ?? ''}
+                        onChange={(e) =>
+                          e.target.value && onChange(setFreeDay(state, state.edit, end, e.target.value))
+                        }
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            )}
             <div className="anx-wp__weeks" role="group" aria-label="Недели" ref={strip}>
               {cells.map((w) => (
                 <button

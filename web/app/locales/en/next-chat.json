@@ -333,6 +333,7 @@
   "next.slash.label": "Commands, skills and settings",
   "next.slash.group.setting": "Chat settings",
   "next.slash.group.command": "Commands",
+  "next.slash.group.app": "Apps",
   "next.slash.group.skill": "Skills",
   "next.slash.group.mcp": "MCP servers",
   "next.slash.group.quick": "Quick prompts",
@@ -491,5 +492,7 @@
   "next.cleared.model": "The model picker was open in the terminal — closed it to send the message",
   "next.cleared.effort": "The effort setting was open in the terminal — closed it to send the message",
   "next.message.copy": "Copy",
-  "next.message.copied": "Copied"
+  "next.message.copied": "Copied",
+  "next.tool.guarded": "The app {app} did not let “{tool}” run: rule {rule}",
+  "next.tool.guardedChat": "The chat's apps did not let “{tool}” run: rule {rule}"
 }

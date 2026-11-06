@@ -1,0 +1,184 @@
+/* Живой хаб (флаг ui.hx.live): общее движение для всех экранов на ключах и токенах motion.css.
+   Всё лежит под .hx-root[data-live], так что без флага экраны выглядят как раньше. Новых стилей нет: только
+   появление, переходы и отклик на наведение/нажатие. Экран «Окружение» не трогаем. */
+
+/* Каскад: шапка, панель, затем блоки страницы по очереди; первые 12 с шагом, остальные разом. */
+.hx-root[data-live] .hx-set__page-in > * > .ad-head,
+.hx-root[data-live] .hx-set__page-in .ad-head {
+  animation: hx-in-down var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+.hx-root[data-live] .hx-set__page-in .ad-tools {
+  animation: hx-in-fade var(--hx-dur-md) var(--hx-ease-out) 60ms backwards;
+}
+.hx-root[data-live] .an-stage > *,
+.hx-root[data-live] .mx > *,
+.hx-root[data-live] .mo > *,
+.hx-root[data-live] .md-sec,
+.hx-root[data-live] .ac-group,
+.hx-root[data-live] .hx-set__group,
+.hx-root[data-live] .mx-split > * {
+  animation: hx-in-up var(--hx-dur-lg) var(--hx-ease-out) backwards;
+  animation-delay: calc(80ms + var(--live-i, 0) * var(--hx-stagger));
+}
+.hx-root[data-live] :is(.an-stage, .mx, .mo, .mx-split) > :nth-child(1) {
+  --live-i: 0;
+}
+.hx-root[data-live] :is(.an-stage, .mx, .mo, .mx-split) > :nth-child(2) {
+  --live-i: 1;
+}
+.hx-root[data-live] :is(.an-stage, .mx, .mo, .mx-split) > :nth-child(3) {
+  --live-i: 2;
+}
+.hx-root[data-live] :is(.an-stage, .mx, .mo, .mx-split) > :nth-child(4) {
+  --live-i: 3;
+}
+.hx-root[data-live] :is(.an-stage, .mx, .mo, .mx-split) > :nth-child(5) {
+  --live-i: 4;
+}
+.hx-root[data-live] :is(.an-stage, .mx, .mo, .mx-split) > :nth-child(n + 6) {
+  --live-i: 5;
+}
+
+/* Строки таблиц и списков появляются каскадом (первые 12). */
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(-n + 12) {
+  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
+  animation-delay: calc(120ms + var(--r, 0) * 28ms);
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(2) {
+  --r: 1;
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(3) {
+  --r: 2;
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(4) {
+  --r: 3;
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(5) {
+  --r: 4;
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(6) {
+  --r: 5;
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(7) {
+  --r: 6;
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(8) {
+  --r: 7;
+}
+.hx-root[data-live] :is(.mo-list, .mt, .ac-group, .tl-rows) > :nth-child(n + 9) {
+  --r: 8;
+}
+
+/* Отклик карточек и плиток: подъём на наведение, нажатие вдавливает. */
+.hx-root[data-live] :is(.sx-tile, .anm, .hx-set__card, .md-sec, .viz-card) {
+  transition:
+    transform var(--hx-dur-sm) var(--hx-ease-out),
+    box-shadow var(--hx-dur-sm) var(--hx-ease-out),
+    border-color var(--hx-dur-sm) var(--hx-ease-out);
+}
+@media (hover: hover) {
+  .hx-root[data-live] :is(.sx-tile, .anm):hover {
+    transform: translateY(-2px);
+  }
+}
+.hx-root[data-live] :is(.sx-tile, .anm, .hx-btn):active {
+  transform: scale(0.985);
+  transition-duration: var(--hx-dur-xs);
+}
+
+/* Диаграммы текут, а не мигают: столбики растут от низа, значения плавно переходят, линии дорисовываются. */
+.hx-root[data-live] .sx-bars rect {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: live-bar-grow var(--hx-dur-lg) var(--hx-ease-out) backwards;
+  animation-delay: calc(var(--b, 0) * 18ms);
+  transition:
+    y var(--hx-dur-lg) var(--hx-ease-out),
+    height var(--hx-dur-lg) var(--hx-ease-out);
+}
+@keyframes live-bar-grow {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+}
+.hx-root[data-live] .mt-meter i {
+  transition: width var(--hx-dur-lg) var(--hx-ease-out);
+}
+.hx-root[data-live] .anx-viz svg {
+  transition: opacity var(--hx-dur-md) var(--hx-ease-out);
+}
+
+/* Смена периода или фильтра: данные, которые ещё едут, приглушены; новые приходят с лёгким сдвигом. */
+.hx-root[data-live] [data-stale='1'] {
+  opacity: 0.55;
+  transition: opacity var(--hx-dur-xs) linear;
+}
+.hx-root[data-live] .live-swap {
+  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+
+/* Скелет один на все экраны: тот же перелив из motion.css. */
+.hx-root[data-live] :is(.hx-sk, .ov-sk__tile, .ov-sk__card, .tm-sk, .mo-sk) {
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--hx-fg-1) 5%, transparent) 30%,
+    color-mix(in srgb, var(--hx-fg-1) 10%, transparent) 50%,
+    color-mix(in srgb, var(--hx-fg-1) 5%, transparent) 70%
+  );
+  background-size: 300% 100%;
+  animation: hx-shimmer 1.4s linear infinite;
+}
+
+/* Сортировка и поиск таблиц (ui-кит хаба: компонент SortHead). */
+.hx-root[data-live] .live-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.hx-root[data-live] .live-sort i {
+  opacity: 0;
+  transition:
+    opacity var(--hx-dur-xs) linear,
+    transform var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-root[data-live] .live-sort:hover i,
+.hx-root[data-live] .live-sort[aria-sort='ascending'] i,
+.hx-root[data-live] .live-sort[aria-sort='descending'] i {
+  opacity: 0.7;
+}
+.hx-root[data-live] .live-sort[aria-sort='descending'] i {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-root[data-live] * {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Поиск и сортировка списков (sort-bar.tsx). */
+.hx-root[data-live] .live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+}
+.hx-root[data-live] .live-bar__q {
+  flex: 1 1 200px;
+  min-width: 160px;
+  width: auto;
+}
+.hx-root[data-live] .live-bar .hx-set__seg {
+  max-width: 100%;
+  overflow-x: auto;
+}

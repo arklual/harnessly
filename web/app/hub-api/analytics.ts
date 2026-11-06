@@ -26,7 +26,10 @@ export type KpiId =
   | 'reread_context'
   | 'session_start_ctx'
   | 'cache_hit'
-  | 'skills_in_use';
+  | 'skills_in_use'
+  | 'cache_write_1h'
+  | 'mr_survival'
+  | 'waiting_p90';
 
 export type KpiUnit = 'usd' | 'share' | 'ms' | 'count' | 'tokens';
 
@@ -380,6 +383,7 @@ export type HubMachine = {
   people: PersonRef[]; // who used it in the last 30 days
   access: { kind: 'user' | 'team'; id: string; label: string }[]; // empty: everyone in its tenant
   problems: MachineProblem[];
+  opensRuntime?: boolean; // false: the hub only observes the machine and cannot open its runtime (absent: an older hub)
   // The rest is filled only for an organization with the `machine.resources` feature on (docs/hub/machines-resources.md);
   // with it off these are null, and activeOps is empty.
   cloud: MachineCloud | null; // null: the hub knows no server of the machine

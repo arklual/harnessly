@@ -8,7 +8,7 @@ LDFLAGS       := -s -w -X github.com/ly-solutions/harnessly/internal/agent.Build
 CROSS         := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
 .DEFAULT_GOAL := help
-.PHONY: skills-sync skills-check help build test test-race lint fmt fmt-check vet cover cross clean web web-check web-browser-test runtime-web build-webui test-webui release-snapshot run install install-systemd image compose-up compose-down hub-web hub hub-dist hub-image machine-image hub-compose-up hub-compose-down
+.PHONY: skills-sync skills-check help build test test-race lint fmt fmt-check vet cover cross clean web web-check web-browser-test runtime-web build-webui test-webui release-snapshot run install install-systemd image compose-up compose-down hub-web hub hub-schema hub-dist hub-image machine-image hub-compose-up hub-compose-down
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[1m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -95,6 +95,9 @@ hub-web: web/node_modules ## Build the hub page into web/dist-hub
 
 hub: hub-web ## Build bin/hub with the hub page compiled in (the hubui tag)
 	CGO_ENABLED=0 $(GO) build -trimpath -tags hubui -ldflags "$(LDFLAGS)" -o $(BIN)/hub ./cmd/hub
+
+hub-schema: ## Regenerate the expected database schema (internal/hub/store/schema/*.json); HUB_TEST_POSTGRES_URL for the Postgres one
+	$(GO) run ./cmd/hub schema snapshot $(if $(HUB_TEST_POSTGRES_URL),--postgres '$(HUB_TEST_POSTGRES_URL)')
 
 hub-dist: web ## Build what a hub serves to its machines into HUB_DIST: runtime-<os>-<arch>, agent-<os>-<arch>, install.sh (HUB_TARGETS=linux/amd64 for one system)
 	@mkdir -p $(HUB_DIST)

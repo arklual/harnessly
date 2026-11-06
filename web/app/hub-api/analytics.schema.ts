@@ -25,6 +25,9 @@ export const kpiId = lit(
   'session_start_ctx',
   'cache_hit',
   'skills_in_use',
+  'cache_write_1h',
+  'mr_survival',
+  'waiting_p90',
 );
 const kpiUnit = lit('usd', 'share', 'ms', 'count', 'tokens');
 
@@ -326,6 +329,7 @@ export const hubMachine = obj({
   people: arr(personRef),
   access: arr(accessSubject),
   problems: arr(lit('offline', 'idle_week', 'agent_old', 'disk_low', 'login_expired', 'disabled')),
+  opensRuntime: opt(bool),
   cloud: nullable(machineCloud),
   hardware: nullable(machineHardware),
   load: nullable(machineLoad),

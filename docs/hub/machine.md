@@ -154,6 +154,7 @@ the runs are in [environment.md](environment.md#machine-setup); this is who does
   operator opts in on the machine with `AGENT_HUB_SETUP=on` in the agent's environment; without it the observe link
   gets no feature, `env.run` is `policy_denied`, and the runtime is told no. `RUNTIME_ENV_SETUP=off` in the runtime's
   environment switches the runner off on the machine itself (the items then stay «машина ещё настраивается»).
+  The hub's safe is opt-in on an observe link the same way, with `AGENT_HUB_SAFE=on` ([safe.md](../safe.md)).
 - **Limits of what is promised.** Scripts run as the person with a minimal environment; they can do what the person can.
   A script by address is fetched over https only (no redirect to http), a repository over https or ssh only. The sandbox
   is for finding what a fresh machine lacks, not for containing a script: without bubblewrap nothing stops a script
@@ -427,9 +428,28 @@ The hub's `machine` image holds `harnessly-agent` and `harnessly-runtime` in `/u
 | `AGENT_REGISTER_NAME` | the name in the hub |
 | `AGENT_REGISTER_WAIT` | seconds to keep trying while the hub or the code is not there yet (default 120) |
 | `MACHINE_RUNTIME_PORT`, `MACHINE_AGENT_PORT` | loopback ports (default 18022 and 18023); neither is published |
+| `HARNESSLY_SUPERVISE` | `1` runs the runtime and the agent under `harnessly supervise`: a program that ends is started again (waiting 1 s, 2 s, 4 s ... up to 30 s after quick failures), the reason is logged and noted in `supervisor.json` of the data folder, and the machine keeps its id in the hub. Default `0`: the container ends when either program does |
 | `AGENT_AUTH=hs256` | run the closed-cluster way, without registering |
 
 To apply a policy to a container machine, mount a file at `/etc/harnessly/policy.toml`.
+
+## Company network, a check before installing, closed networks
+
+Both installers (`install.sh` for a single machine, the hub's `/install` for a hub machine) take the same network options. Without them nothing changes.
+
+| Option | What it does |
+|---|---|
+| `--check` | Looks and changes nothing: the system, curl/tar, tmux and git, free disk, the port, the service manager, Docker, and whether the network works. A failure says what to give: `--ca-file` for a company CA, `--proxy` or `--mirror` for a closed network, `--offline` for none |
+| `--ca-file FILE` | The company CA. Every component gets `SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`, `GIT_SSL_CAINFO` and `REQUESTS_CA_BUNDLE`; the container profile mounts the file read-only |
+| `--proxy URL`, `--no-proxy LIST` | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` for every component. `127.0.0.1`, `localhost` and `::1` (and the hub's host) always go direct |
+| `--mirror URL` | Release files from `URL/vX.Y.Z/…` (and `URL/latest.txt`) instead of github.com. `--npm-registry` and `--pip-index` set the package sources |
+| `--offline DIR` | Nothing is downloaded: the programs come from `DIR` (see below) |
+| `--docker external\|own\|auto` | Hub installer, container profile. `external` uses only a daemon that already runs; `own` and `auto` start a private `dockerd` under `~/.harnessly/docker` when none runs (root and `dockerd` are needed). A daemon that runs is never touched |
+| `--log FILE` | The step journal; by default `install.log` in the data folder (`~/.harnessly`) |
+
+`harnessly install` runs the single-machine installer with a check first and passes every option on. The settings are written once, into a marked block of `~/.config/harnessly/env` (and the `runtime.env` and `agent.env` of the hub installer); running the installer again replaces the block and updates in place.
+
+**Offline bundle.** On a machine with the internet, `scripts/make-offline-bundle.sh X.Y.Z [OUT] [linux_amd64 …]` downloads the release archives, checks them against `checksums.txt` and writes `harnessly-offline-X.Y.Z.tar`; `scripts/make-offline-bundle.sh --hub https://hub.example.com` makes the same from a hub (its `/install` and a copy of `/dl`). Copy the `.tar` over, unpack it and run `sh install.sh --offline .`. tmux and git are not in the bundle, and a hub machine still has to reach its hub to register. The bundle is a build output and is not committed.
 
 ## Upgrade, move and remove
 

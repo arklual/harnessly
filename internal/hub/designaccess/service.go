@@ -46,6 +46,11 @@ type Deps struct {
 	PlatformAPI string
 	// Transport reaches a machine's runtime through its tunnel.
 	Transport func(id string) http.RoundTripper
+	// LinkKey is the hub's own secret: the guest links' addresses are kept sealed with a key derived from it, so they
+	// can be copied again. Empty keeps no addresses.
+	LinkKey []byte
+	// Notice mails a person about access to a project (a request, a decision); nil sends nothing.
+	Notice Notice
 }
 
 type Service struct {
@@ -58,6 +63,8 @@ type Service struct {
 	shareHost   string
 	platformAPI string
 	transport   func(id string) http.RoundTripper
+	seal        *sealer
+	notice      Notice
 
 	mu       sync.Mutex
 	serving  map[string]bool   // machines whose agent serves design-access
@@ -77,8 +84,8 @@ type dayCount struct {
 func New(d Deps) *Service {
 	s := &Service{
 		db: d.DB, reg: d.Reg, log: d.Log, now: d.Now, hubURL: strings.TrimRight(d.HubURL, "/"), platformAPI: d.PlatformAPI,
-		transport: d.Transport,
-		serving:   map[string]bool{}, prefixes: map[string]string{}, timers: map[string]*time.Timer{},
+		transport: d.Transport, seal: newSealer(d.LinkKey), notice: d.Notice,
+		serving: map[string]bool{}, prefixes: map[string]string{}, timers: map[string]*time.Timer{},
 		events: map[string]*dayCount{}, tokens: map[string]cachedToken{}, budget: newBudget(),
 	}
 	if s.log == nil {
@@ -236,8 +243,9 @@ func (s *Service) Run(ctx context.Context) {
 
 // ---- the page's API ---------------------------------------------------------------------------------------------
 
-// apiPath: <prefix>/design/access[/...] or <prefix>/docs/people under a platform prefix /api/<name>.
-var apiPath = regexp.MustCompile(`^(/api/[A-Za-z0-9_-]+)(/design/access(?:/.*)?|/docs/people)$`)
+// apiPath: <prefix>/design/access[/...], <prefix>/docs/people or the one access API <prefix>/access/{design/...,me,
+// directory} under a platform prefix /api/<name>.
+var apiPath = regexp.MustCompile(`^(/api/[A-Za-z0-9_-]+)(/design/access(?:/.*)?|/docs/people|/access/(?:design(?:/.*)?|me|directory))$`)
 
 // ServeMachine answers the design access API of a machine the person may open; anything else goes to the machine.
 func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) bool {
@@ -256,6 +264,10 @@ func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.U
 			return false
 		}
 		s.people(w, r, m)
+		return true
+	}
+	if strings.HasPrefix(rest, "/access/") {
+		s.serveAccess(w, r, u, m, strings.TrimPrefix(rest, "/access/"))
 		return true
 	}
 	s.serveOld(w, r, u, m, strings.TrimPrefix(strings.TrimPrefix(rest, "/design/access"), "/"))

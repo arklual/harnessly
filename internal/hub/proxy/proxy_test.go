@@ -112,6 +112,14 @@ func (f *fixture) runtime() http.Handler {
 			_ = c.Write(r.Context(), typ, raw)
 		}
 	})
+	mux.HandleFunc("/api/v2/socket", func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
+		if err != nil {
+			return
+		}
+		defer c.CloseNow()
+		_ = c.Write(r.Context(), websocket.MessageText, []byte("v2:"+r.URL.RawQuery))
+	})
 	mux.HandleFunc("/api/browser/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
 		if err != nil {
@@ -365,6 +373,72 @@ func TestPathModeOpensOnlyMachinesAnAdministratorConnected(t *testing.T) {
 	}
 	if r := f.owner.Do("GET", "/api/machines/"+f.id+"/open", nil); r.Code != 200 {
 		t.Errorf("open of the administrator's machine: %s", r)
+	}
+}
+
+// with HUB_MACHINE_TRUST=on an owner of the machine's space may trust it, and then it opens on the hub's origin;
+// the hub says beforehand (View.Runtime) that the machine waits for that.
+func TestPathModeOwnerCanTrustAMachine(t *testing.T) {
+	f := setup(t, hubtest.Env("HUB_MACHINE_TRUST", "on"))
+	owner := f.s.SignIn("member@example.com")
+	space, _ := owner.NewSpace("Моя")
+	m := owner.Machine(space, f.runtime())
+	guest := f.s.SignIn("guest@example.com")
+	owner.Join(space, guest)
+
+	runtime := func(p *hubtest.Person) string {
+		r := p.Do("GET", "/api/machines/"+m.MachineID, nil)
+		var got struct {
+			Machine struct{ Runtime string } `json:"machine"`
+		}
+		if r.Code != 200 || json.Unmarshal(r.Body, &got) != nil {
+			t.Fatalf("machine: %s", r)
+		}
+		return got.Machine.Runtime
+	}
+	if got := runtime(owner); got != "needs_trust" {
+		t.Fatalf("runtime before trust = %q", got)
+	}
+	if r := owner.Do("GET", "/api/machines/"+m.MachineID+"/open", nil); r.Code != 403 || r.Err() != "machine_untrusted" {
+		t.Errorf("open before trust: %s", r)
+	}
+	// a member who is not an owner cannot decide it is safe
+	if r := guest.Do("POST", "/api/machines/"+m.MachineID+"/trust", map[string]string{}); r.Code != 403 {
+		t.Errorf("trust by a member: %s", r)
+	}
+	if r := owner.Do("POST", "/api/machines/"+m.MachineID+"/trust", map[string]string{}); r.Code != 200 {
+		t.Fatalf("trust by the owner: %s", r)
+	}
+	if got := runtime(guest); got != "ready" {
+		t.Errorf("runtime after trust = %q", got)
+	}
+	if r := guest.Do("GET", "/api/machines/"+m.MachineID+"/open", nil); r.Code != 200 {
+		t.Errorf("open after trust: %s", r)
+	}
+	if r := owner.Do("GET", "/m/"+m.MachineID+"/headers", nil); r.Code != 200 {
+		t.Errorf("proxy after trust: %s", r)
+	}
+	// and the owner takes it back
+	if r := owner.Do("DELETE", "/api/machines/"+m.MachineID+"/trust", map[string]string{}); r.Code != 200 {
+		t.Fatalf("untrust: %s", r)
+	}
+	if got := runtime(owner); got != "needs_trust" {
+		t.Errorf("runtime after untrust = %q", got)
+	}
+}
+
+// Without HUB_MACHINE_TRUST the hub behaves as before: the machine is blocked and there is nothing to press.
+func TestPathModeTrustIsOffByDefault(t *testing.T) {
+	f := setup(t)
+	owner := f.s.SignIn("member@example.com")
+	space, _ := owner.NewSpace("Моя")
+	m := owner.Machine(space, f.runtime())
+	if r := owner.Do("POST", "/api/machines/"+m.MachineID+"/trust", map[string]string{}); r.Code != 409 {
+		t.Errorf("trust while off: %s", r)
+	}
+	r := owner.Do("GET", "/api/machines/"+m.MachineID, nil)
+	if !strings.Contains(string(r.Body), `"runtime":"blocked"`) {
+		t.Errorf("runtime while off: %s", r)
 	}
 }
 

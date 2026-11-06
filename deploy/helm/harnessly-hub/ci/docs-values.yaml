@@ -1,0 +1,4 @@
+# Documents on: the artifacts service runs in the release, boards are left to a service of their own.
+publicUrl: https://hub.example.com
+docs:
+  enabled: true

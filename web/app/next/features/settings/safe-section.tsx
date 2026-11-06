@@ -2,7 +2,13 @@
 // it last — with a new value (rotation) and removal. A value is typed here and never comes back: the machine answers
 // with the name and the dates only. Agents ask for a missing secret with a card (ask-dialog), not through the chat.
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { SAFE_REASONS, SECRET_NAME, type ISecret, type ISecretMetadata } from '@/next/features/safe/api';
+import {
+  SAFE_REASONS,
+  SECRET_NAME,
+  type ISafeStore,
+  type ISecret,
+  type ISecretMetadata,
+} from '@/next/features/safe/api';
 import { FormError, Group, SetButton } from '@/next/features/settings/rows';
 import { formatAgoFull } from '@/next/i18n/format';
 import { t } from '@/next/i18n';
@@ -39,6 +45,8 @@ export interface ISafeSectionProps extends ISafeActions {
   /** null while the list is on its way. */
   secrets: readonly ISecret[] | null;
   failed?: { reason: string; onRetry: () => void | Promise<unknown> } | null;
+  /** Where the safe keeps its values; null or left out: this machine's file. */
+  store?: ISafeStore | null;
   now: number;
   projects?: readonly ISafeProject[];
   editName?: string;
@@ -48,6 +56,14 @@ export interface ISafeProject {
   id: string;
   name: string;
 }
+
+/** The section's foot: where the values are kept. */
+export const safeFoot = (store: ISafeStore | null): string => {
+  if (store === null) return t('next.safe.foot');
+  if (store.error !== '') return t('next.safe.foot.broken', { error: store.error });
+  if (store.mode === 'hub') return t('next.safe.foot.hub');
+  return t('next.safe.foot.server', { addr: store.addr });
+};
 
 /** A local action's wait and its error line, kept on screen while the line folds away. */
 const useAction = () => {
@@ -151,6 +167,7 @@ const SecretRow = ({ secret, leaving, now, actions, projects, editName }: IRowPr
               <span className="hx-safe__name">{secret.name}</span>
               <span className="hx-safe__sub">
                 {putLine(secret, now)} · {usedLine(secret, now)}
+                {secret.where !== undefined && ` · ${t(`next.safe.where.${secret.where}`)}`}
               </span>
             </span>
             <span className="hx-safe__actions">
@@ -428,6 +445,7 @@ const AddSecret = ({ onPut, taken }: { onPut: ISafeActions['onPut']; taken: (nam
 const SafeSection = ({
   secrets,
   failed = null,
+  store = null,
   now,
   projects = [],
   editName,
@@ -435,7 +453,7 @@ const SafeSection = ({
 }: ISafeSectionProps) => {
   const rows = useLeavingList(secrets ?? NO_SECRETS, (secret) => secret.name, LEAVE_MS);
   return (
-    <Group title={t('next.safe.title')} foot={t('next.safe.foot')}>
+    <Group title={t('next.safe.title')} foot={safeFoot(store)}>
       {secrets === null && failed === null && (
         <div className="hx-set__empty">{t('next.settings.loading')}</div>
       )}

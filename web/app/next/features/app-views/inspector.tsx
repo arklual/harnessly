@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   callStorage,
   createViewSession,
+  loadAppDecisions,
+  type IAppDecision,
   type IAppView,
   type IInstalledApp,
 } from '@/next/features/app-views/api';
@@ -108,6 +110,50 @@ const Keys = ({
   );
 };
 
+/** null: not read yet, which is not the same as nothing decided. */
+type TDecisions = IAppDecision[] | null | 'failed';
+
+const Decisions = ({
+  machine,
+  app,
+  conversation,
+}: {
+  machine: MachineId;
+  app: string;
+  conversation: ConvId;
+}) => {
+  // The answer is kept with the chat it is for: another chat reads as not read yet, with no reset inside the effect.
+  const key = `${machine}|${app}|${conversation}`;
+  const [read, setRead] = useState<{ key: string; list: TDecisions }>({ key: '', list: null });
+  useEffect(() => {
+    let live = true;
+    loadAppDecisions(machine, app, conversation)
+      .then((found) => live && setRead({ key, list: found }))
+      .catch(() => live && setRead({ key, list: 'failed' }));
+    return () => {
+      live = false;
+    };
+  }, [key, machine, app, conversation]);
+  const list: TDecisions = read.key === key ? read.list : null;
+  if (list === null) return <p className="hx-insp__none">{t('next.inspector.loading')}</p>;
+  if (list === 'failed') return <p className="hx-insp__none">{t('next.inspector.decisionsFailed')}</p>;
+  if (list.length === 0) return <p className="hx-insp__none">{t('next.inspector.noDecisions')}</p>;
+  return (
+    <table className="hx-insp__calls">
+      <tbody>
+        {list.map((e, i) => (
+          <tr key={`${e.at}-${i}`} data-ok={e.decision !== 'deny'}>
+            <td>{clock(e.at)}</td>
+            <td>{e.tool}</td>
+            <td>{e.rule || '—'}</td>
+            <td>{t(`next.inspector.decision.${e.decision}`)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};
+
 export interface IAppInspectorProps {
   machine: MachineId;
   app: IInstalledApp;
@@ -162,6 +208,12 @@ const AppInspector = ({
         {showsUnwalled(app, agentWalled) && <p className="hx-insp__warn">{t('next.inspector.unwalled')}</p>}
       </div>
       <AppSetup machine={machine} app={app} />
+      {conversation !== null && app.targets.includes('chat') && (
+        <div className="hx-insp__sec">
+          <h3 className="hx-insp__h">{t('next.inspector.decisions')}</h3>
+          <Decisions machine={machine} app={app.id} conversation={conversation} />
+        </div>
+      )}
       <div className="hx-insp__sec">
         <h3 className="hx-insp__h">{t('next.inspector.rights')}</h3>
         {app.permissions.length === 0 ? (

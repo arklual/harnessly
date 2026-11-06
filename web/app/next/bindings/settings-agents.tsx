@@ -5,9 +5,12 @@ import { useState } from 'react';
 import {
   useAgentSettings,
   useCatalog,
+  useHubEnv,
   type IAgentSettingsHandle,
   type Loaded,
 } from '@/next/bindings/settings-data';
+import { switchHubEnv } from '@/next/features/hub-env/api';
+import HubEnvSection from '@/next/features/settings/hub-env-section';
 import { useAgentCredentials } from '@/next/bindings/settings-credentials';
 import { useProviders } from '@/next/bindings/settings-providers';
 import { useSpeechKeys } from '@/next/bindings/settings-speech';
@@ -231,6 +234,8 @@ export const SkillsPage = ({ machine, pages, pending }: ISkillsPageProps) => {
   const [tab, setTab] = useState<ExtTab>('skills');
   const [filter, setFilter] = useState<ExtFilter>('all');
   const catalog = useCatalog(machine, provider, tab === 'skills');
+  const hubEnv = useHubEnv(machine);
+  const [off, setOff] = useState<ReadonlySet<string>>(new Set());
   const handle = pages[provider];
   const { run, pending: waiting } = pending;
   const prefix = `${provider}/${tab}`;
@@ -284,18 +289,43 @@ export const SkillsPage = ({ machine, pages, pending }: ISkillsPageProps) => {
   };
   const retry = tab === 'mcp' ? handle.retry : catalog.retry;
 
+  const hub = hubEnv.state.k === 'ready' && hubEnv.state.value.enabled ? hubEnv.state.value : null;
+  const hubItems = hub ? hub.items.filter((item) => (tab === 'mcp') === (item.kind === 'mcp')) : [];
+  const switchOff = (id: string, value: boolean) =>
+    void run(`hub/${id}`, t('next.settings.hubEnv.failed'), async () => {
+      const res = await switchHubEnv(machine, id, value);
+      if (!('ok' in res)) throw new Error(t('next.settings.hubEnv.failed'));
+      setOff((now) => {
+        const next = new Set(now);
+        if (value) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+    });
+
   return (
-    <SkillsSection
-      provider={provider}
-      tab={tab}
-      filter={filter}
-      list={list}
-      busy={busyOf(waiting, prefix)}
-      onProvider={setProvider}
-      onTab={setTab}
-      onFilter={setFilter}
-      onToggle={toggle}
-      onRetry={retry}
-    />
+    <>
+      {hub && (
+        <HubEnvSection
+          items={hubItems}
+          canSwitch={hub.canSwitch}
+          busy={busyOf(waiting, 'hub')}
+          off={off}
+          onSwitch={switchOff}
+        />
+      )}
+      <SkillsSection
+        provider={provider}
+        tab={tab}
+        filter={filter}
+        list={list}
+        busy={busyOf(waiting, prefix)}
+        onProvider={setProvider}
+        onTab={setTab}
+        onFilter={setFilter}
+        onToggle={toggle}
+        onRetry={retry}
+      />
+    </>
   );
 };

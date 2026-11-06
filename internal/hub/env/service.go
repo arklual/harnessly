@@ -101,6 +101,10 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/me/env", s.gate(s.meEnv))
 	mux.Handle("PUT /api/me/env/{itemId}", s.gate(s.putMeEnv))
 	mux.Handle("PUT /api/me/env/groups/{groupId}", s.gate(s.putMeGroup))
+	mux.Handle("PUT /api/me/env/presets/{presetId}", s.gate(s.putMePreset))
+	mux.Handle("POST /api/orgs/{org}/env/presets", s.gate(s.addPreset))
+	mux.Handle("PATCH /api/orgs/{org}/env/presets/{presetId}", s.gate(s.patchPreset))
+	mux.Handle("DELETE /api/orgs/{org}/env/presets/{presetId}", s.gate(s.deletePreset))
 	mux.Handle("POST /api/orgs/{org}/env/apply", s.gate(s.apply))
 	mux.Handle("POST /api/orgs/{org}/env/groups", s.gate(s.addGroup))
 	mux.Handle("PATCH /api/orgs/{org}/env/groups/{groupId}", s.gate(s.patchGroup))
@@ -148,6 +152,7 @@ type world struct {
 	items    map[string]store.CatalogItem
 	entries  []store.EnvEntry
 	groups   []store.EnvGroup
+	presets  []store.EnvPreset
 	// choices are the people's choices of optional groups: tenant id → user id → group id → on.
 	choices map[string]map[string]map[string]bool
 }
@@ -181,6 +186,9 @@ func loadWorld(ctx context.Context, st store.Store, o store.Org, recommended boo
 		return nil, err
 	}
 	if w.groups, err = st.EnvGroupsOfOrg(ctx, o.ID); err != nil {
+		return nil, err
+	}
+	if w.presets, err = st.EnvPresetsOfOrg(ctx, o.ID); err != nil {
 		return nil, err
 	}
 	if recommended {
@@ -349,7 +357,8 @@ func (r *rights) visibleTenants(w *world) ([]store.Space, error) {
 }
 
 var kindRu = map[string]string{store.CatalogSkill: "скилл", store.CatalogMCP: "MCP", store.CatalogRepo: "репозиторий", store.CatalogDoc: "документ",
-	store.CatalogScript: "скрипт", store.CatalogAccess: "доступ", store.CatalogPlugin: "плагин", store.CatalogClaudeSettings: "настройки Claude"}
+	store.CatalogScript: "скрипт", store.CatalogAccess: "доступ", store.CatalogPlugin: "плагин", store.CatalogClaudeSettings: "настройки Claude",
+	store.CatalogApp: "приложение"}
 
 // whereRu says where a layer is, for the title of a change.
 func (w *world) whereRu(layer, scopeID string) string {

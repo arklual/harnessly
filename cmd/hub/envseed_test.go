@@ -106,8 +106,9 @@ func TestEnvSeedCommand(t *testing.T) {
 		t.Errorf("no hint wiped the stored one: %d %q", code, out)
 	}
 	// Groups: made from the file, entries put into them by name; the same file again changes nothing.
-	grouped := write("env4.yaml", strings.Replace(envSeedFile, "    entries:\n      - {layer: org, item: GitLab, pinned: true}\n      - {layer: org, item: Монорепо}",
-		"    groups:\n      - {layer: org, name: Основа, required: true}\n      - {layer: org, name: Код, defaultOn: false}\n    entries:\n      - {layer: org, item: GitLab, pinned: true, group: Основа}\n      - {layer: org, item: Монорепо, group: Код}", 1))
+	groupedBody := strings.Replace(envSeedFile, "    entries:\n      - {layer: org, item: GitLab, pinned: true}\n      - {layer: org, item: Монорепо}",
+		"    groups:\n      - {layer: org, name: Основа, required: true}\n      - {layer: org, name: Код, defaultOn: false}\n    entries:\n      - {layer: org, item: GitLab, pinned: true, group: Основа}\n      - {layer: org, item: Монорепо, group: Код}", 1)
+	grouped := write("env4.yaml", groupedBody)
 	if code, out, errOut := do("env-seed", "--file", grouped); code != 0 || !strings.Contains(out, "+ group «Основа» in org") || !strings.Contains(out, "~ entry repo «Монорепо» in org Альфа (group)") {
 		t.Errorf("groups: %d %q %q", code, out, errOut)
 	}
@@ -116,6 +117,20 @@ func TestEnvSeedCommand(t *testing.T) {
 	}
 	if code, _, errOut := do("env-seed", "--file", write("env5.yaml", strings.Replace(envSeedFile, "item: Монорепо}", "item: Монорепо, group: Нет}", 1))); code == 0 || !strings.Contains(errOut, "no group") {
 		t.Errorf("unknown group: %d %q", code, errOut)
+	}
+	// Presets: made from the file by group names; the same file again changes nothing; a changed set is an update.
+	presetFile := strings.Replace(groupedBody, "    entries:\n", "    presets:\n      - {layer: org, name: Разработчик, hint: всё для кода, groups: [Код]}\n    entries:\n", 1)
+	if code, out, errOut := do("env-seed", "--file", write("env6.yaml", presetFile)); code != 0 || !strings.Contains(out, "+ preset «Разработчик» in org") {
+		t.Errorf("presets: %d %q %q", code, out, errOut)
+	}
+	if code, out, _ := do("env-seed", "--file", write("env6.yaml", presetFile)); code != 0 || strings.TrimSpace(out) != "изменений нет" {
+		t.Errorf("presets again: %d %q", code, out)
+	}
+	if code, out, _ := do("env-seed", "--file", write("env7.yaml", strings.Replace(presetFile, "groups: [Код]", "groups: [Код, Основа]", 1)), "--dry-run"); code != 0 || !strings.Contains(out, "~ preset «Разработчик» in org") || !strings.Contains(out, "(groups)") {
+		t.Errorf("preset update: %d %q", code, out)
+	}
+	if code, _, errOut := do("env-seed", "--file", write("env8.yaml", strings.Replace(presetFile, "groups: [Код]", "groups: [Нет]", 1))); code == 0 || !strings.Contains(errOut, "no group") {
+		t.Errorf("unknown group in a preset: %d %q", code, errOut)
 	}
 	// The same rules as the API: a bad source, a script of a team in the org layer, an unknown organization.
 	for name, body := range map[string]string{

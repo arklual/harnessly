@@ -43,6 +43,25 @@ What happens:
 The engine folder is `RUNTIME_DESIGN_ENGINE_DIR`, by default `design-engine` in the runtime's data folder
 (`~/.harnessly/design-engine`). Run the command again to pick up a newer release.
 
+Run `harnessly design engine status` to see which engine this machine has.
+
+### Official way to install the vendor's engine, and a mirror inside a company
+
+The only supported way is the command above, run by a person who owns the claude.ai account on the machine that will
+use it. harnessly does not ship the vendor's engine: it is not in the public source archive, the container image or the
+installer, and no script of ours downloads it for you.
+
+A company may serve it to its own machines from an internal mirror, **only if the vendor's licence allows it for that
+company**. Check that first; this page is not legal advice. If it does:
+
+1. On one machine with an account that may fetch it, run `harnessly design engine fetch`.
+2. Copy the engine folder (`releases.json` and `upstream/design/<release>/`) into a private location that only your
+   machines can read (a private repository, an artifact store or a shared disk). Never a public one.
+3. On every other machine set `RUNTIME_DESIGN_RELEASES_DIR` to a checkout or mount of that folder.
+   `harnessly design engine status` then shows `vendor's, release …`; nothing is fetched there.
+
+Without the permission, leave it out: the built-in engine is complete.
+
 ## The rest: Chromium and ffmpeg
 
 Checks, board pictures and PDF/PPTX exports drive a headless Chromium (or Chrome); video exports and recordings use
@@ -53,6 +72,8 @@ ffmpeg. Both are optional: designs work without them.
   `HARNESSLY_DESIGN_TOOLS=0` skips that.
 - Elsewhere install `chromium` (or Google Chrome) and `ffmpeg` with the system's package manager. The runtime finds
   them in the usual places and on `PATH`; `RUNTIME_DESIGN_CHROME` and `RUNTIME_DESIGN_FFMPEG` name them explicitly.
+- Their versions are pinned, and `harnessly doctor render` draws a real picture and a 2-second video to prove they work:
+  see [the render kit](render-kit.md).
 
 ## For a team
 

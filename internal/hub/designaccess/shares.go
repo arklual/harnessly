@@ -81,6 +81,8 @@ type shareRow struct {
 	CreatedBy                           string
 	CreatedAt                           time.Time
 	Comments                            int64
+	LastOpened                          *time.Time
+	Sealed                              bool // the address is kept sealed and can be copied again
 }
 
 func (r shareRow) json(url any) map[string]any {
@@ -97,17 +99,18 @@ func (r shareRow) json(url any) map[string]any {
 }
 
 const shareCols = `l.id, l.project_id, l.title, l.rights, l.version, l.rev, l.pages, l.view, l.expires_at, l.revoked_at, l.opens, l.created_by, l.created_at,
-	(SELECT COUNT(*) FROM design_guest_comments c WHERE c.link_id = l.id)`
+	(SELECT COUNT(*) FROM design_guest_comments c WHERE c.link_id = l.id), l.last_opened_at, CASE WHEN l.token_enc IS NULL THEN 0 ELSE 1 END`
 
 func scanShare(row interface{ Scan(...any) error }) (shareRow, error) {
 	var r shareRow
 	var rev, pages, view sql.NullString
-	var exp, revoked sql.NullInt64
-	var created int64
-	if err := row.Scan(&r.ID, &r.Project, &r.Title, &r.Rights, &r.Version, &rev, &pages, &view, &exp, &revoked, &r.Opens, &r.CreatedBy, &created, &r.Comments); err != nil {
+	var exp, revoked, opened sql.NullInt64
+	var created, sealed int64
+	if err := row.Scan(&r.ID, &r.Project, &r.Title, &r.Rights, &r.Version, &rev, &pages, &view, &exp, &revoked, &r.Opens, &r.CreatedBy, &created, &r.Comments, &opened, &sealed); err != nil {
 		return shareRow{}, err
 	}
 	r.Rev, r.Expires, r.Revoked, r.CreatedAt = rev.String, fromNull(exp), fromNull(revoked), fromMs(created)
+	r.LastOpened, r.Sealed = fromNull(opened), sealed != 0
 	if pages.Valid && pages.String != "" {
 		_ = json.Unmarshal([]byte(pages.String), &r.Pages)
 		if r.Pages == nil {
@@ -222,6 +225,18 @@ func (t *txn) makerMayShare(projectID, createdBy string) (bool, error) {
 // listShares: live links and the ones revoked in the last 30 days; a link whose maker lost the right to share is listed
 // as revoked now, the way a guest is told.
 func (t *txn) listShares(id string) ([]map[string]any, error) {
+	all, err := t.shareRows(id)
+	if err != nil {
+		return nil, err
+	}
+	out := []map[string]any{}
+	for _, r := range all {
+		out = append(out, r.json(nil))
+	}
+	return out, nil
+}
+
+func (t *txn) shareRows(id string) ([]shareRow, error) {
 	rows, err := t.q.Query(t.ctx, `SELECT `+shareCols+` FROM design_share_links l WHERE l.machine_id = ? AND l.project_id = ? AND (l.revoked_at IS NULL OR l.revoked_at > ?)
 		ORDER BY l.created_at DESC, l.id`, t.m.ID, id, ms(t.now.Add(-revokedShown)))
 	if err != nil {
@@ -241,8 +256,8 @@ func (t *txn) listShares(id string) ([]map[string]any, error) {
 		return nil, err
 	}
 	may := map[string]bool{}
-	out := []map[string]any{}
-	for _, r := range all {
+	for i := range all {
+		r := &all[i]
 		maker := normEmail(r.CreatedBy)
 		if r.Revoked == nil {
 			if _, ok := may[maker]; !ok {
@@ -257,9 +272,8 @@ func (t *txn) listShares(id string) ([]map[string]any, error) {
 				r.Revoked = &now
 			}
 		}
-		out = append(out, r.json(nil))
 	}
-	return out, nil
+	return all, nil
 }
 
 type shareInput struct {
@@ -272,28 +286,31 @@ type shareInput struct {
 	Rev     string
 }
 
-func (t *txn) createShare(id, actor string, in shareInput, urlOf func(string) string) (map[string]any, string, error) {
+// createShare makes a link; the answer has its token, the one moment it is surely known.
+func (t *txn) createShare(id, actor string, in shareInput) (shareRow, string, error) {
 	expires, err := expiry(in.TTL, t.now)
 	if err != nil {
-		return nil, "", err
+		return shareRow{}, "", err
 	}
 	if _, err := t.lockProject(id); err != nil {
-		return nil, "", err
+		return shareRow{}, "", err
 	}
 	token := randomToken(16)
 	linkID := newUUID()
 	r := shareRow{ID: linkID, Project: id, Title: clip(in.Title, maxTitle), Rights: in.Rights, Version: in.Version, Rev: in.Rev, Pages: in.Pages,
 		View: in.View, Expires: expires, CreatedBy: normEmail(actor), CreatedAt: t.now}
-	if _, err := t.q.Exec(t.ctx, `INSERT INTO design_share_links (id, machine_id, project_id, token_hash, title, rights, expires_at, view, version, rev, pages, created_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, linkID, t.m.ID, id, store.HashToken(token), r.Title, r.Rights, nullTime(expires),
+	enc := t.seal.seal(linkID, token)
+	r.Sealed = enc != ""
+	if _, err := t.q.Exec(t.ctx, `INSERT INTO design_share_links (id, machine_id, project_id, token_hash, token_enc, title, rights, expires_at, view, version, rev, pages, created_by, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, linkID, t.m.ID, id, store.HashToken(token), nullStr(enc), r.Title, r.Rights, nullTime(expires),
 		jsonOrNil(in.View, in.View == nil), in.Version, nullStr(in.Rev), jsonOrNil(in.Pages, in.Pages == nil), r.CreatedBy, ms(t.now)); err != nil {
-		return nil, "", err
+		return shareRow{}, "", err
 	}
 	details := map[string]any{"rights": in.Rights, "until": iso(expires), "version": in.Version}
 	if in.Pages != nil {
 		details["pages"] = len(in.Pages)
 	}
-	return r.json(urlOf(token)), linkID, t.writeLog(id, actor, "share.create", linkID, details)
+	return r, token, t.writeLog(id, actor, "share.create", linkID, details)
 }
 
 // shareState is what the API decides on before it changes a live link.
@@ -317,16 +334,16 @@ type shareChange struct {
 	Rev     *string // set: a revision, or "" for none
 }
 
-func (t *txn) updateShare(id, actor, linkID string, c shareChange) (map[string]any, error) {
+func (t *txn) updateShare(id, actor, linkID string, c shareChange) (shareRow, error) {
 	var expires *time.Time
 	if c.TTL != nil {
 		var err error
 		if expires, err = expiry(*c.TTL, t.now); err != nil {
-			return nil, err
+			return shareRow{}, err
 		}
 	}
 	if _, err := t.lockProject(id); err != nil {
-		return nil, err
+		return shareRow{}, err
 	}
 	sets := []string{}
 	args := []any{}
@@ -374,20 +391,20 @@ func (t *txn) updateShare(id, actor, linkID string, c shareChange) (map[string]a
 		args = append(args, linkID, t.m.ID, id)
 		res, err := t.q.Exec(t.ctx, `UPDATE design_share_links SET `+strings.Join(sets, ", ")+` WHERE id = ? AND machine_id = ? AND project_id = ? AND revoked_at IS NULL`, args...)
 		if err != nil {
-			return nil, err
+			return shareRow{}, err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
-			return nil, fail("not_found", "Ссылка не найдена или уже отозвана")
+			return shareRow{}, fail("not_found", "Ссылка не найдена или уже отозвана")
 		}
 	}
 	r, err := scanShare(t.q.QueryRow(t.ctx, `SELECT `+shareCols+` FROM design_share_links l WHERE l.id = ? AND l.machine_id = ? AND l.project_id = ? AND l.revoked_at IS NULL`, linkID, t.m.ID, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fail("not_found", "Ссылка не найдена или уже отозвана")
+		return shareRow{}, fail("not_found", "Ссылка не найдена или уже отозвана")
 	}
 	if err != nil {
-		return nil, err
+		return shareRow{}, err
 	}
-	return r.json(nil), t.writeLog(id, actor, "share.update", linkID, details)
+	return r, t.writeLog(id, actor, "share.update", linkID, details)
 }
 
 func (t *txn) revokeShare(id, actor, linkID string) error {

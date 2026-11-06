@@ -104,6 +104,23 @@ func (x *orgScope) reaches(kind, id string) bool {
 	return kind == store.ScopeOrg && id == x.org.ID || kind == store.ScopeTeam && id == x.sc.ID
 }
 
+// reachesAccount says whether an account belongs or is granted to the scope, above it or in it.
+func (x *orgScope) reachesAccount(ctx context.Context, st store.Store, a store.Account) (bool, error) {
+	if x.reaches(a.ScopeKind, a.ScopeID) {
+		return true, nil
+	}
+	gs, err := st.AccountGrants(ctx, a.ID)
+	if err != nil {
+		return false, err
+	}
+	for _, g := range gs {
+		if x.reaches(g.ScopeKind, g.ScopeID) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // subscriptionsOf is the organization's subscription accounts as the scope sees them in the period. An account that
 // reaches the scope, or that the scope has used in the period, is listed, with no shares when nobody used it.
 func (s *Service) subscriptionsOf(ctx context.Context, st store.Store, x *orgScope, sp span, cur Currency) ([]Subscription, error) {
@@ -219,19 +236,12 @@ func (s *Service) subscriptionsOf(ctx context.Context, st store.Store, x *orgSco
 	preliminary := x.now.Before(monthStart(last, x.loc).AddDate(0, 1, 0))
 	for _, a := range subs {
 		people := byAccount[a.ID]
-		if len(people) == 0 && !x.reaches(a.ScopeKind, a.ScopeID) {
-			granted := false
-			gs, err := st.AccountGrants(ctx, a.ID)
+		if len(people) == 0 {
+			ok, err := x.reachesAccount(ctx, st, a)
 			if err != nil {
 				return nil, err
 			}
-			for _, g := range gs {
-				if x.reaches(g.ScopeKind, g.ScopeID) {
-					granted = true
-					break
-				}
-			}
-			if !granted {
+			if !ok {
 				continue
 			}
 		}

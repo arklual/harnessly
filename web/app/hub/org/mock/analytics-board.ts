@@ -11,7 +11,7 @@ export interface BoardCurves {
   sparkPrev: number[];
 }
 
-export const BOARD_CURVES: Record<KpiId, BoardCurves> = {
+const OWN_CURVES: Record<Exclude<KpiId, 'cacheWrite1h' | 'mrSurvival' | 'waitingP90'>, BoardCurves> = {
   moneyPerMr: {
     teams: [
       [
@@ -522,4 +522,12 @@ export const BOARD_CURVES: Record<KpiId, BoardCurves> = {
       0.228, 0.163, 0.202, 0.219, 0.293, 0.346, 0.361, 0.367, 0.373, 0.373, 0.397, 0.243, 0.337, 0.364, 0.394,
     ],
   },
+};
+
+/** The three newer KPIs borrow the shape of a neighbour: the mock only needs a believable line. */
+export const BOARD_CURVES: Record<KpiId, BoardCurves> = {
+  ...OWN_CURVES,
+  cacheWrite1h: OWN_CURVES.cache,
+  mrSurvival: OWN_CURVES.yield,
+  waitingP90: OWN_CURVES.waiting,
 };

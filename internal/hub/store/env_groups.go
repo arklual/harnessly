@@ -82,7 +82,7 @@ func (s Store) UpdateEnvGroup(ctx context.Context, g EnvGroup) error {
 	return err
 }
 
-// DeleteEnvGroup removes a group; its entries stay, without a group, and the people's choices of it go. Call it in a
+// DeleteEnvGroup removes a group; its entries stay, without a group, and the people's choices of it go, and so does its place in the presets. Call it in a
 // transaction (DB.Tx) when the three steps must go together.
 func (s Store) DeleteEnvGroup(ctx context.Context, id string) error {
 	if _, err := s.q.Exec(ctx, `UPDATE env_entries SET group_id = NULL WHERE group_id = ?`, id); err != nil {
@@ -90,6 +90,11 @@ func (s Store) DeleteEnvGroup(ctx context.Context, id string) error {
 	}
 	if _, err := s.q.Exec(ctx, `DELETE FROM env_person_group WHERE group_id = ?`, id); err != nil {
 		return err
+	}
+	if g, err := s.EnvGroupByID(ctx, id); err == nil {
+		if err := s.dropGroupFromPresets(ctx, g.OrgID, id); err != nil {
+			return err
+		}
 	}
 	_, err := s.q.Exec(ctx, `DELETE FROM env_groups WHERE id = ?`, id)
 	return err

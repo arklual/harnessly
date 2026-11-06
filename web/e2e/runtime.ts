@@ -80,11 +80,17 @@ export async function startRuntime(
     });
   }
   // The agent's own CLI, which the fake agent calls as a real one would (harnessly widget).
-  execFileSync('go', ['build', '-o', join(bin, 'harnessly'), './cmd/harnessly'], {
-    cwd: repo,
-    stdio: 'inherit',
-    env: { ...process.env, GOFLAGS: '-mod=readonly' },
-  });
+  // (HARNESSLY_BIN: the CI builds both binaries in one job and the test job has no Go.)
+  if (process.env.HARNESSLY_BIN) {
+    copyFileSync(process.env.HARNESSLY_BIN, join(bin, 'harnessly'));
+    execFileSync('chmod', ['+x', join(bin, 'harnessly')]);
+  } else {
+    execFileSync('go', ['build', '-o', join(bin, 'harnessly'), './cmd/harnessly'], {
+      cwd: repo,
+      stdio: 'inherit',
+      env: { ...process.env, GOFLAGS: '-mod=readonly' },
+    });
+  }
   const port = opts.port ?? (await freePort());
   const socket = `hs-test-web-${process.pid}-${port}`;
   const env: Record<string, string> = {

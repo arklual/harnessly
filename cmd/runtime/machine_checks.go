@@ -522,7 +522,12 @@ func machineCheckRoutes(d deps, self *selfupdate.Updater) []gate.Route {
 	answer := func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
-		peerJSON(w, http.StatusOK, map[string]any{"checks": probe.run(ctx)})
+		checks := probe.run(ctx)
+		// The self-test needs tmux: without it the tmux check already says what is wrong.
+		if d.Tmux != nil && tmuxReady(checks) {
+			checks = append(checks, newSelftest(d.Tmux).run(ctx)...)
+		}
+		peerJSON(w, http.StatusOK, map[string]any{"checks": checks})
 	}
 	return []gate.Route{
 		{
@@ -578,6 +583,16 @@ func machineCheckRoutes(d deps, self *selfupdate.Updater) []gate.Route {
 			}),
 		},
 	}
+}
+
+// tmuxReady: the tmux check is there and passed.
+func tmuxReady(checks []machineCheck) bool {
+	for _, c := range checks {
+		if c.ID == "tmux" {
+			return c.OK
+		}
+	}
+	return false
 }
 
 // chromeProbes keeps a probe's answer for a while: each probe starts a real Chrome, and the checks page is opened often.

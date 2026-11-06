@@ -25,8 +25,10 @@ import {
 import { logCall, logKey } from '@/next/features/app-views/bridge-log';
 import { watchLoads } from '@/next/features/app-views/frame-loads';
 import { chatOf, useHostHandlers } from '@/next/features/app-views/host-handlers';
-import { useConversation } from '@/next/stores/conversations';
+import { conversationsStore, useConversation } from '@/next/stores/conversations';
 import { openAppTab } from '@/next/features/app-views/open';
+import { agentRows, chatTarget, openConversation, watchAgents } from '@/next/features/app-views/agents';
+import { reaches, subscribeStorageChanges } from '@/next/features/app-views/storage-events';
 import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
 import { toast } from '@/next/ui/toast';
@@ -113,6 +115,9 @@ interface IOpened {
   error: string | null;
 }
 
+const isSlotTarget = (target: string) =>
+  target === 'settings' || target === 'onboarding' || target === 'object-action' || target === 'hub-settings';
+
 const AppFrame = ({
   machine,
   app,
@@ -137,7 +142,9 @@ const AppFrame = ({
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
   const [reload, setReload] = useState(0);
   const bridge = useRef<AppBridge | null>(null);
-  const lease = `app:${app.id}`;
+  // A slot view holds a slot of its own: two views of one app on a page would share one cookie, and the second
+  // one's session would replace the first one's.
+  const lease = isSlotTarget(target) ? `app:${app.id}/${view.id}` : `app:${app.id}`;
   const key = `${machine}|${app.id}|${view.id}|${viewPort}|${reload}|${reloadToken}`;
   // An app gets a chat only where the person turned it on; the runtime checks the same when it issues the session.
   const turnedOn = useConversation(conversation)?.apps?.includes(app.id) ?? false;
@@ -246,9 +253,16 @@ const AppFrame = ({
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
         return callTool(machine, session, name, args);
       },
-      storage: (op, scope, k, value) => {
+      storage: (op, scope, k, value, ifVersion) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
-        return callStorage(machine, { session, op, scope, key: k, value });
+        return callStorage(machine, {
+          session,
+          op,
+          scope,
+          key: k,
+          value,
+          ...(ifVersion === undefined ? {} : { ifVersion }),
+        });
       },
       settings: () => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
@@ -261,9 +275,18 @@ const AppFrame = ({
       chatSend: async (text) => {
         sendMessage(machine, { conversationId: chatOf(conversation, on), text: fromApp(app.name, text) });
       },
+      agents: async () => agentRows(machine),
       paneOpen: async (to) => {
+        const chatId = chatTarget(to);
+        if (chatId !== null) {
+          // The bridge has checked agents.read; only a conversation of this machine opens.
+          if (conversationsStore.get(chatId)?.machineId !== machine)
+            throw new BridgeError('invalid_params', 'no such conversation on this machine');
+          openConversation(chatId);
+          return;
+        }
         if (!openAppTab(to))
-          throw new BridgeError('invalid_params', 'only app:<id>[/<view>] opens from a view for now');
+          throw new BridgeError('invalid_params', 'only app:<id>[/<view>] and chat:<id> open from a view');
       },
       sinopia: async (method, params) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
@@ -300,6 +323,51 @@ const AppFrame = ({
       bridge.current = null;
     };
   }, [frame, ready, session, nonce, machine, app, target, conversation, on, chat, handlers, work]);
+
+  // `storage`: a key of the app's storage was written (by the agent, another view of the app, the view itself), told at
+  // once from the runtime's stream. It names the scope and the key, never the value; the view reads the key again.
+  // Only this app's, and an area of a chat or document only to the views of that chat or document.
+  useEffect(() => {
+    if (!ready) return;
+    return subscribeStorageChanges(machine, (change) => {
+      if (!reaches(change, { app, chat, document: doc })) return;
+      bridge.current?.notify('harnessly/notifications/storage', { scope: change.scope, key: change.key });
+    });
+  }, [ready, machine, app, chat, doc]);
+
+  // `agents`: the list of the person's conversations on this machine, or the status of one, changed. Told only to a
+  // view that holds agents.read, with the rows themselves (no text); the view need not ask again.
+  const readsAgents = app.permissions.includes('agents.read');
+  useEffect(() => {
+    if (!ready || !readsAgents) return;
+    return watchAgents(machine, (agents) =>
+      bridge.current?.notify('harnessly/notifications/agents', { agents }),
+    );
+  }, [ready, readsAgents, machine]);
+
+  // `visibility`: the view is shown or hidden (its pane tab left, the pane folded, the page in the background).
+  useEffect(() => {
+    if (!frame || !ready) return;
+    let inView = true;
+    let told = true;
+    const report = () => {
+      const visible = inView && !document.hidden;
+      if (visible === told) return;
+      told = visible;
+      bridge.current?.notify('harnessly/notifications/visibility', { visible });
+    };
+    const observer = new IntersectionObserver((entries) => {
+      const last = entries[entries.length - 1];
+      if (last) inView = last.isIntersecting;
+      report();
+    });
+    observer.observe(frame);
+    document.addEventListener('visibilitychange', report);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', report);
+    };
+  }, [frame, ready]);
 
   // The host's notice to the view (a new Sinopia selection); a view not up yet reads the selection when it starts.
   const noticed = useRef(notice?.seq ?? 0);

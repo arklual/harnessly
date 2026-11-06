@@ -110,6 +110,7 @@
   "docs.docViewer.shownFilter": "Показаны: {filter}",
   "docs.docViewer.threadLabel": "Тред #{n}: {quote}",
   "docs.docViewer.unbound": "Документ не привязан к разговору — комментарии сохранятся, но агент их не получит.",
+  "docs.docViewer.notConfiguredHint": "Документы подключает администратор хаба: см. docs/hub/docs.md в репозитории harnessly.",
   "docs.docViewer.versionMissing": "Версия {sha} не найдена в истории документа, показана актуальная.",
   "docs.mentionField.people": "Люди",
   "docs.mentionField.send": "Отправить"

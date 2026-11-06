@@ -50,6 +50,9 @@ type Runner struct {
 	// Home is the person's home: where repositories go and what scripts get as HOME.
 	Home    string
 	Secrets Secrets
+	// Apps installs the environment's apps (items of kind app) in the runtime's app registry; nil: this runtime does
+	// not, and such a step fails saying so.
+	Apps Apps
 
 	// The rest is for tests; the zero value is the real thing.
 	Exec   ExecFunc
@@ -120,6 +123,17 @@ func (r *Runner) exec(ctx context.Context, c Cmd) (int, error) {
 }
 
 // source is what any setup kind's source may hold (docs/hub/environment.md).
+// Apps is the runtime's app registry as the setup sees it.
+type Apps interface {
+	// Install puts the app in dir on the machine as the environment item's; changed is false when the same version
+	// from the same files is already there.
+	Install(dir, itemID string, locked bool) (id string, changed bool, err error)
+	// Has: the item's app is installed.
+	Has(itemID string) bool
+	// Prune takes off the environment's apps whose item is not among keep.
+	Prune(keep []string) ([]string, error)
+}
+
 type source struct {
 	// repo
 	URL    string `json:"url"`

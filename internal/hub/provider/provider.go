@@ -11,37 +11,20 @@ package provider
 
 import (
 	"context"
-	"errors"
-	"fmt"
+
+	"github.com/ly-solutions/harnessly/internal/hub/ext"
 )
 
-// Errors the port answers.
+// Errors the port answers; they are those of the extension frame.
 var (
 	// ErrUnsupported means the machine has no provider that can do this; the API answers {"error":"not_supported"}.
-	ErrUnsupported = errors.New("provider: not supported")
+	ErrUnsupported = ext.ErrUnsupported
 	// ErrNotFound means the provider does not know the machine or the operation.
-	ErrNotFound = errors.New("provider: not found")
+	ErrNotFound = ext.ErrNotFound
 )
 
 // Error is a refusal or a failure from the provider with its own code.
-type Error struct {
-	// Status is the HTTP status the provider answered with (0 when it did not come over HTTP).
-	Status  int
-	Code    string
-	Message string
-}
-
-func (e *Error) Error() string {
-	switch {
-	case e.Code != "" && e.Message != "":
-		return fmt.Sprintf("provider: %s: %s", e.Code, e.Message)
-	case e.Code != "":
-		return "provider: " + e.Code
-	case e.Message != "":
-		return "provider: " + e.Message
-	}
-	return fmt.Sprintf("provider: status %d", e.Status)
-}
+type Error = ext.Error
 
 // Machine names the machine to the provider.
 type Machine struct {
@@ -111,6 +94,8 @@ type OpStatus struct {
 	// State is pending, running, done or failed.
 	State string `json:"state"`
 	Error string `json:"error,omitempty"`
+	// Machine is the provider's id of the server the operation made (protocol v1: the answer of a finished create).
+	Machine string `json:"machine,omitempty"`
 }
 
 // Finished reports whether the operation reached an end.
@@ -131,19 +116,14 @@ type Provider interface {
 	ConsoleURL(ctx context.Context, m Machine) (string, error)
 }
 
-type idemKey struct{}
-
 // WithIdempotencyKey carries the key a state-changing call is sent with, so that a retry of the same hub operation is
 // the same operation at the provider. Without one the provider implementation makes a random key per call.
 func WithIdempotencyKey(ctx context.Context, key string) context.Context {
-	return context.WithValue(ctx, idemKey{}, key)
+	return ext.WithIdempotencyKey(ctx, key)
 }
 
 // IdempotencyKey reads the key WithIdempotencyKey put in ctx.
-func IdempotencyKey(ctx context.Context) string {
-	k, _ := ctx.Value(idemKey{}).(string)
-	return k
-}
+func IdempotencyKey(ctx context.Context) string { return ext.IdempotencyKey(ctx) }
 
 // None is the provider of a hub that has none: every call is unsupported.
 type None struct{}

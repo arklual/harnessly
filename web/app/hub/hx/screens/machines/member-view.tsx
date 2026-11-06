@@ -51,14 +51,16 @@ export const MemberView = ({ list }: { list: MachinesList }) => {
                 <span className="ad-live" data-live={on ? '1' : '0'}>
                   {on ? 'на связи' : 'не на связи'}
                 </span>
-                <Btn
-                  variant={on ? 'primary' : 'outline'}
-                  size="sm"
-                  busy={busyId === m.id}
-                  onClick={() => void open(m.id)}
-                >
-                  Открыть
-                </Btn>
+                {m.opensRuntime !== false && (
+                  <Btn
+                    variant={on ? 'primary' : 'outline'}
+                    size="sm"
+                    busy={busyId === m.id}
+                    onClick={() => void open(m.id)}
+                  >
+                    Открыть
+                  </Btn>
+                )}
               </div>
             );
           })}

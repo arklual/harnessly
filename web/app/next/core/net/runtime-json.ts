@@ -7,7 +7,15 @@ import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 
 /** The runtime's refusal in its own words, or the failure in ours. */
-export class RuntimeError extends Error {}
+export class RuntimeError extends Error {
+  constructor(
+    message: string,
+    /** What the runtime answered with, when it answered an error. */
+    readonly body?: unknown,
+  ) {
+    super(message);
+  }
+}
 
 /** How long a route may take before it is given up. */
 export const RUNTIME_TIMEOUT_MS = 20_000;
@@ -30,7 +38,7 @@ export const runtimeJson = async <T>(m: MachineId, path: `/${string}`, init?: Re
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const said = typeof body === 'object' && body !== null && 'error' in body ? String(body.error) : '';
-    throw new RuntimeError(said || t('next.failure.http'));
+    throw new RuntimeError(said || t('next.failure.http'), body);
   }
   return body as T;
 };

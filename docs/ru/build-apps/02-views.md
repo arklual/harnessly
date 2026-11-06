@@ -77,7 +77,7 @@ sequenceDiagram
   V->>P: hl.storage.chat.get(key) читает то, что записал агент
 ```
 
-Сторона агента и сторона окна делят **хранилище чата** (`app.data_*` и `hl.storage.chat` это одни и те же данные) и **файлы рабочей папки**. Окно не получает уведомления, когда пишет агент. Читайте заново, например по `hl.on('context')` или после сообщения агента, либо опрашивайте редко. Событие `tool-result` пока не подключено.
+Сторона агента и сторона окна делят **хранилище чата** (`app.data_*` и `hl.storage.chat` это одни и те же данные) и **файлы рабочей папки**. Когда агент пишет ключ (`app.data_set`), окно узнаёт об этом сразу, не позже секунды, по событию `storage`: `hl.on('storage', ({scope, key}) => …)`. Событие называет ключ и не несёт значения: прочитайте ключ заново через `hl.storage.chat.get(key)`. Оно приходит и когда пишет другое окно приложения или само окно. Окно слышит только ключи своего приложения, а область чата только в этом чате. Доставка по возможности, поэтому читайте заново и когда окно снова видно (событие `visibility`). Событие `tool-result` пока не подключено.
 
 ## Песочница
 
@@ -102,6 +102,8 @@ sequenceDiagram
 ## Дизайн: тема и размеры
 
 `hl.connect()` задаёт `<html data-theme="light|dark">`, `color-scheme`, `lang` и эти токены на `:root`, а при смене темы обновляет их. SDK не приносит таблицы стилей, а до подключения токенов нет, поэтому дайте каждому токену значение по умолчанию.
+
+**hl-ui.css.** Примитивы хоста на этих токенах: `<link rel="stylesheet" href="/__hl/hl-ui.css">` и `.hl-body` на `<body>`. Текст (`.hl-title`, `.hl-h`, `.hl-muted`, `.hl-hint`), раскладка по сетке 8 px (`.hl-row`, `.hl-stack`, `.hl-grid`), `.hl-card`, `.hl-list`, число с контекстом (`.hl-stat`, `.hl-stat__value`, `.hl-stat__label`), элементы управления (`.hl-btn`, `--primary`, `--ghost`, `--sm`, `.hl-input`, `.hl-field`, `.hl-label`), `.hl-seg` для выбора из нескольких вместо нативного `<select>`, `.hl-table`, `.hl-skeleton` на время чтения и `.hl-empty`, когда ничего нет, `.hl-pop` с `.hl-closing` для того, что открывается и закрывается. Ваша таблица стилей после неё побеждает. `harnessly app validate` предупреждает об инлайн-`style=`, нативном `<select>` и цвете, записанном вместо токена (файл и строка); `--strict` считает предупреждения.
 
 | Токен | Назначение | Светлая | Тёмная |
 | --- | --- | --- | --- |
@@ -137,13 +139,15 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 | --- | --- | --- |
 | `hl.context` | нет | `app`, `target`, `view`, `theme`, `locale`, `chat` (null, если приложение в чате выключено), `readOnly`, `data` (у карточки). `user` всегда `null` |
 | `hl.host` | нет | `{name, version}` |
-| `hl.on(event, fn)` | нет | Рабочие события: `context`, `theme` и `selection` в Sinopia |
+| `hl.on(event, fn)` | нет | Рабочие события: `context`, `theme`, `storage` (`{scope, key}`: ключ записан или удалён), `visibility` (`{visible}`: окно скрыто или показано), `agents` (`{agents}`: список бесед или статус одной изменился; только с `agents.read`) и `selection` в Sinopia. `tool-input` и `tool-result` пока не приходят |
 | `hl.chat.send(text)` | `chat.prompt` | Сообщение агенту до 20 000 символов, показывается с названием приложения в одну строку |
 | `hl.chat.read({last})` | `chat.read` | Последние сообщения в виде `{role, text}`: по умолчанию 20, не больше 200 |
 | `hl.chat.card(view, data)` | `chat.card` | Карточка в конце ленты. Хранится в этом браузере, не больше 20 на чат, данные до 20 000 символов |
-| `hl.pane.open(target)` | `pane.open` | Только `app:<id>[/<view>]` |
+| `hl.pane.open(target)` | `pane.open` | `app:<id>[/<view>]` или `chat:<id>`, чтобы открыть беседу из `hl.agents.list()` (для этого нужно ещё и `agents.read`, иначе `permission_denied`) |
+| `hl.agents.list()` | `agents.read` | Беседы человека на этой машине в виде `{id, title, status, provider, machine}`. `status`: `working`, `waiting` (ждёт вопрос, разрешение или план) или `free`. Без текста сообщений, промптов и путей. Событие `agents` приносит тот же список, когда он меняется |
 | `hl.tools.call('server.tool', args)` | нет | Инструмент вашего **удалённого https**-сервера. Возвращает сырой результат MCP: `isError` проверяйте сами. См. [Бэкенд](03-backend.md) |
-| `hl.storage.<scope>.get/set/delete/keys` | `storage` | Области ниже; `get` несуществующего ключа даёт `null` |
+| `hl.storage.<scope>.get/getVersioned/set/delete/keys` | `storage` | Области ниже; `get` несуществующего ключа даёт `null`. `getVersioned(key)` отвечает `{value, version}`; `set(key, value, {ifVersion})` отвечает новой версией. См. [Версии](#версии) |
+| `hl.flow.*`, `hl.data.*` | нет | **Убраны.** Они никогда не были подключены. Вызов отклоняется с `invalid_params` и подсказывает `hl.storage` |
 | `hl.files.read(path)`, `hl.files.write(path, text)` | `files.read:<mask>`, `files.write:<mask>` | Файлы папки чата, как текст |
 | `hl.ui.confirm(text)` | нет | Диалог с настоящим именем приложения в заголовке. **Возвращает boolean.** До 500 символов; время не ограничено |
 | `hl.ui.toast(text)` | нет | Уведомление до 500 символов |
@@ -166,7 +170,23 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 | `space` | Команду; для записи нужно `storage.space.write` | 10 МБ |
 | `doc` | Документ Sinopia | 100 КБ на документ, 20 МБ всего |
 
-Ключ это от 1 до 256 символов. Запись сверх лимита отклоняется целиком, и окно видит `host_unavailable` со словом `quota`.
+Ключ это от 1 до 256 символов. Запись сверх лимита отклоняется целиком, и окно видит код `quota_exceeded`.
+
+### Версии
+
+У каждого ключа есть версия: счётчик, который растёт на единицу с каждой записью или удалением ключа. Ключ, который не писали или хранили до появления версий, имеет версию 0. `getVersioned(key)` отвечает `{value, version}`. `set(key, value)` отвечает новой версией. Чтобы изменить прочитанное значение и не затереть то, что тем временем записал кто-то другой (агент, другое окно), верните версию:
+
+```js
+const { value, version } = await hl.storage.chat.getVersioned('notes');
+try {
+  await hl.storage.chat.set('notes', [...(value ?? []), 'new'], { ifVersion: version });
+} catch (e) {
+  if (e.code !== 'conflict') throw e;
+  // e.version это версия ключа сейчас: прочитайте заново, слейте, повторите. Ничего не записано.
+}
+```
+
+`ifVersion: 0` пишет, только если ключ ещё не писали. `set` без `ifVersion` пишет как раньше. У агента тот же договор: `app.data_get` отвечает `{"value", "version"}`, `app.data_set` принимает `ifVersion` и отказывает с `conflict` и текущей версией.
 
 ## Файлы рабочей папки
 

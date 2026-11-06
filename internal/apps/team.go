@@ -481,7 +481,7 @@ func (r *Registry) UninstallForTeam(id string, now time.Time) error {
 	return nil
 }
 
-// MuteTeamApp turns a team app off for the person (on false: on again). It is theirs alone: nothing is sent anywhere.
+// MuteTeamApp turns a team app (or the environment's) off for the person (on false: on again). It is theirs alone: nothing is sent anywhere.
 func (r *Registry) MuteTeamApp(id string, mute bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -490,7 +490,7 @@ func (r *Registry) MuteTeamApp(id string, mute bool) error {
 		return err
 	}
 	if !slices.ContainsFunc(t.Installs, func(i TeamInstall) bool { return i.ID == id }) {
-		return ErrNotInstalled
+		return r.muteEnv(id, mute)
 	}
 	t.Muted = slices.DeleteFunc(t.Muted, func(m string) bool { return m == id })
 	if mute {

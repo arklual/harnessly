@@ -22,7 +22,12 @@ export class HarnesslyError extends Error {
 }
 
 // The host answers with a JSON-RPC error whose data.code is ours; an error without one is the host being unavailable.
-const errorOf = (e) => new HarnesslyError(e?.data?.code || 'host_unavailable', e?.message);
+const errorOf = (e) => {
+  const err = new HarnesslyError(e?.data?.code || 'host_unavailable', e?.message);
+  // A conflict says the version the key has now.
+  if (typeof e?.data?.version === 'number') err.version = e.data.version;
+  return err;
+};
 
 // The host speaks MCP Apps' host context (theme as the mode, styles.variables) and carries its own whole context under
 // `harnessly`: that is what `hl.context` is.
@@ -112,10 +117,11 @@ export async function connect(options = {}) {
       case 'ui/notifications/tool-input':
         emit('tool-input', m.params);
         break;
-      case 'harnessly/notifications/flow':
       case 'harnessly/notifications/data':
       case 'harnessly/notifications/selection':
+      case 'harnessly/notifications/storage':
       case 'harnessly/notifications/visibility':
+      case 'harnessly/notifications/agents':
         emit(m.method.slice('harnessly/notifications/'.length), m.params);
         break;
       default:
@@ -150,21 +156,33 @@ export async function connect(options = {}) {
     read: ({ last = 20 } = {}) => request('harnessly/chat.read', { last }).then((r) => r.messages),
     card: (view, data) => request('harnessly/chat.card', { view, data }),
   };
+  hl.agents = { list: () => request('harnessly/agents.list', {}).then((r) => r.agents) };
   hl.pane = { open: (target) => request('harnessly/pane.open', { target }) };
   hl.tools = { call: (name, args = {}) => request('tools/call', { name, arguments: args }) };
-  hl.flow = {
-    status: () => request('harnessly/flow.status', {}),
-    go: (state) => request('harnessly/flow.go', { state }),
-  };
-  hl.data = {
-    get: () => request('harnessly/data.get', {}).then((r) => r.data),
-    set: (patch) => request('harnessly/data.set', { patch }).then((r) => r.data),
-  };
+  // hl.flow and hl.data were never connected in the host (every call answered host_unavailable) and are gone. A view
+  // that still calls them gets the reason, not a silent hang: use hl.storage (state) and hl.on('data') (a chat card).
+  const removed = (name, instead) =>
+    new Proxy(
+      {},
+      {
+        get: (_, method) => () =>
+          Promise.reject(new HarnesslyError('invalid_params', `hl.${name}.${String(method)} was removed from the SDK: ${instead}`)),
+      },
+    );
+  hl.flow = removed('flow', 'keep the steps in hl.storage');
+  hl.data = removed('data', 'keep the state in hl.storage, and read a card\'s data from hl.context.data');
   hl.storage = {};
   for (const scope of STORAGE_SCOPES) {
     hl.storage[scope] = {
+      // get answers the value (null if none); getVersioned also the key's version, to hand back as set's ifVersion.
       get: (key) => request('harnessly/storage.get', { scope, key }).then((r) => r.value),
-      set: (key, value) => request('harnessly/storage.set', { scope, key, value }).then(() => undefined),
+      getVersioned: (key) => request('harnessly/storage.get', { scope, key }).then((r) => ({ value: r.value, version: r.version })),
+      // set answers the key's new version; with { ifVersion } it writes only if the key is still at that version,
+      // else it rejects with code 'conflict' (error.version is the current one) and nothing is written.
+      set: (key, value, options = {}) =>
+        request('harnessly/storage.set', { scope, key, value, ...(options.ifVersion === undefined ? {} : { ifVersion: options.ifVersion }) }).then(
+          (r) => r.version,
+        ),
       delete: (key) => request('harnessly/storage.delete', { scope, key }).then(() => undefined),
       keys: () => request('harnessly/storage.keys', { scope }).then((r) => r.keys),
     };
@@ -185,6 +203,8 @@ export async function connect(options = {}) {
     // A person decides in their own time.
     confirm: (text) => request('harnessly/ui.confirm', { text }, { timeout: 0 }).then((r) => r.ok),
   };
+  // An onboarding step tells the host it is finished; other slots ignore it.
+  hl.slot = { done: () => request('harnessly/slot.done', {}).then(() => undefined) };
   // The Document API of Sinopia, for a view shown beside a document (target sinopia.<kind>): the host and the runtime
   // check the manifest's rights (sinopia.read/write/comment/export) on every call.
   const sinopia = (method, params = {}) => request(`harnessly/sinopia.${method}`, params).then((r) => r.result);
@@ -206,7 +226,8 @@ export async function connect(options = {}) {
   hl.resize = (height) => notify('ui/notifications/size-changed', { height: Math.ceil(height) });
   hl.close = () => window.removeEventListener('message', onMessage);
 
-  if (hl.context?.target === 'chat' && typeof ResizeObserver === 'function') {
+  // A card and a slot view are as tall as their content.
+  if (['chat', 'settings', 'onboarding', 'object-action'].includes(hl.context?.target) && typeof ResizeObserver === 'function') {
     new ResizeObserver(() => hl.resize(document.documentElement.scrollHeight)).observe(document.documentElement);
   }
   return hl;

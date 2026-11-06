@@ -93,6 +93,7 @@ func (r *Runner) execute(ctx context.Context, req hubproto.EnvRunRequest, hash s
 	ex.finish()
 	if ex.modifies && !ex.sandbox && ctx.Err() == nil {
 		ex.saveState()
+		ex.pruneApps()
 	}
 	if req.Mode != hubproto.RunCheck && !ex.sandbox {
 		r.waited, r.waitedHash = ex.waits, hash
@@ -153,6 +154,8 @@ func (ex *execution) step(i int) {
 		ex.plugin(i)
 	case ex.items[i].Kind == hubproto.EnvKindClaudeSettings:
 		ex.claudeSettings(i)
+	case ex.items[i].Kind == hubproto.EnvKindApp:
+		ex.app(i)
 	}
 	st.Message = ex.mask(st.Message)
 	st.Ms = ex.r.now().Sub(start).Milliseconds()

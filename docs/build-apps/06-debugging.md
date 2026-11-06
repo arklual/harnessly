@@ -34,6 +34,7 @@ and on in the page. A copy from `app install` never sees later edits: reinstall 
 | Question | Where |
 | --- | --- |
 | Is the package valid? | `harnessly app validate DIR --strict` names the field |
+| Why is the app not on in this chat? | `harnessly app explain <id>` in the chat's tab: the machine, the team, the setup, how it turns on, the chat and the wall, line by line; `✗` marks the layer that keeps it off |
 | Which bridge calls did the view make? Which failed? | «Отладка», for a dev install: under the view in the pane, or in «…» on `/apps/<id>`. Method, right, `ok` or the code, and storage keys per scope |
 | Console of the view | The browser's own DevTools: inspect the frame. `preview_console` does not capture a view's console |
 | Which of its own files did the view load? | `preview_network` lists them. It does not show bridge calls or the view's `fetch` to other hosts |
@@ -93,7 +94,10 @@ link: `harnessly app share <id> --view <view> --ttl 1d --write`, then drive `/ap
 | `tls_untrusted` | The server's certificate ends in no root the machine trusts | The admin adds the organization's root with `RUNTIME_APPS_CA_FILE` |
 | `upstream_error` | The server answered an HTTP error or no JSON-RPC | Look at the server's log |
 | `rate_limited` | Over 60 calls a second | Slow down, batch |
-| `host_unavailable` | Outside harnessly; no chat; `hl.flow`, `hl.data` and other things not connected; the machine did not answer; the runtime answered `quota`, `not-on`, `failed` | Read the error's message for the word |
+| `host_unavailable` | Outside harnessly; no chat; the machine did not answer; the runtime answered `not-on`, `failed` | Read the error's message for the word |
+| `conflict` | `set` with `ifVersion` found the key at another version; `error.version` is the current one; nothing was written | Read the key again (`getVersioned`), merge, write again |
+| `quota_exceeded` | The write would take the storage area past its limit; nothing was written | Write less, delete keys. See [Views](02-views.md#storage) |
+| `invalid_params` from `hl.flow` / `hl.data` | Those calls were removed from the SDK | Keep state in `hl.storage` |
 | `invalid_params` | A bad argument; an unknown view for a card; data too big | See the limits |
 
 The view gets only the runtime's error word. The longer reason is in the runtime's log.

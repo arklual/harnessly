@@ -286,7 +286,12 @@ func historyLibrary(t *testing.T) (*Library, string) {
 	t.Setenv("HOME", filepath.Join(tmp, "home"))
 	l := New(Config{DataDir: filepath.Join(tmp, "data"), LibraryDir: library, HistoryDir: filepath.Join(tmp, "history"),
 		Texts: Texts{CLI: "acme-cli", KitGlobal: "AcmeKit", Tag: "acme-design", HistoryEmail: "design@example.local"}})
-	t.Cleanup(l.StopWatching)
+	// Cleanups run last-in first-out: the history is stopped, and its snapshot in flight finished, before the
+	// temporary directory (registered above) is removed.
+	t.Cleanup(func() {
+		l.StopWatching()
+		l.StopBackground()
+	})
 	return l, library
 }
 

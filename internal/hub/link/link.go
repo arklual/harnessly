@@ -88,6 +88,12 @@ type Link struct {
 	tunnels map[string]*Tunnel
 
 	onEvent chan Event
+
+	// owner and fence are the directory entry of the link in a cluster (cluster.go); remote is set on a stand-in for a
+	// link another replica holds.
+	owner  string
+	fence  int64
+	remote *remote
 }
 
 // New wraps an accepted WebSocket. Nothing runs until Serve.
@@ -313,6 +319,9 @@ func (l *Link) sendBinary(b []byte, cancel <-chan struct{}, deadline <-chan time
 // Call asks the agent to do op and waits for its answer. params is a struct or map that marshals to a JSON object, or
 // nil. An agent's refusal is a *hubproto.Error; a link that ends meanwhile is ErrClosed; ctx ends the wait.
 func (l *Link) Call(ctx context.Context, op string, params any) (json.RawMessage, error) {
+	if l.remote != nil {
+		return l.remoteCall(ctx, op, params)
+	}
 	rest, err := encodeParams(params)
 	if err != nil {
 		return nil, err

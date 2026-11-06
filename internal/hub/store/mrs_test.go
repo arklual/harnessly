@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 )
 
 func TestMergedMRsSQLite(t *testing.T)   { exerciseMergedMRs(t, openTest(t)) }
@@ -103,5 +104,51 @@ func exerciseMergedMRs(t *testing.T, db *DB) {
 	}
 	if m["late"]["mrsMerged"] != 2 {
 		t.Errorf("late now owns !1: %v", m["late"])
+	}
+}
+
+func TestMRSurvivalSQLite(t *testing.T)   { exerciseMRSurvival(t, openTest(t)) }
+func TestMRSurvivalPostgres(t *testing.T) { exerciseMRSurvival(t, openPostgres(t)) }
+
+// A merged request survives when SurvivalDays have passed without a revert of it; younger ones are not counted at all.
+func exerciseMRSurvival(t *testing.T, db *DB) {
+	ctx := context.Background()
+	s := db.S()
+	u := &User{Email: "surv@example.com"}
+	if err := s.CreateUser(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	const org = "org1"
+	day := int64(24 * 3600 * 1000)
+	now := time.Now().UnixMilli()
+	if _, err := s.PutSession(ctx, AgentSession{OrgKey: org, Provider: "claude", SessionKey: "s", UserID: u.ID, Funding: FundingPersonal,
+		Origin: "live", Attribution: "x", StartedAt: now - 60*day, Metrics: `{}`, Seq: 1, UpdatedAt: now - 60*day}); err != nil {
+		t.Fatal(err)
+	}
+	keys := []string{"h/a/!1", "h/a/!2", "h/a/!3", "h/a/!4"}
+	if err := s.ReplaceSessionMRs(ctx, org, "claude", "s", "s", keys); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertMergedMRs(ctx, []MergedMR{
+		{Key: "h/a/!1", MergedAt: now - 40*day, CreatedAt: now - 41*day, Title: "keep", Project: "a"},
+		{Key: "h/a/!2", MergedAt: now - 40*day, CreatedAt: now - 41*day, Title: "undone", Project: "a"},
+		{Key: "h/a/!3", MergedAt: now - 3*day, CreatedAt: now - 4*day, Title: "fresh", Project: "a"},
+		// Reverts: one inside the 14 days of !2; one of !1 after them; one of another project's title.
+		{Key: "h/a/!5", MergedAt: now - 30*day, CreatedAt: now - 31*day, Title: `Revert "undone"`, Project: "a"},
+		{Key: "h/a/!6", MergedAt: now - 10*day, CreatedAt: now - 11*day, Title: `Revert "keep"`, Project: "a"},
+		{Key: "h/a/!7", MergedAt: now - 39*day, CreatedAt: now - 39*day, Title: `Revert "keep"`, Project: "b"},
+		{Key: "h/a/!4", MergedAt: now - 20*day, CreatedAt: now - 21*day, Title: "other", Project: "a"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.UserSessions(ctx, SessionFilter{UserID: u.ID, From: 0, To: now + day})
+	if err != nil || len(got) != 1 {
+		t.Fatalf("sessions %v %v", got, err)
+	}
+	m := map[string]float64{}
+	_ = json.Unmarshal([]byte(got[0].Metrics), &m)
+	// Mature: !1 (revert came after 14 days), !2 (reverted in 10 days), !4. !3 is too young. Survived: !1 and !4.
+	if m["mrsMerged"] != 4 || m["mrsMature"] != 3 || m["mrsSurvived"] != 2 {
+		t.Errorf("survival %v", m)
 	}
 }

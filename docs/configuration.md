@@ -147,6 +147,7 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_GITLAB_API_ORIGIN` | for tests: the origin the GitLab API is read from instead of `https://<host>` |
 | `RUNTIME_TRACKER_URL`, `RUNTIME_TRACKER_HOSTS`, `RUNTIME_TRACKER_KEYS` | the issue tracker's origin (also listed as the read-only connection `env-tracker`, see [connections](connections.md)), the hosts its issue links use (comma-separated) and its project keys (comma-separated; unset: the alternatives of `RUNTIME_TASK_KEY_RE` when it is the plain `^(KEY\|KEY)-…` form), by which the conversation sources tell issues apart |
 | `RUNTIME_APPS_INTERNAL_HOSTS`, `RUNTIME_APPS_CA_FILE` | the internal hosts the apps' MCP calls (a view's `hl.tools.call`, a Sinopia check) may reach besides public ones: names and `*.suffix`es, comma-separated, whose addresses may be private, loopback or shared and which may be plain `http://` (link-local stays closed); and a PEM file of the organization's root certificates added to the system's |
+| `RUNTIME_APPS_REQUIRE_WALL` | `1`: a chat with apps does not start where the operating system's wall around the apps cannot be made (no bubblewrap, user namespaces refused); the chat says why and the command that puts it right. Unset: the chat starts without the wall and says so |
 | `RUNTIME_ICON_USER_AGENT` | the User-Agent of site icon requests |
 | `RUNTIME_NOTIFY_BOT_TOKEN` | a self-hosted installation's own shared Telegram bot: the runtime reads its messages (a /start with the one-time code links the person's chat, /stop forgets it) and sends through it. Unset: the cloud's shared bot through the machine agent, if the cloud has one |
 | `RUNTIME_NOTIFY_OWN_BOTS` | bots of the person's own by token in Settings → Notifications: `auto` (default) only while there is no shared bot, `on` always, `off` never |
@@ -195,6 +196,8 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_DESIGN_CHROME` | the headless browser a check drives (unset: the usual places, then `chromium`, `google-chrome` and the like on `PATH`) |
 | `RUNTIME_DESIGN_CHROME_ARGS` | extra switches for that browser, space separated (the container image sets `--no-sandbox`) |
 | `RUNTIME_DESIGN_FFMPEG` | the ffmpeg of video exports and recordings (unset: `ffmpeg` on `PATH`) |
+| `RUNTIME_DESIGN_FFPROBE` | the ffprobe of `harnessly doctor render` (unset: next to ffmpeg, else `PATH`) |
+| `RUNTIME_DESIGN_READY_PROBE` | `1`: the design engine's `ready` in the API is the result of `harnessly doctor render` (cached), not "always true" ([render kit](render-kit.md)) |
 | `RUNTIME_CLI_NAME` | the command agents are told to run (`<cli> design check …`, the DevTools hints; default `harnessly`) |
 | `RUNTIME_DESIGN_TAG`, `RUNTIME_DESIGN_HISTORY_EMAIL` | what this runtime writes into shared places (the history's author and markers, a check's temporary profile; default `harnessly-design`) and the history's author address (default `design@localhost`) |
 | `RUNTIME_DESIGN_SHARED_DIR` | the team's shared library on the machines, named in the library's rules file (default `/srv/design`) |

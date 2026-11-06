@@ -108,6 +108,7 @@
   "docs.docViewer.shownFilter": "Shown: {filter}",
   "docs.docViewer.threadLabel": "Thread #{n}: {quote}",
   "docs.docViewer.unbound": "The document is not bound to a conversation: comments are kept, but no agent receives them.",
+  "docs.docViewer.notConfiguredHint": "Documents are set up by the hub administrator: see docs/hub/docs.md in the harnessly repository.",
   "docs.docViewer.versionMissing": "Version {sha} was not found in the document's history; showing the current one.",
   "docs.mentionField.people": "People",
   "docs.mentionField.send": "Send"

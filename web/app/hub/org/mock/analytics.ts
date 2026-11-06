@@ -187,6 +187,42 @@ const KPI_SEEDS: KpiSeed[] = [
     prev: 85,
   },
   {
+    id: 'cacheWrite1h',
+    group: 'env',
+    title: '',
+    hint: '',
+    format: 'pct',
+    delta: 'pts',
+    better: 'down',
+    noise: 2,
+    value: 18,
+    prev: 24,
+  },
+  {
+    id: 'mrSurvival',
+    group: 'result',
+    title: '',
+    hint: '',
+    format: 'pct',
+    delta: 'pts',
+    better: 'up',
+    noise: 2,
+    value: 92,
+    prev: 89,
+  },
+  {
+    id: 'waitingP90',
+    group: 'agent',
+    title: '',
+    hint: '',
+    format: 'minutes',
+    delta: 'rel',
+    better: 'down',
+    noise: 5,
+    value: 41,
+    prev: 47,
+  },
+  {
     id: 'skills',
     group: 'env',
     title: 'Скиллы в ходу',
@@ -531,5 +567,31 @@ export const analyticsMock = (ctx: MockCtx): AnalyticsApi => ({
     };
     return later(data, 400);
   },
+  limitWindows: () =>
+    later(
+      ctx.role === 'member'
+        ? null
+        : [
+            {
+              id: 'acc-1',
+              label: 'Claude Max №1',
+              plan: 'max',
+              windows: [
+                {
+                  name: 'weekly',
+                  lengthSec: 604_800,
+                  avgPeakPct: 81,
+                  fullCycles: 1,
+                  cycles: [
+                    { endsAt: '2026-10-11T09:00:00Z', peakPct: 64, measures: 210 },
+                    { endsAt: '2026-10-18T09:00:00Z', peakPct: 78, measures: 224 },
+                    { endsAt: '2026-10-25T09:00:00Z', peakPct: 97, measures: 231 },
+                    { endsAt: '2026-11-01T09:00:00Z', peakPct: 85, measures: 219 },
+                  ],
+                },
+              ],
+            },
+          ],
+    ),
   analyticsChart: (q, kpi) => later(chartFor(ctx, q, kpi), 450),
 });

@@ -199,6 +199,11 @@ type ExportResponse struct {
 // Export makes the bundle of a conversation at rest. Nothing changes on the source: it stays active until the cluster
 // switches. A tree with uncommitted changes is refused (they are not carried), unless the move goes without files.
 func (s *Service) Export(ctx context.Context, opID, conv string, withoutFiles bool) (ExportResponse, *Refusal) {
+	return s.export(ctx, opID, conv, withoutFiles, nil)
+}
+
+// export is Export with an optional one-time key (see OpKey): with it the bundle is made for the target directly.
+func (s *Service) export(ctx context.Context, opID, conv string, withoutFiles bool, key []byte) (ExportResponse, *Refusal) {
 	if !validOp(opID) {
 		return ExportResponse{}, refuse(http.StatusBadRequest, CodeBadBundle, "Неверная операция")
 	}
@@ -239,7 +244,11 @@ func (s *Service) Export(ctx context.Context, opID, conv string, withoutFiles bo
 	if err != nil {
 		return ExportResponse{}, refuse(http.StatusInternalServerError, CodeInternal, "Не удалось собрать перенос")
 	}
-	env, err := Encrypt(s.Secret, opID, Export, raw)
+	secret, dir := s.Secret, Export
+	if key != nil {
+		secret, dir = key, Import
+	}
+	env, err := Encrypt(secret, opID, dir, raw)
 	if err != nil {
 		return ExportResponse{}, refuse(http.StatusInternalServerError, CodeInternal, "Не удалось зашифровать перенос")
 	}
@@ -254,6 +263,8 @@ type ImportRequest struct {
 	Profile      string   `json:"profile"`
 	Model        ModelRef `json:"model"`
 	WithoutFiles bool     `json:"withoutFiles"`
+	// Key is the one-time key of the operation (OpKey) the bundle was made under; empty for the pair's secret.
+	Key string `json:"key,omitempty"`
 }
 
 // ModelRef is the model a move continues on.
@@ -298,7 +309,15 @@ func (s *Service) Import(ctx context.Context, req ImportRequest) (ImportResponse
 		}
 		s.Store.dropOp(req.OpID)
 	}
-	plain, err := Decrypt(s.Secret, req.OpID, Import, req.BundleEnc)
+	secret := s.Secret
+	if req.Key != "" {
+		k, ok := OpKey(req.Key)
+		if !ok {
+			return ImportResponse{}, refuse(http.StatusBadRequest, CodeBadBundle, "Перенос не прошёл проверку")
+		}
+		secret = k
+	}
+	plain, err := Decrypt(secret, req.OpID, Import, req.BundleEnc)
 	if err != nil {
 		return ImportResponse{}, refuse(http.StatusBadRequest, CodeBadBundle, "Перенос не прошёл проверку")
 	}
@@ -509,12 +528,31 @@ func (s *Service) dispatch(ctx context.Context, step string, body []byte) any {
 			OpID           string `json:"opId"`
 			ConversationID string `json:"conversationId"`
 			WithoutFiles   bool   `json:"withoutFiles"`
+			Key            string `json:"key"`
 		}
 		if !decode(body, &q) {
 			return bad
 		}
-		out, ref := s.Export(ctx, q.OpID, q.ConversationID, q.WithoutFiles)
+		var key []byte
+		if q.Key != "" {
+			k, ok := OpKey(q.Key)
+			if !ok {
+				return bad
+			}
+			key = k
+		}
+		out, ref := s.export(ctx, q.OpID, q.ConversationID, q.WithoutFiles, key)
 		return orRefusal(out, ref)
+	case "status":
+		var q struct {
+			ConversationID string `json:"conversationId"`
+		}
+		if !decode(body, &q) {
+			return bad
+		}
+		return struct {
+			Moved *Pointer `json:"moved"`
+		}{s.Store.Sealed(q.ConversationID)}
 	case "import":
 		var q ImportRequest
 		if !decode(body, &q) {

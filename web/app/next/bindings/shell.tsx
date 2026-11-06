@@ -88,12 +88,14 @@ import {
 } from '@/next/features/sidebar/types';
 import Icon from '@/next/ui/icon';
 import { useHubEntry } from '@/next/features/sidebar/hub-entry';
+import { useBeta } from '@/next/stores/beta';
 import LazyView from '@/next/ui/lazy-view';
 import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
 import { goTo, HOME, ROUTE, useRoute, type TRoute } from '@/next/routes/routes';
 import AppsScreen from '@/next/bindings/apps';
 import SettingsScreen from '@/next/bindings/settings';
+import { BrandingHost } from '@/next/features/app-views/slot-pages';
 import DesignlyView from '@/next/bindings/designly';
 import { DESIGN_KIND } from '@/next/features/designly/designly-home';
 import { useWorkingDesigns } from '@/next/bindings/working-designs';
@@ -292,6 +294,9 @@ const Shell = ({ owner }: IShellProps) => {
   // The tabs over the window: a browser's, on a wide window, unless switched off in Settings.
   const phone = usePhone();
   const hubEntry = useHubEntry();
+  // «Hub first» (Settings → Beta): the runtime is a place to work with agents; Tasks, MR and Help are gone, Management
+  // lives in the hub.
+  const { hubFirst } = useBeta();
   const tabs = useShellTabs(useTabChats(), useTopTabs() && !phone);
   const name = (me.k === 'ready' ? me.me.name : null) ?? appConfig().people[login] ?? null;
 
@@ -314,6 +319,22 @@ const Shell = ({ owner }: IShellProps) => {
     const id = legacyChatId(window.location.search);
     if (id) goTo({ kind: ROUTE.chat, id }, { replace: true });
   }, []);
+
+  // With «Hub first» the retired screens' addresses lead home; Management goes to the hub (home when there is none).
+  const retired =
+    hubFirst &&
+    (route.kind === ROUTE.tasks ||
+      route.kind === ROUTE.help ||
+      route.kind === ROUTE.manage ||
+      route.kind === ROUTE.stats ||
+      route.kind === ROUTE.efficiency);
+  const managed =
+    route.kind === ROUTE.manage || route.kind === ROUTE.stats || route.kind === ROUTE.efficiency;
+  useEffect(() => {
+    if (!retired) return;
+    if (managed && hubEntry) window.location.replace(hubEntry);
+    else goTo(HOME, { replace: true });
+  }, [retired, managed, hubEntry]);
 
   // Switching chats, the open one leaves first (its thread fades up, 180 ms), then the next one comes in.
   const stageId = useLeaving(currentId, CHAT_LEAVE_MS);
@@ -475,7 +496,20 @@ const Shell = ({ owner }: IShellProps) => {
     setDrawerOpen(false);
   };
   const { resolvedTheme, setTheme } = useTheme();
+  const hubItem: readonly IMoreItem[] =
+    hubFirst && hubEntry
+      ? [
+          {
+            id: 'to-hub',
+            icon: 'layout-dashboard',
+            label: t('next.sidebar.hub'),
+            current: false,
+            onSelect: () => window.location.assign(hubEntry),
+          },
+        ]
+      : [];
   const profile: readonly IMoreItem[] = [
+    ...hubItem,
     {
       id: 'settings',
       icon: 'settings',
@@ -484,7 +518,7 @@ const Shell = ({ owner }: IShellProps) => {
       onSelect: () => openScreen({ kind: ROUTE.settings, section: null }),
     },
   ];
-  const more: readonly IMoreItem[] = [
+  const moreAll: readonly IMoreItem[] = [
     {
       id: 'tasks',
       icon: 'list-checks',
@@ -507,6 +541,12 @@ const Shell = ({ owner }: IShellProps) => {
       onSelect: () => openScreen({ kind: ROUTE.help, section: null, page: null }),
     },
   ];
+  // «Hub first»: no Tasks and Help; Management is the hub's row (and only when this person has a hub).
+  const more: readonly IMoreItem[] = hubFirst
+    ? hubEntry
+      ? [{ ...moreAll[1]!, onSelect: () => window.location.assign(hubEntry), current: false }]
+      : []
+    : moreAll;
 
   // No machine runs the new runtime: nothing will load, the list is empty rather than a skeleton forever.
   const noV2 = boot.k === 'ready' && boot.machines.length === 0;
@@ -701,16 +741,26 @@ const Shell = ({ owner }: IShellProps) => {
       else navigate(next);
     },
   });
+  const manageTool: IHomeTool =
+    hubFirst && hubEntry
+      ? {
+          id: 'manage',
+          icon: 'sliders-horizontal',
+          label: t('next.sidebar.manage'),
+          onOpen: (newTab) =>
+            newTab ? void window.open(hubEntry, '_blank', 'noopener') : window.location.assign(hubEntry),
+        }
+      : toolOf('manage', 'sliders-horizontal', t('next.sidebar.manage'), { kind: ROUTE.manage });
   const homeTools: readonly IHomeTool[] = [
     toolOf('designly', 'palette', t('next.sidebar.designly'), { kind: ROUTE.designly }),
-    toolOf('tasks', 'list-checks', t('next.sidebar.tasks'), { kind: ROUTE.tasks }),
+    ...(hubFirst ? [] : [toolOf('tasks', 'list-checks', t('next.sidebar.tasks'), { kind: ROUTE.tasks })]),
     {
       id: 'search',
       icon: 'search',
       label: t('next.sidebar.search'),
       onOpen: () => setSearchOpen(true),
     },
-    toolOf('manage', 'sliders-horizontal', t('next.sidebar.manage'), { kind: ROUTE.manage }),
+    ...(hubFirst && !hubEntry ? [] : [manageTool]),
     toolOf('settings', 'settings', t('next.shell.settings'), { kind: ROUTE.settings, section: null }),
   ];
 
@@ -949,13 +999,13 @@ const Shell = ({ owner }: IShellProps) => {
           initialKind={DESIGN_KIND.video}
         />
       )}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.tasks && model.active && (
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.tasks && !hubFirst && model.active && (
         <AppsScreen key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.apps && model.active && (
         <AppsListPage key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
       )}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.help && model.active && (
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.help && !hubFirst && model.active && (
         <HelpPage
           key={model.active}
           machine={model.active}
@@ -987,6 +1037,7 @@ const Shell = ({ owner }: IShellProps) => {
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
+      {model.active && <BrandingHost machine={model.active} />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.settings && model.active && (
         <SettingsScreen
           key={model.active}
@@ -996,9 +1047,11 @@ const Shell = ({ owner }: IShellProps) => {
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
-      {route.kind === ROUTE.manage && <ManageScreen onOpen={navigate} />}
-      {route.kind === ROUTE.stats && <LegacyScreen screen={LEGACY_SCREEN.stats} onOpen={navigate} />}
-      {route.kind === ROUTE.efficiency && (
+      {!hubFirst && route.kind === ROUTE.manage && <ManageScreen onOpen={navigate} />}
+      {!hubFirst && route.kind === ROUTE.stats && (
+        <LegacyScreen screen={LEGACY_SCREEN.stats} onOpen={navigate} />
+      )}
+      {!hubFirst && route.kind === ROUTE.efficiency && (
         <LegacyScreen screen={LEGACY_SCREEN.efficiency} onOpen={navigate} />
       )}
       {route.kind === ROUTE.invite && <InviteAccept key={route.token} token={route.token} />}

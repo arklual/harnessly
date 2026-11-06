@@ -3,6 +3,12 @@
 *.test
 *.out
 /runtime
+/hub
 /agent
 /agentprobe
 /.env
+
+# HRN-761 browser journey output
+web/e2e-hub-report/
+web/e2e-hub-results/
+/hub

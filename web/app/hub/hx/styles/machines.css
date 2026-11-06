@@ -3,7 +3,7 @@
   display: block;
   border-radius: 8px;
   background: var(--hx-bg-hover);
-  animation: mo-pulse 1.2s ease-in-out infinite;
+  animation: hx-blink 1.2s ease-in-out infinite;
 }
 .ad .mx-skel-tiles {
   display: grid;

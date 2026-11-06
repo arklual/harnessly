@@ -694,3 +694,18 @@ func TestWithRealTmux(t *testing.T) {
 		t.Fatalf("delete: %v", err)
 	}
 }
+
+// A tab whose id was chosen ahead (a launch line that names its chat) is added under that id.
+func TestAddTabTakesTheChosenID(t *testing.T) {
+	r := newRig(t)
+	r.writeLayout("ws-x", `{"root":{"type":"pane","id":"pane-a","tabs":[],"activeTabId":null},"activePaneId":"pane-a","updatedAt":"x"}`)
+	r.s.cfg.NewID = func() string { return nanoid(6) }
+	id := r.s.NewTabID()
+	tab, err := r.s.AddTab("ws-x", "pane-a", TabOptions{ID: id})
+	if err != nil || tab.String("id") != id || !strings.Contains(tab.String("sessionName"), id) {
+		t.Fatalf("tab %v: %v", tab, err)
+	}
+	if other, _ := r.s.AddTab("ws-x", "pane-a", TabOptions{}); other == nil || other.String("id") == id {
+		t.Fatalf("a tab without a chosen id: %v", other)
+	}
+}

@@ -17,7 +17,7 @@ var connReasons = map[string]string{
 	"denied":          "the service refused the connection's credentials: ask the person to reconnect it in Settings → Connections",
 	"not-found":       "no such connection, issue or page",
 	"unreachable":     "the service did not answer; try again later",
-	"unsupported":     "this connection cannot do that (a tracker has no pages, a wiki no issues)",
+	"unsupported":     "this connection cannot do that (a tracker has no pages, a wiki no issues, only GitLab has merge requests)",
 	"unknown-product": "the link is not a product harnessly knows",
 }
 
@@ -181,8 +181,11 @@ func (c *cli) primaryOf(capability string) (string, error) {
 	}
 	if first == "" {
 		what := "tracker"
-		if capability == "pages" {
+		switch capability {
+		case "pages":
 			what = "wiki"
+		case "code":
+			what = "code host (GitLab)"
 		}
 		return "", fail("no %s is connected: ask the person to connect one in Settings → Connections", what)
 	}
@@ -281,6 +284,84 @@ func (c *cli) issues(args []string) error {
 	}
 	if len(out.Issues) == 0 {
 		c.out("no issues\n")
+	}
+	return nil
+}
+
+type cliMR struct {
+	IID                 int    `json:"iid"`
+	Title               string `json:"title"`
+	URL                 string `json:"url"`
+	State               string `json:"state"`
+	Draft               bool   `json:"draft"`
+	Project             string `json:"project"`
+	SourceBranch        string `json:"sourceBranch"`
+	DetailedMergeStatus string `json:"detailedMergeStatus"`
+	Pipeline            *struct {
+		Status string `json:"status"`
+	} `json:"pipeline"`
+}
+
+// mrs: harnessly mrs [--conn ID] [--state opened|merged|closed|all] [--limit N] TEXT… — merge requests of a code host.
+func (c *cli) mrs(args []string) error {
+	state, rest := "", make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--state":
+			if i+1 >= len(args) {
+				return usageErr("--state needs a value")
+			}
+			i++
+			state = args[i]
+		case strings.HasPrefix(a, "--state="):
+			state = strings.TrimPrefix(a, "--state=")
+		default:
+			rest = append(rest, a)
+		}
+	}
+	if state != "" && state != "opened" && state != "merged" && state != "closed" && state != "all" {
+		return usageErr("--state is opened, merged, closed or all")
+	}
+	conn, q, err := searchFlags(rest, false)
+	if err != nil {
+		return err
+	}
+	if state != "" {
+		q.Set("state", state)
+	}
+	if conn == "" {
+		if conn, err = c.primaryOf("code"); err != nil {
+			return err
+		}
+	}
+	raw, err := c.connGet("/"+url.PathEscape(conn)+"/mrs", q)
+	if err != nil {
+		return err
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var out struct {
+		MRs []cliMR `json:"mrs"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return err
+	}
+	for _, m := range out.MRs {
+		st := m.State
+		if m.Draft {
+			st += ",draft"
+		}
+		ci := "-"
+		if m.Pipeline != nil && m.Pipeline.Status != "" {
+			ci = m.Pipeline.Status
+		}
+		c.out("%s!%d\t[%s]\tci:%s\t%s\t%s\n", m.Project, m.IID, st, ci, m.Title, m.URL)
+	}
+	if len(out.MRs) == 0 {
+		c.out("no merge requests\n")
 	}
 	return nil
 }

@@ -65,4 +65,34 @@ describe('chat move gateway client', () => {
     vi.stubGlobal('fetch', answer(200, { nope: true }));
     await expect(fetchMoveTargets('vm1', 'tab-1')).rejects.toBeInstanceOf(MoveError);
   });
+
+  it('asks the fleet hub first and goes on asking it while it answers', async () => {
+    const fetchMock = answer(200, { enabled: true, moved: null });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await fetchMoveStatus('hubvm', 'tab-1')).toEqual({ enabled: true, moved: null });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/api\/v2\/chat-move\/status\?machine=hubvm/);
+    const targets = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ source: { ok: true }, targets: [{ machineId: 'vm2', orgName: 'Acme' }] }),
+    });
+    vi.stubGlobal('fetch', targets);
+    const got = await fetchMoveTargets('hubvm', 'tab-1');
+    expect(String(targets.mock.calls[0]?.[0])).toMatch(/\/api\/v2\/chat-move\/targets\?machine=hubvm/);
+    expect(got.targets[0]?.orgName).toBe('Acme');
+  });
+
+  it('falls back to the gateway when the hub has no such path (flag off, standalone)', async () => {
+    const fetchMock = vi.fn(async (url: unknown) =>
+      String(url).includes('/api/v2/chat-move')
+        ? { ok: false, status: 404, json: async () => ({ error: 'off', code: 'not_enabled' }) }
+        : { ok: true, status: 200, json: async () => ({ enabled: true, moved: null }) },
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await fetchMoveStatus('gwvm')).toEqual({ enabled: true, moved: null });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await fetchMoveStatus('gwvm');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[2]?.[0])).not.toContain('/api/v2/');
+  });
 });

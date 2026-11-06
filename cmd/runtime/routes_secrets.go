@@ -35,9 +35,10 @@ const (
 	secretWaitMax = 55 * time.Second
 )
 
-// safe is the safe of a runtime: its store, the open asks and the short-lived files.
+// safe is the safe of a runtime: where it keeps the values (safe_backend.go), the open asks and the short-lived files.
 type safe struct {
-	store    *secrets.Store
+	store    *secrets.Safe
+	where    safeStore
 	asks     *secrets.Asks
 	files    *secrets.Files
 	identity func(string) secrets.Use
@@ -62,11 +63,25 @@ func storeFor(dataDir, home string) *secrets.Store {
 }
 
 func newSafe(d deps) *safe {
+	dir := filepath.Join(d.DataDir, "secrets")
+	store, where := newSafeBackend(os.Getenv, storeFor(d.DataDir, d.Home), dir, d.DataDir)
+	if where.Error != "" {
+		agent.Log("warn", "safe: the server safe cannot be used: "+where.Error)
+	}
 	return &safe{
-		store: storeFor(d.DataDir, d.Home),
+		store: store,
+		where: where,
 		asks:  secrets.NewAsks(),
 		files: secrets.NewFiles(os.Getenv("RUNTIME_SECRETS_FILES_DIR")),
 	}
+}
+
+// listAnswer is the list of the page and the CLI; a safe on a server also says where it is.
+func (sf *safe) listAnswer(out map[string]any) map[string]any {
+	if sf.where.Mode != safeModeLocal {
+		out["store"] = sf.where
+	}
+	return out
 }
 
 func secretJSON(w http.ResponseWriter, status int, v any) {
@@ -91,8 +106,13 @@ func secretRefusal(w http.ResponseWriter, err error) {
 	switch reason {
 	case secrets.ReasonNotFound:
 		status = http.StatusNotFound
-	case secrets.ReasonKeyLost:
+	case secrets.ReasonKeyLost, secrets.ReasonReadOnly:
 		status = http.StatusConflict
+	case secrets.ReasonDenied:
+		status = http.StatusForbidden
+	case secrets.ReasonUnavailable:
+		status = http.StatusServiceUnavailable
+		agent.Log("warn", "safe: "+err.Error())
 	case secrets.ReasonRateLimited, secrets.ReasonTooMany:
 		status = http.StatusTooManyRequests
 	case secrets.ReasonFailed:
@@ -123,6 +143,7 @@ type cliSecret struct {
 	CreatedAt  int64  `json:"createdAt"`
 	UpdatedAt  int64  `json:"updatedAt"`
 	LastUsedAt int64  `json:"lastUsedAt"`
+	Where      string `json:"where,omitempty"`
 }
 
 func secretRoutes(d deps, c *core) []gate.Route {
@@ -225,7 +246,7 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 			secretRefusal(w, err)
 			return
 		}
-		secretJSON(w, http.StatusOK, map[string]any{"secrets": views, "asks": sf.asks.Pending()})
+		secretJSON(w, http.StatusOK, sf.listAnswer(map[string]any{"secrets": views, "asks": sf.asks.Pending()}))
 	}
 
 	one := func(w http.ResponseWriter, r *http.Request) {
@@ -366,9 +387,9 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 			if !v.Allowed(identity(r, "").Project) {
 				continue
 			}
-			out = append(out, cliSecret{Name: v.Name, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt, LastUsedAt: v.LastUsedAt})
+			out = append(out, cliSecret{Name: v.Name, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt, LastUsedAt: v.LastUsedAt, Where: v.Where})
 		}
-		secretJSON(w, http.StatusOK, map[string]any{"secrets": out})
+		secretJSON(w, http.StatusOK, sf.listAnswer(map[string]any{"secrets": out}))
 	}
 
 	cliAsk := func(w http.ResponseWriter, r *http.Request) {
@@ -448,7 +469,7 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 			return
 		}
 		for _, n := range b.Names {
-			if !secrets.ValidName(n) {
+			if !secrets.ValidRef(n) {
 				secretRefusal(w, &secrets.Refusal{Reason: secrets.ReasonBadName})
 				return
 			}
@@ -477,7 +498,7 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 			badBody(w)
 			return
 		}
-		if !secrets.ValidName(b.Name) {
+		if !secrets.ValidRef(b.Name) {
 			secretRefusal(w, &secrets.Refusal{Reason: secrets.ReasonBadName})
 			return
 		}
@@ -492,7 +513,7 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 		if ttl == 0 {
 			ttl = secrets.DefaultFileTTL
 		}
-		path, err := sf.files.Write(b.Name, values[b.Name], ttl)
+		path, err := sf.files.Write(secrets.FileName(b.Name), values[b.Name], ttl)
 		if err != nil {
 			secretRefusal(w, err)
 			return

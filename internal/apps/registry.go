@@ -34,7 +34,11 @@ type Installed struct {
 	Previous string `json:"previous,omitempty"`
 	// Team: the install is the team's, made by an owner for everybody (see team.go); the person can turn it off for
 	// themselves (Muted), not remove it. Never written to installed.json.
-	Team        bool  `json:"team,omitempty"`
+	Team bool `json:"team,omitempty"`
+	// Env: the install is the environment's (see envinstall.go); Locked: its item is pinned, so it cannot be turned off.
+	// Never written to installed.json.
+	Env         bool  `json:"env,omitempty"`
+	Locked      bool  `json:"locked,omitempty"`
 	Muted       bool  `json:"muted,omitempty"`
 	InstalledAt int64 `json:"installedAt"`
 	UpdatedAt   int64 `json:"updatedAt"`
@@ -165,7 +169,11 @@ func (r *Registry) ListAll() ([]Installed, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.mergeTeam(list)
+	withTeam, err := r.mergeTeam(list)
+	if err != nil {
+		return nil, err
+	}
+	return r.mergeEnv(withTeam)
 }
 
 // Get is one installed app.
@@ -226,7 +234,11 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 	if err != nil {
 		return Installed{}, ps, err
 	}
-	everyone, err := r.mergeTeam(list)
+	withTeam, err := r.mergeTeam(list)
+	if err != nil {
+		return Installed{}, ps, err
+	}
+	everyone, err := r.mergeEnv(withTeam)
 	if err != nil {
 		return Installed{}, ps, err
 	}
@@ -309,6 +321,9 @@ func (r *Registry) Remove(id string) error {
 	if !slices.ContainsFunc(list, func(a Installed) bool { return a.ID == id }) && r.teamHas(id) {
 		return ErrTeamApp
 	}
+	if !slices.ContainsFunc(list, func(a Installed) bool { return a.ID == id }) && r.envHas(id) {
+		return ErrEnvApp
+	}
 	for i, a := range list {
 		if a.ID != id {
 			continue
@@ -320,6 +335,7 @@ func (r *Registry) Remove(id string) error {
 		if !a.Dev {
 			_ = os.RemoveAll(filepath.Join(r.Root, "packages", a.ID))
 		}
+		r.dropConnectionGrants(id)
 		return nil
 	}
 	return ErrNotInstalled

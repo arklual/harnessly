@@ -48,10 +48,10 @@ func runMachineCode(ctx context.Context, args []string, lookup func(string) (str
 		fmt.Fprintln(stderr, "hub machine-code: data folder:", err)
 		return 1
 	}
-	db, err := store.Open(ctx, cfg.DatabaseURL)
+	db, err := openDB(ctx, cfg, logger(stderr, cfg.LogLevel))
 	if err != nil {
 		fmt.Fprintln(stderr, "hub machine-code:", err)
-		return 1
+		return exitCode(err)
 	}
 	defer db.Close()
 	st := db.S()

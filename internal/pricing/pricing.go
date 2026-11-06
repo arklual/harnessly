@@ -173,6 +173,9 @@ var (
 
 func openAIPriceOf(model string) (openAIPrice, bool) {
 	n := jscompat.Trim(strings.ToLower(model))
+	if p, ok := customPrice(n); ok {
+		return p, true
+	}
 	n = openAIPrefix.ReplaceAllLiteralString(n, "")
 	n = openAIDate.ReplaceAllLiteralString(n, "")
 	n = openAISnapshot.ReplaceAllLiteralString(n, "")
@@ -205,4 +208,24 @@ func OpenAICost(model string, input, cachedInput, output float64) (float64, bool
 	}
 	const mtok = 1_000_000
 	return float64(nonCached/mtok*p.input) + float64(cached/mtok*cachedPrice) + float64(max(0, output)/mtok*p.output), true
+}
+
+var (
+	customMu     sync.RWMutex
+	customPrices = map[string]openAIPrice{}
+)
+
+// RegisterOpenAI adds the price of a model that is not in the table (dollars per million tokens), for a model profile of
+// the profiles file; the model id is matched whole, ahead of the table. A price of a model already registered is replaced.
+func RegisterOpenAI(model string, input, cachedInput, output float64) {
+	customMu.Lock()
+	defer customMu.Unlock()
+	customPrices[strings.ToLower(jscompat.Trim(model))] = openAIPrice{input, output, usd(cachedInput)}
+}
+
+func customPrice(n string) (openAIPrice, bool) {
+	customMu.RLock()
+	defer customMu.RUnlock()
+	p, ok := customPrices[n]
+	return p, ok
 }

@@ -471,8 +471,8 @@ func (s *Service) sharesRoute(r *http.Request, m store.Machine, email, project s
 		}
 		var made map[string]any
 		if err := s.write(ctx, m, func(t *txn) error {
-			var err error
-			made, _, err = t.createShare(project, email, in, s.shareURLOf)
+			row, token, err := t.createShare(project, email, in)
+			made = row.json(s.shareURLOf(token))
 			return err
 		}); err != nil {
 			return nil, 0, err
@@ -585,8 +585,8 @@ func (s *Service) sharesRoute(r *http.Request, m store.Machine, email, project s
 		}
 		var out map[string]any
 		if err := s.write(ctx, m, func(t *txn) error {
-			var err error
-			out, err = t.updateShare(project, email, third, c)
+			row, err := t.updateShare(project, email, third, c)
+			out = row.json(nil)
 			return err
 		}); err != nil {
 			return nil, 0, err

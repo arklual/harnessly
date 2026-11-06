@@ -36,26 +36,73 @@ const Tipped = ({ tip, children }: { tip: string; children: React.ReactNode }) =
   </span>
 );
 
+/** «3 пункта»: the count of a group's items in words. */
+export const itemsWord = (n: number): string => {
+  const ten = n % 10;
+  const hundred = n % 100;
+  if (ten === 1 && hundred !== 11) return `${n} пункт`;
+  if (ten >= 2 && ten <= 4 && (hundred < 12 || hundred > 14)) return `${n} пункта`;
+  return `${n} пунктов`;
+};
+
+/** The head of a group: a folder that opens onto its items, its name and count, and its switches. */
 export const GroupHead = ({
   g,
   count,
   edit,
+  open,
+  onToggle,
   a,
 }: {
   g: EnvGroup;
   count: number;
   edit: boolean;
+  open: boolean;
+  onToggle: () => void;
   a: GroupActions;
 }) => {
   const mine = a.onMine;
   return (
-    <div className="ev-grp" data-required={g.required ? 'true' : undefined}>
-      <span className="ev-grp__t">
-        <b>{g.name}</b>
-        <small>{g.hint || (count === 0 ? 'Пока пусто — перенесите сюда пункты' : `${count} в группе`)}</small>
-      </span>
+    <div
+      className="ev-grp"
+      data-required={g.required ? 'true' : undefined}
+      data-open={open ? 'true' : undefined}
+    >
+      <button
+        type="button"
+        className="ev-grp__head"
+        aria-expanded={open ? 'true' : 'false'}
+        aria-label={`Группа «${g.name}», ${itemsWord(count)}`}
+        onClick={onToggle}
+      >
+        <Icon i="chevron-right" size="sm" className="ev-chev" />
+        <span className="ad-ic ev-grp__ic">
+          <Icon i={open ? 'folder-open' : 'folder'} size="sm" />
+        </span>
+        <span className="ev-grp__t">
+          <span className="ev-grp__name">
+            <b>{g.name}</b>
+            <span className="ev-grp__n">Группа · {itemsWord(count)}</span>
+          </span>
+          <small>{g.hint || (count === 0 ? 'Пока пусто — перенесите сюда пункты' : '')}</small>
+        </span>
+      </button>
       {edit && !g.builtIn && (
         <>
+          <Tipped
+            tip={
+              g.required
+                ? 'Поставится всем, выключить нельзя. Выключите — каждый выберет сам'
+                : 'Каждый выбирает у себя. Включите — поставится всем'
+            }
+          >
+            <span className="ev-req__l">{g.required ? 'всем' : 'по желанию'}</span>
+            <Switch
+              on={g.required}
+              label="Всем"
+              onClick={() => void a.onPatch(g, { required: !g.required })}
+            />
+          </Tipped>
           {!g.required && (
             <Tipped
               tip={
@@ -64,28 +111,14 @@ export const GroupHead = ({
                   : 'Получат только те, кто включит у себя. Включите — получат все, кто не выключил'
               }
             >
-              <span className="ev-req__l">{g.defaultOn ? 'включена сразу' : 'выключена'}</span>
+              <span className="ev-req__l">{g.defaultOn ? 'сразу включена' : 'сразу выключена'}</span>
               <Switch
                 on={g.defaultOn}
-                label="Включена сразу"
+                label="Сразу включена"
                 onClick={() => void a.onPatch(g, { defaultOn: !g.defaultOn })}
               />
             </Tipped>
           )}
-          <Tipped
-            tip={
-              g.required
-                ? 'Поставится всем, выключить нельзя. Выключите — каждый выберет сам'
-                : 'Каждый выбирает у себя. Включите — поставится всем'
-            }
-          >
-            <span className="ev-req__l">{g.required ? 'обязательная' : 'по желанию'}</span>
-            <Switch
-              on={g.required}
-              label="Обязательная"
-              onClick={() => void a.onPatch(g, { required: !g.required })}
-            />
-          </Tipped>
           <span className="ev-pen-w hx-tipped">
             <button
               type="button"
@@ -118,7 +151,7 @@ export const GroupHead = ({
       )}
       {edit && g.builtIn && <span className="ev-req__ro">от платформы</span>}
       {!edit && (g.required || !mine) && (
-        <span className="ev-req__ro">{g.required ? 'обязательная' : 'по желанию'}</span>
+        <span className="ev-req__ro">{g.required ? 'всем' : 'по желанию'}</span>
       )}
     </div>
   );
@@ -164,7 +197,7 @@ export const MoveTo = ({ row, groups, a }: { row: EnvEntryRow; groups: EnvGroup[
                 }}
               >
                 <span>{g ? g.name : 'Без группы'}</span>
-                {g && <small>{g.required ? 'обязательная' : 'по желанию'}</small>}
+                {g && <small>{g.required ? 'всем' : 'по желанию'}</small>}
                 {on && <Icon i="check" size="sm" />}
               </button>
             );

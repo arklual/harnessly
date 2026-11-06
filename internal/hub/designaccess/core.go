@@ -56,6 +56,7 @@ var (
 	uuidRe      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	emailRe     = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 	isoDateRe   = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))$`)
+	teamIDRe    = regexp.MustCompile(`^(space:)?[a-z0-9][a-z0-9_-]{0,62}$`)
 	hexRevRe    = regexp.MustCompile(`^[0-9a-f]{40}$`)
 )
 

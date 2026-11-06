@@ -29,6 +29,8 @@ export class OrgApiError extends Error {
     // Machine setup: no online machine of the person with the setup feature; the machine is already running something.
     | 'no_machine'
     | 'busy'
+    // The hub opens only machines it trusts on its own origin (no HUB_RUNTIME_DOMAIN): the tenant's owner may trust one.
+    | 'untrusted'
     // A refusal of the space endpoints (machine codes, invites, members): the message is already the text to show.
     | 'hub'
     | 'internal';

@@ -487,7 +487,9 @@ const steerScenario = async (text: string, name: string) => {
   await input.fill(text);
   await input.press('Control+Enter');
   await expect(stack.filter({ hasText: text })).toHaveCount(1, { timeout: 8_000 });
-  await expect(stack.filter({ hasText: text })).toContainText('The agent reads it after the current step');
+  await expect(stack.filter({ hasText: text })).toContainText(
+    "In the agent's queue — read after the current step",
+  );
   await shot(`${name}-stack`);
   await expect(feed().getByText(text, { exact: true })).toHaveCount(1, { timeout: 30_000 });
   await expect(stack).toHaveCount(0);
@@ -551,6 +553,25 @@ test('3c3. a message to an idle agent is in the feed at once and stays where it 
   await expect(feed().getByText(reply('plain one'))).toBeVisible({ timeout: 60_000 });
   await expect(stack).toHaveCount(0);
   expectSteady(await stop(), 'feed');
+});
+
+test("3c3b. the agent's questions stand over the field: one choice, then two of several, «Send answers» reaches the agent, which says what it got", async () => {
+  await agentFree();
+  const { input } = stage();
+  await input.fill('askquestions please');
+  await input.press('Enter');
+  const card = page.locator('.hx-ask');
+  await expect(card.locator('.hx-ask__q', { hasText: 'Which crust?' })).toBeVisible({ timeout: 30_000 });
+  await card.getByRole('button', { name: /Thick/ }).click();
+  // A single choice moves on to the next question by itself.
+  await expect(card.locator('.hx-ask__q', { hasText: 'Which toppings?' })).toBeVisible();
+  await card.getByRole('button', { name: /Cheese/ }).click();
+  await card.getByRole('button', { name: /Basil/ }).click();
+  await card.getByRole('button', { name: 'Send answers', exact: true }).click();
+  await expect(feed().getByText(reply('got crust Thick and toppings Cheese, Basil'))).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(card).toHaveCount(0);
 });
 
 test('3c4. the socket drops with a message in the stack and again as one is sent: after the reconnect each stands once and is delivered once', async () => {
@@ -1018,7 +1039,10 @@ test("4. the header opens the agent's terminal, which shows the agent's pane", a
   await page.locator('.hx-header__term').click();
   const term = page.locator('.hx-term');
   await expect(term).toHaveAttribute('data-open', 'true');
-  await expect(term.locator('.xterm-rows')).toContainText('shorter please', { timeout: 30_000 });
+  await expect(term.locator('.xterm-rows')).toContainText(
+    /Fake agent reply: (shorter please|askquestions please)/,
+    { timeout: 30_000 },
+  );
   await page.locator('.hx-term__btn').click();
   await expect(term).toHaveAttribute('data-open', 'false');
 });

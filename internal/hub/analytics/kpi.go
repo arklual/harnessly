@@ -189,6 +189,27 @@ var kpis = []kpiDef{
 	{"cache_hit", "share", "up", func(ss []kSession, _ float64) *float64 {
 		return ratio(sum(ss, "cacheReadTokens"), sum(ss, input...))
 	}},
+	// The share of cache writes made for an hour (twice the price of a five-minute one); sessions of machines that do not
+	// split the writes add nothing to either side.
+	{"cache_write_1h", "share", "down", func(ss []kSession, _ float64) *float64 {
+		return ratio(sum(ss, "cacheWrite1hTokens"), sum(ss, "cacheWrite5mTokens", "cacheWrite1hTokens"))
+	}},
+	// Merged requests that stayed 14 days without a revert, of those old enough to tell (mrsMature is set by the hub).
+	{"mr_survival", "share", "up", func(ss []kSession, _ float64) *float64 {
+		return ratio(sum(ss, "mrsSurvived"), sum(ss, "mrsMature"))
+	}},
+	// How long the person makes the agent wait: the 90th percentile of the waits of a session, averaged over sessions by
+	// their number of waits (the machine keeps the waits, the hub only gets each session's p90).
+	{"waiting_p90", "ms", "down", func(ss []kSession, _ float64) *float64 {
+		var t, n float64
+		for _, s := range ss {
+			if p, w := s.M["waitP90Ms"], s.M["waits"]; p > 0 && w >= 1 {
+				t += p * w
+				n += w
+			}
+		}
+		return ratio(t, n)
+	}},
 	{"skills_in_use", "share", "up", func(ss []kSession, _ float64) *float64 {
 		return ratio(sum(ss, "skillsLoaded"), sum(ss, "skillsListed"))
 	}},

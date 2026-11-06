@@ -264,13 +264,20 @@ func (c *cli) designMigrate(args []string) error {
 // hook runs a hook of an agent: its input on stdin, its answer on stdout.
 func (c *cli) hook(args []string) error {
 	if len(args) == 3 && args[0] == "app-guard" && args[1] == "--policy" {
-		return c.appGuard(args[2])
+		return c.appGuard(args[2], false)
+	}
+	// Codex's hook says so: its input and its answer are not Claude Code's.
+	if len(args) == 5 && args[0] == "app-guard" && args[1] == "--policy" && args[3] == "--agent" && args[4] == "codex" {
+		return c.appGuard(args[2], true)
 	}
 	if len(args) == 3 && args[0] == "app-context" && args[1] == "--policy" {
 		return c.appContext(args[2])
 	}
+	if len(args) == 5 && args[0] == "app-validate" && args[1] == "--policy" && args[3] == "--event" {
+		return c.appValidateHook(args[2], args[4])
+	}
 	if len(args) != 1 || (args[0] != "design-guard" && args[0] != "design-release") {
-		return usageErr("hook design-guard|design-release|app-guard --policy <file>|app-context --policy <file>")
+		return usageErr("hook design-guard|design-release|app-guard --policy <file> [--agent codex]|app-context --policy <file>|app-validate --policy <file> --event PostToolUse|Stop")
 	}
 	if args[0] == "design-release" {
 		c.releaseLeases()

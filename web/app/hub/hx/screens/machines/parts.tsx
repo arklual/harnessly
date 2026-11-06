@@ -5,6 +5,9 @@ import type { MachineGroup, OrgMachine } from '../../../org/api/machines';
 import { Bars } from '../../charts/bars';
 import { Meter } from '../../charts/meter';
 import { Strip } from '../../charts/strip';
+import { Count, useLive } from '../../live';
+import { type SortKey, useListView } from '../../sort-bar';
+import { sortRows } from '../../sort';
 import { Btn, Icon, initial } from '../../ui';
 import { useRowOpen } from './open';
 import {
@@ -42,7 +45,9 @@ export const Tiles = ({ tiles }: { tiles: readonly Tile[] }) => (
               {t.strip ? <Strip parts={t.strip} /> : <Bars values={t.bars ?? []} />}
             </span>
             <span className="sx-tile__label">{t.label}</span>
-            <span className="sx-tile__value">{t.value}</span>
+            <span className="sx-tile__value">
+              <Count text={t.value} />
+            </span>
           </div>
         ))}
       </div>
@@ -168,18 +173,71 @@ export const Seg = <T extends string>({
   </div>
 );
 
-export const TableHead = () => (
-  <div className="mt-row mt-head">
-    <span>Машина</span>
-    <span>Состояние</span>
-    <span>Чаты сейчас</span>
-    <span>Процессор</span>
-    <span>Память</span>
-    <span>Диск</span>
-    <span>Раннер</span>
-    <span>За неделю</span>
-  </div>
-);
+const MACHINE_SORTS: SortKey[] = [
+  { id: 'name', label: 'Машина', first: 'asc' },
+  { id: 'chats', label: 'Чаты сейчас' },
+  { id: 'cpu', label: 'Процессор' },
+  { id: 'ram', label: 'Память' },
+  { id: 'disk', label: 'Диск' },
+  { id: 'week', label: 'За неделю' },
+];
+
+/** The sort of the flat list of machines (live hub only): the address keeps it, no key keeps the usual order. */
+export const useMachineSort = () => {
+  const live = useLive();
+  const view = useListView(MACHINE_SORTS, { key: null, dir: 'desc' });
+  const sort = (rows: OrgMachine[]): OrgMachine[] =>
+    live && view.sort.key
+      ? sortRows(rows, view.sort, {
+          name: (m) => m.name,
+          chats: (m) => m.chats ?? -1,
+          cpu: (m) => m.cpu ?? -1,
+          ram: (m) => m.ram ?? -1,
+          disk: (m) => m.disk ?? -1,
+          week: (m) => m.weekCostUsd ?? -1,
+        })
+      : rows;
+  return { view, sort };
+};
+
+const HEAD: [string | null, string][] = [
+  ['name', 'Машина'],
+  [null, 'Состояние'],
+  ['chats', 'Чаты сейчас'],
+  ['cpu', 'Процессор'],
+  ['ram', 'Память'],
+  ['disk', 'Диск'],
+  [null, 'Раннер'],
+  ['week', 'За неделю'],
+];
+
+export const TableHead = ({ sorting }: { sorting?: ReturnType<typeof useMachineSort> }) => {
+  const live = useLive();
+  const view = live ? sorting?.view : undefined;
+  return (
+    <div className="mt-row mt-head">
+      {HEAD.map(([id, label]) =>
+        view && id ? (
+          <span key={label}>
+            <button
+              type="button"
+              className="live-sort"
+              aria-sort={
+                view.sort.key === id ? (view.sort.dir === 'asc' ? 'ascending' : 'descending') : undefined
+              }
+              onClick={() => view.pick(id)}
+            >
+              {label}
+              <i aria-hidden="true">↓</i>
+            </button>
+          </span>
+        ) : (
+          <span key={label}>{label}</span>
+        ),
+      )}
+    </div>
+  );
+};
 
 export const MachineRow = ({
   m,

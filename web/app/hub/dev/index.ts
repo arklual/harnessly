@@ -50,6 +50,23 @@ export const SCENARIOS: Record<string, Entry> = {
       },
     },
   },
+  'signin-oidc': {
+    title: 'Вход только через провайдера (HUB_AUTH_EMAIL=off)',
+    path: '/signin',
+    scenario: {
+      signedIn: false,
+      spaces: [],
+      config: {
+        auth: {
+          email: { mode: 'off' },
+          passkey: false,
+          github: false,
+          yandex: false,
+          oidc: [{ id: 'corp', name: 'Corp SSO' }],
+        },
+      },
+    },
+  },
   invite: {
     title: 'Приглашение по ссылке',
     path: '/invite/abc',

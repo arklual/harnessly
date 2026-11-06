@@ -48,6 +48,18 @@ OTHER AGENTS (this machine and the fleet's other machines)
                                     or exits 1 with "refused: <reason> — <why>". The other agent reads it as a
                                     <peer-message> with your machine, owner and chat, and answers by building the same command from its ref.
 
+INSTALLING A RELEASE
+  harnessly upgrade plan|apply|rollback
+                                    a signed release as one set: what changes and which extensions break (plan), replace,
+                                    check and roll back the programs (apply). harnessly upgrade --help
+
+MACHINE
+  harnessly selftest [--agent] [--claude PATH]
+                                    tries what a tab needs from this machine in a throwaway pane: an empty shell is
+                                    seen, a program in it is seen, typed keys reach it; --agent also has a real Claude
+                                    (on haiku; --claude PATH: that binary) ask a question and get its answer; exit 1
+                                    when a step fails
+
 TELEGRAM NOTIFICATIONS (the person's Telegram, connected in Settings → Notifications)
   harnessly notify                  the person's Telegram and any bots of their own: chat, and the person's instruction
                                     of when to write
@@ -81,7 +93,10 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
   harnessly app install [DIR]       install a copy of the package on this machine
   harnessly app list | remove ID    the installed apps; uninstall one
   harnessly app enable|disable ID
+  harnessly app connect ID CONNECTION [--off]
                                     turn an app on or off in this chat (the agent gets it when it starts next)
+  harnessly app explain ID          why the app is on or off here, layer by layer: machine, team, setup, activation,
+                                    this chat, the wall; ✗ marks the layer that keeps it off
   harnessly app publish [DIR] --channel dev|beta|stable [--team]
                                     publish a new, immutable version on a channel (--team: also to the team's catalog)
   harnessly app promote VERSION --channel beta|stable | rollback --channel C | channels [ID]
@@ -116,6 +131,9 @@ TRACKERS AND WIKIS (the person's Jira, Confluence, YouTrack, Linear, GitLab, Git
   harnessly issue KEY|URL [--conn ID]
                                     one issue with its description and last comments; a link is read by the
                                     connection it belongs to
+  harnessly mrs [--conn ID] [--state opened|merged|closed|all] [--limit N] TEXT...
+                                    merge requests of the GitLab connection whose title or description has TEXT
+                                    (up to 10): project!iid, state, pipeline, title, link
   harnessly pages [--conn ID] TEXT...   search wiki pages;  harnessly page ID|URL [--conn ID]   read one
                                     Never ask for a tracker's token: if a service is not connected, ask the person to
                                     connect it in Settings → Connections.
@@ -130,6 +148,7 @@ ASK A PERSON (through the same bots; the person sets who and where in Settings �
   harnessly ask wait|status|cancel ask_…   wait again, show the replies (new ones marked), call it off
 
 DESIGN PROJECTS
+  harnessly doctor render [--json]            draw a real picture and a 2 s video here and read them back ("help doctor")
   harnessly design page list <project>        the pages of a design project: id, title, board file
   harnessly design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE]
                                     a new page: a permanent id and a board file made from the project's board template
@@ -178,6 +197,7 @@ Exit codes: 0 done, 1 refused or failed (the reason is printed), 2 wrong usage.
 var commandHelp = map[string]string{
 	"docs":         docsUsage,
 	"browser":      browserHelp,
+	"upgrade":      upgradeHelp,
 	"design video": videoHelp,
 	"open": `harnessly open <target>
 
@@ -253,9 +273,34 @@ A project-scoped secret requires a verified connection from an allowed project.
 run passes the command's exit code on and masks the values in its output; quote $VAR inside sh -c, never echo it.
 Never print a value, write it into the workspace or a commit, or ask the person to paste it into the chat.
 `,
+	"supervise": `harnessly supervise [--runtime BIN] [--agent BIN] [--status-file F]
+
+Keeps the machine's processes running where no service manager does (a container, WSL without systemd): starts the
+runtime (and the agent, when --agent is given), starts one again when it ends, waiting 1 s, 2 s, 4 s ... up to 30 s
+after quick failures (--backoff-base, --backoff-max), and says why it ended on stderr. As process 1 of a container it
+passes SIGTERM/SIGINT on to the children and collects orphaned processes. It never registers: the agent finds the same
+machine.json at each start, so the machine stays in its hub under the same id. Restarts and the last end of each
+process are noted in supervisor.json of the data folder.
+`,
+	"install": `harnessly install [--check] [--script FILE] [installer options]
+
+Installs harnessly on this machine with the installer script, after checking the environment (HARNESSLY_PREFLIGHT=1):
+the system, curl/tar, tmux and git, free disk, the port, the service manager, Docker, and whether the network works
+(a company CA, a proxy). Every step goes to a journal (install.log in the data folder, --log FILE for another). --check
+only checks and changes nothing. The script comes from --script, $HARNESSLY_INSTALL_SCRIPT, DIR/install.sh of
+--offline DIR, the --mirror, or the public address.
+
+  --ca-file FILE     company CA (SSL_CERT_FILE, NODE_EXTRA_CA_CERTS and others for every component)
+  --proxy URL        HTTPS proxy; --no-proxy LIST adds hosts that go direct (localhost always does)
+  --mirror URL       a copy of the release files; --npm-registry URL, --pip-index URL for the packages
+  --offline DIR      an offline bundle (scripts/make-offline-bundle.sh builds one); nothing is downloaded
+  --check            look only
+Running it again updates in place and doubles nothing. Other options go to the script (install.sh --help).
+`,
 	"connections": connectionsHelp,
 	"issues":      connectionsHelp,
 	"issue":       connectionsHelp,
+	"mrs":         connectionsHelp,
 	"pages":       connectionsHelp,
 	"page":        connectionsHelp,
 	"tab": `harnessly tab list|create|send|status|result|close
@@ -370,7 +415,7 @@ and say so, or stop and leave the question for the person.
 	"api-guide":  "harnessly api-guide\n\nPrint the runtime's HTTP API for agents: the /api/cli routes with their payloads.\n",
 }
 
-const connectionsHelp = `harnessly connections | issues | issue | pages | page
+const connectionsHelp = `harnessly connections | issues | issue | mrs | pages | page
 
 The person's trackers, wikis and code hosts are connected in Settings → Connections (Jira, Confluence, YouTrack, Linear,
 GitLab, GitHub, …, in the cloud or on their own servers). These commands read them through the runtime: you never hold
@@ -382,6 +427,7 @@ their tokens. Reads only.
   harnessly issues --native 'project = ABC AND status = "In Review"'   a query in the product's own language
   harnessly issue ABC-12                      a key of the primary tracker (--conn for another one)
   harnessly issue https://acme.atlassian.net/browse/ABC-12   a link: the connection that owns it answers
+  harnessly mrs --state opened HRN-796       merge requests that name a task, with their pipelines (GitLab)
   harnessly pages onboarding checklist        search the primary wiki
   harnessly page https://acme.atlassian.net/wiki/spaces/ENG/pages/123456/Runbook
 

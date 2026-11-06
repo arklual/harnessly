@@ -50,6 +50,9 @@ type Preset struct {
 	// Switched: the profile takes no key. The person turns it on (Store.Switches), and Claude Code is pointed at the
 	// local proxy the switch keeps; BaseURL is where the proxy's requests end up.
 	Switched bool
+	// KeyRef names a secret of the safe the key is taken from (a profile of the profiles file, ProfileFile). It is a
+	// name and never the value; Store.Secrets turns it into the key when the key is needed.
+	KeyRef string
 }
 
 const million = 1 << 20
@@ -145,11 +148,11 @@ var presets = []Preset{
 }
 
 // Presets are the vendor setups the runtime knows, in the order the Settings screen lists them.
-func Presets() []Preset { return append([]Preset(nil), presets...) }
+func Presets() []Preset { return all() }
 
 // Find is the preset with that id.
 func Find(id string) (Preset, bool) {
-	for _, p := range presets {
+	for _, p := range all() {
 		if p.ID == id {
 			return p, true
 		}

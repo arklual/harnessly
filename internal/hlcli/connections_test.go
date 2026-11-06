@@ -26,10 +26,14 @@ func connRuntime(t *testing.T) (*httptest.Server, *[]string) {
 		case "/api/cli/connections":
 			_, _ = w.Write([]byte(`{"connections":[
 				{"id":"env-tracker","kind":"youtrack","name":"tracker.example.com","baseUrl":"https://tracker.example.com","state":"ok","env":true,"capabilities":["issues"]},
+				{"id":"g1","kind":"gitlab","name":"GitLab","baseUrl":"https://gitlab.example.com","state":"ok","capabilities":["issues","code"]},
 				{"id":"c1","kind":"jira","name":"Acme Jira","baseUrl":"https://acme.atlassian.net","state":"ok","primary":true,"capabilities":["issues"],"me":{"name":"Ann Lee"}},
 				{"id":"c2","kind":"confluence","name":"Acme Wiki","baseUrl":"https://acme.atlassian.net/wiki","state":"denied","capabilities":["pages"]}],"kinds":["jira"]}`))
 		case "/api/cli/connections/c1/issues":
 			_, _ = w.Write([]byte(`{"issues":[{"key":"ABC-1","title":"Login bug","url":"https://acme.atlassian.net/browse/ABC-1","status":{"name":"In Progress","category":"doing"},"assignee":{"name":"Ann Lee"}}]}`))
+		case "/api/cli/connections/g1/mrs":
+			_, _ = w.Write([]byte(`{"mrs":[{"iid":7,"title":"HRN-796 mrs","url":"https://gitlab.example.com/a/b/-/merge_requests/7","state":"opened","draft":true,"project":"a/b","pipeline":{"status":"running"}},` +
+				`{"iid":8,"title":"HRN-796 docs","url":"https://gitlab.example.com/a/b/-/merge_requests/8","state":"merged","project":"a/b","pipeline":null}]}`))
 		case "/api/cli/connections/c1/issue":
 			if r.URL.Query().Get("key") != "ABC-1" {
 				w.WriteHeader(404)
@@ -78,6 +82,21 @@ func TestConnectionsCommands(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("the primary tracker was not asked: %v", *asked)
+	}
+	r = runConn(t, srv.URL, "mrs", "--state", "all", "--limit", "5", "HRN-796")
+	if r.code != 0 || r.out != "a/b!7\t[opened,draft]\tci:running\tHRN-796 mrs\thttps://gitlab.example.com/a/b/-/merge_requests/7\n"+
+		"a/b!8\t[merged]\tci:-\tHRN-796 docs\thttps://gitlab.example.com/a/b/-/merge_requests/8\n" {
+		t.Fatalf("%d %q %q", r.code, r.out, r.errs)
+	}
+	found = false
+	for _, a := range *asked {
+		found = found || a == "GET /api/cli/connections/g1/mrs?limit=5&q=HRN-796&state=all"
+	}
+	if !found {
+		t.Fatalf("the GitLab connection was not asked: %v", *asked)
+	}
+	if r = runConn(t, srv.URL, "mrs", "--state", "bogus", "x"); r.code != 2 {
+		t.Fatalf("%d %q", r.code, r.errs)
 	}
 	r = runConn(t, srv.URL, "issue", "ABC-1")
 	if r.code != 0 || !strings.Contains(r.out, "ABC-1  Login bug\nstatus:   In Progress\n") || !strings.Contains(r.out, "Steps to reproduce") ||

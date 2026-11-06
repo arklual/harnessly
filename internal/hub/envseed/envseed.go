@@ -29,10 +29,11 @@ type File struct {
 
 // Org is what goes into one organization, named by its slug.
 type Org struct {
-	Org     string  `yaml:"org"`
-	Items   []Item  `yaml:"items"`
-	Groups  []Group `yaml:"groups"`
-	Entries []Entry `yaml:"entries"`
+	Org     string   `yaml:"org"`
+	Items   []Item   `yaml:"items"`
+	Groups  []Group  `yaml:"groups"`
+	Presets []Preset `yaml:"presets"`
+	Entries []Entry  `yaml:"entries"`
 }
 
 // Group is a group of a layer (docs/hub/environment.md, «Groups»): required, or optional and on (defaultOn: false starts
@@ -43,6 +44,15 @@ type Group struct {
 	Hint      string `yaml:"hint"`
 	Required  bool   `yaml:"required"`
 	DefaultOn *bool  `yaml:"defaultOn"`
+}
+
+// Preset is a named set of the groups of a layer (docs/hub/environment.md, «Presets»); Groups are group names of the
+// same layer. Matched by (layer, scope, name).
+type Preset struct {
+	Scope  `yaml:",inline"`
+	Name   string   `yaml:"name"`
+	Hint   string   `yaml:"hint"`
+	Groups []string `yaml:"groups"`
 }
 
 // Item is a catalog item. Owner narrows who may change it and where it may be used; none: the organization.
@@ -127,6 +137,7 @@ type applier struct {
 	tenants map[string]store.Space // by slug
 	teams   map[string]store.Team  // by tenant slug + "/" + team name
 	groups  []store.EnvGroup
+	presets []store.EnvPreset
 }
 
 func (a *applier) note(format string, args ...any) {
@@ -170,6 +181,14 @@ func (a *applier) org(o Org) error {
 	for i, g := range o.Groups {
 		if err := a.group(g); err != nil {
 			return fmt.Errorf("groups[%d] %q: %w", i, g.Name, err)
+		}
+	}
+	if a.presets, err = a.st.EnvPresetsOfOrg(a.ctx, a.org_.ID); err != nil {
+		return err
+	}
+	for i, pr := range o.Presets {
+		if err := a.preset(pr); err != nil {
+			return fmt.Errorf("presets[%d] %q: %w", i, pr.Name, err)
 		}
 	}
 	for i, e := range o.Entries {
@@ -519,5 +538,78 @@ func (a *applier) group(in Group) error {
 	}
 	a.note("~ group «%s» in %s (%s)", name, a.where(layer, scopeID), strings.Join(what, ", "))
 	return a.journal(layer, scopeID, "env.group.update", "env_group", cur.ID, fmt.Sprintf("Окружение (из файла): группа «%s» в %s изменена (%s)", name, a.where(layer, scopeID), strings.Join(what, ", ")),
+		map[string]any{"name": name, "changed": what})
+}
+
+func (a *applier) preset(in Preset) error {
+	layer, scopeID, err := a.resolve(&in.Scope)
+	if err != nil {
+		return err
+	}
+	name, err := env.CleanText("name", in.Name, 40, true)
+	if err != nil {
+		return err
+	}
+	hint, err := env.CleanText("hint", in.Hint, 200, false)
+	if err != nil {
+		return err
+	}
+	ids := []string{}
+	for _, gn := range in.Groups {
+		g, ok := a.groupOf(layer, scopeID, gn)
+		if !ok {
+			return fmt.Errorf("no group %q in this layer: add it to groups", gn)
+		}
+		if !slices.Contains(ids, g.ID) {
+			ids = append(ids, g.ID)
+		}
+	}
+	var cur store.EnvPreset
+	var found bool
+	for _, p := range a.presets {
+		if p.Layer == layer && p.ScopeID == scopeID && strings.EqualFold(p.Name, name) {
+			cur, found = p, true
+			break
+		}
+	}
+	where := a.where(layer, scopeID)
+	if !found {
+		p := store.EnvPreset{OrgID: a.org_.ID, Layer: layer, ScopeID: scopeID, Name: name, Hint: hint, GroupIDs: ids, CreatedAt: a.now, UpdatedAt: a.now}
+		for _, o := range a.presets {
+			if o.Layer == layer && o.ScopeID == scopeID {
+				p.Position++
+			}
+		}
+		p.Position++
+		added, ok, err := a.st.AddEnvPreset(a.ctx, p)
+		if err != nil || !ok {
+			return errors.Join(err, errors.New("preset not added"))
+		}
+		a.presets = append(a.presets, added)
+		a.note("+ preset «%s» in %s", name, where)
+		return a.journal(layer, scopeID, "env.preset.add", "env_preset", added.ID, fmt.Sprintf("Окружение (из файла): пресет «%s» добавлен в %s", name, where),
+			map[string]any{"name": name, "groupIds": ids})
+	}
+	var what []string
+	if hint != "" && cur.Hint != hint {
+		what, cur.Hint = append(what, "hint"), hint
+	}
+	if !slices.Equal(cur.GroupIDs, ids) {
+		what, cur.GroupIDs = append(what, "groups"), ids
+	}
+	if len(what) == 0 {
+		return nil
+	}
+	cur.UpdatedAt = a.now
+	if err := a.st.UpdateEnvPreset(a.ctx, cur); err != nil {
+		return err
+	}
+	for i := range a.presets {
+		if a.presets[i].ID == cur.ID {
+			a.presets[i] = cur
+		}
+	}
+	a.note("~ preset «%s» in %s (%s)", name, where, strings.Join(what, ", "))
+	return a.journal(layer, scopeID, "env.preset.update", "env_preset", cur.ID, fmt.Sprintf("Окружение (из файла): пресет «%s» в %s изменён (%s)", name, where, strings.Join(what, ", ")),
 		map[string]any{"name": name, "changed": what})
 }

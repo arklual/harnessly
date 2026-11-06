@@ -79,8 +79,10 @@ sequenceDiagram
 ```
 
 The agent side and the view side share **chat storage** (`app.data_*` and `hl.storage.chat` are the same data) and **workspace files**.
-A view does not receive a push when the agent writes: read again, for example on `hl.on('context')` or after the agent's message, or poll
-sparingly. The `tool-result` event is not connected yet.
+When the agent writes a key (`app.data_set`), the view is told at once, within a second, by the `storage` event: `hl.on('storage', ({scope, key}) => …)`.
+The event names the key and never carries the value: read it again with `hl.storage.chat.get(key)`. The same event comes when another view of the
+app or the view itself writes. A view hears only its own app's keys, and the area of a chat only in that chat. The stream is best effort, so also read again when the
+view becomes visible (the `visibility` event). The `tool-result` event is not connected yet.
 
 ## The sandbox
 
@@ -109,6 +111,8 @@ listing in review.
 
 `hl.connect()` sets `<html data-theme="light|dark">`, `color-scheme`, `lang`, and these tokens on `:root`, and updates them when the theme
 changes. The SDK ships no stylesheet and there are no tokens before the connect, so give every token a default.
+
+**hl-ui.css.** The host's primitives on these tokens: `<link rel="stylesheet" href="/__hl/hl-ui.css">`, then `.hl-body` on `<body>`. Type (`.hl-title`, `.hl-h`, `.hl-muted`, `.hl-hint`), layout on an 8 px grid (`.hl-row`, `.hl-stack`, `.hl-grid`), `.hl-card`, `.hl-list`, a figure with its context (`.hl-stat`, `.hl-stat__value`, `.hl-stat__label`), controls (`.hl-btn`, `--primary`, `--ghost`, `--sm`, `.hl-input`, `.hl-field`, `.hl-label`), `.hl-seg` for a choice of a few in place of a native `<select>`, `.hl-table`, `.hl-skeleton` while reading and `.hl-empty` for nothing there, `.hl-pop` with `.hl-closing` for what opens and closes. Your own sheet after it wins. `harnessly app validate` warns of an inline `style=`, a native `<select>` and a colour written out instead of a token (file and line); `--strict` counts the warnings.
 
 | Token | Use | Light | Dark |
 | --- | --- | --- | --- |
@@ -145,13 +149,15 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 | --- | --- | --- |
 | `hl.context` | none | `app`, `target`, `view`, `theme`, `locale`, `chat` (null when the app is off in the chat), `readOnly`, `data` (a card's). `user` is always `null` |
 | `hl.host` | none | `{name, version}` |
-| `hl.on(event, fn)` | none | Working events: `context`, `theme`, and `selection` in Sinopia |
+| `hl.on(event, fn)` | none | Working events: `context`, `theme`, `storage` (`{scope, key}`: a key was written or deleted), `visibility` (`{visible}`: the view was hidden or shown), `agents` (`{agents}`: the list of conversations or the status of one changed; only with `agents.read`), and `selection` in Sinopia. `tool-input` and `tool-result` are not sent yet |
 | `hl.chat.send(text)` | `chat.prompt` | A message to the agent, up to 20 000 characters, shown with the app's name on one line |
 | `hl.chat.read({last})` | `chat.read` | Latest messages as `{role, text}`: default 20, at most 200 |
 | `hl.chat.card(view, data)` | `chat.card` | A card at the end of the feed. Kept in this browser, at most 20 per chat, data up to 20 000 characters |
-| `hl.pane.open(target)` | `pane.open` | Only `app:<id>[/<view>]` |
+| `hl.pane.open(target)` | `pane.open` | `app:<id>[/<view>]`, or `chat:<id>` to open a conversation from `hl.agents.list()` (this also needs `agents.read`; otherwise `permission_denied`) |
+| `hl.agents.list()` | `agents.read` | The person's conversations on this machine as `{id, title, status, provider, machine}`. `status` is `working`, `waiting` (a question, a permission or a plan waits for the person) or `free`. No message text, prompt or path. The `agents` event brings the same list when it changes |
 | `hl.tools.call('server.tool', args)` | none | A tool of your own **remote https** server. Returns the raw MCP result: check `isError` yourself. See [Backend](03-backend.md) |
-| `hl.storage.<scope>.get/set/delete/keys` | `storage` | Scopes below; `get` of a missing key is `null` |
+| `hl.storage.<scope>.get/getVersioned/set/delete/keys` | `storage` | Scopes below; `get` of a missing key is `null`. `getVersioned(key)` answers `{value, version}`; `set(key, value, {ifVersion})` answers the new version. See [Versions](#versions) |
+| `hl.flow.*`, `hl.data.*` | none | **Removed.** They were never connected. A call rejects with `invalid_params` and says to use `hl.storage` |
 | `hl.files.read(path)`, `hl.files.write(path, text)` | `files.read:<mask>`, `files.write:<mask>` | Files of the chat's folder, as text |
 | `hl.ui.confirm(text)` | none | A dialog titled with the app's real name. **Resolves a boolean.** Up to 500 characters; never times out |
 | `hl.ui.toast(text)` | none | A notice, up to 500 characters |
@@ -175,7 +181,26 @@ The wire is MCP Apps (JSON-RPC 2.0 over `postMessage`), so a standard MCP Apps v
 | `space` | The team; writing needs `storage.space.write` | 10 MB |
 | `doc` | A Sinopia document | 100 KB per document, 20 MB in all |
 
-A key is 1 to 256 characters. A write past a limit is refused whole, and the view sees `host_unavailable` with the word `quota`.
+A key is 1 to 256 characters. A write past a limit is refused whole, and the view sees the code `quota_exceeded`.
+
+### Versions
+
+Every key has a version: a counter that goes up by one with each write or delete of the key. A key never written, or kept before versions existed, is at 0.
+`getVersioned(key)` answers `{value, version}`. `set(key, value)` answers the new version. To change a value you read without
+overwriting what someone else wrote meanwhile (the agent, another view), hand the version back:
+
+```js
+const { value, version } = await hl.storage.chat.getVersioned('notes');
+try {
+  await hl.storage.chat.set('notes', [...(value ?? []), 'new'], { ifVersion: version });
+} catch (e) {
+  if (e.code !== 'conflict') throw e;
+  // e.version is the version the key has now: read again, merge, try again. Nothing was written.
+}
+```
+
+`ifVersion: 0` writes only if the key was never written. A `set` without `ifVersion` writes as it always did. The agent has the same contract in
+`app.data_get` (answers `{"value", "version"}`) and `app.data_set` (`ifVersion`; refuses with `conflict` and the current version).
 
 ## Files of the workspace
 

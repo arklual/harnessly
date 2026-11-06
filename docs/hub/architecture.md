@@ -74,8 +74,9 @@ frames are protocol v1 as it is today (request with `id` → one response, event
 frames); protocol 2 only adds operations and events ([api.md, agent link](api.md#agent-link-protocol-2)).
 
 The hub keeps the links in memory, one per machine; a second connection of the same machine replaces the first
-(close code 4011). That makes the hub **one replica**, as the closed cluster's gateway is today. Several replicas need a
-link directory (who holds which machine) and a hop between replicas; that is after launch.
+(close code 4011). That makes the hub **one replica** by default. With `HUB_REPLICAS=on` the links get an owner, a lease
+and a fencing token in a directory in Postgres, and a request for a machine on another replica goes to its owner over an
+internal hop: [replicas.md](replicas.md).
 
 ### Reaching a runtime through the hub
 
@@ -125,7 +126,7 @@ person's cookie, so a compromised machine could act as the person in the hub. Tw
   `check-config` prints it, and the docs say so. The hub enforces the trust it asks for: in this mode `proxy.admit` and
   `GET /api/machines/<id>/open` refuse (403 `machine_untrusted`, with the explanation to set `HUB_RUNTIME_DOMAIN`) every
   machine whose creator (`machines.created_by`) is not an instance administrator, as `adminFor` computes it, however
-  open `HUB_SIGNUP` is. A member can make a space and a machine and invite an administrator in; without this the
+  open `HUB_SIGNUP` is, unless the owner of the machine's space has trusted it (`HUB_MACHINE_TRUST=on`, `machine_trust`). A member can make a space and a machine and invite an administrator in; without this the
   machine's script would act as that administrator on the hub's origin. It cannot be sandboxed: a `Content-Security-Policy: sandbox` without
   `allow-same-origin` gives the page an opaque origin, which sends no cookies, and the runtime would not work with it.
 
@@ -356,6 +357,6 @@ One binary, one schema. What changes is configuration:
 | SSH to private addresses | refused; `HUB_SSH_ALLOW_PRIVATE=on` allows | refused |
 | Container profile | when `HUB_CONTAINER_IMAGE` is set | when `HUB_CONTAINER_IMAGE` is set |
 
-Not in this version (named so nobody stubs them): conversation projection into the database, several hub replicas,
+Not in this version (named so nobody stubs them): conversation projection into the database,
 agent self-update (re-run the install command), Teleport, «Наша ВМ», signed release artefacts beyond SHA-256 over TLS,
 bubblewrap around agent launches, captcha, recovery codes, SAML/SCIM, Gemini.

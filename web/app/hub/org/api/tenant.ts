@@ -51,8 +51,9 @@ export interface TenantApi {
   issueMachineCode(spaceId: string, profile: MachineProfile, confirmFull: boolean): Promise<IssuedCode>;
   tenantInvites(spaceId: string): Promise<TenantInvite[]>;
   /** Invites one address; the invitee joins with the role given (a member by default). */
-  inviteByEmail(spaceId: string, email: string, role?: TenantRole): Promise<TenantInvite>;
-  inviteByLink(spaceId: string): Promise<TenantInvite>;
+  inviteByEmail(spaceId: string, email: string, role?: TenantRole, teamId?: string): Promise<TenantInvite>;
+  /** A link for anyone given it; `teamId` also puts them in that team of the tenant. */
+  inviteByLink(spaceId: string, teamId?: string): Promise<TenantInvite>;
   revokeInvite(spaceId: string, inviteId: string): Promise<void>;
   tenantMembers(spaceId: string): Promise<TenantMember[]>;
   setTenantRole(spaceId: string, userId: string, role: TenantRole): Promise<void>;

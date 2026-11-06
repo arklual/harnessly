@@ -6,11 +6,22 @@ metadata:
   labels:
     {{- include "hub.labels" . | nindent 4 }}
 spec:
-  # One replica, replaced and not rolled: a second hub on the same SQLite file would corrupt it, and agent links and
-  # event streams live in the process.
+  {{- if include "hub.multi" . }}
+  # Several replicas on a shared Postgres, rolled one at a time: a machine's link has an owner with a lease and a
+  # fencing token in the database, and a request reaches the owner over the replicas' internal hop (docs/hub/replicas.md).
+  replicas: {{ int .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  {{- else }}
+  # One replica, replaced and not rolled: a second hub on the same SQLite file would corrupt it, and without a shared
+  # database the agent links live in this process only.
   replicas: 1
   strategy:
     type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "hub.selectorLabels" . | nindent 6 }}
@@ -57,6 +68,18 @@ spec:
               value: /var/lib/harnessly-hub
             - name: HUB_SIGNUP
               value: {{ .Values.signup | quote }}
+            - name: HUB_ORGS
+              value: {{ .Values.orgs | quote }}
+            {{- with .Values.featuresDefault }}
+            - name: HUB_FEATURES_DEFAULT
+              value: {{ join "," . | quote }}
+            {{- end }}
+            - name: HUB_MACHINE_TRUST
+              value: {{ ternary "on" "off" .Values.machineTrust | quote }}
+            {{- if .Values.oidcEmailTrusted }}
+            - name: HUB_OIDC_EMAIL_TRUSTED
+              value: "on"
+            {{- end }}
             - name: HUB_EDITION
               value: {{ .Values.edition | quote }}
             - name: HUB_PASSKEY
@@ -117,6 +140,28 @@ spec:
             - name: HUB_MAIL_FROM
               value: {{ . | quote }}
             {{- end }}
+            {{- if eq (.Values.authEmail | default "on") "off" }}
+            - name: HUB_AUTH_EMAIL
+              value: "off"
+            {{- end }}
+            {{- with .Values.storage }}
+            {{- if eq .type "s3" }}
+            - name: HUB_STORAGE
+              value: "s3"
+            - name: HUB_S3_ENDPOINT
+              value: {{ required "storage.s3.endpoint is required with storage.type=s3" .s3.endpoint | quote }}
+            - name: HUB_S3_BUCKET
+              value: {{ required "storage.s3.bucket is required with storage.type=s3" .s3.bucket | quote }}
+            {{- with .s3.region }}
+            - name: HUB_S3_REGION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .s3.prefix }}
+            - name: HUB_S3_PREFIX
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- with .Values.containerImage }}
             - name: HUB_CONTAINER_IMAGE
               value: {{ . | quote }}
@@ -170,6 +215,45 @@ spec:
             - name: HUB_DATABASE_URL
               value: "postgres://harnessly:$(POSTGRES_PASSWORD)@{{ include "hub.postgresName" . }}:5432/harnessly?sslmode=disable"
             {{- end }}
+            {{- if include "hub.multi" . }}
+            - name: HUB_REPLICAS
+              value: "on"
+            # Defined before HUB_REPLICA_ADDR: Kubernetes expands $(NAME) from the variables above it.
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: HUB_REPLICA_ADDR
+              value: "http://$(POD_IP):8040"
+            - name: HUB_REPLICA_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HUB_REPLICA_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hub.replicaSecretName" . }}
+                  key: secret
+            {{- end }}
+            {{- if .Values.docs.enabled }}
+            - name: HUB_DOCS
+              value: "on"
+            - name: HUB_DOCS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hub.docsSecretName" . }}
+                  key: token
+            - name: HUB_ARTIFACTS_URL
+              value: {{ include "hub.artifactsURL" . | quote }}
+            - name: HUB_ARTIFACTS_TOKEN
+              value: "$(HUB_DOCS_TOKEN)"
+            {{- with (include "hub.boardsURL" .) }}
+            - name: HUB_BOARDS_URL
+              value: {{ . | quote }}
+            - name: HUB_BOARDS_TOKEN
+              value: "$(HUB_DOCS_TOKEN)"
+            {{- end }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -194,7 +278,7 @@ spec:
               mountPath: /tmp
       volumes:
         - name: data
-          {{- if .Values.persistence.enabled }}
+          {{- if and .Values.persistence.enabled (not (include "hub.multi" .)) }}
           persistentVolumeClaim:
             claimName: {{ include "hub.fullname" . }}-data
           {{- else }}

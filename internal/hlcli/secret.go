@@ -22,7 +22,7 @@ import (
 var secretReasons = map[string]string{
 	"bad-origin":   "a site must be an HTTPS origin, or HTTP on localhost, 127.0.0.1 or [::1]",
 	"bad-project":  "project identifiers must be nonempty and have no surrounding spaces",
-	"bad-name":     "a name is letters, digits, '.', '_' and '-' (64 at most), e.g. github-token",
+	"bad-name":     "a name is letters, digits, '.', '_' and '-' (64 at most), e.g. github-token; a reference is local:NAME or vault:PATH#KEY",
 	"not-found":    "the safe has no secret by that name: ask the person for it with harnessly secret ask NAME --why \"...\"",
 	"key-lost":     "the safe's key is gone, its values cannot be read: ask for the secret again with --replace",
 	"rate-limited": "too many asks from this conversation in the last 10 minutes, wait a little",
@@ -30,6 +30,9 @@ var secretReasons = map[string]string{
 	"empty":        "the value is empty",
 	"too-large":    "the value is too large",
 	"failed":       "the runtime could not read its safe",
+	"denied":       "the safe's server refused this machine's login or this path: tell the person, do not retry",
+	"unavailable":  "the safe's server does not answer or is not set up right: tell the person, try again later",
+	"read-only":    "a vault: reference is read only: it is changed on the server, not through the safe",
 }
 
 const (
@@ -91,7 +94,14 @@ func (c *cli) secretList() error {
 			Name       string `json:"name"`
 			UpdatedAt  int64  `json:"updatedAt"`
 			LastUsedAt int64  `json:"lastUsedAt"`
+			Where      string `json:"where"`
 		} `json:"secrets"`
+		Store *struct {
+			Mode  string `json:"mode"`
+			Addr  string `json:"addr"`
+			Refs  bool   `json:"refs"`
+			Error string `json:"error"`
+		} `json:"store"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
 		return err
@@ -102,8 +112,22 @@ func (c *cli) secretList() error {
 		}
 		return time.UnixMilli(ms).In(c.zone()).Format("2006-01-02 15:04")
 	}
+	if st := out.Store; st != nil {
+		switch {
+		case st.Error != "":
+			c.out("the safe is on a server that cannot be used: %s\n", st.Error)
+		case st.Refs:
+			c.out("the safe is on %s; vault:PATH#KEY references may be used\n", st.Addr)
+		default:
+			c.out("the safe is on %s\n", st.Addr)
+		}
+	}
 	for _, s := range out.Secrets {
-		c.out("%s\tput %s\tused %s\n", s.Name, stamp(s.UpdatedAt), stamp(s.LastUsedAt))
+		where := ""
+		if s.Where != "" {
+			where = "\t" + s.Where
+		}
+		c.out("%s\tput %s\tused %s%s\n", s.Name, stamp(s.UpdatedAt), stamp(s.LastUsedAt), where)
 	}
 	if len(out.Secrets) == 0 {
 		c.out("the safe is empty: ask the person for a secret with harnessly secret ask NAME --why \"...\"\n")

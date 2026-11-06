@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,12 +54,18 @@ type Launcher struct {
 	// Boundary is the operating system's wall around the agent (boundary.go); nil launches without it and says nothing,
 	// which only a test does.
 	Boundary *Boundary
+	// RequireWall refuses a chat with apps whose wall cannot be made, with the reason and the fix (a deployment's
+	// RUNTIME_APPS_REQUIRE_WALL=1); false starts it without the wall and says so, as boundary.go says why.
+	RequireWall bool
 	// AgentToken issues the token of one launch (gate.CLIToken.IssueAgent), which the routes that change the apps
 	// refuse; the agent's CLI reads it from the file HARNESSLY_CLI_TOKEN_FILE names. nil gives the agent none (a test).
 	AgentToken func(session string, ttl time.Duration) (string, error)
 	// Secrets are the machine's safe, for the ${secret:<name>} an app's .mcp.json names (launch_secrets.go); nil leaves
 	// the servers that name one out of the launch.
 	Secrets SecretSource
+	// Connections are the person's connections, for the servers of an app's .mcp.json that name one (launch_connections.go);
+	// nil leaves those servers out of the launch.
+	Connections ConnectionSource
 }
 
 // AgentTokenTTL is how long the token of a launch holds. A chat that runs longer is given a new one when the agent
@@ -93,6 +100,11 @@ var _ agents.AppLauncher = (*Launcher)(nil)
 
 // Claude is what a Claude Code chat with the apps adds to its launch.
 func (l *Launcher) Claude(ids []string, settingsPath string) (agents.ClaudeApps, error) {
+	return l.ClaudeFor("", ids, settingsPath)
+}
+
+// ClaudeFor is Claude for the launch of a chat: its grant names the chat (writeGrant).
+func (l *Launcher) ClaudeFor(conversation string, ids []string, settingsPath string) (agents.ClaudeApps, error) {
 	var out agents.ClaudeApps
 	var prompt strings.Builder
 	protected, err := l.Registry.ProtectedDirs()
@@ -112,7 +124,12 @@ func (l *Launcher) Claude(ids []string, settingsPath string) (agents.ClaudeApps,
 		}
 		out.PluginDirs = append(out.PluginDirs, a.Dir)
 		installed = append(installed, a)
-		snap.Apps = append(snap.Apps, SnapshotApp{ID: a.ID, Name: a.Manifest.Name, Tools: toolsOf(a.Manifest), Context: ContextItems(a.Manifest)})
+		sa := SnapshotApp{ID: a.ID, Name: a.Manifest.Name, Tools: toolsOf(a.Manifest), Context: ContextItems(a.Manifest)}
+		// Scripts run only for a trusted app: an install made before this rule, or edited since, does not get round it.
+		if vs := ValidatorsOf(a.Manifest); len(vs) > 0 && a.Manifest.Trust == TrustTrusted {
+			sa.Dir, sa.Validators = a.Dir, vs
+		}
+		snap.Apps = append(snap.Apps, sa)
 		text, err := instructions(a)
 		if err != nil {
 			return out, fmt.Errorf("app %s: %w", id, err)
@@ -168,7 +185,7 @@ func (l *Launcher) Claude(ids []string, settingsPath string) (agents.ClaudeApps,
 		sealDir = l.sessionDir(session)
 		// What this token may ask the runtime's MCP proxy for: the apps on in this chat now (launch_secrets.go). The agent
 		// cannot write it: its folder is a read-only bind in the wall. A new launch writes a new one.
-		if err := writeGrant(sealDir, ids); err != nil {
+		if err := writeGrant(sealDir, ids, conversation); err != nil {
 			return out, fmt.Errorf("the apps' grant: %w", err)
 		}
 		// The pane's shell names the tab's tmux session before the wall: inside it the tmux server is out of reach
@@ -204,7 +221,11 @@ func (l *Launcher) Claude(ids []string, settingsPath string) (agents.ClaudeApps,
 			out.PluginDirs[i] = pluginDir
 		}
 	}
-	out.Wrap = l.wall(ids, snap.Protected, token != "", own)
+	wrap, err := l.wall(ids, snap.Protected, token != "", own)
+	if err != nil {
+		return out, err
+	}
+	out.Wrap = wrap
 	return out, nil
 }
 
@@ -250,18 +271,25 @@ func withToken(srv map[string]any, token string) {
 }
 
 // wall is the wall's words for the launch line, "" when the machine cannot make it: the chat then starts without it,
-// and the log says so at every such launch (see boundary.go for why it is not refused).
-func (l *Launcher) wall(ids []string, protected []string, hideCredentials bool, own []string) string {
+// and the log says so at every such launch (see boundary.go for why it is not refused), unless the deployment requires
+// the wall (RequireWall): then the launch fails with the reason and the fix.
+func (l *Launcher) wall(ids []string, protected []string, hideCredentials bool, own []string) (string, error) {
 	if l.Boundary == nil {
-		return ""
+		if l.RequireWall {
+			return "", ErrWallRequired{Cause: errors.New("this runtime has no wall")}
+		}
+		return "", nil
 	}
 	if err := l.Boundary.Ready(l.Registry.Root); err != nil {
+		if l.RequireWall {
+			return "", ErrWallRequired{Cause: err}
+		}
 		jsonlog.Log("warn", "apps: the agent of a chat with apps starts without the operating system's wall around the apps",
 			jsonlog.F{K: "apps", V: strings.Join(ids, ",")}, jsonlog.F{K: "error", V: err.Error()})
-		return ""
+		return "", nil
 	}
 	if !hideCredentials {
-		return l.Boundary.Words(protected)
+		return l.Boundary.Words(protected), nil
 	}
 	data := filepath.Dir(l.Registry.Root)
 	hidden := []string{filepath.Join(data, "cli-token"), filepath.Join(data, gate.AgentTokenFile)}
@@ -269,8 +297,25 @@ func (l *Launcher) wall(ids []string, protected []string, hideCredentials bool, 
 		hidden = append(hidden, l.MCPConfigPath)
 	}
 	home, _ := os.UserHomeDir()
-	return l.Boundary.SealedWords(protected, &Seal{Data: data, Home: home, Open: own}, hidden...)
+	return l.Boundary.SealedWords(protected, &Seal{Data: data, Home: home, Open: own}, hidden...), nil
 }
+
+// ErrWallRequired: the deployment requires the wall around the apps (RUNTIME_APPS_REQUIRE_WALL) and this machine cannot
+// make it. The text names the cause and the command that puts it right.
+type ErrWallRequired struct{ Cause error }
+
+func (e ErrWallRequired) Error() string {
+	fix := "allow unprivileged user namespaces: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 " +
+		"(or kernel.unprivileged_userns_clone=1), then check «Проверка машины» → apps_boundary"
+	if errors.Is(e.Cause, ErrNoBwrap) {
+		fix = "install bubblewrap: sudo apt-get install -y bubblewrap (dnf install bubblewrap), then check «Проверка машины» → apps_boundary"
+	}
+	return "the chat does not start with apps on: this deployment requires the wall around the apps " +
+		"(RUNTIME_APPS_REQUIRE_WALL) and it cannot be made here (" + e.Cause.Error() + "); " + fix +
+		", or turn the apps off in this chat"
+}
+
+func (e ErrWallRequired) Unwrap() error { return e.Cause }
 
 // hostMCP writes the config of the harnessly-app server: the runtime's own MCP endpoint and token (read from its config
 // file), selected by ?server=harnessly-app, so the app tools come under that name and not the runtime's.
@@ -367,6 +412,20 @@ func guardSettings(path, command string, snap Snapshot) ([]byte, error) {
 		for _, ev := range []string{"SessionStart", "UserPromptSubmit"} {
 			have, _ := hooks[ev].([]any)
 			hooks[ev] = append(have, ctx)
+		}
+	}
+	if snap.HasValidators() {
+		// The apps' checks of the turn: after a tool call and before the agent stops. A hook that fails blocks nothing.
+		base := strings.Replace(command, "hook app-guard", "hook app-validate", 1)
+		for _, ev := range []string{ValidatorPostToolUse, ValidatorStop} {
+			entry := map[string]any{"hooks": []any{map[string]any{
+				"type": "command", "command": base + " --event " + ev, "timeout": ValidatorHookTimeoutSeconds,
+			}}}
+			if ev == ValidatorPostToolUse {
+				entry["matcher"] = "*"
+			}
+			have, _ := hooks[ev].([]any)
+			hooks[ev] = append(have, entry)
 		}
 	}
 	settings["hooks"] = hooks

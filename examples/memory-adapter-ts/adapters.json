@@ -1,0 +1,9 @@
+[
+  {
+    "name": "example-memory",
+    "kind": "memory",
+    "url": "http://127.0.0.1:8080",
+    "tokenFile": "/etc/harnessly/example-memory.token",
+    "protocol": "harnessly.memory/v1"
+  }
+]

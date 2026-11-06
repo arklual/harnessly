@@ -161,7 +161,7 @@ export type Config = {
   edition: 'self-hosted' | 'cloud';
   signup: 'open' | 'invite';
   auth: {
-    email: { mode: 'smtp' | 'log' };
+    email: { mode: 'smtp' | 'log' | 'off' };
     passkey: boolean;
     github: boolean;
     yandex: boolean;
@@ -179,6 +179,8 @@ export type Config = {
   sites?: { enabled: boolean; scheme?: 'subdomain' | 'path'; domain?: string };
   /** The page came through a gateway that signs its people in; their workspace is its /agents/. */
   proxied?: boolean;
+  /** What the instance itself switches on for every organization (HUB_FEATURES_DEFAULT); `ui.hx` is one of them. */
+  features?: string[];
 };
 
 export type SiteAccess = 'team' | 'link';

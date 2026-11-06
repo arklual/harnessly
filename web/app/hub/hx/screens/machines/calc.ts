@@ -484,4 +484,5 @@ export const cleanName = (raw: string): string | null => {
 };
 
 /** Whether the machine's workspace can be opened now: it is on and reachable. */
-export const canOpen = (m: OrgMachine): boolean => m.state === 'online' || m.state === 'idle';
+export const canOpen = (m: OrgMachine): boolean =>
+  m.opensRuntime !== false && (m.state === 'online' || m.state === 'idle');

@@ -131,7 +131,12 @@ func probeAppGuard(command string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
-	cmd.Stdin = strings.NewReader(`{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/"}}`)
+	// The input is the agent's own: Codex's guard (--agent codex) reads Codex's tool names.
+	probe := `{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/"}}`
+	if strings.Contains(command, " --agent codex") {
+		probe = `{"hook_event_name":"PreToolUse","tool_name":"update_plan","tool_input":{},"cwd":"/"}`
+	}
+	cmd.Stdin = strings.NewReader(probe)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {

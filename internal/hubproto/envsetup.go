@@ -24,10 +24,16 @@ const (
 	// EnvKindClaudeSettings are keys of the person's ~/.claude/settings.json (always, or only where the person set
 	// none) and a block of ~/.claude/CLAUDE.md between marks.
 	EnvKindClaudeSettings = "claude-settings"
+	// EnvKindApp is an app (the folder with harnessly/app.json) in a repository, installed for the person as the
+	// environment's: they cannot remove it, nor turn it off when it is pinned.
+	EnvKindApp = "app"
 
 	// FeatureEnvClaude is in `hello` when the machine's runtime does the plugin and claude-settings kinds; the hub sends
 	// them only to such a machine.
 	FeatureEnvClaude = "environment.claude"
+	// FeatureEnvApps is in `hello` when the machine's runtime installs the app kind; the hub sends it only to such a
+	// machine.
+	FeatureEnvApps = "environment.apps"
 
 	// FeatureEnvSetup is in `hello` when the agent hands the setup kinds to its runtime and serves env.run. The hub sends
 	// script and access items, and the order of the list, only to such a machine: an older agent would refuse a list
@@ -144,7 +150,7 @@ type EnvSetupState struct {
 
 // IsSetupKind says whether the machine (the runtime) does something with an item of this kind besides the chats.
 func IsSetupKind(kind string) bool {
-	return kind == EnvKindScript || kind == EnvKindAccess || kind == EnvKindRepo || IsClaudeKind(kind)
+	return kind == EnvKindScript || kind == EnvKindAccess || kind == EnvKindRepo || IsClaudeKind(kind) || kind == EnvKindApp
 }
 
 // IsClaudeKind says whether the kind changes the person's Claude Code (FeatureEnvClaude).

@@ -222,15 +222,15 @@ func (c *core) launchRoutes(f *gate.Gate, d deps, isMachineAgent func(*http.Requ
 	l := &layoutapi.Launch{
 		Starter: c.launcher, Inbox: c.inbox, Headlines: &launch.Headlines{}, MachineAgent: isMachineAgent,
 		SessionCreated: func(s string) int64 { return c.cfg.Tmux.PaneDetail(s).SessionCreated },
-		CodexArgs: func(ws, resume string, l *agents.Launch) ([]string, error) {
+		CodexArgs: func(ws, resume string, l *agents.Launch) (codex.Start, error) {
 			if c.agents == nil {
-				return nil, errCoreOff
+				return codex.Start{}, errCoreOff
 			}
 			return c.agents.CodexArgs(ws, resume, l)
 		},
-		CodexForkArgs: func(ws, session string, l *agents.Launch) ([]string, error) {
+		CodexForkArgs: func(ws, session string, l *agents.Launch) (codex.Start, error) {
 			if c.agents == nil {
-				return nil, errCoreOff
+				return codex.Start{}, errCoreOff
 			}
 			return c.agents.CodexForkArgs(ws, session, l)
 		},

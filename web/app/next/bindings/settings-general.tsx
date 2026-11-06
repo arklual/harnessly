@@ -17,6 +17,7 @@ import {
 } from '@/next/features/settings/machine-checks';
 import { applyMachineUpdate, loadUpdateInfo, type TUpdateInfo } from '@/next/features/update/machine-update';
 import { machineRows } from '@/next/features/settings/machines';
+import { ObjectActions } from '@/next/features/app-views/slot-pages';
 import MachinesSection from '@/next/features/settings/machines-section';
 import { loadRuntimeSettings, saveRuntimeSettings, signOut } from '@/next/features/settings/api';
 import { useEffect, useState } from 'react';
@@ -355,12 +356,21 @@ export const MachinesPage = ({ now, pending }: IMachinesPageProps) => {
       }
     : null;
   return (
-    <MachinesSection
-      rows={rows}
-      failed={failed}
-      busy={new Set(waiting.keys())}
-      onMakeMain={(id) => void run(id, t('next.settings.failed'), () => savePerson({ defaultMachine: id }))}
-    />
+    <>
+      <MachinesSection
+        rows={rows}
+        failed={failed}
+        busy={new Set(waiting.keys())}
+        onMakeMain={(id) => void run(id, t('next.settings.failed'), () => savePerson({ defaultMachine: id }))}
+      />
+      {(rows ?? []).map((row) => (
+        <ObjectActions
+          key={row.id}
+          machine={row.id}
+          object={{ kind: 'machine', id: row.id, name: row.name }}
+        />
+      ))}
+    </>
   );
 };
 

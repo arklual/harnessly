@@ -24,6 +24,7 @@ harnessly tab create -t codex-cli --prompt "<the whole task>"   # start another 
 harnessly peers                      # other agents' chats you may write to
 harnessly secret run --env VAR=NAME -- cmd   # run a command with a secret from the safe
 harnessly issues --mine --open       # the person's tasks in their tracker
+harnessly mrs HRN-796                # merge requests that name a task, from the person's GitLab
 harnessly --help                     # everything, with examples
 ```
 

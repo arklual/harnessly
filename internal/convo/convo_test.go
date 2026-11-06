@@ -771,17 +771,17 @@ func TestImportLegacyQueue(t *testing.T) {
 func TestTabFromLayout(t *testing.T) {
 	tab := jsvalue.NewObject("id", "tab-x1", "sessionName", "ws-1-x1", "name", "fix", "panelType", "claude-code",
 		"claudeJsonlPath", "/h/.claude/projects/p/0b8f3c3e-1111-4222-8333-444455556666.jsonl")
-	got, ok := TabFromLayout(tab, "/w")
+	got, ok := TabFromLayout(tab, "/w", "meta")
 	if !ok || got.Provider != wire.ProviderClaude || got.Session != "ws-1-x1" ||
 		got.AgentSessionID != "0b8f3c3e-1111-4222-8333-444455556666" || got.TranscriptPath == "" {
 		t.Fatalf("claude tab: %+v %v", got, ok)
 	}
 	codex := jsvalue.NewObject("id", "tab-x2", "panelType", "codex-cli",
 		"agentState", jsvalue.NewObject("providerId", "codex", "sessionId", "s-1", "jsonlPath", "/c.jsonl"))
-	if got, ok := TabFromLayout(codex, "/w"); !ok || got.TranscriptPath != "/c.jsonl" || got.AgentSessionID != "s-1" {
+	if got, ok := TabFromLayout(codex, "/w", "meta"); !ok || got.TranscriptPath != "/c.jsonl" || got.AgentSessionID != "s-1" {
 		t.Fatalf("codex tab: %+v", got)
 	}
-	if _, ok := TabFromLayout(jsvalue.NewObject("id", "tab-x3", "panelType", "terminal"), "/w"); ok {
+	if _, ok := TabFromLayout(jsvalue.NewObject("id", "tab-x3", "panelType", "terminal"), "/w", "meta"); ok {
 		t.Fatal("a terminal is not a conversation")
 	}
 }
@@ -932,11 +932,11 @@ func TestAnswerReadAfterTheStopHookStaysInItsTurn(t *testing.T) {
 func TestImportedTitlesAreLegacys(t *testing.T) {
 	tab := jsvalue.NewObject("id", "tab-x1", "name", "Claude Code", "title", "acme", "panelType", "claude-code",
 		"agentState", jsvalue.NewObject("providerId", "claude", "summary", "Доступ к dev-машине"))
-	if got, _ := TabFromLayout(tab, "/w"); got.Title != "Доступ к dev-машине" || got.Name != "Claude Code" {
+	if got, _ := TabFromLayout(tab, "/w", "meta"); got.Title != "Доступ к dev-машине" || got.Name != "Claude Code" {
 		t.Fatalf("from the summary: %+v", got)
 	}
 	bare := jsvalue.NewObject("id", "tab-x2", "name", "Claude Code", "title", "acme", "panelType", "claude-code")
-	if got, _ := TabFromLayout(bare, "/w"); got.Title != "" || got.Pane != "acme" {
+	if got, _ := TabFromLayout(bare, "/w", "meta"); got.Title != "" || got.Pane != "acme" {
 		t.Fatalf("the tab's terminal title names no chat: %+v", got)
 	}
 
@@ -1541,7 +1541,47 @@ func TestAppsCommand(t *testing.T) {
 	}
 }
 
-// A new Claude chat starts with the apps that ask to be on in every chat; a Codex chat starts with none.
+// A tab started by the CLI (harnessly tab create) keeps the apps of its launch when it becomes a conversation: the chat's
+// switches and its next launch see what its agent runs with.
+func TestImportKeepsTheLaunchApps(t *testing.T) {
+	tab := jsvalue.NewObject("id", "tab-ap1", "sessionName", "ws-1-ap1", "panelType", "claude-code",
+		"meta", jsvalue.NewObject("launch", jsvalue.NewObject("apps", []any{"acme.meter"})))
+	got, ok := TabFromLayout(tab, "/w", "meta")
+	if !ok || !slices.Equal(got.Apps, []string{"acme.meter"}) {
+		t.Fatalf("tab: %+v", got)
+	}
+	r := newRig(t)
+	r.deps = func(d *Deps) { d.AppsOK = func([]string) string { return "" } }
+	r.rt = r.runtime()
+	if n := r.rt.Import([]ImportTab{got}, nil); n != 1 {
+		t.Fatalf("imported %d", n)
+	}
+	if rec, _ := r.rt.Record("tab-ap1"); !slices.Equal(rec.Apps, []string{"acme.meter"}) {
+		t.Fatalf("apps: %v", rec.Apps)
+	}
+	// An app that is gone from the machine is not turned on by the import.
+	r.deps = func(d *Deps) { d.AppsOK = func(ids []string) string { return ids[0] } }
+	r.rt = r.runtime()
+	got.ID, got.Session = "tab-ap2", "ws-1-ap2"
+	r.rt.Import([]ImportTab{got}, nil)
+	if rec, _ := r.rt.Record("tab-ap2"); len(rec.Apps) != 0 {
+		t.Fatalf("gone app: %v", rec.Apps)
+	}
+	// A Codex tab keeps them too: Codex chats run apps.
+	r.deps = func(d *Deps) { d.AppsOK = func([]string) string { return "" } }
+	r.rt = r.runtime()
+	cx, ok := TabFromLayout(jsvalue.NewObject("id", "tab-ap3", "sessionName", "ws-1-ap3", "panelType", "codex-cli",
+		"meta", jsvalue.NewObject("launch", jsvalue.NewObject("apps", []any{"acme.meter"}))), "/w", "meta")
+	if !ok || cx.Provider != wire.ProviderCodex {
+		t.Fatalf("codex tab: %+v", cx)
+	}
+	r.rt.Import([]ImportTab{cx}, nil)
+	if rec, _ := r.rt.Record("tab-ap3"); !slices.Equal(rec.Apps, []string{"acme.meter"}) {
+		t.Fatalf("codex apps: %v", rec.Apps)
+	}
+}
+
+// A new chat, Claude Code or Codex, starts with the apps that ask to be on in every chat.
 func TestCreateStartsWithAlwaysApps(t *testing.T) {
 	r := newRig(t)
 	r.deps = func(d *Deps) {
@@ -1564,7 +1604,35 @@ func TestCreateStartsWithAlwaysApps(t *testing.T) {
 	if res.R != wire.ResultAccepted || res.ID == nil {
 		t.Fatalf("create codex: %+v", res)
 	}
-	if rec, _ := r.rt.Record(*res.ID); len(rec.Apps) != 0 {
+	if rec, _ := r.rt.Record(*res.ID); !slices.Equal(rec.Apps, []string{"acme.meter"}) {
 		t.Fatalf("codex chat apps: %v", rec.Apps)
+	}
+}
+
+// Apps can be turned on in a Codex chat (they used to be refused): the record carries them to the launch.
+func TestAppsCommandInCodexChat(t *testing.T) {
+	r := newRig(t)
+	r.deps = func(d *Deps) { d.AppsOK = func([]string) string { return "" } }
+	r.rt = r.runtime()
+	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderCodex})
+	if res.R != wire.ResultAccepted || res.ID == nil {
+		t.Fatalf("create codex: %+v", res)
+	}
+	on := r.do(wire.ConversationAppsCmd{OpID: "a1", ID: *res.ID, Apps: []string{"acme.cashback"}})
+	if on.R != wire.ResultAccepted {
+		t.Fatalf("apps in a codex chat: %+v", on)
+	}
+	cs, _ := r.rt.Conversations(context.Background())
+	found := false
+	for _, c := range cs.Conversations {
+		if c.ID == *res.ID {
+			found = true
+			if !slices.Equal(c.Apps, []string{"acme.cashback"}) {
+				t.Fatalf("record: %v", c.Apps)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the codex chat is not listed")
 	}
 }

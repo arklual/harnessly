@@ -5,7 +5,16 @@ import { type ReactNode, useRef, useState } from 'react';
 import { Icon } from '../../ui';
 import { Help } from './bits';
 import { Seg } from './bits';
-import { type Draft, type Fields, hasBrew, runOf, secretVar, SOURCES, type RepoRef } from './model';
+import {
+  type Draft,
+  type Fields,
+  hasBrew,
+  runOf,
+  secretVar,
+  SETTINGS_EXAMPLE,
+  SOURCES,
+  type RepoRef,
+} from './model';
 import { lastSeg } from './model';
 
 export type Patch = (p: Partial<Fields>) => void;
@@ -521,6 +530,134 @@ export const DraftForm = ({
       </>
     );
   }
+
+  if (d.k === 'app') {
+    const otherRepo = f.repoOther || repos.length === 0;
+    return (
+      <>
+        {repos.length > 0 && (
+          <Field
+            label="Репозиторий"
+            tip="Где лежит приложение. Машина склонирует репозиторий и поставит приложение из его папки. Репозитория нет в окружении — выберите «Другой» и вставьте ссылку"
+          >
+            <Opts
+              items={[...repos.map((r) => [r.id, r.name] as const), ['__other', 'Другой'] as const]}
+              isOn={(v) => (v === '__other' ? otherRepo : !otherRepo && f.repo === v)}
+              onPick={(v) =>
+                v === '__other' ? set({ repo: '', repoOther: true }) : set({ repo: v, repoOther: false })
+              }
+              label="Репозиторий"
+            />
+          </Field>
+        )}
+        {otherRepo && (
+          <Field
+            label={repos.length === 0 ? 'Ссылка на репозиторий' : undefined}
+            tight={repos.length > 0}
+            hint="Склонируем только чтобы взять приложение — в окружение репозиторий не добавится"
+          >
+            <TextIn
+              mono
+              value={f.repoUrl}
+              onChange={(v) => set({ repoUrl: v })}
+              placeholder="gitlab.example.ru/design/kit"
+              label="Ссылка на репозиторий"
+            />
+          </Field>
+        )}
+        {otherRepo && (
+          <Field label="Ветка" hint="Пусто — ветка по умолчанию">
+            <TextIn
+              mono
+              value={f.branch}
+              onChange={(v) => set({ branch: v })}
+              placeholder="main"
+              label="Ветка"
+            />
+          </Field>
+        )}
+        <Field
+          label="Папка приложения"
+          tip="Папка, в которой лежит harnessly/app.json"
+          hint="Путь внутри репозитория"
+        >
+          <TextIn
+            mono
+            value={f.path}
+            onChange={(v) => set({ path: v })}
+            placeholder="apps/design-kit"
+            label="Папка приложения"
+          />
+        </Field>
+        <Field label="Название" hint="Пусто — из имени папки">
+          <TextIn
+            value={f.name}
+            onChange={(v) => set({ name: v })}
+            placeholder="Дизайн-система"
+            label="Название"
+          />
+        </Field>
+      </>
+    );
+  }
+
+  if (d.k === 'plugin')
+    return (
+      <>
+        <Field label="Плагин" hint="Имя и маркетплейс через @">
+          <TextIn
+            mono
+            value={f.plugin}
+            onChange={(v) => set({ plugin: v.trim() })}
+            placeholder="review-kit@team-plugins"
+            label="Плагин"
+          />
+        </Field>
+        <Field label="Маркетплейс" hint="Адрес репозитория маркетплейса или owner/repo на GitHub">
+          <TextIn
+            mono
+            value={f.marketplace}
+            onChange={(v) => set({ marketplace: v })}
+            placeholder="gitlab.example.ru/ai/team-plugins"
+            label="Маркетплейс"
+          />
+        </Field>
+        <Field label="Название" hint="Пусто — из имени плагина">
+          <TextIn
+            value={f.name}
+            onChange={(v) => set({ name: v })}
+            placeholder="Ревью кода"
+            label="Название"
+          />
+        </Field>
+      </>
+    );
+
+  if (d.k === 'claude-settings')
+    return (
+      <>
+        <Field
+          label="Настройки"
+          tip="always — ключи settings.json, которые ставятся всегда; ifAbsent — только если у человека их нет; claudeMd — правила, которые допишем в ~/.claude/CLAUDE.md"
+        >
+          <AreaIn
+            rows={8}
+            value={f.json}
+            onChange={(v) => set({ json: v })}
+            placeholder={SETTINGS_EXAMPLE}
+            label="Настройки"
+          />
+        </Field>
+        <Field label="Название" hint="Пусто — «Настройки Claude»">
+          <TextIn
+            value={f.name}
+            onChange={(v) => set({ name: v })}
+            placeholder="Экономия Claude"
+            label="Название"
+          />
+        </Field>
+      </>
+    );
 
   // a script
   const brew = hasBrew(f.body);

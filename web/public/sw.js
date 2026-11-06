@@ -35,6 +35,14 @@ const trustedUrl = (value) => {
   }
 };
 
+// The documentation page is the app's too, but it opens no chat: a click for a chat goes to a window of the shell.
+const inShell = (client) => {
+  try {
+    return !new URL(client.url).pathname.startsWith(`${BASE}docs/`);
+  } catch {
+    return false;
+  }
+};
 const conversationUrl = (message) =>
   message.tabId ? `${BASE}?open=${encodeURIComponent(message.tabId)}` : BASE;
 
@@ -140,7 +148,18 @@ self.addEventListener('notificationclick', (event) => {
         return self.clients.openWindow(safeUrl);
       }
 
-      const client = tops[0];
+      const client = tops.find(inShell);
+      if (!client && message.tabId) {
+        // Only the documentation is open: take that window to the chat.
+        const docs = tops.find((c) => typeof c.navigate === 'function');
+        if (docs) {
+          await docs.navigate(conversationUrl(message));
+          return docs.focus();
+        }
+        return self.clients.openWindow(conversationUrl(message));
+      }
+      // A push for no chat just brings the app forward, documentation and all.
+      if (!client && tops[0]) return tops[0].focus();
       if (client) {
         if (message.tabId) {
           client.postMessage({

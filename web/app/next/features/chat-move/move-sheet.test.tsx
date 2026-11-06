@@ -94,6 +94,31 @@ describe('continue on another machine', () => {
     expect(screen.getByText('Offline')).toBeTruthy();
   });
 
+  it('names the organization of each machine and says in words why one is refused', async () => {
+    open(async () =>
+      data({
+        targets: [
+          target({ orgName: 'Acme' }),
+          target({
+            machineId: 'vm4',
+            name: 'Away VM',
+            orgName: 'Globex',
+            online: false,
+            ok: false,
+            code: 'machine_offline',
+            checks: [],
+            agents: [],
+          }),
+        ],
+      }),
+    );
+    expect(await screen.findByText('Acme')).toBeTruthy();
+    expect(screen.getByText('Globex')).toBeTruthy();
+    const away = screen.getByRole('radio', { name: /Away VM/ });
+    expect((away as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Offline')).toBeTruthy();
+  });
+
   it('asks for «without local files» when the machine lacks the commit, and sends it', async () => {
     const { onMove } = open(async () =>
       data({

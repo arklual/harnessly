@@ -159,3 +159,12 @@ func mcpEnabledOf(dataDir string) func() []mcpconn.Server {
 	svc := mcpconn.New(dataDir, nil, nil)
 	return svc.Enabled
 }
+
+// appConnections is apps.ConnectionSource over the person's connections of this machine: a launch reads the file at
+// every call, so a sign-in made while the runtime runs counts at the next launch.
+type appConnections struct{ ms *mcpconn.Service }
+
+func (a appConnections) Transport(id string) (string, bool) {
+	srv, ok := a.ms.ByCatalog(id)
+	return string(srv.Transport), ok
+}

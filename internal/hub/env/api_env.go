@@ -192,7 +192,7 @@ func (s *Service) getEnv(w http.ResponseWriter, r *http.Request, p *auth.Princip
 // team) called; without any tool facts the organization has, they are unknown.
 func (q *req) layerView(layer, scopeID, tenantID, title, subtitle string, c cover, locked bool, use *usageIndex) LayerView {
 	lv := LayerView{Layer: layer, ScopeID: scopeID, TenantID: tenantID, Title: title, Subtitle: subtitle, Locked: locked, Items: []EntryItem{},
-		Groups: q.w.groupsOf(layer, scopeID)}
+		Groups: q.w.groupsOf(layer, scopeID), Presets: q.w.presetsOf(layer, scopeID)}
 	rs := q.w.resolverEntries()
 	var calls int64
 	for _, e := range q.w.entries {

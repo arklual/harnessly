@@ -16,7 +16,9 @@ export type TBridgeCode =
   | 'upstream_error'
   | 'rate_limited'
   | 'host_unavailable'
-  | 'invalid_params';
+  | 'invalid_params'
+  | 'conflict'
+  | 'quota_exceeded';
 
 const CODES: readonly string[] = [
   'permission_denied',
@@ -29,6 +31,8 @@ const CODES: readonly string[] = [
   'rate_limited',
   'host_unavailable',
   'invalid_params',
+  'conflict',
+  'quota_exceeded',
 ];
 
 /** A refusal or failure with the code a view sees as HarnesslyError.code. */
@@ -36,6 +40,8 @@ export class BridgeError extends Error {
   constructor(
     readonly code: TBridgeCode,
     message?: string,
+    /** More the view reads in the error's `data` next to the code (a `conflict` says the key's current `version`). */
+    readonly extra?: Record<string, unknown>,
   ) {
     super(message ?? code);
   }
@@ -54,6 +60,7 @@ export const METHOD_PERMISSION = {
   'harnessly/chat.read': 'chat.read',
   'harnessly/chat.card': 'chat.card',
   'harnessly/pane.open': 'pane.open',
+  'harnessly/agents.list': 'agents.read',
   'harnessly/storage.get': 'storage',
   'harnessly/storage.set': 'storage',
   'harnessly/storage.delete': 'storage',
@@ -62,12 +69,9 @@ export const METHOD_PERMISSION = {
   'harnessly/notify': 'notify',
   'harnessly/files.read': 'files.read',
   'harnessly/files.write': 'files.write',
-  'harnessly/flow.status': '',
-  'harnessly/flow.go': '',
-  'harnessly/data.get': '',
-  'harnessly/data.set': '',
   'harnessly/ui.toast': '',
   'harnessly/ui.confirm': '',
+  'harnessly/slot.done': '',
   'harnessly/sinopia.document': 'sinopia.read',
   'harnessly/sinopia.selection': 'sinopia.read',
   'harnessly/sinopia.node': 'sinopia.read',
@@ -101,7 +105,15 @@ const changesDocument = (method: TBridgeMethod, params: Record<string, unknown>)
 const isMethod = (m: string): m is TBridgeMethod => Object.hasOwn(METHOD_PERMISSION, m);
 
 /** Where a view is shown: a chat, a pane tab, an app tab, or a Sinopia document of a kind (`sinopia.slides`). */
-export type TTarget = 'chat' | 'pane' | 'app' | `sinopia.${string}`;
+export type TTarget =
+  | 'chat'
+  | 'pane'
+  | 'app'
+  | 'settings'
+  | 'onboarding'
+  | 'object-action'
+  | 'hub-settings'
+  | `sinopia.${string}`;
 
 /** The Sinopia methods (the part after `harnessly/sinopia.`). */
 export const SINOPIA_METHODS = [
@@ -169,6 +181,8 @@ export interface IBridgeHandlers {
     scope: TStorageScope,
     key: string,
     value?: unknown,
+    /** For a set: write only if the key is at this version, else `conflict`. */
+    ifVersion?: number,
   ) => Promise<unknown>;
   /** The settings the person saved in the app's form, over the schema's defaults. */
   settings?: () => Promise<unknown>;
@@ -176,14 +190,14 @@ export interface IBridgeHandlers {
   chatRead?: (last: number) => Promise<{ role: string; text: string }[]>;
   chatCard?: (view: string, data: unknown) => Promise<void>;
   paneOpen?: (target: string) => Promise<void>;
+  /** The person's conversations on this machine: who and in what state, never what was said. */
+  agents?: () => Promise<readonly object[]>;
   notify?: (text: string) => Promise<void>;
   /** A file of the chat's workspace; the runtime judges the path against the app's masks and answers for it. */
   files?: (op: 'read' | 'write', path: string, text?: string) => Promise<string | undefined>;
-  flowStatus?: () => Promise<unknown>;
-  flowGo?: (state: string) => Promise<unknown>;
-  dataGet?: () => Promise<unknown>;
-  dataSet?: (patch: Record<string, unknown>) => Promise<unknown>;
   toast?: (text: string) => void;
+  /** A slot view (an onboarding step) says it is finished. */
+  slotDone?: () => void;
   confirm?: (text: string) => Promise<boolean>;
   /** The Document API of Sinopia: the runtime does the work and checks the right once more. */
   sinopia?: (method: TSinopiaMethod, params: Record<string, unknown>) => Promise<unknown>;
@@ -336,10 +350,16 @@ export class AppBridge {
     send({ jsonrpc: '2.0', id, ...body }, transfer);
   }
 
-  private fail(frame: TSend, id: number | string | undefined, code: TBridgeCode, message: string): void {
+  private fail(
+    frame: TSend,
+    id: number | string | undefined,
+    code: TBridgeCode,
+    message: string,
+    extra?: Record<string, unknown>,
+  ): void {
     if (id === undefined) return;
     const rpc = code === 'invalid_params' ? RPC_ERROR.invalidParams : RPC_ERROR.refused;
-    this.reply(frame, id, { error: { code: rpc, message, data: { code } } });
+    this.reply(frame, id, { error: { code: rpc, message, data: { ...extra, code } } });
   }
 
   private limited(): boolean {
@@ -384,7 +404,7 @@ export class AppBridge {
     } catch (e) {
       const err = this.asBridgeError(e);
       this.log(method, need, err);
-      this.fail(frame, id, err.code, err.message);
+      this.fail(frame, id, err.code, err.message, err.extra);
     }
   }
 
@@ -427,6 +447,14 @@ export class AppBridge {
         'permission_denied',
         `${method} changes the document, which is open for reading only`,
       );
+    // Opening a conversation (chat:<id>) shows the person's chats, which is what agents.read is for.
+    if (
+      method === 'harnessly/pane.open' &&
+      typeof params.target === 'string' &&
+      params.target.startsWith('chat:') &&
+      !app.permissions.includes('agents.read')
+    )
+      throw new BridgeError('permission_denied', `${method} of chat:<id> needs the permission agents.read`);
     const writes = method === 'harnessly/storage.set' || method === 'harnessly/storage.delete';
     if (writes && params.scope === 'space' && !app.permissions.includes('storage.space.write'))
       throw new BridgeError(
@@ -506,11 +534,26 @@ export class AppBridge {
       case 'harnessly/pane.open':
         await this.need('paneOpen')(str('target', 2048));
         return {};
-      case 'harnessly/storage.get':
-        return { value: (await this.need('storage')('get', scope(), str('key', 256))) ?? null };
-      case 'harnessly/storage.set':
-        await this.need('storage')('set', scope(), str('key', 256), p.value);
-        return {};
+      case 'harnessly/agents.list':
+        return { agents: await this.need('agents')() };
+      case 'harnessly/storage.get': {
+        const read = (await this.need('storage')('get', scope(), str('key', 256))) as
+          { value?: unknown; version?: number } | undefined;
+        return { value: read?.value ?? null, version: read?.version ?? 0 };
+      }
+      case 'harnessly/storage.set': {
+        const ifVersion = p.ifVersion;
+        if (ifVersion !== undefined && (!Number.isSafeInteger(ifVersion) || (ifVersion as number) < 0))
+          throw new BridgeError('invalid_params', 'ifVersion is a whole number, 0 or more');
+        const wrote = (await this.need('storage')(
+          'set',
+          scope(),
+          str('key', 256),
+          p.value,
+          ifVersion as number | undefined,
+        )) as { version?: number } | undefined;
+        return { version: wrote?.version ?? 0 };
+      }
       case 'harnessly/storage.delete':
         await this.need('storage')('delete', scope(), str('key', 256));
         return {};
@@ -529,18 +572,11 @@ export class AppBridge {
         await this.need('files')('write', str('path', 4096), p.text);
         return {};
       }
-      case 'harnessly/flow.status':
-        return this.need('flowStatus')();
-      case 'harnessly/flow.go':
-        return this.need('flowGo')(str('state', 80));
-      case 'harnessly/data.get':
-        return { data: await this.need('dataGet')() };
-      case 'harnessly/data.set': {
-        if (!isRecord(p.patch)) throw new BridgeError('invalid_params', 'patch is an object');
-        return { data: await this.need('dataSet')(p.patch) };
-      }
       case 'harnessly/ui.toast':
         this.need('toast')(str('text', 500));
+        return {};
+      case 'harnessly/slot.done':
+        this.need('slotDone')();
         return {};
       case 'harnessly/ui.confirm':
         return { ok: await this.need('confirm')(str('text', 500)) };

@@ -88,3 +88,32 @@ func catalogEntry(id string) (CatalogEntry, bool) {
 	}
 	return CatalogEntry{}, false
 }
+
+// CatalogName is the name the catalog gives the entry id; the id itself for one it does not know.
+func CatalogName(id string) string {
+	if e, ok := catalogEntry(id); ok && e.Name != "" {
+		return e.Name
+	}
+	return id
+}
+
+// KnownCatalogID says whether id is one of the catalog's entries.
+func KnownCatalogID(id string) bool {
+	_, ok := catalogEntry(id)
+	return ok
+}
+
+// ByCatalog is the person's server made from the catalog entry id, as agents may use it now: turned on and signed in.
+// ok is false when the person has no such server, or it waits for a sign-in. The servers are the machine's, so two
+// people on two machines each get their own.
+func (s *Service) ByCatalog(id string) (Server, bool) {
+	if id == "" {
+		return Server{}, false
+	}
+	for _, srv := range s.Enabled() {
+		if srv.CatalogID == id {
+			return srv, true
+		}
+	}
+	return Server{}, false
+}

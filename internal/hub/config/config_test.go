@@ -89,8 +89,8 @@ func TestLoadErrors(t *testing.T) {
 		want string
 	}{
 		"no public url":       {map[string]string{}, "HUB_PUBLIC_URL is required"},
-		"public url path":     {map[string]string{"HUB_PUBLIC_URL": "https://h.example.com/app"}, "without a path"},
-		"public url scheme":   {map[string]string{"HUB_PUBLIC_URL": "ftp://h.example.com"}, "without a path"},
+		"public url path":     {map[string]string{"HUB_PUBLIC_URL": "https://h.example.com/api"}, "path of the hub itself"},
+		"public url scheme":   {map[string]string{"HUB_PUBLIC_URL": "ftp://h.example.com"}, "http(s)://host"},
 		"edition":             {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_EDITION": "saas"}, "HUB_EDITION"},
 		"signup":              {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SIGNUP": "closed"}, "HUB_SIGNUP"},
 		"database":            {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_DATABASE_URL": "mysql://x"}, "HUB_DATABASE_URL"},
@@ -105,6 +105,8 @@ func TestLoadErrors(t *testing.T) {
 		"mr source no groups": {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "https://git.example.com", "HUB_MR_SOURCE_GITLAB_TOKEN": "t"}, "HUB_MR_SOURCE_GITLAB_GROUPS"},
 		"mr source no token":  {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "https://git.example.com", "HUB_MR_SOURCE_GITLAB_GROUPS": "g"}, "HUB_MR_SOURCE_GITLAB_TOKEN"},
 		"mr source bad url":   {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "git.example.com"}, "HUB_MR_SOURCE_GITLAB_URL"},
+		"machine trust":       {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MACHINE_TRUST": "maybe"}, "HUB_MACHINE_TRUST"},
+		"oidc email trusted":  {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_OIDC_EMAIL_TRUSTED": "maybe"}, "HUB_OIDC_EMAIL_TRUSTED"},
 		"missing file":        {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SMTP_URL_FILE": "/nonexistent/x"}, "HUB_SMTP_URL_FILE"},
 	} {
 		_, err := Load(env(tc.env))
@@ -442,7 +444,7 @@ func TestFeatureLists(t *testing.T) {
 		want string
 	}{
 		"feature name":    {with("HUB_FEATURES_FORCE", "Bad Name"), "not a feature name"},
-		"agent url path":  {with("HUB_AGENT_URL", "https://a.example.com/x"), "HUB_AGENT_URL"},
+		"agent url query": {with("HUB_AGENT_URL", "https://a.example.com/x?y=1"), "HUB_AGENT_URL"},
 		"agent url bogus": {with("HUB_AGENT_URL", "nope"), "HUB_AGENT_URL"},
 	} {
 		if _, err := Load(env(tc.env)); err == nil || !strings.Contains(err.Error(), tc.want) {
@@ -467,5 +469,172 @@ func TestLoadMRSource(t *testing.T) {
 	}
 	if c, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "http://h"})); err != nil || c.MRSourceURL != "" {
 		t.Errorf("off by default: %v %+v", err, c)
+	}
+}
+
+func TestPublicURLWithAPath(t *testing.T) {
+	smtp := map[string]string{"HUB_SMTP_URL": "smtp://mail.example.com"}
+	load := func(url string) (*Config, error) {
+		m := map[string]string{"HUB_PUBLIC_URL": url}
+		for k, v := range smtp {
+			m[k] = v
+		}
+		return Load(env(m))
+	}
+	c, err := load("https://Example.com/harnessly/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.PublicURL != "https://Example.com/harnessly" || c.Origin != "https://Example.com" || c.BasePath != "/harnessly" || c.Host != "example.com" {
+		t.Errorf("urls: %q %q %q %q", c.PublicURL, c.Origin, c.BasePath, c.Host)
+	}
+	if c.CookiePath() != "/harnessly" || c.CookiePrefix() != "__Secure-" {
+		t.Errorf("cookies: %q %q", c.CookiePath(), c.CookiePrefix())
+	}
+	root, err := load("https://example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root.BasePath != "" || root.CookiePath() != "/" || root.CookiePrefix() != "__Host-" || root.PublicURL != root.Origin {
+		t.Errorf("at the root nothing changes: %+v", root)
+	}
+	for _, bad := range []string{"https://example.com/api", "https://example.com/m/x", "https://example.com/a//b", "https://example.com/a/../b",
+		"https://example.com/h?x=1", "https://example.com/h#top", "https://example.com/a%2Fb", "https://example.com/a b"} {
+		if _, err := load(bad); err == nil {
+			t.Errorf("%s was accepted", bad)
+		}
+	}
+}
+
+func TestTrustSwitchesAreOffByDefault(t *testing.T) {
+	c, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "http://h"}))
+	if err != nil || c.MachineTrust || c.OIDCEmailTrusted {
+		t.Fatalf("defaults: %v %+v", err, c)
+	}
+	c, err = Load(env(map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MACHINE_TRUST": "on", "HUB_OIDC_EMAIL_TRUSTED": "on"}))
+	if err != nil || !c.MachineTrust || !c.OIDCEmailTrusted {
+		t.Fatalf("on: %v %+v", err, c)
+	}
+}
+
+func TestAuthEmailOff(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_AUTH_EMAIL": "off"}
+	// No other way in: refused.
+	if _, err := Load(env(base)); err == nil || !strings.Contains(err.Error(), "no way to sign in") {
+		t.Fatalf("no provider: %v", err)
+	}
+	// A GitHub sign-in and no SMTP: starts on https, the log is not a mailbox.
+	m := map[string]string{}
+	for k, v := range base {
+		m[k] = v
+	}
+	m["HUB_GITHUB_CLIENT_ID"], m["HUB_GITHUB_CLIENT_SECRET"] = "id", "secret"
+	c, err := Load(env(m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.AuthEmailOff || c.MailLogRefused() {
+		t.Errorf("off: %+v", c)
+	}
+	// Default: the code sign-in stays and an https hub still needs SMTP.
+	if _, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com"})); err == nil {
+		t.Error("https without SMTP must still be refused by default")
+	}
+	if _, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_AUTH_EMAIL": "maybe"})); err == nil {
+		t.Error("HUB_AUTH_EMAIL=maybe")
+	}
+}
+
+func TestStorageS3(t *testing.T) {
+	m := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040"}
+	c, err := Load(env(m))
+	if err != nil || c.StorageS3() || c.SitesS3.Endpoint != "" {
+		t.Fatalf("default is the disk: %v %+v", err, c)
+	}
+	m["HUB_STORAGE"] = "s3"
+	if _, err := Load(env(m)); err == nil || !strings.Contains(err.Error(), "HUB_S3_ENDPOINT") {
+		t.Fatalf("s3 without a bucket: %v", err)
+	}
+	m["HUB_S3_ENDPOINT"], m["HUB_S3_BUCKET"], m["HUB_S3_ACCESS_KEY"], m["HUB_S3_SECRET_KEY"], m["HUB_S3_PREFIX"] = "http://minio:9000", "hub", "k", "s", "p/"
+	c, err = Load(env(m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.StorageS3() || c.SitesS3.Endpoint != "http://minio:9000" || c.SitesS3.Bucket != "hub" || c.SitesS3.Prefix != "p/sites/" {
+		t.Errorf("sites follow the one setting: %+v", c.SitesS3)
+	}
+	// The sites' own settings win over it.
+	m["HARNESSLY_SITES_S3_ENDPOINT"], m["HARNESSLY_SITES_S3_BUCKET"], m["HARNESSLY_SITES_S3_ACCESS_KEY"], m["HARNESSLY_SITES_S3_SECRET_KEY"] = "http://other:9000", "s", "a", "b"
+	if c, err = Load(env(m)); err != nil || c.SitesS3.Endpoint != "http://other:9000" {
+		t.Errorf("explicit sites bucket: %v %+v", err, c.SitesS3)
+	}
+	m["HUB_STORAGE"] = "tape"
+	if _, err := Load(env(m)); err == nil {
+		t.Error("HUB_STORAGE=tape")
+	}
+}
+
+func TestReplicas(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040"}
+	with := func(kv ...string) map[string]string {
+		m := map[string]string{}
+		for k, v := range base {
+			m[k] = v
+		}
+		for i := 0; i+1 < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return m
+	}
+	c, err := Load(env(with()))
+	if err != nil || c.Replicas {
+		t.Fatalf("default: %v %v", c.Replicas, err)
+	}
+	c, err = Load(env(with("HUB_REPLICAS", "on", "HUB_REPLICA_ADDR", "http://10.0.0.5:8040/", "HUB_REPLICA_SECRET", "secretsecretsecret")))
+	if err != nil || !c.Replicas || c.ReplicaAddr != "http://10.0.0.5:8040" {
+		t.Fatalf("on: %+v %v", c, err)
+	}
+	for name, m := range map[string]map[string]string{
+		"no address":   with("HUB_REPLICAS", "on", "HUB_REPLICA_SECRET", "secretsecretsecret"),
+		"short secret": with("HUB_REPLICAS", "on", "HUB_REPLICA_ADDR", "http://10.0.0.5:8040", "HUB_REPLICA_SECRET", "short"),
+		"bad value":    with("HUB_REPLICAS", "maybe"),
+	} {
+		if _, err := Load(env(m)); err == nil {
+			t.Errorf("%s: want an error", name)
+		}
+	}
+}
+
+func TestLoadSafe(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "http://h"}
+	c, err := Load(env(base))
+	if err != nil || c.SafeVault != nil {
+		t.Fatalf("no address, no safe: %+v %v", c.SafeVault, err)
+	}
+	with := func(kv ...string) map[string]string {
+		m := map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SECRETS_VAULT_ADDR": "https://openbao.example.com"}
+		for i := 0; i < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return m
+	}
+	c, err = Load(env(with("HUB_SECRETS_VAULT_AUTH", "kubernetes", "HUB_SECRETS_VAULT_ROLE", "hub", "HUB_SECRETS_REF_PREFIXES", " /shared/ci/ ,,team")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SafeVault == nil || c.SafeVault.Auth.Method() != "kubernetes" || c.SafePrefix != "harnessly" || strings.Join(c.SafeRefPrefixes, ",") != "shared/ci,team" {
+		t.Fatalf("safe: %+v %q %v", c.SafeVault, c.SafePrefix, c.SafeRefPrefixes)
+	}
+	for name, tc := range map[string]struct {
+		env  map[string]string
+		want string
+	}{
+		"no token":   {with(), "HUB_SECRETS_VAULT_TOKEN_FILE"},
+		"bad auth":   {with("HUB_SECRETS_VAULT_AUTH", "ldap"), "HUB_SECRETS_VAULT_AUTH"},
+		"bad prefix": {with("HUB_SECRETS_VAULT_TOKEN_FILE", "/x", "HUB_SECRETS_VAULT_PREFIX", "a/../b"), "HUB_SECRETS_VAULT_PREFIX"},
+	} {
+		if _, err := Load(env(tc.env)); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v, want %q", name, err, tc.want)
+		}
 	}
 }

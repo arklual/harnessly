@@ -154,20 +154,29 @@ func (s *Service) IsInstanceAdmin(ctx context.Context, userID string) (bool, err
 // RequireTrustedMachine is the rule of a hub that has no HUB_RUNTIME_DOMAIN: a machine's page runs on the hub's own
 // origin, where its script acts with the session of whoever opens it (and the hub's CSRF checks pass: it is the same
 // origin). That is safe only for a machine as trusted as the hub itself, so such a hub opens the machines its
-// administrators connected (createdBy is the one who did) and no others, however open its sign-up is. In subdomain mode
-// every machine has an origin of its own and the rule does not apply.
-func (s *Service) RequireTrustedMachine(ctx context.Context, createdBy string) error {
+// administrators connected (CreatedBy is the one who did) and no others, however open its sign-up is. With
+// HUB_MACHINE_TRUST=on there is one more way in: an owner of the machine's space accepted the risk for that machine
+// (store.MachineTrust, set by POST /api/machines/{id}/trust). In subdomain mode every machine has an origin of its own
+// and the rule does not apply.
+func (s *Service) RequireTrustedMachine(ctx context.Context, m store.Machine) error {
 	if s.cfg.SubdomainMode() {
 		return nil
 	}
-	admin, err := s.IsInstanceAdmin(ctx, createdBy)
+	admin, err := s.IsInstanceAdmin(ctx, m.CreatedBy)
 	if err != nil {
 		return err
 	}
-	if !admin {
-		return httpx.ErrMachineUntrusted
+	if admin {
+		return nil
 	}
-	return nil
+	if s.cfg.MachineTrust {
+		if _, _, ok, err := s.db.S().MachineTrust(ctx, m.ID); err != nil {
+			return err
+		} else if ok {
+			return nil
+		}
+	}
+	return httpx.ErrMachineUntrusted
 }
 
 // resolve decides which account an identity belongs to, and makes the account when it has to.

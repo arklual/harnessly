@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/docprovider"
 	"net/http"
 	"os"
 	"strings"
@@ -108,7 +109,7 @@ func integrationRoutes(d deps, c integrations.Config) []gate.Route {
 					write(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 					return
 				}
-				boards, err := c.ListBoards(r.Context())
+				boards, err := docprovider.For(c, nil).Boards(r.Context())
 				if err != nil {
 					failed(w, "boards", err)
 					return

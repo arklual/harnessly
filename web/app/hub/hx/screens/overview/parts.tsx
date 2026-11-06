@@ -14,6 +14,7 @@ import type {
 } from '../../../org/api/overview';
 import { navigate } from '../../../lib/router';
 import { goSignal } from '../../go';
+import { Count } from '../../live';
 import { Btn, Icon, initial } from '../../ui';
 import {
   barRects,
@@ -177,7 +178,9 @@ export const SxTile = ({
       </span>
       <span className="sx-tile__chart">{chart}</span>
       <span className="sx-tile__label">{label}</span>
-      <span className="sx-tile__value">{value}</span>
+      <span className="sx-tile__value">
+        <Count text={value} />
+      </span>
     </>
   );
   const style = css({ '--sx-i': i, '--sx-tone': tone });

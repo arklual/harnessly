@@ -47,15 +47,17 @@ export const liveTenant = (fetcher?: Fetcher): TenantApi => {
         (e) => (e.code === 'provider_off' && profile === 'container' ? CONTAINER_OFF : null),
       ),
     tenantInvites: (spaceId) => wrap(async () => (await api.spaces.invites(spaceId)).invites.map(inviteOf)),
-    inviteByEmail: (spaceId, email, role = 'member') =>
+    inviteByEmail: (spaceId, email, role = 'member', teamId) =>
       wrap(async () => {
-        const { invites } = await api.spaces.invite(spaceId, [email], role);
+        const { invites } = await api.spaces.invite(spaceId, [email], role, teamId);
         const first = invites[0];
         if (!first) throw new OrgApiError('invalid_request', 'Проверьте адрес почты.');
         return inviteOf(first);
       }),
-    inviteByLink: (spaceId) =>
-      wrap(async () => inviteOf((await api.spaces.inviteLink(spaceId, { days: 7 })).invite)),
+    inviteByLink: (spaceId, teamId) =>
+      wrap(async () =>
+        inviteOf((await api.spaces.inviteLink(spaceId, { days: 7, ...(teamId ? { teamId } : {}) })).invite),
+      ),
     revokeInvite: (spaceId, inviteId) => wrap(() => api.spaces.revokeInvite(spaceId, inviteId)),
     tenantMembers: (spaceId) =>
       wrap(async () =>

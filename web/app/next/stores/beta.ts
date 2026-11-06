@@ -2,16 +2,17 @@
 // browser's, as the theme and the feed's cards are.
 import { useSyncExternalStore } from 'react';
 
-export const BETA_FLAGS = ['retitle', 'multiModel'] as const;
+export const BETA_FLAGS = ['retitle', 'multiModel', 'hubFirst'] as const;
 export type BetaFlag = (typeof BETA_FLAGS)[number];
 export type BetaFlags = Readonly<Record<BetaFlag, boolean>>;
 
 const KEY = 'hl:beta';
 
-export const DEFAULT_BETA: BetaFlags = { retitle: false, multiModel: false } as const satisfies Record<
-  BetaFlag,
-  boolean
->;
+export const DEFAULT_BETA: BetaFlags = {
+  retitle: false,
+  multiModel: false,
+  hubFirst: false,
+} as const satisfies Record<BetaFlag, boolean>;
 
 const listeners = new Set<() => void>();
 let current: BetaFlags | null = null;

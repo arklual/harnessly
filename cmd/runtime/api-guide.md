@@ -71,6 +71,7 @@ and the shared bot's token is never on the machine.
 | --- | --- |
 | `GET /api/cli/notify/bots` | `{bots: [{id, name, username, chat, bound, instruction}], shared: {enabled, bot, linked, chat, instruction}}`: `shared` is the person's Telegram through the shared bot; `bots` are the person's own (empty while those are off), `chat` the bound chat's title, `bound` false while the person has not bound one |
 | `POST /api/cli/notify/send` | body `{bot?, text, silent?, session?}`: without `bot` the text goes to the person's Telegram through the shared bot; `bot` is a bot of their own by name (any case), `@username` or id. `text` is markdown-ish (`**bold**`, `` `code` ``, fenced blocks, `[links](https://…)`), sent as Telegram HTML, as several messages when it is long. Answers `{bot, chat, messages}` |
+| `GET /api/cli/selftest` | runs the self-test of this machine in a throwaway pane started as a tab's pane: `pane_shell` (an empty shell is seen), `pane_program` (a program typed into it is seen, the shell again after Ctrl-C), `pane_keys` (a typed key reaches a program and its answer is read off the screen). Answers `{ok, checks: [{id, ok, title, detail}]}`; `harnessly selftest` prints it and exits 1 when a step failed |
 
 Refusals are `{error, detail?}`: `not-linked` (409, the person has not connected Telegram), `no-shared` (404, no shared
 bot here), `offline` (503, the platform did not answer), `disabled` (403, bots of the person's own are off), `not-found`,

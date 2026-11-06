@@ -127,7 +127,7 @@ func DialURL(publicURL string) string {
 	if u.Scheme == "https" {
 		scheme = "wss"
 	}
-	return scheme + "://" + u.Host + "/agent/v1"
+	return scheme + "://" + u.Host + strings.TrimRight(u.Path, "/") + "/agent/v1"
 }
 
 func printable(v string, max int) (string, bool) {

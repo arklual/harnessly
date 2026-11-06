@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -24,9 +26,9 @@ import (
 //
 //	GET|POST <platform>/connections, POST <platform>/connections/detect, GET <platform>/connections/resolve,
 //	PATCH|DELETE <platform>/connections/<id>, POST <platform>/connections/<id>/check,
-//	GET <platform>/connections/<id>/projects|issues|issue|pages|page
+//	GET <platform>/connections/<id>/projects|issues|issue|mrs|pages|page
 //	                                     the person's page: a page session, same origin
-//	GET /api/cli/connections, /api/cli/connections/resolve, /api/cli/connections/<id>/projects|issues|issue|pages|page
+//	GET /api/cli/connections, /api/cli/connections/resolve, /api/cli/connections/<id>/projects|issues|issue|mrs|pages|page
 //	                                     an agent of this machine: the cli-token (harnessly connections, issues, …);
 //	                                     reads only
 //
@@ -64,7 +66,7 @@ func safeFor(d deps) *safe {
 
 // connSecrets keeps connections' credentials in the safe. A reveal is recorded as a use by "connection <name>".
 type connSecrets struct {
-	store *secrets.Store
+	store secrets.Provider
 	svc   *connections.Service
 	// titleOf names the use of a secret in the safe's record; nil names it by the connection.
 	titleOf func(name string) string
@@ -127,6 +129,9 @@ func (a *connSecrets) Reveal(name string) (string, error) {
 	return values[name], nil
 }
 
+// loadConnAdapters registers the declared connection adapters once per process.
+var loadConnAdapters sync.Once
+
 // connectionsFor is the one connections service of a runtime.
 func connectionsFor(d deps) *connections.Service {
 	connsMu.Lock()
@@ -134,6 +139,15 @@ func connectionsFor(d deps) *connections.Service {
 	if s := connsFor[d.CLI]; s != nil {
 		return s
 	}
+	loadConnAdapters.Do(func() {
+		// Only a declared file adds anything; a silent adapter is told on stderr and the built-in products go on.
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, errs := connections.LoadAdapters(ctx, os.Getenv("RUNTIME_CONNECTION_ADAPTERS_FILE"))
+		for _, err := range errs {
+			fmt.Fprintf(os.Stderr, "runtime: %v\n", err)
+		}
+	})
 	sec := &connSecrets{store: safeFor(d).store}
 	s := connections.New(d.DataDir, sec, nil, envConnections(serviceConfig(d), time.Now().UTC())...)
 	sec.svc = s
@@ -348,7 +362,7 @@ func connectionRoutesOf(d deps, cs *connections.Service) []gate.Route {
 		connJSON(w, http.StatusOK, out)
 	}
 
-	// read answers the reads of one connection: projects, issues, issue, pages, page.
+	// read answers the reads of one connection: projects, issues, issue, mrs, pages, page.
 	read := func(w http.ResponseWriter, r *http.Request, id, what string) {
 		c, err := cs.Get(id)
 		if err != nil {
@@ -380,6 +394,20 @@ func connectionRoutesOf(d deps, cs *connections.Service) []gate.Route {
 					return
 				}
 				out, err = src.Issue(ctx, k)
+			}
+			if err != nil {
+				agent.Log("info", "connections: read failed", agent.F{K: "id", V: c.ID}, agent.F{K: "kind", V: string(c.Kind)},
+					agent.F{K: "what", V: what}, agent.F{K: "reason", V: connReason(err)})
+				connRefusal(w, err, nil)
+				return
+			}
+		case "mrs":
+			src, err := cs.Code(c)
+			if err == nil {
+				key = "mrs"
+				qu := queryOf(r)
+				qu.State = r.URL.Query().Get("state")
+				out, err = src.MergeRequests(ctx, qu)
 			}
 			if err != nil {
 				agent.Log("info", "connections: read failed", agent.F{K: "id", V: c.ID}, agent.F{K: "kind", V: string(c.Kind)},
@@ -427,6 +455,10 @@ func connectionRoutesOf(d deps, cs *connections.Service) []gate.Route {
 		case []connections.Page:
 			if v == nil {
 				out = []connections.Page{}
+			}
+		case []connections.MergeRequest:
+			if v == nil {
+				out = []connections.MergeRequest{}
 			}
 		}
 		connJSON(w, http.StatusOK, map[string]any{key: out})

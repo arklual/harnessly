@@ -2,6 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "docs": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "artifacts": { "type": "object", "properties": { "bundled": { "type": "boolean" }, "url": { "type": "string" } } },
+        "boards": { "type": "object", "properties": { "bundled": { "type": "boolean" }, "url": { "type": "string" } } }
+      }
+    },
     "image": {
       "type": "object",
       "properties": {
@@ -41,6 +50,10 @@
     },
     "signup": { "enum": ["open", "invite"] },
     "adminEmails": { "type": "array", "items": { "type": "string", "pattern": "^[^@\\s,]+@[^@\\s,]+$" } },
+    "orgs": { "enum": ["off", "shadow", "on"] },
+    "featuresDefault": { "type": "array", "items": { "type": "string" } },
+    "machineTrust": { "type": "boolean" },
+    "oidcEmailTrusted": { "type": "boolean" },
     "edition": { "enum": ["self-hosted", "cloud"] },
     "passkey": { "type": "boolean" },
     "ssh": { "type": "boolean" },

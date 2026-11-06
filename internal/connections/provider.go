@@ -57,6 +57,13 @@ type IssueSource interface {
 	Issue(ctx context.Context, key string) (*Issue, error)
 }
 
+// CodeSource is a client of a code host: its merge requests.
+type CodeSource interface {
+	// MergeRequests searches merge requests by words of the title and description, newest update first, each with the
+	// pipeline at its head.
+	MergeRequests(ctx context.Context, q Query) ([]MergeRequest, error)
+}
+
 // PageSource is a client of a wiki.
 type PageSource interface {
 	SearchPages(ctx context.Context, q Query) ([]Page, error)

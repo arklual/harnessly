@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AnalyticsFrame, KpiId } from '../../org/api/analytics';
 import { orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
-import { useLocation } from '../../lib/router';
+import { navigate, useLocation } from '../../lib/router';
 import { Btn } from '../ui';
 import { Titles } from '../shell';
 import { Attention, Changes, PeersCard, WasteCard } from './analytics/cards';
@@ -18,7 +18,7 @@ import {
   compareNameOf,
   decodePeriod,
   encodePeriod,
-  nameOf,
+  periodNameOf,
   type PickerState,
   queryOf,
 } from './analytics/period';
@@ -94,6 +94,16 @@ const Failure = ({ title, error, retry }: { title: string; error: unknown; retry
   </p>
 );
 
+/** The metrics the «Эффективность» screen opens with their own chart. */
+const EFFICIENCY_KPIS: readonly KpiId[] = [
+  'reread',
+  'sessionStart',
+  'cache',
+  'cacheWrite1h',
+  'waiting',
+  'waitingP90',
+];
+
 const Body = ({ frame }: { frame: AnalyticsFrame }) => {
   const { api, shell, base } = useOrg();
   const staff = shell.viewer.role !== 'member';
@@ -117,7 +127,7 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
     () => queryOf(frame.weeks, picker),
     // The ranges decide the query; a click that only moves the open tab does not ask again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [frame.weeks, picker.a, picker.b],
+    [frame.weeks, picker.a, picker.b, picker.free],
   );
   const dKey = dataKey(query);
   const data = useAnswer(
@@ -138,7 +148,7 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
   // The series is fetched while the pointer is still on the tile, so the click finds it ready.
   const warm = useCallback((id: KpiId) => void store.chart(query, id).catch(() => undefined), [store, query]);
 
-  const nowName = nameOf(frame.weeks, picker.a, { month: true });
+  const nowName = periodNameOf(frame.weeks, picker);
   const prevName = compareNameOf(frame.weeks, picker);
   const nowLabel = `${nowName.title.toLowerCase()} (${nowName.dates})`;
   const prevLabel = `${prevName.title.toLowerCase()} (${prevName.dates})`;
@@ -184,6 +194,20 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
                   shownKpi={shownKpi}
                   teamOrder={teamOrder}
                 />
+              )}
+              {kpi && (shell.features ?? []).includes('ui.hx.live') && (
+                <div className="anx-what">
+                  <Btn
+                    size="sm"
+                    icon="gauge"
+                    data-variant="outline"
+                    onClick={() =>
+                      navigate(`${base}/efficiency${EFFICIENCY_KPIS.includes(kpi.id) ? `?k=${kpi.id}` : ''}`)
+                    }
+                  >
+                    Разрез на экране «Эффективность»
+                  </Btn>
+                </div>
               )}
               <Changes changes={d.changes} />
               {staff && <Attention signals={d.signals} base={base} />}

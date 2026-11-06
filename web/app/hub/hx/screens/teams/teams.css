@@ -220,3 +220,65 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Managing from the list: the row menu, a row dragged onto a team, the footer of a team. */
+.ad .pt-row[data-act='1'] {
+  position: relative;
+  padding-right: 56px;
+}
+.ad .pt-row[draggable='true'] {
+  cursor: grab;
+}
+.ad .pt-row[draggable='true']:active {
+  cursor: grabbing;
+}
+.ad .pt-act {
+  position: absolute;
+  top: calc(50% - 16px);
+  right: 10px;
+}
+.ad .pt-menu {
+  min-width: 220px;
+}
+.ad .pt-menu__t {
+  padding: 6px 10px 2px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.ad .pt-menu__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--hx-border);
+}
+.ad .tg[data-drop='1'] {
+  box-shadow: 0 0 0 2px var(--hx-primary);
+  transition: box-shadow var(--hx-dur-sm, 0.15s) var(--hx-ease-out);
+}
+.ad .tg-links {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.ad .tg-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+  text-decoration: none;
+}
+.ad .tg-link:hover {
+  color: var(--hx-fg-1);
+}
+@container (max-width: 560px) {
+  .ad .pt-row[data-act='1'] {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+  .ad .tg .tg-foot {
+    padding-left: 16px;
+  }
+}
+.ad .pt-row:has(.pt-menu) {
+  z-index: 30;
+}

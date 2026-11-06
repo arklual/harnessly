@@ -632,3 +632,22 @@ func TestOAuthCookieKeepsItsPlainNameWithoutHTTPS(t *testing.T) {
 		t.Errorf("sign-in over http: %s", location(cb))
 	}
 }
+
+// HUB_AUTH_EMAIL=off: the code sign-in answers 404, a provider still signs people in, and nobody is mailed.
+func TestEmailSignInOff(t *testing.T) {
+	f := newFakeIdP(t)
+	e := oauthEnv(t, f, withEnv("HUB_AUTH_EMAIL", "off"))
+	for _, path := range []string{"/api/auth/email/start", "/api/auth/email/verify"} {
+		r := e.post(path, map[string]string{"email": "someone@example.com", "code": "123456"})
+		if r.StatusCode != 404 {
+			t.Errorf("%s: %d, want 404", path, r.StatusCode)
+		}
+	}
+	if e.mail.code("someone@example.com") != "" {
+		t.Error("a code was mailed with the email sign-in off")
+	}
+	cb, _ := e.oauth(e.client, f, "github", "?intent=signup", profile{email: "octo@example.com", verified: true, name: "Octo"}, nil)
+	if cb.StatusCode != 302 || location(cb) != "/new" {
+		t.Fatalf("GitHub sign-in with the email one off: %d %s", cb.StatusCode, location(cb))
+	}
+}

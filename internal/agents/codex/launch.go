@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -49,6 +50,14 @@ func LauncherFlags(l *agents.Launch) ([]string, error) {
 	}
 	if l.Effort != nil && *l.Effort != "" {
 		flags = append(flags, "--effort", agents.ShellQuote(*l.Effort))
+	}
+	if len(l.Apps) > 0 {
+		// Checked by CheckLaunch: ids are [a-z0-9.-].
+		flags = append(flags, "--apps", agents.ShellQuote(strings.Join(l.Apps, ",")))
+		if l.Conversation != "" {
+			// The chat the apps' grant names, so the guard's journal finds it.
+			flags = append(flags, "--conversation", agents.ShellQuote(l.Conversation))
+		}
 	}
 	return flags, nil
 }
@@ -97,6 +106,15 @@ type LaunchConfig struct {
 	ShellEnvExclude []string
 	// Profiles points a launch on a backend profile at the vendor; nil refuses such a launch.
 	Profiles agents.ProfileLauncher
+	// Apps gives a launch with apps their guard, servers, instructions and wall; nil refuses such a launch.
+	Apps agents.AppLauncher
+}
+
+// Start is what a Codex launch is built to: codex's own arguments, and the shell words it runs behind (the apps' token
+// and wall, which only the pane's shell can put in front of it); Prefix is "" for a launch without apps.
+type Start struct {
+	Args   []string
+	Prefix string
 }
 
 // ErrNoProfiles: a launch names a backend profile and this deployment has none.
@@ -128,42 +146,88 @@ func invalidID(id string) error { return errors.New("Invalid codex session ID fo
 // MCP server, hook trust and update check off (their dialogs are invisible to the web composer), the workspace's
 // instructions, permissions, model and effort. ConfigParseError reports an unreadable config.toml.
 func (c LaunchConfig) RuntimeArgs(workspaceID, resumeID string, launch *agents.Launch) (args []string, configParseError bool, err error) {
+	return c.argsOnly(c.RuntimeStart(workspaceID, resumeID, launch))
+}
+
+// RuntimeStart is RuntimeArgs with the words codex runs behind (Start.Prefix), which a launch with apps has.
+func (c LaunchConfig) RuntimeStart(workspaceID, resumeID string, launch *agents.Launch) (Start, bool, error) {
 	return c.runtimeArgs(workspaceID, "resume", resumeID, launch)
+}
+
+// ErrNeedsStart: a launch with apps was built where only the arguments are kept, which would drop the apps' wall.
+var ErrNeedsStart = errors.New("a launch with apps needs RuntimeStart: its arguments alone would leave out the wall")
+
+func (c LaunchConfig) argsOnly(s Start, parseErr bool, err error) ([]string, bool, error) {
+	if err == nil && s.Prefix != "" {
+		return nil, false, ErrNeedsStart
+	}
+	return s.Args, parseErr, err
 }
 
 // ForkArgs are RuntimeArgs that start codex on a fork of the session (`codex fork <id>`): a session of its own that
 // begins with the other's history.
 func (c LaunchConfig) ForkArgs(workspaceID, sessionID string, launch *agents.Launch) (args []string, configParseError bool, err error) {
+	return c.argsOnly(c.ForkStart(workspaceID, sessionID, launch))
+}
+
+// ForkStart is ForkArgs with the words codex runs behind (Start.Prefix).
+func (c LaunchConfig) ForkStart(workspaceID, sessionID string, launch *agents.Launch) (Start, bool, error) {
 	if sessionID == "" {
-		return nil, false, invalidID(sessionID)
+		return Start{}, false, invalidID(sessionID)
 	}
 	return c.runtimeArgs(workspaceID, "fork", sessionID, launch)
 }
 
 // runtimeArgs start codex on session by verb (resume, fork), or anew when session is "".
-func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *agents.Launch) (args []string, configParseError bool, err error) {
+func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *agents.Launch) (start Start, configParseError bool, err error) {
 	if session != "" && !agents.IsUUID(session) {
-		return nil, false, invalidID(session)
+		return Start{}, false, invalidID(session)
 	}
 	prof, err := c.profile(launch)
 	if err != nil {
-		return nil, false, err
+		return Start{}, false, err
+	}
+	var apps agents.CodexApps
+	if launch != nil && len(launch.Apps) > 0 {
+		if c.Apps == nil {
+			return Start{}, false, agents.ErrNoApps
+		}
+		if err := agents.CheckLaunch(launch); err != nil {
+			return Start{}, false, err
+		}
+		if apps, err = c.Apps.Codex(launch.Conversation, launch.Apps); err != nil {
+			return Start{}, false, err
+		}
 	}
 	var hookArgs []string
 	if c.Hooks != nil {
-		if hookArgs, configParseError, err = c.Hooks.Flags(); err != nil {
-			return nil, false, err
+		if hookArgs, configParseError, err = c.Hooks.FlagsWithGuard(apps.Guard); err != nil {
+			return Start{}, false, err
 		}
+	} else if apps.Guard != "" {
+		// Apps without the hook that holds their rules would run unguarded.
+		return Start{}, false, errors.New("the apps' guard has no hook to run in")
 	}
 	var devArgs []string
+	instructions := ""
 	if workspaceID != "" && c.WorkspacePrompt != nil {
 		if raw, err := os.ReadFile(c.WorkspacePrompt(workspaceID)); err == nil {
-			devArgs = []string{"-c", "developer_instructions=" + TOMLBasicString(strings.ToValidUTF8(string(raw), "�"))}
+			instructions = strings.ToValidUTF8(string(raw), "�")
 		}
 	}
-	if c.MCP.URL == "" {
-		return nil, false, errors.New("Runtime port is unknown")
+	if apps.Instructions != "" {
+		if instructions != "" {
+			instructions += "\n\n"
+		}
+		instructions += apps.Instructions
 	}
+	if instructions != "" {
+		devArgs = []string{"-c", "developer_instructions=" + TOMLBasicString(instructions)}
+	}
+	if c.MCP.URL == "" {
+		return Start{}, false, errors.New("Runtime port is unknown")
+	}
+	var args []string
 	if session != "" {
 		args = append(args, verb, session)
 	}
@@ -176,6 +240,12 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 			}
 		}
 	}
+	for _, srv := range apps.Servers {
+		if srv.Name == c.MCP.Server {
+			continue
+		}
+		args = append(args, AppServerArgs(srv, c.MCP.TokenEnv)...)
+	}
 	args = append(args, "--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false")
 	args = append(args, devArgs...)
 	args = append(args, c.shellEnvArgs(prof.KeyEnv)...)
@@ -186,10 +256,80 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	}
 	launchArgs, err := RuntimeLaunchArgs(launch)
 	if err != nil {
-		return nil, false, err
+		return Start{}, false, err
 	}
 	// The vendor's provider comes with the model: Codex starts on the profile and asks it for the model.
-	return append(append(args, prof.Args...), launchArgs...), configParseError, nil
+	args = append(append(args, prof.Args...), launchArgs...)
+	return Start{Args: args, Prefix: appsPrefix(apps, c.MCP.TokenEnv)}, configParseError, nil
+}
+
+// appsPrefix are the shell words the CLI of a chat with apps runs behind: the apps' environment, the launch's own token
+// in the variable the runtime's MCP servers read (the launcher script put the person's there), and the wall.
+func appsPrefix(apps agents.CodexApps, tokenEnv string) string {
+	var words []string
+	if apps.Env != "" {
+		words = append(words, apps.Env)
+	}
+	if apps.TokenFile != "" && tokenEnv != "" {
+		words = append(words, tokenEnv+`="$(cat `+agents.ShellQuote(apps.TokenFile)+`)"`)
+	}
+	if apps.Wrap != "" {
+		words = append(words, apps.Wrap)
+	}
+	return strings.Join(words, " ")
+}
+
+// AppServerArgs are the `-c` flags of one MCP server of an app. The headers that carry the launch's token read it from
+// tokenEnv, so it is on no command line; like the runtime's own, the server's tools need no approval of Codex's (the apps'
+// guard decides every call).
+func AppServerArgs(s agents.CodexAppServer, tokenEnv string) []string {
+	key := "mcp_servers." + s.Name + "."
+	args := []string{}
+	add := func(k, v string) { args = append(args, "-c", key+k+"="+v) }
+	if s.URL != "" {
+		add("url", TOMLBasicString(s.URL))
+	} else {
+		add("command", TOMLBasicString(s.Command))
+		if len(s.Args) > 0 {
+			parts := make([]string, len(s.Args))
+			for i, a := range s.Args {
+				parts[i] = TOMLBasicString(a)
+			}
+			add("args", "["+strings.Join(parts, ",")+"]")
+		}
+		if t := inlineStrings(s.Env); t != "" {
+			add("env", t)
+		}
+	}
+	add("default_tools_approval_mode", `"approve"`)
+	if t := inlineStrings(s.Headers); t != "" && s.URL != "" {
+		add("http_headers", t)
+	}
+	if len(s.TokenHeaders) > 0 && tokenEnv != "" {
+		bound := map[string]string{}
+		for _, h := range s.TokenHeaders {
+			bound[h] = tokenEnv
+		}
+		add("env_http_headers", inlineStrings(bound))
+	}
+	return args
+}
+
+// inlineStrings is a TOML inline table of strings, keys sorted; "" for none.
+func inlineStrings(m map[string]string) string {
+	if len(m) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = TOMLBasicString(k) + "=" + TOMLBasicString(m[k])
+	}
+	return "{" + strings.Join(parts, ",") + "}"
 }
 
 // shellEnvArgs are the two flags that keep Codex from dropping the services' tokens from its commands' environment.
@@ -298,7 +438,7 @@ const readTrim = (filePath) => {
 };
 
 const parseArgs = (argv) => {
-  const result = { workspaceId: null, resumeSessionId: null, forkSessionId: null, model: null, effort: null, prompt: null };
+  const result = { workspaceId: null, resumeSessionId: null, forkSessionId: null, model: null, effort: null, apps: null, conversation: null, prompt: null };
   for (let i = 0; i < argv.length; i += 1) {
     const item = argv[i];
     const next = argv[i + 1];
@@ -320,6 +460,12 @@ const parseArgs = (argv) => {
       i += 1;
     } else if (item === '--effort' && next) {
       result.effort = next;
+      i += 1;
+    } else if (item === '--apps' && next) {
+      result.apps = next.split(',').filter(Boolean);
+      i += 1;
+    } else if (item === '--conversation' && next) {
+      result.conversation = next;
       i += 1;
     } else if (item === '--prompt' && next) {
       result.prompt = next;
@@ -355,16 +501,20 @@ const fetchArgs = async (payload) => {
   if (!Array.isArray(data.args) || data.args.some((arg) => typeof arg !== 'string')) {
     throw new Error('invalid Codex launch args response');
   }
-  return data.args;
+  // A chat with apps runs behind words of the pane's shell: its own token and the wall (prefix).
+  const prefix = typeof data.prefix === 'string' ? data.prefix : '';
+  return { args: data.args, prefix };
 };
 
 const main = async () => {
   const { prompt, ...payload } = parseArgs(process.argv.slice(2));
-  const args = await fetchArgs(payload);
+  const { args, prefix } = await fetchArgs(payload);
   if (prompt) args.push(prompt);
   const token = readTrim(path.join(baseDir, {{js .TokenFile}}));
   const env = token ? { ...process.env, [{{js .TokenEnv}}]: token } : process.env;
-  const child = spawn('codex', args, { stdio: 'inherit', env });
+  const child = prefix
+    ? spawn('sh', ['-c', prefix + ' codex "$@"', 'codex', ...args], { stdio: 'inherit', env })
+    : spawn('codex', args, { stdio: 'inherit', env });
   child.on('exit', (code, signal) => {
     if (signal) {
       process.kill(process.pid, signal);

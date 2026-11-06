@@ -125,6 +125,7 @@ const Inner = ({
           k: 'чатов за неделю',
         },
         { v: person!.invited || person!.mrsWeek === null ? '—' : String(person!.mrsWeek), k: 'MR за неделю' },
+        { v: person!.invited || person!.machines == null ? '—' : String(person!.machines), k: 'машин' },
       ]
     : [
         { v: kRub(spent), k: 'потрачено в этом месяце' },

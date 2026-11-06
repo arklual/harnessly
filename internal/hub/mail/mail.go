@@ -21,12 +21,31 @@ import (
 
 // Mailer sends the hub's mail.
 type Mailer interface {
-	// Mode is "smtp" when mail leaves the hub and "log" when it only reaches the hub's log.
+	// Mode is "smtp" when mail leaves the hub, "log" when it only reaches the hub's log and "off" when there is no mail.
 	Mode() string
 	// SendCode mails a six-digit sign-in code.
 	SendCode(ctx context.Context, to, code string, ttl time.Duration) error
 	// SendInvite mails an invitation link. sent is false when nothing left the hub (the log mailer).
 	SendInvite(ctx context.Context, to, inviter, space, link string, expires time.Time) (sent bool, err error)
+}
+
+// Off is the mailer of a hub that signs in without mail (HUB_AUTH_EMAIL=off) and has no SMTP server: nothing leaves
+// the hub and nothing is written to its log. An invitation is a link its author hands over.
+type Off struct{}
+
+func (Off) Mode() string { return "off" }
+
+func (Off) SendCode(context.Context, string, string, time.Duration) error {
+	return errors.New("mail sign-in is off")
+}
+
+func (Off) SendInvite(context.Context, string, string, string, string, time.Time) (bool, error) {
+	return false, nil
+}
+
+// Noticer mails a short notice: someone asks for access, access was given. link may be empty.
+type Noticer interface {
+	SendNotice(ctx context.Context, to, subject, body, link string) (sent bool, err error)
 }
 
 // Log writes mail to the hub's log instead of sending it. Every line is marked DEV: it prints a sign-in code, which
@@ -50,6 +69,11 @@ func (l Log) SendCode(_ context.Context, to, code string, ttl time.Duration) err
 
 func (l Log) SendInvite(_ context.Context, to, inviter, space, link string, expires time.Time) (bool, error) {
 	l.logger().Warn("DEV invitation (no HUB_SMTP_URL is set, so it is not mailed)", "to", to, "inviter", inviter, "space", space, "link", link, "expires", expires.UTC().Format(time.RFC3339))
+	return false, nil
+}
+
+func (l Log) SendNotice(_ context.Context, to, subject, _ string, link string) (bool, error) {
+	l.logger().Warn("DEV notice (no HUB_SMTP_URL is set, so it is not mailed)", "to", to, "subject", subject, "link", link)
 	return false, nil
 }
 
@@ -110,6 +134,18 @@ func (s *SMTP) SendInvite(ctx context.Context, to, inviter, space, link string, 
 	body := fmt.Sprintf("%s приглашает вас в пространство «%s» в harnessly.\r\n\r\nПринять приглашение: %s\r\n\r\nСсылка действует до %s и подходит один раз.\r\n",
 		inviter, space, link, russianDate(expires))
 	err := s.send(ctx, to, fmt.Sprintf("%s приглашает вас в «%s» в harnessly", inviter, space), body)
+	return err == nil, err
+}
+
+func (s *SMTP) SendNotice(ctx context.Context, to, subject, body, link string) (bool, error) {
+	text := strings.TrimSpace(body)
+	if text != "" {
+		text += "\r\n\r\n"
+	}
+	if link != "" {
+		text += "Открыть: " + clean(link) + "\r\n"
+	}
+	err := s.send(ctx, to, clean(subject)+" — harnessly", text)
 	return err == nil, err
 }
 

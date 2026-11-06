@@ -142,15 +142,50 @@ export const NewTeamSheet = ({
 const until = (iso: string): string =>
   new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 
+/** «В какую команду» — optional: the invited person joins the team together with the tenant. */
+const TeamPick = ({
+  teams,
+  value,
+  onPick,
+}: {
+  teams: { id: string; name: string }[];
+  value: string | null;
+  onPick: (id: string | null) => void;
+}) => (
+  <div className="md-sec">
+    <div className="md-sec__t">Команда</div>
+    <div className="hx-set__seg ps-teams" role="radiogroup" aria-label="Команда">
+      {[{ id: null, name: 'Без команды' }, ...teams].map((t) => (
+        <button
+          key={t.id ?? 'none'}
+          type="button"
+          className="hx-set__seg-item"
+          role="radio"
+          aria-checked={t.id === value}
+          onClick={() => onPick(t.id)}
+        >
+          {t.name}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
 export const InviteSheet = ({
   open,
   tenants,
+  teams = [],
+  presetTeam = null,
   onClose,
   onChanged,
 }: {
   open: boolean;
+  /** A team the person is put in unless the form says otherwise (the invitation started from that team). */
+  presetTeam?: string | null;
   /** The tenants a person can be invited to: one fixes it, several make the form ask. */
   tenants: TenantRef[];
+  /** The teams the person may be put in, each named with the tenant it belongs to. */
+  teams?: { id: string; name: string; tenantId?: string }[];
   onClose: () => void;
   onChanged: () => void;
 }) => {
@@ -158,6 +193,9 @@ export const InviteSheet = ({
   const [picked, setPicked] = useState<string | null>(null);
   const tenant = tenants.length === 1 ? (tenants[0] ?? null) : (tenants.find((t) => t.id === picked) ?? null);
   const [list, setList] = useState<TenantInvite[] | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const tenantTeams = tenant ? teams.filter((t) => t.tenantId === tenant.id) : [];
+  const team = tenantTeams.find((t) => t.id === teamId) ?? null;
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<TenantRole>('member');
   const [fresh, setFresh] = useState<TenantInvite | null>(null);
@@ -175,7 +213,9 @@ export const InviteSheet = ({
       setError(null);
       setBadMail(false);
       setList(null);
-      setPicked(null);
+      const pre = presetTeam ? teams.find((t) => t.id === presetTeam) : undefined;
+      setPicked(pre?.tenantId ?? null);
+      setTeamId(pre?.id ?? null);
     }
   }
 
@@ -218,14 +258,14 @@ export const InviteSheet = ({
     }
     setBadMail(false);
     void act('mail', async () => {
-      const made = await api.inviteByEmail(tenant!.id, address, role);
+      const made = await api.inviteByEmail(tenant!.id, address, role, team?.id);
       setEmail('');
       setFresh(made.sent === false && made.url ? made : null);
     });
   };
   const makeLink = () =>
     void act('link', async () => {
-      const made = await api.inviteByLink(tenant!.id);
+      const made = await api.inviteByLink(tenant!.id, team?.id);
       setFresh(made.url ? made : null);
       setCopied(false);
     });
@@ -269,12 +309,14 @@ export const InviteSheet = ({
           value={picked}
           onPick={(id) => {
             setPicked(id);
+            setTeamId(null);
             setList(null);
             setFresh(null);
             setError(null);
           }}
         />
       )}
+      {tenant && tenantTeams.length > 0 && <TeamPick teams={tenantTeams} value={teamId} onPick={setTeamId} />}
       {tenant && (
         <>
           <form
@@ -339,7 +381,7 @@ export const InviteSheet = ({
           <div className="md-sec">
             <div className="md-sec__t">По ссылке</div>
             <p className="md-note tm-first">
-              Ссылка действует 7 дней, по ней может войти любой, кому вы её передали. Входит участником.
+              {`Ссылка действует 7 дней, по ней может войти любой, кому вы её передали. Входит участником${team ? ` команды «${team.name}»` : ''}.`}
             </p>
             <div className="tm-inline">
               <Btn size="sm" icon="link" busy={busy === 'link'} onClick={makeLink}>

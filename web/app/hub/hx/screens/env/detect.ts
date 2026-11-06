@@ -47,6 +47,9 @@ export const detWord = (d: Draft): string => {
     skill: 'скилл',
     mcp: 'MCP',
     script: 'скрипт',
+    app: 'приложение',
+    plugin: 'плагин',
+    'claude-settings': 'настройки Claude',
   } as const;
   const src: Record<string, string> = {
     link: 'ссылка',
@@ -57,6 +60,6 @@ export const detWord = (d: Draft): string => {
     cmd: 'команда',
     repo: 'из репозитория',
   };
-  const how = d.k === 'repo' || d.k === 'access' ? '' : (src[d.f.src] ?? '');
+  const how = d.k === 'skill' || d.k === 'mcp' || d.k === 'script' ? (src[d.f.src] ?? '') : '';
   return how ? `${kinds[d.k]} · ${how}` : kinds[d.k];
 };

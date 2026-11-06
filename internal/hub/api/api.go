@@ -18,10 +18,13 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/designaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/dist"
+	"github.com/ly-solutions/harnessly/internal/hub/docs"
 	"github.com/ly-solutions/harnessly/internal/hub/env"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
+	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/hubsafe"
 	"github.com/ly-solutions/harnessly/internal/hub/ingest"
 	"github.com/ly-solutions/harnessly/internal/hub/limits"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
@@ -40,6 +43,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/secrets"
+	"github.com/ly-solutions/harnessly/internal/secrets/vaultkv"
 	"github.com/ly-solutions/harnessly/internal/sites"
 )
 
@@ -73,8 +78,12 @@ type Options struct {
 	// Features says whether an organization has a feature on; nil: the resources, load and operations of machines are
 	// on for every organization when HUB_MACHINE_RESOURCES=on, else dark (docs/hub/machines-resources.md).
 	Features machines.FeatureGate
+	// Ext replaces the registry the settings (HUB_EXTENSIONS*) name (tests).
+	Ext *ext.Registry
 	// Publisher carries the machines' live events to the organization's channel; nil: the space's own stream.
 	Publisher machines.Publisher
+	// SafeKV replaces the server of the machines' safes that HUB_SECRETS_VAULT_* name (tests).
+	SafeKV secrets.KV
 }
 
 // Hub is the assembled hub.
@@ -98,6 +107,8 @@ type Hub struct {
 	EnvPush *env.Pusher
 	Relay   *relay.Service
 	Proxy   *proxy.Service
+	// Docs is the documents and boards of the installation (HUB_DOCS).
+	Docs *docs.Service
 	// Design is who may see and change a machine's designs, and the guest links to them.
 	Design   *designaccess.Service
 	Dist     *dist.Handler
@@ -110,6 +121,10 @@ type Hub struct {
 	Tickets   *ticket.Store
 	// Sites is the published-sites module; nil when HARNESSLY_SITES is off.
 	Sites *sites.Service
+	// Ext is the registry of the extension adapters (docs/hub/extensions.md); nil unless HUB_EXTENSIONS=on.
+	Ext *ext.Registry
+	// Safe keeps the machines' safes on the hub's server; nil when HUB_SECRETS_VAULT_ADDR is not set.
+	Safe *hubsafe.Broker
 
 	cfg     *config.Config
 	db      *store.DB
@@ -136,6 +151,13 @@ func New(o Options) (*Hub, error) {
 	}
 
 	h := &Hub{cfg: cfg, db: db, log: log, limiter: o.Limiter, Registry: link.NewRegistry(), Events: events.NewBroker(), Tickets: ticket.New(o.Now)}
+	if cfg.Replicas {
+		id := cfg.ReplicaID
+		if id == "" {
+			id = link.NewID()
+		}
+		h.Registry.SetCluster(&link.Cluster{DB: db, ID: id, Addr: cfg.ReplicaAddr, Secret: cfg.ReplicaSecret, Log: log})
+	}
 	h.Auth, err = auth.New(auth.Deps{Config: cfg, DB: db, Mailer: o.Mailer, Limiter: o.Limiter, Log: log, Now: o.Now, HTTPClient: o.HTTPClient, Endpoints: o.Endpoints})
 	if err != nil {
 		return nil, err
@@ -153,6 +175,20 @@ func New(o Options) (*Hub, error) {
 	}
 	rb := &rates.Book{DB: db, URL: cfg.RatesURL, Client: o.HTTPClient, Log: log, Now: o.Now}
 	h.Features = features.New(db, cfg.Features, o.Now)
+	if kv := o.SafeKV; kv != nil || cfg.SafeVault != nil {
+		if kv == nil {
+			c, err := vaultkv.New(*cfg.SafeVault)
+			if err != nil {
+				return nil, fmt.Errorf("HUB_SECRETS_VAULT_*: %w", err)
+			}
+			kv = c
+		}
+		prefix := cfg.SafePrefix
+		if prefix == "" {
+			prefix = "harnessly"
+		}
+		h.Safe = hubsafe.New(kv, prefix, cfg.SafeRefPrefixes)
+	}
 	h.OrgEvents = events.NewMemoryBus(o.Now)
 	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents})
 	h.Analytics = analytics.New(analytics.Deps{DB: db, Gate: h.Orgs.Gate, Log: log, Now: o.Now, Rates: rb})
@@ -208,26 +244,50 @@ func New(o Options) (*Hub, error) {
 		}
 		machineFeatures = anyGate{env.StaticFeatures(static), h.Features}
 	}
+	h.Ext = o.Ext
+	if h.Ext == nil && cfg.Extensions.On {
+		specs, err := ext.LoadSpecs(cfg.Extensions.File)
+		if err != nil {
+			return nil, err
+		}
+		if h.Ext, err = ext.NewRegistry(specs, ext.Config{}); err != nil {
+			return nil, err
+		}
+	}
 	prov := o.Provider
 	if prov == nil {
 		if prov, err = newProvider(cfg); err != nil {
 			return nil, err
 		}
 	}
+	linkKey, err := sshinstall.MasterKey(cfg.DataDir, cfg.SecretKey)
+	if err != nil {
+		log.Warn("design access: no hub key, guest link addresses are not kept", "error", err)
+		linkKey = nil
+	}
+	var notice designaccess.Notice
+	if n, ok := o.Mailer.(mail.Noticer); ok {
+		notice = func(ctx context.Context, to, subject, body, link string) error {
+			_, err := n.SendNotice(ctx, to, subject, body, link)
+			return err
+		}
+	}
 	h.Design = designaccess.New(designaccess.Deps{
 		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL,
 		PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
+		LinkKey: linkKey, Notice: notice,
 	})
+	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now})
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
-		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design,
+		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Docs: h.Docs,
 	})
 	h.Analytics.UseMachines(h.Machines)
 	h.Analytics.UseEvents(h.OrgEvents)
 	h.Analytics.UseFeatures(h.Features)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
-	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design})
+	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features})
 	h.Proxy = px
 	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
 	if cfg.SSH {
@@ -253,9 +313,9 @@ func New(o Options) (*Hub, error) {
 	var page http.Handler
 	switch {
 	case cfg.WebDir != "":
-		page = newUI(os.DirFS(cfg.WebDir), true)
+		page = newUI(os.DirFS(cfg.WebDir), true, cfg.BasePath)
 	case o.UI != nil:
-		page = newUI(o.UI, false)
+		page = newUI(o.UI, false, cfg.BasePath)
 	default:
 		page = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -267,12 +327,14 @@ func New(o Options) (*Hub, error) {
 	mux.HandleFunc("GET /healthz", h.healthz)
 	mux.HandleFunc("GET /readyz", h.readyz)
 	mux.Handle("GET /api/config", httpx.Handler(h.config))
+	mux.Handle("GET /api/capabilities", httpx.Handler(h.capabilities))
 	h.Auth.Mount(mux)
 	h.Spaces.Mount(mux)
 	h.Orgs.Mount(mux)
 	h.Analytics.Mount(mux)
 	h.Env.Mount(mux)
 	h.Machines.Mount(mux)
+	h.Docs.Mount(mux)
 	if h.SSH != nil {
 		h.SSH.Mount(h.Spaces.Sub())
 	} else {
@@ -296,7 +358,11 @@ func New(o Options) (*Hub, error) {
 			mux.Handle("/sites/", h.Sites.PathEdge())
 		}
 	}
+	if c := h.Registry.Cluster(); c != nil {
+		mux.Handle("/internal/replica/v1/", c.Handler())
+	}
 	mux.Handle("GET /agent/v1", h.Dialer)
+	mux.Handle("POST "+hubproto.SecretsPath, httpx.Handler(h.agentSecrets))
 	mux.HandleFunc("DELETE /agent/v1", h.Dialer.ServeUnlink)
 	// Messages between agents of different machines (docs/hub/peers.md): off unless HUB_PEERS=on, and then the paths
 	// fall through to the 404 below, which the agent reads as "this hub does not carry them".
@@ -342,7 +408,7 @@ func New(o Options) (*Hub, error) {
 		}
 		secured.ServeHTTP(w, r)
 	})
-	h.Handler = recoverer(log, accessLog(log, h.Auth.ClientIP, guarded))
+	h.Handler = underBase(cfg.BasePath, recoverer(log, accessLog(log, h.Auth.ClientIP, guarded)))
 	return h, nil
 }
 
@@ -369,6 +435,9 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 	go h.Analytics.RunLive(ctx, h.OrgEvents.Active)
 	go h.Design.Run(ctx)
+	if h.Ext != nil {
+		go h.Ext.Run(ctx, ext.CheckEvery)
+	}
 	if h.Sites != nil {
 		go h.Sites.Run(ctx)
 	}
@@ -412,7 +481,15 @@ func newProvider(cfg *config.Config) (provider.Provider, error) {
 	if cfg.Machines.Provider != "http" {
 		return provider.None{}, nil
 	}
-	p, err := provider.NewHTTP(provider.HTTPConfig{BaseURL: cfg.Machines.ProviderURL, TokenFile: cfg.Machines.ProviderTokenFile})
+	hc := provider.HTTPConfig{BaseURL: cfg.Machines.ProviderURL, TokenFile: cfg.Machines.ProviderTokenFile}
+	if cfg.Machines.ProviderProtocol != config.ProviderProtocolV0 {
+		p, err := provider.NewAuto(hc, cfg.Machines.ProviderProtocol)
+		if err != nil {
+			return nil, fmt.Errorf("provider: %w", err)
+		}
+		return p, nil
+	}
+	p, err := provider.NewHTTP(hc)
 	if err != nil {
 		return nil, fmt.Errorf("provider: %w", err)
 	}

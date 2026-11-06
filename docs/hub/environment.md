@@ -40,6 +40,7 @@ A source holds the text or the address of the item and **nothing secret**. Whate
 | `doc` | `url` (http or https), `text` (≤ 48 KiB) |
 | `plugin` | `marketplace` (GitHub `owner/repo` or an https git address), `plugin` (`name@marketplace`) — see «Recommended» |
 | `claude-settings` | `always`, `ifAbsent` (objects of Claude Code's settings), `claudeMd` (≤ 8 KiB) — see «Recommended» |
+| `app` | `from` (`repo`), `repo` (the item id of a `repo` of the list) or `repoUrl` (https) + `branch`, `path` (the app's folder in the repository, relative, no `..`) — see «Apps» |
 
 The whole source is at most 64 KiB. Names are up to 80 characters, hints up to 200, without control characters.
 
@@ -208,6 +209,51 @@ orgs:
 
 An entry without `group:` keeps the group it has; a group without `defaultOn:` keeps (or, new, gets) `true`.
 
+## Presets
+
+A **preset** is a named set of one layer's groups, for a person who does not want to switch groups one by one: they pick
+it, and its optional groups turn on while the layer's other optional groups turn off. Required groups are not touched.
+
+- **Preset** — `id`, `name` (≤ 40 characters, unique in the layer, compared without case), `hint`, `groupIds` (groups
+  of the same layer), `position`. Managers of the layer keep presets; a deleted group leaves the presets that held it.
+- Picking a preset is the person's own choice per optional group, the same as `PUT /api/me/env/groups/{groupId}`: each
+  change is in the audit log (`env.person.group`), and the person's machines get the new list at once.
+- **Active** — the person's current choice of the layer's optional groups (the ones they have items in) is exactly the
+  preset's.
+- A person sees only presets with at least one group they have items in.
+
+| Method and path | Who | Answer |
+| --- | --- | --- |
+| `POST /api/orgs/{org}/env/presets` `{layer, scopeId, name, hint?, groupIds?}` | managers of the layer | 201 `{preset: PresetView}`; 409 `name_taken`; 400 `invalid_request` with `details.field` `groupIds` for a group of another layer |
+| `PATCH /api/orgs/{org}/env/presets/{presetId}` `{name?, hint?, groupIds?, position?}` | managers of the layer | 200 `{preset}` |
+| `DELETE /api/orgs/{org}/env/presets/{presetId}` | managers of the layer | 204 |
+| `PUT /api/me/env/presets/{presetId}?space=` | the person | 200 `{presets: MePreset[], groups: MeGroup[]}` as they are now; 404 for a preset none of whose groups holds an item of the person |
+
+`GET /api/orgs/{org}/env` lists every layer's `presets: PresetView[]` (`{id, name, hint, groupIds, position}`);
+`GET /api/me/env` has `presets: MePreset[]` (`{id, name, hint, layer, groupIds, active}`).
+
+Example — presets over the groups above, by the API:
+
+```sh
+curl -X POST $HUB/api/orgs/acme/env/presets -d '{"layer":"org","scopeId":"<org id>","name":"Бэкендер","groupIds":["<id of Бэкенд>"]}'
+curl -X POST $HUB/api/orgs/acme/env/presets -d '{"layer":"org","scopeId":"<org id>","name":"Аналитик","hint":"отчёты без сервисов","groupIds":["<id of Аналитика>"]}'
+# a person picks «Аналитик»: Аналитика goes on, Бэкенд off
+curl -X PUT "$HUB/api/me/env/presets/<id of Аналитик>?space=product" -d '{}'
+```
+
+The same in an env-seed file: `presets:` of an organization, with the groups by name (they must be groups of the same
+layer, in `groups:` or already there). The file is idempotent; a preset without `hint:` keeps its hint.
+
+```yaml
+orgs:
+  - org: acme
+    presets:
+      - {layer: org, name: Бэкендер, groups: [Бэкенд]}
+      - {layer: org, name: Аналитик, hint: отчёты без сервисов, groups: [Аналитика]}
+```
+
+`--dry-run` prints `+ preset «…» in …` for a new preset and `~ preset «…» in … (groups)` for a changed one.
+
 ## Recommended
 
 «Рекомендованное» is a group of the platform itself, in every organization with no setting up: plugins and settings of
@@ -249,6 +295,25 @@ organization's admin writes them (a team's or a tenant's item of these kinds is 
   file is never touched. A file linked from elsewhere (dotfiles) is written where it really is.
 
 A check run says what would change and changes nothing; a sandbox run writes into the sandbox's own home.
+
+### Apps
+
+An `app` item puts a harnessly app (the folder with `harnessly/app.json`: a design system, presentation templates) on
+everyone the item reaches. Only an organization's admin writes one (a team's or a tenant's is refused, like `plugin`),
+and it goes only to a machine whose hello has `environment.apps` (`hubproto.FeatureEnvApps`).
+
+The machine's step comes after the repositories and before Claude's settings and the scripts
+(`internal/envsetup/app.go`): it takes the folder as a script from a repository is taken (a repository of the list, or a
+clone of `repoUrl` kept for the environment) and installs it in the app registry as an **environment install**
+(`internal/apps/envinstall.go`): a copy in `<data>/apps/env/<id>/<version>`, a record in `<data>/apps/env.json`. The same
+version from the same files is «уже стоит». A trusted app is never installed this way (the step fails).
+
+- The person cannot remove it. They can turn it off for themselves only when the item is not pinned (a pinned item, or
+  an item of a required group); a pinned one says so on «О приложении». Their own install of the same app wins.
+- After a full run on the machine itself (not a check, not a sandbox) the environment's apps whose items left the list
+  are taken off, the copy with them. Each hub link takes off only its own.
+- A new version in the repository comes with the next setup. Boards already made from the app's templates are not
+  changed; a strict template keeps them locked as before.
 
 ## Calls of the tools
 

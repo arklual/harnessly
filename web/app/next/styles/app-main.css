@@ -571,44 +571,190 @@
   font-weight: var(--hx-weight-semibold);
   letter-spacing: -0.01em;
 }
-.hx-appslist__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: min(640px, 100%);
+.hx-appgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--hx-space-3);
+  width: min(960px, 100%);
 }
-.hx-appslist__row {
+.hx-appcard {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: var(--hx-space-4);
-  min-height: 56px;
-  padding: 8px 12px;
+  min-height: 148px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-sm);
+  transition:
+    border-color var(--hx-dur-md) var(--hx-ease-out),
+    transform var(--hx-dur-md) var(--hx-ease-out),
+    box-shadow var(--hx-dur-md) var(--hx-ease-out);
+  animation: hx-appmain-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+}
+.hx-appcard:hover {
+  border-color: var(--hx-border-strong);
+  box-shadow: var(--hx-shadow-md);
+  transform: translateY(-1px);
+}
+.hx-appcard[data-muted] .hx-appcard__open {
+  opacity: 0.55;
+}
+.hx-appcard--skel {
+  border-style: dashed;
+  box-shadow: none;
+}
+.hx-appcard__open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hx-space-1);
+  min-width: 0;
+  padding: var(--hx-space-4);
   border: 0;
-  border-radius: var(--hx-radius-md);
+  border-radius: inherit;
   background: none;
   color: var(--hx-fg-1);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--hx-dur-sm) var(--hx-ease-out);
 }
-.hx-appslist__row:hover {
-  background: var(--hx-bg-hover);
+.hx-appcard__open:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -2px;
 }
-.hx-appslist__text {
+.hx-appcard__tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--hx-space-2);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-appcard__name {
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-appcard__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.hx-appcard__state {
+  margin-top: auto;
+  padding-top: var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs, var(--hx-text-sm));
+}
+.hx-appcard__more {
+  position: absolute;
+  top: var(--hx-space-2);
+  right: var(--hx-space-2);
+}
+.hx-appslist__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hx-space-2);
+  width: min(560px, 100%);
+  padding: var(--hx-space-6) 0;
+  animation: hx-appmain-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+}
+.hx-appslist__hint {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-appsheet__in {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-4);
+}
+.hx-appsheet__head {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+}
+.hx-appsheet__head .hx-appcard__tile {
+  margin: 0;
+}
+.hx-appsheet__title {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.hx-appslist__name {
-  font-weight: var(--hx-weight-semibold);
-}
-.hx-appslist__desc {
-  overflow: hidden;
+.hx-appsheet__title span {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+.hx-appsheet__text {
+  margin: 0;
+  color: var(--hx-fg-2);
+}
+.hx-appsheet__sec {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hx-space-2);
+}
+.hx-appsheet__h {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-appsheet__switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-4);
+  width: 100%;
+}
+.hx-appsheet__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-appsheet__chips li {
+  padding: 2px 10px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-bubble);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+/* On a wide window the sheet is a panel at the right edge; on the phone it stays the kit's bottom sheet. */
+@media (min-width: 761px) {
+  .hx-sheet.hx-appsheet {
+    top: 8px;
+    left: auto;
+    width: 400px;
+    max-height: none;
+    animation-name: hx-appsheet-in;
+  }
+}
+@keyframes hx-appsheet-in {
+  from {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-appcard {
+    animation: none;
+    transition: none;
+  }
+  .hx-appcard:hover {
+    transform: none;
+  }
 }
 .hx-appslist__help {
   display: inline-flex;

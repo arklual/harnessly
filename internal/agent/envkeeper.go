@@ -196,7 +196,7 @@ func (k *envKeeper) apply(items []hubproto.EnvItem) []hubproto.EnvApplied {
 			}
 		case it.Kind == hubproto.EnvKindMCP:
 			a.Status, a.Message = k.putMCP(servers, it, src)
-		case it.Kind == hubproto.EnvKindScript || it.Kind == hubproto.EnvKindAccess || hubproto.IsClaudeKind(it.Kind):
+		case it.Kind == hubproto.EnvKindScript || it.Kind == hubproto.EnvKindAccess || it.Kind == hubproto.EnvKindApp || hubproto.IsClaudeKind(it.Kind):
 			// Nothing for the chats; the runtime's account below says how the machine's side went.
 		default:
 			a.Status, a.Message = hubproto.EnvError, "unknown kind "+it.Kind

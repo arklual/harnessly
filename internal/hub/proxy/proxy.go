@@ -62,6 +62,8 @@ type Deps struct {
 	Now func() time.Time
 	// Design answers the design access API before a request would reach the machine; nil leaves it to the machine.
 	Design Interceptor
+	// Features says whether runtime.fleet is on for an organization (fleet.go); nil: off, the routes answer not found.
+	Features FeatureGate
 }
 
 // Interceptor answers some requests of a signed-in person to a machine itself; false lets them through to it.
@@ -81,6 +83,7 @@ type Service struct {
 	now     func() time.Time
 	acc     *machaccess.Checker
 	design  Interceptor
+	gate    FeatureGate
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
@@ -107,7 +110,7 @@ type grantCall struct {
 // New makes the proxy.
 func New(d Deps) *Service {
 	s := &Service{
-		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design,
+		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features,
 		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
 		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}
@@ -126,6 +129,7 @@ func New(d Deps) *Service {
 func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("/m/", s)
 	mux.Handle("GET /api/machines/{machineId}/browser/ws", s.auth.Require(s.browserWS))
+	s.mountFleet(mux)
 }
 
 func (s *Service) browserWS(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -267,7 +271,7 @@ func (s *Service) trusted(ctx context.Context, m store.Machine) error {
 	if ok && s.now().Before(until) {
 		return nil
 	}
-	if err := s.auth.RequireTrustedMachine(ctx, m.CreatedBy); err != nil {
+	if err := s.auth.RequireTrustedMachine(ctx, m); err != nil {
 		return err
 	}
 	s.mu.Lock()
@@ -561,11 +565,11 @@ func (s *Service) transport(id string) *http.Transport {
 			}
 			dctx, cancel := context.WithTimeout(ctx, dialTimeout)
 			defer cancel()
-			tn, err := l.OpenTunnel(dctx)
+			c, err := l.OpenConn(dctx)
 			if err != nil {
 				return nil, err
 			}
-			return tn, nil
+			return c, nil
 		},
 		DisableCompression:  true,
 		MaxIdleConnsPerHost: 8,

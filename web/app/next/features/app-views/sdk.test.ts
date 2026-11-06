@@ -44,7 +44,7 @@ const view = async (permissions: string[], handlers: IBridgeHandlers) => {
 
 describe('@harnessly/app-sdk against the bridge, through the shim', () => {
   it('shakes hands, takes the theme and calls what the manifest grants', async () => {
-    const storage = vi.fn(async () => 'stored');
+    const storage = vi.fn(async () => ({ value: 'stored', version: 1 }));
     const chatSend = vi.fn(async () => undefined);
     const { dom, hl } = await view(['storage', 'chat.prompt'], { storage, chatSend });
     expect(hl.context.app.id).toBe('acme.demo');

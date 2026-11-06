@@ -199,8 +199,9 @@ export function applyConvEvent(machine: MachineId, conv: ConvId, e: ConvEvent): 
 export const storeSink: Sink = {
   welcome(machine, w) {
     noteServerTime(machine, w.serverTime);
+    const orgName = machinesStore.get(machine)?.machine.orgName;
     machinesStore.set(machine, {
-      machine: { ...w.machine, id: machine },
+      machine: { ...w.machine, id: machine, ...(orgName ? { orgName } : {}) },
       runtime: 'v2',
       epoch: w.epoch,
       features: w.features,
@@ -209,7 +210,12 @@ export const storeSink: Sink = {
   },
   snapshot(machine, s) {
     if (s.ch === 'machine') {
-      patchMachine(machine, () => ({ ...s.data.machine, id: machine }));
+      // The organization is the hub's word about the machine; the machine's own snapshot does not know it.
+      patchMachine(machine, (m) => ({
+        ...s.data.machine,
+        id: machine,
+        ...(m.orgName ? { orgName: m.orgName } : {}),
+      }));
       return;
     }
     if (s.ch === 'convs') {

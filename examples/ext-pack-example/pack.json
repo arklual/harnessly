@@ -1,0 +1,15 @@
+{
+  "name": "example-corp-pack",
+  "version": "1.0.0",
+  "vendor": "Example Corp",
+  "homepage": "https://example.com",
+  "description": "An example extension pack: everything a corporation puts next to an unmodified harnessly",
+  "requires": {"harnessly": ">=0.85"},
+  "components": [
+    {"id": "machines", "protocol": "harnessly.machine-provider/v1", "where": "hub", "run": "bin/machine-adapter", "doc": "docs/hub/provider.md"},
+    {"id": "memory", "protocol": "harnessly.memory/v1", "where": "runtime", "run": "adapters/memory.ts", "doc": "docs/memory-adapters.md"},
+    {"id": "connection", "protocol": "harnessly.connection/v1", "where": "runtime", "run": "adapters/connection.ts", "doc": "docs/connection-adapters.md"},
+    {"id": "secrets", "where": "runtime", "config": "runtime.env", "doc": "docs/safe.md"},
+    {"id": "ui", "where": "runtime", "app": "ui-app", "doc": "docs/apps.md"}
+  ]
+}

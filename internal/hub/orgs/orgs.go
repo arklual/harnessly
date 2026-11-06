@@ -215,10 +215,17 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request, p *auth.Principal
 	return nil
 }
 
+// defaultTenantName is the first tenant of an organization that was not asked to name it.
+const defaultTenantName = "Основное"
+
 func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
 	var req struct {
 		Name     string
 		SpaceIDs []string
+		// TenantName asks for a first tenant made together with the organization: an organization without one
+		// is a dead end for a person who has no tenant to move in. A blank name means "Основное". Absent: the
+		// organization is made as it always was.
+		TenantName *string
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -226,6 +233,16 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	name, err := CleanName(req.Name, "Назовите организацию")
 	if err != nil {
 		return err
+	}
+	tenant := ""
+	if req.TenantName != nil {
+		tenant = strings.TrimSpace(*req.TenantName)
+		if tenant == "" {
+			tenant = defaultTenantName
+		}
+		if tenant, err = CleanName(tenant, "Назовите тенант"); err != nil {
+			return err
+		}
 	}
 	if len(req.SpaceIDs) > maxSpacesPerCreate {
 		return httpx.Invalid("spaceIds", "Слишком много пространств за раз")
@@ -239,7 +256,7 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	// A taken slug is a unique violation that spoils the transaction; the whole of it is tried again with the next one.
 	for n := 1; ; n++ {
 		o = store.Org{Slug: spaces.Slug(name, n), Name: name, CreatedBy: p.User.ID, CreatedAt: now}
-		err = s.db.Tx(ctx, func(st store.Store) error { return s.createIn(ctx, st, p, &o, req.SpaceIDs, now) })
+		err = s.db.Tx(ctx, func(st store.Store) error { return s.createIn(ctx, st, p, &o, req.SpaceIDs, tenant, n, now) })
 		if err == nil {
 			break
 		}
@@ -255,7 +272,7 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	return nil
 }
 
-func (s *Service) createIn(ctx context.Context, st store.Store, p *auth.Principal, o *store.Org, spaceIDs []string, now time.Time) error {
+func (s *Service) createIn(ctx context.Context, st store.Store, p *auth.Principal, o *store.Org, spaceIDs []string, tenant string, attempt int, now time.Time) error {
 	seen := map[string]bool{}
 	var moved []store.Space
 	for _, id := range spaceIDs {
@@ -287,6 +304,19 @@ func (s *Service) createIn(ctx context.Context, st store.Store, p *auth.Principa
 	if err := st.AddAudit(ctx, &store.AuditEvent{OrgID: o.ID, ActorID: p.User.ID, ScopeKind: store.ScopeOrg, ScopeID: o.ID, Action: "org.create",
 		TargetKind: "org", TargetID: o.ID, After: jsonOf(map[string]any{"name": o.Name, "slug": o.Slug}), At: now}); err != nil {
 		return err
+	}
+	if tenant != "" {
+		sp := store.Space{Slug: spaces.Slug(tenant, attempt), Name: tenant, CreatedBy: p.User.ID, CreatedAt: now}
+		if err := st.CreateSpace(ctx, &sp); err != nil {
+			return err
+		}
+		if err := st.SetSpaceOrg(ctx, sp.ID, o.ID); err != nil {
+			return err
+		}
+		if err := st.AddAudit(ctx, &store.AuditEvent{OrgID: o.ID, SpaceID: sp.ID, ActorID: p.User.ID, ScopeKind: store.ScopeOrg, ScopeID: o.ID,
+			Action: "tenant.create", TargetKind: "tenant", TargetID: sp.ID, After: jsonOf(map[string]any{"name": sp.Name, "slug": sp.Slug}), At: now}); err != nil {
+			return err
+		}
 	}
 	for _, sp := range moved {
 		if err := st.SetSpaceOrg(ctx, sp.ID, o.ID); err != nil {

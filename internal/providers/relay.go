@@ -359,7 +359,7 @@ const RelayPrefix = "/api/cli/providers"
 // Relays serves the relay of every Relayed preset under prefix, each over the store's credential of its profile.
 func Relays(store *Store, prefix string) http.Handler {
 	mux := map[string]*Relay{}
-	for _, p := range presets {
+	for _, p := range all() {
 		if !p.Relayed {
 			continue
 		}

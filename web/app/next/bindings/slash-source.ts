@@ -7,7 +7,7 @@ import type { ICatalogItem } from '@/next/features/settings/api';
 import { listFolder } from '@/next/features/pane/chat-files-api';
 import { findChats } from '@/next/features/composer/chat-sources';
 import type { ISlashSource } from '@/next/features/composer/slash-palette';
-import type { IMcpRef, ISlashActions } from '@/next/features/composer/slash-model';
+import type { IAppCommands, IMcpRef, ISlashActions } from '@/next/features/composer/slash-model';
 import type { ConvId, MachineId, MessageRef, Provider } from '@/next/protocol/v2';
 
 interface IOptions {
@@ -18,6 +18,8 @@ interface IOptions {
   /** Where the agent works, so a project's own commands are found. */
   cwd: string | null;
   actions: ISlashActions;
+  /** The commands of the apps on in the chat. */
+  appCommands?: readonly IAppCommands[];
   /** A chat picked after «@»: the message points at it. */
   onChat: (ref: MessageRef) => void;
 }
@@ -37,6 +39,7 @@ export const useSlashSource = ({
   provider,
   cwd,
   actions,
+  appCommands,
   onChat,
 }: IOptions): ISlashSource | null => {
   const [woken, setWoken] = useState(false);
@@ -80,6 +83,7 @@ export const useSlashSource = ({
             wake,
             catalog: list,
             mcp,
+            appCommands,
             actions,
             starting: conv === null,
             filesScope: conv ?? '',
@@ -88,6 +92,6 @@ export const useSlashSource = ({
             onChat,
           }
         : null,
-    [machine, provider, wake, list, mcp, actions, conv, lister, chats, onChat],
+    [machine, provider, wake, list, mcp, appCommands, actions, conv, lister, chats, onChat],
   );
 };

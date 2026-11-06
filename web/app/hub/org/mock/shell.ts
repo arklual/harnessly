@@ -31,7 +31,15 @@ export const VIEWERS: Record<'admin' | 'lead' | 'member', Viewer> = {
 };
 
 /** The mock organization has every feature on, so the gallery shows the whole new hub. */
-export const MOCK_FEATURES = ['ui.hx', 'env', 'catalog', 'machine.resources', 'org.events'];
+export const MOCK_FEATURES = [
+  'ui.hx',
+  'env',
+  'catalog',
+  'machine.resources',
+  'org.events',
+  'ui.hx.live',
+  'secrets.vault',
+];
 
 export const shellMock = (ctx: MockCtx): ShellApi => ({
   shell: async (org, tenant) => {

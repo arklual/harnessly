@@ -2,6 +2,9 @@ package api_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/api"
+	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
 )
 
@@ -467,4 +471,89 @@ func TestInstallScriptCarriesTheAgentURL(t *testing.T) {
 	if cfg.PublicURL != s.URL || cfg.AgentURL != "https://agents.example.test" {
 		t.Errorf("config = %+v", cfg)
 	}
+}
+
+func TestCapabilitiesAreOpenAndFollowTheSettings(t *testing.T) {
+	type doc struct {
+		Server       string
+		Capabilities []struct{ ID, Status, Reason, Configure string }
+	}
+	read := func(s *hubtest.Stack) map[string]string {
+		r := s.Browser().Do("GET", "/api/capabilities", nil)
+		if r.Code != 200 || r.Header.Get("Set-Cookie") != "" {
+			t.Fatal(r)
+		}
+		var d doc
+		r.JSON(&d)
+		if d.Server != "hub" {
+			t.Fatalf("server = %q", d.Server)
+		}
+		out := map[string]string{}
+		for _, c := range d.Capabilities {
+			if c.Status != "on" && c.Reason == "" {
+				t.Errorf("%s is %s with no reason", c.ID, c.Status)
+			}
+			out[c.ID] = c.Status
+		}
+		return out
+	}
+	c := read(hubtest.New(t))
+	if c["ssh"] != "on" || c["sign-in.github"] != "needs_config" || c["platform-gateway"] != "off" || c["flag.env"] != "needs_config" {
+		t.Errorf("defaults = %v", c)
+	}
+	c = read(hubtest.New(t, hubtest.Env("HUB_SSH", "off"), hubtest.Env("HUB_FEATURES_FORCE", "env")))
+	if c["ssh"] != "needs_config" || c["flag.env"] != "on" {
+		t.Errorf("settings = %v", c)
+	}
+}
+
+func TestCapabilitiesShowTheExtensionAdapters(t *testing.T) {
+	good := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(ext.Description{Protocol: "harnessly.test/v1", Name: "acme", Version: "1"})
+	}))
+	defer good.Close()
+	dead := httptest.NewServer(http.NotFoundHandler())
+	deadURL := dead.URL
+	dead.Close()
+	reg, err := ext.NewRegistry([]ext.Spec{
+		{Name: "up", Kind: "test", URL: good.URL, Protocol: "harnessly.test/v1"},
+		{Name: "down", Kind: "test", URL: deadURL, Protocol: "harnessly.test/v1"},
+	}, ext.Config{Attempts: 1, Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg.Check(context.Background())
+	s := hubtest.New(t, hubtest.WithOptions(func(o *api.Options) { o.Ext = reg }))
+	r := s.Browser().Do("GET", "/api/capabilities", nil)
+	var d struct {
+		Capabilities []struct{ ID, Status, Reason string }
+	}
+	r.JSON(&d)
+	got := map[string]string{}
+	for _, c := range d.Capabilities {
+		got[c.ID] = c.Status
+		if strings.HasPrefix(c.ID, "extension.") && (strings.Contains(c.Reason, "127.0.0.1") || strings.Contains(c.Reason, "http")) {
+			t.Errorf("%s leaks the address: %q", c.ID, c.Reason)
+		}
+	}
+	if got["extension.up"] != "on" || got["extension.down"] != "needs_config" {
+		t.Errorf("extensions = %v", got)
+	}
+	// Without the registry there is nothing of the kind.
+	for id := range readCaps(t, hubtest.New(t)) {
+		if strings.HasPrefix(id, "extension.") {
+			t.Errorf("%s with no extensions", id)
+		}
+	}
+}
+
+func readCaps(t *testing.T, s *hubtest.Stack) map[string]bool {
+	t.Helper()
+	var d struct{ Capabilities []struct{ ID string } }
+	s.Browser().Do("GET", "/api/capabilities", nil).JSON(&d)
+	out := map[string]bool{}
+	for _, c := range d.Capabilities {
+		out[c.ID] = true
+	}
+	return out
 }

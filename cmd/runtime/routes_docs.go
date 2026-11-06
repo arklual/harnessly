@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/docprovider"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -27,10 +28,12 @@ var (
 const docBodyMax = 16 << 10
 
 func docsRoutes(d deps, c integrations.Config) []gate.Route {
-	if !d.Standalone && c.ArtifactsURL == "" {
+	if !d.Standalone && c.ArtifactsURL == "" && len(docprovider.Adapters()) == 0 {
 		return nil
 	}
 	threads := &integrations.Threads{Path: filepath.Join(d.DataDir, "doc-threads.json")}
+	// The built-in catalog, or the declared documents adapter (docs/doc-adapters.md).
+	provider := docprovider.For(c, threads)
 	prefix := platformAPI + "/docs"
 	tail := func(r *http.Request) (string, bool) {
 		p := strings.TrimPrefix(r.URL.Path, "/agents")
@@ -51,6 +54,8 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 	fail := func(w http.ResponseWriter, err error) {
 		var ue *integrations.UpstreamError
 		switch {
+		case errors.Is(err, docprovider.ErrUnsupported):
+			write(w, http.StatusNotImplemented, map[string]string{"error": locale.Pick("The documents service does not do this", "Сервис документов этого не умеет")})
 		case errors.Is(err, integrations.ErrNotConfigured):
 			write(w, http.StatusNotFound, map[string]string{"error": locale.Pick("Documents are not connected", "Документы не подключены")})
 		case errors.Is(err, integrations.ErrNoThread):
@@ -82,14 +87,14 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 		return true
 	}
 	withCounts := func(r *http.Request, docs []integrations.DocSummary) []integrations.DocSummary {
-		open, unread, last, err := threads.Counts(person(r).Email)
-		if err != nil {
+		n, err := provider.Counts(r.Context(), person(r).Email)
+		if err != nil || n.Open == nil {
 			return docs
 		}
 		for i := range docs {
-			docs[i].OpenThreads, docs[i].Unread = open[docs[i].Slug], unread[docs[i].Slug]
-			if last[docs[i].Slug] > docs[i].LastActivityAt {
-				docs[i].LastActivityAt = last[docs[i].Slug]
+			docs[i].OpenThreads, docs[i].Unread = n.Open[docs[i].Slug], n.Unread[docs[i].Slug]
+			if n.Last[docs[i].Slug] > docs[i].LastActivityAt {
+				docs[i].LastActivityAt = n.Last[docs[i].Slug]
 			}
 		}
 		return docs
@@ -107,11 +112,7 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 		parts := strings.Split(rest, "/")
 		switch {
 		case rest == "" && r.Method == http.MethodGet:
-			if c.ArtifactsURL == "" {
-				write(w, 200, map[string]any{"docs": []integrations.DocSummary{}})
-				return
-			}
-			docs, err := c.ListDocs(r.Context(), 100)
+			docs, err := provider.List(r.Context(), 100)
 			if err != nil {
 				fail(w, err)
 				return
@@ -140,19 +141,19 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 		case !docSlugRe.MatchString(parts[0]):
 			write(w, http.StatusNotFound, map[string]string{"error": locale.Pick("Document not found", "Документ не найден")})
 		case len(parts) == 1 && r.Method == http.MethodGet:
-			doc, err := c.Doc(r.Context(), parts[0])
+			doc, err := provider.Get(r.Context(), parts[0])
 			if err != nil {
 				fail(w, err)
 				return
 			}
-			list, err := threads.Of(parts[0])
+			list, err := provider.Threads(r.Context(), parts[0])
 			if err != nil {
 				fail(w, err)
 				return
 			}
 			write(w, 200, map[string]any{"doc": withCounts(r, []integrations.DocSummary{doc})[0], "threads": list})
 		case len(parts) == 2 && parts[1] == "versions" && r.Method == http.MethodGet:
-			versions, err := c.DocVersions(r.Context(), parts[0])
+			versions, err := provider.Versions(r.Context(), parts[0])
 			if err != nil {
 				fail(w, err)
 				return
@@ -160,18 +161,19 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 			write(w, 200, map[string]any{"versions": versions})
 		case len(parts) == 2 && parts[1] == "diff" && r.Method == http.MethodGet:
 			q := r.URL.Query()
-			diff, err := c.DocDiff(r.Context(), parts[0], q.Get("from"), q.Get("to"))
+			diff, err := provider.Diff(r.Context(), parts[0], q.Get("from"), q.Get("to"))
 			if err != nil {
 				fail(w, err)
 				return
 			}
 			write(w, 200, diff)
 		case len(parts) == 2 && parts[1] == "content" && r.Method == http.MethodGet:
-			link, _, err := c.DocReadLink(r.Context(), parts[0])
+			embed, err := provider.Embed(r.Context(), parts[0])
 			if err != nil {
 				fail(w, err)
 				return
 			}
+			link := embed.URL
 			if v := r.URL.Query().Get("v"); v != "" {
 				sep := "?"
 				if strings.Contains(link, "?") {
@@ -196,14 +198,14 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 				}
 				open = body.Public
 			}
-			access, err := c.DocAccessOf(r.Context(), parts[0], open)
+			access, err := provider.SetAccess(r.Context(), parts[0], docprovider.AccessChange{Public: open})
 			if err != nil {
 				fail(w, err)
 				return
 			}
 			write(w, 200, access)
 		case len(parts) == 2 && parts[1] == "read" && r.Method == http.MethodPost:
-			if err := threads.MarkRead(person(r).Email, parts[0]); err != nil {
+			if err := provider.MarkRead(r.Context(), person(r).Email, parts[0]); err != nil {
 				fail(w, err)
 				return
 			}
@@ -220,7 +222,7 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 				write(w, http.StatusBadRequest, map[string]string{"error": locale.Pick("A text and a place in the document are required", "Нужны текст и место в документе")})
 				return
 			}
-			th, err := threads.Create(parts[0], body.Anchor, strings.TrimSpace(body.Body), person(r))
+			th, err := provider.CreateThread(r.Context(), parts[0], body.Anchor, strings.TrimSpace(body.Body), person(r))
 			if err != nil {
 				fail(w, err)
 				return
@@ -241,7 +243,7 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 					write(w, http.StatusBadRequest, map[string]string{"error": locale.Pick("Empty comment", "Пустой комментарий")})
 					return
 				}
-				th, err = threads.Reply(parts[0], parts[2], strings.TrimSpace(body.Body), person(r))
+				th, err = provider.Reply(r.Context(), parts[0], parts[2], strings.TrimSpace(body.Body), person(r))
 			case "status":
 				var body struct {
 					Status string `json:"status"`
@@ -253,7 +255,7 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 					write(w, http.StatusBadRequest, map[string]string{"error": locale.Pick("status: open or resolved", "status: open или resolved")})
 					return
 				}
-				th, err = threads.SetStatus(parts[0], parts[2], body.Status)
+				th, err = provider.SetStatus(r.Context(), parts[0], parts[2], body.Status)
 			default:
 				write(w, http.StatusNotFound, map[string]string{"error": "Not found"})
 				return

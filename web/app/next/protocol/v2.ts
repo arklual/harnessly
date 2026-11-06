@@ -410,6 +410,8 @@ export interface Machine {
   load?: MachineLoad; // only while subscribed with {load: true}
   /** The machine's own judgement of its disk, memory and CPU; absent where the source does not judge it. */
   health?: MachineHealth;
+  /** Only from a hub that serves the fleet (runtime.fleet): the organization the machine belongs to. */
+  orgName?: string;
 }
 /** Level is the worst of issues; issues are worst first, then disk, mem, cpu, and empty when ok. */
 export interface MachineHealth {

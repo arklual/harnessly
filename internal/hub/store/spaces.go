@@ -356,3 +356,20 @@ func (s Store) ReplaceSpaceSSHKey(ctx context.Context, k SpaceSSHKey) error {
 		k.PublicKey, k.PrivateKeyEnc, Ms(k.CreatedAt), k.SpaceID)
 	return err
 }
+
+// SetInviteTeam says the person who accepts the invitation joins the team too.
+func (s Store) SetInviteTeam(ctx context.Context, inviteID, teamID string) error {
+	_, err := s.q.Exec(ctx, `INSERT INTO invite_team (invite_id, team_id) VALUES (?, ?)
+		ON CONFLICT (invite_id) DO UPDATE SET team_id = excluded.team_id`, inviteID, teamID)
+	return err
+}
+
+// InviteTeam is the team of an invitation; "" when it names none.
+func (s Store) InviteTeam(ctx context.Context, inviteID string) (string, error) {
+	var id string
+	err := s.q.QueryRow(ctx, `SELECT team_id FROM invite_team WHERE invite_id = ?`, inviteID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}

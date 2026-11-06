@@ -64,3 +64,76 @@ is recognized too.
 
 `provider.Memory` implements the same interface from a table, for tests and for trying the screens: plans and sizes are
 set by the test, a job finishes as the test says, and the new size is recorded at the moment of the call.
+
+# Protocol v1: the machine adapter
+
+The protocol above is **v0**. It stays as it is and is still the default. Protocol **v1** adds what v0 lacks: the
+adapter describes itself, makes a server, takes over an existing one and reports its state. An adapter is a separate
+process next to an unmodified Hub; it is the way to put a cloud behind the Hub without changing the Hub.
+
+## Choosing the protocol
+
+`HUB_PROVIDER_PROTOCOL` (with `HUB_PROVIDER=http`):
+
+| Value | Behaviour |
+| --- | --- |
+| `v0` (default) | exactly as before: no `describe`, only the calls of v0 |
+| `auto` | the Hub asks `GET /v1/describe`; an answer with `protocol: "harnessly.machine-provider/v1"` means v1, «unknown call» (404, 405, 501) means v0 |
+| `v1` | the adapter must speak v1; a v0 service is refused |
+
+The choice is made on the first call, not at the start of the Hub (an adapter that is down while the Hub starts does not
+stop it), and is made again every 10 minutes, so a new version of the adapter is noticed without a restart.
+
+## Calls
+
+All v1 paths start with `/v1`, carry the same bearer token, retries and `Idempotency-Key` rules as v0, and answer errors
+as in the table above.
+
+| Call | Request | Answer |
+| --- | --- | --- |
+| `GET /v1/describe` | | `{ "protocol", "name", "version", "capabilities": [...], "config_schema"?: JSON Schema }` |
+| `POST /v1/machines` | `{ "name", "config"?: {...}, "bootstrap"?: { "hubUrl", "code" } }` | 202 `{ "op", "machine"? }` |
+| `POST /v1/machines/{id}/attach` | `{ "hubMachine", "name"? }` | state |
+| `GET /v1/machines/{id}` | | `{ "id", "status", "cpu"?, "ramGB"?, "diskGB"?, "plan"?, "price"? }` |
+| `POST /v1/machines/{id}/power` | `{ "action": "on"\|"off"\|"reboot" }` | `{ "op" }` |
+| `POST /v1/machines/{id}/resize` | `{ "cpu", "ramGB", "diskGB" }` | `{ "op" }` |
+| `GET /v1/machines/{id}/plans`, `POST /v1/machines/{id}/quote` | as in v0 | as in v0 |
+| `GET /v1/machines/{id}/console` | | `{ "url" }` |
+| `GET /v1/ops/{op}` | | `{ "state": "pending"\|"running"\|"done"\|"failed", "error"?, "machine"? }` |
+
+`capabilities` lists what the adapter can do: `create`, `attach`, `state`, `power`, `resize`, `console`, `plans`. A call
+whose capability is not listed is not sent: the Hub answers 422 `not_supported`. Without `plans` the resources screen
+shows the one plan the machine is on, taken from its state. `config_schema` describes the `config` of create; the Hub
+passes `config` on as it came and does not read it. `bootstrap` is what the new server's agent needs to register with the
+Hub; the adapter starts the agent with it, the Hub never reaches into the machine.
+
+## What the Hub does with it (behind the switch)
+
+With `HUB_PROVIDER_PROTOCOL` other than `v0` the Hub mounts, for the owner of a space:
+
+- `POST /api/spaces/{spaceId}/machines/provision` `{ name, config }` → 202 `{ op, machine }`: issues a registration code
+  and calls create with it; `GET …/provision/{opId}` follows the operation;
+- `POST /api/machines/{machineId}/provider/attach` `{ externalId }`: calls attach and records `externalId` as the
+  machine's id at the provider;
+- `GET /api/machines/{machineId}/provider`, `POST …/provider/power` `{ action }`, `GET …/provider/ops/{opId}`.
+
+On v0 these answer 404 as before.
+
+## The example adapter and the update scenario
+
+`examples/machine-adapter` is a stand-in cloud, a separate process that speaks v1 and v0 on one port and can keep its
+servers in a file (`-state`). `tools/ci/adapter-upgrade.sh` (CI job `adapter-upgrade`, test
+`internal/hub/upgradecheck`) builds the Hub at the base of the merge request (N) and the tree under test (N+1), starts
+the adapter, creates and attaches a machine through N, resizes and restarts it, replaces N with N+1 on the same
+database, and checks that the machine is in place, N+1 chose v1 by describe, and the operations still go. Neither the
+Hub nor the adapter is edited in between.
+
+## What this showed (limits)
+
+- An adapter that speaks only v1 does not work with a Hub released before v1: such a Hub knows no `describe`. To outlive
+  an update the adapter keeps v0 until the last old Hub is gone, as the example does.
+- v1 is used only after `HUB_PROVIDER_PROTOCOL=auto` (or `v1`) is set: the update alone does not switch an install.
+- The resources screens still need an organization with the resources feature (`HUB_ORGS`, `HUB_MACHINE_RESOURCES=on`)
+  and the machine marked `managed`.
+- The Hub does not yet link a registered machine to its server by the registration code: attach is explicit.
+- A Hub released before v1 has no create call, so create in the scenario is made at the adapter directly.

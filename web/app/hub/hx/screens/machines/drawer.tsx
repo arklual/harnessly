@@ -83,7 +83,27 @@ export const MachineDrawer = ({
     const off = m.state === 'offline' || m.state === 'disabled';
     return (
       <>
-        {(card.error || ws.error?.id === id) && (
+        {ws.error?.id === id && ws.error.untrusted && !card.error && (
+          <div className="hxa__msg hxa__trust" data-tone="warn" role="alert">
+            <Icon i="shield-check" />
+            <div className="hxa__stack">
+              <strong>Машина ждёт доверия</strong>
+              <span>
+                Хаб открывает страницу машины на своём адресе, поэтому пускает только доверенные машины. Если
+                вы подключили её сами и это ваша машина, доверьтесь ей.
+              </span>
+              <div className="hxa__actions">
+                <Btn variant="primary" size="sm" busy={ws.busyId === id} onClick={() => void ws.trust(id)}>
+                  Доверять машине
+                </Btn>
+                <Btn variant="ghost" size="sm" onClick={() => ws.clear()}>
+                  Закрыть
+                </Btn>
+              </div>
+            </div>
+          </div>
+        )}
+        {(card.error || (ws.error?.id === id && !ws.error.untrusted)) && (
           <div className="md-err" role="alert">
             <span>{card.error ?? ws.error?.text}</span>
             <button

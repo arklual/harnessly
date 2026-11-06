@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/envsetup"
 	"github.com/ly-solutions/harnessly/internal/secrets"
 )
@@ -38,7 +40,7 @@ func envSetupRunners(d deps, observeFile, version string) []*envsetup.Runner {
 	sec := safeSecrets{safeFor(d)}
 	var out []*envsetup.Runner
 	for _, dir := range hubLinkDirs(d.DataDir, observeFile) {
-		out = append(out, &envsetup.Runner{LinkDir: dir, Home: d.Home, Secrets: sec, Log: setupLog, Version: version,
+		out = append(out, &envsetup.Runner{LinkDir: dir, Home: d.Home, Secrets: sec, Apps: setupApps{reg: apps.Open(d.DataDir), link: dir, version: version}, Log: setupLog, Version: version,
 			OnUpdate: func() {
 				if err := askBasepkg(d.DataDir); err != nil {
 					setupLog("warn", "base package not asked", "error", err.Error())
@@ -62,3 +64,20 @@ func (f *runtimeGate) startEnvSetup(ctx context.Context) {
 		go r.Run(ctx)
 	}
 }
+
+// setupApps is the app registry as the machine's setup installs the environment's apps into it.
+type setupApps struct {
+	reg *apps.Registry
+	// link is the runner's link folder: its installs are its own.
+	link    string
+	version string
+}
+
+func (s setupApps) Install(dir, itemID string, locked bool) (string, bool, error) {
+	got, changed, err := s.reg.InstallForEnv(dir, apps.EnvInstallOptions{Link: s.link, ItemID: itemID, Locked: locked, HostVersion: s.version, Now: time.Now()})
+	return got.ID, changed, err
+}
+
+func (s setupApps) Has(itemID string) bool { return s.reg.EnvHasItem(s.link, itemID) }
+
+func (s setupApps) Prune(keep []string) ([]string, error) { return s.reg.PruneEnv(s.link, keep) }

@@ -487,6 +487,22 @@ func (s *Service) Issues(c Conn) (IssueSource, error) {
 	return src, nil
 }
 
+// Code opens a connection's code source: it needs the code capability.
+func (s *Service) Code(c Conn) (CodeSource, error) {
+	if !c.Has(Code) {
+		return nil, fmt.Errorf("%w: %s has no code", ErrUnsupported, c.Kind)
+	}
+	cl, err := s.Open(c)
+	if err != nil {
+		return nil, err
+	}
+	src, ok := cl.(CodeSource)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s has no merge requests", ErrUnsupported, c.Kind)
+	}
+	return src, nil
+}
+
 // Pages opens a connection's page source.
 func (s *Service) Pages(c Conn) (PageSource, error) {
 	cl, err := s.Open(c)

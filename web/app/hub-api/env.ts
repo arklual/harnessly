@@ -3,7 +3,7 @@
 // UTC strings, days are YYYY-MM-DD (UTC). A number the hub has no facts for is null, never 0.
 
 export type CatalogKind =
-  'skill' | 'mcp' | 'repo' | 'doc' | 'script' | 'access' | 'plugin' | 'claude-settings';
+  'skill' | 'mcp' | 'repo' | 'doc' | 'script' | 'access' | 'plugin' | 'claude-settings' | 'app';
 export type EnvLayerKind = 'org' | 'tenant' | 'team';
 export type AudienceMode = 'tenant' | 'teams' | 'off';
 
@@ -41,6 +41,13 @@ export type CatalogSource = {
   rerun?: 'once' | 'check';
   check?: string;
   secrets?: string[];
+  // plugin: `name@marketplace` and the marketplace's address
+  marketplace?: string;
+  plugin?: string;
+  // claude-settings: keys of settings.json set always or only when absent, and the rules for CLAUDE.md
+  always?: unknown;
+  ifAbsent?: unknown;
+  claudeMd?: string;
 };
 
 // `script` and `access` are counted by a hub that has the machine setup; an older one omits them.
@@ -53,6 +60,7 @@ export type KindCounts = {
   access?: number;
   plugin?: number;
   'claude-settings'?: number;
+  app?: number;
 };
 
 export type Audience = {
@@ -119,6 +127,31 @@ export type PatchGroupRequest = {
 };
 export type GroupResponse = { group: EnvGroup };
 
+// A preset of a layer: a named set of the layer's groups (docs/hub/environment.md, «Presets»).
+export type EnvPreset = {
+  id: string;
+  name: string;
+  hint: string;
+  groupIds: string[];
+  position: number;
+};
+// POST /api/orgs/{org}/env/presets → 201 { preset }; PATCH …/env/presets/{presetId} → 200 { preset }; DELETE → 204.
+// 409 name_taken: the layer has a preset of that name; 400 on `groupIds`: a group of another layer.
+export type AddPresetRequest = {
+  layer: EnvLayerKind;
+  scopeId: string;
+  name: string;
+  hint?: string;
+  groupIds?: string[];
+};
+export type PatchPresetRequest = {
+  name?: string;
+  hint?: string;
+  groupIds?: string[];
+  position?: number;
+};
+export type PresetResponse = { preset: EnvPreset };
+
 // POST /api/orgs/{org}/env/apply → 200: «Применить на машинах». `now` runs an update on the machines online now, the
 // rest when they next connect; `next` waits for the next connection on every machine.
 export type ApplyWhen = 'now' | 'next';
@@ -144,6 +177,7 @@ export type EnvLayer = {
   counts: KindCounts;
   items: EnvEntryRow[];
   groups: EnvGroup[];
+  presets: EnvPreset[];
 };
 
 export type TeamRef = { id: string; name: string; tenantId: string };
@@ -270,12 +304,26 @@ export type MeEnvGroup = {
 };
 // PUT /api/me/env/groups/{groupId}?space= → 200 MeEnvGroup
 export type MeEnvGroupRequest = { on: boolean; space?: string };
+// A preset of a layer, for the person: only presets with a group they have items in. `active`: their choice of the
+// layer's optional groups is the preset's.
+export type MeEnvPreset = {
+  id: string;
+  name: string;
+  hint: string;
+  layer: EnvLayerKind;
+  groupIds: string[];
+  active: boolean;
+};
+// PUT /api/me/env/presets/{presetId}?space= → 200: the person's presets and groups as they are now
+export type MeEnvPresetRequest = { space?: string };
+export type MeEnvPresetResponse = { presets: MeEnvPreset[]; groups: MeEnvGroup[] };
 // GET /api/me/env?space=
 export type MeEnvResponse = {
   space: { id: string; slug: string; name: string };
   org: { id: string; name: string };
   items: MeEnvItem[];
   groups: MeEnvGroup[];
+  presets: MeEnvPreset[];
   // Some machine of theirs in the tenant is not current or has a failed item.
   outdated: boolean;
   machines: MeMachine[];

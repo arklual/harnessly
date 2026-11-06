@@ -1,0 +1,14 @@
+# test-design-library-history v2
+.git
+.claims/
+.check/
+.thumbs/
+.trash/
+.media/
+.claude/
+.playwright-mcp/
+.remember/
+node_modules/
+.importing-*/
+.creating-*/
+*.tmp

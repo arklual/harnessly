@@ -70,3 +70,34 @@
     animation: none;
   }
 }
+
+/* UI slots: an app's views in the Extensions page and at objects. Nothing here draws unless an app fills a slot. */
+.hx-uislot {
+  min-width: 0;
+}
+.hx-uislot-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border-top: 1px solid var(--hx-border);
+}
+.hx-uislot-step:first-child {
+  border-top: 0;
+}
+.hx-uislot-step__head {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+}
+.hx-uislot-step[data-done='true'] .hx-uislot-step__head {
+  color: var(--hx-fg-3);
+}
+.hx-uislot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-2) var(--hx-space-4);
+}

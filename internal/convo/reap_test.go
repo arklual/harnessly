@@ -466,7 +466,7 @@ func TestAppsChangeStopsAnAgentAtRest(t *testing.T) {
 		t.Fatalf("the same list again: %+v %v", res, r.terms.stopped)
 	}
 	r.poke(func(c *conv) { c.rec.Provider = wire.ProviderCodex })
-	if res := r.do(wire.ConversationAppsCmd{OpID: "a4", ID: r.id, Apps: []string{"acme.review"}}); res.Code != wire.RefuseUnsupported {
-		t.Fatalf("codex: %+v", res)
+	if res := r.do(wire.ConversationAppsCmd{OpID: "a4", ID: r.id, Apps: []string{"acme.review"}}); res.R != wire.ResultAccepted {
+		t.Fatalf("codex takes apps too: %+v", res)
 	}
 }

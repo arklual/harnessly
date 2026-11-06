@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import type { MachinesList, OrgMachine } from '../../../org/api/machines';
 import { useNow } from '../../../lib/hooks';
 import { flatRows, machinesWord, searchGroups, tenantTiles } from './calc';
-import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles } from './parts';
+import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles, useMachineSort } from './parts';
 
 type View = 'team' | 'flat';
 
@@ -28,7 +28,8 @@ export const TenantView = ({
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const tiles = useMemo(() => tenantTiles(list.summary, list.groups, now), [list, now]);
   const shown = useMemo(() => searchGroups(list.groups, q), [list.groups, q]);
-  const rows = useMemo(() => flatRows(list.groups, q), [list.groups, q]);
+  const ms = useMachineSort();
+  const rows = ms.sort(useMemo(() => flatRows(list.groups, q), [list.groups, q]));
   const searching = q.trim() !== '';
   const empty = searching && (view === 'team' ? shown.length === 0 : rows.length === 0);
 
@@ -69,7 +70,7 @@ export const TenantView = ({
       )}
       {view === 'flat' && rows.length > 0 && (
         <div className="mt">
-          <TableHead />
+          <TableHead sorting={ms} />
           {rows.map((m) => (
             <MachineRow key={m.id} m={m} mode="flat-tenant" now={now} onOpen={onOpen} />
           ))}

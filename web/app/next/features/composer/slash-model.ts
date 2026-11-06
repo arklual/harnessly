@@ -19,6 +19,7 @@ import { EFFORTS, type FileEntry, type MessageRef, type Provider } from '@/next/
 export const GROUP = {
   setting: 'setting',
   command: 'command',
+  app: 'app',
   skill: 'skill',
   mcp: 'mcp',
   quick: 'quick',
@@ -31,6 +32,7 @@ export type TGroup = (typeof GROUP)[keyof typeof GROUP];
 export const GROUP_ORDER: readonly TGroup[] = [
   GROUP.setting,
   GROUP.command,
+  GROUP.app,
   GROUP.skill,
   GROUP.mcp,
   GROUP.quick,
@@ -131,6 +133,8 @@ export interface ISlashRow {
   /** The places of `name` the query matched. */
   ranges: TRange[];
   description: string;
+  /** The heading of the row's list when it is not the group's own: the name of the app whose commands these are. */
+  heading?: string;
   /** What follows the name: [instructions]. */
   hint: string | null;
   /** Where it comes from: skill, command, mcp. */
@@ -145,6 +149,7 @@ export interface ISlashRow {
 const ICON: Record<TGroup, string> = {
   setting: 'sliders-horizontal',
   command: 'square-slash',
+  app: 'square-slash',
   skill: 'sparkles',
   mcp: 'plug',
   quick: 'zap',
@@ -171,6 +176,16 @@ export interface IMcpRef {
   target: string;
 }
 
+/** The commands of one app that is on in the chat. */
+export interface IAppCommands {
+  appId: string;
+  /** The app's name, the heading of its list. */
+  appName: string;
+  /** The app's plugin name: the prefix a command keeps when a built-in one has its name. */
+  plugin: string;
+  commands: readonly { name: string; slash: string; description: string }[];
+}
+
 export interface ISlashAvailable {
   model: boolean;
   effort: boolean;
@@ -184,6 +199,8 @@ interface IRowsInput {
   catalog: readonly ICatalogItem[] | null;
   mcp: readonly IMcpRef[];
   quick: readonly IQuickPrompt[];
+  /** The apps on in the chat with their commands. */
+  appCommands?: readonly IAppCommands[];
   available: ISlashAvailable;
   /** The chat is not started: only what may be a first message is offered. */
   starting: boolean;
@@ -294,6 +311,33 @@ const catalogDrafts = (
       also: item.description,
     }));
 
+/**
+ * The commands of the apps on in the chat, a list per app. A built-in command (a setting of the chat, the agent's own)
+ * keeps its name: an app's command of the same name is listed as `plugin:name`. What is sent is always the full
+ * `/plugin:name`, which only the app's command answers to.
+ */
+export const appDrafts = (apps: readonly IAppCommands[], taken: ReadonlySet<string>): IDraft[] =>
+  apps.flatMap((app) =>
+    app.commands.map((cmd) => {
+      const name = taken.has(cmd.name) ? `${app.plugin}:${cmd.name}` : cmd.name;
+      return {
+        id: `app:${app.appId}:${cmd.name}`,
+        group: GROUP.app,
+        name,
+        prefix: TRIGGER_CHAR.command,
+        heading: app.appName,
+        description: cmd.description,
+        hint: null,
+        source: app.appName,
+        icon: ICON.app,
+        current: false,
+        action: { k: 'insert', text: `${cmd.slash} ` } as TAction,
+        names: name === cmd.name ? [name] : [name, cmd.name],
+        also: cmd.description,
+      };
+    }),
+  );
+
 const mcpDrafts = (mcp: readonly IMcpRef[], provider: Provider): IDraft[] =>
   mcp.map((server) => ({
     id: `mcp:${server.name}`,
@@ -356,14 +400,25 @@ export const buildRows = ({
   catalog,
   mcp,
   quick,
+  appCommands = [],
   available,
   starting,
 }: IRowsInput): IRowList => {
   const atStart = trigger.start === 0;
-  const settings = atStart && trigger.char === TRIGGER_CHAR.command ? settingDrafts(available) : [];
+  const isCommand = trigger.char === TRIGGER_CHAR.command;
+  const settings = atStart && isCommand ? settingDrafts(available) : [];
+  const catalogRows = catalogDrafts(catalog ?? [], trigger, atStart, shadowed(settings), starting);
+  // An app's command is typed at the start of a started chat, like the agent's own; the agent's catalog may list the
+  // same command as its plugin's, which is then the app's row only.
+  const own = new Set(appCommands.flatMap((app) => app.commands.map((cmd) => cmd.slash.slice(1))));
+  const builtIn = new Set([
+    ...shadowed(settings),
+    ...catalogRows.filter((row) => !own.has(row.name)).flatMap((row) => row.names),
+  ]);
   const drafts = [
     ...settings,
-    ...catalogDrafts(catalog ?? [], trigger, atStart, shadowed(settings), starting),
+    ...catalogRows.filter((row) => !own.has(row.name)),
+    ...(atStart && isCommand && !starting ? appDrafts(appCommands, builtIn) : []),
     ...(trigger.char === TRIGGER_CHAR.command ? [...mcpDrafts(mcp, provider), ...quickDrafts(quick)] : []),
   ];
   return arranged(drafts, trigger.query);

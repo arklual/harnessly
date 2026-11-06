@@ -56,8 +56,10 @@
 
   var port = null;
 
-  var refuse = function (id, code, message) {
-    port.postMessage({ jsonrpc: '2.0', id: id, error: { code: code === 'invalid_params' ? -32602 : -32000, message: message, data: { code: code } } });
+  var refuse = function (id, code, message, version) {
+    var data = { code: code };
+    if (typeof version === 'number') data.version = version;
+    port.postMessage({ jsonrpc: '2.0', id: id, error: { code: code === 'invalid_params' ? -32602 : -32000, message: message, data: data } });
   };
 
   // The storage calls go to the link's own route; the runtime checks the link, the app's right and the write flag again.
@@ -66,7 +68,7 @@
     fetch('__guest/storage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: op, key: params.key || '', value: params.value }),
+      body: JSON.stringify({ op: op, key: params.key || '', value: params.value, ifVersion: params.ifVersion }),
     })
       .then(function (res) {
         return res.json().then(function (body) {
@@ -74,10 +76,10 @@
         });
       })
       .then(function (r) {
-        if (!r.ok) return refuse(id, (r.body && r.body.error) || 'host_unavailable', (r.body && r.body.message) || 'refused');
-        if (op === 'get') return port.postMessage({ jsonrpc: '2.0', id: id, result: { value: r.body.value === undefined ? null : r.body.value } });
+        if (!r.ok) return refuse(id, (r.body && r.body.error) || 'host_unavailable', (r.body && r.body.message) || 'refused', r.body && r.body.version);
+        if (op === 'get') return port.postMessage({ jsonrpc: '2.0', id: id, result: { value: r.body.value === undefined ? null : r.body.value, version: r.body.version || 0 } });
         if (op === 'keys') return port.postMessage({ jsonrpc: '2.0', id: id, result: { keys: r.body.keys || [] } });
-        port.postMessage({ jsonrpc: '2.0', id: id, result: {} });
+        port.postMessage({ jsonrpc: '2.0', id: id, result: op === 'set' ? { version: r.body.version || 0 } : {} });
       })
       .catch(function () {
         refuse(id, 'host_unavailable', 'the machine did not answer');

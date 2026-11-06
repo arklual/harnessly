@@ -27,6 +27,8 @@ const (
 	// CatalogPlugin and CatalogClaudeSettings change the person's Claude Code (docs/hub/environment.md, «Recommended»).
 	CatalogPlugin         = "plugin"
 	CatalogClaudeSettings = "claude-settings"
+	// CatalogApp is an app in a repository (docs/hub/environment.md, «Apps»).
+	CatalogApp = "app"
 )
 
 // CatalogItem is something an environment can hold: a skill, an MCP server, a repository or a document. OrgID is ""

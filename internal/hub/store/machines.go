@@ -349,3 +349,29 @@ func (s Store) SetEnvNames(ctx context.Context, machineID string, names []string
 
 // IsNotFound says whether err is the "no such row" error.
 func IsNotFound(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+
+// TrustMachine records that by accepted the machine's page running on the hub's own origin.
+func (s Store) TrustMachine(ctx context.Context, machineID, by string, at time.Time) error {
+	_, err := s.q.Exec(ctx, `INSERT INTO machine_trust (machine_id, trusted_by, trusted_at) VALUES (?, ?, ?)
+		ON CONFLICT (machine_id) DO UPDATE SET trusted_by = excluded.trusted_by, trusted_at = excluded.trusted_at`, machineID, by, Ms(at))
+	return err
+}
+
+// UntrustMachine takes the trust back; a machine that had none is not an error.
+func (s Store) UntrustMachine(ctx context.Context, machineID string) error {
+	_, err := s.q.Exec(ctx, `DELETE FROM machine_trust WHERE machine_id = ?`, machineID)
+	return err
+}
+
+// MachineTrust is who trusted the machine and when; ok is false for a machine nobody trusted.
+func (s Store) MachineTrust(ctx context.Context, machineID string) (by string, at time.Time, ok bool, err error) {
+	var ms int64
+	err = s.q.QueryRow(ctx, `SELECT trusted_by, trusted_at FROM machine_trust WHERE machine_id = ?`, machineID).Scan(&by, &ms)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", time.Time{}, false, nil
+	}
+	if err != nil {
+		return "", time.Time{}, false, err
+	}
+	return by, fromMs(ms), true, nil
+}

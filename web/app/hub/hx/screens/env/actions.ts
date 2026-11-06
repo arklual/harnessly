@@ -11,7 +11,9 @@ import type {
   EnvEntryRow,
   EnvGroup,
   EnvLayer,
+  EnvPreset,
   PatchGroupRequest,
+  PatchPresetRequest,
 } from '../../../../hub-api/env';
 import { OrgApiError, orgErrorText } from '../../../org/api/errors';
 import { useOrg } from '../../../org/context';
@@ -284,9 +286,9 @@ export const useActions = (
     if (req.defaultOn !== undefined) back.defaultOn = g.defaultOn;
     if (req.name !== undefined) back.name = g.name;
     let text = `Группа «${req.name ?? g.name}» сохранена`;
-    if (req.required === true) text = `Группа «${g.name}» обязательная — поставится всем`;
+    if (req.required === true) text = `Группа «${g.name}» ставится всем`;
     if (req.required === false) text = `Группа «${g.name}» по желанию — каждый выбирает у себя`;
-    if (req.defaultOn === true) text = `«${g.name}» включена сразу — кто не выбирал, получит её`;
+    if (req.defaultOn === true) text = `«${g.name}» сразу включена — кто не выбирал, получит её`;
     if (req.defaultOn === false) text = `«${g.name}» выключена, пока человек сам не включит`;
     return change(
       () => api.envGroupPatch(org, g.id, req),
@@ -315,6 +317,26 @@ export const useActions = (
       on ? `«${name}» включена — машина поставит её` : `«${name}» выключена — новое из неё не поставится`,
       () => api.envMineGroup(groupId, !on, space),
     );
+
+  const addPreset = (t: Target, name: string, groupIds: string[]): Promise<boolean> =>
+    change(
+      () => api.envPresetAdd(org, { layer: t.layer, scopeId: t.scopeId, name, groupIds }),
+      `Пресет «${name}» готов — человек выберет его одним нажатием`,
+    );
+
+  const patchPreset = (p: EnvPreset, req: PatchPresetRequest): Promise<boolean> =>
+    change(
+      () => api.envPresetPatch(org, p.id, req),
+      `Пресет «${req.name ?? p.name}» сохранён`,
+      () => api.envPresetPatch(org, p.id, { name: p.name, hint: p.hint, groupIds: p.groupIds }),
+    );
+
+  const removePreset = (p: EnvPreset): Promise<boolean> =>
+    change(() => api.envPresetRemove(org, p.id), `Пресета «${p.name}» больше нет — группы остались`);
+
+  /** A member picks a preset: its groups go on, the other optional groups of the layer off. */
+  const minePreset = (p: EnvPreset, space?: string): Promise<boolean> =>
+    change(() => api.envMinePreset(p.id, space), `Выбран пресет «${p.name}» — машина обновит окружение`);
 
   const reorder = async (t: Target, entryIds: string[], text?: string): Promise<boolean> => {
     const layer = layers.find((l) => keyOf(l) === keyOf(t));
@@ -423,6 +445,10 @@ export const useActions = (
     removeGroup,
     moveToGroup,
     mineGroup,
+    addPreset,
+    patchPreset,
+    removePreset,
+    minePreset,
   };
 };
 

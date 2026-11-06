@@ -211,10 +211,16 @@ func (c *cli) run(args []string) error {
 		return c.apiGuide()
 	case "design":
 		return c.design(rest)
+	case "doctor":
+		return c.doctor(rest)
 	case "hook":
 		return c.hook(rest)
+	case "upgrade":
+		return c.upgrade(rest)
 	case "notify":
 		return c.notify(rest)
+	case "selftest":
+		return c.selftest(rest)
 	case "ask":
 		return c.ask(rest)
 	case "widget", "widgets":
@@ -223,6 +229,10 @@ func (c *cli) run(args []string) error {
 		return c.peers(rest)
 	case "secret", "secrets":
 		return c.secret(rest)
+	case "supervise":
+		return c.supervise(rest)
+	case "install":
+		return c.install(rest)
 	case "site", "sites":
 		return c.site(rest)
 	case "app", "apps":
@@ -233,6 +243,8 @@ func (c *cli) run(args []string) error {
 		return c.issues(rest)
 	case "issue":
 		return c.issue(rest)
+	case "mrs":
+		return c.mrs(rest)
 	case "pages":
 		return c.pages(rest)
 	case "page":

@@ -16,7 +16,10 @@ export type KpiId =
   | 'reread'
   | 'sessionStart'
   | 'cache'
-  | 'skills';
+  | 'skills'
+  | 'cacheWrite1h'
+  | 'mrSurvival'
+  | 'waitingP90';
 
 export type KpiGroup = 'result' | 'agent' | 'env';
 
@@ -217,8 +220,38 @@ export interface KpiChart {
   previous?: (number | null)[];
 }
 
+/** One finished or running cycle of a limit window (a week of a subscription, five hours of a session). */
+export interface LimitCycle {
+  /** RFC 3339: when the cycle resets. */
+  endsAt: string;
+  /** The highest use of the window in the cycle, percent. */
+  peakPct: number;
+  measures: number;
+}
+
+export interface LimitWindow {
+  /** «weekly», «5h»: the window's name as the provider calls it. */
+  name: string;
+  lengthSec: number;
+  cycles: LimitCycle[];
+  avgPeakPct: number;
+  /** How many cycles ran into the limit. */
+  fullCycles: number;
+}
+
+export interface LimitAccount {
+  id: string;
+  label: string;
+  plan: string;
+  windows: LimitWindow[];
+}
+
+/** The history of the limit windows of the scope's accounts; null: the viewer may not see money, or the hub has no history. */
+export type LimitHistory = LimitAccount[] | null;
+
 export interface AnalyticsApi {
   analyticsFrame(): Promise<AnalyticsFrame>;
   analytics(query: AnalyticsQuery): Promise<AnalyticsData>;
   analyticsChart(query: AnalyticsQuery, kpi: KpiId): Promise<KpiChart>;
+  limitWindows(query: AnalyticsQuery): Promise<LimitHistory>;
 }

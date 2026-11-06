@@ -196,6 +196,15 @@ func tomlInline(v any) string {
 // Flags are `-c hooks.<Event>=[ours, theirs…]` for every event; parseError reports a config.toml that could not be
 // read as TOML (only the runtime's hook applies then, and the person should be told once).
 func (h *HookConfig) Flags() (args []string, parseError bool, err error) {
+	return h.FlagsWithGuard("")
+}
+
+// GuardTimeoutSeconds is how long Codex waits for the apps' guard (apps.GuardTimeoutSeconds).
+const GuardTimeoutSeconds = 15
+
+// FlagsWithGuard is Flags with the apps' guard command as the first PreToolUse hook of the launch, before the runtime's own
+// and the person's: the hook comes by `-c` on the launch line, so the agent has no file to edit it out of. "" adds none.
+func (h *HookConfig) FlagsWithGuard(guard string) (args []string, parseError bool, err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	u, err := h.userEntries()
@@ -212,6 +221,10 @@ func (h *HookConfig) Flags() (args []string, parseError bool, err error) {
 		}
 		ours := tomlTable{keys: []string{"matcher", "hooks"}, m: map[string]any{"matcher": ".*", "hooks": cmds}}
 		entries := append([]any{ours}, u.byEvent[ev]...)
+		if guard != "" && ev == "PreToolUse" {
+			g := tomlTable{keys: []string{"type", "command", "timeout"}, m: map[string]any{"type": "command", "command": guard, "timeout": int64(GuardTimeoutSeconds)}}
+			entries = append([]any{tomlTable{keys: []string{"matcher", "hooks"}, m: map[string]any{"matcher": ".*", "hooks": []any{g}}}}, entries...)
+		}
 		args = append(args, "-c", "hooks."+ev+"="+tomlInline(entries))
 	}
 	return args, u.parseError, nil

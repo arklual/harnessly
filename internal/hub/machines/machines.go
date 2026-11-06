@@ -51,6 +51,8 @@ type Deps struct {
 	Env EnvSink
 	// Design keeps the machines' design access (internal/hub/designaccess); nil: off.
 	Design DesignSink
+	// Docs answers the machines' doc.publish and doc.acl (internal/hub/docs); nil: nobody answers.
+	Docs DocsSink
 	// Provider runs the machines' virtual servers (docs/hub/provider.md); nil means provider.None.
 	Provider provider.Provider
 	// Publisher carries machine.op and machine.status to the organization's live channel; nil: they go to the space's
@@ -67,6 +69,11 @@ type EnvSink interface {
 	Reported(machineID string, st hubproto.EnvState)
 	// Run keeps a run of the machine's setup (the env.run event).
 	Run(machineID string, run hubproto.EnvRun)
+}
+
+// DocsSink answers the document events of a machine's agent.
+type DocsSink interface {
+	Event(l *link.Link, m store.Machine, ev link.Event)
 }
 
 // DesignSink is what keeps a machine's design access (internal/hub/designaccess).
@@ -103,6 +110,7 @@ type Service struct {
 	budget  BudgetSink
 	env     EnvSink
 	design  DesignSink
+	docs    DocsSink
 	prov    provider.Provider
 	pub     Publisher
 	gate    FeatureGate
@@ -120,7 +128,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, prov: d.Provider, pub: d.Publisher, gate: d.Features}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, prov: d.Provider, pub: d.Publisher, gate: d.Features}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now
@@ -152,9 +160,12 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("PATCH /api/machines/{machineId}", s.auth.Require(s.rename))
 	mux.Handle("DELETE /api/machines/{machineId}", s.auth.Require(s.remove))
 	mux.Handle("GET /api/machines/{machineId}/open", s.auth.Require(s.open))
+	mux.Handle("POST /api/machines/{machineId}/trust", s.auth.Require(s.trust))
+	mux.Handle("DELETE /api/machines/{machineId}/trust", s.auth.Require(s.trust))
 	mux.Handle("POST /api/machines/{machineId}/preflight", s.auth.Require(s.rerunPreflight))
 
 	s.mountOrg(mux)
+	s.mountProvision(mux)
 
 	mux.Handle("POST /agent/register", httpx.Handler(s.register))
 }
@@ -208,6 +219,9 @@ type View struct {
 	Proxy        json.RawMessage   `json:"proxy"`
 	Env          []string          `json:"env"`
 	CreatedAt    string            `json:"createdAt"`
+	// Runtime is whether the machine's page opens on this hub: ready, needs_trust (an owner of its space can allow it)
+	// or blocked (docs/hub/api.md, «Trusting a machine»).
+	Runtime string `json:"runtime"`
 }
 
 // info is what the hub remembers of a machine's last reports, in the form the API sends them.
@@ -216,6 +230,21 @@ type info struct {
 	Preflight json.RawMessage `json:"preflight,omitempty"`
 	Agents    json.RawMessage `json:"agents,omitempty"`
 	Proxy     json.RawMessage `json:"proxy,omitempty"`
+}
+
+// opensRuntime says whether the hub may open the machine's runtime: not when the machine's last policy refused runtime
+// sessions.
+func opensRuntime(m store.Machine) bool {
+	// An agent older than the field sent no word on it, and it opened then.
+	var in struct {
+		Policy struct {
+			RuntimeSession *bool `json:"runtimeSession"`
+		} `json:"policy"`
+	}
+	if err := json.Unmarshal([]byte(m.Info), &in); err != nil || in.Policy.RuntimeSession == nil {
+		return true
+	}
+	return *in.Policy.RuntimeSession
 }
 
 var emptyProxy = json.RawMessage(`{"all":null,"claude":null,"codex":null}`)
@@ -249,6 +278,9 @@ func (s *Service) View(ctx context.Context, m store.Machine) (View, error) {
 	if m.SpaceID != "" {
 		id := m.SpaceID
 		v.SpaceID = &id
+	}
+	if v.Runtime, err = s.runtimeState(ctx, m); err != nil {
+		return View{}, err
 	}
 	if len(v.Proxy) == 0 {
 		v.Proxy = emptyProxy
@@ -478,8 +510,11 @@ func (s *Service) open(w http.ResponseWriter, r *http.Request, p *auth.Principal
 		return err
 	}
 	// Without HUB_RUNTIME_DOMAIN the page would run on the hub's origin: only a machine an administrator connected may.
-	if err := s.auth.RequireTrustedMachine(ctx, m.CreatedBy); err != nil {
+	if err := s.auth.RequireTrustedMachine(ctx, m); err != nil {
 		return err
+	}
+	if !opensRuntime(m) {
+		return errObserveOnly
 	}
 	path := "/m/" + m.ID + "/"
 	if asked := r.URL.Query().Get("path"); asked != "" {

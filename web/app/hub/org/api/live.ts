@@ -12,6 +12,7 @@ import { liveOverview } from './live/overview';
 import { liveShell, roleIn, viewerTeam } from './live/shell';
 import { liveTeams } from './live/teams';
 import { liveTenant } from './live/tenant';
+import { liveTools } from './live/tools';
 
 export const liveOrgApi = (): OrgApi => {
   let here: { view: OrgView; scope: ApiScope } | null = null;
@@ -47,6 +48,7 @@ export const liveOrgApi = (): OrgApi => {
     ...liveOverview(analyticsCtx),
     ...liveMember(),
     ...liveAnalytics(analyticsCtx),
+    ...liveTools(analyticsCtx),
     ...liveMachines(() => {
       const { view, scope } = place();
       const team = roleIn(view, scope) === 'lead' ? viewerTeam(view, scope) : null;

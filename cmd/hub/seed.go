@@ -10,7 +10,6 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/seed"
-	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
 // runSeed is `hub seed --file seed.yaml [--dry-run]`: organizations, tenants, teams, people and roles from a file, on
@@ -47,10 +46,10 @@ func runSeed(ctx context.Context, args []string, lookup func(string) (string, bo
 		fmt.Fprintln(stderr, "hub seed: data folder:", err)
 		return 1
 	}
-	db, err := store.Open(ctx, cfg.DatabaseURL)
+	db, err := openDB(ctx, cfg, logger(stderr, cfg.LogLevel))
 	if err != nil {
 		fmt.Fprintln(stderr, "hub seed:", err)
-		return 1
+		return exitCode(err)
 	}
 	defer db.Close()
 	changes, err := seed.Apply(ctx, db, plan, *dry, time.Now())

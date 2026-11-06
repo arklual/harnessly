@@ -4,6 +4,7 @@ import type {
   CatalogKind,
   EnvEntryRow,
   EnvLayer,
+  EnvPreset,
   EnvLayerKind,
   EnvResponse,
   MeEnvResponse,
@@ -120,6 +121,11 @@ export const blocksOf = (rows: readonly EnvEntryRow[], q: string): Block[] => {
   );
 };
 
+/** A preset in the layers of a member: `active` says their choice of groups is the preset's. */
+export interface MemberPreset extends EnvPreset {
+  active: boolean;
+}
+
 /** Layers a member sees: what `/api/me/env` gives, in the shape of the layers (nothing there is theirs to change). */
 export const layersOfMe = (me: MeEnvResponse): EnvLayer[] => {
   const out: EnvLayer[] = [];
@@ -147,6 +153,16 @@ export const layersOfMe = (me: MeEnvResponse): EnvLayer[] => {
             defaultOn: g.on,
             position,
             builtIn: g.builtIn,
+          })),
+        presets: me.presets
+          .filter((p) => p.layer === it.layer)
+          .map((p, position): MemberPreset => ({
+            id: p.id,
+            name: p.name,
+            hint: p.hint,
+            groupIds: p.groupIds,
+            position,
+            active: p.active,
           })),
       };
       out.push(l);

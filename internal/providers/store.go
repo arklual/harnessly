@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -26,8 +27,13 @@ type Store struct {
 	// Switches are the switched profiles' switches, by profile id (GPTProxy for gpt); nil for none, and a switched
 	// profile without one is never ready.
 	Switches map[string]Switch
+	// Secrets turns the name of a secret of the safe (Preset.KeyRef of a profile of the profiles file) into its value; nil
+	// for none, and a profile with a KeyRef then takes the key typed on the Settings screen like any other.
+	Secrets func(name string) (string, error)
 
 	mu sync.Mutex
+	// refreshed is when each profile's key was last taken from the safe.
+	refreshed map[string]time.Time
 	// masks are the keys the feed hides, each with the form it has in a JSON string; read on every frame, so kept here
 	// and rebuilt when a key is saved or removed. nil until the first use.
 	masks atomic.Pointer[[]mask]
@@ -75,35 +81,74 @@ func (s *Store) Set(id, key string) (wire.ProfileKey, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+	if err := s.writeLocked(id, key); err != nil {
 		return wire.ProfileKey{}, err
 	}
+	return tailOf(key), nil
+}
+
+// writeLocked writes the key file of a profile whole under a temporary name and renames it over.
+func (s *Store) writeLocked(id, key string) error {
+	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+		return err
+	}
 	if err := os.Chmod(s.Dir, 0o700); err != nil {
-		return wire.ProfileKey{}, err
+		return err
 	}
 	file := s.KeyFile(id)
 	tmp := file + ".tmp"
 	_ = os.Remove(tmp)
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return wire.ProfileKey{}, err
+		return err
 	}
 	// No newline: the file is read by `cat` into a header.
 	if _, err := f.WriteString(key); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmp)
-		return wire.ProfileKey{}, err
+		return err
 	}
 	if err := f.Close(); err != nil {
 		_ = os.Remove(tmp)
-		return wire.ProfileKey{}, err
+		return err
 	}
 	if err := os.Rename(tmp, file); err != nil {
 		_ = os.Remove(tmp)
-		return wire.ProfileKey{}, err
+		return err
 	}
 	s.rebuildLocked()
-	return tailOf(key), nil
+	return nil
+}
+
+// refSettle is how long a key taken from the safe is trusted before the safe is asked again.
+const refSettle = time.Minute
+
+// refresh puts the key of a profile that names a secret of the safe (Preset.KeyRef) into its key file, so that every
+// reader of the file (the CLI's apiKeyHelper, a test) sees the safe's current value. A safe that does not answer leaves
+// the file as it was.
+func (s *Store) refresh(id string) {
+	p, ok := Find(id)
+	if !ok || p.KeyRef == "" || s.Secrets == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if at, ok := s.refreshed[id]; ok && time.Since(at) < refSettle {
+		return
+	}
+	val, err := s.Secrets(p.KeyRef)
+	val = strings.TrimSpace(val)
+	if err != nil || len(val) < wire.ProfileKeyMin {
+		return
+	}
+	if s.refreshed == nil {
+		s.refreshed = map[string]time.Time{}
+	}
+	s.refreshed[id] = time.Now()
+	if raw, err := os.ReadFile(s.KeyFile(id)); err == nil && strings.TrimSpace(string(raw)) == val {
+		return
+	}
+	_ = s.writeLocked(id, val)
 }
 
 // Remove deletes the saved key; a profile with none stays as it is.
@@ -126,6 +171,7 @@ func (s *Store) Key(id string) (string, error) {
 	if _, ok := Find(id); !ok && !IsSpeechKey(id) {
 		return "", wire.ErrProfileUnknown
 	}
+	s.refresh(id)
 	raw, err := os.ReadFile(s.KeyFile(id))
 	if errors.Is(err, os.ErrNotExist) {
 		return "", ErrNoKey
@@ -227,7 +273,7 @@ func Mask(key string) string {
 func (s *Store) rebuildLocked() {
 	masks := []mask{}
 	ids := SpeechKeys
-	for _, p := range presets {
+	for _, p := range all() {
 		ids = append(ids[:len(ids):len(ids)], p.ID)
 	}
 	for _, id := range ids {

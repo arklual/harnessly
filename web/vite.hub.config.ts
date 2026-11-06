@@ -39,6 +39,16 @@ const spaFallback = (): Plugin => ({
 
 export default defineConfig({
   base: '/',
+  experimental: {
+    // A chunk loaded on demand is fetched from /assets/ under the path the hub is served at (window.__hubBase, set in
+    // hub.html); the files the page names itself are given the path by the server; a font or an image in a stylesheet is
+    // named relative to the stylesheet, which lies in /assets/ too.
+    renderBuiltUrl: (filename, { hostType }) => {
+      if (hostType === 'js') return { runtime: `(window.__hubBase||"")+${JSON.stringify(`/${filename}`)}` };
+      if (hostType === 'css') return { relative: true };
+      return undefined;
+    },
+  },
   publicDir: false,
   plugins: [react(), indexHtml(), spaFallback()],
   resolve: {

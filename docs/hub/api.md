@@ -95,6 +95,7 @@ below, passed through by the hub unchanged except times converted to RFC 3339 st
 | `GET /healthz` | | `{"ok":true,"version":"…"}` |
 | `GET /readyz` | | `{"ok":true}` once the database answers and migrations ran; 503 otherwise |
 | `GET /api/config` | | `Config` |
+| `GET /api/capabilities` | | `{server:"hub", capabilities:[{id, status: on｜off｜needs_config, reason?, configure?}]}`: what this hub does, open like `/api/config`; the runtime answers the same shape |
 
 ```ts
 type Config = {
@@ -197,8 +198,8 @@ The person's numbers are described in [analytics.md](analytics.md#the-person-api
 | `GET /api/spaces/{spaceId}/members` | member | | `{ members: { userId, email, name, role, joinedAt }[] }` |
 | `PATCH /api/spaces/{spaceId}/members/{userId}` | owner | `{ role }` | `{ member }`; 409 `last_owner` |
 | `DELETE /api/spaces/{spaceId}/members/{userId}` | owner, or self | | 204; 409 `last_owner` |
-| `POST /api/spaces/{spaceId}/invites` | owner | `{ emails: string[], role?: "member" \| "owner" }` (≤ 20; `role` is what the invitee becomes, member by default) | 201 `{ invites: Invite[] }` |
-| `POST /api/spaces/{spaceId}/invites/link` | owner | `{ maxUses?: number, days?: 1..7 }` | 201 `{ invite: Invite }`; returns the current active link invite if one exists and the body is empty |
+| `POST /api/spaces/{spaceId}/invites` | owner | `{ emails: string[], role?: "member" \| "owner", teamId?: string }` (≤ 20; `role` is what the invitee becomes, member by default; `teamId` is a team of this space the invitee joins on accepting, else 400 `invalid_request`; `GET /api/invites/{token}` then also says `teamName`) | 201 `{ invites: Invite[] }` |
+| `POST /api/spaces/{spaceId}/invites/link` | owner | `{ maxUses?: number, days?: 1..7, teamId?: string }` | 201 `{ invite: Invite }`; returns the current active link invite if one exists and the body is empty (a link that names a team is always a new one) |
 | `GET /api/spaces/{spaceId}/invites` | owner | | `{ invites: Invite[] }` (active ones; `url` absent: only hashes are kept) |
 | `DELETE /api/spaces/{spaceId}/invites/{inviteId}` | owner | | 204 |
 | `GET /api/invites/{token}` | anyone | | `{ spaceName, inviterName, kind, email: string \| null, valid: boolean }` (email masked `r***@company.ru`) |
@@ -239,10 +240,13 @@ off. A choice made by this process is seen at once, one made by another replica 
 | Flag | Switches on |
 | --- | --- |
 | `ui.hx` | the new interface, and the background signal checker for the organization ([analytics.md](analytics.md#signals-требует-внимания)) |
+| `ui.hx.live` | the lively hub: the common motion on every screen, free periods, sortable tables, the «Инструменты» screen |
 | `org.events` | the organization's live stream, «Organization events» below |
 | `env` | the machines' environment screen |
 | `catalog` | the catalog of tools and skills |
 | `machine.resources` | editing a machine's resources and showing their price |
+| `runtime.fleet` | one runtime for all of a person's machines, «Fleet» below |
+| `secrets.vault` | the hub's safe: the machines keep their secrets on the hub's Vault-compatible server ([../safe.md](../safe.md#the-hubs-safe)) |
 
 | Method, path | Who | Request | Response |
 | --- | --- | --- | --- |
@@ -303,6 +307,40 @@ data: {"signal":{"id":"g2offlineaaaaaaaaaaa","rule":"machine_offline","severity"
 The bus is behind an interface (`events.OrgBus`): the one in memory serves a single hub process; a replica set needs
 one over a shared channel (for example PostgreSQL LISTEN/NOTIFY), which the rest of the hub does not notice.
 
+### Fleet (flag `runtime.fleet`)
+
+One page for all of a person's machines, across their organizations. With the flag off for every tenant of the person
+these routes answer 404 `not_enabled` (the proxy: 404 `not_found`).
+
+| Method, path | Who | Response |
+| --- | --- | --- |
+| `GET /api/me/machines` | signed in | `{machines: [{id, name, host, online, status, lastSeenAt, orgId, orgName, tenantId, tenant}]}` |
+| `GET /api/v2/machines` | signed in | the same list as the runtime's `Machine[]` (`reach`, `lastSeenAt`, `orgName`, `tenant`) |
+| `ANY /api/v2/…?machine=<id>` | signed in | the runtime's own `/api/v2/…` on that machine through its agent tunnel; sockets too |
+| `GET /api/v2/{me,search,vault,push}` | signed in | no machine named: the person's first machine that is on answers |
+
+A machine is listed and proxied by the one rule of `/m/<id>/…`: the person is in its tenant (or manages the organization),
+the access list of the machine lets them in (`HUB_ACCESS_ENFORCE`), and in path mode the machine is trusted. Anything
+else is not in the list and the proxy refuses it with 403/404. The answers are believed for 5 seconds, so a revoked
+access takes effect within that time. The `machine` parameter is not passed on to the runtime.
+
+#### Moving a chat between machines (flag `runtime.fleet`)
+
+The runtime's chat move (`/api/v2/move/*`, one machine's chat to another) driven by the hub, so the two machines need no
+shared secret: the hub makes a one-time key for the operation, hands it to both ends, and never sees the bundle. The
+person must be let into both machines by the rule above; a machine that is away or not theirs is refused before
+anything is asked of the source. Flag off: 404 `not_enabled`.
+
+| Method, path | Response |
+| --- | --- |
+| `GET /api/v2/chat-move/status?machine=&conv=` | `{enabled, moved: {toMachine, toName, toConv, at} \| null}`: where a chat went, as the old machine remembers it |
+| `GET /api/v2/chat-move/targets?machine=&conv=` | `{source: {ok, code?, project, dirty, busy}, targets: [{machineId, name, orgName, online, ok, code?, checks, filesOk, agents}]}` |
+| `POST /api/v2/chat-move` | body `{opId, machineId, convId, targetMachineId, provider, profile?, model: {id, effort?}, withoutFiles}`; `{targetMachineId, targetName, convId}` |
+
+A refusal is `{error, code}` with the words for the person: 409 `machine_offline`, 403 `no_access`, 400 `same_machine`,
+and the runtime's own (`changed`, `commit_missing`, …). If the old machine cannot be sealed after the import, the
+import is discarded and the chat stays where it was.
+
 ### Machines
 
 | Method, path | Who | Request | Response |
@@ -315,7 +353,8 @@ one over a shared channel (for example PostgreSQL LISTEN/NOTIFY), which the rest
 | `GET /api/machines/{machineId}` | member | | `{ machine: Machine }` |
 | `PATCH /api/machines/{machineId}` | owner | `{ name }` | `{ machine: Machine }` |
 | `DELETE /api/machines/{machineId}` | owner | | 204 (revoked, link closed with 4010) |
-| `GET /api/machines/{machineId}/open` | member | `?redirect=1` answers 302 instead | `{ url }` — path mode: `/m/<id>/` (403 `machine_untrusted` unless an instance administrator connected the machine); subdomain mode: `https://<id>.<HUB_RUNTIME_DOMAIN>/m/<id>/?hl_ticket=<t>` (60 s, single use) |
+| `GET /api/machines/{machineId}/open` | member | `?redirect=1` answers 302 instead | `{ url }` — path mode: `/m/<id>/` (403 `machine_untrusted` unless an instance administrator connected the machine or, with `HUB_MACHINE_TRUST=on`, the owner of its space trusted it); subdomain mode: `https://<id>.<HUB_RUNTIME_DOMAIN>/m/<id>/?hl_ticket=<t>` (60 s, single use) |
+| `POST /api/machines/{machineId}/trust` | owner | `{}` | `{ machine: Machine }` — path mode only, and only with `HUB_MACHINE_TRUST=on`: the owner of the machine's space lets the hub open it on its own origin (journal `machine_trusted`). `DELETE` takes the trust back (`machine_untrusted`). 409 `trust_unavailable` in subdomain mode (every machine has its own origin there) or with `HUB_MACHINE_TRUST` off. `Machine.runtime` is `ready`, `needs_trust` (the owner may trust it) or `blocked` (path mode with trust off: only administrator-connected machines open) |
 | `POST /api/machines/{machineId}/preflight` | owner | `{}` | `{ preflight: PreflightReport }` (runs it again) |
 
 Resources, load and operations of a machine (only with the organization's `machine.resources` feature, 404 `not_enabled`
@@ -816,8 +855,12 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | Variable | Default | What |
 | --- | --- | --- |
 | `HUB_LISTEN` | `0.0.0.0:8040` | HTTP listen address (TLS is the reverse proxy's) |
-| `HUB_PUBLIC_URL` | required | the address people and machines use, e.g. `https://hub.example.com` |
+| `HUB_PUBLIC_URL` | required | the address people and machines use, e.g. `https://hub.example.com`, or with a path behind a proxy `https://example.com/harnessly` ([proxy.md](proxy.md)) |
 | `HUB_DATABASE_URL` | `sqlite://$HUB_DATA_DIR/hub.db` | `sqlite:///abs/path.db` or `postgres://user:pass@host/db?sslmode=…` |
+| `HUB_DB_SCHEMA` | not set | Postgres schema for the hub's tables instead of `public` ([migrations](migrations.md)) |
+| `HUB_DB_POOLER` | not set | `transaction` behind PgBouncer in transaction mode: simple protocol, transaction-scoped migration lock |
+| `HUB_DB_MIGRATE_URL` | not set | direct `postgres://` URL for the migrations when `HUB_DATABASE_URL` goes through a pooler |
+| `HUB_DB_CHECK` | `warn` | `warn`, `strict` (refuse to start on a database newer than the binary or on schema drift; exit 70/71/72/73) or `off` |
 | `HUB_DATA_DIR` | `/var/lib/harnessly-hub` | SQLite file, the `secret_key` file (unless `HUB_SECRET_KEY` is set) |
 | `HUB_EDITION` | `self-hosted` | or `cloud` (needs `HUB_RUNTIME_DOMAIN`; no SSH to private addresses) |
 | `HUB_SIGNUP` | `open` (Helm chart: `invite`) | or `invite` |
@@ -850,7 +893,7 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_MR_SOURCE_GITLAB_TOKEN` | | token with `read_api` (also `_FILE`); never logged |
 | `HUB_LIMITS_ENFORCE` | `off` | limits on machines ([limits.md](limits.md#enforcement)): `off` — computed and shown only; `warn` — machines notify; `stop` — machines do not start chats past a limit |
 | `HUB_RATES_URL` | `https://www.cbr.ru/scripts/XML_daily.asp` | the Central Bank's daily rates the organizations' money is shown in ([analytics.md](analytics.md#money-and-periods)); `off` never fetches: dollars unless an admin put a rate in `currency_rates` |
-| `HUB_AGENT_URL` | `HUB_PUBLIC_URL` | the address machines reach the hub at (`http(s)://host[:port]`, no path), when it differs from the people's one: the install command and script, registration, the signature of a machine's dial, the ssh install and the runtime domain use it; people's links, cookies and sign-in keep `HUB_PUBLIC_URL`; reported as `agentUrl` in `/api/config` |
+| `HUB_AGENT_URL` | `HUB_PUBLIC_URL` | the address machines reach the hub at (`http(s)://host[:port][/path]`), when it differs from the people's one: the install command and script, registration, the signature of a machine's dial, the ssh install and the runtime domain use it; people's links, cookies and sign-in keep `HUB_PUBLIC_URL`; reported as `agentUrl` in `/api/config` |
 | `HUB_FEATURES_FORCE` | | comma-separated flags the instance decides for every organization: `name` forces on, `-name` forces off ([Feature flags](#feature-flags)) |
 | `HUB_FEATURES_DEFAULT` | | comma-separated flags that are on for every organization that has not chosen |
 | `HUB_PROXY_JWT_JWKS_URL` | | the identity provider's key set; setting it turns [proxy sign-in](#proxy-sign-in) on |

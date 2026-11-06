@@ -1333,7 +1333,7 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 		Provider: m.Provider, Model: m.Model, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
 		ParentID: parentID, Rev: 1}
-	if m.Provider == wire.ProviderClaude && r.d.AlwaysApps != nil {
+	if r.d.AlwaysApps != nil {
 		if ids := r.d.AlwaysApps(); len(ids) > 0 && (r.d.AppsOK == nil || r.d.AppsOK(ids) == "") {
 			rec.Apps = append([]string(nil), ids...)
 		}

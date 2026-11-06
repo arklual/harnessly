@@ -39,6 +39,8 @@ func shareRefused(w http.ResponseWriter, err error) {
 		{apps.ErrNoTeam, "no-team", http.StatusConflict},
 		{apps.ErrNotOwner, "not-owner", http.StatusForbidden},
 		{apps.ErrTeamApp, "team-app", http.StatusConflict},
+		{apps.ErrEnvApp, "env-app", http.StatusConflict},
+		{apps.ErrEnvLocked, "env-locked", http.StatusConflict},
 		{apps.ErrTrustedTeam, "trusted", http.StatusUnprocessableEntity},
 		{apps.ErrNotInCatalog, "not-in-catalog", http.StatusNotFound},
 		{apps.ErrNotInstalled, "not-found", http.StatusNotFound},

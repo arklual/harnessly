@@ -23,6 +23,10 @@ type MachinesConfig struct {
 	// ProviderTokenFile (HUB_PROVIDER_TOKEN_FILE) is a file with the bearer token the provider is called with. It is the
 	// path, not the content, because the hub reads the file again when it changes.
 	ProviderTokenFile string
+	// ProviderProtocol (HUB_PROVIDER_PROTOCOL) is v0 (the default: the protocol without a version, as before), auto (ask
+	// GET /v1/describe, speak v1 when the service answers it) or v1 (the service must speak v1). Only v1 gives create,
+	// attach and the provider endpoints of docs/hub/provider.md.
+	ProviderProtocol string
 	// AccessEnforce (HUB_ACCESS_ENFORCE) is off, warn or on: whether the access list of a machine is kept when someone
 	// who is not its owner opens it.
 	AccessEnforce string
@@ -52,6 +56,11 @@ func loadMachines(lookup func(string) (string, bool), def func(string, string) s
 	default:
 		bad("HUB_PROVIDER must be none or http, got %q", m.Provider)
 	}
+	switch m.ProviderProtocol = strings.ToLower(def("HUB_PROVIDER_PROTOCOL", "v0")); m.ProviderProtocol {
+	case "v0", "auto", "v1":
+	default:
+		bad("HUB_PROVIDER_PROTOCOL must be v0, auto or v1, got %q", m.ProviderProtocol)
+	}
 	switch m.AccessEnforce = strings.ToLower(def("HUB_ACCESS_ENFORCE", AccessOff)); m.AccessEnforce {
 	case AccessOff, AccessWarn, AccessOn:
 	default:
@@ -66,3 +75,8 @@ func loadMachines(lookup func(string) (string, bool), def func(string, string) s
 	}
 	return m
 }
+
+// Values of HUB_PROVIDER_PROTOCOL.
+const (
+	ProviderProtocolV0 = "v0"
+)

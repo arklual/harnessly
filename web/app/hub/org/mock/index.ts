@@ -11,6 +11,7 @@ import { machinesMock } from './machines';
 import { shellMock } from './shell';
 import { teamsMock } from './teams';
 import { tenantMock } from './tenant';
+import { toolsMock } from './tools';
 import type { MockCtx } from './ctx';
 import { setShownCurrency } from '../money';
 
@@ -28,4 +29,5 @@ export const mockOrgApi = (ctx: MockCtx): OrgApi => ({
   ...tenantMock(ctx),
   ...envMock(ctx),
   ...accountsMock(ctx),
+  ...toolsMock(ctx),
 });

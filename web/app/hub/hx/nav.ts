@@ -22,24 +22,39 @@ const item = (id: string, label: string, icon: string, section?: Section): HxNav
   section,
 });
 
-export const navOf = (role: Role, teamName: string | null, features: readonly string[]): HxNavGroup[] => {
+export const navOf = (
+  role: Role,
+  teamName: string | null,
+  features: readonly string[],
+  scope: 'org' | 'tenant' = 'tenant',
+): HxNavGroup[] => {
   const env = features.includes('env') ? [item('env', 'Окружение', 'layers', 'env')] : [];
   const overview = item('overview', 'Обзор', 'chart-column', 'overview');
   const analytics = item('analytics', 'Аналитика', 'activity', 'analytics');
   const machines = item('machines', 'Машины', 'server', 'machines');
   const accounts = item('accounts', 'Аккаунты', 'key-round', 'accounts');
-  if (role === 'member') return [{ label: '', items: [overview, analytics, machines, ...env] }];
+  // The tools screen comes with the lively hub (`ui.hx.live`).
+  const tools = features.includes('ui.hx.live')
+    ? [
+        item('efficiency', 'Эффективность', 'gauge', 'efficiency'),
+        item('tools', 'Инструменты', 'blocks', 'tools'),
+      ]
+    : [];
+  if (role === 'member') return [{ label: '', items: [overview, analytics, ...tools, machines, ...env] }];
   if (role === 'lead') {
     return [
       {
         label: teamName ? `Команда ${teamName}` : 'Команда',
-        items: [overview, analytics, machines, item('team', 'Моя команда', 'users', 'team')],
+        items: [overview, analytics, ...tools, machines, item('team', 'Моя команда', 'users', 'team')],
       },
       { label: 'Настройки', items: [...env, accounts] },
     ];
   }
   return [
-    { label: 'Тенант', items: [overview, analytics, machines, item('teams', 'Команды', 'users', 'teams')] },
+    {
+      label: scope === 'org' ? 'Организация' : 'Тенант',
+      items: [overview, analytics, ...tools, machines, item('teams', 'Команды', 'users', 'teams')],
+    },
     { label: 'Настройки', items: [...env, accounts] },
   ];
 };
@@ -47,7 +62,8 @@ export const navOf = (role: Role, teamName: string | null, features: readonly st
 /** The sections a role may open in the new hub; anything else goes to the overview. */
 export const hxSectionsOf = (role: Role, features: readonly string[]): Section[] => {
   const env: Section[] = features.includes('env') ? ['env'] : [];
+  const tools: Section[] = features.includes('ui.hx.live') ? ['efficiency', 'tools'] : [];
   return role === 'member'
-    ? ['overview', 'analytics', 'machines', ...env]
-    : ['overview', 'analytics', 'machines', 'teams', 'team', 'accounts', ...env];
+    ? ['overview', 'analytics', 'machines', ...tools, ...env]
+    : ['overview', 'analytics', 'machines', 'teams', 'team', 'accounts', ...tools, ...env];
 };

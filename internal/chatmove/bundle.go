@@ -106,6 +106,17 @@ type Envelope struct {
 
 const encName = "aes-256-gcm"
 
+// MinOpKey is the shortest one-time key, in bytes.
+const MinOpKey = 32
+
+// OpKey reads a one-time key of an operation (base64). A hub that carries a bundle between two machines does not know
+// their secrets: it makes a random key for the operation and gives it to both ends, and the bundle is then made for the
+// target directly, so the hub never reads it. ok is false for a key that is not base64 or too short.
+func OpKey(b64 string) ([]byte, bool) {
+	k, err := base64.StdEncoding.DecodeString(b64)
+	return k, err == nil && len(k) >= MinOpKey
+}
+
 func aead(secret []byte, opID string, dir Direction) (cipher.AEAD, error) {
 	if len(secret) == 0 || opID == "" {
 		return nil, errors.New("chatmove: no key")

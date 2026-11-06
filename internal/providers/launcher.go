@@ -55,6 +55,7 @@ func (l Launcher) Codex(profile string) (agents.CodexProfile, error) {
 			"-c", "model_provider=" + strconv.Quote(p.ID),
 		}}, nil
 	}
+	l.Store.refresh(p.ID)
 	return agents.CodexProfile{
 		Args: []string{
 			"-c", prefix + "base_url=" + strconv.Quote(p.BaseURL),
@@ -108,7 +109,7 @@ func (Launcher) Window(profile, model string) int {
 // OwnsModel says whether the model id is one of some profile's: a conversation on the CLI's own account is not to be
 // started on it or switched to it.
 func (Launcher) OwnsModel(model string) bool {
-	for _, p := range presets {
+	for _, p := range all() {
 		if _, ok := p.ModelOf(model); ok {
 			return true
 		}

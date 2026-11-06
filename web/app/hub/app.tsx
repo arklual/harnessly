@@ -1,5 +1,5 @@
 // The hub UI's routes (docs/hub/api.md, "UI routes"): which screen a path shows, and who may see it.
-import { type ReactNode, useEffect, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 
 import { Button, EmptyState, Spinner } from '@kit';
 
@@ -12,6 +12,7 @@ import { SessionProvider, useSession } from './lib/session';
 import { AccessScreen } from './screens/access';
 import { AccountScreen } from './screens/account';
 import { AgentsScreen } from './screens/agents';
+import { hxOn } from './hx/flag';
 import { AuthScreen } from './screens/auth';
 import { BrowserScreen } from './screens/browser';
 import { DoneScreen } from './screens/done';
@@ -102,9 +103,23 @@ const SessionFailed = ({ error, retry }: { error: ApiError; retry: () => void })
 );
 
 /** `/`: signed out → sign-in; no space → the first one is made; else the last space, or where its setup stopped. */
+/** The organizations of the person, asked again twice when the hub does not answer: a slow hub is not «no organization». */
+const orgsWithRetry = async (alive: () => boolean): Promise<OrgList | null> => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await http.get<OrgList>('/api/orgs');
+    } catch {
+      if (attempt >= 2 || !alive()) return null;
+      await new Promise((done) => setTimeout(done, 1000 * (attempt + 1)));
+    }
+  }
+};
+
 const Landing = () => {
   const api = useApi();
   const { me, config } = useSession();
+  const [failed, setFailed] = useState(0);
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -112,11 +127,16 @@ const Landing = () => {
         navigate('/signin', { replace: true });
         return;
       }
-      // A member of an organization lands in its hub; without HUB_ORGS=on, or when the list fails, the spaces as before.
+      // A member of an organization lands in its hub; without HUB_ORGS=on the spaces as before.
       let orgs: OrgList | null = null;
       if (orgStepOn(config)) {
-        orgs = await http.get<OrgList>('/api/orgs').catch(() => null);
+        orgs = await orgsWithRetry(() => alive);
         if (!alive) return;
+        // The hub did not answer: say so, never lead to «make an organization» as if there were none.
+        if (orgs === null) {
+          setFailed(tries + 1);
+          return;
+        }
         const target = orgLanding(orgs);
         if (target) {
           navigate(target, { replace: true });
@@ -151,7 +171,19 @@ const Landing = () => {
     return () => {
       alive = false;
     };
-  }, [api, me, config]);
+  }, [api, me, config, tries]);
+  if (failed > tries) {
+    return (
+      <PlainPage>
+        <EmptyState
+          title={t('session.failed')}
+          actions={<Button onClick={() => setTries(failed)}>{t('common.retry')}</Button>}
+        >
+          {t('landing.orgsFailed')}
+        </EmptyState>
+      </PlainPage>
+    );
+  }
   return <Loading />;
 };
 
@@ -217,20 +249,48 @@ const SpaceEntry = ({
   return answer.to ? <Redirect to={answer.to} /> : <>{children}</>;
 };
 
+const HxAuth = lazy(() => import('./hx/auth').then((m) => ({ default: m.HxAuth })));
+const HxInvite = lazy(() => import('./hx/auth').then((m) => ({ default: m.HxInvite })));
+const HxOrgNew = lazy(() => import('./hx/auth').then((m) => ({ default: m.HxOrgNew })));
+
 const Routes = () => {
   const { path, search } = useLocation();
-  const { me } = useSession();
+  const { me, config } = useSession();
   const match = matchRoute(ROUTES, path);
+  // Before sign-in there is no organization: the instance's own flag picks the kit.
+  const hx = hxOn(config.features, search);
 
   if (!match) return <NotFound />;
   const { route, params } = match;
   if (route === '/') return <Landing />;
+  if (hx && (route === '/signin' || route === '/signup')) {
+    return (
+      <Suspense fallback={null}>
+        <HxAuth mode={route === '/signin' ? 'signin' : 'signup'} />
+      </Suspense>
+    );
+  }
+  if (hx && route === '/invite/:token') {
+    return (
+      <Suspense fallback={null}>
+        <HxInvite token={params.token ?? ''} />
+      </Suspense>
+    );
+  }
   if (route === '/signin') return <AuthScreen mode="signin" />;
   if (route === '/signup') return <AuthScreen mode="signup" />;
   if (route === '/invite/:token') return <InviteScreen token={params.token ?? ''} />;
   if (!me) return <Redirect to={`/signin?next=${encodeURIComponent(path + search)}`} />;
   if (route === '/new') return <NewSpaceScreen />;
-  if (route === '/org/new') return <OrgStepScreen />;
+  if (route === '/org/new') {
+    return hx ? (
+      <Suspense fallback={null}>
+        <HxOrgNew />
+      </Suspense>
+    ) : (
+      <OrgStepScreen />
+    );
+  }
   if (route === '/settings') return <AccountScreen />;
   if (route === '/browser/:machineId') return <BrowserScreen machineId={params.machineId ?? ''} />;
   if (route === '/o/:org' || route === '/o/:org/:scope' || route === '/o/:org/:scope/:section') {

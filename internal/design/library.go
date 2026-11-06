@@ -87,6 +87,9 @@ type Config struct {
 type Library struct {
 	cfg Config
 
+	// ready caches the render doctor's result (doctor.go).
+	ready readyCache
+
 	mu        sync.Mutex
 	locks     map[string]*sync.Mutex
 	listing   listingCache

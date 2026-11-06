@@ -24,6 +24,7 @@ import AppCard from '@/next/features/app-views/app-card';
 import { parseAppCard } from '@/next/features/app-views/card';
 import ChatWidget from '@/next/features/app-views/chat-widget';
 import CardOutput, { cardOutputPending } from '@/next/features/app-views/card-output';
+import { parseGuardDenial } from '@/next/features/app-views/guard-denial';
 import { parseWidgetRef } from '@/next/features/app-views/widgets';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { useSeen } from '@/next/ui/presence';
@@ -60,13 +61,16 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
   const [open, setOpen] = useState(false);
   const seen = useSeen(open);
   const { icon, label } = toolView(entry.tool);
-  const has = Boolean(entry.output?.text);
+  const denial = entry.ok === false ? parseGuardDenial(entry.output?.text) : null;
+  const text = denial ? denial.reason : entry.output?.text;
+  const has = Boolean(text);
   let meta = '';
   if (entry.ok === null) meta = t('next.tool.running');
-  else if (entry.ok === false) meta = t('next.tool.failed');
+  else if (entry.ok === false && !denial) meta = t('next.tool.failed');
   return (
     <div
       className="hx-tool"
+      data-guarded={denial ? 'true' : undefined}
       data-ok={entry.ok === false ? 'false' : undefined}
       data-has={has || undefined}
       aria-expanded={open}
@@ -82,8 +86,20 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
         ) : (
           <Icon name={icon} size="sm" className="hx-tool__ico" />
         )}
-        <span className="hx-tool__label">{label}</span>
-        <code className="hx-tool__detail">{entry.summary}</code>
+        {denial ? (
+          <span className="hx-tool__label">
+            {t(denial.app ? 'next.tool.guarded' : 'next.tool.guardedChat', {
+              app: denial.app,
+              tool: label.toLowerCase(),
+              rule: denial.rule,
+            })}
+          </span>
+        ) : (
+          <>
+            <span className="hx-tool__label">{label}</span>
+            <code className="hx-tool__detail">{entry.summary}</code>
+          </>
+        )}
         <span className="hx-spacer" />
         {meta && <span className="hx-tool__meta">{meta}</span>}
       </button>
@@ -92,7 +108,7 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
           <div>
             {seen && (
               <div className="hx-tool__out">
-                {entry.output?.text.split('\n').map((line, index) => (
+                {text?.split('\n').map((line, index) => (
                   <div key={index} className="hx-cmd__ln">
                     {line}
                   </div>

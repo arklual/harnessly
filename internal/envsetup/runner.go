@@ -168,16 +168,18 @@ func (r *Runner) readHeld() (held, bool) {
 	return h, true
 }
 
-// setupItems are the items the machine does something with, in the order of the steps: access, repositories, then the
-// scripts by their place in the list (those without one, in the order they came, last).
+// setupItems are the items the machine does something with, in the order of the steps: access, repositories, apps,
+// Claude's settings and plugins, then the scripts by their place in the list (those without one, in the order they came, last).
 func setupItems(all []hubproto.EnvItem) []hubproto.EnvItem {
-	var access, repos, claude, scripts []hubproto.EnvItem
+	var access, repos, appItems, claude, scripts []hubproto.EnvItem
 	for _, it := range all {
 		switch it.Kind {
 		case hubproto.EnvKindAccess:
 			access = append(access, it)
 		case hubproto.EnvKindRepo:
 			repos = append(repos, it)
+		case hubproto.EnvKindApp:
+			appItems = append(appItems, it)
 		case hubproto.EnvKindClaudeSettings, hubproto.EnvKindPlugin:
 			claude = append(claude, it)
 		case hubproto.EnvKindScript:
@@ -191,7 +193,7 @@ func setupItems(all []hubproto.EnvItem) []hubproto.EnvItem {
 		}
 		return a < b
 	})
-	return slices.Concat(access, repos, claude, scripts)
+	return slices.Concat(access, repos, appItems, claude, scripts)
 }
 
 func (r *Runner) readState() hubproto.EnvSetupState {

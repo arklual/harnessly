@@ -100,6 +100,15 @@
           "position": 1,
           "builtIn": false
         }
+      ],
+      "presets": [
+        {
+          "id": "pre-back",
+          "name": "Бэкенд-разработка",
+          "hint": "только сервисы",
+          "groupIds": ["grp-back"],
+          "position": 1
+        }
       ]
     },
     {
@@ -119,7 +128,8 @@
         "access": 0
       },
       "items": [],
-      "groups": []
+      "groups": [],
+      "presets": []
     },
     {
       "layer": "tenant",
@@ -160,7 +170,8 @@
           "groupId": ""
         }
       ],
-      "groups": []
+      "groups": [],
+      "presets": []
     },
     {
       "layer": "team",
@@ -284,7 +295,8 @@
           "groupId": ""
         }
       ],
-      "groups": []
+      "groups": [],
+      "presets": []
     },
     {
       "layer": "team",
@@ -303,7 +315,8 @@
         "access": 0
       },
       "items": [],
-      "groups": []
+      "groups": [],
+      "presets": []
     }
   ],
   "teams": [

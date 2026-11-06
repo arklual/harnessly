@@ -33,8 +33,9 @@ type Source struct {
 var _ wire.ProfilesSource = (*Source)(nil)
 
 func (s *Source) Profiles(context.Context) (wire.ProfileList, error) {
-	out := make([]wire.ProfileInfo, 0, len(presets))
-	for _, p := range presets {
+	list := all()
+	out := make([]wire.ProfileInfo, 0, len(list))
+	for _, p := range list {
 		info := wire.ProfileInfo{ID: p.ID, Label: p.Label, Vendor: p.Vendor, Via: p.Via, Host: p.Host, Hint: p.Hint,
 			Key: s.Store.State(p.ID), Models: p.AgentModels()}
 		if account, ok := s.Store.LoginOf(p.ID); ok {

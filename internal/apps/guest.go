@@ -306,7 +306,7 @@ func guestOwner(l GuestLink) string { return "guest-" + l.ID }
 // GuestMatch: the request is one of the guest routes or the public SDK files the views load by absolute path.
 func GuestMatch(r *http.Request) bool {
 	p := strings.TrimPrefix(r.URL.Path, "/agents")
-	return strings.HasPrefix(p, GuestPrefix) || p == SDKPath || p == SDKModulePath || p == ShimPath
+	return strings.HasPrefix(p, GuestPrefix) || p == SDKPath || p == SDKModulePath || p == ShimPath || p == UICSSPath
 }
 
 func guestGone(w http.ResponseWriter) {
@@ -328,6 +328,9 @@ func (g *Guests) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case ShimPath:
 		serveBytes(w, r, "text/javascript; charset=utf-8", shimJS)
+		return
+	case UICSSPath:
+		serveBytes(w, r, "text/css; charset=utf-8", hlUICSS)
 		return
 	}
 	token, rest, hasSlash := strings.Cut(strings.TrimPrefix(p, GuestPrefix), "/")
@@ -412,6 +415,8 @@ func (g *Guests) sdkFile(w http.ResponseWriter, r *http.Request, name string) {
 		serveBytes(w, r, "text/javascript; charset=utf-8", sdkJS)
 	case ShimPath:
 		serveBytes(w, r, "text/javascript; charset=utf-8", shimJS)
+	case UICSSPath:
+		serveBytes(w, r, "text/css; charset=utf-8", hlUICSS)
 	default:
 		http.NotFound(w, r)
 	}
@@ -529,9 +534,10 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 		return
 	}
 	var b struct {
-		Op    string          `json:"op"`
-		Key   string          `json:"key"`
-		Value json.RawMessage `json:"value"`
+		Op        string          `json:"op"`
+		Key       string          `json:"key"`
+		Value     json.RawMessage `json:"value"`
+		IfVersion *int64          `json:"ifVersion"`
 	}
 	raw, err := io.ReadAll(io.LimitReader(r.Body, maxGuestBody+1))
 	if err != nil || len(raw) > maxGuestBody || json.Unmarshal(raw, &b) != nil {
@@ -540,9 +546,12 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 	}
 	owner := guestOwner(l)
 	fail := func(err error) {
+		var conflict *ConflictError
 		switch {
+		case errors.As(err, &conflict):
+			guestJSON(w, http.StatusConflict, map[string]any{"error": CodeConflict, "message": "the key changed since it was read", "version": conflict.Current})
 		case errors.Is(err, ErrQuota):
-			guestRefusal(w, http.StatusRequestEntityTooLarge, CodeInvalidParams, "the link's storage is full")
+			guestRefusal(w, http.StatusRequestEntityTooLarge, CodeQuotaExceeded, "the link's storage is full")
 		case errors.Is(err, ErrStorageArgs):
 			guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, "a bad key")
 		default:
@@ -551,16 +560,16 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 	}
 	switch b.Op {
 	case "get":
-		v, ok, err := g.storage.Get(app.ID, ScopeDoc, owner, b.Key)
+		v, version, ok, err := g.storage.GetVersioned(app.ID, ScopeDoc, owner, b.Key)
 		if err != nil {
 			fail(err)
 			return
 		}
 		if !ok {
-			guestJSON(w, http.StatusOK, map[string]any{"value": nil})
+			guestJSON(w, http.StatusOK, map[string]any{"value": nil, "version": version})
 			return
 		}
-		guestJSON(w, http.StatusOK, map[string]any{"value": v})
+		guestJSON(w, http.StatusOK, map[string]any{"value": v, "version": version})
 	case "keys":
 		keys, err := g.storage.Keys(app.ID, ScopeDoc, owner)
 		if err != nil {
@@ -577,17 +586,26 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 			return
 		}
 		var err error
+		var version int64
 		if b.Op == "set" {
 			if len(b.Value) == 0 {
 				guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, "a value")
 				return
 			}
-			err = g.storage.Set(app.ID, ScopeDoc, owner, b.Key, b.Value)
+			if b.IfVersion != nil && *b.IfVersion < 0 {
+				guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, "ifVersion is 0 or more")
+				return
+			}
+			version, err = g.storage.SetIf(app.ID, ScopeDoc, owner, b.Key, b.Value, b.IfVersion)
 		} else {
 			err = g.storage.Delete(app.ID, ScopeDoc, owner, b.Key)
 		}
 		if err != nil {
 			fail(err)
+			return
+		}
+		if b.Op == "set" {
+			guestJSON(w, http.StatusOK, map[string]any{"version": version})
 			return
 		}
 		guestJSON(w, http.StatusOK, map[string]any{})

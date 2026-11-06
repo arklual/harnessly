@@ -1,0 +1,4144 @@
+{
+  "driver": "sqlite",
+  "tables": {
+    "account_balances": {
+      "columns": [
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "currency",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "available",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "spend_cap",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "spent_in_period",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "measured_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "account_id",
+        "currency"
+      ]
+    },
+    "account_grants": {
+      "columns": [
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "granted_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "granted_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "account_id",
+        "scope_kind",
+        "scope_id"
+      ]
+    },
+    "account_window_cycles": {
+      "columns": [
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "resets_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "length_sec",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "peak_pct",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "first_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "measures",
+          "type": "INTEGER",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "account_id",
+        "scope",
+        "name",
+        "resets_at"
+      ],
+      "indexes": [
+        {
+          "name": "account_window_cycles_resets",
+          "columns": [
+            "resets_at"
+          ]
+        }
+      ]
+    },
+    "account_windows": {
+      "columns": [
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "length_sec",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "unit",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "used_pct",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "used",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "lim",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "resets_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "measured_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "confidence",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "account_id",
+        "scope",
+        "name"
+      ]
+    },
+    "accounts": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "plan",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "account_ref",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "base_url_host",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "funding",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "monthly_fee_micros",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "discovered",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "unique": true,
+          "columns": [
+            "org_key",
+            "provider",
+            "account_ref"
+          ]
+        }
+      ]
+    },
+    "agent_connections": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "installed",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "version",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "login_state",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "auth_mode",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider_verdict",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "checked_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "provider"
+      ]
+    },
+    "agent_session_mrs": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "session_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "mr_key",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "org_key",
+        "provider",
+        "session_key",
+        "mr_key"
+      ],
+      "indexes": [
+        {
+          "name": "agent_session_mrs_mr",
+          "columns": [
+            "org_key",
+            "mr_key"
+          ]
+        },
+        {
+          "name": "agent_session_mrs_owner",
+          "columns": [
+            "org_key",
+            "provider",
+            "owner_key"
+          ]
+        }
+      ]
+    },
+    "agent_sessions": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "session_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "parent_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "account_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "funding",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "origin",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "attribution",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "started_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "ended_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "metrics",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "seq",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "org_key",
+        "provider",
+        "session_key"
+      ],
+      "indexes": [
+        {
+          "name": "agent_sessions_machine",
+          "columns": [
+            "machine_id",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "agent_sessions_parent",
+          "columns": [
+            "org_key",
+            "parent_key"
+          ]
+        },
+        {
+          "name": "agent_sessions_user",
+          "columns": [
+            "org_key",
+            "user_id",
+            "started_at"
+          ]
+        }
+      ]
+    },
+    "audit_events": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "actor_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "scope_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "target_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "target_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "before_json",
+          "type": "TEXT"
+        },
+        {
+          "name": "after_json",
+          "type": "TEXT"
+        },
+        {
+          "name": "self",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "audit_events_org",
+          "columns": [
+            "org_id",
+            "at"
+          ]
+        },
+        {
+          "name": "audit_events_space",
+          "columns": [
+            "space_id",
+            "at"
+          ]
+        },
+        {
+          "name": "audit_events_team",
+          "columns": [
+            "team_id",
+            "at"
+          ]
+        }
+      ]
+    },
+    "auth_challenges": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "code_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "data",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "ip",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "auth_challenges_email",
+          "columns": [
+            "kind",
+            "email"
+          ]
+        },
+        {
+          "name": "auth_challenges_expires",
+          "columns": [
+            "expires_at"
+          ]
+        }
+      ]
+    },
+    "auth_events": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "ip",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_agent",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "detail",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "auth_events_user",
+          "columns": [
+            "user_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "catalog_items": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hint",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "archived_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "owner_layer",
+          "type": "TEXT"
+        },
+        {
+          "name": "owner_scope",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "catalog_items_org",
+          "columns": [
+            "org_id",
+            "kind"
+          ]
+        }
+      ]
+    },
+    "currency_rates": {
+      "columns": [
+        {
+          "name": "code",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "day",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "per_usd",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "fetched_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "code",
+        "day"
+      ]
+    },
+    "design_access_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "actor",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "subject",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "details",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "design_access_log_project",
+          "columns": [
+            "machine_id",
+            "project_id",
+            "at"
+          ]
+        }
+      ]
+    },
+    "design_guest_comments": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "link_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "board",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "x",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "y",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "text",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "guest_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "guest_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "anchor",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "design_guest_comments_link",
+          "columns": [
+            "link_id"
+          ]
+        }
+      ]
+    },
+    "design_invites": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "role_ttl_ms",
+          "type": "BIGINT"
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "max_uses",
+          "type": "INTEGER"
+        },
+        {
+          "name": "uses",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "revoked_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "design_invites_project",
+          "columns": [
+            "machine_id",
+            "project_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
+    "design_members": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "person_email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "granted_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "granted_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "via_invite",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "project_id",
+        "person_email"
+      ],
+      "indexes": [
+        {
+          "name": "design_members_person",
+          "columns": [
+            "person_email"
+          ]
+        }
+      ]
+    },
+    "design_projects": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_email",
+          "type": "TEXT"
+        },
+        {
+          "name": "owner_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "home_team",
+          "type": "TEXT"
+        },
+        {
+          "name": "team_level",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "editors_can_share",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "legacy",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "subkind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "project_id"
+      ],
+      "indexes": [
+        {
+          "name": "design_projects_owner",
+          "columns": [
+            "owner_email"
+          ]
+        }
+      ]
+    },
+    "design_requests": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "person_email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "level",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "message",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "decided_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "decided_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "design_requests_project",
+          "columns": [
+            "machine_id",
+            "project_id",
+            "status"
+          ]
+        }
+      ]
+    },
+    "design_share_links": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "token_enc",
+          "type": "TEXT"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "rights",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "version",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "TEXT"
+        },
+        {
+          "name": "pages",
+          "type": "TEXT"
+        },
+        {
+          "name": "view",
+          "type": "TEXT"
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "revoked_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "opens",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "last_opened_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "design_share_links_project",
+          "columns": [
+            "machine_id",
+            "project_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
+    "design_share_views": {
+      "columns": [
+        {
+          "name": "link_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "guest_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "guest_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "board",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "ms",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "design_share_views_link",
+          "columns": [
+            "link_id"
+          ]
+        }
+      ]
+    },
+    "design_team_grants": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "can_share",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "granted_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "granted_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "project_id",
+        "team_id"
+      ]
+    },
+    "doc_comments": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "thread_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "author_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "author_email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "author_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "body",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "doc_comments_thread",
+          "columns": [
+            "thread_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "doc_meta": {
+      "columns": [
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "source_path",
+          "type": "TEXT"
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "team_level",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "slug"
+      ]
+    },
+    "doc_reads": {
+      "columns": [
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "read_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "slug",
+        "email"
+      ]
+    },
+    "doc_threads": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "anchor",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "author_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "author_email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "author_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "resolved_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "doc_threads_slug",
+          "columns": [
+            "slug",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "env_entries": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "layer",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "item_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "audience",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "pinned",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "position",
+          "type": "INTEGER"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "env_entries_org",
+          "columns": [
+            "org_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "layer",
+            "scope_id",
+            "item_id"
+          ]
+        }
+      ]
+    },
+    "env_person_off": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "item_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "scope",
+        "item_id"
+      ]
+    },
+    "env_runs": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "by_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "started_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "finished_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "steps",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "env_runs_machine",
+          "columns": [
+            "machine_id",
+            "started_at"
+          ]
+        },
+        {
+          "name": "env_runs_org",
+          "columns": [
+            "org_id",
+            "started_at"
+          ]
+        }
+      ]
+    },
+    "env_state": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "applied",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "sent_rev",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "sent_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "sent_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "identities": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "subject",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "email_verified",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "identities_user",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "provider",
+            "subject"
+          ]
+        }
+      ]
+    },
+    "ingest_cursors": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "stream",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "epoch",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "seq",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "acked_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "stream"
+      ]
+    },
+    "invite_team": {
+      "columns": [
+        {
+          "name": "invite_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "invite_id"
+      ]
+    },
+    "invite_uses": {
+      "columns": [
+        {
+          "name": "invite_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "used_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "invite_id",
+        "user_id"
+      ]
+    },
+    "invites": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "max_uses",
+          "type": "INTEGER"
+        },
+        {
+          "name": "uses",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "revoked_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "invites_space",
+          "columns": [
+            "space_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
+    "limit_rules": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "model_pattern",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "forbid",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "period",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "unit",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "amount",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "warn_pct",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "set_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "set_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "limit_rules_org",
+          "columns": [
+            "org_key"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "scope_kind",
+            "scope_id",
+            "user_id",
+            "account_id",
+            "model_pattern",
+            "period",
+            "unit"
+          ]
+        }
+      ]
+    },
+    "machine_access": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "ref_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "kind",
+        "ref_id"
+      ]
+    },
+    "machine_budgets": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "version",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "synced_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "machine_env": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "delivered_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "delivered_by",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "name"
+      ]
+    },
+    "machine_hw": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "cores",
+          "type": "INTEGER"
+        },
+        {
+          "name": "ram_total",
+          "type": "BIGINT"
+        },
+        {
+          "name": "disk_total",
+          "type": "BIGINT"
+        },
+        {
+          "name": "os",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "arch",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "laptop",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "machine_links": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "addr",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "fence",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "lease_until",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ],
+      "indexes": [
+        {
+          "name": "machine_links_lease",
+          "columns": [
+            "lease_until"
+          ]
+        }
+      ]
+    },
+    "machine_managed": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "capability",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "managed",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "capability"
+      ]
+    },
+    "machine_metrics_5m": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "bucket",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "samples",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "cpu_sum",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "cpu_max",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "ram_sum",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "ram_max",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "disk_sum",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "disk_max",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "chats_max",
+          "type": "INTEGER",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "bucket"
+      ],
+      "indexes": [
+        {
+          "name": "machine_metrics_5m_bucket",
+          "columns": [
+            "bucket"
+          ]
+        }
+      ]
+    },
+    "machine_ops": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "params",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider_op_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "finished_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "machine_ops_machine",
+          "columns": [
+            "machine_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "machine_ops_open",
+          "columns": [
+            "status",
+            "updated_at"
+          ]
+        }
+      ]
+    },
+    "machine_resources": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "cpu",
+          "type": "INTEGER"
+        },
+        {
+          "name": "ram_gb",
+          "type": "INTEGER"
+        },
+        {
+          "name": "disk_gb",
+          "type": "INTEGER"
+        },
+        {
+          "name": "plan",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "price_amount",
+          "type": "BIGINT"
+        },
+        {
+          "name": "price_currency",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "price_period",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "machine_trust": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "trusted_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "trusted_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "machines": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hostname",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "os",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "arch",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "unix_user",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "profile",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "via",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "key_pub",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "enc_pub",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "agent_version",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_seen_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "revoked_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "info",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "disabled_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "machines_space",
+          "columns": [
+            "space_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "key_pub"
+          ]
+        }
+      ]
+    },
+    "memberships": {
+      "columns": [
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "space_id",
+        "user_id"
+      ],
+      "indexes": [
+        {
+          "name": "memberships_user",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ]
+    },
+    "merged_mrs": {
+      "columns": [
+        {
+          "name": "mr_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "merged_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "author",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "project",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "web_url",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "mr_key"
+      ],
+      "indexes": [
+        {
+          "name": "merged_mrs_merged",
+          "columns": [
+            "merged_at"
+          ]
+        }
+      ]
+    },
+    "org_changes": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "author_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machines",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "org_changes_org_at",
+          "columns": [
+            "org_key",
+            "at"
+          ]
+        }
+      ]
+    },
+    "org_features": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "feature",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "org_key",
+        "feature"
+      ]
+    },
+    "org_signals": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "rule",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "dedupe_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "subject_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "subject_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "subject_label",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "addressee_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "severity",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "weight",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "detail",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "first_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "acted_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "snoozed_until",
+          "type": "BIGINT"
+        },
+        {
+          "name": "resolved_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "org_signals_org_open",
+          "columns": [
+            "org_key",
+            "resolved_at"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "org_key",
+            "rule",
+            "dedupe_key"
+          ]
+        }
+      ]
+    },
+    "orgs": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "timezone",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "currency",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "unique": true,
+          "columns": [
+            "slug"
+          ]
+        }
+      ]
+    },
+    "passkeys": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "credential_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "credential",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_used_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "passkeys_user",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "credential_id"
+          ]
+        }
+      ]
+    },
+    "prices": {
+      "columns": [
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "model_pattern",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "effective_from",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "input",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "cache_write_5m",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "cache_write_1h",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "cache_read",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "output",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "long_ctx_threshold",
+          "type": "BIGINT"
+        },
+        {
+          "name": "long_ctx_factor",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "unit",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "provider",
+        "model_pattern",
+        "effective_from"
+      ]
+    },
+    "registration_codes": {
+      "columns": [
+        {
+          "name": "code_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "profile",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "local",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "used_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "code_hash"
+      ]
+    },
+    "role_grants": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "granted_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "granted_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "scope_kind",
+        "scope_id",
+        "role"
+      ],
+      "indexes": [
+        {
+          "name": "role_grants_scope",
+          "columns": [
+            "scope_kind",
+            "scope_id"
+          ]
+        }
+      ]
+    },
+    "schema_migrations": {
+      "columns": [
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "applied_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "compat_prev",
+          "type": "INTEGER",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "version"
+      ]
+    },
+    "sessions": {
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_seen_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "ip",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_agent",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "token_hash"
+      ],
+      "indexes": [
+        {
+          "name": "sessions_expires",
+          "columns": [
+            "expires_at"
+          ]
+        },
+        {
+          "name": "sessions_user",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ]
+    },
+    "site_blobs": {
+      "columns": [
+        {
+          "name": "hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "size",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "hash"
+      ]
+    },
+    "site_deployments": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "site_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "manifest",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "file_count",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "total_bytes",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "unique": true,
+          "columns": [
+            "site_id",
+            "version"
+          ]
+        }
+      ]
+    },
+    "site_pending": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "site_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "manifest",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "allow_secrets",
+          "type": "INTEGER",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    "site_space_blobs": {
+      "columns": [
+        {
+          "name": "space",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hash",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "space",
+        "hash"
+      ]
+    },
+    "site_tokens": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "site_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_used_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "site_tokens_site",
+          "columns": [
+            "site_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
+    "sites": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "access",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "spa",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "current_version",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "next_version",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "origin",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "unique": true,
+          "columns": [
+            "space",
+            "name"
+          ]
+        }
+      ]
+    },
+    "space_ssh_keys": {
+      "columns": [
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "public_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "private_key_enc",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "space_id"
+      ]
+    },
+    "spaces": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "onboarding_step",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "spaces_org",
+          "columns": [
+            "org_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "slug"
+          ]
+        }
+      ]
+    },
+    "team_members": {
+      "columns": [
+        {
+          "name": "team_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "is_primary",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "team_id",
+        "user_id"
+      ],
+      "indexes": [
+        {
+          "name": "team_members_user",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ]
+    },
+    "teams": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "unique": true,
+          "columns": [
+            "space_id",
+            "slug"
+          ]
+        }
+      ]
+    },
+    "tool_usage_day": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "session_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "item_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "tool_kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "tool_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "day",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "calls",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "errors",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "session_key",
+        "day",
+        "tool_kind",
+        "tool_name"
+      ],
+      "indexes": [
+        {
+          "name": "tool_usage_day_org",
+          "columns": [
+            "org_key",
+            "day"
+          ]
+        }
+      ]
+    },
+    "usage_calls": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "msg_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "session_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "ts",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "price_provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "base_url_host",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "input",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "output",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "cache_read",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "cache_write_5m",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "cache_write_1h",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "list_cost_micros",
+          "type": "BIGINT"
+        },
+        {
+          "name": "price_ver",
+          "type": "BIGINT"
+        },
+        {
+          "name": "ts_shifted",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "received_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "org_key",
+        "provider",
+        "msg_key"
+      ],
+      "indexes": [
+        {
+          "name": "usage_calls_session",
+          "columns": [
+            "org_key",
+            "session_key"
+          ]
+        },
+        {
+          "name": "usage_calls_ts",
+          "columns": [
+            "org_key",
+            "ts"
+          ]
+        }
+      ]
+    },
+    "usage_rollup_hour": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hour",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "account_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "funding",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "calls",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "unpriced_calls",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "input",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "output",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "cache_read",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "cache_write",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "list_cost_micros",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "paid_cost_micros",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "org_key",
+        "hour",
+        "user_id",
+        "team_id",
+        "space_id",
+        "account_id",
+        "funding",
+        "model"
+      ]
+    },
+    "users": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "is_admin",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "last_login_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "unique": true,
+          "columns": [
+            "email"
+          ]
+        }
+      ]
+    }
+  }
+}

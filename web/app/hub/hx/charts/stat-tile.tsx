@@ -1,6 +1,7 @@
 // The stat tile of the board's pages: an icon, a small chart (a strip of parts or bars), a label and a value line.
 import type { CSSProperties, ReactNode } from 'react';
 
+import { Count } from '../live';
 import { Icon } from '../ui';
 import './stat-tile.css';
 
@@ -77,7 +78,9 @@ export const StatTile = ({
     </span>
     <span className="sx-tile__chart">{chart}</span>
     <span className="sx-tile__label">{label}</span>
-    <span className="sx-tile__value">{value}</span>
+    <span className="sx-tile__value">
+      <Count text={value} />
+    </span>
   </div>
 );
 

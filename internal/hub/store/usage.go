@@ -1,8 +1,10 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	"slices"
 	"strings"
 	"time"
 )
@@ -263,6 +265,9 @@ func nullI(v *int64) any {
 func (s Store) PutWindow(ctx context.Context, w AccountWindow) (bool, error) {
 	if w.UsedPct == nil && w.Used == nil {
 		return false, nil
+	}
+	if err := s.noteCycle(ctx, w); err != nil {
+		return false, err
 	}
 	res, err := s.q.Exec(ctx, `INSERT INTO account_windows (account_id, scope, name, length_sec, unit, used_pct, used, lim, resets_at, measured_at, source, confidence, machine_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -740,4 +745,75 @@ func (s Store) PriceCall(ctx context.Context, orgKey, provider, msgKey string, m
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// cycleRoundMs is the step the reset time of a cycle is rounded to: providers report it with seconds of jitter.
+const cycleRoundMs = 10 * 60 * 1000
+
+// noteCycle adds a measurement to the history of its window: the highest use of the cycle that ends at its reset time.
+// A measurement without a use or a reset time says nothing about a cycle.
+func (s Store) noteCycle(ctx context.Context, w AccountWindow) error {
+	if w.UsedPct == nil || w.ResetsAt == nil {
+		return nil
+	}
+	end := (*w.ResetsAt + cycleRoundMs/2) / cycleRoundMs * cycleRoundMs
+	_, err := s.q.Exec(ctx, `INSERT INTO account_window_cycles (account_id, scope, name, resets_at, length_sec, peak_pct, first_at, last_at, measures)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+		ON CONFLICT (account_id, scope, name, resets_at) DO UPDATE SET
+		peak_pct = CASE WHEN excluded.peak_pct > account_window_cycles.peak_pct THEN excluded.peak_pct ELSE account_window_cycles.peak_pct END,
+		length_sec = CASE WHEN excluded.length_sec > 0 THEN excluded.length_sec ELSE account_window_cycles.length_sec END,
+		first_at = CASE WHEN excluded.first_at < account_window_cycles.first_at THEN excluded.first_at ELSE account_window_cycles.first_at END,
+		last_at = CASE WHEN excluded.last_at > account_window_cycles.last_at THEN excluded.last_at ELSE account_window_cycles.last_at END,
+		measures = account_window_cycles.measures + 1`,
+		w.AccountID, w.Scope, w.Name, end, w.LengthSec, *w.UsedPct, w.MeasuredAt, w.MeasuredAt)
+	return err
+}
+
+// WindowCycle is one cycle of a rate-limit window: how full it got before it reset.
+type WindowCycle struct {
+	AccountID string
+	Scope     string
+	Name      string
+	// ResetsAt is the end of the cycle, Unix milliseconds.
+	ResetsAt  int64
+	LengthSec int64
+	PeakPct   float64
+	FirstAt   int64
+	LastAt    int64
+	Measures  int
+}
+
+// WindowCycles are the cycles of the accounts' windows that end in [from, to), oldest first.
+func (s Store) WindowCycles(ctx context.Context, accountIDs []string, from, to int64) ([]WindowCycle, error) {
+	var out []WindowCycle
+	for i := 0; i < len(accountIDs); i += chunk {
+		part := accountIDs[i:min(i+chunk, len(accountIDs))]
+		args := []any{from, to}
+		for _, id := range part {
+			args = append(args, id)
+		}
+		rows, err := s.q.Query(ctx, `SELECT account_id, scope, name, resets_at, length_sec, peak_pct, first_at, last_at, measures
+			FROM account_window_cycles WHERE resets_at >= ? AND resets_at < ? AND account_id IN (`+placeholders(len(part))+`)
+			ORDER BY resets_at, account_id, scope, name`, args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var c WindowCycle
+			if err := rows.Scan(&c.AccountID, &c.Scope, &c.Name, &c.ResetsAt, &c.LengthSec, &c.PeakPct, &c.FirstAt, &c.LastAt, &c.Measures); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out = append(out, c)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	slices.SortFunc(out, func(a, b WindowCycle) int {
+		return cmp.Or(cmp.Compare(a.ResetsAt, b.ResetsAt), cmp.Compare(a.AccountID, b.AccountID), cmp.Compare(a.Scope, b.Scope), cmp.Compare(a.Name, b.Name))
+	})
+	return out, nil
 }

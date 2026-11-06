@@ -37,7 +37,7 @@ type DesignPublicTokenRequest struct {
 	Pages   []string `json:"pages,omitempty"`
 }
 
-// DesignPublicToken is the token and the request header the runtime reads it from.
+// DesignPublicToken is the token, the request header the runtime reads it from and its expiry in unix milliseconds.
 type DesignPublicToken struct {
 	Token     string `json:"token"`
 	Header    string `json:"header"`

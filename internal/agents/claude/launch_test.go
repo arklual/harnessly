@@ -207,6 +207,10 @@ type fakeApps struct {
 }
 
 func (f *fakeApps) Claude(ids []string, settingsPath string) (agents.ClaudeApps, error) {
+	return f.ClaudeFor("", ids, settingsPath)
+}
+
+func (f *fakeApps) ClaudeFor(conversation string, ids []string, settingsPath string) (agents.ClaudeApps, error) {
 	f.ids, f.settings = ids, settingsPath
 	out := agents.ClaudeApps{Settings: "/data/apps/launch/settings-1.json", PluginDirs: []string{"/data/apps/a", "/dev/b"},
 		PromptFile: f.prompt, Wrap: f.wrap}
@@ -215,6 +219,8 @@ func (f *fakeApps) Claude(ids []string, settingsPath string) (agents.ClaudeApps,
 	}
 	return out, nil
 }
+
+func (f *fakeApps) Codex(string, []string) (agents.CodexApps, error) { return agents.CodexApps{}, nil }
 
 // The apps of a chat replace --settings with the copy that carries the guard, add their plugins and their instructions.
 func TestAppsFlags(t *testing.T) {

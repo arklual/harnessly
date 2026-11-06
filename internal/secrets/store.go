@@ -88,6 +88,8 @@ type View struct {
 	UpdatedAt  int64    `json:"updatedAt"`
 	LastUsedAt int64    `json:"lastUsedAt"`
 	UsedBy     []Use    `json:"usedBy"`
+	// Where says which store holds it (WhereLocal, WhereVault) when the safe has more than one; empty otherwise.
+	Where string `json:"where,omitempty"`
 }
 
 type entry struct {
@@ -419,20 +421,25 @@ func (s *Store) Reveal(names []string, use Use) (map[string]string, error) {
 	}
 	use.At = s.now()
 	for _, e := range entries {
-		e.LastUsedAt = use.At
-		users := []Use{use}
-		for _, u := range e.UsedBy {
-			if u.Conv != use.Conv || u.Origin != use.Origin || use.Conv == "" {
-				users = append(users, u)
-			}
-		}
-		if len(users) > maxUsedBy {
-			users = users[:maxUsedBy]
-		}
-		e.UsedBy = users
+		recordUse(&e.View, use)
 	}
 	if err := s.write(f); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// recordUse puts use (its At set) first among the latest users of v, one line per conversation.
+func recordUse(v *View, use Use) {
+	v.LastUsedAt = use.At
+	users := []Use{use}
+	for _, u := range v.UsedBy {
+		if u.Conv != use.Conv || u.Origin != use.Origin || use.Conv == "" {
+			users = append(users, u)
+		}
+	}
+	if len(users) > maxUsedBy {
+		users = users[:maxUsedBy]
+	}
+	v.UsedBy = users
 }

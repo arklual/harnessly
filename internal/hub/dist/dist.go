@@ -23,7 +23,7 @@ import (
 const maxInstaller = 1 << 20
 
 // binaryName is the file names under /dl/: runtime-<os>-<arch> and agent-<os>-<arch>.
-var binaryName = regexp.MustCompile(`^(runtime|agent|harnessly)-(linux|darwin)-(amd64|arm64)$`)
+var binaryName = regexp.MustCompile(`^(runtime|agent|harnessly|hub)-(linux|darwin)-(amd64|arm64)$`)
 
 // Handler serves the installer and the binaries from a folder.
 type Handler struct {
@@ -53,6 +53,8 @@ func New(dir, hubURL, version, image string) *Handler {
 func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /install", httpx.Handler(h.install))
 	mux.Handle("GET /dl/manifest.json", httpx.Handler(h.manifest))
+	mux.Handle("GET /dl/release.json", httpx.Handler(h.releaseFile("release.json", "application/json")))
+	mux.Handle("GET /dl/release.json.sig", httpx.Handler(h.releaseFile("release.json.sig", "application/json")))
 	mux.Handle("GET /dl/{name}", httpx.Handler(h.binary))
 }
 
@@ -171,4 +173,20 @@ func (h *Handler) binary(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeContent(w, r, name, info.ModTime(), f)
 	return nil
+}
+
+// releaseFile serves the signed release manifest (internal/release) and its signature when the folder holds them: the
+// files are made and signed by the release, never by the hub. /dl/manifest.json is unchanged.
+func (h *Handler) releaseFile(name, ctype string) func(http.ResponseWriter, *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		body, err := os.ReadFile(filepath.Join(h.Dir, name))
+		if err != nil {
+			return httpx.New(http.StatusNotFound, "not_found", "На этом хабе нет подписанного манифеста релиза")
+		}
+		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		_, _ = w.Write(body)
+		return nil
+	}
 }

@@ -7,7 +7,9 @@
 //	hub healthcheck    ask a running hub on this host whether it is up (for container health checks)
 //	hub sites          run the sites module on its own (docs/hub/sites.md)
 //	hub seed           make organizations, tenants, teams and roles from a file (docs/hub/orgs.md, «Seeding»)
+//	hub doctor         check what the hub depends on: the extension adapters (docs/hub/extensions.md)
 //	hub machine-code   a registration code for a person's machine, without the page (AGENT_HUB_OBSERVE_FILE)
+//	hub schema snapshot   write the expected database schema (internal/hub/store/schema/*.json) for the migrations
 //	hub version
 package main
 
@@ -28,8 +30,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/api"
 	"github.com/ly-solutions/harnessly/internal/hub/buildinfo"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/diag"
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
-	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/web"
 )
 
@@ -57,7 +59,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	case "check-config":
 		cfg, err := config.Load(lookup)
 		if err != nil {
-			fmt.Fprintln(stderr, err)
+			fmt.Fprint(stderr, diag.Describe(configProblem(err)))
 			return 2
 		}
 		describe(stdout, cfg)
@@ -69,20 +71,26 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 		}
 		cfg, err := config.Load(lookup)
 		if err != nil {
-			fmt.Fprintln(stderr, err)
+			fmt.Fprint(stderr, diag.Describe(configProblem(err)))
 			return 2
 		}
 		if err := serve(ctx, cfg, nil, stderr); err != nil {
-			fmt.Fprintln(stderr, "hub:", err)
-			return 1
+			fmt.Fprint(stderr, "hub: ", diag.Describe(err))
+			return exitCode(err)
 		}
 		return 0
+	case "schema":
+		return runSchema(ctx, args, stdout, stderr)
 	case "sites":
 		return runSites(ctx, args, lookup, stdout, stderr)
+	case "storage":
+		return runStorage(ctx, args, lookup, stdout, stderr)
 	case "seed":
 		return runSeed(ctx, args, lookup, stdout, stderr)
 	case "env-seed":
 		return runEnvSeed(ctx, args, lookup, stdout, stderr)
+	case "doctor":
+		return runDoctor(ctx, args, lookup, stdout, stderr)
 	case "machine-code":
 		return runMachineCode(ctx, args, lookup, stdout, stderr)
 	case "help", "-h", "--help":
@@ -94,7 +102,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 }
 
-const usage = `usage: hub [serve | check-config | healthcheck | sites | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | machine-code --space <slug> --owner <email> [--profile p] | version]
+const usage = `usage: hub [serve | check-config | healthcheck | sites | storage migrate [--dry-run] [--remove-source] | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | doctor | schema snapshot [--dir d] [--postgres url] | machine-code --space <slug> --owner <email> [--profile p] | version]
 
 The hub is configured by HUB_* environment variables; see docs/hub/deploy.md.
 `
@@ -119,11 +127,19 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 	slog.SetDefault(log)
 
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
-		return fmt.Errorf("data folder: %w", err)
+		return &diag.Problem{Code: diag.DataDirError, What: "data folder " + cfg.DataDir, Err: err,
+			Fix: "HUB_DATA_DIR must exist or be makeable, and be writable by the user the hub runs as"}
 	}
-	db, err := store.Open(ctx, cfg.DatabaseURL)
+	// Connect first and migrate second, so the two failures get their own codes; StartupError stays reachable
+	// through Problem.Err for the exit code.
+	db, err := connectDB(ctx, cfg, log)
 	if err != nil {
-		return err
+		return &diag.Problem{Code: diag.DBUnreachable, What: "database", Err: err,
+			Fix: "check HUB_DATABASE_URL (host, port, user, password, database name) and that the database accepts connections from this machine"}
+	}
+	if err := db.Migrate(ctx); err != nil {
+		db.Close()
+		return &diag.Problem{Code: diag.MigrationsLeft, What: "migrations", Err: err, Fix: "the database user needs rights to change the schema; a failed migration left the database as it was (each runs in a transaction)"}
 	}
 	defer db.Close()
 
@@ -132,6 +148,8 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 		if mailer, err = mail.NewSMTP(cfg.SMTPURL, cfg.MailFrom); err != nil {
 			return err
 		}
+	} else if cfg.AuthEmailOff {
+		mailer = mail.Off{}
 	} else {
 		// config.Load refuses this already; a configuration built another way must not get a hub whose log is a mailbox.
 		if cfg.MailLogRefused() {
@@ -146,7 +164,8 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 
 	ln, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
-		return err
+		return &diag.Problem{Code: diag.PortBusy, What: "listening on " + cfg.Listen, Err: err,
+			Fix: "another process holds the port, or the user may not use it: change HUB_LISTEN or stop the other one (`ss -ltnp`)"}
 	}
 	srv := &http.Server{
 		Handler:           hub.Handler,
@@ -166,6 +185,9 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 	}
 	if !cfg.SubdomainMode() {
 		log.Warn("no HUB_RUNTIME_DOMAIN: a machine's page runs on the hub's own origin, with the signed-in person's session, so connect only machines you trust as much as the hub (docs/hub/deploy.md)")
+	}
+	if cfg.Signup == "invite" && len(cfg.AdminEmails) == 0 && !cfg.OIDCEmailTrusted {
+		log.Warn("HUB_SIGNUP=invite and no HUB_ADMIN_EMAILS: the first account becomes the administrator and must prove its email (an email code, GitHub); to take an OpenID Connect provider's address as proven set HUB_OIDC_EMAIL_TRUSTED=on, or name the administrator in HUB_ADMIN_EMAILS")
 	}
 	if mailer.Mode() == "log" {
 		if cfg.Secure || cfg.Edition == config.EditionCloud {
@@ -229,7 +251,9 @@ func describe(w io.Writer, cfg *config.Config) {
 	fmt.Fprintf(w, "listen         %s\n", cfg.Listen)
 	fmt.Fprintf(w, "edition        %s, sign-up %s\n", cfg.Edition, cfg.Signup)
 	fmt.Fprintf(w, "database       %s\n", dbKind(cfg))
-	if cfg.SMTPURL != "" {
+	if cfg.AuthEmailOff {
+		fmt.Fprintln(w, "email code     off (HUB_AUTH_EMAIL=off): sign-in only through OpenID Connect, GitHub, Yandex or the gateway; invitations are links")
+	} else if cfg.SMTPURL != "" {
 		fmt.Fprintln(w, "email code     mailed over SMTP")
 	} else {
 		fmt.Fprintln(w, "email code     written to the hub log (no HUB_SMTP_URL; accepted by HUB_MAIL_LOG=allow or plain http)")
@@ -252,6 +276,11 @@ func describe(w io.Writer, cfg *config.Config) {
 	}
 	for _, warning := range cfg.Warnings {
 		fmt.Fprintf(w, "WARNING        %s\n", warning)
+	}
+	if cfg.StorageS3() {
+		fmt.Fprintf(w, "files          s3 %s/%s (HUB_STORAGE=s3)\n", cfg.S3.Endpoint, cfg.S3.Bucket)
+	} else {
+		fmt.Fprintf(w, "files          the data folder %s (HUB_STORAGE=s3 moves them to a bucket)\n", cfg.DataDir)
 	}
 	describeSites(w, cfg)
 	fmt.Fprintf(w, "SSH install    %s\n", on(cfg.SSH))

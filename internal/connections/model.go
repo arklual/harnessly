@@ -208,6 +208,28 @@ type Query struct {
 	// Native is a query in the product's own language (JQL, CQL, YouTrack query); wins over the fields above.
 	Native string `json:"native,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
+	// State narrows merge requests: opened, merged, closed or all (the default).
+	State string `json:"state,omitempty"`
+}
+
+// MergeRequest is a merge request (pull request) of a code host in one format.
+type MergeRequest struct {
+	IID                 int       `json:"iid"`
+	Title               string    `json:"title"`
+	URL                 string    `json:"url"`
+	State               string    `json:"state"`
+	Draft               bool      `json:"draft"`
+	Project             string    `json:"project"`
+	SourceBranch        string    `json:"sourceBranch"`
+	Updated             time.Time `json:"updated,omitzero"`
+	DetailedMergeStatus string    `json:"detailedMergeStatus,omitempty"`
+	Pipeline            *Pipeline `json:"pipeline"`
+}
+
+// Pipeline is the CI run at the head of a merge request.
+type Pipeline struct {
+	Status string `json:"status"`
+	URL    string `json:"url"`
 }
 
 // LimitOr is the query's limit, or def when unset, capped at 200.

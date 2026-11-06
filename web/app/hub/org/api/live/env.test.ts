@@ -117,6 +117,24 @@ describe('liveEnv', () => {
     expect(seen[2]?.body).toEqual({ on: true, space: 'product' });
   });
 
+  it('changes the presets of a layer and a person picks one', async () => {
+    const p = { id: 'p1', name: 'Разработчик', hint: '', groupIds: ['g1'], position: 0 };
+    const seen = answer(200, { preset: p });
+    expect(
+      await liveEnv().envPresetAdd('acme', { layer: 'org', scopeId: 'o1', name: 'Разработчик' }),
+    ).toEqual(p);
+    await liveEnv().envPresetPatch('acme', 'p1', { groupIds: ['g1'] });
+    await liveEnv().envPresetRemove('acme', 'p1');
+    await liveEnv().envMinePreset('p1', 'product');
+    expect(seen.map((s) => `${s.method} ${s.url}`)).toEqual([
+      'POST /api/orgs/acme/env/presets',
+      'PATCH /api/orgs/acme/env/presets/p1',
+      'DELETE /api/orgs/acme/env/presets/p1',
+      'PUT /api/me/env/presets/p1',
+    ]);
+    expect(seen[3]?.body).toEqual({ space: 'product' });
+  });
+
   it('applies a layer on its machines', async () => {
     const seen = answer(200, { machines: 3, started: 2, waiting: 1 });
     const out = await liveEnv().envApply('acme', { layer: 'tenant', scopeId: 't1', when: 'now' });

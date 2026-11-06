@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/ly-solutions/harnessly/internal/mcpconn"
 )
 
 // A package on disk: the manifest plus the files it names. Every path the manifest names stays inside the package (no
@@ -48,6 +50,41 @@ type MCPServer struct {
 	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
+	// Connection makes the server the person's own connection (Settings → Connections, internal/mcpconn) from the
+	// catalog entry of that id: the address and the sign-in are the connection's, so a server with it names no url,
+	// headers or command. Nobody's token is in the package.
+	Connection string `json:"connection,omitempty"`
+}
+
+// connectionProblems is what is wrong with a server that names a connection: it is a remote one (http or sse) whose
+// address and sign-in come from the person's connection, so it brings no address, credentials or process of its own.
+func connectionProblems(s MCPServer) []string {
+	var out []string
+	if !mcpconn.KnownCatalogID(s.Connection) {
+		out = append(out, fmt.Sprintf("connection %q is not in the catalog of connections", s.Connection))
+	}
+	if s.Type != "" && s.Type != "http" && s.Type != "sse" {
+		out = append(out, "a server with a connection is remote: its type is http or sse")
+	}
+	if s.Command != "" || len(s.Args) > 0 || len(s.Env) > 0 {
+		out = append(out, "a server with a connection is a remote one: it has no command, args or env")
+	}
+	if s.URL != "" || len(s.Headers) > 0 {
+		out = append(out, "a server with a connection takes its address and sign-in from the connection: no url or headers")
+	}
+	return out
+}
+
+// Connections are the catalog ids of the connections the package's servers name, sorted, each once.
+func (p *Package) Connections() []string {
+	var out []string
+	for _, s := range p.MCP {
+		if s.Connection != "" && !slices.Contains(out, s.Connection) {
+			out = append(out, s.Connection)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // loads counts the full reads of a package (a test watches that a repeated call does not make another).
@@ -180,8 +217,10 @@ func (p *Package) checkFiles() Problems {
 		for i, s := range ag.Skills {
 			_, _ = p.stat(fmt.Sprintf("agent.skills[%d]", i), "skills/"+s+"/SKILL.md", &ps)
 		}
-		if ag.Validators != "" {
-			p.checkJSON("agent.validators", ag.Validators, &ps)
+		for i, v := range ag.Validators {
+			if strings.TrimSpace(v.Run) != "" {
+				_, _ = p.stat(fmt.Sprintf("agent.validators[%d].run", i), v.Run, &ps)
+			}
 		}
 		if ag.Flow != "" {
 			p.checkJSON("agent.flow", ag.Flow, &ps)
@@ -189,7 +228,22 @@ func (p *Package) checkFiles() Problems {
 	}
 
 	p.PluginParts = p.pluginParts()
+	if m.Agent != nil && len(m.Agent.Validators) > 0 {
+		// Local scripts on the agent's events: listed with the rights a person agrees to at install and update. (A
+		// package that is not trusted is refused by Check.)
+		ids := make([]string, 0, len(m.Agent.Validators))
+		for _, v := range m.Agent.Validators {
+			ids = append(ids, v.ID)
+		}
+		p.PluginParts = append(p.PluginParts, "agent.validators: "+strings.Join(ids, ", "))
+	}
 	for _, part := range p.PluginParts {
+		if strings.HasPrefix(part, "agent.validators:") {
+			if m.Trust == TrustTrusted {
+				warn("agent.validators", "this trusted app runs local scripts (%s) on the agent's events; they are listed with its rights", strings.TrimPrefix(part, "agent.validators: "))
+			}
+			continue
+		}
 		if m.Trust == TrustTrusted {
 			warn(part, "this trusted app carries %s, a part of a Claude Code plugin that runs on the agent's events or outside the app's rules; it is listed with its rights", part)
 		} else {
@@ -215,6 +269,10 @@ func (p *Package) checkFiles() Problems {
 				add(path, "%s is the host's own server: name yours otherwise", hostServer)
 			case s.Command != "" && m.Trust != TrustTrusted:
 				add(path, "a local server (command) needs trust trusted; a %s app uses remote servers (url)", m.Trust)
+			case s.Connection != "":
+				for _, why := range connectionProblems(s) {
+					add(path, "%s", why)
+				}
 			case s.Command == "" && !strings.HasPrefix(s.URL, "https://"):
 				add(path, "a remote server has an https:// url")
 			}

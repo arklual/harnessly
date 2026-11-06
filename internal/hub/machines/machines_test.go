@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
+	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
@@ -1071,5 +1072,18 @@ func TestMachinesGetTheAgentURL(t *testing.T) {
 	u, err := url.Parse(out.URL)
 	if err != nil || u.Scheme != "https" || u.Host != a.MachineID+".m.example.test:8443" {
 		t.Errorf("runtime url = %q (%v)", out.URL, err)
+	}
+}
+
+func TestDialURLKeepsThePathOfTheAgentAddress(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://example.com":            "wss://example.com/agent/v1",
+		"https://example.com/harnessly":  "wss://example.com/harnessly/agent/v1",
+		"https://example.com/harnessly/": "wss://example.com/harnessly/agent/v1",
+		"http://127.0.0.1:8040":          "ws://127.0.0.1:8040/agent/v1",
+	} {
+		if got := machines.DialURL(in); got != want {
+			t.Errorf("DialURL(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

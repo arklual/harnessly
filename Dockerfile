@@ -89,9 +89,15 @@ RUN apt-get update \
 # ffmpeg. They are in the image by default; --build-arg DESIGN_TOOLS=0 leaves them out (about 400 MB less). The board
 # engine is never in the image: each machine fetches it with its owner's own account (docs/design-engine.md).
 ARG DESIGN_TOOLS=1
+# The render kit is pinned (HRN-744): deploy/renderkit/versions.env holds the version patterns of Chromium, ffmpeg and the
+# fonts, and the image installs exactly those (`apt-get install pkg=PATTERN`); a pattern that no longer matches fails
+# the build instead of silently drawing with another Chromium. `harnessly doctor render` is the check (docs/render-kit.md).
+COPY deploy/renderkit/versions.env /usr/share/harnessly/render-kit.env
 RUN if [ "$DESIGN_TOOLS" = 1 ]; then \
-      apt-get update \
-   && apt-get install -y --no-install-recommends chromium ffmpeg xvfb x11vnc websockify fonts-liberation fonts-noto-color-emoji \
+      . /usr/share/harnessly/render-kit.env \
+   && apt-get update \
+   && apt-get install -y --no-install-recommends "chromium=${RENDER_KIT_CHROMIUM}" "ffmpeg=${RENDER_KIT_FFMPEG}" \
+        "fonts-liberation=${RENDER_KIT_FONTS_LIBERATION}" "fonts-noto-color-emoji=${RENDER_KIT_FONTS_EMOJI}" xvfb x11vnc websockify \
    && rm -rf /var/lib/apt/lists/*; \
     fi
 # A container gives an unprivileged user no namespaces for Chromium's own sandbox: the container is the boundary.

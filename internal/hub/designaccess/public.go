@@ -127,7 +127,7 @@ func (s *Service) guestToken(ctx context.Context, machine string, req hubproto.D
 	if tok.Token == "" || tok.Header == "" {
 		return tok, errors.New("machine gave no token")
 	}
-	until := time.Unix(tok.ExpiresAt, 0).Add(-tokenMargin)
+	until := time.UnixMilli(tok.ExpiresAt).Add(-tokenMargin)
 	if until.After(now) {
 		s.mu.Lock()
 		s.tokens[key] = cachedToken{tok: tok, until: until}

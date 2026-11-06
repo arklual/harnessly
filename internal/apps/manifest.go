@@ -13,10 +13,12 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // ManifestPath is where the manifest lives inside a package.
@@ -38,6 +40,25 @@ const (
 	TargetApp  = "app"
 )
 
+// The slots of the interface an extension fills: a view in a sandboxed frame at a place the page declares, or,
+// for branding, a few declared values. With the runtime's HARNESSLY_UI_SLOTS off the page shows none of them.
+const (
+	TargetSettings     = "settings"      // a page in the settings
+	TargetOnboarding   = "onboarding"    // a step of the first run
+	TargetObjectAction = "object-action" // a button at an object (a machine, a chat) that opens the view
+	TargetHubSettings  = "hub-settings"  // a page in the settings of a Hub
+	TargetBranding     = "branding"      // the product's name and accent; no view, see Branding
+)
+
+// SlotTargets are the targets above, in the order the docs name them.
+var SlotTargets = []string{TargetSettings, TargetOnboarding, TargetObjectAction, TargetHubSettings, TargetBranding}
+
+// IsSlot says whether a target is one of the slots.
+func IsSlot(target string) bool { return contains(SlotTargets, target) }
+
+// Objects an object-action view can sit at.
+var ObjectKinds = []string{"machine", "chat"}
+
 // Activations: how an app turns on.
 const (
 	OnManual   = "manual"
@@ -56,6 +77,7 @@ type Manifest struct {
 	Harnessly   string          `json:"harnessly"`
 	Trust       string          `json:"trust"`
 	Targets     []string        `json:"targets"`
+	Branding    *Branding       `json:"branding,omitempty"`
 	When        string          `json:"when,omitempty"`
 	Activation  *Activation     `json:"activation,omitempty"`
 	Permissions []string        `json:"permissions"`
@@ -99,9 +121,18 @@ type Agent struct {
 	MCP          []string      `json:"mcp,omitempty"`
 	Context      []ContextItem `json:"context,omitempty"`
 	Tools        *ToolPolicy   `json:"tools,omitempty"`
-	Validators   string        `json:"validators,omitempty"`
+	Validators   []Validator   `json:"validators,omitempty"`
 	Flow         string        `json:"flow,omitempty"`
 	Exclusive    bool          `json:"exclusive,omitempty"`
+}
+
+// Validator is a check of the agent's turn (validate.go): a script of the package that runs on PostToolUse or Stop.
+type Validator struct {
+	ID         string `json:"id"`
+	On         string `json:"on"`
+	Match      string `json:"match,omitempty"`
+	Run        string `json:"run"`
+	MaxRetries int    `json:"maxRetries,omitempty"`
 }
 
 // ContextItem is a source the agent reads on demand or gets on activation.
@@ -125,6 +156,22 @@ type View struct {
 	Entry   string   `json:"entry"`
 	Targets []string `json:"targets"`
 	Height  string   `json:"height,omitempty"`
+	// Label, Icon, Order and Objects are for the slots: the name on the settings entry, the step or the button (Title when
+	// empty), a name from the icon set, the place among its neighbours, and the kinds of object an object-action view is
+	// shown at (machine, chat; every kind when empty).
+	Label   string   `json:"label,omitempty"`
+	Icon    string   `json:"icon,omitempty"`
+	Order   int      `json:"order,omitempty"`
+	Objects []string `json:"objects,omitempty"`
+}
+
+// Branding is the product's name and accent as an app sets them, for the `branding` target. Declared values, no code: the
+// page takes the name for its title and the sign-in and the accent for its colour.
+type Branding struct {
+	Name       string `json:"name"`
+	Accent     string `json:"accent,omitempty"`     // #rrggbb
+	SupportURL string `json:"supportUrl,omitempty"` // https://
+	Tagline    string `json:"tagline,omitempty"`
 }
 
 // Chat is what the app adds to the chat.
@@ -194,7 +241,7 @@ var (
 
 // permissions are the rights an app may ask for; a parameterised one is written right:<value>.
 var permissions = map[string]bool{
-	"chat.prompt": true, "chat.read": true, "chat.card": true,
+	"chat.prompt": true, "chat.read": true, "chat.card": true, "agents.read": true,
 	"pane.open": true, "storage": true, "storage.space.write": true, "ai": true,
 	"sinopia.read": true, "sinopia.write": true, "sinopia.comment": true, "sinopia.export": true, "sinopia.kind": true,
 	"users.read": true, "notify": true,
@@ -310,12 +357,12 @@ func (m *Manifest) Check() Problems {
 
 	targets := map[string]bool{}
 	if len(m.Targets) == 0 {
-		add("targets", "is required: where the app works (chat, pane, app, sinopia.<kind>)")
+		add("targets", "is required: where the app works (chat, pane, app, settings, onboarding, object-action, hub-settings, branding, sinopia.<kind>)")
 	}
 	for i, t := range m.Targets {
 		path := fmt.Sprintf("targets[%d]", i)
 		if !validTarget(t) {
-			add(path, "%q is not a target: chat, pane, app, sinopia.<kind> or sinopia.*", t)
+			add(path, "%q is not a target: chat, pane, app, settings, onboarding, object-action, hub-settings, branding, sinopia.<kind> or sinopia.*", t)
 			continue
 		}
 		if targets[t] {
@@ -459,6 +506,37 @@ func (m *Manifest) Check() Problems {
 				}
 			}
 		}
+		if len(ag.Validators) > 0 && m.Trust != TrustTrusted {
+			add("agent.validators", "validators run local scripts and need trust trusted; a %s app may not have them", m.Trust)
+		}
+		seenV := map[string]bool{}
+		for i, v := range ag.Validators {
+			path := fmt.Sprintf("agent.validators[%d]", i)
+			if !kindRe.MatchString(v.ID) {
+				add(path+".id", "%q: a validator id is lower case latin letters, digits and '-'", v.ID)
+			} else if seenV[v.ID] {
+				add(path+".id", "%q is used twice", v.ID)
+			}
+			seenV[v.ID] = true
+			if v.On != ValidatorPostToolUse && v.On != ValidatorStop {
+				add(path+".on", "%q is not %s or %s", v.On, ValidatorPostToolUse, ValidatorStop)
+			}
+			if v.Match != "" {
+				if v.On != ValidatorPostToolUse {
+					add(path+".match", "only a %s validator has a match: a Stop validator checks the whole turn", ValidatorPostToolUse)
+				} else if why := checkToolPattern(v.Match); why != "" {
+					add(path+".match", "%q: %s", v.Match, why)
+				}
+			}
+			if strings.TrimSpace(v.Run) == "" {
+				add(path+".run", "is required: the script of the package that checks")
+			} else if filepath.IsAbs(v.Run) || strings.HasPrefix(v.Run, "/") || v.Run == ".." || strings.HasPrefix(filepath.ToSlash(filepath.Clean(v.Run)), "../") {
+				add(path+".run", "%q must lead to a file inside the package", v.Run)
+			}
+			if v.MaxRetries < 0 || v.MaxRetries > ValidatorMaxRetries {
+				add(path+".maxRetries", "%d is out of 1..%d (default %d)", v.MaxRetries, ValidatorMaxRetries, ValidatorDefaultRetries)
+			}
+		}
 		if ag.Flow != "" {
 			notYet("agent.flow")
 		}
@@ -501,7 +579,25 @@ func (m *Manifest) Check() Problems {
 				add(fmt.Sprintf("%s.targets[%d]", path, j), "%q is not in the app's targets", t)
 			}
 		}
+		for j, t := range v.Targets {
+			if t == TargetBranding {
+				add(fmt.Sprintf("%s.targets[%d]", path, j), "branding has no view: declare the `branding` block")
+			}
+		}
+		for j, o := range v.Objects {
+			if !contains(ObjectKinds, o) {
+				add(fmt.Sprintf("%s.objects[%d]", path, j), "%q is not an object kind: %s", o, strings.Join(ObjectKinds, ", "))
+			}
+		}
+		if len(v.Objects) > 0 && !contains(v.Targets, TargetObjectAction) {
+			add(path+".objects", "is for views of the object-action target")
+		}
+		if utf8.RuneCountInString(v.Label) > 40 {
+			add(path+".label", "is up to 40 characters")
+		}
 	}
+
+	m.checkBranding(targets, add)
 
 	// A target with nothing in it is a mistake: the app would show up where it does nothing.
 	for _, t := range sortedKeys(targets) {
@@ -550,6 +646,8 @@ func (m *Manifest) contributes(target string) bool {
 	switch {
 	case target == TargetChat:
 		return m.Agent != nil || m.Chat != nil
+	case target == TargetBranding:
+		return m.Branding != nil
 	case strings.HasPrefix(target, "sinopia."):
 		return len(m.Sinopia) > 0 || m.Agent != nil
 	}
@@ -593,12 +691,17 @@ func validTarget(t string) bool {
 	switch t {
 	case TargetChat, TargetPane, TargetApp, "sinopia.*":
 		return true
+	case TargetSettings, TargetOnboarding, TargetObjectAction, TargetHubSettings, TargetBranding:
+		return true
 	}
 	kind, ok := strings.CutPrefix(t, "sinopia.")
 	return ok && (kindRe.MatchString(kind) || appKindRe.MatchString(kind))
 }
 
-func hasViewTarget(targets map[string]bool) bool { return targets[TargetPane] || targets[TargetApp] }
+func hasViewTarget(targets map[string]bool) bool {
+	return targets[TargetPane] || targets[TargetApp] || targets[TargetSettings] || targets[TargetOnboarding] ||
+		targets[TargetObjectAction] || targets[TargetHubSettings]
+}
 
 func hasSinopia(targets map[string]bool) bool {
 	for t := range targets {
@@ -736,4 +839,29 @@ func HostAllows(raw []byte, host string) (ok bool, wanted string) {
 		return true, ""
 	}
 	return rng.Allows(host), text
+}
+
+var accentRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// checkBranding keeps the declared values plain: a short name, a colour, an https address.
+func (m *Manifest) checkBranding(targets map[string]bool, add func(path, format string, a ...any)) {
+	b := m.Branding
+	if b == nil {
+		return
+	}
+	if !targets[TargetBranding] {
+		add("branding", "needs the branding target in targets")
+	}
+	if n := utf8.RuneCountInString(strings.TrimSpace(b.Name)); n == 0 || n > 40 {
+		add("branding.name", "is required, up to 40 characters")
+	}
+	if b.Accent != "" && !accentRe.MatchString(b.Accent) {
+		add("branding.accent", "%q is not a colour #rrggbb", b.Accent)
+	}
+	if b.SupportURL != "" && !strings.HasPrefix(b.SupportURL, "https://") {
+		add("branding.supportUrl", "must be an https:// address")
+	}
+	if utf8.RuneCountInString(b.Tagline) > 120 {
+		add("branding.tagline", "is up to 120 characters")
+	}
 }

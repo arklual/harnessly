@@ -31,3 +31,9 @@ export const hxOn = (features: readonly string[] | undefined, search = location.
   if (pref === '1' && import.meta.env.DEV) return true;
   return (features ?? []).includes(HX_FEATURE);
 };
+
+/** The lively hub: the common motion on every screen, free periods, sortable tables, the tools screen. */
+export const HX_LIVE_FEATURE = 'ui.hx.live';
+
+export const liveOn = (features: readonly string[] | undefined): boolean =>
+  (features ?? []).includes(HX_LIVE_FEATURE);

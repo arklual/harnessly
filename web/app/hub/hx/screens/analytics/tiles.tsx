@@ -3,6 +3,7 @@
 import { type CSSProperties, memo, useMemo } from 'react';
 
 import type { Kpi, KpiGroup, KpiId } from '../../../org/api/analytics';
+import { Count } from '../../live';
 import { deltaOf, formatKpi, sparkPaths, SPARK_H, SPARK_W, wasText } from './calc';
 
 const GROUPS: { id: KpiGroup; title: string }[] = [
@@ -29,7 +30,7 @@ interface TileProps {
   onHover: (id: KpiId) => void;
 }
 
-const Tile = memo(({ kpi, index, selected, nowLabel, prevLabel, onPick, onHover }: TileProps) => {
+export const Tile = memo(({ kpi, index, selected, nowLabel, prevLabel, onPick, onHover }: TileProps) => {
   const delta = useMemo(() => deltaOf(kpi), [kpi]);
   const paths = useMemo(() => sparkPaths(kpi.series, kpi.prevSeries), [kpi.series, kpi.prevSeries]);
   const none = kpi.value === null;
@@ -47,7 +48,7 @@ const Tile = memo(({ kpi, index, selected, nowLabel, prevLabel, onPick, onHover 
       <span className="anm__t">{kpi.title}</span>
       <span className="anm__row">
         <span className="anm__v" data-none={none ? '1' : undefined}>
-          {formatKpi(kpi.format, kpi.value)}
+          <Count text={formatKpi(kpi.format, kpi.value)} />
         </span>
         <span className="anm__d" data-tone={delta.tone}>
           {delta.text}

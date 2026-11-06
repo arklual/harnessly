@@ -28,6 +28,17 @@ harnessly installer
   --wait SECONDS     how long to wait for the machine to link to the hub (default 60)
   --hub URL          the hub's address (default: the one this script was served by)
   --image IMAGE      the machine image of the container profile (default: the hub's)
+  --check            check this machine (system, tools, hub, CA, Docker) and install nothing
+  --ca-file FILE     PEM file with your company's CA certificates: downloads and every component trust it
+                     (SSL_CERT_FILE, NODE_EXTRA_CA_CERTS ...)
+  --proxy URL        HTTP(S) proxy for downloads and for every component
+  --no-proxy LIST    hosts that skip the proxy (127.0.0.1, localhost and the hub are always there)
+  --docker MODE      container profile: external (a daemon that already runs), own (this installer starts one
+                     for harnessly, as root) or auto (default: external if there is one, else own where it can)
+  --offline DIR      take the programs from a folder copied from the hub's /dl (scripts/make-offline-bundle.sh
+                     --hub URL) instead of downloading; the hub itself must still be reachable for the registration
+  --log FILE         journal of the steps (default: install.log in the machine's folder; written by --check and
+                     HARNESSLY_PREFLIGHT=1)
 EOF
 }
 
@@ -48,11 +59,22 @@ say() { printf '%s\n' "$(pick "$1" "$2")"; }
 step() {
 	STEP=$(pick "$1" "$2")
 	printf '==> %s\n' "$STEP"
+	jlog step "$STEP"
 }
-warn() { printf 'harnessly-install: %s\n' "$(pick "$1" "$2")" >&2; }
+warn() {
+	printf 'harnessly-install: %s\n' "$(pick "$1" "$2")" >&2
+	jlog warn "$(pick "$1" "$2")"
+}
 die() {
 	warn "$1" "$2"
+	jlog fail "$(pick "$1" "$2")"
 	exit 1
+}
+# jlog writes a line to the journal of the steps when it is on (--check, HARNESSLY_PREFLIGHT=1 or --log).
+jlog() {
+	[ "${JOURNAL:-0}" = 1 ] || return 0
+	mkdir -p "$(dirname "$LOG")" 2>/dev/null || return 0
+	printf '%s %-5s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" >>"$LOG" 2>/dev/null || true
 }
 # fail stops the installation, but only warns on a dry run: the plan goes on and shows what a real run would stop at.
 fail() {
@@ -78,6 +100,14 @@ parse_args() {
 	WAIT=60
 	IMAGE=${HARNESSLY_IMAGE:-}
 	HUB_URL=${HARNESSLY_HUB_URL:-}
+	CHECK=0
+	CA_FILE=${HARNESSLY_CA_FILE:-}
+	PROXY=${HARNESSLY_PROXY:-${HTTPS_PROXY:-${https_proxy:-}}}
+	NO_PROXY_EXTRA=${HARNESSLY_NO_PROXY:-}
+	DOCKER_MODE=${HARNESSLY_DOCKER:-auto}
+	OFFLINE=${HARNESSLY_OFFLINE:-}
+	LOG=${HARNESSLY_INSTALL_LOG:-}
+	PREFLIGHT=${HARNESSLY_PREFLIGHT:-0}
 	while [ $# -gt 0 ]; do
 		case $1 in
 		--*=*)
@@ -92,13 +122,20 @@ parse_args() {
 		--purge) PURGE=1 ;;
 		--re-register) REREGISTER=1 ;;
 		--update) UPDATE=1 ;;
+		--check) CHECK=1 ;;
 		-h | --help)
 			usage
 			exit 0
 			;;
-		--token | --profile | --name | --wait | --hub | --image)
+		--token | --profile | --name | --wait | --hub | --image | --ca-file | --proxy | --no-proxy | --docker | --offline | --log)
 			[ $# -ge 2 ] || die "$1 needs a value" "для $1 нужно значение"
 			case $1 in
+			--ca-file) CA_FILE=$2 ;;
+			--proxy) PROXY=$2 ;;
+			--no-proxy) NO_PROXY_EXTRA=$2 ;;
+			--docker) DOCKER_MODE=$2 ;;
+			--offline) OFFLINE=$2 ;;
+			--log) LOG=$2 ;;
 			--token) TOKEN=$2 ;;
 			--profile) PROFILE=$2 ;;
 			--name) NAME=$2 ;;
@@ -129,12 +166,19 @@ validate_args() {
 	case $NAME in *[[:cntrl:]]*) die "--name has control characters" "в --name есть управляющие символы" ;; esac
 	[ "${#NAME}" -le 100 ] || die "--name is longer than 100 characters" "--name длиннее 100 символов"
 	case $IMAGE in *[!A-Za-z0-9:/._@+-]*) die "--image has odd characters" "в --image странные символы" ;; esac
+	case $DOCKER_MODE in external | own | auto) ;; *) die "--docker must be external, own or auto" "--docker должен быть external, own или auto" ;; esac
+	if [ "$CHECK" = 1 ]; then
+		[ -n "$PROFILE" ] || PROFILE=dir
+		[ -n "$TOKEN" ] || TOKEN=check
+	fi
 	if [ "$UPDATE" = 1 ] && [ -z "$PROFILE" ]; then PROFILE=$(installed_profile); fi
 	case $PROFILE in
 	dir | container | full) ;;
-	'') [ "$UPDATE" = 1 ] && die "no harnessly install found on this machine: take the command with a code from the hub" \
-		"на этой машине нет установки harnessly: возьмите в хабе команду с кодом"
-		[ "$UNINSTALL" = 1 ] || die "--profile dir, container or full is required" "нужен --profile dir, container или full" ;;
+	'')
+		[ "$UPDATE" = 1 ] && die "no harnessly install found on this machine: take the command with a code from the hub" \
+			"на этой машине нет установки harnessly: возьмите в хабе команду с кодом"
+		[ "$UNINSTALL" = 1 ] || die "--profile dir, container or full is required" "нужен --profile dir, container или full"
+		;;
 	*) die "--profile must be dir, container or full" "--profile должен быть dir, container или full" ;;
 	esac
 	# An update keeps the registration (register --reuse does not look at the code): any code passes the checks.
@@ -282,6 +326,14 @@ load_manifest() {
 
 # fetch downloads a URL to a file.
 fetch() {
+	if [ -n "${OFFLINE:-}" ]; then
+		case $1 in
+		"$HUB_URL"/dl/*)
+			cp "$OFFLINE/${1#"$HUB_URL"/dl/}" "$2"
+			return
+			;;
+		esac
+	fi
 	if command -v curl >/dev/null 2>&1; then
 		curl -fsSL --retry 3 --connect-timeout 15 -o "$2" "$1"
 	elif command -v wget >/dev/null 2>&1; then
@@ -567,6 +619,7 @@ runtime_env() {
 	printf 'AGENT_POLICY_FILE=%s\n' "$POLICY"
 	if [ "$PROFILE" = dir ]; then printf 'HARNESSLY_BASEPKG_STATE=%s\n' "$BASEPKG_STATE"; fi
 	if [ -n "${TMUX_DIR:-}" ]; then printf 'TMUX_TMPDIR=%s\n' "$TMUX_DIR"; fi
+	net_lines
 }
 
 agent_env() {
@@ -576,6 +629,7 @@ agent_env() {
 	printf 'AGENT_POLICY_FILE=%s\n' "$POLICY"
 	printf 'AGENT_WORK_DIR=%s\n' "$WORK_DIR"
 	if [ -n "${TMUX_DIR:-}" ]; then printf 'TMUX_TMPDIR=%s\n' "$TMUX_DIR"; fi
+	net_lines
 }
 
 write_policy() {
@@ -704,6 +758,44 @@ done_message() {
 # profiles only say what is missing. HARNESSLY_DESIGN_TOOLS=0 skips both. The board engine is built in; the vendor's
 # optional one is never installed from here: the owner fetches it with their own account (harnessly design engine fetch).
 
+# The render kit's pins: the same values as deploy/renderkit/versions.env (a test keeps them equal). The hub
+# serves this script alone, so it carries them. They are apt version patterns; dnf and pacman have no such pins, and
+# there the installer only names what is missing. `harnessly doctor render` says whether the result draws.
+# shellcheck disable=SC2034 # REV is read by people and by the test, not by the script
+kit_pins() {
+	RENDER_KIT_REV='1'
+	RENDER_KIT_DEBIAN='bookworm'
+	RENDER_KIT_CHROMIUM='156.*'
+	RENDER_KIT_FFMPEG='7:5.1.*'
+	RENDER_KIT_FONTS_LIBERATION='1:1.07.4-*'
+	RENDER_KIT_FONTS_EMOJI='2.042-*'
+}
+
+# kit_pin_apt turns the wanted package names into apt arguments: the packages of the kit get their pinned version when
+# this is the Debian release the pins are for (/etc/os-release, or the file in HARNESSLY_OS_RELEASE), anything else is installed unpinned and is only checked.
+kit_pin_apt() {
+	kit_pins
+	_debian=
+	_osr=${HARNESSLY_OS_RELEASE:-/etc/os-release}
+	if [ -r "$_osr" ]; then
+		# shellcheck disable=SC1090
+		_debian=$( (. "$_osr"; [ "${ID:-}" = debian ] && echo "${VERSION_CODENAME:-}") 2>/dev/null || true)
+	fi
+	_out=
+	for _p in "$@"; do
+		if [ "$_debian" = "$RENDER_KIT_DEBIAN" ]; then
+			case "$_p" in
+			chromium) _p="chromium=$RENDER_KIT_CHROMIUM" ;;
+			ffmpeg) _p="ffmpeg=$RENDER_KIT_FFMPEG" ;;
+			fonts-liberation) _p="fonts-liberation=$RENDER_KIT_FONTS_LIBERATION" ;;
+			fonts-noto-color-emoji) _p="fonts-noto-color-emoji=$RENDER_KIT_FONTS_EMOJI" ;;
+			esac
+		fi
+		_out="$_out $_p"
+	done
+	echo "${_out# }"
+}
+
 has_chrome() {
 	for _c in chromium chromium-browser google-chrome google-chrome-stable; do
 		command -v "$_c" >/dev/null 2>&1 && return 0
@@ -714,7 +806,7 @@ has_chrome() {
 design_tools() {
 	[ "${HARNESSLY_DESIGN_TOOLS:-1}" != 0 ] || return 0
 	_want=
-	has_chrome || _want="$_want chromium"
+	has_chrome || _want="$_want chromium fonts-liberation fonts-noto-color-emoji"
 	command -v ffmpeg >/dev/null 2>&1 || _want="$_want ffmpeg"
 	command -v Xvfb >/dev/null 2>&1 || _want="$_want xvfb"
 	command -v x11vnc >/dev/null 2>&1 || _want="$_want x11vnc"
@@ -728,8 +820,8 @@ design_tools() {
 	fi
 	say "Installing for designs and the remote browser: $_want (HARNESSLY_DESIGN_TOOLS=0 skips)" "Ставим для макетов и удалённого браузера: $_want (HARNESSLY_DESIGN_TOOLS=0 — пропустить)"
 	if command -v apt-get >/dev/null 2>&1; then
-		# shellcheck disable=SC2086 # the names are words
-		{ X apt-get update && X env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $_want; } ||
+		# shellcheck disable=SC2086,SC2046 # the names are words
+		{ X apt-get update && X env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $(kit_pin_apt $_want); } ||
 			warn "could not install $_want: designs work without it" "не удалось поставить $_want: макеты работают и без этого"
 	elif command -v dnf >/dev/null 2>&1; then
 		# shellcheck disable=SC2086
@@ -1167,22 +1259,223 @@ install_full() {
 	done_message
 }
 
-# --- profile container --------------------------------------------------------------------------------------------
+# --- the network: CA, proxy --------------------------------------------------------------------------------------
 
-# engine sets ENGINE to the container command this account can use, with sudo in front when it needs it.
-find_engine() {
-	ENGINE=
+# net_setup exports the company's CA and proxy for this script's own downloads and builds the lists every component gets
+# (net_lines for the env files, net_run_args for the container profile). Without any of the options nothing changes.
+net_setup() {
+	NO_PROXY_ALL=
+	if [ -n "$CA_FILE" ]; then
+		case $CA_FILE in *[!A-Za-z0-9:/._@%+~=,-]*) die "--ca-file has odd characters in its path" "в пути --ca-file странные символы" ;; esac
+		[ -r "$CA_FILE" ] || die "--ca-file $CA_FILE is not a readable file" "--ca-file $CA_FILE не читается"
+		grep -q 'BEGIN CERTIFICATE' "$CA_FILE" || die "--ca-file $CA_FILE has no PEM certificate in it" "в --ca-file $CA_FILE нет PEM-сертификата"
+		case $CA_FILE in /*) ;; *) CA_FILE=$(cd "$(dirname "$CA_FILE")" && pwd)/$(basename "$CA_FILE") ;; esac
+		export SSL_CERT_FILE="$CA_FILE" NODE_EXTRA_CA_CERTS="$CA_FILE" CURL_CA_BUNDLE="$CA_FILE" GIT_SSL_CAINFO="$CA_FILE" REQUESTS_CA_BUNDLE="$CA_FILE"
+	fi
+	if [ -n "$PROXY" ]; then
+		case $PROXY in *[!A-Za-z0-9:/._@%+~=,-]*) die "--proxy has odd characters" "в --proxy странные символы" ;; esac
+		export HTTPS_PROXY="$PROXY" HTTP_PROXY="$PROXY" https_proxy="$PROXY" http_proxy="$PROXY"
+	fi
+	case $NO_PROXY_EXTRA in *[!A-Za-z0-9:/._@%+~=,-]*) die "--no-proxy has odd characters" "в --no-proxy странные символы" ;; esac
+	if [ -n "$CA_FILE$PROXY$NO_PROXY_EXTRA" ]; then
+		_hubhost=${HUB_URL#*://}
+		_hubhost=${_hubhost%%/*}
+		_hubhost=${_hubhost%%:*}
+		NO_PROXY_ALL=127.0.0.1,localhost,::1
+		[ -z "$_hubhost" ] || NO_PROXY_ALL=$NO_PROXY_ALL,$_hubhost
+		[ -z "${NO_PROXY:-}" ] || NO_PROXY_ALL=$NO_PROXY_ALL,$NO_PROXY
+		[ -z "$NO_PROXY_EXTRA" ] || NO_PROXY_ALL=$NO_PROXY_ALL,$NO_PROXY_EXTRA
+		export NO_PROXY="$NO_PROXY_ALL" no_proxy="$NO_PROXY_ALL"
+	fi
+}
+
+# net_lines prints KEY=VALUE lines of what the company's network needs, the same for every component; nothing when
+# no option was given.
+net_lines() {
+	[ -n "$CA_FILE$PROXY$NO_PROXY_EXTRA" ] || return 0
+	if [ -n "$CA_FILE" ]; then
+		for _v in SSL_CERT_FILE NODE_EXTRA_CA_CERTS CURL_CA_BUNDLE GIT_SSL_CAINFO REQUESTS_CA_BUNDLE; do printf '%s=%s\n' "$_v" "$CA_FILE"; done
+	fi
+	if [ -n "$PROXY" ]; then
+		for _v in HTTPS_PROXY HTTP_PROXY https_proxy http_proxy; do printf '%s=%s\n' "$_v" "$PROXY"; done
+	fi
+	printf 'NO_PROXY=%s\nno_proxy=%s\n' "$NO_PROXY_ALL" "$NO_PROXY_ALL"
+}
+
+# net_run_args prints the options of "docker run" that give a container the same: the CA file is mounted read-only.
+net_run_args() {
+	[ -n "$CA_FILE$PROXY$NO_PROXY_EXTRA" ] || return 0
+	if [ -n "$CA_FILE" ]; then printf ' -v %s:/etc/harnessly/ca.pem:ro,z' "$CA_FILE"; fi
+	net_lines | while IFS='=' read -r _k _v; do
+		case $_k in
+		SSL_CERT_FILE | NODE_EXTRA_CA_CERTS | CURL_CA_BUNDLE | GIT_SSL_CAINFO | REQUESTS_CA_BUNDLE) _v=/etc/harnessly/ca.pem ;;
+		esac
+		printf ' -e %s=%s' "$_k" "$_v"
+	done
+}
+
+# --- checks before installing ---------------------------------------------------------------------------------
+
+pf_ok() {
+	printf '  ok    %s\n' "$(pick "$1" "$2")"
+	jlog ok "$(pick "$1" "$2")"
+}
+pf_info() {
+	printf '  info  %s\n' "$(pick "$1" "$2")"
+	jlog info "$(pick "$1" "$2")"
+}
+pf_warn() {
+	printf '  warn  %s\n' "$(pick "$1" "$2")"
+	jlog warn "$(pick "$1" "$2")"
+}
+pf_fail() {
+	printf '  FAIL  %s\n' "$(pick "$1" "$2")"
+	jlog fail "$(pick "$1" "$2")"
+	PF_FAIL=1
+}
+
+# docker_state says what the container profile can have here: external (a daemon answers for this account), own (none
+# does, but this installer can start one: dockerd is installed and we are root), or none.
+docker_state() {
+	DOCKER_STATE=none
 	for _e in docker podman; do
 		command -v "$_e" >/dev/null 2>&1 || continue
-		if "$_e" info >/dev/null 2>&1; then
-			ENGINE=$_e
-			return 0
-		fi
-		if command -v sudo >/dev/null 2>&1 && sudo -n "$_e" info >/dev/null 2>&1; then
-			ENGINE="sudo -n $_e"
+		if "$_e" info >/dev/null 2>&1 || { command -v sudo >/dev/null 2>&1 && sudo -n "$_e" info >/dev/null 2>&1; }; then
+			DOCKER_STATE=external
 			return 0
 		fi
 	done
+	if [ -S "$OWN_SOCK" ] && docker -H "unix://$OWN_SOCK" info >/dev/null 2>&1; then
+		DOCKER_STATE=external
+		return 0
+	fi
+	if command -v dockerd >/dev/null 2>&1 && [ "$(id -u)" = 0 ]; then DOCKER_STATE=own; fi
+	return 0
+}
+
+preflight() {
+	PF_FAIL=0
+	step "Checking this machine" "Проверяем машину"
+	pf_ok "system: $OS/$ARCH" "система: $OS/$ARCH"
+	if command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; then
+		pf_ok "curl or wget is installed" "curl или wget есть"
+	else pf_fail "curl or wget is needed" "нужен curl или wget"; fi
+	if command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1; then
+		pf_ok "a sha256 tool is installed" "программа для sha256 есть"
+	else pf_fail "sha256sum, shasum or openssl is needed" "нужен sha256sum, shasum или openssl"; fi
+	for _t in tmux git; do
+		if command -v "$_t" >/dev/null 2>&1; then
+			pf_ok "$_t is installed" "$_t установлен"
+		elif [ -n "$OFFLINE" ]; then
+			pf_warn "$_t is missing; with --offline install it from your own package source" "$_t нет; при --offline поставьте его из своего источника пакетов"
+		else
+			pf_info "$_t is missing; the installer adds it where it can" "$_t нет; установщик поставит его, где сможет"
+		fi
+	done
+	if [ "$(id -u)" = 0 ]; then
+		pf_ok "running as root" "запуск от root"
+	elif [ "$PROFILE" = dir ]; then
+		if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+			pf_ok "sudo works without a password" "sudo работает без пароля"
+		else pf_fail "profile dir needs root once: run as root or with passwordless sudo" "профилю dir нужен root один раз: запустите от root или через sudo без пароля"; fi
+	fi
+	if [ -n "$CA_FILE" ]; then pf_ok "CA file: $CA_FILE" "файл CA: $CA_FILE"; fi
+	if [ -n "$PROXY" ]; then pf_ok "proxy: $PROXY (NO_PROXY: $NO_PROXY_ALL)" "прокси: $PROXY (NO_PROXY: $NO_PROXY_ALL)"; fi
+	_rc=0
+	_err="${TMPDIR:-/tmp}/harnessly-pf.$$"
+	if [ -n "$OFFLINE" ]; then
+		if [ -f "$OFFLINE/manifest.json" ]; then
+			pf_ok "offline folder: $OFFLINE has manifest.json" "офлайн-папка: в $OFFLINE есть manifest.json"
+		else pf_fail "offline folder: $OFFLINE/manifest.json is missing" "офлайн-папка: нет $OFFLINE/manifest.json"; fi
+	fi
+	if command -v curl >/dev/null 2>&1; then
+		curl -sS -o /dev/null -I --max-time 20 "$HUB_URL/dl/manifest.json" 2>"$_err" || _rc=$?
+		case $_rc in
+		0) pf_ok "the hub answers: $HUB_URL" "хаб отвечает: $HUB_URL" ;;
+		60 | 35 | 51 | 58 | 77) pf_fail "the hub's certificate is not trusted (curl $_rc): give your company's CA with --ca-file" "сертификату хаба нет доверия (curl $_rc): укажите корпоративный CA через --ca-file" ;;
+		5 | 6 | 7 | 28) pf_fail "the hub is not reachable (curl $_rc): check the address, --proxy and --no-proxy" "хаб недоступен (curl $_rc): проверьте адрес, --proxy и --no-proxy" ;;
+		*) pf_warn "the hub answered with an error (curl $_rc)" "хаб ответил ошибкой (curl $_rc)" ;;
+		esac
+		rm -f "$_err"
+	fi
+	case $PROFILE in
+	container)
+		docker_state
+		case $DOCKER_STATE in
+		external) pf_ok "Docker: a daemon that is already running answers for this account (external)" "Docker: для этого аккаунта отвечает уже работающий демон (внешний)" ;;
+		own)
+			if [ "$DOCKER_MODE" = external ]; then
+				pf_fail "Docker: no running daemon, and --docker external was asked" "Docker: нет работающего демона, а запрошен --docker external"
+			else pf_ok "Docker: no daemon is running; dockerd is installed and the installer can start its own" "Docker: демона нет; dockerd установлен, установщик поднимет свой"; fi
+			;;
+		*) pf_fail "Docker: no daemon answers and there is no way to start one (needs root and dockerd): install Docker or run as root" "Docker: демон не отвечает, а поднять свой нельзя (нужны root и dockerd): установите Docker или запустите от root" ;;
+		esac
+		if [ -z "$IMAGE" ]; then pf_fail "no machine image: this hub has none (give --image)" "нет образа машины: у этого хаба его нет (укажите --image)"; fi
+		;;
+	dir | full)
+		if [ "$OS" = linux ]; then
+			if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+				pf_ok "systemd is running" "systemd работает"
+			else pf_fail "profile $PROFILE needs systemd; in a container without it use profile container on a host with Docker" "профилю $PROFILE нужен systemd; в контейнере без него используйте профиль container на хосте с Docker"; fi
+		fi
+		;;
+	esac
+	[ "$PF_FAIL" = 0 ] || die "the machine is not ready (see FAIL above); nothing was installed" "машина не готова (см. FAIL выше); ничего не установлено"
+	say "    ready" "    готово"
+}
+
+# --- profile container --------------------------------------------------------------------------------------------
+
+# find_engine sets ENGINE to the container command this account can use, with sudo in front when it needs it: a daemon
+# that is running already (external), or the installer's own (its socket under OWN_DIR). With the argument "start" and
+# no daemon, --docker own|auto starts its own.
+find_engine() {
+	ENGINE=
+	if [ "$DOCKER_MODE" != own ]; then
+		for _e in docker podman; do
+			command -v "$_e" >/dev/null 2>&1 || continue
+			if "$_e" info >/dev/null 2>&1; then
+				ENGINE=$_e
+				return 0
+			fi
+			if command -v sudo >/dev/null 2>&1 && sudo -n "$_e" info >/dev/null 2>&1; then
+				ENGINE="sudo -n $_e"
+				return 0
+			fi
+		done
+	fi
+	if [ -S "$OWN_SOCK" ] && docker -H "unix://$OWN_SOCK" info >/dev/null 2>&1; then
+		ENGINE="docker -H unix://$OWN_SOCK"
+		return 0
+	fi
+	[ "${1:-}" = start ] && [ "$DOCKER_MODE" != external ] || return 1
+	start_own_engine
+}
+
+# start_own_engine starts a Docker daemon of the installer's own (needs root and dockerd): its own socket and data folder,
+# so that it never touches a daemon the host may start later. Run the installer again after a reboot to start it.
+start_own_engine() {
+	command -v dockerd >/dev/null 2>&1 && [ "$(id -u)" = 0 ] || return 1
+	if [ "$DRY" = 1 ]; then
+		plan "start its own Docker daemon: dockerd --host unix://$OWN_SOCK --data-root $OWN_DIR/data"
+		ENGINE="docker -H unix://$OWN_SOCK"
+		return 0
+	fi
+	step "Starting its own Docker daemon" "Поднимаем собственный демон Docker"
+	mkdir -p "$OWN_DIR"
+	nohup dockerd --host "unix://$OWN_SOCK" --data-root "$OWN_DIR/data" --exec-root "$OWN_DIR/run" \
+		--pidfile "$OWN_DIR/dockerd.pid" >>"$OWN_DIR/dockerd.log" 2>&1 &
+	_i=0
+	while [ "$_i" -lt 30 ]; do
+		if docker -H "unix://$OWN_SOCK" info >/dev/null 2>&1; then
+			ENGINE="docker -H unix://$OWN_SOCK"
+			return 0
+		fi
+		sleep 1
+		_i=$((_i + 1))
+	done
+	warn "its own Docker daemon did not start in 30 seconds; see $OWN_DIR/dockerd.log" \
+		"собственный демон Docker не поднялся за 30 секунд; смотрите $OWN_DIR/dockerd.log"
 	return 1
 }
 
@@ -1221,11 +1514,12 @@ hostname_of() {
 
 install_container() {
 	step "Checking the system" "Проверяем систему"
-	if ! find_engine; then
+	if ! find_engine start; then
 		if [ "$DRY" = 1 ]; then ENGINE=docker; fi
-		fail "Docker or Podman is needed, and this account must be able to use it (the docker group, or run as root)" \
-			"нужен Docker или Podman, и этот аккаунт должен уметь им пользоваться (группа docker или root)"
+		fail "Docker or Podman is needed, and this account must be able to use it (the docker group, or run as root); with root and dockerd installed, the installer starts its own (--docker own)" \
+			"нужен Docker или Podman, и этот аккаунт должен уметь им пользоваться (группа docker или root); от root и с установленным dockerd установщик поднимет свой (--docker own)"
 	fi
+	NETARGS=$(net_run_args)
 	layout_container
 	[ -n "$IMAGE" ] || fail "this hub has no machine image configured: the container profile is off (or give --image)" \
 		"в этом хабе не настроен образ машины: профиль container выключен (или укажите --image)"
@@ -1246,7 +1540,8 @@ install_container() {
 		if ! eng volume inspect "$VOLUME" >/dev/null 2>&1; then track volume "$VOLUME"; fi
 		eng volume create "$VOLUME" >/dev/null
 		# shellcheck disable=SC2086 # _force is a flag
-		eng run --rm --hostname "$_host" -v "$VOLUME:/home/agent" -v "$TMP/code:/run/harnessly-register-code:ro,z" \
+		# shellcheck disable=SC2086 # NETARGS is a list of options
+		eng run --rm $NETARGS --hostname "$_host" -v "$VOLUME:/home/agent" -v "$TMP/code:/run/harnessly-register-code:ro,z" \
 			--entrypoint harnessly-agent "$IMAGE" register --hub "$HUB_URL" --code-file /run/harnessly-register-code \
 			--profile container --via container $_force ${NAME:+--name "$NAME"} ||
 			die "the hub did not accept the registration (see above); get a new command in the hub" \
@@ -1263,7 +1558,8 @@ install_container() {
 	else
 		eng rm -f "$CONTAINER" >/dev/null 2>&1 || true
 	fi
-	engx run -d --name "$CONTAINER" --hostname "$_host" --restart unless-stopped -v "$VOLUME:/home/agent" "$IMAGE"
+	# shellcheck disable=SC2086 # NETARGS is a list of options
+	engx run -d $NETARGS --name "$CONTAINER" --hostname "$_host" --restart unless-stopped -v "$VOLUME:/home/agent" "$IMAGE"
 	wait_linked_container
 	done_message
 }
@@ -1574,6 +1870,18 @@ main() {
 	trap 'exit 143' TERM
 	detect_platform
 	validate_args
+	net_setup
+	JOURNAL=0
+	if [ "$CHECK" = 1 ] || [ "$PREFLIGHT" = 1 ] || [ -n "$LOG" ]; then JOURNAL=1; fi
+	[ -n "$LOG" ] || LOG=$ROOT${HOME:-/root}/.harnessly/install.log
+	jlog start "install.sh profile=$PROFILE $OS/$ARCH"
+	OWN_DIR=${HOME:-/root}/.harnessly/docker
+	OWN_SOCK=$OWN_DIR/docker.sock
+	if [ "$CHECK" = 1 ]; then
+		preflight
+		return 0
+	fi
+	if [ "$PREFLIGHT" = 1 ]; then preflight; fi
 	if [ "$DRY" = 1 ]; then say "Dry run: nothing will be changed." "Пробный запуск: ничего не будет изменено."; fi
 	if [ "$UNINSTALL" = 1 ]; then
 		do_uninstall

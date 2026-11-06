@@ -79,7 +79,7 @@ func TestSafeRoutesSocketCallerProjectIsolation(t *testing.T) {
 	headerFile := write("request.headers", []byte("X-CLI-Token: "+token+"\nContent-Type: application/json\n"))
 	d := deps{DataDir: dir, CLI: &gate.CLIToken{DataDir: dir, Headers: []string{"X-CLI-Token"}},
 		SessionOK: func(*http.Request) bool { return false }}
-	sf := &safe{store: secrets.Open(filepath.Join(dir, "safe"), filepath.Join(dir, "state", "safe.key")),
+	sf := &safe{store: &secrets.Safe{Local: secrets.Open(filepath.Join(dir, "safe"), filepath.Join(dir, "state", "safe.key"))},
 		asks: secrets.NewAsks(), files: secrets.NewFiles(filepath.Join(dir, "files"))}
 	t.Cleanup(sf.files.Close)
 	for _, name := range []string{"scoped-a", "scoped-b", "legacy-key"} {

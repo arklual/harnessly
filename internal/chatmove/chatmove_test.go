@@ -3,6 +3,7 @@ package chatmove
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -548,5 +549,63 @@ func TestHandlerSteps(t *testing.T) {
 	}
 	if w := call("POST", "/api/v2/move/export", `{"opId":"op-y","conversationId":"tab-src"}`); w.Code != http.StatusConflict {
 		t.Fatalf("a moved chat was exported: %d", w.Code)
+	}
+}
+
+// A hub that knows no machine's secret carries a bundle under a one-time key of the operation: the source makes it for
+// the target directly, the target opens it with the same key, and a wrong key or another operation does not open it.
+func TestOneTimeKeyCarriesABundleWithoutThePairsSecrets(t *testing.T) {
+	base := t.TempDir()
+	src := service(t, newFake(""), secretA)
+	dst := service(t, newFake(""), secretB, base)
+	key := base64.StdEncoding.EncodeToString([]byte("one-time-key-one-time-key-000001"))
+	h := src.Handler()
+	post := func(path, body string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("POST", path, bytes.NewBufferString(body)))
+		return w
+	}
+	if w := post("/api/v2/move/export", `{"opId":"op-k","conversationId":"tab-src","withoutFiles":true,"key":"short"}`); w.Code != http.StatusBadRequest {
+		t.Fatalf("a short key was taken: %d", w.Code)
+	}
+	w := post("/api/v2/move/export", `{"opId":"op-k","conversationId":"tab-src","withoutFiles":true,"key":"`+key+`"}`)
+	var exp ExportResponse
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &exp) != nil {
+		t.Fatalf("export %d %s", w.Code, w.Body)
+	}
+	req := ImportRequest{OpID: "op-k", BundleEnc: exp.BundleEnc, Provider: "claude", Model: ModelRef{ID: "opus"}, WithoutFiles: true}
+	bad := req
+	bad.Key = base64.StdEncoding.EncodeToString([]byte("another-key-another-key-00000002"))
+	if _, ref := dst.Import(context.Background(), bad); ref == nil || ref.Code != CodeBadBundle {
+		t.Fatalf("a wrong key opened the bundle: %+v", ref)
+	}
+	if _, ref := dst.Import(context.Background(), req); ref == nil {
+		t.Fatal("the pair's secret opened a bundle made under a one-time key")
+	}
+	req.Key = key
+	if out, ref := dst.Import(context.Background(), req); ref != nil || out.ConversationID == "" {
+		t.Fatalf("import under the key: %+v %+v", out, ref)
+	}
+}
+
+func TestStatusStepSaysWhereASealedChatWent(t *testing.T) {
+	s := service(t, newFake(""), secretA)
+	h := s.Handler()
+	moved := func() string {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("POST", "/api/v2/move/status", bytes.NewBufferString(`{"conversationId":"tab-src"}`)))
+		if w.Code != 200 {
+			t.Fatalf("status %d", w.Code)
+		}
+		return strings.TrimSpace(w.Body.String())
+	}
+	if got := moved(); got != `{"moved":null}` {
+		t.Fatalf("before: %s", got)
+	}
+	if ref := s.Seal("op-s", "tab-src", Pointer{MachineID: "vm2", Name: "B", ConversationID: "tab-n"}); ref != nil {
+		t.Fatal(ref)
+	}
+	if got := moved(); !strings.Contains(got, `"machineId":"vm2"`) || !strings.Contains(got, `"conversationId":"tab-n"`) {
+		t.Fatalf("after: %s", got)
 	}
 }

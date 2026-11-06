@@ -435,7 +435,7 @@ func (s *Service) tryDraft(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		spaceID, teamID = q.w.tenantOf(in.Layer, in.ScopeID), in.ScopeID
 	}
 	// The list is the one a machine of the layer holds, with the setup kinds: the same function the pusher uses.
-	items := MachineItems(world, spaceID, teamID, p.User.ID, true, true) // the asker's choices: they try what they would get
+	items := MachineItems(world, spaceID, teamID, p.User.ID, true, All) // the asker's choices: they try what they would get
 	by := cmp.Or(p.User.Name, p.User.Email)
 	runID, err := s.startRun(r.Context(), q.w.org.ID, m, hubproto.RunSandbox, items, by)
 	if err != nil {

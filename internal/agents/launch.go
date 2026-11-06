@@ -30,6 +30,10 @@ type Launch struct {
 	// instructions and tool policy. They stay on the tab and change when the person turns one on or off; the agent
 	// takes the change when it starts next.
 	Apps []string `json:"apps,omitempty"`
+	// Conversation is the chat this launch is for. The runtime sets it when it starts or resumes the agent, and it is not
+	// kept on the tab: the apps' launch records it in the launch's own folder (internal/apps), where the guard's journal
+	// reads which chat a launch belongs to. Empty when the runtime does not know the chat at that point.
+	Conversation string `json:"-"`
 }
 
 // AppIDRe: an app id goes into file names and the launch line, so it stays this strict (internal/apps checks the same).
@@ -40,6 +44,41 @@ type AppLauncher interface {
 	// Claude is what a Claude Code chat with the apps adds: settingsPath is the `--settings` file the launch would use
 	// without them, which the apps' file extends.
 	Claude(ids []string, settingsPath string) (ClaudeApps, error)
+	// ClaudeFor is Claude for the launch of a known chat: the launch's record names it.
+	ClaudeFor(conversation string, ids []string, settingsPath string) (ClaudeApps, error)
+	// Codex is what a Codex chat with the apps adds: the same rules and wall as Claude's, given the way Codex takes
+	// them (`-c` flags on the launch line, never a file the agent could edit).
+	Codex(conversation string, ids []string) (CodexApps, error)
+}
+
+// CodexApps is what the apps of a Codex chat add to its launch.
+type CodexApps struct {
+	// Guard is the PreToolUse hook command line (`harnessly hook app-guard --policy <file> --agent codex`); it goes first
+	// among the event's hooks.
+	Guard string
+	// Servers are the apps' MCP servers, each a `-c mcp_servers.<name>.*` set.
+	Servers []CodexAppServer
+	// Instructions are the apps' instructions and the list of their skills, joined; "" for none. They go with the
+	// workspace's developer instructions.
+	Instructions string
+	// TokenFile holds the launch's own token; the CLI gets it in place of the person's in the variable the runtime's MCP
+	// config names ("" keeps the person's, a test).
+	TokenFile string
+	// Env are `VAR='value'` shell words the CLI gets, Wrap the shell words it runs under (the wall); both "" for none.
+	Env, Wrap string
+}
+
+// CodexAppServer is one MCP server of an app as Codex is told about it.
+type CodexAppServer struct {
+	// Name is the server's name in Codex's config (plugin_<plugin>_<server>, the name the rules read from a tool).
+	Name string
+	// URL is a remote server's address; Command, Args and Env a local one's process.
+	URL, Command string
+	Args         []string
+	Env, Headers map[string]string
+	// TokenHeaders are headers that carry the launch's token: they read it from the CLI's environment, so it is on no
+	// command line.
+	TokenHeaders []string
 }
 
 // ClaudeApps is what the apps of a Claude Code chat add to its launch.

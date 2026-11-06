@@ -42,6 +42,8 @@ const REASON: Record<string, string> = {
   agent_unavailable: 'next.moveVm.reason.agent',
   model_unavailable: 'next.moveVm.reason.agent',
   offline: 'next.moveVm.reason.offline',
+  machine_offline: 'next.moveVm.reason.offline',
+  no_access: 'next.moveVm.reason.noAccess',
   unsupported: 'next.moveVm.reason.unsupported',
 };
 
@@ -186,6 +188,7 @@ const SheetBody = ({ load, onMove, onClose, prefer = null }: Omit<IMoveSheetProp
                   }}
                 >
                   <span className="hx-mv__name">{x.name}</span>
+                  {x.orgName && <span className="hx-mv__why">{x.orgName}</span>}
                   {why && <span className="hx-mv__why">{why}</span>}
                 </button>
               );

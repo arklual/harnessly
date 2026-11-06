@@ -1,0 +1,22 @@
+/* The host passes its --t-* tokens at the handshake; these are the defaults for a page opened on its own. */
+:root {
+  --t-bg: #ffffff;
+  --t-text: #15171a;
+  --t-text-muted: #6b7280;
+  --t-border: #d9dde3;
+  --t-accent: #2f6fed;
+}
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--t-bg);
+  color: var(--t-text);
+  font: 14px/1.45 system-ui, sans-serif;
+}
+h1 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+p { margin: 0 0 12px; color: var(--t-text-muted); }
+label { display: block; margin-bottom: 4px; font-weight: 500; }
+input { box-sizing: border-box; width: 100%; max-width: 360px; padding: 8px 10px; border: 1px solid var(--t-border); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+button { margin-top: 12px; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--t-accent); color: #fff; font: inherit; cursor: pointer; }
+.ok { color: var(--t-text-muted); margin-top: 8px; }
+#root > button:only-child { margin-top: 0; }

@@ -23,6 +23,7 @@ var agentRefusedAppRoutes = [...]string{
 	"/api/cli/apps/install",
 	"/api/cli/apps/remove",
 	"/api/cli/apps/enable",
+	"/api/cli/apps/connect",
 	"/api/cli/apps/promote",
 	"/api/cli/apps/rollback",
 	"/api/cli/apps/follow",

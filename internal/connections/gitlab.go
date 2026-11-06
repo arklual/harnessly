@@ -286,6 +286,70 @@ func (c *glClient) Issue(ctx context.Context, key string) (*Issue, error) {
 	return &i, nil
 }
 
+// glMRMax is how many merge requests one call returns: each costs a second request for its pipeline.
+const glMRMax = 10
+
+type glMR struct {
+	IID                 int    `json:"iid"`
+	ProjectID           int    `json:"project_id"`
+	Title               string `json:"title"`
+	State               string `json:"state"`
+	Draft               bool   `json:"draft"`
+	WebURL              string `json:"web_url"`
+	SourceBranch        string `json:"source_branch"`
+	UpdatedAt           string `json:"updated_at"`
+	DetailedMergeStatus string `json:"detailed_merge_status"`
+	HeadPipeline        *struct {
+		Status string `json:"status"`
+		WebURL string `json:"web_url"`
+	} `json:"head_pipeline"`
+	References struct {
+		Full string `json:"full"`
+	} `json:"references"`
+}
+
+// MergeRequests implements CodeSource: merge requests of every project the token sees, found by words of the title and
+// description. The list does not carry the head pipeline, so each one is read once more; that read is a nicety.
+func (c *glClient) MergeRequests(ctx context.Context, q Query) ([]MergeRequest, error) {
+	state := strings.ToLower(strings.TrimSpace(q.State))
+	if state == "" {
+		state = "all"
+	}
+	if !slices.Contains([]string{"opened", "merged", "closed", "all"}, state) {
+		return nil, ErrNotFound
+	}
+	params := []string{"scope", "all", "state", state, "order_by", "updated_at", "sort", "desc",
+		"per_page", strconv.Itoa(min(q.LimitOr(glMRMax), glMRMax))}
+	if text := strings.TrimSpace(q.Text); text != "" {
+		params = append(params, "search", text, "in", "title,description")
+	}
+	v := url.Values{}
+	for i := 0; i+1 < len(params); i += 2 {
+		v.Set(params[i], params[i+1])
+	}
+	var list []glMR
+	if _, err := c.get(ctx, "merge_requests", v.Encode(), &list); err != nil {
+		return nil, err
+	}
+	out := make([]MergeRequest, 0, len(list))
+	for _, r := range list {
+		if r.HeadPipeline == nil && r.ProjectID != 0 && r.IID != 0 {
+			var full glMR
+			if _, err := c.get(ctx, "projects/"+strconv.Itoa(r.ProjectID)+"/merge_requests/"+strconv.Itoa(r.IID), "", &full); err == nil {
+				r.HeadPipeline, r.DetailedMergeStatus = full.HeadPipeline, full.DetailedMergeStatus
+			}
+		}
+		project, _, _ := strings.Cut(r.References.Full, "!")
+		mr := MergeRequest{IID: r.IID, Title: r.Title, URL: r.WebURL, State: r.State, Draft: r.Draft, Project: project,
+			SourceBranch: r.SourceBranch, Updated: ParseTime(r.UpdatedAt), DetailedMergeStatus: r.DetailedMergeStatus}
+		if r.HeadPipeline != nil {
+			mr.Pipeline = &Pipeline{Status: r.HeadPipeline.Status, URL: r.HeadPipeline.WebURL}
+		}
+		out = append(out, mr)
+	}
+	return out, nil
+}
+
 type glIssue struct {
 	ID          int      `json:"id"`
 	IID         int      `json:"iid"`

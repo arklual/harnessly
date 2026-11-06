@@ -318,8 +318,16 @@ func (s *Starter) Start(o Options) (Result, error) {
 		return fail(500, msgNoPane.String()), nil
 	}
 	launch := o.Launch
-	if launch != nil && launch.Model == nil && launch.Effort == nil {
+	if launch != nil && launch.Model == nil && launch.Effort == nil && len(launch.Apps) == 0 {
 		launch = nil
+	}
+	// A launch with apps names its chat (the tab's id) in the apps' grant, so the tab's id is chosen before the line.
+	tabID := ""
+	if launch != nil && len(launch.Apps) > 0 {
+		tabID = s.cfg.Store.NewTabID()
+		l := *launch
+		l.Conversation = tabID
+		launch = &l
 	}
 	var line string
 	switch {
@@ -350,7 +358,7 @@ func (s *Starter) Start(o Options) (Result, error) {
 	if name == "" {
 		name = agents.DisplayName(o.Provider)
 	}
-	tab, err := s.cfg.Store.AddTab(wsID, panes[0].String("id"), state.TabOptions{Name: name, Cwd: cwd, PanelType: panelType, Command: command})
+	tab, err := s.cfg.Store.AddTab(wsID, panes[0].String("id"), state.TabOptions{Name: name, Cwd: cwd, PanelType: panelType, Command: command, ID: tabID})
 	var se *state.Error
 	if errors.As(err, &se) || err == nil && tab == nil {
 		return fail(500, msgStartFailed.String()), nil
@@ -358,7 +366,8 @@ func (s *Starter) Start(o Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	tabID, session := tab.String("id"), tab.String("sessionName")
+	tabID = tab.String("id")
+	session := tab.String("sessionName")
 	if k := s.keeper(); k != nil {
 		agentSession := status.Null[string]()
 		if o.ResumeSessionID != "" && !o.ForkSession {

@@ -23,6 +23,7 @@ export const OrgStepScreen = () => {
   const [loadError, setLoadError] = useState<unknown>(null);
   const [name, setName] = useState('');
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [tenantName, setTenantName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +44,11 @@ export const OrgStepScreen = () => {
 
   const clean = name.trim();
   const nameError = clean.length > NAME_MAX ? `Не длиннее ${NAME_MAX} знаков` : null;
-  const canCreate = clean !== '' && nameError === null && !busy;
+  const tenantClean = tenantName.trim();
+  const tenantError = tenantClean.length > NAME_MAX ? `Не длиннее ${NAME_MAX} знаков` : null;
+  // With no space moved in the organization gets a tenant of its own, so it is never empty.
+  const needsTenant = spaces !== null && picked.size === 0;
+  const canCreate = clean !== '' && nameError === null && (!needsTenant || tenantError === null) && !busy;
 
   const toggle = (id: string) =>
     setPicked((cur) => {
@@ -57,7 +62,11 @@ export const OrgStepScreen = () => {
     setBusy(true);
     setError(null);
     try {
-      const { slug } = await api.createOrg({ name: clean, spaceIds: [...picked] });
+      const { slug } = await api.createOrg({
+        name: clean,
+        spaceIds: [...picked],
+        ...(picked.size === 0 ? { tenantName: tenantClean } : {}),
+      });
       navigate(`/o/${slug}/all/overview`);
     } catch (e) {
       setError(orgErrorText(e));
@@ -110,6 +119,17 @@ export const OrgStepScreen = () => {
             </label>
           ))}
         </fieldset>
+        {needsTenant && (
+          <TextField
+            label="Первый тенант"
+            value={tenantName}
+            onChange={(e) => setTenantName(e.target.value)}
+            error={tenantError ?? undefined}
+            placeholder="Основное"
+            maxLength={NAME_MAX + 20}
+            hint="Тенант — рабочее пространство: в нём команды и машины. Название можно изменить позже."
+          />
+        )}
         {error && (
           <p className="ho-step__err" role="alert">
             {error}

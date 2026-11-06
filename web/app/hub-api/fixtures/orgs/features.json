@@ -21,9 +21,24 @@
       "forced": false
     },
     {
+      "name": "ui.hx.live",
+      "enabled": false,
+      "forced": false
+    },
+    {
       "name": "org.events",
       "enabled": true,
       "forced": true
+    },
+    {
+      "name": "runtime.fleet",
+      "enabled": false,
+      "forced": false
+    },
+    {
+      "name": "secrets.vault",
+      "enabled": false,
+      "forced": false
     }
   ]
 }

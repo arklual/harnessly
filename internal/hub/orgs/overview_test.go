@@ -231,20 +231,20 @@ func TestOrgKPIs(t *testing.T) {
 		Series []analytics.KpiSeries
 	}
 	r.JSON(&k)
-	if k.Scope.Kind != "org" || k.Period.From != "2026-10-01" || len(k.Kpis) != 12 {
+	if k.Scope.Kind != "org" || k.Period.From != "2026-10-01" || len(k.Kpis) != 15 {
 		t.Errorf("scope %+v period %+v kpis %d", k.Scope, k.Period, len(k.Kpis))
 	}
 	if m := kpi(k.Kpis, "money_per_mr"); m == nil || m.Value == nil || *m.Value != 630 {
 		t.Errorf("money_per_mr = %+v", m)
 	}
-	if len(k.Series) != 1 || k.Series[0].Key != v.team.ID || k.Series[0].Label != "Платформа" || len(k.Series[0].Kpis) != 12 {
+	if len(k.Series) != 1 || k.Series[0].Key != v.team.ID || k.Series[0].Label != "Платформа" || len(k.Series[0].Kpis) != 15 {
 		t.Errorf("series = %+v", k.Series)
 	}
 
 	// Without ?series it is null; the lead sees his team; vera manages nothing; only team splits.
 	var plain analytics.KpisResponse
 	v.boris.Do("GET", v.url("/kpis?scope=team:"+v.team.ID), nil).JSON(&plain)
-	if plain.Series != nil || len(plain.Kpis) != 12 {
+	if plain.Series != nil || len(plain.Kpis) != 15 {
 		t.Errorf("lead kpis = %+v", plain)
 	}
 	for _, c := range []struct {

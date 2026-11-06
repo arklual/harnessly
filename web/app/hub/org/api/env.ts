@@ -3,11 +3,15 @@
 import type {
   AddCatalogRequest,
   AddGroupRequest,
+  AddPresetRequest,
   ApplyRequest,
   ApplyResponse,
   EnvGroup,
+  EnvPreset,
   MeEnvGroup,
+  MeEnvPresetResponse,
   PatchGroupRequest,
+  PatchPresetRequest,
   AddEntryRequest,
   CatalogItem,
   CatalogKind,
@@ -56,6 +60,12 @@ export interface EnvApi {
   envGroupPatch(org: string, groupId: string, req: PatchGroupRequest): Promise<EnvGroup>;
   /** Removes a group; its entries stay in the layer without a group. */
   envGroupRemove(org: string, groupId: string): Promise<void>;
+  /** The person picks a preset of a layer: its optional groups go on, the layer's other optional groups off. */
+  envMinePreset(presetId: string, space?: string): Promise<MeEnvPresetResponse>;
+  /** A preset of a layer: a named set of the layer's groups. */
+  envPresetAdd(org: string, req: AddPresetRequest): Promise<EnvPreset>;
+  envPresetPatch(org: string, presetId: string, req: PatchPresetRequest): Promise<EnvPreset>;
+  envPresetRemove(org: string, presetId: string): Promise<void>;
   /** «Применить на машинах»: an update run on the machines a layer reaches, now or at their next connection. */
   envApply(org: string, req: ApplyRequest): Promise<ApplyResponse>;
 

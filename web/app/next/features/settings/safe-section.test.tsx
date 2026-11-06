@@ -72,6 +72,38 @@ describe('Settings → Safe', { timeout: 20_000 }, () => {
     expect(screen.getByText(/Added .* · used by «Release notes»/)).toBeTruthy();
   });
 
+  it('says where each secret lives when the safe is on a server', () => {
+    const store = { mode: 'vault', addr: 'https://openbao.example.com:8200', error: '' };
+    render(
+      <SafeSection
+        secrets={[
+          readSecret(wire({ where: 'vault' })),
+          readSecret(wire({ name: 'old-token', where: 'local' })),
+        ]}
+        store={store}
+        now={NOW}
+        {...actions()}
+      />,
+    );
+    expect(screen.getByText(/· on the server/)).toBeTruthy();
+    expect(screen.getByText(/· on this machine/)).toBeTruthy();
+    expect(screen.getByText(/kept on the server https:\/\/openbao\.example\.com:8200/)).toBeTruthy();
+  });
+
+  it('says a server safe that cannot be used, and why', () => {
+    render(
+      <SafeSection
+        secrets={[]}
+        store={{ mode: 'vault', addr: '', error: 'RUNTIME_SECRETS_VAULT_TOKEN_FILE is not set' }}
+        now={NOW}
+        {...actions()}
+      />,
+    );
+    expect(
+      screen.getByText(/settings do not work: RUNTIME_SECRETS_VAULT_TOKEN_FILE is not set/),
+    ).toBeTruthy();
+  });
+
   it('replaces a value and forgets the typed one at once', async () => {
     const a = actions();
     render(<SafeSection secrets={[readSecret(wire())]} now={NOW} {...a} />);

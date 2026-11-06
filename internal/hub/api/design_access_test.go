@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
@@ -250,6 +251,16 @@ func TestDesignShareLinksThroughHubAndRuntime(t *testing.T) {
 		if c.Str("project") != "shop" {
 			t.Fatalf("a token asked for %q", c.Str("project"))
 		}
+	}
+	// The runtime's token lasts a minute (expiresAt in milliseconds): past it the hub asks for a fresh one instead of
+	// carrying the dead token, which the runtime refuses and the guest sees as «the owner's machine is unavailable».
+	asked := len(a.Calls(hubproto.OpDesignPublicToken))
+	s.Clock.Advance(61 * time.Second)
+	if r := open(path + "/f/Main.dc.html"); r.Code != 200 {
+		t.Fatalf("guest page a minute later: %s", r)
+	}
+	if n := len(a.Calls(hubproto.OpDesignPublicToken)); n <= asked {
+		t.Fatal("the hub kept a guest token past its expiry")
 	}
 
 	// A second link, then a restart of the hub: the links, the records and the snapshot come back from the database.

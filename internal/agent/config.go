@@ -77,6 +77,9 @@ type Config struct {
 	// link (AGENT_HUB_OBSERVE_FILE); nil when there is none, or when the agent is a hub's machine already.
 	ObserveMachine     *MachineFile
 	ObserveMachineFile string
+	// ObserveSafe is AGENT_HUB_SAFE=on: the runtime may keep its safe on the hub of the observe link too (docs/safe.md,
+	// "The hub's safe"). A hub's own machine always may.
+	ObserveSafe bool
 	// PolicyFile is AGENT_POLICY_FILE ("": /etc/harnessly/policy.toml if there is one, else the account's).
 	PolicyFile string
 	// EnvDir holds the env files the agents' launches source; WorkDir is the folder whose disk the preflight reports.
@@ -196,6 +199,7 @@ func LoadConfig() (Config, error) {
 			return c, fmt.Errorf("AGENT_HUB_OBSERVE_FILE: %w", err)
 		}
 	}
+	c.ObserveSafe = env("AGENT_HUB_SAFE", "") == "on"
 	// A hub's runtime answers its API under its base path, so the routes the agent calls itself start with it.
 	base := ""
 	if c.Machine != nil {

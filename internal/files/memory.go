@@ -165,3 +165,47 @@ func stripQuotes(s string) string {
 	}
 	return s[start:end]
 }
+
+// MemoryName reports whether name is a note's file name the memory accepts.
+func MemoryName(name string) bool { return memoryName.MatchString(name) }
+
+// MemoryFile is one note found on disk: the freshest copy of its name.
+type MemoryFile struct {
+	Name string
+	Path string
+	// MtimeMs is the modification time in milliseconds, as ReadMemoryNote counts it.
+	MtimeMs float64
+}
+
+// ListMemoryFiles is every note under the parents, one per name (the freshest copy), by name.
+func ListMemoryFiles(parents []string) []MemoryFile {
+	best := map[string]MemoryFile{}
+	for _, dir := range memoryDirs(parents) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			name := e.Name()
+			if !memoryName.MatchString(name) {
+				continue
+			}
+			file := filepath.Join(dir, name)
+			st, err := os.Stat(file)
+			if err != nil || !st.Mode().IsRegular() {
+				continue
+			}
+			t := st.ModTime()
+			mtime := float64(t.Unix())*1e3 + float64(t.Nanosecond())/1e6
+			if old, ok := best[name]; !ok || mtime > old.MtimeMs {
+				best[name] = MemoryFile{Name: name, Path: file, MtimeMs: mtime}
+			}
+		}
+	}
+	out := make([]MemoryFile, 0, len(best))
+	for _, f := range best {
+		out = append(out, f)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}

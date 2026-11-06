@@ -5,8 +5,20 @@ import type { CatalogItem, CatalogKind, CatalogSource, ScriptFrom } from '../../
 import { plural } from './format';
 
 /** The kinds a person adds. «Модель» of the board is not here: the hub has no storage for it yet. */
-export const ADD_KINDS = ['access', 'repo', 'script', 'skill', 'mcp'] as const;
+export const ADD_KINDS = [
+  'access',
+  'repo',
+  'script',
+  'skill',
+  'mcp',
+  'app',
+  'plugin',
+  'claude-settings',
+] as const;
 export type AddKind = (typeof ADD_KINDS)[number];
+
+/** What only an organization's admin adds: it works in every chat of the people it reaches. */
+export const ADMIN_KINDS: readonly AddKind[] = ['access', 'app', 'plugin', 'claude-settings'];
 
 /** The order of the groups in a layer; a document (made elsewhere) is shown last. */
 export const GROUP_ORDER: readonly CatalogKind[] = [
@@ -17,6 +29,7 @@ export const GROUP_ORDER: readonly CatalogKind[] = [
   'mcp',
   'plugin',
   'claude-settings',
+  'app',
   'doc',
 ];
 
@@ -79,6 +92,13 @@ export const KIND: Record<CatalogKind, KindMeta> = {
     about: 'Ключи settings.json и правила в CLAUDE.md',
     newT: 'Новые настройки',
   },
+  app: {
+    icon: 'layout-grid',
+    one: 'Приложение',
+    many: 'Приложения',
+    about: 'Приложение harnessly из папки репозитория: дизайн-система, шаблоны',
+    newT: 'Новое приложение',
+  },
   doc: {
     icon: 'book-open',
     one: 'Документ',
@@ -134,6 +154,8 @@ export interface Fields {
   rerun: 'once' | 'check';
   check: string;
   secrets: string[];
+  marketplace: string;
+  plugin: string; // name@marketplace
 }
 
 export interface Draft {
@@ -151,7 +173,16 @@ const GITLAB_HOST = 'gitlab.com';
 const GITHUB_HOST = 'github.com';
 
 export const blankFields = (k: AddKind, repos: readonly RepoRef[] = []): Fields => ({
-  src: { skill: 'link', mcp: 'url', script: 'repo', repo: '', access: '' }[k],
+  src: {
+    skill: 'link',
+    mcp: 'url',
+    script: 'repo',
+    repo: '',
+    access: '',
+    app: '',
+    plugin: '',
+    'claude-settings': '',
+  }[k],
   name: '',
   about: '',
   url: '',
@@ -173,6 +204,8 @@ export const blankFields = (k: AddKind, repos: readonly RepoRef[] = []): Fields 
   rerun: 'once',
   check: '',
   secrets: [],
+  marketplace: '',
+  plugin: '',
 });
 
 export const blankDraft = (k: AddKind, repos: readonly RepoRef[] = []): Draft => ({
@@ -236,6 +269,50 @@ export const runOf = (f: Fields): string => {
 
 const repoOf = (f: Fields, repos: readonly RepoRef[]): string =>
   f.repoOther ? repoName(f.repoUrl) : (repos.find((r) => r.id === f.repo)?.name ?? '');
+
+// ── Claude's settings as JSON ─────────────────────────────────────────────────────────────────────────────────────
+
+export interface Settings {
+  always: Record<string, unknown>;
+  ifAbsent: Record<string, unknown>;
+  claudeMd: string;
+}
+const SETTINGS_KEYS = ['always', 'ifAbsent', 'claudeMd'];
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** The form's JSON: `always`, `ifAbsent` (objects of settings.json keys) and `claudeMd` (text); null: not that. */
+export const parseSettings = (raw: string): Settings | null => {
+  try {
+    const data: unknown = JSON.parse(raw);
+    if (!isObj(data) || Object.keys(data).some((k) => !SETTINGS_KEYS.includes(k))) return null;
+    const always = data.always ?? {};
+    const ifAbsent = data.ifAbsent ?? {};
+    const claudeMd = data.claudeMd ?? '';
+    if (!isObj(always) || !isObj(ifAbsent) || typeof claudeMd !== 'string') return null;
+    if (Object.keys(always).length + Object.keys(ifAbsent).length === 0 && claudeMd.trim() === '')
+      return null;
+    return { always, ifAbsent, claudeMd };
+  } catch {
+    return null;
+  }
+};
+
+const settingsLine = (st: Settings | null): string => {
+  if (!st) return 'settings.json и CLAUDE.md';
+  const n = Object.keys(st.always).length + Object.keys(st.ifAbsent).length;
+  const parts = n ? [`${n} ${plural(n, 'ключ', 'ключа', 'ключей')} settings.json`] : [];
+  if (st.claudeMd.trim()) parts.push('правила в CLAUDE.md');
+  return parts.join(' · ');
+};
+
+export const SETTINGS_EXAMPLE = `{
+  "always": { "env": { "DISABLE_TELEMETRY": "1" } },
+  "ifAbsent": { "model": "sonnet" },
+  "claudeMd": "Отвечай по-русски."
+}`;
+
+const PLUGIN_RE = /^[^@\s]+@[^@\s]+$/;
 
 // ── what the board says about an item ─────────────────────────────────────────────────────────────────────────────
 
@@ -312,6 +389,9 @@ export const nameOf = (d: Draft): string => {
     return (f.src === 'link' ? pretty(lastSeg(f.url)) : '') || 'Скилл';
   }
   if (d.k === 'mcp') return typed || pretty(guessMcpName(f)) || 'MCP';
+  if (d.k === 'app') return typed || pretty(f.path.split('/').filter(Boolean).pop() ?? '') || 'Приложение';
+  if (d.k === 'plugin') return typed || pretty(f.plugin.split('@')[0] ?? '') || 'Плагин';
+  if (d.k === 'claude-settings') return typed || 'Настройки Claude';
   if (typed) return typed;
   if (f.src === 'text') return 'Команды';
   if (f.src === 'file') return pretty(f.fileName) || 'Скрипт';
@@ -338,6 +418,13 @@ const hintTail = (d: Draft, repos: readonly RepoRef[]): string => {
     return 'обновляется сам';
   }
   if (d.k === 'mcp') return mcpAuth(f);
+  if (d.k === 'app') {
+    const rp = repoOf(f, repos);
+    return `папка ${f.path.trim() || '…'}${rp ? ` из ${rp}` : ''}`;
+  }
+  if (d.k === 'plugin')
+    return `плагин Claude Code${f.plugin.includes('@') ? ` · ${f.plugin.split('@')[1]}` : ''}`;
+  if (d.k === 'claude-settings') return settingsLine(parseSettings(f.json));
   const n = f.body.split('\n').filter((x) => x.trim()).length;
   if (f.src === 'text') return `${n} ${plural(n, 'команда', 'команды', 'команд')} · при настройке машины`;
   if (f.src === 'file') return `файл ${f.fileName || '…'} · при настройке машины`;
@@ -372,6 +459,43 @@ export const viewOf = (d: Draft, repos: readonly RepoRef[] = []): ItemView => {
   const f = d.f;
   const name = nameOf(d);
   const hint = hintOf(d, repos);
+  if (d.k === 'app') {
+    const rp = repoOf(f, repos);
+    return {
+      name,
+      hint,
+      does: `поставит приложение из папки ${f.path.trim() || '…'} репозитория ${rp || '…'} всем, до кого дойдёт пункт. Удалить его нельзя, закреплённое — и выключить. Новая версия в репозитории приедет при следующей настройке`,
+      lines: [
+        ['Репозиторий', rp],
+        ['Папка', f.path],
+        ['Ветка', f.branch.trim() || 'main'],
+        ['У человека', 'Удалить нельзя; выключить — только если пункт не закреплён'],
+      ],
+    };
+  }
+  if (d.k === 'plugin')
+    return {
+      name,
+      hint,
+      does: `добавит маркетплейс ${f.marketplace.trim() || '…'} и поставит плагин ${f.plugin.trim() || '…'} в Claude Code`,
+      lines: [
+        ['Плагин', f.plugin],
+        ['Маркетплейс', f.marketplace],
+      ],
+    };
+  if (d.k === 'claude-settings') {
+    const st = parseSettings(f.json);
+    return {
+      name,
+      hint,
+      does: `пропишет в ~/.claude/settings.json ${settingsLine(st)}. Ключи «always» ставятся всегда, «ifAbsent» — только если их нет`,
+      lines: [
+        ['Всегда', st ? Object.keys(st.always).join(', ') : ''],
+        ['Если нет', st ? Object.keys(st.ifAbsent).join(', ') : ''],
+        ['CLAUDE.md', st ? short(st.claudeMd, 140) : ''],
+      ].filter(([, v]) => v !== '') as [string, string][],
+    };
+  }
   if (d.k === 'repo') {
     const raw = noScheme(f.url);
     const br = f.branch.trim() || 'main';
@@ -527,6 +651,12 @@ export const viewOf = (d: Draft, repos: readonly RepoRef[] = []): ItemView => {
 
 // ── valid or not ──────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** A folder of the repository: relative and inside it. */
+const badPath = (p: string): boolean => {
+  const t = p.trim();
+  return t.startsWith('/') || t.split('/').includes('..');
+};
+
 const scriptSourceOk = (f: Fields): boolean => {
   if (f.src === 'repo') return has(f.path) && (f.repoOther ? has(f.repoUrl) : has(f.repo));
   if (f.src === 'text' || f.src === 'file') return has(f.body);
@@ -537,6 +667,9 @@ export const valid = (d: Draft): boolean => {
   const f = d.f;
   if (d.k === 'repo') return /\S+[/:]\S+/.test(f.url);
   if (d.k === 'access') return true;
+  if (d.k === 'app') return has(f.path) && !badPath(f.path) && (f.repoOther ? has(f.repoUrl) : has(f.repo));
+  if (d.k === 'plugin') return PLUGIN_RE.test(f.plugin.trim()) && has(f.marketplace);
+  if (d.k === 'claude-settings') return parseSettings(f.json) !== null;
   if (d.k === 'skill') {
     if (f.src === 'link') return has(f.url);
     if (f.src === 'file') return has(f.body);
@@ -572,6 +705,17 @@ export const need = (d: Draft): string => {
       ? 'ключ из сейфа'
       : { url: 'адрес MCP', cmd: 'команду запуска', json: 'конфиг MCP' }[f.src as 'url' | 'cmd' | 'json'];
   }
+  if (d.k === 'app') {
+    if (badPath(f.path)) return 'Папка приложения — путь внутри репозитория, без «..» и «/» в начале';
+    t = (f.repoOther ? has(f.repoUrl) : has(f.repo))
+      ? 'папку приложения в репозитории'
+      : 'ссылку на репозиторий';
+  }
+  if (d.k === 'plugin') t = has(f.plugin) ? 'адрес маркетплейса' : 'плагин в виде имя@маркетплейс';
+  if (d.k === 'claude-settings') {
+    if (has(f.json)) return 'JSON не разобран: нужны always, ifAbsent или claudeMd, и что-то одно непустое';
+    t = 'настройки в JSON';
+  }
   if (d.k === 'script') {
     if (hasBrew(f.body) || hasBrew(f.run))
       return 'Уберите brew: на Linux-машинах его нет — поставьте через apt или curl';
@@ -595,6 +739,21 @@ export const toSource = (d: Draft): CatalogSource => {
   const f = d.f;
   if (d.k === 'repo') return { url: withScheme(f.url), branch: orUndef(f.branch), dir: orUndef(f.dir) };
   if (d.k === 'access') return { service: f.svc, host: orUndef(f.host) };
+  if (d.k === 'app') {
+    const out: CatalogSource = { from: 'repo', path: f.path.trim(), branch: orUndef(f.branch) };
+    if (f.repoOther) out.repoUrl = withScheme(f.repoUrl);
+    else out.repo = f.repo;
+    return out;
+  }
+  if (d.k === 'plugin') return { plugin: f.plugin.trim(), marketplace: f.marketplace.trim() };
+  if (d.k === 'claude-settings') {
+    const st = parseSettings(f.json);
+    return {
+      always: st && Object.keys(st.always).length ? st.always : undefined,
+      ifAbsent: st && Object.keys(st.ifAbsent).length ? st.ifAbsent : undefined,
+      claudeMd: st?.claudeMd.trim() ? st.claudeMd : undefined,
+    };
+  }
   if (d.k === 'skill') {
     if (f.src === 'link') return { ref: withScheme(f.url) };
     return { body: f.body };
@@ -646,6 +805,27 @@ export const fromItem = (it: CatalogItem): Draft | null => {
   if (it.kind === 'access') {
     f.svc = s.service ?? 'gitlab';
     f.host = s.host ?? '';
+  }
+  if (it.kind === 'app') {
+    f.name = it.name;
+    f.repo = s.repo ?? '';
+    f.repoOther = !s.repo && !!s.repoUrl;
+    f.repoUrl = noScheme(s.repoUrl ?? '');
+    f.branch = s.branch ?? '';
+    f.path = s.path ?? '';
+  }
+  if (it.kind === 'plugin') {
+    f.name = it.name;
+    f.plugin = s.plugin ?? '';
+    f.marketplace = s.marketplace ?? '';
+  }
+  if (it.kind === 'claude-settings') {
+    f.name = it.name;
+    const body: Record<string, unknown> = {};
+    if (s.always) body.always = s.always;
+    if (s.ifAbsent) body.ifAbsent = s.ifAbsent;
+    if (s.claudeMd) body.claudeMd = s.claudeMd;
+    f.json = JSON.stringify(body, null, 2);
   }
   if (it.kind === 'skill') {
     f.name = it.name;

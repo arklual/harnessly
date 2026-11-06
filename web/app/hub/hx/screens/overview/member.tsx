@@ -27,6 +27,7 @@ import {
   thousandBare,
 } from './fmt';
 import { Bars, Card, css, NO_TEAM_COLOR, Strip, SxTile, TEAM_COLORS } from './parts';
+import { withBase } from '../../../lib/base';
 
 const askMore = (api: { requestMoreLimit: () => Promise<{ sent: true }> }) => api.requestMoreLimit();
 
@@ -235,7 +236,7 @@ const ChatsCard = ({ chats, now }: { chats: MyChat[]; now: number }) => (
               {c.machineId ? (
                 <a
                   className="me-chat__a"
-                  href={`/api/machines/${encodeURIComponent(c.machineId)}/open?redirect=1`}
+                  href={withBase(`/api/machines/${encodeURIComponent(c.machineId)}/open?redirect=1`)}
                   target="_blank"
                   rel="noopener"
                   title={`Открыть рабочее пространство ${c.machine}`}

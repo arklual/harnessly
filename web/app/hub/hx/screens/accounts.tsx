@@ -8,6 +8,8 @@ import type { Account, AccountFunding, AccountKind, RegisterAccount } from '../.
 import { orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
 import { useLoad } from '../../org/hooks';
+import { ListBar, NoMatch, useListView, type SortKey } from '../sort-bar';
+import { searchRows, sortRows } from '../sort';
 import { Titles } from '../shell';
 import { Btn, Drawer, Icon, initial } from '../ui';
 import { inRubles, shownOfUsd } from '../../org/money';
@@ -452,8 +454,15 @@ const Skeleton = () => (
   </div>
 );
 
+const ACC_SORTS: SortKey[] = [
+  { id: 'spend', label: 'По расходу' },
+  { id: 'name', label: 'По имени', first: 'asc' },
+  { id: 'fee', label: 'По абонентской' },
+];
+
 const Screen = () => {
   const { shell, base } = useOrg();
+  const view = useListView(ACC_SORTS, { key: null, dir: 'desc' });
   const { data, error, reload } = useLoad((api) => api.accounts(), []);
   const url = useUrl(CARDS);
   const [saved, setSaved] = useState<Record<string, Account>>({});
@@ -463,7 +472,19 @@ const Screen = () => {
     id === null ? 'Вся организация' : (shell.tenants.find((t) => t.id === id)?.name ?? 'тенант');
 
   const list = (data?.accounts ?? []).map((a) => saved[a.id] ?? a);
-  const ordered = [...list].sort((x, y) => Number(y.discovered) - Number(x.discovered));
+  const sorted = sortRows(list, view.sort, {
+    spend: (a) => a.monthRub,
+    name: (a) => titleOf(a),
+    fee: (a) => (a.kind === 'subscription' ? a.feeUsd : 0),
+  });
+  const matched = searchRows(sorted, view.q, (a) => [
+    titleOf(a),
+    a.label,
+    providerName(a.provider),
+    a.plan,
+    ...a.people.map((x) => x.name),
+  ]);
+  const ordered = [...matched].sort((x, y) => Number(y.discovered) - Number(x.discovered));
   const found = ordered.filter((a) => a.discovered);
   const known = ordered.filter((a) => !a.discovered);
 
@@ -511,6 +532,8 @@ const Screen = () => {
         </p>
       ) : (
         <div className="ac-stack">
+          <ListBar keys={ACC_SORTS} view={view} placeholder="Найти аккаунт или человека" />
+          {ordered.length === 0 && <NoMatch view={view} />}
           {found.length > 0 && (
             <section className="ac-group" aria-label="Ждут регистрации">
               <h3 className="ac-group__t">
@@ -534,7 +557,9 @@ const Screen = () => {
           <section className="ac-group" aria-label="Аккаунты организации">
             {found.length > 0 && <h3 className="ac-group__t">Аккаунты организации</h3>}
             {known.length === 0 ? (
-              <p className="ov-empty">Зарегистрированных аккаунтов пока нет.</p>
+              ordered.length === 0 ? null : (
+                <p className="ov-empty">Зарегистрированных аккаунтов пока нет.</p>
+              )
             ) : (
               <div className="mt">
                 <Head />

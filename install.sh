@@ -8,7 +8,11 @@
 # It checks the archive against the release's checksums.txt (and its sigstore signature when cosign is installed),
 # installs tmux and git with the system's package manager when they are missing, and runs the runtime as a systemd
 # user service on Linux, a launchd agent on macOS, or a background process where neither is available. Nothing is
-# opened to the network. Run it again to update; --uninstall removes what it installed and keeps your data.
+# opened to the network. Where there is no service manager, HARNESSLY_SUPERVISE=1 keeps the runtime running under
+# `harnessly supervise` (it is started again when it ends). Run it again to update; --uninstall removes what it installed and keeps your data.
+# Closed networks: --ca-file, --proxy, --no-proxy, --mirror, --npm-registry, --pip-index reach every component the service
+# starts (SSL_CERT_FILE, NODE_EXTRA_CA_CERTS, HTTPS_PROXY, NO_PROXY ...); --offline DIR installs from a bundle made by
+# scripts/make-offline-bundle.sh; --check only checks the machine; HARNESSLY_PREFLIGHT=1 checks before installing.
 # To connect machines to a team hub instead, use the installer the hub serves (docs/hub/machine.md).
 #
 # Nothing runs until main on the last line, so a download that stops half way does nothing.
@@ -31,17 +35,40 @@ harnessly installer
   --no-deps         do not install tmux and git, only check for them
   --no-browser      skip optional browser libraries, Xvfb and fonts (or HARNESSLY_NO_BROWSER=1)
   --archive FILE    install a locally built release archive (trusted input)
+  --check           check this machine (system, tools, disk, port, network, CA) and install nothing
+  --ca-file FILE    PEM file with your company's CA certificates (downloads and every component trust it)
+  --proxy URL       HTTP(S) proxy for downloads and for every component
+  --no-proxy LIST   hosts that skip the proxy (127.0.0.1 and localhost are always there)
+  --mirror URL      release files from here instead of github.com (same layout: URL/vX.Y.Z/<file>, URL/latest.txt)
+  --npm-registry URL, --pip-index URL
+                    package mirrors the agents' own installs and tools use
+  --offline DIR     install from a bundle folder (scripts/make-offline-bundle.sh); no network is used
+  --log FILE        journal of the steps (default ~/.local/state/harnessly/install.log; written by --check and
+                    HARNESSLY_PREFLIGHT=1)
   --uninstall       stop the service and remove the programs; your data in ~/.harnessly stays
   -h, --help        this text
 EOF
 }
 
 say() { printf '%s\n' "$*"; }
-step() { printf '\033[1m==> %s\033[0m\n' "$*"; }
-warn() { printf 'harnessly-install: %s\n' "$*" >&2; }
+step() {
+	printf '\033[1m==> %s\033[0m\n' "$*"
+	jlog step "$*"
+}
+warn() {
+	printf 'harnessly-install: %s\n' "$*" >&2
+	jlog warn "$*"
+}
 die() {
 	warn "$*"
+	jlog fail "$*"
 	exit 1
+}
+# jlog writes one line to the journal of the steps when it is on (--check, HARNESSLY_PREFLIGHT=1 or --log).
+jlog() {
+	[ "${JOURNAL:-0}" = 1 ] || return 0
+	mkdir -p "$(dirname "$LOG")" 2>/dev/null || return 0
+	printf '%s %-5s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" >>"$LOG" 2>/dev/null || true
 }
 have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -54,6 +81,16 @@ parse_args() {
 	UNINSTALL=0
 	BROWSER=1
 	LOCAL_ARCHIVE=
+	CHECK=0
+	CA_FILE=${HARNESSLY_CA_FILE:-}
+	PROXY=${HARNESSLY_PROXY:-${HTTPS_PROXY:-${https_proxy:-}}}
+	NO_PROXY_EXTRA=${HARNESSLY_NO_PROXY:-}
+	MIRROR=${HARNESSLY_MIRROR:-}
+	NPM_REGISTRY=${HARNESSLY_NPM_REGISTRY:-}
+	PIP_INDEX=${HARNESSLY_PIP_INDEX:-}
+	OFFLINE=${HARNESSLY_OFFLINE:-}
+	LOG=${HARNESSLY_INSTALL_LOG:-}
+	PREFLIGHT=${HARNESSLY_PREFLIGHT:-0}
 	while [ $# -gt 0 ]; do
 		case $1 in
 		--*=*)
@@ -63,9 +100,17 @@ parse_args() {
 			set -- "$_k" "$_v" "$@"
 			continue
 			;;
-		--version | --port | --prefix | --archive)
+		--version | --port | --prefix | --archive | --ca-file | --proxy | --no-proxy | --mirror | --npm-registry | --pip-index | --offline | --log)
 			[ $# -ge 2 ] || die "$1 needs a value"
 			case $1 in
+			--ca-file) CA_FILE=$2 ;;
+			--proxy) PROXY=$2 ;;
+			--no-proxy) NO_PROXY_EXTRA=$2 ;;
+			--mirror) MIRROR=${2%/} ;;
+			--npm-registry) NPM_REGISTRY=$2 ;;
+			--pip-index) PIP_INDEX=$2 ;;
+			--offline) OFFLINE=$2 ;;
+			--log) LOG=$2 ;;
 			--version) VERSION=${2#v} ;;
 			--port) PORT=$2 ;;
 			--prefix) PREFIX=$2 ;;
@@ -73,6 +118,7 @@ parse_args() {
 			esac
 			shift
 			;;
+		--check) CHECK=1 ;;
 		--no-service) SERVICE=0 ;;
 		--no-deps) DEPS=0 ;;
 		--no-browser) BROWSER=0 ;;
@@ -91,6 +137,165 @@ parse_args() {
 	case $PORT in '' | *[!0-9]*) die "--port must be a number, got: $PORT" ;; esac
 	BIN=$PREFIX/bin
 	URL=http://127.0.0.1:$PORT
+}
+
+# --- the network: CA, proxy, mirror ----------------------------------------------------------------------------
+
+# net_setup exports the company's CA and proxy for this script and checks the files named. What is set here is also
+# written to the service's environment (write_net_block), so every component the service starts uses the same.
+net_setup() {
+	if [ -n "$CA_FILE" ]; then
+		[ -r "$CA_FILE" ] || die "--ca-file $CA_FILE is not a readable file"
+		grep -q 'BEGIN CERTIFICATE' "$CA_FILE" || die "--ca-file $CA_FILE has no PEM certificate in it"
+		case $CA_FILE in /*) ;; *) CA_FILE=$(cd "$(dirname "$CA_FILE")" && pwd)/$(basename "$CA_FILE") ;; esac
+		export SSL_CERT_FILE="$CA_FILE" NODE_EXTRA_CA_CERTS="$CA_FILE" CURL_CA_BUNDLE="$CA_FILE" GIT_SSL_CAINFO="$CA_FILE" REQUESTS_CA_BUNDLE="$CA_FILE"
+	fi
+	if [ -n "$PROXY" ]; then
+		export HTTPS_PROXY="$PROXY" HTTP_PROXY="$PROXY" https_proxy="$PROXY" http_proxy="$PROXY"
+	fi
+	NO_PROXY_ALL=127.0.0.1,localhost,::1
+	[ -z "${NO_PROXY:-}" ] || NO_PROXY_ALL=$NO_PROXY_ALL,$NO_PROXY
+	[ -z "$NO_PROXY_EXTRA" ] || NO_PROXY_ALL=$NO_PROXY_ALL,$NO_PROXY_EXTRA
+	export NO_PROXY="$NO_PROXY_ALL" no_proxy="$NO_PROXY_ALL"
+	[ -z "$NPM_REGISTRY" ] || export npm_config_registry="$NPM_REGISTRY"
+	[ -z "$PIP_INDEX" ] || export PIP_INDEX_URL="$PIP_INDEX"
+}
+
+net_given() {
+	[ -n "$CA_FILE$PROXY$NO_PROXY_EXTRA$NPM_REGISTRY$PIP_INDEX" ]
+}
+
+# net_lines prints the variables the service gets; empty when nothing was asked for.
+net_lines() {
+	net_given || return 0
+	if [ -n "$CA_FILE" ]; then
+		for v in SSL_CERT_FILE NODE_EXTRA_CA_CERTS CURL_CA_BUNDLE GIT_SSL_CAINFO REQUESTS_CA_BUNDLE; do printf '%s=%s\n' "$v" "$CA_FILE"; done
+	fi
+	if [ -n "$PROXY" ]; then
+		for v in HTTPS_PROXY HTTP_PROXY https_proxy http_proxy; do printf '%s=%s\n' "$v" "$PROXY"; done
+	fi
+	printf 'NO_PROXY=%s\nno_proxy=%s\n' "$NO_PROXY_ALL" "$NO_PROXY_ALL"
+	if [ -n "$NPM_REGISTRY" ]; then printf 'npm_config_registry=%s\n' "$NPM_REGISTRY"; fi
+	if [ -n "$PIP_INDEX" ]; then printf 'PIP_INDEX_URL=%s\n' "$PIP_INDEX"; fi
+	return 0
+}
+
+# write_net_block keeps one marked block in the env file, replaced on every run, so running again never doubles it.
+write_net_block() {
+	net_given || return 0
+	mkdir -p "$(dirname "$ENV_FILE")"
+	_tmp=$ENV_FILE.new
+	if [ -f "$ENV_FILE" ]; then
+		awk '/^# BEGIN harnessly network/ { skip = 1 } !skip { print } /^# END harnessly network/ { skip = 0 }' "$ENV_FILE" >"$_tmp"
+	else
+		: >"$_tmp"
+	fi
+	{
+		printf '# BEGIN harnessly network (written by install.sh; change it by running the installer again)\n'
+		net_lines
+		printf '# END harnessly network\n'
+	} >>"$_tmp"
+	chmod 600 "$_tmp"
+	mv -f "$_tmp" "$ENV_FILE"
+	jlog info "network settings written to $ENV_FILE"
+}
+
+# --- checks before installing --------------------------------------------------------------------------------
+
+PF_FAIL=0
+pf_ok() {
+	printf '  ok    %s\n' "$*"
+	jlog ok "$*"
+}
+pf_info() {
+	printf '  info  %s\n' "$*"
+	jlog info "$*"
+}
+pf_warn() {
+	printf '  warn  %s\n' "$*"
+	jlog warn "$*"
+}
+pf_fail() {
+	printf '  FAIL  %s\n' "$*"
+	jlog fail "$*"
+	PF_FAIL=1
+}
+
+port_answers() {
+	curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$1/" 2>/dev/null
+}
+
+preflight() {
+	step "Checking this machine"
+	pf_ok "system: $OS/$ARCH"
+	for c in curl tar; do
+		if have "$c"; then pf_ok "$c is installed"; else pf_fail "$c is needed"; fi
+	done
+	if have sha256sum || have shasum; then pf_ok "sha256 tool is installed"; else pf_fail "sha256sum or shasum is needed"; fi
+	for c in tmux git; do
+		if have "$c"; then
+			pf_ok "$c is installed"
+		elif [ -n "$OFFLINE" ] || [ "$DEPS" = 0 ]; then
+			pf_fail "$c is missing and will not be installed here: install it first"
+		else
+			pf_warn "$c is missing: it will be installed with the system's package manager"
+		fi
+	done
+	_dir=$PREFIX
+	while [ ! -d "$_dir" ] && [ "$_dir" != / ]; do _dir=$(dirname "$_dir"); done
+	_free=$(df -Pk "$_dir" 2>/dev/null | awk 'NR == 2 { print int($4 / 1024) }')
+	if [ -n "$_free" ] && [ "$_free" -lt 200 ]; then
+		pf_fail "only $_free MB free where $PREFIX goes; 200 MB are needed"
+	elif [ -n "$_free" ]; then
+		pf_ok "disk: $_free MB free"
+	fi
+	if [ "$SERVICE" = 1 ]; then
+		if port_answers "$PORT"; then
+			if curl -fsS -o /dev/null --max-time 2 "$URL/api/health" 2>/dev/null; then
+				pf_ok "port $PORT: harnessly answers there already; it will be updated in place"
+			else
+				pf_fail "port $PORT is taken by something else: give another with --port"
+			fi
+		else
+			pf_ok "port $PORT is free"
+		fi
+		if [ "$OS" = darwin ]; then
+			pf_info "service: launchd agent"
+		elif user_systemd_works; then
+			pf_info "service: systemd user service"
+		elif [ "${HARNESSLY_SUPERVISE:-0}" = 1 ]; then
+			pf_info "service: no systemd here; a background process under 'harnessly supervise'"
+		else
+			pf_info "service: no systemd here; a background process (set HARNESSLY_SUPERVISE=1 to keep it running)"
+		fi
+	fi
+	if [ -n "$CA_FILE" ]; then pf_ok "CA file: $CA_FILE (SSL_CERT_FILE, NODE_EXTRA_CA_CERTS and others)"; fi
+	if [ -n "$PROXY" ]; then pf_ok "proxy: $PROXY (NO_PROXY: $NO_PROXY_ALL)"; fi
+	if [ -n "$OFFLINE" ]; then
+		if ls "$OFFLINE"/harnessly_*_"${OS}_${ARCH}".tar.gz >/dev/null 2>&1; then
+			pf_ok "offline bundle: $OFFLINE has a build for $OS/$ARCH"
+		else
+			pf_fail "offline bundle: no harnessly_*_${OS}_${ARCH}.tar.gz in $OFFLINE"
+		fi
+	else
+		_base=${MIRROR:-https://github.com}
+		_rc=0
+		curl -sS -o /dev/null -I --max-time 20 "$_base" 2>"${TMPDIR:-/tmp}/harnessly-pf.$$" || _rc=$?
+		case $_rc in
+		0) pf_ok "network: $_base answers" ;;
+		60 | 35 | 51 | 58 | 77) pf_fail "network: $_base is not trusted (TLS, curl $_rc): give your company's CA with --ca-file" ;;
+		5 | 6 | 7 | 28) pf_fail "network: $_base is not reachable (curl $_rc): give --proxy or --mirror, or install with --offline" ;;
+		*) pf_warn "network: $_base answered with an error (curl $_rc): $(tr '\n' ' ' <"${TMPDIR:-/tmp}/harnessly-pf.$$")" ;;
+		esac
+		rm -f "${TMPDIR:-/tmp}/harnessly-pf.$$"
+	fi
+	if have docker && docker info >/dev/null 2>&1; then
+		pf_info "docker: a daemon answers (agents can use it)"
+	elif have docker; then
+		pf_info "docker: the command is here, no daemon answers for this account"
+	fi
+	[ "$PF_FAIL" = 0 ] || die "the machine is not ready (see FAIL above); nothing was installed"
+	say "    ready"
 }
 
 detect_platform() {
@@ -145,6 +350,9 @@ ensure_deps() {
 	missing=
 	for c in tmux git; do have "$c" || missing="$missing $c"; done
 	[ -n "$missing" ] || return 0
+	if [ -n "$OFFLINE" ]; then
+		die "harnessly needs$missing, and with --offline nothing is downloaded: install it and run this again"
+	fi
 	if [ "$DEPS" = 1 ]; then
 		step "Installing$missing"
 		# shellcheck disable=SC2086 # the list is words on purpose
@@ -309,6 +517,17 @@ stop_browser_hosts() {
 resolve_version() {
 	if [ -n "$LOCAL_ARCHIVE" ]; then VERSION=${VERSION:-local}; return 0; fi
 	[ -z "$VERSION" ] || return 0
+	if [ -n "$OFFLINE" ]; then
+		# shellcheck disable=SC2012 # the names are ours
+		VERSION=$(ls "$OFFLINE"/harnessly_*_"${OS}_${ARCH}".tar.gz 2>/dev/null | sed -n 's|.*/harnessly_\(.*\)_'"${OS}_${ARCH}"'\.tar\.gz|\1|p' | sort -V | tail -n 1)
+		[ -n "$VERSION" ] || die "no harnessly_*_${OS}_${ARCH}.tar.gz in $OFFLINE"
+		return 0
+	fi
+	if [ -n "$MIRROR" ]; then
+		VERSION=$(curl -fsSL "$MIRROR/latest.txt" | tr -d 'v \r\n') || die "could not read $MIRROR/latest.txt; give --version"
+		case $VERSION in '' | *[!0-9.]*) die "$MIRROR/latest.txt has no version in it" ;; esac
+		return 0
+	fi
 	# The /releases/latest page redirects to the tag; this needs no API token and no rate limit.
 	tag_url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest") ||
 		die "could not reach github.com"
@@ -333,12 +552,21 @@ download_and_verify() {
 	fi
 	ARCHIVE=harnessly_${VERSION}_${OS}_${ARCH}.tar.gz
 	base=https://github.com/$REPO/releases/download/v$VERSION
+	[ -z "$MIRROR" ] || base=$MIRROR/v$VERSION
 	TMP=$(mktemp -d)
 	trap 'rm -rf "$TMP"' EXIT
-	step "Downloading harnessly $VERSION for $OS/$ARCH"
-	(cd "$TMP" && curl -fsSL --retry 3 -O "$base/$ARCHIVE" -O "$base/checksums.txt" -O "$base/checksums.txt.sigstore.json") ||
-		die "could not download $base/$ARCHIVE"
-	if have cosign; then
+	if [ -n "$OFFLINE" ]; then
+		step "Using the offline bundle $OFFLINE: harnessly $VERSION for $OS/$ARCH"
+		[ -f "$OFFLINE/$ARCHIVE" ] || die "$OFFLINE/$ARCHIVE is not there"
+		[ -f "$OFFLINE/checksums.txt" ] || die "$OFFLINE/checksums.txt is not there"
+		cp "$OFFLINE/$ARCHIVE" "$OFFLINE/checksums.txt" "$TMP/"
+		cp "$OFFLINE/checksums.txt.sigstore.json" "$TMP/" 2>/dev/null || true
+	else
+		step "Downloading harnessly $VERSION for $OS/$ARCH"
+		(cd "$TMP" && curl -fsSL --retry 3 -O "$base/$ARCHIVE" -O "$base/checksums.txt" -O "$base/checksums.txt.sigstore.json") ||
+			die "could not download $base/$ARCHIVE"
+	fi
+	if have cosign && [ -f "$TMP/checksums.txt.sigstore.json" ]; then
 		cosign verify-blob "$TMP/checksums.txt" --bundle "$TMP/checksums.txt.sigstore.json" \
 			--certificate-identity "https://github.com/$REPO/.github/workflows/release.yml@refs/tags/v$VERSION" \
 			--certificate-oidc-issuer https://token.actions.githubusercontent.com >/dev/null 2>&1 ||
@@ -459,6 +687,7 @@ start_launchd() {
     <key>RUNTIME_GATE_UPSTREAM</key><string></string>
     <key>RUNTIME_APP_BASE_PATH</key><string>/</string>
     <key>PATH</key><string>$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH</string>
+$(net_lines | while IFS='=' read -r k v; do printf '    <key>%s</key><string>%s</string>\n' "$k" "$v"; done)
   </dict>
   <key>WorkingDirectory</key><string>$HOME</string>
   <key>RunAtLoad</key><true/>
@@ -490,15 +719,26 @@ start_background() {
 		cd "$HOME"
 		# shellcheck disable=SC1090
 		if [ -f "$ENV_FILE" ]; then set -a && . "$ENV_FILE" && set +a; fi
-		RUNTIME_GATE_LISTEN=127.0.0.1:$PORT RUNTIME_GATE_UPSTREAM='' RUNTIME_APP_BASE_PATH=/ PATH=$BIN:$PATH \
-			nohup "$BIN/harnessly-runtime" >>"$LOG_FILE" 2>&1 &
+		if [ "${HARNESSLY_SUPERVISE:-0}" = 1 ] && [ -x "$BIN/harnessly" ]; then
+			# The supervisor starts the runtime again when it ends (waiting longer after quick failures) and logs why.
+			RUNTIME_GATE_LISTEN=127.0.0.1:$PORT RUNTIME_GATE_UPSTREAM='' RUNTIME_APP_BASE_PATH=/ PATH=$BIN:$PATH \
+				nohup "$BIN/harnessly" supervise --runtime "$BIN/harnessly-runtime" >>"$LOG_FILE" 2>&1 &
+		else
+			RUNTIME_GATE_LISTEN=127.0.0.1:$PORT RUNTIME_GATE_UPSTREAM='' RUNTIME_APP_BASE_PATH=/ PATH=$BIN:$PATH \
+				nohup "$BIN/harnessly-runtime" >>"$LOG_FILE" 2>&1 &
+		fi
 		echo $! >"$PID_FILE"
 	)
-	HOW="background process (no systemd here; it stops on reboot)   log: $LOG_FILE · run this installer again to restart it"
+	if [ "${HARNESSLY_SUPERVISE:-0}" = 1 ] && [ -x "$BIN/harnessly" ]; then
+		HOW="background process under the supervisor (no systemd here; it restarts the runtime if it ends, not after a reboot)   log: $LOG_FILE · run this installer again to restart it"
+	else
+		HOW="background process (no systemd here; it stops on reboot)   log: $LOG_FILE · run this installer again to restart it"
+	fi
 }
 
 start_service() {
 	write_env_file
+	write_net_block
 	step "Starting harnessly"
 	if [ "$OS" = darwin ]; then
 		start_launchd
@@ -584,10 +824,20 @@ uninstall() {
 main() {
 	parse_args "$@"
 	detect_platform
+	JOURNAL=0
+	if [ "$CHECK" = 1 ] || [ "$PREFLIGHT" = 1 ] || [ -n "${HARNESSLY_INSTALL_LOG:-}" ] || [ -n "$LOG" ]; then JOURNAL=1; fi
+	[ -n "$LOG" ] || LOG=$STATE_DIR/install.log
+	jlog start "install.sh $(id -un) $OS/$ARCH"
+	net_setup
 	if [ "$UNINSTALL" = 1 ]; then
 		uninstall
 		return 0
 	fi
+	if [ "$CHECK" = 1 ]; then
+		preflight
+		return 0
+	fi
+	[ "$PREFLIGHT" != 1 ] || preflight
 	ensure_deps
 	ensure_browser
 	resolve_version
@@ -595,6 +845,7 @@ main() {
 	install_programs
 	[ "$SERVICE" = 0 ] || start_service
 	finish
+	jlog finish "harnessly $VERSION at $BIN"
 }
 
 main "$@"

@@ -203,3 +203,21 @@ func TestFilePermissionMasks(t *testing.T) {
 		t.Errorf("a write over the whole workspace is a warning: %v", ps)
 	}
 }
+
+func TestAgentsReadPermission(t *testing.T) {
+	with := func(perm string) Problems {
+		m, ps := ParseManifest([]byte(strings.Replace(review, `"permissions": []`, `"permissions": ["`+perm+`"]`, 1)))
+		if m == nil {
+			t.Fatalf("%s: %v", perm, ps)
+		}
+		return m.Check()
+	}
+	if ps := with("agents.read"); len(ps.Errors()) != 0 {
+		t.Errorf("agents.read is a right: %v", ps)
+	}
+	for _, bad := range []string{"agents.write", "agents.read:x"} {
+		if ps := with(bad); len(ps.Errors()) == 0 {
+			t.Errorf("%s passed", bad)
+		}
+	}
+}

@@ -149,6 +149,7 @@ func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, ho
 			FallbackVersion: healthFallbackVersion(),
 			ReleaseFile:     releaseFile,
 			Alive:           alive,
+			Selftest:        selfKeeper.Selftest,
 		},
 		ManifestFile:     releaseStatic("RUNTIME_MANIFEST_FILE", "manifest.json"),
 		MachineAgent:     d.MachineAgent,

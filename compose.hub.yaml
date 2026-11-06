@@ -56,11 +56,24 @@ services:
       # the address). The try-out is invite: the first account is the administrator, the others come by invitation.
       HUB_SIGNUP: ${HUB_SIGNUP:-invite}
       HUB_ADMIN_EMAILS: ${HUB_ADMIN_EMAILS:-}
+      # The first account to sign in becomes the administrator. A provider that does not verify emails cannot prove the
+      # address, so name the installation's own OpenID Connect provider as one that does (HUB_OIDC_EMAIL_TRUSTED=on).
+      HUB_OIDC_EMAIL_TRUSTED: ${HUB_OIDC_EMAIL_TRUSTED:-}
+      # Organizations and the new interface are on for a new installation: sign in, make an organization with
+      # its first tenant, invite people, connect a machine. An existing installation keeps its own values.
+      HUB_ORGS: ${HUB_ORGS:-on}
+      HUB_FEATURES_DEFAULT: ${HUB_FEATURES_DEFAULT:-ui.hx}
+      # Without HUB_RUNTIME_DOMAIN a machine's page runs on the hub's own origin; an owner of a space may trust a machine
+      # that an administrator did not connect (docs/hub/api.md, «Trusting a machine»).
+      HUB_MACHINE_TRUST: ${HUB_MACHINE_TRUST:-on}
       # Mail for sign-in codes and invitations. Empty: the code is written to the log, marked DEV, which a hub on https
       # refuses unless HUB_MAIL_LOG=allow.
       HUB_SMTP_URL: ${HUB_SMTP_URL:-}
       HUB_MAIL_LOG: ${HUB_MAIL_LOG:-}
       HUB_MAIL_FROM: ${HUB_MAIL_FROM:-}
+      # off: no sign-in by a mailed code and no SMTP; people sign in through an OpenID Connect provider (or GitHub, Yandex),
+      # and an invitation is a link the inviter passes on (docs/hub/deploy.md, «Sign in without mail»).
+      HUB_AUTH_EMAIL: ${HUB_AUTH_EMAIL:-on}
       # Sign in with GitHub, Yandex ID or an OpenID Connect provider appears when its settings are filled in.
       HUB_GITHUB_CLIENT_ID: ${HUB_GITHUB_CLIENT_ID:-}
       HUB_GITHUB_CLIENT_SECRET: ${HUB_GITHUB_CLIENT_SECRET:-}
@@ -79,6 +92,14 @@ services:
       HARNESSLY_SITES_DOMAIN: ${HARNESSLY_SITES_DOMAIN:-}
       HARNESSLY_SITES_ABUSE_URL: ${HARNESSLY_SITES_ABUSE_URL:-}
       # The sites' files live in the hub's data volume unless a bucket (MinIO, any S3) is named.
+      # HUB_STORAGE=s3 with HUB_S3_* puts every file of the hub in one bucket (docs/hub/deploy.md, «Files in S3»).
+      HUB_STORAGE: ${HUB_STORAGE:-disk}
+      HUB_S3_ENDPOINT: ${HUB_S3_ENDPOINT:-}
+      HUB_S3_REGION: ${HUB_S3_REGION:-}
+      HUB_S3_BUCKET: ${HUB_S3_BUCKET:-}
+      HUB_S3_PREFIX: ${HUB_S3_PREFIX:-}
+      HUB_S3_ACCESS_KEY: ${HUB_S3_ACCESS_KEY:-}
+      HUB_S3_SECRET_KEY: ${HUB_S3_SECRET_KEY:-}
       HARNESSLY_SITES_S3_ENDPOINT: ${HARNESSLY_SITES_S3_ENDPOINT:-}
       HARNESSLY_SITES_S3_REGION: ${HARNESSLY_SITES_S3_REGION:-}
       HARNESSLY_SITES_S3_BUCKET: ${HARNESSLY_SITES_S3_BUCKET:-}

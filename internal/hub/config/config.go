@@ -11,11 +11,14 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
 	"golang.org/x/net/publicsuffix"
+
+	"github.com/ly-solutions/harnessly/internal/secrets/vaultkv"
 )
 
 const (
@@ -29,10 +32,76 @@ const (
 	SignupInvite      = "invite"
 )
 
+// parseBaseURL reads http(s)://host[:port][/path]: the URL and its path without a trailing slash ("" at the root). A
+// query, a fragment, a login, an empty segment or a dot segment is refused: the path becomes a prefix of routes and
+// cookies, so it must be one plain thing.
+func parseBaseURL(raw string) (*url.URL, string, error) {
+	u, err := url.Parse(raw)
+	switch {
+	case err != nil:
+		return nil, "", err
+	case u.Scheme != "http" && u.Scheme != "https":
+		return nil, "", errors.New("the scheme is http or https")
+	case u.Host == "":
+		return nil, "", errors.New("no host")
+	case u.RawQuery != "" || u.Fragment != "" || u.User != nil || u.RawPath != "":
+		return nil, "", errors.New("no query, fragment, login or escapes")
+	}
+	base := strings.TrimRight(u.Path, "/")
+	if base != "" {
+		if first, _, _ := strings.Cut(base[1:], "/"); slices.Contains(reservedFirstSegments, first) {
+			return nil, "", fmt.Errorf("/%s is a path of the hub itself", first)
+		}
+		for _, seg := range strings.Split(base[1:], "/") {
+			if seg == "" || seg == "." || seg == ".." || strings.ContainsAny(seg, "\\ ;%") {
+				return nil, "", errors.New("the path is plain segments like /harnessly")
+			}
+		}
+	}
+	return u, base, nil
+}
+
+// reservedFirstSegments are the paths the hub answers at its root: a base path starting with one would be ambiguous.
+var reservedFirstSegments = []string{"api", "agent", "dl", "m", "assets", "sites", "healthz", "readyz", "signin", "invite"}
+
+// CookiePath is the Path of the hub's cookies: the base path, or / at the root of the host.
+func (c *Config) CookiePath() string {
+	if c.BasePath == "" {
+		return "/"
+	}
+	return c.BasePath
+}
+
+// CookiePrefix is the name prefix a Secure cookie of the hub carries. __Host- needs Path=/, so under a base path the
+// weaker __Secure- is what a browser can still be held to.
+func (c *Config) CookiePrefix() string {
+	switch {
+	case !c.Secure:
+		return ""
+	case c.BasePath != "":
+		return "__Secure-"
+	default:
+		return "__Host-"
+	}
+}
+
 // Config is the validated configuration of one hub process.
 type Config struct {
-	Listen    string
-	PublicURL string // no trailing slash
+	// Replicas turns on several hub replicas (HUB_REPLICAS=on, docs/hub/replicas.md): machine links get a lease and a
+	// fencing token in the database and a request reaches the replica that holds the link. ReplicaID names this replica
+	// (random when empty), ReplicaAddr is where the other replicas reach it, ReplicaSecret is shared by all of them.
+	Replicas                              bool
+	ReplicaID, ReplicaAddr, ReplicaSecret string
+
+	Listen string
+	// PublicURL is the address people open the hub at, without a trailing slash. It may carry a path
+	// (https://example.com/harnessly) when a reverse proxy serves the hub under one: every link the hub builds starts with it.
+	PublicURL string
+	// Origin is PublicURL without the path: what a browser calls the origin (sign-in with a passkey is bound to it).
+	Origin string
+	// BasePath is the path of PublicURL ("/harnessly"), "" when the hub is at the root of its host. A request may come
+	// with it or without (the proxy may strip it); the hub answers both.
+	BasePath string
 	// Host is the public URL's host (with :port when not default), lower-case: what a machine signs its dial for.
 	Host string
 	// Secure is whether the public URL is https: cookies carry Secure and the __Host- prefix.
@@ -51,7 +120,16 @@ type Config struct {
 	Features Features
 
 	DatabaseURL string
-	DataDir     string
+	// DBSchema (HUB_DB_SCHEMA) is the Postgres schema for the hub's tables; empty: the connection's search_path.
+	DBSchema string
+	// DBPooler (HUB_DB_POOLER) is "transaction" behind a connection pooler in transaction mode (PgBouncer), else "".
+	DBPooler string
+	// DBMigrateURL (HUB_DB_MIGRATE_URL) is a direct Postgres URL the migrations use instead of DatabaseURL.
+	DBMigrateURL string
+	// DBCheck (HUB_DB_CHECK) is what the hub does when the database is newer than the binary or its schema drifted:
+	// "warn" (the default) logs, "strict" refuses to start, "off" does not look.
+	DBCheck string
+	DataDir string
 
 	Edition string
 	Signup  string
@@ -65,6 +143,10 @@ type Config struct {
 	// written to the hub's log even though the hub is on https or in the cloud edition, where the log is read by more
 	// people than the person signing in.
 	MailLogAllowed bool
+	// AuthEmailOff (HUB_AUTH_EMAIL=off) closes the sign-in by a code mailed to the person: the hub signs people in only
+	// through an OpenID Connect provider, GitHub, Yandex or the gateway, needs no SMTP server, and gives invitations
+	// as links. Off by default (the code sign-in stays).
+	AuthEmailOff bool
 
 	Passkey bool
 	RPID    string
@@ -91,9 +173,19 @@ type Config struct {
 	// SitesDir holds the sites' files when no bucket is set.
 	SitesDir string
 	SitesS3  SitesS3
+	// Storage is where the hub keeps its files: "disk" (the data folder, the default) or "s3" (HUB_STORAGE=s3 with
+	// HUB_S3_*: one bucket for every kind of file the hub holds). S3 is that bucket when Storage is "s3".
+	Storage string
+	S3      SitesS3
 	// FleetSites lets a fleet gateway mint narrow publishing sessions without registering its machines in the hub.
 	FleetSitesSecret string
 	FleetSitesSpace  string
+	// SafeVault is the Vault-compatible server the hub keeps its machines' safes on (HUB_SECRETS_VAULT_*, docs/safe.md);
+	// nil: the hub keeps none. SafePrefix is the hub's folder in the mount, SafeRefPrefixes the folders a machine may
+	// read references from (HUB_SECRETS_REF_PREFIXES).
+	SafeVault       *vaultkv.Config
+	SafePrefix      string
+	SafeRefPrefixes []string
 	// Warnings are what the hub starts with although its operator should look at it again: the binary logs each at
 	// error level and check-config prints them.
 	Warnings []string
@@ -113,6 +205,21 @@ type Config struct {
 	// Orgs (HUB_ORGS) is how far organizations are switched on: OrgsOff (the schema is there, the hub behaves as before),
 	// OrgsShadow (the new endpoints answer instance administrators only: checking and seeding), OrgsOn (everyone).
 	Orgs string
+	// MachineTrust (HUB_MACHINE_TRUST=on) lets an owner of a space trust a machine to run on the hub's own origin when
+	// the hub has no HUB_RUNTIME_DOMAIN; off: only machines an instance administrator connected open there.
+	MachineTrust bool
+	// OIDCEmailTrusted (HUB_OIDC_EMAIL_TRUSTED=on) takes the email of an OpenID Connect provider as verified even when
+	// the provider does not say email_verified: for a provider the operator runs or trusts. It is how the
+	// first person to sign in through it becomes the administrator of a fresh installation that names none.
+	OIDCEmailTrusted bool
+	// Docs (HUB_DOCS=on) switches on the documents and boards side: the hub answers <platform api>/docs and the agents'
+	// doc.publish / doc.acl (docs/hub/docs.md). Off: nothing of it is served and the page says so.
+	Docs bool
+	// ArtifactsURL and ArtifactsToken (HUB_ARTIFACTS_URL, HUB_ARTIFACTS_TOKEN) reach the documents service with an editor
+	// token. BoardsURL and BoardsToken (HUB_BOARDS_URL, HUB_BOARDS_TOKEN) reach the boards service. A document needs the
+	// first pair, boards need the second; either may be missing and the page then says which one.
+	ArtifactsURL, ArtifactsToken string
+	BoardsURL, BoardsToken       string
 	// UsageIngest (HUB_USAGE_INGEST=on) lets the hub pull the machines' spend facts (docs/hub/usage.md); off: it never
 	// asks, and the spend tables stay empty.
 	UsageIngest bool
@@ -142,6 +249,8 @@ type Config struct {
 	EnvRecommended bool
 	// Machines holds the settings of the machine resources and access (machines.go).
 	Machines MachinesConfig
+	// Extensions holds the settings of the extension protocol (extensions.go).
+	Extensions ExtensionsConfig
 	// RatesURL (HUB_RATES_URL) is where the Central Bank's daily rates are read; "" is cbr.ru, "off" never fetches (money
 	// is then shown in dollars).
 	RatesURL string
@@ -160,6 +269,9 @@ type Features struct {
 
 // SitesS3 is an S3-compatible bucket for the sites' files (MinIO, Selectel). Endpoint empty: a folder.
 type SitesS3 struct{ Endpoint, Region, Bucket, Prefix, AccessKey, SecretKey string }
+
+// StorageS3 says the hub keeps its files in an S3-compatible bucket (HUB_STORAGE=s3), not in its data folder.
+func (c *Config) StorageS3() bool { return c.Storage == "s3" }
 
 // SitesMode says how published sites are reached: "subdomain" (own address per site under SitesDomain), "path"
 // (/sites/<site>--<space>/ on the hub's origin, sandboxed) or "off".
@@ -230,7 +342,7 @@ func (c *Config) IsAdminEmail(email string) bool {
 // not acceptable: on an https hub and in the cloud edition the log is kept and read by people other than the one who
 // asked for the code, and a code in it is a sign-in as that person. HUB_MAIL_LOG=allow takes the decision from here.
 func (c *Config) MailLogRefused() bool {
-	return c.SMTPURL == "" && (c.Secure || c.Edition == EditionCloud) && !c.MailLogAllowed
+	return c.SMTPURL == "" && !c.AuthEmailOff && (c.Secure || c.Edition == EditionCloud) && !c.MailLogAllowed
 }
 
 // SubdomainMode is whether every machine gets its own origin under RuntimeDomain.
@@ -338,6 +450,10 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		WebDir:   get("HUB_WEB_DIR"),
 		LogLevel: strings.ToLower(def("HUB_LOG_LEVEL", "info")),
 	}
+	c.DBSchema = get("HUB_DB_SCHEMA")
+	c.DBPooler = strings.ToLower(get("HUB_DB_POOLER"))
+	c.DBMigrateURL = get("HUB_DB_MIGRATE_URL")
+	c.DBCheck = strings.ToLower(def("HUB_DB_CHECK", "warn"))
 	c.DatabaseURL = get("HUB_DATABASE_URL")
 	if c.DatabaseURL == "" {
 		c.DatabaseURL = "sqlite://" + filepath.Join(c.DataDir, "hub.db")
@@ -345,13 +461,15 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 
 	// Public URL: the one required setting.
 	raw := strings.TrimRight(get("HUB_PUBLIC_URL"), "/")
-	switch u, err := url.Parse(raw); {
+	switch u, base, err := parseBaseURL(raw); {
 	case raw == "":
 		bad("HUB_PUBLIC_URL is required, e.g. https://hub.example.com")
-	case err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil:
-		bad("HUB_PUBLIC_URL must be http(s)://host[:port] without a path, got %q", raw)
+	case err != nil:
+		bad("HUB_PUBLIC_URL must be http(s)://host[:port][/path], got %q (%v)", raw, err)
 	default:
 		c.PublicURL = raw
+		c.Origin = u.Scheme + "://" + u.Host
+		c.BasePath = base
 		c.Host = strings.ToLower(u.Host)
 		c.Secure = u.Scheme == "https"
 		if c.RPID == "" {
@@ -362,9 +480,9 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	// The machines' address: the public one unless HUB_AGENT_URL says otherwise.
 	c.AgentURL, c.AgentHost, c.AgentSecure = c.PublicURL, c.Host, c.Secure
 	if raw := strings.TrimRight(get("HUB_AGENT_URL"), "/"); raw != "" {
-		switch u, err := url.Parse(raw); {
-		case err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil:
-			bad("HUB_AGENT_URL must be http(s)://host[:port] without a path, got %q", raw)
+		switch u, _, err := parseBaseURL(raw); {
+		case err != nil:
+			bad("HUB_AGENT_URL must be http(s)://host[:port][/path], got %q (%v)", raw, err)
 		default:
 			c.AgentURL, c.AgentHost, c.AgentSecure = raw, strings.ToLower(u.Host), u.Scheme == "https"
 		}
@@ -392,10 +510,54 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	default:
 		bad("HUB_SSH must be on or off")
 	}
+	switch strings.ToLower(def("HUB_OIDC_EMAIL_TRUSTED", "off")) {
+	case "on", "true", "1", "yes":
+		c.OIDCEmailTrusted = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_OIDC_EMAIL_TRUSTED must be on or off")
+	}
+	switch strings.ToLower(def("HUB_MACHINE_TRUST", "off")) {
+	case "on", "true", "1", "yes":
+		c.MachineTrust = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_MACHINE_TRUST must be on or off")
+	}
+	switch strings.ToLower(def("HUB_REPLICAS", "off")) {
+	case "on", "true", "1", "yes":
+		c.Replicas = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_REPLICAS must be on or off")
+	}
+	c.ReplicaID, c.ReplicaAddr, c.ReplicaSecret = def("HUB_REPLICA_ID", ""), strings.TrimRight(def("HUB_REPLICA_ADDR", ""), "/"), def("HUB_REPLICA_SECRET", "")
+	if c.Replicas {
+		if u, err := url.Parse(c.ReplicaAddr); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			bad("HUB_REPLICAS=on needs HUB_REPLICA_ADDR, the address the other replicas reach this one at (http://<pod ip>:8040)")
+		}
+		if len(c.ReplicaSecret) < 16 {
+			bad("HUB_REPLICAS=on needs HUB_REPLICA_SECRET of at least 16 characters, the same on every replica")
+		}
+	}
 	switch c.Orgs = strings.ToLower(def("HUB_ORGS", OrgsOff)); c.Orgs {
 	case OrgsOff, OrgsShadow, OrgsOn:
 	default:
 		bad("HUB_ORGS must be off, shadow or on, got %q", c.Orgs)
+	}
+	switch strings.ToLower(def("HUB_DOCS", "off")) {
+	case "on", "true", "1", "yes":
+		c.Docs = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_DOCS must be on or off")
+	}
+	c.ArtifactsURL, c.ArtifactsToken = strings.TrimRight(get("HUB_ARTIFACTS_URL"), "/"), get("HUB_ARTIFACTS_TOKEN")
+	c.BoardsURL, c.BoardsToken = strings.TrimRight(get("HUB_BOARDS_URL"), "/"), get("HUB_BOARDS_TOKEN")
+	for _, u := range []struct{ name, v string }{{"HUB_ARTIFACTS_URL", c.ArtifactsURL}, {"HUB_BOARDS_URL", c.BoardsURL}} {
+		if u.v != "" && !strings.HasPrefix(u.v, "http://") && !strings.HasPrefix(u.v, "https://") {
+			bad("%s must be an http(s) address", u.name)
+		}
 	}
 	for _, f := range strings.FieldsFunc(strings.ToLower(def("HUB_ENV_FEATURES", "")), func(r rune) bool { return r == ',' || r == ' ' }) {
 		switch f {
@@ -469,6 +631,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 	c.RatesURL = get("HUB_RATES_URL")
 	c.Machines = loadMachines(lookup, def, bad)
+	c.Extensions = loadExtensions(lookup, def, bad)
 	switch strings.ToLower(def("HUB_SSH_ALLOW_PRIVATE", "off")) {
 	case "on", "true", "1", "yes":
 		c.SSHAllowPrivate = true
@@ -500,6 +663,31 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		}
 	}
 
+	switch c.DBCheck {
+	case "warn", "strict", "off":
+	default:
+		bad("HUB_DB_CHECK must be warn, strict or off")
+	}
+	switch c.DBPooler {
+	case "", "off", "transaction":
+		if c.DBPooler == "off" {
+			c.DBPooler = ""
+		}
+	default:
+		bad("HUB_DB_POOLER must be transaction (PgBouncer in transaction mode) or empty")
+	}
+	if c.DBSchema != "" && !regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`).MatchString(c.DBSchema) {
+		bad("HUB_DB_SCHEMA must be lower-case letters, digits and _, starting with a letter or _ (63 characters at most)")
+	}
+	if !c.IsPostgres() && (c.DBSchema != "" || c.DBPooler != "" || c.DBMigrateURL != "") {
+		bad("HUB_DB_SCHEMA, HUB_DB_POOLER and HUB_DB_MIGRATE_URL work with a postgres:// HUB_DATABASE_URL only")
+	}
+	if c.DBMigrateURL != "" {
+		if u, err := url.Parse(c.DBMigrateURL); err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
+			bad("HUB_DB_MIGRATE_URL must be a postgres:// URL")
+		}
+	}
+
 	for _, e := range strings.Split(get("HUB_ADMIN_EMAILS"), ",") {
 		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
 			c.AdminEmails = append(c.AdminEmails, e)
@@ -526,6 +714,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		if err != nil || (u.Scheme != "smtp" && u.Scheme != "smtps") || u.Hostname() == "" {
 			bad("HUB_SMTP_URL must be smtp://[user:pass@]host[:587] or smtps://[user:pass@]host[:465]")
 		}
+	}
+	switch strings.ToLower(def("HUB_AUTH_EMAIL", "on")) {
+	case "on", "true", "1", "yes":
+	case "off", "false", "0", "no":
+		c.AuthEmailOff = true
+	default:
+		bad("HUB_AUTH_EMAIL must be on or off")
 	}
 	switch strings.ToLower(get("HUB_MAIL_LOG")) {
 	case "":
@@ -639,6 +834,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		}
 	}
 	c.loadSites(get, def, bad)
+	c.loadSafe(lookup, bad)
 	if c.Edition == EditionCloud && c.RuntimeDomain == "" {
 		// The cloud's machines belong to people who do not trust each other (and the hub): a machine's page is its own
 		// script, and on the hub's origin it would act with the signed-in person's session.
@@ -659,6 +855,9 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		c.ProxyJWT = ProxyJWT{}
 		c.LocalCodeFile = ""
 		c.SSHAllowPrivate = false
+	}
+	if c.AuthEmailOff && !c.GitHubOn() && !c.YandexOn() && len(c.OIDC) == 0 && !c.ProxyJWT.On() {
+		bad("HUB_AUTH_EMAIL=off leaves no way to sign in: set an OpenID Connect provider (HUB_OIDC_*), GitHub, Yandex or the gateway sign-in (HUB_PROXY_JWT_*)")
 	}
 
 	if len(problems) > 0 {
@@ -695,6 +894,32 @@ func ParseIP(s string) net.IP {
 	return net.ParseIP(s)
 }
 
+// loadSafe reads the HUB_SECRETS_* settings: a server for the machines' safes, set when HUB_SECRETS_VAULT_ADDR is.
+// The names are read as they are (not NAME_FILE): the logins name their files themselves.
+func (c *Config) loadSafe(lookup func(string) (string, bool), bad func(string, ...any)) {
+	plain := func(k string) string {
+		v, _ := lookup(k)
+		return strings.TrimSpace(v)
+	}
+	if plain("HUB_SECRETS_VAULT_ADDR") == "" {
+		return
+	}
+	vc, err := vaultkv.FromEnv("HUB_SECRETS_VAULT_", plain)
+	if err != nil {
+		bad("%v", err)
+		return
+	}
+	c.SafeVault = &vc
+	c.SafePrefix = strings.Trim(plain("HUB_SECRETS_VAULT_PREFIX"), "/")
+	if c.SafePrefix == "" {
+		c.SafePrefix = "harnessly"
+	}
+	if !vaultkv.ValidPath(c.SafePrefix) {
+		bad("HUB_SECRETS_VAULT_PREFIX must be a path like harnessly")
+	}
+	c.SafeRefPrefixes = vaultkv.SplitPrefixes(plain("HUB_SECRETS_REF_PREFIXES"))
+}
+
 // loadSites reads the HARNESSLY_SITES_* settings and checks the domain the way the runtime domain is checked: sites run
 // pages of strangers, so their domain must not be one the hub's cookies reach.
 func (c *Config) loadSites(get func(string) string, def func(string, string) string, bad func(string, ...any)) {
@@ -706,12 +931,33 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 		bad("HARNESSLY_SITES must be on or off")
 	}
 	c.SitesDir = def("HARNESSLY_SITES_DIR", filepath.Join(c.DataDir, "sites"))
+	switch strings.ToLower(def("HUB_STORAGE", "disk")) {
+	case "disk":
+		c.Storage = "disk"
+	case "s3":
+		c.Storage = "s3"
+		c.S3 = SitesS3{Endpoint: get("HUB_S3_ENDPOINT"), Region: get("HUB_S3_REGION"), Bucket: get("HUB_S3_BUCKET"),
+			Prefix: get("HUB_S3_PREFIX"), AccessKey: get("HUB_S3_ACCESS_KEY"), SecretKey: get("HUB_S3_SECRET_KEY")}
+		if c.S3.Endpoint == "" || c.S3.Bucket == "" || c.S3.AccessKey == "" || c.S3.SecretKey == "" {
+			bad("HUB_STORAGE=s3 needs HUB_S3_ENDPOINT, HUB_S3_BUCKET, HUB_S3_ACCESS_KEY and HUB_S3_SECRET_KEY")
+		}
+		if u, err := url.Parse(c.S3.Endpoint); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			bad("HUB_S3_ENDPOINT must be http(s)://host[:port]")
+		}
+	default:
+		bad("HUB_STORAGE must be disk or s3")
+	}
 	c.SitesS3 = SitesS3{
 		Endpoint: get("HARNESSLY_SITES_S3_ENDPOINT"), Region: get("HARNESSLY_SITES_S3_REGION"), Bucket: get("HARNESSLY_SITES_S3_BUCKET"),
 		Prefix: get("HARNESSLY_SITES_S3_PREFIX"), AccessKey: get("HARNESSLY_SITES_S3_ACCESS_KEY"), SecretKey: get("HARNESSLY_SITES_S3_SECRET_KEY"),
 	}
 	if c.SitesS3.Endpoint != "" && (c.SitesS3.Bucket == "" || c.SitesS3.AccessKey == "" || c.SitesS3.SecretKey == "") {
 		bad("HARNESSLY_SITES_S3_ENDPOINT needs HARNESSLY_SITES_S3_BUCKET, HARNESSLY_SITES_S3_ACCESS_KEY and HARNESSLY_SITES_S3_SECRET_KEY")
+	}
+	if c.StorageS3() && c.SitesS3.Endpoint == "" {
+		// The one setting: the sites go to the hub's bucket, under their own prefix. HARNESSLY_SITES_S3_* still wins.
+		c.SitesS3 = c.S3
+		c.SitesS3.Prefix = c.S3.Prefix + "sites/"
 	}
 	if c.SitesAbuseURL != "" {
 		if u, err := url.Parse(c.SitesAbuseURL); err != nil || (u.Scheme != "https" && u.Scheme != "http" && u.Scheme != "mailto") {

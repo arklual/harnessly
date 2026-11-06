@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/memstore"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
@@ -59,6 +61,19 @@ func splitList(v string) []string {
 // memoryParents: Claude Code's projects, then the folders of synced session copies (RUNTIME_SESSION_MEMORY_DIRS).
 func memoryParents(home string) []string {
 	return append([]string{filepath.Join(machine.ClaudeDir(home), "projects")}, splitList(os.Getenv("RUNTIME_SESSION_MEMORY_DIRS"))...)
+}
+
+// readMemoryNote reads a note from the files, as it always was; with a declared memory adapter (docs/memory-adapters.md)
+// the adapter answers first and the files fill in what it does not have.
+func readMemoryNote(ctx context.Context, name string, parents []string) (files.Object, bool) {
+	if len(memstore.Adapters()) == 0 {
+		return files.ReadMemoryNote(name, parents)
+	}
+	n, err := memstore.For(memstore.FileStore{Parents: parents}).Get(ctx, name)
+	if err != nil {
+		return nil, false
+	}
+	return files.Object{{K: "name", V: n.Name}, {K: "title", V: n.Title}, {K: "description", V: n.Description}, {K: "body", V: n.Body}}, true
 }
 
 func fileRoutes(d deps) []gate.JSONRoute {
@@ -209,7 +224,7 @@ func fileRoutes(d deps) []gate.JSONRoute {
 				}
 				noStore := http.Header{"Cache-Control": {"no-store"}}
 				name, _ := files.RequestQuery(r).String("name")
-				note, ok := files.ReadMemoryNote(name, memoryParents(d.Home))
+				note, ok := readMemoryNote(r.Context(), name, memoryParents(d.Home))
 				if !ok {
 					return answer(r, 404, files.Error(locale.Pick("There is no such memory on this machine", "Такой памяти на этой машине нет")), noStore)
 				}

@@ -27,6 +27,8 @@ func TestAuthorize(t *testing.T) {
 		{"harnessly/chat.card", "pane", nil, CodePermissionDenied},
 		{"harnessly/pane.open", "pane", nil, CodePermissionDenied},
 		{"harnessly/notify", "pane", nil, CodePermissionDenied},
+		{"harnessly/agents.list", "pane", nil, CodePermissionDenied},
+		{"harnessly/pane.open", "pane", map[string]any{"target": "chat:tab-1"}, CodePermissionDenied},
 		{"harnessly/storage.get", "pane", map[string]any{"scope": "install"}, ""},
 		{"harnessly/storage.set", "pane", map[string]any{"scope": "user"}, ""},
 		{"harnessly/storage.set", "pane", map[string]any{"scope": "space"}, CodePermissionDenied},
@@ -45,6 +47,23 @@ func TestAuthorize(t *testing.T) {
 		if got != c.code {
 			t.Errorf("%s %v: %q, want %q", c.method, c.params, got, c.code)
 		}
+	}
+	// agents.read gives the list of conversations; opening one needs it as well as pane.open.
+	agents := &Manifest{Targets: []string{TargetPane}, Permissions: []string{"agents.read"}}
+	if err := agents.Authorize("harnessly/agents.list", "pane", nil); err != nil {
+		t.Errorf("agents.list with agents.read: %v", err)
+	}
+	open := &Manifest{Targets: []string{TargetPane}, Permissions: []string{"pane.open"}}
+	if err := open.Authorize("harnessly/pane.open", "pane", map[string]any{"target": "app:a.b"}); err != nil {
+		t.Errorf("pane.open of an app: %v", err)
+	}
+	var denial *BridgeError
+	if err := open.Authorize("harnessly/pane.open", "pane", map[string]any{"target": "chat:tab-1"}); !errors.As(err, &denial) || denial.Code != CodePermissionDenied {
+		t.Errorf("pane.open of a chat without agents.read: %v", err)
+	}
+	both := &Manifest{Targets: []string{TargetPane}, Permissions: []string{"pane.open", "agents.read"}}
+	if err := both.Authorize("harnessly/pane.open", "pane", map[string]any{"target": "chat:tab-1"}); err != nil {
+		t.Errorf("pane.open of a chat with agents.read: %v", err)
 	}
 	// A call with no target is refused, not let through.
 	for _, method := range []string{"ui/initialize", "harnessly/storage.get", "tools/call"} {

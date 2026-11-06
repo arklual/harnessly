@@ -89,6 +89,7 @@ export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
     os: hw?.os || null,
     rent: rent ? { provider: rent.provider, plan: rent.plan, price: rent.price } : null,
     managed: x.managed ?? null,
+    opensRuntime: m.opensRuntime ?? true,
     canManage: canAdmin || (teamCaps?.manage ?? false),
     canAdmin,
     needs: canAdmin ? null : 'tenant_admin',
@@ -314,6 +315,9 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
       await http.del(`/api/machines/${id}`);
     },
     openMachine: (id) => contractGet<{ url: string }>(`/api/machines/${id}/open`),
+    trustMachine: async (id) => {
+      await http.post(`/api/machines/${id}/trust`, {});
+    },
     disableMachine: (id) => post(id, 'disable'),
     enableMachine: (id) => post(id, 'enable'),
     setMachineAccess: async (id, access) => {

@@ -20,6 +20,7 @@ import { LoginPanel } from './agent-login';
 import { ProxyBar, ProxyForm } from './agent-proxy';
 import { jobRows } from './machines';
 import { useGoStep, useSpace, useStepNav } from './space';
+import { withBase } from '../lib/base';
 
 export const AgentMark = ({ provider, soon }: { provider: Provider; soon?: boolean }) => (
   <span className="hub-agent" data-agent={provider} data-soon={soon || undefined} aria-hidden="true">
@@ -115,7 +116,7 @@ export const AgentsScreen = () => {
 const GoMachines = () => {
   const { space } = useSpace();
   return (
-    <a className="hub-link" href={`/s/${space.slug}/setup/machines`}>
+    <a className="hub-link" href={withBase(`/s/${space.slug}/setup/machines`)}>
       {t('agents.toMachines')}
     </a>
   );

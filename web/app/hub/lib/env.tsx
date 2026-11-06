@@ -5,6 +5,7 @@ import { createContext, type ReactNode, useContext } from 'react';
 import { createApi, type HubApi } from './api';
 import { seal, canSeal } from './seal';
 import { createPasskey, getPasskey, passkeysSupported } from './webauthn';
+import { withBase } from './base';
 
 export interface EventSourceLike {
   onopen: ((ev: Event) => void) | null;
@@ -70,7 +71,7 @@ export const browserEnv = (): HubEnv => ({
   seal,
   canSeal,
   copyText,
-  assign: (url) => window.location.assign(url),
+  assign: (url) => window.location.assign(withBase(url)),
   openBlank: () => {
     const w = window.open('', '_blank');
     if (!w) return null;
@@ -82,13 +83,13 @@ export const browserEnv = (): HubEnv => ({
     }
     return {
       go: (url) => {
-        w.location.href = url;
+        w.location.href = withBase(url);
       },
       close: () => w.close(),
     };
   },
   openTab: (url) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(withBase(url), '_blank', 'noopener,noreferrer');
   },
   now: () => Date.now(),
   origin: () => window.location.origin,

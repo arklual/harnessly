@@ -64,14 +64,14 @@ func TestHostToolsEnabledOnly(t *testing.T) {
 
 func TestHostToolsData(t *testing.T) {
 	h, _ := hostRig(t, []string{"acme.cash"})
-	if text, bad := call(t, h, "data_get", "key", "picks"); bad || text != "null" {
+	if text, bad := call(t, h, "data_get", "key", "picks"); bad || text != `{"value":null,"version":0}` {
 		t.Fatalf("empty: %q", text)
 	}
 	value := jsvalue.NewObject("a", float64(1))
 	if text, bad := call(t, h, "data_set", "key", "picks", "value", value); bad {
 		t.Fatalf("set: %q", text)
 	}
-	if text, _ := call(t, h, "data_get", "key", "picks"); text != `{"a":1}` {
+	if text, _ := call(t, h, "data_get", "key", "picks"); text != `{"value":{"a":1},"version":1}` {
 		t.Fatalf("get: %q", text)
 	}
 	// What the agent wrote is the chat's area, the one the view reads.
@@ -79,7 +79,7 @@ func TestHostToolsData(t *testing.T) {
 		t.Fatalf("storage: %s %v", raw, ok)
 	}
 	big := strings.Repeat("x", 300<<10)
-	if text, bad := call(t, h, "data_set", "key", "big", "value", big); !bad || !strings.Contains(text, "full") {
+	if text, bad := call(t, h, "data_set", "key", "big", "value", big); !bad || !strings.Contains(text, "quota_exceeded") {
 		t.Fatalf("quota: %.60q", text)
 	}
 	if text, bad := call(t, h, "data_get", "key", ""); !bad {
@@ -297,5 +297,36 @@ func TestHostToolsWidgets(t *testing.T) {
 	}
 	if changed != 3 {
 		t.Fatalf("changed told %d times", changed)
+	}
+}
+
+func TestHostToolsDataVersions(t *testing.T) {
+	h, _ := hostRig(t, []string{"acme.cash"})
+	var changes []Change
+	h.Storage.OnChange(func(c Change) { changes = append(changes, c) })
+	if text, bad := call(t, h, "data_set", "key", "k", "value", "one", "ifVersion", float64(0)); bad || text != `{"version":1}` {
+		t.Fatalf("first: %q", text)
+	}
+	// A write that read version 0 comes late: refused, the value stays.
+	text, bad := call(t, h, "data_set", "key", "k", "value", "two", "ifVersion", float64(0))
+	if !bad || !strings.HasPrefix(text, "refused: conflict:") || !strings.Contains(text, "version 1") {
+		t.Fatalf("stale: %q", text)
+	}
+	if text, _ := call(t, h, "data_get", "key", "k"); text != `{"value":"one","version":1}` {
+		t.Fatalf("kept: %q", text)
+	}
+	if text, bad := call(t, h, "data_set", "key", "k", "value", "two", "ifVersion", float64(1)); bad || text != `{"version":2}` {
+		t.Fatalf("current: %q", text)
+	}
+	if _, bad := call(t, h, "data_set", "key", "k", "value", "x", "ifVersion", float64(-1)); !bad {
+		t.Fatal("a negative ifVersion is refused")
+	}
+	// Without ifVersion the write is as it was.
+	if text, bad := call(t, h, "data_set", "key", "k", "value", "three"); bad || text != `{"version":3}` {
+		t.Fatalf("plain: %q", text)
+	}
+	// The agent's write reaches whoever listens, and says no value.
+	if len(changes) != 3 || changes[0] != (Change{App: "acme.cash", Scope: ScopeChat, Owner: "tab-1", Key: "k"}) {
+		t.Fatalf("changes: %+v", changes)
 	}
 }

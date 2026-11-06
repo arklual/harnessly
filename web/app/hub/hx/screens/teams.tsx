@@ -7,11 +7,14 @@ import { useMemo, useState } from 'react';
 import { useNow } from '../../lib/hooks';
 import { Redirect } from '../../lib/router';
 import { useOrg } from '../../org/context';
+import { useLive } from '../live';
 import { people as peopleText, plural, kRub } from '../../org/screens/teams/format';
 import { Btn, Icon } from '../ui';
 import { Titles } from '../shell';
 import { InviteSheet, NewTeamSheet } from './teams/extra';
+import type { Manage } from './teams/manage';
 import { flatOf, groupsOf } from './teams/model';
+import { moveTo, setRole } from './teams/ops';
 import { Empty, GroupCard, LoadFailed, PeopleTable, Problem, Tiles, TeamsSkeleton } from './teams/parts';
 import { PersonOrTeamSheet, type Subject } from './teams/sheet';
 import { TenantSheet } from './teams/tenant';
@@ -22,7 +25,8 @@ const CARDS = ['p', 't', 'dlg'] as const;
 type Mode = 'team' | 'flat';
 
 const List = () => {
-  const { scope, shell } = useOrg();
+  const { scope, shell, base } = useOrg();
+  const live = useLive();
   const slug = scope.kind === 'org' ? 'all' : scope.tenant.slug;
   const { view, error, reload, refresh, apply, problem, clearProblem } = useTeams(slug);
   const url = useUrl(CARDS);
@@ -56,6 +60,19 @@ const List = () => {
     : scope.kind === 'tenant'
       ? `Тенант ${scope.tenant.name}`
       : '';
+
+  // Moving, roles and an invitation from the list itself: only for the one who may change teams, and with live effects.
+  const manage: Manage | undefined =
+    live && view && view.teams.some((t) => t.people.some((p) => p.can.team || p.can.role))
+      ? {
+          teams: view.teams.map((t) => ({ id: t.id, name: t.name })),
+          move: (id, teamId) => void apply(moveTo(id, teamId)),
+          role: (id, role) => void apply(setRole(id, role)),
+          invite: (teamId) => url.open({ dlg: 'invite', t: teamId }),
+          base,
+          block: (teamId) => view.teams.find((t) => t.id === teamId),
+        }
+      : undefined;
 
   const noResult = needle !== '' && (mode === 'team' ? groups.length === 0 : flat.length === 0);
   const nobody = view !== null && view.total === 0 && teamCount === 0;
@@ -164,6 +181,7 @@ const List = () => {
                       }
                       onGear={g.teamId ? () => url.open({ t: g.teamId, dlg: 'limit', p: null }) : undefined}
                       onOpenPerson={(id) => url.open({ p: id })}
+                      manage={manage}
                     />
                   ))}
                 </div>
@@ -173,6 +191,7 @@ const List = () => {
                   items={flat.map((x) => ({ person: x.person, team: x.team }))}
                   now={now}
                   onOpen={(id) => url.open({ p: id })}
+                  manage={manage}
                 />
               )}
             </>
@@ -210,7 +229,19 @@ const List = () => {
           {tenants.length > 0 && (
             <InviteSheet
               open={dlg === 'invite'}
+              presetTeam={dlg === 'invite' ? tId : null}
               tenants={tenants}
+              teams={view.teams.flatMap((t) =>
+                t.id === null
+                  ? []
+                  : [
+                      {
+                        id: t.id,
+                        name: t.name,
+                        tenantId: t.tenantId ?? (scope.kind === 'tenant' ? scope.tenant.id : undefined),
+                      },
+                    ],
+              )}
               onClose={() => url.close()}
               onChanged={refresh}
             />

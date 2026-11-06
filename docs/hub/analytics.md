@@ -48,12 +48,25 @@ is `verdict: 'noise'`, shown as «не отличить от шума».
 | `reread_context` | Перечитанный контекст | the share of input that is context carried again | Σ `carryTokens` ÷ Σ (`inputTokens` + `cacheReadTokens` + `cacheWriteTokens`) | `carryTokens`, `inputTokens`, `cacheReadTokens`, `cacheWriteTokens` | share, down |
 | `session_start_ctx` | Старт сессии | how much context a session starts with | median of `firstCtx` | `firstCtx` | tokens, down |
 | `cache_hit` | Кэш | the share of input read from the cache | Σ `cacheReadTokens` ÷ Σ (`inputTokens` + `cacheReadTokens` + `cacheWriteTokens`) | `cacheReadTokens`, `inputTokens`, `cacheWriteTokens` | share, up |
+| `cache_write_1h` | Часовые записи кэша | the share of cache writes asked to live an hour (twice the price of a five-minute write) | Σ `cacheWrite1hTokens` ÷ Σ (`cacheWrite5mTokens` + `cacheWrite1hTokens`) | `cacheWrite5mTokens`, `cacheWrite1hTokens` | share, down |
+| `mr_survival` | Доживаемость MR | merged MRs that stayed 14 days without a revert, of those old enough to tell | Σ `mrsSurvived` ÷ Σ `mrsMature` | `mrsMature`, `mrsSurvived` (set by the hub, below) | share, up |
+| `waiting_p90` | Ожидание, p90 | how long the agent waits for the person in the slowest tenth of the waits | Σ (`waitP90Ms` × `waits`) ÷ Σ `waits` over sessions with `waitP90Ms` | `waitP90Ms`, `waits` | ms, down |
 | `skills_in_use` | Скиллы в ходу | of the skills offered, how many are used | Σ `skillsLoaded` ÷ Σ `skillsListed` | `skillsListed`, `skillsLoaded` | share, up |
 
 `metrics` keys (numbers): `turns`, `agentMs`, `waitMs`, `waits`, `activeIntervals` (the session's working intervals,
 encoded as a count here and kept as pairs on the machine), `toolCalls`, `toolErrors`, `carryTokens`, `firstCtx`,
 `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `skillsListed`, `skillsLoaded`, `mrs`, `mrsMerged`, `firstMrMs`,
-`waitingSince` (optional, epoch ms: since when the agent waits for its person).
+`waitingSince` (optional, epoch ms: since when the agent waits for its person), and since HRN-786 `cacheWrite5mTokens` and
+`cacheWrite1hTokens` (`cacheWriteTokens` split by the lifetime asked for), `waitP90Ms` (the 90th percentile, nearest rank,
+of the session's waits; absent without a wait) and, set by the hub, `mrsMature` and `mrsSurvived`. A session of an older
+machine lacks the first three; the KPI built on them count only the sessions that have them, so a period of old sessions
+shows «данных пока нет», never a zero.
+
+**Survival of merged MRs (`mrsMature`, `mrsSurvived`).** Over the merged requests that count for a session (above), the
+hub counts the ones merged at least 14 days ago (`mrsMature`) and, of them, the ones with no revert merged in the same
+project within those 14 days (`mrsSurvived`). A revert is a merged request titled `Revert "<title>"` (as GitLab writes it)
+in the same project as the request titled `<title>`. The numbers move with time, so they are computed on every read and
+are not stored.
 
 **Merged MRs (`mrsMerged`, `firstMrMs`).** The machine's scanner sends only the keys of the merge requests a session
 mentioned (`mrKeys`, `host/project/!iid`, host in lower case; found in pr-link records, in `curl`/`glab`/push output of
@@ -406,12 +419,14 @@ Markers (here and in the organization's series) carry what the chart draws:
 | `DELETE …/signals/{id}/snooze` | the addressee or above | | `{ signal: Signal }` back in the list; journal `signal.unsnooze` |
 | `GET …/spend?scope=&by=team\|person\|model\|account\|tenant&period=` | money | | `SpendResponse` — each row with its limit and forecast; sums of rows equal the total |
 | `GET …/subscriptions?scope=` | money | | `SubscriptionsResponse` — each subscription's fee split between people, its windows |
-| `GET …/kpis?scope=&from=&to=&cmpFrom=&cmpTo=&series=team` | view | | `KpisResponse` — all twelve with the comparison; `series=team` adds them per team («Команды рядом») |
+| `GET …/limit-windows?scope=&from=&to=` | money | | `LimitWindowsResponse` — the history of the windows of the subscriptions the scope reaches ([below](#limit-windows-hrn-786)) |
+| `GET …/kpis?scope=&from=&to=&cmpFrom=&cmpTo=&series=team` | view | | `KpisResponse` — all fifteen with the comparison; `series=team` adds them per team («Команды рядом») |
 | `GET …/kpis/{kpi}/series?scope=&from=&to=&by=day\|week&split=team` | view | | `KpiSeriesResponse` — points, splits per team, markers of changes |
 | `GET …/changes?scope=&from=&to=` | view | | `ChangesResponse` — the scope's changes and its ancestors' (they touch it too) |
 | `POST …/changes` | manage of the scope | `{ scope, title, at }` | 201 `{ change: Change }`; journal `change.create` |
 | `GET …/changes/{id}/effect?scope=` | view | | `EffectResponse` — 7 days before against 7 after, live sessions, every KPI; `overlaps` lists other changes in the windows (then `verdict: 'mixed'`) |
 | `GET …/waste?scope=&period=` | money | | `WasteResponse` — «Куда уходят деньги впустую» |
+| `GET …/tools?scope=&from=&to=` (or `period=`) | view | | `ToolsResponse` — MCP servers, skills and built-in tools the agents called: calls, errors, people and teams, calls by day, the last call; at most 400 days |
 | `GET …/people?scope=&period=` | money | | `PeopleResponse` — «Расход по людям» of a team or tenant: each person's money, share, personal limit, week's chats and MRs ([below](#people-and-the-week)) |
 
 ### Machines
@@ -464,7 +479,9 @@ As built (machines):
   first, then by name. A row is computed from what the hub holds: `status` from the link, `lastActiveAt` and
   `chatsRunning` from the top-level `live` sessions of the machine (running: not ended and moved in the last 15
   minutes), `people` from those sessions of the last 30 days, `access` from the new `machine_access` table (migration
-  `0010_machines.sql`; empty means the whole tenant).
+  `0010_machines.sql`; empty means the whole tenant). `opensRuntime` is false when the machine's last policy refused
+  runtime sessions (a machine the hub only watches): the page hides «Открыть» and `…/open` answers 409 `observe_only`
+ .
 - Problems: `disabled` (alone, when the machine is switched off), `offline` (seen once, no link now), `idle_week` (no
   chat for 7 days; not for a machine that never connected), `agent_old` (below `HUB_MIN_AGENT_VERSION`), `disk_low`
   (the last preflight reported less than 10% or 5 GiB free), `login_expired` (an installed agent reports
@@ -567,7 +584,7 @@ As built (machines):
   the reset. `windowPct` is the person's part of the shortest still-open window of all models: its `usedPct` × their
   share of the account's `list` over that window's hours (percent, «примерно», as `window_pct` in [limits.md](limits.md)),
   `null` with no such window or no use in its hours. The overview fills its `subscriptions` the same way.
-- **`…/kpis`** (view) are the twelve KPI of `/api/me/kpis` over the scope's live top-level sessions (any funding), with
+- **`…/kpis`** (view) are the fifteen KPI of `/api/me/kpis` over the scope's live top-level sessions (any funding), with
   `scope` the `{kind, id}` object; `money_per_mr` counts only the organization's sessions, their `list` ÷ their
   `mrsMerged`, as `moneyPerMr` does. `series=team` adds them per team of the scope, sorted by name; without it `series`
   is `null`.
@@ -597,3 +614,20 @@ As built (machines):
   decimals). A session can be in several kinds, so the items are not added up. Items of zero are left out, the rest are
   sorted by amount; `items` is `[]` when none. The first version's `reread_context`, `failed_tools`, `long_waits` and
   `oversized_model` are gone.
+
+
+## Limit windows
+
+`GET /api/orgs/{org}/limit-windows?scope=&from=&to=` (money; the period as in `…/spend`) answers
+`LimitWindowsResponse = { scope, period, accounts: AccountWindows[] }`. An account is a subscription of the organization
+(`funding: 'org'`, kind `subscription`) that belongs or is granted to the scope, above it or in it; one with no cycle in
+the period is left out. `AccountWindows = { accountId, label, provider, plan, windows: WindowHistory[] }`, the longest
+window first. `WindowHistory = { name, scope, lengthSec, cycles: { endsAt, peakPct, measures }[], avgPeakPct, fullCycles }`:
+a cycle is one stretch of a window between two resets, listed when it ends in the period, oldest first; `peakPct` is the
+highest use measured in it, `measures` the number of measurements, `avgPeakPct` the mean of the peaks, `fullCycles` the
+number of cycles that reached 95%.
+
+The hub writes a cycle on every measurement of a window that has a use and a reset time (table `account_window_cycles`,
+migration 0016, additive): the cycle is the reset time rounded to ten minutes, its `peakPct` the highest use seen, an
+older measurement counts too, one without a use does not. Cycles exist from the first measurement after the hub took the
+migration; earlier periods have none, and the screen says so.

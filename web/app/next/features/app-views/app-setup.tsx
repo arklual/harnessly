@@ -8,11 +8,14 @@ import {
   putAppSecret,
   removeAppSecret,
   saveAppSettings,
+  setAppConnection,
+  type IAppConnection,
   type IAppSetup,
   type IInstalledApp,
   type ISettingField,
 } from '@/next/features/app-views/api';
 import type { MachineId } from '@/next/protocol/v2';
+import { ROUTE, goTo } from '@/next/routes/routes';
 import { t } from '@/next/i18n';
 import { Button } from '@/next/ui/button';
 import SecretField from '@/next/ui/secret-field';
@@ -235,6 +238,61 @@ const Secret = ({
   );
 };
 
+/** One connection of the person's the app goes through: allowed to this app or not, signed in or not. */
+const Connection = ({
+  machine,
+  app,
+  connection,
+  onSetup,
+}: {
+  machine: MachineId;
+  app: IInstalledApp;
+  connection: IAppConnection;
+  onSetup: (setup: IAppSetup) => void;
+}) => {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const allow = (on: boolean) => {
+    setBusy(true);
+    setFailed(false);
+    setAppConnection(machine, app.id, connection.id, on)
+      .then(onSetup)
+      .catch(() => setFailed(true))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div className="hx-insp__field">
+      <span className="hx-insp__label">{connection.name}</span>
+      <span className="hx-insp__hint">
+        {t(connection.granted ? 'next.inspector.connectionAllowed' : 'next.inspector.connectionAsk', {
+          name: connection.name,
+        })}
+      </span>
+      <div className="hx-insp__row">
+        {connection.granted ? (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => allow(false)}>
+            {t('next.inspector.connectionRevoke')}
+          </Button>
+        ) : (
+          <Button size="sm" variant="primary" busy={busy} onClick={() => allow(true)}>
+            {t('next.inspector.connectionAllow')}
+          </Button>
+        )}
+        {!connection.connected && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => goTo({ kind: ROUTE.settings, section: 'connections' })}
+          >
+            {t('next.inspector.connectionSignIn')}
+          </Button>
+        )}
+      </div>
+      {failed && <span className="hx-insp__problem">{t('next.inspector.saveFailed')}</span>}
+    </div>
+  );
+};
+
 /** The settings form and the secrets of an app; nothing for an app that has neither. */
 const AppSetup = ({ machine, app }: { machine: MachineId; app: IInstalledApp }) => {
   const [state, setState] = useState<TLoad>({ k: 'loading' });
@@ -270,6 +328,17 @@ const AppSetup = ({ machine, app }: { machine: MachineId; app: IInstalledApp }) 
         </p>
       )}
       {setup.fields.length > 0 && <Settings machine={machine} app={app} setup={setup} onSetup={onSetup} />}
+      {(setup.connections ?? []).length > 0 && (
+        <div className="hx-insp__sec">
+          <h3 className="hx-insp__h">{t('next.inspector.connections')}</h3>
+          <p className="hx-insp__hint">{t('next.inspector.connectionsNote')}</p>
+          <div className="hx-insp__form">
+            {(setup.connections ?? []).map((c) => (
+              <Connection key={c.id} machine={machine} app={app} connection={c} onSetup={onSetup} />
+            ))}
+          </div>
+        </div>
+      )}
       {setup.secrets.length > 0 && (
         <div className="hx-insp__sec">
           <h3 className="hx-insp__h">{t('next.inspector.secrets')}</h3>

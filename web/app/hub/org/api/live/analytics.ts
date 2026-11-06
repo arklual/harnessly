@@ -37,7 +37,7 @@ import type {
   Signal,
   Week,
 } from '../analytics';
-import { monthPeriod } from '../analytics';
+import { monthPeriod, type LimitHistory, type LimitWindow } from '../analytics';
 import { formatValue } from '../../screens/analytics/format';
 import { spentOf } from '../../money';
 import { contractGet, http, orgPath } from './http';
@@ -132,6 +132,27 @@ export const KPI: Record<ApiKpi, KpiMeta> = {
     ...KPI_COPY.cache,
     format: 'pct',
     delta: 'pts',
+  },
+  cache_write_1h: {
+    id: 'cacheWrite1h',
+    group: 'env',
+    ...KPI_COPY.cacheWrite1h,
+    format: 'pct',
+    delta: 'pts',
+  },
+  mr_survival: {
+    id: 'mrSurvival',
+    group: 'result',
+    ...KPI_COPY.mrSurvival,
+    format: 'pct',
+    delta: 'pts',
+  },
+  waiting_p90: {
+    id: 'waitingP90',
+    group: 'agent',
+    ...KPI_COPY.waitingP90,
+    format: 'minutes',
+    delta: 'rel',
   },
   skills_in_use: {
     id: 'skills',
@@ -315,6 +336,13 @@ export interface AnalyticsCtx {
   label: string;
 }
 
+interface LimitAccountApi {
+  accountId: string;
+  label: string;
+  plan: string;
+  windows: LimitWindow[];
+}
+
 const scopeParam = (c: AnalyticsCtx): string => `${c.scope.kind}:${c.scope.id}`;
 
 export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
@@ -401,6 +429,26 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
         : null,
       peers: peersOf(kpis),
     };
+  },
+  limitWindows: async ({ period }): Promise<LimitHistory> => {
+    const c = ctx();
+    if (c.role === 'member') return null;
+    const r = await contractGet<{ accounts: LimitAccountApi[] }>(orgPath(c.org, '/limit-windows'), {
+      scope: scopeParam(c),
+      ...range(period),
+    });
+    return r.accounts.map((a) => ({
+      id: a.accountId,
+      label: a.label,
+      plan: a.plan,
+      windows: a.windows.map((w) => ({
+        name: w.name,
+        lengthSec: w.lengthSec,
+        cycles: w.cycles,
+        avgPeakPct: w.avgPeakPct,
+        fullCycles: w.fullCycles,
+      })),
+    }));
   },
   analyticsChart: async ({ period, compare }, kpi): Promise<KpiChart> => {
     const c = ctx();

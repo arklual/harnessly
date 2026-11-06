@@ -37,11 +37,15 @@ type ImportTab struct {
 	CreatedAt      wire.Ms
 	// LaunchUltracode: the tab was started with --effort ultracode. Claude's transcript logs it as xhigh.
 	LaunchUltracode bool
+	// Apps are the apps the tab's launch started with (its meta's launch.apps): the conversation keeps them on, so a
+	// relaunch and the chat's switches see what the agent runs with.
+	Apps []string
 }
 
 // TabFromLayout reads a tab object of a Legacy workspace layout (state.TabFromLayout's fields); ok is false for a
-// tab that runs no agent or has no usable id.
-func TabFromLayout(tab *jsvalue.Object, cwd string) (ImportTab, bool) {
+// tab that runs no agent or has no usable id. metaKey is the tab field the platform keeps its metadata in (the launch
+// with its apps); "" reads none.
+func TabFromLayout(tab *jsvalue.Object, cwd, metaKey string) (ImportTab, bool) {
 	str := func(o *jsvalue.Object, k string) string {
 		if o == nil {
 			return ""
@@ -77,6 +81,16 @@ func TabFromLayout(tab *jsvalue.Object, cwd string) (ImportTab, bool) {
 		}
 		if t.AgentSessionID == "" && t.TranscriptPath != "" {
 			t.AgentSessionID = strings.TrimSuffix(path.Base(t.TranscriptPath), ".jsonl")
+		}
+	}
+	// Claude Code and Codex both take apps.
+	if l := tab.Object(metaKey).Object("launch"); metaKey != "" && l != nil {
+		v, _ := l.Get("apps")
+		list, _ := v.([]any)
+		for _, x := range list {
+			if id, ok := x.(string); ok && id != "" {
+				t.Apps = append(t.Apps, id)
+			}
 		}
 	}
 	if v, ok := tab.Get("createdAt"); ok {
@@ -194,6 +208,9 @@ func (r *Runtime) Import(tabs []ImportTab, queues map[string][]outbox.LegacyItem
 			TitleSource: wire.TitleFromAgent, CreatedAt: created, LastActivityAt: created, LastPromptAt: created, SeenAt: ms(now),
 			State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)}, Rev: 1,
 			Session: t.Session, TranscriptPath: t.TranscriptPath, AgentSessionID: t.AgentSessionID}
+		if len(t.Apps) > 0 && (t.Provider == wire.ProviderClaude || t.Provider == wire.ProviderCodex) && (r.d.AppsOK == nil || r.d.AppsOK(t.Apps) == "") {
+			rec.Apps = append([]string(nil), t.Apps...)
+		}
 		c := newConv(&r.d, rec)
 		c.dirty = true
 		c.launchUltracode = t.LaunchUltracode

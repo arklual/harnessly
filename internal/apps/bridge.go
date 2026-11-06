@@ -25,6 +25,11 @@ const (
 	CodeRateLimited     = "rate_limited"
 	CodeHostUnavailable = "host_unavailable"
 	CodeInvalidParams   = "invalid_params"
+	// CodeConflict: a storage write named the version it read (ifVersion) and the key has moved on; the error says the
+	// current version and nothing was written.
+	CodeConflict = "conflict"
+	// CodeQuotaExceeded: a storage write would take its area past its limit.
+	CodeQuotaExceeded = "quota_exceeded"
 )
 
 // BridgeError is a refusal with the code a view sees.
@@ -52,6 +57,7 @@ var methodPermission = map[string]string{
 	"harnessly/chat.read":           "chat.read",
 	"harnessly/chat.card":           "chat.card",
 	"harnessly/pane.open":           "pane.open",
+	"harnessly/agents.list":         "agents.read",
 	"harnessly/storage.get":         "storage",
 	"harnessly/storage.set":         "storage",
 	"harnessly/storage.delete":      "storage",
@@ -60,12 +66,9 @@ var methodPermission = map[string]string{
 	"harnessly/notify":              "notify",
 	"harnessly/files.read":          "files.read",
 	"harnessly/files.write":         "files.write",
-	"harnessly/flow.status":         "",
-	"harnessly/flow.go":             "",
-	"harnessly/data.get":            "",
-	"harnessly/data.set":            "",
 	"harnessly/ui.toast":            "",
 	"harnessly/ui.confirm":          "",
+	"harnessly/slot.done":           "",
 	"harnessly/sinopia.document":    "sinopia.read",
 	"harnessly/sinopia.selection":   "sinopia.read",
 	"harnessly/sinopia.node":        "sinopia.read",
@@ -122,6 +125,12 @@ func (m *Manifest) Authorize(method, target string, params map[string]any) error
 	if scope, _ := params["scope"].(string); scope == string(ScopeSpace) && (method == "harnessly/storage.set" || method == "harnessly/storage.delete") {
 		if !m.Allows("storage.space.write") {
 			return denied("%s on the space needs the permission storage.space.write", method)
+		}
+	}
+	// Opening a conversation (chat:<id>) shows the person's chats, which is what agents.read is for.
+	if method == "harnessly/pane.open" {
+		if target, _ := params["target"].(string); strings.HasPrefix(target, "chat:") && !m.Allows("agents.read") {
+			return denied("%s of %s needs the permission agents.read", method, "chat:<id>")
 		}
 	}
 	return nil

@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,12 +65,16 @@ func (c *cli) app(args []string) error {
 		return c.appList()
 	case "remove", "rm", "uninstall":
 		return c.appRemove(args)
+	case "connect":
+		return c.appConnect(args)
 	case "enable", "on":
 		return c.appEnable(args, true)
 	case "disable", "off":
 		return c.appEnable(args, false)
+	case "explain", "why":
+		return c.appExplain(args)
 	}
-	return usageErr("app takes new, validate, install, dev, list, remove, enable, disable, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
+	return usageErr("app takes new, validate, install, dev, list, remove, enable, disable, explain, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
 }
 
 // appDir is a folder argument made absolute; none is the working folder.
@@ -135,6 +142,9 @@ func (c *cli) appValidate(args []string) error {
 	}
 	dir = c.appDir(dir)
 	pkg, problems := apps.LoadPackage(dir)
+	if pkg != nil {
+		problems = append(problems, apps.DesignProblems(dir)...)
+	}
 	if strict && pkg != nil {
 		problems = append(problems, c.weighPackage(pkg)...)
 	}
@@ -322,13 +332,57 @@ func (c *cli) appEnable(args []string, on bool) error {
 	return nil
 }
 
+// appExplain says why an app is on or off, layer by layer: the machine, the team, its setup, how it turns on, the chat of
+// this tab (when run in one) and the wall. The line marked ✗ is the one that keeps it off.
+func (c *cli) appExplain(args []string) error {
+	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
+		return usageErr("takes the app's id")
+	}
+	q := url.Values{"id": {args[0]}}
+	if session := c.session(); session != "" {
+		q.Set("session", session)
+	}
+	status, raw, err := c.call("GET", "/api/cli/apps/explain", q, nil)
+	if err != nil {
+		return err
+	}
+	if status >= 300 {
+		return apiError(status, raw)
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var r struct {
+		Lines []struct {
+			Layer string `json:"layer"`
+			Says  string `json:"says"`
+			Off   bool   `json:"off"`
+		} `json:"lines"`
+	}
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return fail("the runtime's answer is not readable: %v", err)
+	}
+	for _, l := range r.Lines {
+		mark := "·"
+		if l.Off {
+			mark = "✗"
+		}
+		c.out("%s %-10s %s\n", mark, l.Layer, l.Says)
+	}
+	return nil
+}
+
 // appGuard is the PreToolUse hook of a chat with apps (internal/apps policy.go): it decides the call by the snapshot of
 // the apps' rules the chat's launch wrote, alone, so a guard never waits on the runtime. A call it cannot check is
 // refused: the apps of the chat asked for their rules to hold.
-func (c *cli) appGuard(policyPath string) error {
+func (c *cli) appGuard(policyPath string, codexInput bool) error {
 	in := c.env.Stdin
 	if in == nil {
 		in = os.Stdin
+	}
+	if codexInput {
+		return c.appGuardCodex(in, policyPath)
 	}
 	answer := func(decision, reason string) error {
 		out, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
@@ -339,8 +393,10 @@ func (c *cli) appGuard(policyPath string) error {
 	}
 	raw, err := io.ReadAll(io.LimitReader(in, 4<<20))
 	var call struct {
-		Tool  string         `json:"tool_name"`
-		Input map[string]any `json:"tool_input"`
+		Session string         `json:"session_id"`
+		Tool    string         `json:"tool_name"`
+		Input   map[string]any `json:"tool_input"`
+		Cwd     string         `json:"cwd"`
 	}
 	if err != nil || json.Unmarshal(raw, &call) != nil || call.Tool == "" {
 		return answer("deny", "The app guard could not read the tool call, so the apps of this chat cannot let it through.")
@@ -351,14 +407,73 @@ func (c *cli) appGuard(policyPath string) error {
 		return answer("deny", "The app guard could not read the rules of this chat's apps, so it cannot let this call through. "+
 			"Ask the person to turn the apps off and on again.")
 	}
-	v, reason := snap.Decide(apps.Call{Tool: call.Tool, Input: call.Input})
+	v, reason := snap.Decide(apps.Call{Tool: call.Tool, Input: call.Input, Cwd: call.Cwd,
+		Root: os.Getenv("CLAUDE_PROJECT_DIR")})
 	switch v.Decision {
 	case apps.DecideDeny:
+		reason = guardMark(snap, v) + reason
+		c.journalDecision(call.Session, call.Tool, v, "deny", reason)
 		return answer("deny", reason)
 	case apps.DecideConfirm:
+		c.journalDecision(call.Session, call.Tool, v, "ask", reason)
 		return answer("ask", reason)
 	}
 	// No rule of the apps, or one that allows: the chat's own permissions decide.
+	return nil
+}
+
+// guardMark is the head of a refusal's reason that the feed knows it by (web: app-views/guard-denial.ts): the app's
+// name and the rule, each as a JSON string.
+func guardMark(snap apps.Snapshot, v apps.Verdict) string {
+	name := v.App
+	for _, a := range snap.Apps {
+		if a.ID == v.App {
+			name = a.Name
+		}
+	}
+	n, _ := json.Marshal(name)
+	r, _ := json.Marshal(v.Rule)
+	return "[app-guard " + string(n) + " " + string(r) + "] "
+}
+
+// journalDecision tells the runtime about a refusal or a question to the person, for the journal the app's page shows
+// (internal/apps decisions.go). It is a courtesy: the guard has answered by the snapshot alone, so a runtime that is
+// slow or away costs the journal a line and the call nothing.
+func (c *cli) journalDecision(agentSession, tool string, v apps.Verdict, decision, reason string) {
+	session := c.session()
+	if session == "" {
+		return
+	}
+	cc := *c
+	if cc.env.Client == nil {
+		cc.env.Client = &http.Client{Timeout: 2 * time.Second}
+	}
+	_, _, _ = cc.call("POST", "/api/cli/apps/decision", nil, map[string]any{
+		"session": session, "agentSession": agentSession, "app": v.App, "tool": tool, "rule": v.Rule,
+		"decision": decision, "reason": reason,
+	})
+}
+
+// appGuardCodex is the guard for Codex's PreToolUse (apps.CodexCalls reads the call, Snapshot.CodexAnswer decides it):
+// the same snapshot and the same rules, with Codex's own tool names and its answer, which has no "ask" and says nothing
+// for a call that goes on. Anything it cannot read or check is a refusal.
+func (c *cli) appGuardCodex(in io.Reader, policyPath string) error {
+	raw, err := io.ReadAll(io.LimitReader(in, 4<<20))
+	var snap apps.Snapshot
+	rawSnap, snapErr := os.ReadFile(policyPath)
+	var out []byte
+	switch {
+	case err != nil:
+		out = apps.CodexDeny("The app guard could not read the tool call, so the apps of this chat cannot let it through.")
+	case snapErr != nil || !apps.SnapshotIntact(policyPath, rawSnap) || json.Unmarshal(rawSnap, &snap) != nil:
+		out = apps.CodexDeny("The app guard could not read the rules of this chat's apps, so it cannot let this call through. " +
+			"Ask the person to turn the apps off and on again.")
+	default:
+		out = snap.CodexAnswer(raw)
+	}
+	if len(out) > 0 {
+		_, _ = c.env.Stdout.Write(out)
+	}
 	return nil
 }
 
@@ -425,6 +540,92 @@ func (c *cli) appContext(policyPath string) error {
 	return nil
 }
 
+// appValidateHook is the PostToolUse and Stop hook that runs the validators of the chat's apps (internal/apps validate.go):
+// a script that exits 2 fails the check, and its remark goes to the agent as {"decision":"block","reason":…}. Failures
+// in a row are counted per chat and validator in a file beside the snapshot; past maxRetries the hook lets go (a Stop
+// ends, a PostToolUse stops blocking) and says so on stderr, so the agent does not spin. A pass resets the count. A
+// script that does not work blocks nothing.
+func (c *cli) appValidateHook(policyPath, event string) error {
+	if event != apps.ValidatorPostToolUse && event != apps.ValidatorStop {
+		return usageErr("hook app-validate --policy <file> --event PostToolUse|Stop")
+	}
+	in := c.env.Stdin
+	if in == nil {
+		in = os.Stdin
+	}
+	raw, err := io.ReadAll(io.LimitReader(in, 4<<20))
+	if err != nil {
+		return nil
+	}
+	var ev struct {
+		Tool      string         `json:"tool_name"`
+		Input     map[string]any `json:"tool_input"`
+		SessionID string         `json:"session_id"`
+	}
+	if json.Unmarshal(raw, &ev) != nil {
+		return nil
+	}
+	var snap apps.Snapshot
+	rawSnap, err := os.ReadFile(policyPath)
+	if err != nil || !apps.SnapshotIntact(policyPath, rawSnap) || json.Unmarshal(rawSnap, &snap) != nil {
+		return nil
+	}
+	session := ev.SessionID
+	if session == "" {
+		session = c.hookSession()
+	}
+	var reasons []string
+	for _, a := range snap.Apps {
+		for _, v := range a.Validators {
+			if !v.Applies(event, a.ID, ev.Tool, ev.Input) {
+				continue
+			}
+			limit := v.MaxRetries
+			if limit <= 0 {
+				limit = apps.ValidatorDefaultRetries
+			}
+			state := policyPath + ".val-" + apps.ContextDigest(session + "\x00" + a.ID + "\x00" + v.ID)[:16]
+			fails := 0
+			if b, err := os.ReadFile(state); err == nil {
+				fails, _ = strconv.Atoi(strings.TrimSpace(string(b)))
+			}
+			res := apps.RunValidator(context.Background(), a.Dir, v, raw)
+			switch {
+			case res.Err != nil:
+				fmt.Fprintf(c.errOut(), "validator %s of %s did not work, nothing is blocked: %v\n", v.ID, a.ID, res.Err)
+			case !res.Failed:
+				if fails != 0 {
+					_ = os.Remove(state)
+				}
+			case fails >= limit:
+				// (A Stop with stop_hook_active set is a retry; once the retries are out it is let go too.)
+				// Out of retries: let go. A Stop ends the turn, so the next one starts afresh; a PostToolUse stays released until a pass.
+				fmt.Fprintf(c.errOut(), "validator %s of %s failed %d times in a row, no more retries: %s\n", v.ID, a.ID, fails, res.Remark)
+				if event == apps.ValidatorStop {
+					_ = os.Remove(state)
+				} else {
+					_ = os.WriteFile(state, []byte(strconv.Itoa(limit)), 0o600)
+				}
+			default:
+				_ = os.WriteFile(state, []byte(strconv.Itoa(fails+1)), 0o600)
+				reasons = append(reasons, fmt.Sprintf("%s (%s, attempt %d of %d): %s", a.Name, v.ID, fails+1, limit, res.Remark))
+			}
+		}
+	}
+	if len(reasons) > 0 {
+		_, _ = c.env.Stdout.Write(apps.ValidatorBlockAnswer(strings.Join(reasons, "\n\n")))
+	}
+	return nil
+}
+
+// errOut is where a hook writes what is for the log, not for the agent.
+func (c *cli) errOut() io.Writer {
+	if c.env.Stderr != nil {
+		return c.env.Stderr
+	}
+	return io.Discard
+}
+
 // weighPackage is the strict check of what the app costs the agent's context on every turn: its instructions, the
 // descriptions of the tools of the remote servers it turns on (agent.mcp) and those servers' own `instructions`, in
 // tokens (bytes / 4). The line is printed; past apps.AppContextWarnBytes it is a warning, which strict fails on. A
@@ -467,4 +668,42 @@ func (c *cli) weighPackage(pkg *apps.Package) apps.Problems {
 			apps.EstimateTokens(total), apps.EstimateTokens(apps.AppContextWarnBytes))
 	}
 	return out
+}
+
+// appConnect is the person's agreement that an app uses their connection from Settings → Connections:
+// harnessly app connect ID CONNECTION [--off].
+func (c *cli) appConnect(args []string) error {
+	on, words := true, []string{}
+	for _, a := range args {
+		if a == "--off" {
+			on = false
+		} else if strings.HasPrefix(a, "-") {
+			return usageErr("unknown flag %s", a)
+		} else {
+			words = append(words, a)
+		}
+	}
+	if len(words) != 2 {
+		return usageErr("takes the app's id and the connection's id: harnessly app connect acme.tracker linear [--off]")
+	}
+	status, raw, err := c.call("POST", "/api/cli/apps/connect", nil, map[string]any{"id": words[0], "connection": words[1], "on": on})
+	if err != nil {
+		return err
+	}
+	if status == 404 {
+		return fail("%s is not installed, or its package names no connection %s", words[0], words[1])
+	}
+	if status >= 300 {
+		return apiError(status, raw)
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	if on {
+		c.out("%s may use your %s connection; the agent gets it when it starts next\n", words[0], words[1])
+	} else {
+		c.out("%s may no longer use your %s connection\n", words[0], words[1])
+	}
+	return nil
 }

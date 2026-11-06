@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -46,6 +47,8 @@ var sourceKeys = map[string][]string{
 	store.CatalogPlugin: {"marketplace", "plugin"},
 	// Settings of Claude Code: keys set always, keys set only where the person has none, the CLAUDE.md block.
 	store.CatalogClaudeSettings: {"always", "ifAbsent", "claudeMd"},
+	// An app: the folder of its harnessly/app.json in a repository of the list (repo) or at an address (repoUrl, branch).
+	store.CatalogApp: {"from", "repo", "repoUrl", "branch", "path"},
 }
 
 // objectKeys are the keys whose value is an object of Claude Code's settings.
@@ -225,6 +228,26 @@ func cleanScript(out map[string]any) error {
 	return nil
 }
 
+// cleanApp checks where an app comes from: a folder of a repository, inside it.
+func cleanApp(out map[string]any) error {
+	str := func(k string) string { s, _ := out[k].(string); return s }
+	if f := str("from"); f != "" && f != "repo" {
+		return httpx.Invalid("source.from", "Приложение берут из репозитория")
+	}
+	out["from"] = "repo"
+	if str("repo") == "" && str("repoUrl") == "" {
+		return httpx.Invalid("source.repo", "Выберите репозиторий или укажите его адрес")
+	}
+	p := str("path")
+	if p == "" {
+		return httpx.Invalid("source.path", "Укажите папку приложения в репозитории (где лежит harnessly/app.json)")
+	}
+	if c := path.Clean(p); path.IsAbs(p) || c == ".." || strings.HasPrefix(c, "../") {
+		return httpx.Invalid("source.path", "Папка должна быть внутри репозитория")
+	}
+	return nil
+}
+
 // CleanSource checks the source of a catalog item and returns it in a canonical form. A source holds the text or the
 // address of the item and nothing secret; whatever is not understood is refused, so that nothing unchecked reaches a
 // machine.
@@ -302,6 +325,10 @@ func CleanSource(kind string, raw json.RawMessage) (json.RawMessage, error) {
 	case store.CatalogClaudeSettings:
 		if len(out) == 0 {
 			return nil, httpx.Invalid("source", "Нужны настройки или текст для CLAUDE.md")
+		}
+	case store.CatalogApp:
+		if err := cleanApp(out); err != nil {
+			return nil, err
 		}
 	}
 	b, err := json.Marshal(out)

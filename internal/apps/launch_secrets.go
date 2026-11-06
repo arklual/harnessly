@@ -85,7 +85,7 @@ func (l *Launcher) proxyOrigin() (origin string, headers []string) {
 // one except .mcp.json, written anew. mine are the folders the chat's wall must leave readable.
 func (l *Launcher) pluginDir(a Installed, session, token string) (dir string, err error) {
 	raw, rerr := os.ReadFile(filepath.Join(a.Dir, ".mcp.json"))
-	if rerr != nil || !strings.Contains(string(raw), "${secret:") {
+	if rerr != nil || !strings.Contains(string(raw), "${secret:") && !strings.Contains(string(raw), `"connection"`) {
 		return a.Dir, nil
 	}
 	var doc map[string]any
@@ -98,6 +98,10 @@ func (l *Launcher) pluginDir(a Installed, session, token string) (dir string, er
 	for name, v := range servers {
 		srv, _ := v.(map[string]any)
 		decl, ok := pkg.MCP[name]
+		if ok && decl.Connection != "" {
+			l.connectionEntry(servers, name, srv, decl, a.ID, session, token, origin, tokenHeaders)
+			continue
+		}
 		if !ok || len(decl.Secrets()) == 0 {
 			continue
 		}
@@ -167,11 +171,11 @@ func (l *Launcher) pluginDir(a Installed, session, token string) (dir string, er
 	return dir, nil
 }
 
-func writeGrant(sessionDir string, apps []string) error {
+func writeGrant(sessionDir string, apps []string, conversation string) error {
 	if apps == nil {
 		apps = []string{}
 	}
-	raw, err := json.Marshal(map[string][]string{"apps": apps})
+	raw, err := json.Marshal(map[string]any{"apps": apps, "conversation": conversation})
 	if err != nil {
 		return err
 	}
@@ -180,20 +184,28 @@ func writeGrant(sessionDir string, apps []string) error {
 
 // GrantedApps are the apps a launch's token may use the MCP proxy for; none when the launch left no record.
 func (r *Registry) GrantedApps(session string) []string {
+	apps, _ := r.Grant(session)
+	return apps
+}
+
+// Grant is a launch's record: the apps its token may use and the chat it was made for ("" when the runtime did not know
+// the chat). The agent cannot write it: the launch's folder is a read-only bind in the wall (Seal.Open).
+func (r *Registry) Grant(session string) (apps []string, conversation string) {
 	if session == "" || strings.ContainsAny(session, `/\.`) {
-		return nil
+		return nil, ""
 	}
 	raw, err := os.ReadFile(filepath.Join(filepath.Dir(r.Root), "app-launch", session, "grant.json"))
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 	var g struct {
-		Apps []string `json:"apps"`
+		Apps         []string `json:"apps"`
+		Conversation string   `json:"conversation"`
 	}
 	if json.Unmarshal(raw, &g) != nil {
-		return nil
+		return nil, ""
 	}
-	return g.Apps
+	return g.Apps, g.Conversation
 }
 
 // overlayGrace is how long a new launch's folder is left alone: its process may not have started yet.

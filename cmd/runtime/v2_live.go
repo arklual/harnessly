@@ -428,7 +428,7 @@ func (v *v2Live) layoutTabs() []convo.ImportTab {
 			if cwd == "" && len(ws.Directories) > 0 {
 				cwd = ws.Directories[0]
 			}
-			if it, ok := convo.TabFromLayout(t, cwd); ok {
+			if it, ok := convo.TabFromLayout(t, cwd, v.c.cfg.MetaKey); ok {
 				it.LaunchUltracode = v.c.tabLaunchedUltracode(t)
 				if it.Provider == wire.ProviderClaude && it.TranscriptPath != "" {
 					if h := v.heads.Read(it.TranscriptPath); h.Title != nil && *h.Title != "" {
@@ -694,13 +694,11 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 		}
 	}
 	if len(req.Apps) > 0 {
-		if req.Provider != wire.ProviderClaude {
-			return errors.New("apps run in Claude Code chats only")
-		}
 		if chosen == nil {
 			chosen = &agents.Launch{}
 		}
 		chosen.Apps = append([]string(nil), req.Apps...)
+		chosen.Conversation = req.ID
 	}
 	var files []string
 	if f, ok := l.promptFiles.Load(req.Cwd); ok {

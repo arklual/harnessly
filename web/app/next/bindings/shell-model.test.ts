@@ -4,6 +4,8 @@ import {
   cardOf,
   choiceOf,
   oneListOf,
+  machineLabel,
+  noteOf,
   terminalRuns,
   terminalStopText,
 } from '@/next/bindings/shell-model';
@@ -190,5 +192,26 @@ describe('the one list of every machine', () => {
       'tab-c',
       'tab-d',
     ]);
+  });
+});
+
+describe('a fleet across organizations', () => {
+  const inOrg = (orgName: string): MachineView => {
+    const v = view('online', 'v2');
+    return { ...v, machine: { ...v.machine, name: 'build', host: 'build.example.com', orgName } };
+  };
+
+  it('tells two machines of one name apart by their organization, only when there are several', () => {
+    const a = inOrg('Acme').machine;
+    expect(machineLabel(a, true)).toBe('build · Acme');
+    expect(machineLabel(a, false)).toBe('build');
+    expect(machineLabel({ ...a, orgName: undefined }, true)).toBe('build');
+  });
+
+  it('puts the organization under a machine that can be chosen, and «away» under one that cannot', () => {
+    expect(noteOf(inOrg('Acme'))).toBe('Acme');
+    expect(
+      noteOf({ ...inOrg('Acme'), machine: { ...inOrg('Acme').machine, reach: 'unreachable' } }),
+    ).not.toBe('Acme');
   });
 });

@@ -390,10 +390,13 @@ const Page = ({ teamId }: { teamId: string | null }) => {
           onDeleted={() => navigate(`${base}/teams`)}
         />
       )}
-      {invitee && (
+      {invitee && view && (
         <InviteSheet
           open={url.get('dlg') === 'invite'}
           tenants={[invitee]}
+          teams={view.teams.flatMap((t) =>
+            t.id === null ? [] : [{ id: t.id, name: t.name, tenantId: t.tenantId ?? invitee.id }],
+          )}
           onClose={() => url.close()}
           onChanged={refresh}
         />

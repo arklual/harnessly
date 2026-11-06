@@ -27,6 +27,29 @@ export interface IAppView {
   path?: string;
   /** The address of a view the app's own server hosts. */
   url?: string;
+  /** Slot views: the name and glyph the host draws, the order among the app's own, and the kinds of object an action is for. */
+  label?: string;
+  icon?: string;
+  order?: number;
+  objects?: string[];
+}
+
+export interface IBranding {
+  name: string;
+  accent?: string;
+  supportUrl?: string;
+  tagline?: string;
+}
+
+/** A chat.commands entry of an app, as the «/» palette lists it. */
+export interface IAppCommand {
+  /** The command without its slash. */
+  name: string;
+  /** What the agent is sent: /<plugin>:<name>. */
+  slash: string;
+  description: string;
+  /** `prompt`: sent to the agent. (`view`, opening an app view in the pane, is not in the manifest yet.) */
+  kind: 'prompt';
 }
 
 export interface IInstalledApp {
@@ -45,15 +68,25 @@ export interface IInstalledApp {
   instructionsBytes?: number;
   /** The slash command that turns the app on in a chat (`activation.on: ["command:/x"]`); absent when none. */
   command?: string;
+  /** The app's chat.commands, for the «/» palette of a chat it is on in. */
+  commands?: IAppCommand[];
   /** On in every new Claude chat of the machine (`activation.on: ["always"]`, an app the person installed). */
   always?: boolean;
   /** What the app puts into the document editor; absent for an app that puts nothing. */
   sinopia?: ISinopia;
   dev?: boolean;
+  /** The app comes with the organization's environment: the person cannot remove it. */
+  env?: boolean;
+  /** The environment's item is pinned: the app cannot be turned off. */
+  locked?: boolean;
+  /** The person turned the environment's app off for themselves. */
+  muted?: boolean;
   /** The app has settings or secrets: «О приложении» draws their form. */
   setup?: boolean;
   /** The required secrets without a value: the app is «ждёт секрет». */
   waiting?: string[];
+  /** The branding slot: the name, accent and support address the app brings. */
+  branding?: IBranding;
 }
 
 export interface IInstalledApps {
@@ -63,6 +96,8 @@ export interface IInstalledApps {
   /** The agents of chats with apps run inside the operating system's wall around the apps (docs/apps.md); false on a
    * machine that cannot make it, where only the guard hook keeps them out. */
   agentWalled: boolean;
+  /** Whether the machine runs with UI slots on (HARNESSLY_UI_SLOTS=on); without it the list holds no slot view. */
+  slots?: boolean;
 }
 
 export const loadInstalledApps = (m: MachineId): Promise<IInstalledApps> =>
@@ -70,8 +105,16 @@ export const loadInstalledApps = (m: MachineId): Promise<IInstalledApps> =>
 
 /** The runtime's refusal says its code in `error`; a view gets it as the code of its HarnesslyError. */
 const asBridgeError = (e: unknown): BridgeError => {
-  if (e instanceof RuntimeError)
-    return new BridgeError(isBridgeCode(e.message) ? e.message : 'host_unavailable', e.message);
+  if (e instanceof RuntimeError) {
+    // A conflict says the version the key has now, which the view needs to read it again and decide.
+    const body = typeof e.body === 'object' && e.body !== null ? (e.body as Record<string, unknown>) : {};
+    const text = typeof body.message === 'string' ? body.message : e.message;
+    return new BridgeError(
+      isBridgeCode(e.message) ? e.message : 'host_unavailable',
+      text,
+      typeof body.version === 'number' ? { version: body.version } : undefined,
+    );
+  }
   return new BridgeError('host_unavailable', e instanceof Error ? e.message : undefined);
 };
 
@@ -180,16 +223,22 @@ export interface IStorageCall {
   scope: TStorageScope;
   key: string;
   value?: unknown;
+  /** For a set: write only if the key is at this version. */
+  ifVersion?: number;
 }
 
+/** A get answers `{value, version}`, a set `{version}`, keys the list, a delete nothing. */
 export const callStorage = async (m: MachineId, call: IStorageCall): Promise<unknown> => {
   try {
-    const r = await runtimeJson<{ value?: unknown; keys?: string[] }>(
+    const r = await runtimeJson<{ value?: unknown; keys?: string[]; version?: number }>(
       m,
       platformPath('/apps/storage'),
       postJson(call),
     );
-    return call.op === 'keys' ? (r.keys ?? []) : (r.value ?? null);
+    if (call.op === 'keys') return r.keys ?? [];
+    if (call.op === 'get') return { value: r.value ?? null, version: r.version ?? 0 };
+    if (call.op === 'set') return { version: r.version ?? 0 };
+    return undefined;
   } catch (e) {
     throw asBridgeError(e);
   }
@@ -265,6 +314,32 @@ export const loadAppAsks = async (m: MachineId, conversation: string): Promise<I
   return r.asks;
 };
 
+/** One decision of the guard of a chat's apps: a call it refused (`deny`) or put to the person (`ask`). */
+export interface IAppDecision {
+  /** Milliseconds. */
+  at: number;
+  app: string;
+  tool: string;
+  rule: string;
+  decision: 'deny' | 'ask';
+  reason?: string;
+}
+
+/** The last decisions of the guard for an app in a chat, newest first (the runtime keeps fifty). */
+export const loadAppDecisions = async (
+  m: MachineId,
+  app: string,
+  conversation: string,
+): Promise<IAppDecision[]> => {
+  const r = await runtimeJson<{ decisions: IAppDecision[] }>(
+    m,
+    platformPath(
+      `/apps/decisions?app=${encodeURIComponent(app)}&conversation=${encodeURIComponent(conversation)}`,
+    ),
+  );
+  return r.decisions;
+};
+
 /** The pick, or null to cancel; the runtime refuses an ask that is gone or an option it did not offer. */
 export const answerAppAsk = async (m: MachineId, id: string, answer: string | null): Promise<void> => {
   await runtimeJson<object>(m, platformPath('/apps/asks/answer'), postJson({ id, answer }));
@@ -328,11 +403,22 @@ export interface ISecretState {
   set: boolean;
 }
 
+/** A connection of the person's (Настройки → Подключения) a server of the app goes through. */
+export interface IAppConnection {
+  id: string;
+  name: string;
+  /** The person allowed it to this app. */
+  granted: boolean;
+  /** The person is signed in to it. */
+  connected: boolean;
+}
+
 export interface IAppSetup {
   fields: ISettingField[];
   values: Record<string, unknown>;
   secrets: ISecretState[];
   waiting: string[];
+  connections?: IAppConnection[];
   /** After a save the runtime did not accept: the reason by setting. Nothing was saved. */
   problems?: Record<string, string>;
 }
@@ -350,6 +436,10 @@ export const saveAppSettings = (
 /** Puts a secret's value into the machine's safe; the value goes in and never comes back. */
 export const putAppSecret = (m: MachineId, id: string, name: string, value: string): Promise<IAppSetup> =>
   runtimeJson<IAppSetup>(m, platformPath('/apps/setup/secret'), postJson({ id, name, value }));
+
+/** Allows the app the person's connection (on) or takes it back. */
+export const setAppConnection = (m: MachineId, id: string, name: string, on: boolean): Promise<IAppSetup> =>
+  runtimeJson<IAppSetup>(m, platformPath('/apps/setup/connection'), postJson({ id, name, remove: !on }));
 
 export const removeAppSecret = (m: MachineId, id: string, name: string): Promise<IAppSetup> =>
   runtimeJson<IAppSetup>(m, platformPath('/apps/setup/secret'), postJson({ id, name, remove: true }));

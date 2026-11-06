@@ -77,7 +77,7 @@
     color-mix(in srgb, var(--t-text-primary) 5%, transparent) 70%
   );
   background-size: 300% 100%;
-  animation: ov-shimmer 1.4s linear infinite;
+  animation: hx-shimmer 1.4s linear infinite;
 }
 .ov-sk__tile {
   height: 150px;
@@ -96,14 +96,6 @@
 @media (max-width: 900px) {
   .ov-sk .me-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-@keyframes ov-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: -100% 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {

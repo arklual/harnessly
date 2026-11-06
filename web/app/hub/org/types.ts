@@ -2,7 +2,8 @@
 // of each section lives next to its API (org/api/<section>.ts).
 
 export type Role = 'admin' | 'lead' | 'member';
-export type Section = 'overview' | 'analytics' | 'machines' | 'teams' | 'team' | 'env' | 'accounts';
+export type Section =
+  'overview' | 'analytics' | 'machines' | 'teams' | 'team' | 'env' | 'accounts' | 'tools' | 'efficiency';
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Админ организации',

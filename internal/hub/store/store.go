@@ -49,13 +49,43 @@ type Q interface {
 type DB struct {
 	sql    *sql.DB
 	driver Driver
+	opts   Options
 }
 
 // Driver says which dialect this database speaks.
 func (db *DB) Driver() Driver { return db.driver }
 
-// Open connects to a sqlite:///path or postgres:// URL and applies the migrations.
+// Open connects to a sqlite:///path or postgres:// URL and applies the migrations, with the default Options.
 func Open(ctx context.Context, databaseURL string) (*DB, error) {
+	return OpenWith(ctx, databaseURL, Options{})
+}
+
+// OpenWith is Open with the Postgres settings of Options (schema, connection pooler, direct URL for migrations,
+// how strict the checks after the migrations are). The options change nothing for SQLite.
+func OpenWith(ctx context.Context, databaseURL string, opts Options) (*DB, error) {
+	db, err := ConnectWith(ctx, databaseURL, opts)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.migrateAll(ctx); err != nil {
+		db.sql.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+// Connect is Open without the migrations: it connects and pings, and changes nothing (`hub doctor` reads the state of
+// a database this way). A sqlite file that does not exist is made.
+func Connect(ctx context.Context, databaseURL string) (*DB, error) {
+	return ConnectWith(ctx, databaseURL, Options{})
+}
+
+// ConnectWith is Connect with the Postgres settings of Options.
+func ConnectWith(ctx context.Context, databaseURL string, opts Options) (*DB, error) {
+	opts, err := opts.normalized()
+	if err != nil {
+		return nil, err
+	}
 	u, err := url.Parse(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("database url: %w", err)
@@ -85,25 +115,19 @@ func Open(ctx context.Context, databaseURL string) (*DB, error) {
 			return nil, err
 		}
 		raw.SetMaxOpenConns(8)
-		db = &DB{sql: raw, driver: SQLite}
+		db = &DB{sql: raw, driver: SQLite, opts: opts}
 	case "postgres", "postgresql":
-		raw, err := sql.Open("pgx", databaseURL)
+		raw, err := connectPostgres(databaseURL, opts, opts.Pooler == PoolerTransaction)
 		if err != nil {
 			return nil, err
 		}
-		raw.SetMaxOpenConns(20)
-		raw.SetConnMaxLifetime(30 * time.Minute)
-		db = &DB{sql: raw, driver: Postgres}
+		db = &DB{sql: raw, driver: Postgres, opts: opts}
 	default:
 		return nil, fmt.Errorf("database url: unsupported scheme %q", u.Scheme)
 	}
 	if err := db.sql.PingContext(ctx); err != nil {
 		db.sql.Close()
 		return nil, fmt.Errorf("database: %w", err)
-	}
-	if err := db.Migrate(ctx); err != nil {
-		db.sql.Close()
-		return nil, err
 	}
 	return db, nil
 }
@@ -187,63 +211,53 @@ func (db *DB) Tx(ctx context.Context, fn func(s Store) error) error {
 	return t.Commit()
 }
 
-// Migrate applies the embedded migrations not applied yet, in order.
-func (db *DB) Migrate(ctx context.Context) error {
-	if _, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL)`); err != nil {
-		return fmt.Errorf("migrations: %w", err)
-	}
+// PendingMigrations names the embedded migrations not applied yet, and Unknown the applied versions this build has no
+// file for (the database was last written by a newer hub). It writes nothing.
+func (db *DB) PendingMigrations(ctx context.Context) (pending []string, unknown []int, err error) {
 	applied := map[int]bool{}
-	rows, err := db.Query(ctx, `SELECT version FROM schema_migrations`)
-	if err != nil {
-		return fmt.Errorf("migrations: %w", err)
-	}
-	for rows.Next() {
-		var v int
-		if err := rows.Scan(&v); err != nil {
-			rows.Close()
-			return err
+	rows, qerr := db.Query(ctx, `SELECT version FROM schema_migrations`)
+	if qerr != nil {
+		// No table yet: nothing is applied (a new database); any other failure shows at the next step.
+		if _, perr := db.Query(ctx, `SELECT 1`); perr != nil {
+			return nil, nil, qerr
 		}
-		applied[v] = true
-	}
-	if err := rows.Close(); err != nil {
-		return err
+	} else {
+		for rows.Next() {
+			var v int
+			if err := rows.Scan(&v); err != nil {
+				rows.Close()
+				return nil, nil, err
+			}
+			applied[v] = true
+		}
+		if err := rows.Close(); err != nil {
+			return nil, nil, err
+		}
 	}
 	entries, err := migrationFiles.ReadDir("migrations")
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	var names []string
+	known := map[int]bool{}
 	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		version, _, _ := strings.Cut(name, "_")
+		version, _, _ := strings.Cut(e.Name(), "_")
 		v, err := strconv.Atoi(version)
 		if err != nil {
-			return fmt.Errorf("migration %s: the name must start with a number", name)
+			return nil, nil, fmt.Errorf("migration %s: the name must start with a number", e.Name())
 		}
-		if applied[v] {
-			continue
-		}
-		body, err := migrationFiles.ReadFile("migrations/" + name)
-		if err != nil {
-			return err
-		}
-		err = db.Tx(ctx, func(s Store) error {
-			for _, stmt := range splitStatements(string(body)) {
-				if _, err := s.q.Exec(ctx, stmt); err != nil {
-					return fmt.Errorf("%s: %w", name, err)
-				}
-			}
-			_, err := s.q.Exec(ctx, `INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, v, Ms(time.Now()))
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("migrations: %w", err)
+		known[v] = true
+		if !applied[v] {
+			pending = append(pending, e.Name())
 		}
 	}
-	return nil
+	for v := range applied {
+		if !known[v] {
+			unknown = append(unknown, v)
+		}
+	}
+	sort.Strings(pending)
+	sort.Ints(unknown)
+	return pending, unknown, nil
 }
 
 // splitStatements cuts a migration at the semicolons that end a line, dropping comment lines.

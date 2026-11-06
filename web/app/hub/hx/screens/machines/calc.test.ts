@@ -475,4 +475,9 @@ describe('rename and open', () => {
     expect(canOpen(machine({ state: 'offline' }))).toBe(false);
     expect(canOpen(machine({ state: 'disabled' }))).toBe(false);
   });
+
+  it('does not open a machine the hub only watches', () => {
+    expect(canOpen(machine({ state: 'online', opensRuntime: false }))).toBe(false);
+    expect(canOpen(machine({ state: 'online', opensRuntime: true }))).toBe(true);
+  });
 });

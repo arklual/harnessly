@@ -2379,3 +2379,6 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
 .hx-rewound__prompt > .hx-bubble {
   max-width: 80%;
 }
+.hx-tool[data-guarded='true'] .hx-tool__ico {
+  color: var(--hx-warning);
+}

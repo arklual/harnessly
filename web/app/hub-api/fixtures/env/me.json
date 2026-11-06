@@ -35,7 +35,7 @@
       "pinned": true,
       "off": false,
       "canToggle": false,
-      "groupId": ""
+      "groupId": "grp-back"
     }
   ],
   "outdated": true,
@@ -107,5 +107,27 @@
       }
     }
   ],
-  "groups": []
+  "groups": [
+    {
+      "id": "grp-back",
+      "name": "Бэкенд",
+      "hint": "сервисы",
+      "layer": "org",
+      "required": false,
+      "on": true,
+      "canToggle": true,
+      "items": 1,
+      "builtIn": false
+    }
+  ],
+  "presets": [
+    {
+      "id": "pre-back",
+      "name": "Бэкенд-разработка",
+      "hint": "только сервисы",
+      "layer": "org",
+      "groupIds": ["grp-back"],
+      "active": true
+    }
+  ]
 }

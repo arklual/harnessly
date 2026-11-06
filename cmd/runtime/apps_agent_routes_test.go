@@ -32,6 +32,8 @@ func TestAgentTokenIsConfinedToItsList(t *testing.T) {
 		// The person's trackers and wikis, read through the runtime: the agent never holds their tokens.
 		{"GET", "/api/cli/connections", true},
 		{"GET", "/api/cli/connections/env-tracker/issue", true},
+		{"GET", "/api/cli/connections/c1/mrs", true},
+		{"POST", "/api/cli/connections/c1/mrs", false},
 		{"POST", "/api/cli/connections/env-tracker/issue", false},
 		{"DELETE", "/api/cli/connections/env-tracker", false},
 		// What runs or reads outside the wall.

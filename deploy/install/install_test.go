@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ly-solutions/harnessly/deploy/renderkit"
 	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
@@ -1395,10 +1396,25 @@ func TestInstallFullProfileInstallsFFmpegWithSudo(t *testing.T) {
 func TestInstallDesignToolsWhereItCan(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	if r := e.run(nil, "--token", "hx_a", "--profile", "dir", "--wait", "2"); r.code != 0 {
+	osr := func(body string) string {
+		f := filepath.Join(t.TempDir(), "os-release")
+		if err := os.WriteFile(f, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return "HARNESSLY_OS_RELEASE=" + f
+	}
+	// Anything but the Debian release the pins are for: installed unpinned.
+	if r := e.run([]string{osr("ID=ubuntu\nVERSION_CODENAME=noble\n")}, "--token", "hx_a", "--profile", "dir", "--wait", "2"); r.code != 0 {
 		t.Fatalf("%s\n%s", r.out, r.err)
 	}
-	mustContain(t, "calls", e.calledWith(), "apt-get install -y --no-install-recommends chromium ffmpeg xvfb x11vnc websockify\n")
+	mustContain(t, "calls", e.calledWith(), "apt-get install -y --no-install-recommends chromium fonts-liberation fonts-noto-color-emoji ffmpeg xvfb x11vnc websockify\n")
+	// On the pinned Debian release the kit's versions are asked for.
+	eb := newEnv(t)
+	if r := eb.run([]string{osr("ID=debian\nVERSION_CODENAME=bookworm\n")}, "--token", "hx_a", "--profile", "dir", "--wait", "2"); r.code != 0 {
+		t.Fatalf("%s\n%s", r.out, r.err)
+	}
+	pins := renderkit.Pins()
+	mustContain(t, "calls", eb.calledWith(), "apt-get install -y --no-install-recommends chromium="+pins["RENDER_KIT_CHROMIUM"]+" fonts-liberation="+pins["RENDER_KIT_FONTS_LIBERATION"]+" fonts-noto-color-emoji="+pins["RENDER_KIT_FONTS_EMOJI"]+" ffmpeg="+pins["RENDER_KIT_FFMPEG"]+" xvfb x11vnc websockify\n")
 	// Asked not to, it installs nothing for designs.
 	e2 := newEnv(t)
 	if r := e2.run([]string{"HARNESSLY_DESIGN_TOOLS=0"}, "--token", "hx_a", "--profile", "dir", "--wait", "2"); r.code != 0 {

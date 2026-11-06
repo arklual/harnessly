@@ -1,0 +1,59 @@
+# Documents and boards next to the hub: an overlay for compose.hub.yaml.
+#
+#   docker compose -f compose.hub.yaml -f compose.docs.yaml up -d --build
+#
+# It turns on HUB_DOCS and starts the artifacts service (documents), built from its repository the first time. Boards
+# are a profile of their own because no boards image is published yet: build one from the boards repository, then
+#
+#   BOARDS_IMAGE=example.com/boards:latest docker compose -f compose.hub.yaml -f compose.docs.yaml --profile boards up -d
+#
+# The hub reaches both on the network it shares with them; neither is published on the host. The token the hub sends
+# is DOCS_TOKEN (at least 16 characters): set it in .env, the default below is for a trial on one host only.
+
+services:
+  hub:
+    environment:
+      HUB_DOCS: "on"
+      HUB_ARTIFACTS_URL: http://artifacts:8080
+      HUB_ARTIFACTS_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
+      HUB_BOARDS_URL: ${HUB_BOARDS_URL:-}
+      HUB_BOARDS_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
+    depends_on:
+      - artifacts
+
+  artifacts:
+    build: https://github.com/ly-solutions/artifacts.git
+    image: ${ARTIFACTS_IMAGE:-ghcr.io/ly-solutions/artifacts:local}
+    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
+    environment:
+      ARTIFACTS_PUBLIC_URL: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
+      # Files on a volume: one replica. For several, point ARTIFACTS_STORAGE at S3 (its docs, storage.md).
+      ARTIFACTS_STORAGE: fs
+      ARTIFACTS_DATA_DIR: /data
+      ARTIFACTS_AUTH: token
+      ARTIFACTS_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
+    networks:
+      - hub
+    volumes:
+      - artifacts-data:/data
+    restart: unless-stopped
+
+  boards:
+    profiles: [boards]
+    image: ${BOARDS_IMAGE:-boards.invalid/boards:set-BOARDS_IMAGE}
+    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
+    environment:
+      PORT: "8080"
+      BOARDS_BASE_URL: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
+      BOARDS_STORAGE: fs
+      BOARDS_DATA_DIR: /data
+      BOARDS_API_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
+    networks:
+      - hub
+    volumes:
+      - boards-data:/data
+    restart: unless-stopped
+
+volumes:
+  artifacts-data:
+  boards-data:

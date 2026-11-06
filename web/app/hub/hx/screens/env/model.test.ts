@@ -45,6 +45,73 @@ describe('model', () => {
   it('does not accept an empty script', () => {
     expect(valid(blankDraft('script'))).toBe(false);
   });
+
+  const itemOf = (kind: 'app' | 'plugin' | 'claude-settings', source: ReturnType<typeof toSource>) =>
+    fromItem({
+      id: 'i',
+      kind,
+      name: 'X',
+      hint: '',
+      source,
+      builtIn: false,
+      archived: false,
+      added: false,
+      createdAt: '2026-11-01T00:00:00Z',
+      owner: null,
+    });
+
+  it('takes an app from the folder of a repository, never outside it', () => {
+    const d = blankDraft('app', [{ id: 'r1', name: 'kit' }]);
+    expect(valid(d)).toBe(false);
+    d.f.path = '../elsewhere';
+    expect(valid(d)).toBe(false);
+    d.f.path = 'apps/design-kit';
+    expect(valid(d)).toBe(true);
+    expect(toSource(d)).toEqual({ from: 'repo', path: 'apps/design-kit', branch: undefined, repo: 'r1' });
+    d.f.repoOther = true;
+    d.f.repoUrl = 'gitlab.example.ru/design/kit';
+    d.f.branch = 'main';
+    const source = toSource(d);
+    expect(source).toEqual({
+      from: 'repo',
+      path: 'apps/design-kit',
+      branch: 'main',
+      repoUrl: 'https://gitlab.example.ru/design/kit',
+    });
+    const back = itemOf('app', source);
+    expect(back?.f.repoOther).toBe(true);
+    expect(back?.f.path).toBe('apps/design-kit');
+  });
+
+  it('wants a plugin as name@marketplace with the marketplace', () => {
+    const d = blankDraft('plugin');
+    d.f.plugin = 'review-kit';
+    d.f.marketplace = 'gitlab.example.ru/ai/plugins';
+    expect(valid(d)).toBe(false);
+    d.f.plugin = 'review-kit@team';
+    expect(valid(d)).toBe(true);
+    expect(itemOf('plugin', toSource(d))?.f.plugin).toBe('review-kit@team');
+  });
+
+  it('reads Claude settings as JSON of always, ifAbsent and claudeMd', () => {
+    const d = blankDraft('claude-settings');
+    d.f.json = '{"other": 1}';
+    expect(valid(d)).toBe(false);
+    d.f.json = '{"always": {}}';
+    expect(valid(d)).toBe(false);
+    d.f.json = '{"ifAbsent": {"model": "sonnet"}, "claudeMd": "Отвечай по-русски."}';
+    expect(valid(d)).toBe(true);
+    const source = toSource(d);
+    expect(source).toEqual({
+      always: undefined,
+      ifAbsent: { model: 'sonnet' },
+      claudeMd: 'Отвечай по-русски.',
+    });
+    expect(JSON.parse(itemOf('claude-settings', source)?.f.json ?? '')).toEqual({
+      ifAbsent: { model: 'sonnet' },
+      claudeMd: 'Отвечай по-русски.',
+    });
+  });
 });
 
 describe('detect', () => {

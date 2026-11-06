@@ -1,7 +1,7 @@
 // The start page's «Настройка машины»: how the team's environment list is set up on the machine a new chat
 // starts on, read every few seconds while the page is visible, with «Повторить» and «Открыть сейф». A card that was
 // hidden stays hidden until the list changes; a card goes away, fading, once everything is done.
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { pageClock } from '@/next/core/clock';
 import {
   askBaseProxy,
@@ -116,7 +116,10 @@ export const MachineSetup = ({
     view.items.length > 0 &&
     view.hash !== hidden &&
     (!view.done || (seen?.wasOpen === true && doneGone !== view.hash));
-  const card = usePresence(showing && view ? cardOf(view, picked) : null, EXIT_MS);
+  // The card is built once per view: usePresence takes a new object for a new card, and a fresh one on every render
+  // would make it set its state on every render (React #301, a white page).
+  const shownCard = useMemo(() => (showing && view ? cardOf(view, picked) : null), [showing, view, picked]);
+  const card = usePresence(shownCard, EXIT_MS);
   if (!card.value) return null;
 
   const act = async (kind: TAction) => {

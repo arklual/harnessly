@@ -36,6 +36,34 @@ jobs:
         env:
           HARNESSLY_REQUIRE_CHROME: "1"
 
+  # The server safe's client (internal/secrets/vaultkv) against both servers it promises to speak to, in dev mode:
+  # KV v1 and v2, a token and AppRole under a narrow policy. The rest of the suite uses a fake of the API.
+  vault-compat:
+    name: vault-compat ${{ matrix.server.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server:
+          - { name: openbao, image: "openbao/openbao:2.3.1" }
+          - { name: vault, image: "hashicorp/vault:1.20.0" }
+    env:
+      GOFLAGS: -mod=readonly
+      VAULTKV_TEST_ADDR: http://127.0.0.1:8200
+      VAULTKV_TEST_ROOT_TOKEN: dev-root
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Start ${{ matrix.server.name }} in dev mode
+        run: |
+          docker run -d --name kv --cap-add=IPC_LOCK -p 8200:8200 "${{ matrix.server.image }}" \
+            server -dev -dev-root-token-id=dev-root -dev-listen-address=0.0.0.0:8200
+          for _ in $(seq 60); do curl -sf "$VAULTKV_TEST_ADDR/v1/sys/health" >/dev/null && exit 0; sleep 1; done
+          docker logs kv; exit 1
+      - run: go test -count=1 -run Real -v ./internal/secrets/vaultkv
+
   build:
     name: build ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest

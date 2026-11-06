@@ -892,6 +892,21 @@
   opacity: 1;
   background: var(--hx-danger);
 }
+.hx-ext__desc.hx-hubenv__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.hx-ext__desc.hx-hubenv__status > [data-i] {
+  flex: none;
+  margin-top: 2px;
+}
+.hx-ext__desc.hx-hubenv__status[data-status='error'] {
+  color: var(--hx-danger);
+}
 .hx-ext__text {
   flex: 1;
   min-width: 0;

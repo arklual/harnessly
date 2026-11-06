@@ -130,6 +130,17 @@ func TestLauncherAgentToken(t *testing.T) {
 	if err != nil || strings.TrimSpace(string(raw)) != "agent."+sessions[0]+".1.mac" || info.Mode().Perm() != 0o600 {
 		t.Fatalf("%q: %q %v %v", got.Env, raw, err, info)
 	}
+	// The launch of a chat records the chat in its grant; a launch that does not know it records none.
+	if apps, conv := reg.Grant(sessions[0]); conv != "" || len(apps) != 1 {
+		t.Fatalf("grant without a chat: %v %q", apps, conv)
+	}
+	if _, err := l.ClaudeFor("conv-1", []string{"acme.review"}, base); err != nil {
+		t.Fatal(err)
+	}
+	if apps, conv := reg.Grant(sessions[1]); conv != "conv-1" || len(apps) != 1 || apps[0] != "acme.review" {
+		t.Fatalf("grant of a chat's launch: %v %q", apps, conv)
+	}
+	sessions = sessions[:1]
 	again, _ := l.Claude([]string{"acme.review"}, base)
 	if len(sessions) != 2 || sessions[0] == sessions[1] || again.Env == got.Env {
 		t.Fatalf("every launch has its own token: %v", sessions)

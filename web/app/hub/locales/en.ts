@@ -64,6 +64,7 @@ export const en: Record<Key, Entry> = {
   'notFound.title': 'There is no such page',
   'notFound.text': 'Check the address or go back to the start.',
   'session.failed': 'Could not reach the hub',
+  'landing.orgsFailed': 'The hub did not answer. Press Retry or reload the page in a minute.',
 
   // ---- remote browser
   'browser.connecting': 'Connecting to the browser…',
@@ -154,6 +155,15 @@ export const en: Record<Key, Entry> = {
   'invite.forMail': 'The invitation was sent to {mail}. Sign in with that email.',
   'invite.asUser': 'You are signed in as {mail}.',
   'invite.join': 'Join',
+  'authx.expired.title': 'This invitation is no longer valid',
+  'authx.expired.text': 'The link has expired or was already used. Ask your colleague for a new invitation.',
+  'authx.closed.title': 'Sign-up is closed',
+  'authx.closed.text':
+    'This hub takes people by invitation only. If you were invited, sign in with the address from the e-mail.',
+  'authx.wrongMail.title': 'The invitation is for another address',
+  'authx.back': 'Back to sign-in',
+  'authx.retry': 'Try again',
+  'authx.failed.title': 'The invitation did not open',
   'invite.signinJoin': 'Sign in and join',
   'invite.wrongMail': 'The invitation was sent to another email, you are signed in as {mail}.',
 

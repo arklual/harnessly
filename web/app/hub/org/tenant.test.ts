@@ -246,4 +246,19 @@ describe('mock mode', () => {
     expect((await api.tenantInvites('t-product')).some((i) => i.id === link.id)).toBe(false);
     await expect(api.setTenantRole('t-product', 'u-andrey', 'member')).rejects.toBeInstanceOf(OrgApiError);
   });
+  it('puts the team into the body of an invitation, by mail and by link, and leaves it out otherwise', async () => {
+    const { calls, api } = hub(({ url }) =>
+      url.endsWith('/invites/link')
+        ? json({ invite: invite({ id: 'i2', kind: 'link', email: null, url: 'https://h/i/x' }) })
+        : json({ invites: [invite({ url: 'https://h/i/y', sent: false })] }),
+    );
+    await api.inviteByEmail('sp1', 'a@acme.example', 'member', 'tm1');
+    await api.inviteByLink('sp1', 'tm1');
+    await api.inviteByLink('sp1');
+    expect(calls.map((c) => c.body)).toEqual([
+      { emails: ['a@acme.example'], teamId: 'tm1' },
+      { days: 7, teamId: 'tm1' },
+      { days: 7 },
+    ]);
+  });
 });

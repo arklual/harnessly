@@ -71,6 +71,7 @@ func (s *Store) SettingsFile(id, model, hooksPath string) (string, error) {
 	if !ok {
 		return "", ErrUnknownModel
 	}
+	s.refresh(id)
 	base, keyFile := p.BaseURL, s.KeyFile(id)
 	if p.Switched {
 		sw := s.SwitchOf(id)

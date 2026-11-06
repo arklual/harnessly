@@ -56,14 +56,75 @@ var (
 	ErrQuota = errors.New("apps: the storage area is full")
 	// ErrStorageArgs: a scope, owner or key that is not one.
 	ErrStorageArgs = errors.New("apps: bad storage arguments")
+	// ErrConflict: a write that named the version it read (ifVersion) found the key moved on. The error is a
+	// *ConflictError, which carries the version the key has now.
+	ErrConflict = errors.New("apps: the key changed since it was read")
 
 	ownerRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 )
+
+// ConflictError is the refusal of a write whose ifVersion is not the key's version; Current is the version it has.
+type ConflictError struct{ Current int64 }
+
+func (e *ConflictError) Error() string        { return ErrConflict.Error() }
+func (e *ConflictError) Is(target error) bool { return target == ErrConflict }
+
+// versionsKey is where an area's file keeps the version of each key, next to the values. A key's version is a counter
+// that only grows: a write adds one, a delete adds one too and keeps the number, so a key made anew never repeats a
+// version a reader holds. A key with no version (data written before versions) is at 0. The name is not a key a
+// caller can use.
+const versionsKey = "__hl_versions"
+
+// Change is a key of an area that was written or deleted; it carries no value.
+type Change struct {
+	App   string
+	Scope Scope
+	// Owner is the chat or document of an area per owner; empty for the other scopes.
+	Owner string
+	Key   string
+}
 
 // Storage is the machine's app storage.
 type Storage struct {
 	Root string
 	mu   sync.Mutex
+
+	subMu sync.Mutex
+	subs  map[int]func(Change)
+	next  int
+}
+
+// OnChange calls fn for every key written or deleted from now on, whoever wrote it (a view, an agent's host tool, the
+// install's settings form). fn runs on the writer's goroutine after the write is on disk and must not block. It
+// returns the function that stops the calls.
+func (s *Storage) OnChange(fn func(Change)) (cancel func()) {
+	s.subMu.Lock()
+	defer s.subMu.Unlock()
+	if s.subs == nil {
+		s.subs = map[int]func(Change){}
+	}
+	id := s.next
+	s.next++
+	s.subs[id] = fn
+	return func() {
+		s.subMu.Lock()
+		defer s.subMu.Unlock()
+		delete(s.subs, id)
+	}
+}
+
+func (s *Storage) emit(changes ...Change) {
+	s.subMu.Lock()
+	fns := make([]func(Change), 0, len(s.subs))
+	for _, fn := range s.subs {
+		fns = append(fns, fn)
+	}
+	s.subMu.Unlock()
+	for _, c := range changes {
+		for _, fn := range fns {
+			fn(c)
+		}
+	}
 }
 
 var (
@@ -102,69 +163,129 @@ func (s *Storage) file(app string, scope Scope, owner string) (string, error) {
 }
 
 func checkKey(key string) error {
-	if key == "" || len(key) > maxKeyBytes {
+	if key == "" || len(key) > maxKeyBytes || key == versionsKey {
 		return ErrStorageArgs
 	}
 	return nil
 }
 
-func (s *Storage) read(file string) (map[string]json.RawMessage, error) {
+// area is an area as its file holds it: the values and the version of each key.
+type area struct {
+	values   map[string]json.RawMessage
+	versions map[string]int64
+}
+
+func (s *Storage) read(file string) (*area, error) {
+	a := &area{values: map[string]json.RawMessage{}, versions: map[string]int64{}}
 	raw, err := os.ReadFile(file)
 	if errors.Is(err, fs.ErrNotExist) {
-		return map[string]json.RawMessage{}, nil
+		return a, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	var area map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &area); err != nil {
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &all); err != nil {
 		return nil, err
 	}
-	if area == nil {
-		area = map[string]json.RawMessage{}
+	for k, v := range all {
+		if k == versionsKey {
+			// A damaged versions record is the same as none: every key is back at 0.
+			_ = json.Unmarshal(v, &a.versions)
+			if a.versions == nil {
+				a.versions = map[string]int64{}
+			}
+			continue
+		}
+		a.values[k] = v
 	}
-	return area, nil
+	return a, nil
+}
+
+func (a *area) marshal() ([]byte, error) {
+	out := make(map[string]json.RawMessage, len(a.values)+1)
+	for k, v := range a.values {
+		out[k] = v
+	}
+	if len(a.versions) > 0 {
+		raw, err := json.Marshal(a.versions)
+		if err != nil {
+			return nil, err
+		}
+		out[versionsKey] = raw
+	}
+	return json.Marshal(out)
 }
 
 // Get is the value under a key; ok is false when there is none.
 func (s *Storage) Get(app string, scope Scope, owner, key string) (value json.RawMessage, ok bool, err error) {
+	value, _, ok, err = s.GetVersioned(app, scope, owner, key)
+	return value, ok, err
+}
+
+// GetVersioned is Get with the key's version (0 for data kept before versions, or a key never written).
+func (s *Storage) GetVersioned(app string, scope Scope, owner, key string) (value json.RawMessage, version int64, ok bool, err error) {
 	file, err := s.file(app, scope, owner)
 	if err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
 	if err := checkKey(key); err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	area, err := s.read(file)
+	a, err := s.read(file)
 	if err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
-	value, ok = area[key]
-	return value, ok, nil
+	value, ok = a.values[key]
+	return value, a.versions[key], ok, nil
 }
 
 // Set stores a value; a write that takes the area past its limit is refused whole.
 func (s *Storage) Set(app string, scope Scope, owner, key string, value json.RawMessage) error {
+	_, err := s.SetIf(app, scope, owner, key, value, nil)
+	return err
+}
+
+// SetIf stores a value and answers the key's new version. With ifVersion the write is made only if the key is at that
+// version (0 is a key never written or kept before versions): otherwise it is refused with a *ConflictError and
+// nothing changes.
+func (s *Storage) SetIf(app string, scope Scope, owner, key string, value json.RawMessage, ifVersion *int64) (int64, error) {
 	file, err := s.file(app, scope, owner)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err := checkKey(key); err != nil {
-		return err
+		return 0, err
 	}
 	if !json.Valid(value) {
-		return ErrStorageArgs
+		return 0, ErrStorageArgs
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	area, err := s.read(file)
+	version, err := func() (int64, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		a, err := s.read(file)
+		if err != nil {
+			return 0, err
+		}
+		if ifVersion != nil && *ifVersion != a.versions[key] {
+			return 0, &ConflictError{Current: a.versions[key]}
+		}
+		a.values[key] = value
+		a.versions[key]++
+		return a.versions[key], s.write(app, scope, file, a)
+	}()
 	if err != nil {
-		return err
+		return 0, err
 	}
-	area[key] = value
-	raw, err := json.Marshal(area)
+	s.emit(Change{App: app, Scope: scope, Owner: owner, Key: key})
+	return version, nil
+}
+
+// write saves an area if it stays inside the limits of its scope.
+func (s *Storage) write(app string, scope Scope, file string, a *area) error {
+	raw, err := a.marshal()
 	if err != nil {
 		return err
 	}
@@ -196,30 +317,33 @@ func (s *Storage) SetMany(app string, scope Scope, owner string, values map[stri
 			return ErrStorageArgs
 		}
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	area, err := s.read(file)
+	err = func() error {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		a, err := s.read(file)
+		if err != nil {
+			return err
+		}
+		for k, v := range values {
+			a.values[k] = v
+			a.versions[k]++
+		}
+		return s.write(app, scope, file, a)
+	}()
 	if err != nil {
 		return err
 	}
-	for k, v := range values {
-		area[k] = v
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
 	}
-	raw, err := json.Marshal(area)
-	if err != nil {
-		return err
+	sort.Strings(keys)
+	changes := make([]Change, len(keys))
+	for i, k := range keys {
+		changes[i] = Change{App: app, Scope: scope, Owner: owner, Key: k}
 	}
-	if len(raw) > scopeLimit[scope] {
-		return ErrQuota
-	}
-	var before int64
-	if info, err := os.Stat(file); err == nil {
-		before = info.Size()
-	}
-	if s.scopeBytes(app, scope)-before+int64(len(raw)) > scopeTotal[scope] {
-		return ErrQuota
-	}
-	return writeFileAtomic(file, raw)
+	s.emit(changes...)
+	return nil
 }
 
 // scopeBytes is what the areas of a scope of an app weigh on disk.
@@ -236,7 +360,7 @@ func (s *Storage) scopeBytes(app string, scope Scope) int64 {
 	return total
 }
 
-// Delete removes a key; a key that is not there is not an error.
+// Delete removes a key; a key that is not there is not an error. The key's version goes up by one and is kept.
 func (s *Storage) Delete(app string, scope Scope, owner, key string) error {
 	file, err := s.file(app, scope, owner)
 	if err != nil {
@@ -245,21 +369,29 @@ func (s *Storage) Delete(app string, scope Scope, owner, key string) error {
 	if err := checkKey(key); err != nil {
 		return err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	area, err := s.read(file)
-	if err != nil {
+	changed, err := func() (bool, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		a, err := s.read(file)
+		if err != nil {
+			return false, err
+		}
+		if _, ok := a.values[key]; !ok {
+			return false, nil
+		}
+		delete(a.values, key)
+		a.versions[key]++
+		raw, err := a.marshal()
+		if err != nil {
+			return false, err
+		}
+		return true, writeFileAtomic(file, raw)
+	}()
+	if err != nil || !changed {
 		return err
 	}
-	if _, ok := area[key]; !ok {
-		return nil
-	}
-	delete(area, key)
-	raw, err := json.Marshal(area)
-	if err != nil {
-		return err
-	}
-	return writeFileAtomic(file, raw)
+	s.emit(Change{App: app, Scope: scope, Owner: owner, Key: key})
+	return nil
 }
 
 // Keys lists an area's keys, sorted.
@@ -270,12 +402,12 @@ func (s *Storage) Keys(app string, scope Scope, owner string) ([]string, error) 
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	area, err := s.read(file)
+	a, err := s.read(file)
 	if err != nil {
 		return nil, err
 	}
-	keys := make([]string, 0, len(area))
-	for k := range area {
+	keys := make([]string, 0, len(a.values))
+	for k := range a.values {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

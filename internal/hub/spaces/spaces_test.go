@@ -840,3 +840,88 @@ func TestMaskEmail(t *testing.T) {
 		}
 	}
 }
+
+// An invitation may name a team of the space: the person who accepts it joins the space and that team.
+func TestInviteCarriesATeam(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	owner := e.signIn("owner@example.com")
+	sp := owner.newSpace("Команда")
+	other := owner.newSpace("Другая")
+	team := store.Team{SpaceID: sp.ID, Slug: "core", Name: "Ядро"}
+	if err := e.db.S().CreateTeam(ctx, &team); err != nil {
+		t.Fatal(err)
+	}
+	foreign := store.Team{SpaceID: other.ID, Slug: "x", Name: "Чужая"}
+	if err := e.db.S().CreateTeam(ctx, &foreign); err != nil {
+		t.Fatal(err)
+	}
+
+	// a team of another space is refused, for both kinds
+	if r := owner.do("POST", "/api/spaces/"+sp.ID+"/invites", map[string]any{"emails": []string{"a@example.com"}, "teamId": foreign.ID}); r.Code != 400 {
+		t.Errorf("email invite into a foreign team: %d %s", r.Code, r.Body)
+	}
+	if r := owner.do("POST", "/api/spaces/"+sp.ID+"/invites/link", map[string]any{"teamId": foreign.ID}); r.Code != 400 {
+		t.Errorf("link invite into a foreign team: %d %s", r.Code, r.Body)
+	}
+
+	// by email
+	r := owner.do("POST", "/api/spaces/"+sp.ID+"/invites", map[string]any{"emails": []string{"mail@example.com"}, "teamId": team.ID})
+	var made struct{ Invites []InviteView }
+	r.into(&made)
+	if r.Code != 201 || len(made.Invites) != 1 {
+		t.Fatalf("email invite: %d %s", r.Code, r.Body)
+	}
+	token := tokenOf(made.Invites[0].URL)
+	var peek struct{ TeamName string }
+	(&person{e: e, client: &http.Client{}}).do("GET", "/api/invites/"+token, nil).into(&peek)
+	if peek.TeamName != "Ядро" {
+		t.Errorf("peek teamName = %q", peek.TeamName)
+	}
+	guest := e.signIn("mail@example.com")
+	if r := guest.do("POST", "/api/invites/"+token+"/accept", map[string]any{}); r.Code != 200 {
+		t.Fatalf("accept: %d %s", r.Code, r.Body)
+	}
+	if !inTeam(t, e, team.ID, guest.id) {
+		t.Error("the guest did not join the team")
+	}
+
+	// by link
+	r = owner.do("POST", "/api/spaces/"+sp.ID+"/invites/link", map[string]any{"teamId": team.ID})
+	var link struct{ Invite InviteView }
+	r.into(&link)
+	if r.Code != 201 && r.Code != 200 {
+		t.Fatalf("link invite: %d %s", r.Code, r.Body)
+	}
+	second := e.signIn("vialink@example.com")
+	if r := second.do("POST", "/api/invites/"+tokenOf(link.Invite.URL)+"/accept", map[string]any{}); r.Code != 200 {
+		t.Fatalf("accept link: %d %s", r.Code, r.Body)
+	}
+	if !inTeam(t, e, team.ID, second.id) {
+		t.Error("the person who used the link did not join the team")
+	}
+
+	// a plain link has no team
+	r = owner.do("POST", "/api/spaces/"+sp.ID+"/invites/link", map[string]any{})
+	var plain struct{ Invite InviteView }
+	r.into(&plain)
+	third := e.signIn("plain@example.com")
+	third.do("POST", "/api/invites/"+tokenOf(plain.Invite.URL)+"/accept", map[string]any{})
+	if inTeam(t, e, team.ID, third.id) {
+		t.Error("a link without a team put the guest in one")
+	}
+}
+
+func inTeam(t *testing.T, e *env, teamID, userID string) bool {
+	t.Helper()
+	ms, err := e.db.S().TeamMembers(context.Background(), teamID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range ms {
+		if m.UserID == userID {
+			return true
+		}
+	}
+	return false
+}

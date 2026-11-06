@@ -187,14 +187,22 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HUB_PUBLIC_URL` | — (required) | The address people use, `http(s)://host[:port]`, no path. What providers call back, what machines dial, what cookies are bound to. `https` makes cookies `Secure` and `__Host-` prefixed |
+| `HUB_PUBLIC_URL` | — (required) | The address people use, `http(s)://host[:port][/path]`. What providers call back, what machines dial, what cookies are bound to. `https` makes cookies `Secure` and `__Host-` prefixed (`__Secure-` under a path). A path means the hub sits under it behind a proxy: [proxy.md](proxy.md) |
 | `HUB_LISTEN` | `0.0.0.0:8040` | Where the hub listens |
 | `HUB_DATA_DIR` | `/var/lib/harnessly-hub` | The SQLite file and, unless `HUB_SECRET_KEY` is set, `secret_key`: what the spaces' SSH keys are sealed with |
 | `HUB_DATABASE_URL` | SQLite in the data folder | `sqlite:///path` or `postgres://user:pass@host/db` |
+| `HUB_DB_SCHEMA` | not set | Postgres schema for the hub's tables instead of `public` ([migrations](migrations.md)) |
+| `HUB_DB_POOLER` | not set | `transaction` behind PgBouncer in transaction mode: simple protocol, transaction-scoped migration lock |
+| `HUB_DB_MIGRATE_URL` | not set | direct `postgres://` URL for the migrations when `HUB_DATABASE_URL` goes through a pooler |
+| `HUB_DB_CHECK` | `warn` | `warn`, `strict` (refuse to start on a database newer than the binary or on schema drift; exit 70/71/72/73) or `off` |
 | `HUB_SIGNUP` | `open` (the Helm chart and `compose.hub.yaml`: `invite`) | `open`, or `invite`: administrators and people with an invitation |
 | `HUB_ADMIN_EMAILS` | first account | Comma-separated administrators of the installation. Each has to sign in with an address they have [proved](#who-is-the-administrator); without the list the first account, if it has proved its address, is the administrator |
+| `HUB_OIDC_EMAIL_TRUSTED` | `off` | `on`: take the address of every configured OpenID Connect provider as proved even when it does not send `email_verified`. For the installation's own provider (a corporate Keycloak, Authentik): then the first sign-in through it may become the administrator under `HUB_SIGNUP=invite` with no `HUB_ADMIN_EMAILS`. Do not set it for a provider that lets anyone register with any address |
+| `HUB_MACHINE_TRUST` | `off` (`on` in the compose file, the chart and the systemd example) | `on`: in path mode the owner of a machine's space may trust the machine so the hub opens it ([why](#where-machines-open-path-or-subdomain)); `GET`/`POST`/`DELETE /api/machines/{id}/trust` |
 | `HUB_SMTP_URL`, `HUB_MAIL_FROM` | log the code (plain http only) | `smtp://[user:pass@]host[:587]` (STARTTLS) or `smtps://…:465`. **Required on an https hub and in the cloud edition**: the hub does not start without it (and `check-config` exits non-zero) unless `HUB_MAIL_LOG=allow` |
 | `HUB_MAIL_LOG` | not set | `allow`: accept that, with no SMTP server, sign-in codes and invitation links are written to the hub's log although the hub is on https or in the cloud edition. Only for a hub whose log is as private as its database |
+| `HUB_AUTH_EMAIL` | `on` | `off`: no sign-in by a mailed code, no SMTP. People sign in through OpenID Connect, GitHub, Yandex or the gateway; an invitation is a link in the response that the inviter passes on. The hub does not start with `off` and no other way to sign in ([Sign in without mail](#sign-in-without-mail)) |
+| `HUB_STORAGE`, `HUB_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY`, `_SECRET_KEY`, `_REGION`, `_PREFIX` | `disk` | `s3`: the hub's files (published sites) live in one bucket instead of the data folder ([Files in S3](#files-in-s3)) |
 | `HUB_PASSKEY`, `HUB_RP_ID`, `HUB_RP_NAME` | `on`, host of the public URL, `harnessly` | Passkeys; need a domain name, not an IP address |
 | `HUB_GITHUB_CLIENT_ID`, `_SECRET`, `HUB_GITHUB_URL` | off | GitHub sign-in; the URL is for GitHub Enterprise |
 | `HUB_YANDEX_CLIENT_ID`, `_SECRET` | off | Yandex ID sign-in |
@@ -208,9 +216,11 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 | `HARNESSLY_SITES_DOMAIN` | path fallback | [Published sites](sites.md) at `<site>--<space>.<domain>`: a domain of its own, with a wildcard record and certificate. Without it a self-hosted hub serves sites under `/sites/` sandboxed; the cloud edition serves none |
 | `HARNESSLY_SITES`, `HARNESSLY_SITES_ABUSE_URL` | `on`, none | `off` switches sites off; the complaint link on the 404 page of the bare sites domain |
 | `HARNESSLY_SITES_DIR`, `HARNESSLY_SITES_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY`, `_SECRET_KEY`, `_REGION`, `_PREFIX` | `<HUB_DATA_DIR>/sites` | Where the sites' files live: a folder, or an S3 bucket (MinIO, any S3) |
+| `HUB_SECRETS_VAULT_ADDR` and the other `HUB_SECRETS_VAULT_*` | no safe | [The hub's safe](../safe.md#the-hubs-safe): a Vault-compatible server where the machines in `RUNTIME_SECRETS_MODE=hub` keep their owners' secrets through the hub's one account; on for an organization with the flag `secrets.vault` |
+| `HUB_SECRETS_REF_PREFIXES` | none | folders of that server the machines may read as `vault:` references, comma-separated |
 | `HUB_SSH` | `on` | [The SSH way](#the-ssh-way) of connecting a server |
 | `HUB_SSH_ALLOW_PRIVATE` | `off` | Let the SSH way reach private, loopback and link-local addresses. Off in every edition by default; the cloud edition ignores it |
-| `HUB_SECRET_KEY` | a key file in the data folder | At least 32 characters (`openssl rand -base64 32`): what the spaces' SSH keys are sealed with. `_FILE` is read as a file name. Losing it makes the stored keys useless (they are made again) |
+| `HUB_SECRET_KEY` | a key file in the data folder | At least 32 characters (`openssl rand -base64 32`): what the spaces' SSH keys and the design guest links' addresses are sealed with. `_FILE` is read as a file name. Losing it makes the stored keys useless (they are made again) and the links' addresses uncopyable (the links still open) |
 | `HUB_DESIGN_SHARE_URL` | off | Origin of the [design guest links](design-access.md) (`https://share.example.com`, no path): a host of its own that points at the hub, never the hub's host. Without it links cannot be made |
 | `HUB_DESIGN_PLATFORM_API` | `/api/platform` | The runtime's platform prefix (`/api/<name>`) the hub uses for a machine whose page has not called the access API yet; must match the machines' `AGENT_RUNTIME_PLATFORM_API` |
 | `HUB_CONTAINER_IMAGE` | hidden | The image the «В контейнере» way runs; must be pullable by the machines |
@@ -241,7 +251,10 @@ an OpenID Connect provider that says `email_verified: true`. A provider that onl
 provider without `email_verified`) never makes anyone the administrator, never lets them in on `HUB_SIGNUP=invite`
 through an invitation addressed to an email, and never joins an existing account: someone must not become the
 administrator by registering the administrator's address somewhere that does not check it. An invitation by link works
-for any signed-in way; one addressed to an email works once the address is proved. A first account that has not proved its
+for any signed-in way; one addressed to an email works once the address is proved. With `HUB_SIGNUP=invite` and no administrator named, the first sign-in through a provider that does not send
+`email_verified` is refused (`first_account_unverified`) and the hub says so in its log at start. Three ways out: name the
+administrator in `HUB_ADMIN_EMAILS`, sign in the first time with a mailed code, or, for your own OpenID Connect provider,
+set `HUB_OIDC_EMAIL_TRUSTED=on`. A first account that has not proved its
 address is refused (`first_account_unverified`) when no administrator is named. With administrators named and
 `HUB_SIGNUP=invite`, nobody else can create an account before one of them has signed in: the empty user table is a door
 only when no administrator is named. Name the administrators on any server others can reach.
@@ -312,6 +325,50 @@ At the provider create a *confidential* client with the **authorization code** f
 when the provider says `email_verified: true`; some providers need that switched on (Keycloak: *Email verified* on the
 user, or a verification step). The cloud edition runs no generic OIDC. Several providers can run side by side.
 
+### Sign in without mail
+
+`HUB_AUTH_EMAIL=off` closes the sign-in by a mailed code. The hub then needs no SMTP server and never writes a code to its
+log; people sign in through OpenID Connect, GitHub, Yandex ID or the gateway. The hub does not start with `off` when none
+of those is set (`hub check-config` says so), since nobody could sign in. The sign-in screen shows the buttons of the
+configured providers and no email field; the two email routes answer `404`.
+
+An invitation is a link: the response of the invite call carries it (`url`, with `sent: false`), and the inviter passes it on
+in any way they like. The person opens it, signs in through a provider, and joins the organization. Their address counts as
+proved when the provider says `email_verified: true` (see [OpenID Connect](#openid-connect-keycloak-authentik-gitlab-google-)).
+The default is `on`; nothing changes for an installation that does not set it.
+
+## Files in S3
+
+A hub keeps its files in its data folder. `HUB_STORAGE=s3` puts them in one bucket (MinIO, Selectel, any S3 with path-style
+addressing) with one setting:
+
+```sh
+HUB_STORAGE=s3
+HUB_S3_ENDPOINT=https://s3.example.com
+HUB_S3_BUCKET=harnessly-hub
+HUB_S3_ACCESS_KEY=…
+HUB_S3_SECRET_KEY=…        # or HUB_S3_SECRET_KEY_FILE
+# HUB_S3_REGION=us-east-1  HUB_S3_PREFIX=hub/
+```
+
+Today the hub's own files are the [published sites](sites.md) (under `<prefix>sites/`). `HARNESSLY_SITES_S3_*`, when set,
+still wins for the sites. The hub does not start with `HUB_STORAGE=s3` and an incomplete bucket setting, and `check-config`
+lists what is missing.
+
+Not in the bucket: the database (`HUB_DATABASE_URL`), the hub's SSH key, and the files that machines hold themselves
+(attachments, artifacts, shared snapshots live on the machine's runtime, not on the hub).
+
+**Moving an existing hub.** With the new settings in the environment, run on the hub's host:
+
+```sh
+hub storage migrate --dry-run          # count what would move, write nothing
+hub storage migrate                    # copy; a file already in the bucket is not copied again
+hub storage migrate --remove-source    # the same, and remove each folder file once the bucket holds it
+```
+
+Every file is checked against its name (a content hash) before and after the copy. The command can be run again after
+an interruption. Restart the hub with `HUB_STORAGE=s3` afterwards; until then it keeps reading the folder.
+
 ## Where machines open: path or subdomain
 
 A machine's page is the machine's own JavaScript. What differs is the origin it runs on:
@@ -325,7 +382,11 @@ A machine's page is the machine's own JavaScript. What differs is the origin it 
   The hub enforces what it can of that: **in path mode it opens only machines an administrator of the hub connected**
   (`/m/<id>/` and `GET /api/machines/<id>/open` answer 403 `machine_untrusted` for any other, even to a member of its
   space and even with `HUB_SIGNUP=open`), so a stranger who signs up, makes a space and a machine and invites the
-  administrator in cannot run script as them. To let members connect machines, set `HUB_RUNTIME_DOMAIN`. The hub says so
+  administrator in cannot run script as them. To let members connect machines, set `HUB_RUNTIME_DOMAIN`, or set
+  `HUB_MACHINE_TRUST=on` (the compose file, the Helm chart and the systemd example do): a machine connected by a member
+  then waits for trust, the screen says so, and the owner of its space presses «Доверять машине». The trust is a row of
+  the owner's own decision in the journal, per machine, taken back at any time; it does not make a stranger's machine
+  safe, so trust only machines you or your people run. The hub says so
   in its log at start and `hub check-config` prints it.
 - **Subdomain mode** (`HUB_RUNTIME_DOMAIN=run.example.net`): `https://<machine>.run.example.net`, one origin per machine. The
   hub opens a machine by handing a one-minute, single-use ticket to its origin, which trades it for a cookie of its own
@@ -430,6 +491,9 @@ servers that trusted it have to be given their space's key.
   account; `HUB_TRUSTED_PROXIES` decides whose `X-Forwarded-For` is believed.
 
 ## Troubleshooting
+
+`hub doctor` checks the database, migrations, S3, OpenID providers, the public address, the proxy and the clock, and prints a
+code with what to do for each problem ([doctor.md](doctor.md)). Behind a proxy or under a path: [proxy.md](proxy.md).
 
 | Symptom | Look at |
 | --- | --- |

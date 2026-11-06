@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pageText } from '@/next/bindings/outcome';
 import { loadApps } from '@/next/features/apps/api';
+import { loadHubEnv, type IHubEnv } from '@/next/features/hub-env/api';
 import {
   loadAgentSettings,
   loadCatalog,
@@ -158,6 +159,14 @@ export const useCatalog = (
     enabled,
     useCallback(() => loadCatalog(machine, provider, cwd), [machine, provider, cwd]),
     `${machine}/${provider}/${cwd ?? ''}`,
+  );
+
+/** What the hub handed this machine: the runtime says whether the section is on at all. */
+export const useHubEnv = (machine: MachineId) =>
+  useLoaded<IHubEnv>(
+    true,
+    useCallback(() => loadHubEnv(machine), [machine]),
+    machine,
   );
 
 export const useAppsFeed = (machine: MachineId, enabled: boolean) =>

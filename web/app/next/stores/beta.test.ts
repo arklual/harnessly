@@ -12,6 +12,7 @@ describe('parseBeta', () => {
     expect(parseBeta('{"retitle":true,"multiModel":"yes","other":true}')).toEqual({
       retitle: true,
       multiModel: false,
+      hubFirst: false,
     });
   });
 });

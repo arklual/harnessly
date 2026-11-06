@@ -26,6 +26,7 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
   apps: { icon: 'layout-grid' },
   connections: { icon: 'plug' },
   design: { icon: 'pen-tool' },
+  extensions: { icon: 'blocks' },
   beta: { icon: 'sparkles' },
 };
 
@@ -33,7 +34,7 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
 const NAV_GROUPS = [
   { id: 'app', sections: ['general', 'appearance', 'keys', 'notifications', 'voice', 'takes'] },
   { id: 'agents', sections: ['accounts', 'claude', 'codex', 'skills', 'safe', 'browser'] },
-  { id: 'machine', sections: ['machines', 'apps', 'connections', 'design', 'beta'] },
+  { id: 'machine', sections: ['machines', 'apps', 'connections', 'design', 'extensions', 'beta'] },
 ] as const satisfies readonly { id: string; sections: readonly SettingsSection[] }[];
 
 interface ISettingsShellProps {
@@ -43,6 +44,8 @@ interface ISettingsShellProps {
   pageOpen: boolean;
   /** The line under the section's title; the binding knows which machine and file it is about. */
   lead: string;
+  /** Sections the list leaves out (Extensions, where no app fills a slot). */
+  hidden?: readonly SettingsSection[];
   onPick: (section: SettingsSection) => void;
   onBack: () => void;
   onOpenDrawer: () => void;
@@ -53,6 +56,7 @@ const SettingsShell = ({
   section,
   pageOpen,
   lead,
+  hidden = [],
   onPick,
   onBack,
   onOpenDrawer,
@@ -87,29 +91,33 @@ const SettingsShell = ({
             <div className="hx-set__nav-caption" id={`hx-set-nav-${group.id}`}>
               {t(`next.settings.navGroup.${group.id}`)}
             </div>
-            {group.sections.map((id) => {
-              const mark = SECTION_MARK[id];
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className="hx-set__nav-item"
-                  aria-current={id === section ? true : undefined}
-                  ref={(element) => element?.style.setProperty('--i', String(SETTINGS_SECTIONS.indexOf(id)))}
-                  onClick={() => onPick(id)}
-                >
-                  <span className="hx-set__nav-ic">
-                    {'agent' in mark ? (
-                      <i className="hx-agent" data-agent={mark.agent} aria-hidden="true" />
-                    ) : (
-                      <Icon name={mark.icon} size="sm" />
-                    )}
-                  </span>
-                  <span className="hx-set__nav-label">{t(`next.settings.section.${id}`)}</span>
-                  <Icon name="chevron-right" size="sm" className="hx-set__nav-chev" />
-                </button>
-              );
-            })}
+            {group.sections
+              .filter((id) => !hidden.includes(id))
+              .map((id) => {
+                const mark = SECTION_MARK[id];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className="hx-set__nav-item"
+                    aria-current={id === section ? true : undefined}
+                    ref={(element) =>
+                      element?.style.setProperty('--i', String(SETTINGS_SECTIONS.indexOf(id)))
+                    }
+                    onClick={() => onPick(id)}
+                  >
+                    <span className="hx-set__nav-ic">
+                      {'agent' in mark ? (
+                        <i className="hx-agent" data-agent={mark.agent} aria-hidden="true" />
+                      ) : (
+                        <Icon name={mark.icon} size="sm" />
+                      )}
+                    </span>
+                    <span className="hx-set__nav-label">{t(`next.settings.section.${id}`)}</span>
+                    <Icon name="chevron-right" size="sm" className="hx-set__nav-chev" />
+                  </button>
+                );
+              })}
           </div>
         ))}
       </nav>

@@ -7,9 +7,11 @@ import { createRoot } from 'react-dom/client';
 import { startTheme } from '@kit';
 
 import { App } from './app';
+import { installBase } from './lib/base';
 import { browserEnv, EnvProvider, type HubEnv } from './lib/env';
 import { initLang } from './lib/i18n';
 
+installBase();
 startTheme({ storageKey: 'hl-theme', fallback: 'system' });
 initLang();
 

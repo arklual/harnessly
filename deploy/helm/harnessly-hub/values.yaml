@@ -1,6 +1,12 @@
-# The hub is one process with state in memory (the agents' links, the open event streams) and, by default, a SQLite
-# file: it runs as one replica that is replaced, not rolled (strategy: Recreate). Postgres holds the data, not the
-# links, so a second replica is not supported either way (docs/hub/architecture.md, "Not in this version").
+# The hub keeps each machine's link in the replica the machine dialed. On a SQLite file (the default) it is one replica
+# that is replaced, not rolled (strategy: Recreate). On a shared Postgres (database.postgres.enabled, or
+# database.external) it runs replicaCount replicas, rolled one at a time: the owner of a link holds a lease with a
+# fencing token in the database and the other replicas reach it over an internal hop (docs/hub/replicas.md).
+
+# -- Replicas of the hub. More than one needs Postgres (database.postgres.enabled, or database.external with
+# HUB_DATABASE_URL in the Secret) and HUB_SECRET_KEY in the Secret (the data volume is not shared between replicas);
+# without a database both are ignored and the hub runs as one replica, as before.
+replicaCount: 2
 
 image:
   # -- Image repository. Build the `hub` target of the Dockerfile; the image carries the binaries machines download.
@@ -52,6 +58,17 @@ signup: invite
 # the ingress is on (the chart refuses to render otherwise): empty would make the first account to arrive the
 # administrator, and with the ingress that can be anyone on the internet.
 adminEmails: []
+# -- Organizations (HUB_ORGS: off, shadow or on). On for a new installation: sign in, make an organization with its first
+# tenant, invite people, connect a machine.
+orgs: "on"
+# -- Flags that are on for every organization that has not chosen (HUB_FEATURES_DEFAULT): ui.hx is the new interface.
+featuresDefault: ["ui.hx"]
+# -- Let an owner of a space trust a machine to open on the hub's own origin when runtimeDomain is empty
+# (HUB_MACHINE_TRUST). Has no effect with runtimeDomain.
+machineTrust: true
+# -- Take the email of the OpenID Connect providers as verified (HUB_OIDC_EMAIL_TRUSTED): lets the first person to sign in
+# through such a provider become the administrator when adminEmails is empty. Only for a provider you run or trust.
+oidcEmailTrusted: false
 # -- self-hosted or cloud (HUB_EDITION). The cloud edition runs no OpenID Connect and no local machine, needs
 # runtimeDomain, and never lets the SSH way reach a private address.
 edition: self-hosted
@@ -87,6 +104,20 @@ trustedProxies: ""
 # in the Secret below. Required for an https publicUrl and for edition: cloud: without it the hub does not start (a code
 # in a log that others read is a sign-in as anyone), unless extraEnv sets HUB_MAIL_LOG=allow.
 mailFrom: ""
+
+# -- off: no sign-in by a mailed code and no SMTP (HUB_AUTH_EMAIL). People sign in through a provider below; an invitation
+# is a link the inviter passes on. The hub does not start with off and no provider.
+authEmail: "on"
+
+# -- Where the hub keeps its files. type: s3 puts them in one bucket (HUB_STORAGE=s3); the keys go in the Secret:
+# HUB_S3_ACCESS_KEY and HUB_S3_SECRET_KEY. Move an existing hub's files with `hub storage migrate`.
+storage:
+  type: disk
+  s3:
+    endpoint: ""
+    region: ""
+    bucket: ""
+    prefix: ""
 
 # Sign-in providers. A provider shows up on the sign-in page when its settings are complete; the client secrets are
 # keys of the Secret (below), not values.
@@ -125,6 +156,9 @@ extraEnv: []
 extraEnvFrom: []
 
 database:
+  # -- Set when HUB_DATABASE_URL in the Secret points at a Postgres that is not held by this chart: several replicas run
+  # on it (replicaCount).
+  external: false
   # -- Postgres held in the cluster by this chart: one StatefulSet pod with its own volume, for a try-out or a small
   # team. For anything that matters point HUB_DATABASE_URL (in the Secret) at a database you back up, and leave this
   # off. Off and no HUB_DATABASE_URL: SQLite in the data volume.
@@ -143,6 +177,39 @@ database:
         memory: 256Mi
       limits:
         memory: 1Gi
+
+# Documents and boards (HUB_DOCS): the hub keeps the comments, threads and rights; the documents themselves live in the
+# artifacts service and the boards in the boards service. OFF by default: it is two more services to run and to keep
+# a token for, and a hub without them is complete (the screens say "not set up", with the reason, instead of failing).
+docs:
+  enabled: false
+  artifacts:
+    # -- Run the artifacts service in this release (one replica, files on a volume of its own). Off: set url (and
+    # the token below) to a service you run yourself, with S3 storage, behind several replicas.
+    bundled: true
+    # -- Address of an artifacts service you run (HUB_ARTIFACTS_URL); ignored while bundled is true.
+    url: ""
+    image:
+      repository: ghcr.io/ly-solutions/artifacts
+      tag: latest
+    persistence:
+      size: 5Gi
+      storageClass: ""
+  boards:
+    # -- Run the boards service in this release (files on a volume). There is no published image yet: build it from the
+    # boards repository and set image.repository, or leave this off and the hub offers documents only.
+    bundled: false
+    # -- Address of a boards service you run (HUB_BOARDS_URL); empty with bundled: false means no boards.
+    url: ""
+    image:
+      repository: ""
+      tag: latest
+    persistence:
+      size: 1Gi
+      storageClass: ""
+  # -- A Secret with the key `token`: the bearer both services accept from the hub. Empty: the chart makes one and
+  # keeps it across upgrades. Set it when the services are yours (url set), as the chart cannot know their token.
+  existingSecret: ""
 
 persistence:
   # -- The hub's data folder (HUB_DATA_DIR): the SQLite file and, unless HUB_SECRET_KEY is set, the key file that seals

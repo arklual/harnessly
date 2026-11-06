@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -86,6 +87,14 @@ func (c *fakeClient) Issue(_ context.Context, key string) (*connections.Issue, e
 		return nil, connections.ErrNotFound
 	}
 	return &connections.Issue{Key: "FK-1", Title: "First", URL: "https://fake.test/browse/FK-1", Description: "Body"}, nil
+}
+
+func (c *fakeClient) MergeRequests(_ context.Context, q connections.Query) ([]connections.MergeRequest, error) {
+	if q.Text == "none" {
+		return nil, nil
+	}
+	return []connections.MergeRequest{{IID: 5, Title: "Fix " + q.Text + " " + q.State + " " + strconv.Itoa(q.Limit), State: "opened",
+		Pipeline: &connections.Pipeline{Status: "running"}}}, nil
 }
 
 func (c *fakeClient) SearchPages(context.Context, connections.Query) ([]connections.Page, error) {
@@ -246,6 +255,39 @@ func TestConnectionRoutesConnectReadAndForget(t *testing.T) {
 	}
 	if text := logs(); strings.Contains(text, connFakeToken) || strings.Contains(text, "wrong") {
 		t.Fatalf("a credential reached the log: %s", text)
+	}
+}
+
+func TestConnectionRoutesMergeRequests(t *testing.T) {
+	call, _ := connRig(t, nil)
+	base := platformAPI + "/connections"
+	connect := func(caps string) string {
+		det := `{"kind":"fake-tracker","baseUrl":"https://fake.test","deployment":"cloud","methods":[{"id":"pat","fields":[{"id":"token","secret":true}]}],"capabilities":[` + caps + `]}`
+		code, out := call("POST", base, `{"detection":`+det+`,"method":"pat","credentials":{"token":"`+connFakeToken+`"}}`, connPage)
+		if code != 200 {
+			t.Fatalf("connect: %d %v", code, out)
+		}
+		return out["connection"].(map[string]any)["id"].(string)
+	}
+	noCode := connect(`"issues"`)
+	if code, out := call("GET", "/api/cli/connections/"+noCode+"/mrs?q=x", "", connCLI); code != 400 || out["error"] != "unsupported" {
+		t.Fatalf("a connection without code: %d %v", code, out)
+	}
+	if code, _ := call("DELETE", base+"/"+noCode, "", connPage); code != 204 {
+		t.Fatalf("delete: %d", code)
+	}
+	id := connect(`"issues","code"`)
+	code, out := call("GET", "/api/cli/connections/"+id+"/mrs?q=HRN-1&state=merged&limit=3", "", connCLI)
+	mrs, _ := out["mrs"].([]any)
+	if code != 200 || len(mrs) != 1 || mrs[0].(map[string]any)["title"] != "Fix HRN-1 merged 3" ||
+		mrs[0].(map[string]any)["pipeline"].(map[string]any)["status"] != "running" {
+		t.Fatalf("cli mrs: %d %v", code, out)
+	}
+	if code, out := call("GET", "/api/cli/connections/"+id+"/mrs?q=none", "", connCLI); code != 200 || out["mrs"] == nil {
+		t.Fatalf("no merge requests is an empty list: %d %v", code, out)
+	}
+	if code, _ := call("POST", "/api/cli/connections/"+id+"/mrs", "", connCLI); code != 405 {
+		t.Fatalf("cli post: %d", code)
 	}
 }
 

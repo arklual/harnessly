@@ -1,14 +1,17 @@
 // «Открыть»: leads to the machine's runtime; the address comes from the hub when the button is pressed.
 import { createContext, useContext, useState } from 'react';
 
-import { orgErrorText } from '../../../org/api/errors';
+import { OrgApiError, orgErrorText } from '../../../org/api/errors';
 import { useOrg } from '../../../org/context';
+import { withBase } from '../../../lib/base';
 
 export interface OpenMachine {
   /** The machine being opened now. */
   busyId: string | null;
-  error: { id: string; text: string } | null;
+  error: { id: string; text: string; untrusted?: boolean } | null;
   open: (id: string) => Promise<void>;
+  /** The owner trusts a machine the hub refused to open, then it is opened. */
+  trust: (id: string) => Promise<void>;
   clear: () => void;
 }
 
@@ -21,14 +24,31 @@ export const useOpenMachine = (): OpenMachine => {
     setError(null);
     try {
       const { url } = await api.openMachine(id);
-      window.location.assign(url);
+      window.location.assign(withBase(url));
     } catch (e) {
-      setError({ id, text: orgErrorText(e) });
+      setError({
+        id,
+        text: orgErrorText(e),
+        ...(e instanceof OrgApiError && e.code === 'untrusted' ? { untrusted: true } : {}),
+      });
     } finally {
       setBusyId(null);
     }
   };
-  return { busyId, error, open, clear: () => setError(null) };
+  const trust = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api.trustMachine(id);
+    } catch (e) {
+      setError({ id, text: orgErrorText(e) });
+      setBusyId(null);
+      return;
+    }
+    setBusyId(null);
+    await open(id);
+  };
+  return { busyId, error, open, trust, clear: () => setError(null) };
 };
 
 /** The screen's opener, for the rows of the lists. */

@@ -299,6 +299,7 @@ gh attestation verify oci://ghcr.io/ly-solutions/harnessly:latest --repo ly-solu
 | [MCP servers](docs/mcp-connections.md) | remote MCP servers from Settings: OAuth sign-in, the proxy, how the agents get them |
 | [Voice input](docs/voice.md) | the microphone, the built-in recognition, how to change or turn it off |
 | [Board engine](docs/design-engine.md) | the built-in engine, the optional vendor engine, moving upstream changes over |
+| [Render kit](docs/render-kit.md) | pinned Chrome, ffmpeg and fonts; `harnessly doctor render` |
 | [Design pages](docs/design-pages.md) | the page model of a design project and the page commands |
 | [Integrations](docs/integrations.md) | boards, artifacts and the agent skills |
 | [Architecture](docs/architecture.md) | the runtime gate, the core, tmux, the machine agent, the repository layout |

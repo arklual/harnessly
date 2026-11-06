@@ -339,6 +339,7 @@
   "next.slash.label": "Команды, навыки и настройки",
   "next.slash.group.setting": "Настройки чата",
   "next.slash.group.command": "Команды",
+  "next.slash.group.app": "Приложения",
   "next.slash.group.skill": "Навыки",
   "next.slash.group.mcp": "MCP-серверы",
   "next.slash.group.quick": "Быстрые промпты",
@@ -505,5 +506,7 @@
   "next.cleared.model": "В терминале был открыт выбор модели — закрыл его, чтобы отправить сообщение",
   "next.cleared.effort": "В терминале была открыта настройка effort — закрыл её, чтобы отправить сообщение",
   "next.message.copy": "Копировать",
-  "next.message.copied": "Скопировано"
+  "next.message.copied": "Скопировано",
+  "next.tool.guarded": "Приложение {app} не дало выполнить «{tool}»: правило {rule}",
+  "next.tool.guardedChat": "Приложения чата не дали выполнить «{tool}»: правило {rule}"
 }

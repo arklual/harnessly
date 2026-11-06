@@ -89,6 +89,8 @@ export interface OrgMachine {
   /** The rented server: who rents it, which plan and what the provider charges. Absent on a laptop. */
   rent?: { provider: string; plan: string; price: Money | null } | null;
   managed?: MachineManaged | null;
+  /** False when the hub only observes the machine: there is no runtime of it to open here. */
+  opensRuntime?: boolean;
 }
 
 export interface MachineGroup {
@@ -199,4 +201,6 @@ export interface MachinesApi {
   removeMachine(id: string): Promise<void>;
   /** Where «Открыть» leads: the address of the machine's runtime (`GET /api/machines/{id}/open`). */
   openMachine(id: string): Promise<{ url: string }>;
+  /** `POST /api/machines/{id}/trust`: the tenant's owner lets the hub open this machine on its own origin. */
+  trustMachine(id: string): Promise<void>;
 }

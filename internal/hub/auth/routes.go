@@ -18,8 +18,8 @@ type SpaceRef struct {
 
 // Mount registers the sign-in and account endpoints.
 func (s *Service) Mount(mux *http.ServeMux) {
-	mux.Handle("POST /api/auth/email/start", s.direct(httpx.Handler(s.emailStart)))
-	mux.Handle("POST /api/auth/email/verify", s.direct(httpx.Handler(s.emailVerify)))
+	mux.Handle("POST /api/auth/email/start", s.direct(s.emailOn(httpx.Handler(s.emailStart))))
+	mux.Handle("POST /api/auth/email/verify", s.direct(s.emailOn(httpx.Handler(s.emailVerify))))
 	mux.Handle("POST /api/auth/passkey/login/begin", s.direct(httpx.Handler(s.passkeyLoginBegin)))
 	mux.Handle("POST /api/auth/passkey/login/finish", s.direct(httpx.Handler(s.passkeyLoginFinish)))
 	mux.Handle("GET /api/auth/oauth/{provider}/start", s.direct(http.HandlerFunc(s.oauthStart)))
@@ -32,6 +32,17 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/me/passkeys/finish", s.Require(s.passkeyRegisterFinish))
 	mux.Handle("DELETE /api/me/passkeys/{id}", s.Require(s.deletePasskey))
 	mux.Handle("DELETE /api/me/identities/{provider}", s.Require(s.deleteIdentity))
+}
+
+// emailOn answers 404 on the code sign-in when the hub has it off (HUB_AUTH_EMAIL=off).
+func (s *Service) emailOn(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.cfg.AuthEmailOff {
+			httpx.WriteError(w, r, httpx.New(http.StatusNotFound, "email_off", "Вход по коду из письма выключен на этом хабе"))
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 // direct keeps the hub's own sign-in off the gateway's address: there the gateway is the sign-in.

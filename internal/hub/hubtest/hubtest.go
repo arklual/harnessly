@@ -31,6 +31,7 @@ type Mail struct {
 	mu      sync.Mutex
 	codes   map[string]string
 	Invites []Invite
+	notices []Notice
 	// Fail makes sending an invitation fail.
 	Fail bool
 }
@@ -38,7 +39,24 @@ type Mail struct {
 // Invite is a mailed invitation.
 type Invite struct{ To, Inviter, Space, Link string }
 
+// Notice is a mailed notice about access.
+type Notice struct{ To, Subject, Body, Link string }
+
 func (m *Mail) Mode() string { return "smtp" }
+
+func (m *Mail) SendNotice(_ context.Context, to, subject, body, link string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.notices = append(m.notices, Notice{To: to, Subject: subject, Body: body, Link: link})
+	return true, nil
+}
+
+// Notices are the notices mailed so far.
+func (m *Mail) Notices() []Notice {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]Notice(nil), m.notices...)
+}
 
 func (m *Mail) SendCode(_ context.Context, to, code string, _ time.Duration) error {
 	m.mu.Lock()
@@ -133,6 +151,11 @@ func WithOptions(f func(o *api.Options)) Option {
 	return func(_ map[string]string, o *api.Options) { f(o) }
 }
 
+// WithDB starts the hub on a database that is already open, the way a second replica joins the first one's.
+func WithDB(db *store.DB) Option {
+	return func(_ map[string]string, o *api.Options) { o.DB = db }
+}
+
 // New starts a hub. Its clock starts at the real time and moves only when a test advances it.
 func New(t *testing.T, opts ...Option) *Stack {
 	t.Helper()
@@ -156,12 +179,18 @@ func New(t *testing.T, opts ...Option) *Stack {
 	for _, opt := range opts {
 		opt(env, &o)
 	}
+	if env["HUB_REPLICAS"] == "on" && env["HUB_REPLICA_ADDR"] == "" {
+		env["HUB_REPLICA_ADDR"] = s.URL // the stack's own server is where the other replicas reach it
+	}
 	cfg, err := config.Load(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.Cfg = cfg
-	db := openDB(t)
+	db := o.DB
+	if db == nil {
+		db = openDB(t)
+	}
 	s.DB = db
 	o.Config, o.DB = cfg, db
 	hub, err := api.New(o)

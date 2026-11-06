@@ -161,3 +161,23 @@ func TestOnlyKnownNamesAreServed(t *testing.T) {
 		t.Errorf("good name: %d", res.StatusCode)
 	}
 }
+
+func TestReleaseManifestIsServedOnlyWhenTheFolderHoldsIt(t *testing.T) {
+	srv, _ := newServer(t, map[string]string{"runtime-linux-amd64": "x"})
+	if res, _ := get(t, srv.URL+"/dl/release.json"); res.StatusCode != http.StatusNotFound {
+		t.Errorf("without the file: %d", res.StatusCode)
+	}
+	srv, _ = newServer(t, map[string]string{"release.json": `{"schema":2}`, "release.json.sig": `{"alg":"ed25519"}`, "runtime-linux-amd64": "x"})
+	res, body := get(t, srv.URL+"/dl/release.json")
+	if res.StatusCode != 200 || body != `{"schema":2}` {
+		t.Errorf("%d %q", res.StatusCode, body)
+	}
+	if res, body := get(t, srv.URL+"/dl/release.json.sig"); res.StatusCode != 200 || !strings.Contains(body, "ed25519") {
+		t.Errorf("sig: %d %q", res.StatusCode, body)
+	}
+	// the old manifest is as it was: only binaries and sums
+	_, m := get(t, srv.URL+"/dl/manifest.json")
+	if strings.Contains(m, "release") {
+		t.Errorf("manifest.json changed: %s", m)
+	}
+}

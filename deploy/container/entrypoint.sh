@@ -11,6 +11,10 @@
 #   AGENT_REGISTER_WAIT           seconds to keep trying while the hub or the code is not there yet (default 120)
 #   MACHINE_RUNTIME_PORT          the runtime's loopback port (default 18022)
 #   MACHINE_AGENT_PORT            the agent's loopback port (default 18023)
+#   HARNESSLY_SUPERVISE           1 hands the processes to `harnessly supervise` (docs/hub/machine.md): a runtime or an
+#                                 agent that ends is started again with a growing wait, the machine keeps its hub id,
+#                                 and SIGTERM stops both. Default 0: the machine ends when either of them does.
+#   HARNESSLY_BIN                 the harnessly command used for that (default: harnessly)
 #
 # Neither port is published: the hub reaches the runtime through the agent's outgoing link. With AGENT_AUTH=hs256 the
 # machine runs the closed-cluster way, without registering.
@@ -102,6 +106,12 @@ main() {
 	export RUNTIME_PORT="$rport" AGENT_PORT="$aport"
 	export RUNTIME_WORKSPACE_DIR="${RUNTIME_WORKSPACE_DIR:-$HOME/work}"
 	mkdir -p "$RUNTIME_WORKSPACE_DIR"
+
+	if [ "${HARNESSLY_SUPERVISE:-0}" = 1 ]; then
+		# The supervisor is the machine's process 1 from here on: it starts, restarts and stops both programs and
+		# collects what is left over. Registration above is done once; the agent reads the same machine.json each start.
+		exec "${HARNESSLY_BIN:-harnessly}" supervise --runtime "$RUNTIME_BIN" --agent "$AGENT_BIN"
+	fi
 
 	"$RUNTIME_BIN" &
 	rpid=$!

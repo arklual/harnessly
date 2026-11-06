@@ -137,13 +137,13 @@ describe('AppBridge: the nonce of the loaded document', () => {
   });
 
   it('answers the document that presents the nonce', async () => {
-    const r = rig(['storage'], { storage: async () => 'ok' }, {}, 'n-1');
+    const r = rig(['storage'], { storage: async () => ({ value: 'ok', version: 3 }) }, {}, 'n-1');
     await r.call('ui/initialize', { nonce: 'n-1' }, 1);
     expect(r.last()?.result.hostInfo.name).toBe('harnessly');
     r.port()?.onmessage?.({ data: { jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} } });
     r.sent.length = 0;
     await r.call('harnessly/storage.get', { scope: 'install', key: 'k' }, 2);
-    expect(r.last()?.result).toEqual({ value: 'ok' });
+    expect(r.last()?.result).toEqual({ value: 'ok', version: 3 });
   });
 });
 
@@ -259,6 +259,49 @@ describe('AppBridge: what the manifest grants', () => {
     expect(r.last()?.error.data.code).toBe('host_unavailable');
   });
 
+  it('storage carries versions: get answers {value, version}, set takes ifVersion and answers the version', async () => {
+    const storage = vi.fn(async (...args: unknown[]) =>
+      args[0] === 'get' ? { value: { a: 1 }, version: 4 } : args[0] === 'set' ? { version: 5 } : undefined,
+    );
+    const r = rig(['storage'], { storage });
+    await r.start();
+    await r.call('harnessly/storage.get', { scope: 'chat', key: 'k' }, 2);
+    expect(r.last()?.result).toEqual({ value: { a: 1 }, version: 4 });
+    await r.call('harnessly/storage.set', { scope: 'chat', key: 'k', value: 2, ifVersion: 4 }, 3);
+    expect(storage).toHaveBeenLastCalledWith('set', 'chat', 'k', 2, 4);
+    expect(r.last()?.result).toEqual({ version: 5 });
+    await r.call('harnessly/storage.set', { scope: 'chat', key: 'k', value: 2 }, 4);
+    expect(storage).toHaveBeenLastCalledWith('set', 'chat', 'k', 2, undefined);
+    await r.call('harnessly/storage.set', { scope: 'chat', key: 'k', value: 2, ifVersion: -1 }, 5);
+    expect(r.last()?.error.data.code).toBe('invalid_params');
+    await r.call('harnessly/storage.set', { scope: 'chat', key: 'k', value: 2, ifVersion: 'x' }, 6);
+    expect(r.last()?.error.data.code).toBe('invalid_params');
+  });
+
+  it('a conflict reaches the view with its code and the current version', async () => {
+    const storage = vi.fn(async () => {
+      throw new BridgeError('conflict', 'the key changed', { version: 7 });
+    });
+    const r = rig(['storage'], { storage });
+    await r.start();
+    await r.call('harnessly/storage.set', { scope: 'user', key: 'k', value: 1, ifVersion: 2 }, 2);
+    expect(r.last()?.error.data).toEqual({ code: 'conflict', version: 7 });
+  });
+
+  it('no longer has the flow and data methods', async () => {
+    const r = rig([]);
+    await r.start();
+    for (const method of [
+      'harnessly/flow.status',
+      'harnessly/flow.go',
+      'harnessly/data.get',
+      'harnessly/data.set',
+    ]) {
+      await r.call(method, {}, method);
+      expect(r.last()?.error.code, method).toBe(-32601);
+    }
+  });
+
   it('gates each method by its permission', async () => {
     const chatSend = vi.fn(async () => undefined);
     const chatRead = vi.fn(async () => []);
@@ -272,6 +315,39 @@ describe('AppBridge: what the manifest grants', () => {
     expect(chatRead).not.toHaveBeenCalled();
   });
 
+  it('agents.list answers the rows with agents.read and permission_denied without it', async () => {
+    const agents = vi.fn(async () => [
+      { id: 'tab-a', title: 'A', status: 'free', provider: 'claude', machine: 'M' },
+    ]);
+    const without = rig(['chat.read'], { agents });
+    await without.start();
+    await without.call('harnessly/agents.list', {}, 2);
+    expect(without.last()?.error.data.code).toBe('permission_denied');
+    expect(agents).not.toHaveBeenCalled();
+    const r = rig(['agents.read'], { agents });
+    await r.start();
+    await r.call('harnessly/agents.list', {}, 2);
+    expect(r.last()?.result).toEqual({
+      agents: [{ id: 'tab-a', title: 'A', status: 'free', provider: 'claude', machine: 'M' }],
+    });
+    expect(JSON.stringify(r.last()?.result)).not.toContain('text');
+  });
+
+  it('pane.open of chat:<id> needs agents.read besides pane.open', async () => {
+    const paneOpen = vi.fn(async () => undefined);
+    const only = rig(['pane.open'], { paneOpen });
+    await only.start();
+    await only.call('harnessly/pane.open', { target: 'chat:tab-a' }, 2);
+    expect(only.last()?.error.data.code).toBe('permission_denied');
+    expect(paneOpen).not.toHaveBeenCalled();
+    await only.call('harnessly/pane.open', { target: 'app:acme.demo' }, 3);
+    expect(paneOpen).toHaveBeenCalledWith('app:acme.demo');
+    const both = rig(['pane.open', 'agents.read'], { paneOpen });
+    await both.start();
+    await both.call('harnessly/pane.open', { target: 'chat:tab-a' }, 2);
+    expect(paneOpen).toHaveBeenCalledWith('chat:tab-a');
+  });
+
   it('every method that needs a permission is refused without it', async () => {
     const noop = async () => undefined;
     const handlers: IBridgeHandlers = {
@@ -280,6 +356,7 @@ describe('AppBridge: what the manifest grants', () => {
       chatRead: async () => [],
       chatCard: noop,
       paneOpen: noop,
+      agents: async () => [],
       notify: noop,
     };
     for (const [method, need] of Object.entries(METHOD_PERMISSION)) {
@@ -327,16 +404,16 @@ describe('AppBridge: what the manifest grants', () => {
     await r.call('harnessly/storage.set', { scope: 'space', key: 'k', value: 1 });
     expect(r.last()?.error.data.code).toBe('permission_denied');
     await r.call('harnessly/storage.get', { scope: 'space', key: 'k' }, 2);
-    expect(r.last()?.result).toEqual({ value: null });
+    expect(r.last()?.result).toEqual({ value: null, version: 0 });
     const w = rig(['storage', 'storage.space.write'], { storage });
     await w.start();
     await w.call('harnessly/storage.set', { scope: 'space', key: 'k', value: 1 });
-    expect(w.last()?.result).toEqual({});
-    expect(storage).toHaveBeenCalledWith('set', 'space', 'k', 1);
+    expect(w.last()?.result).toEqual({ version: 0 });
+    expect(storage).toHaveBeenCalledWith('set', 'space', 'k', 1, undefined);
   });
 
   it('a document open for reading is read, not changed: its storage and boards refuse writes, the rest works', async () => {
-    const storage = vi.fn(async () => 'v');
+    const storage = vi.fn(async () => ({ value: 'v', version: 0 }));
     const sinopia = vi.fn(async () => ({}));
     const r = rig(
       ['storage', 'sinopia.read', 'sinopia.write'],
@@ -356,9 +433,9 @@ describe('AppBridge: what the manifest grants', () => {
     expect(sinopia).not.toHaveBeenCalled();
     // Reading goes on, and the view's other storage is its own.
     await r.call('harnessly/storage.get', { scope: 'doc', key: 'board' }, 4);
-    expect(r.last()?.result).toEqual({ value: 'v' });
+    expect(r.last()?.result).toEqual({ value: 'v', version: 0 });
     await r.call('harnessly/storage.set', { scope: 'user', key: 'zoom', value: 2 }, 5);
-    expect(r.last()?.result).toEqual({});
+    expect(r.last()?.result).toEqual({ version: 0 });
     // The view is told at the handshake.
     const fresh = rig([], {}, { readOnly: true });
     await fresh.call('ui/initialize', {}, 'init');

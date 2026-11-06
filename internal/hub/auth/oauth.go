@@ -24,10 +24,7 @@ const oauthTTL = 10 * time.Minute
 // started, and sign them in to its account (login CSRF). The flow's address is bound by the state row in the database,
 // not by the cookie's path, which the prefix does not allow to narrow.
 func (s *Service) oauthCookieName() string {
-	if s.cfg.Secure {
-		return "__Host-hl_oauth"
-	}
-	return "hl_oauth"
+	return s.cfg.CookiePrefix() + "hl_oauth"
 }
 
 // oauthProvider is one way to sign in through someone else's login page. The OAuth plumbing (state, PKCE, the
@@ -88,7 +85,7 @@ func (s *Service) redirectError(w http.ResponseWriter, r *http.Request, intent, 
 }
 
 func (s *Service) clearOAuthCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: s.oauthCookieName(), Value: "", Path: "/", HttpOnly: true, Secure: s.cfg.Secure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: s.oauthCookieName(), Value: "", Path: s.cfg.CookiePath(), HttpOnly: true, Secure: s.cfg.Secure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
 
 // oauthStart sends the browser to the provider.
@@ -146,7 +143,7 @@ func (s *Service) oauthStart(w http.ResponseWriter, r *http.Request) {
 	if p.authOptions != nil {
 		opts = append(opts, p.authOptions(st.Nonce)...)
 	}
-	http.SetCookie(w, &http.Cookie{Name: s.oauthCookieName(), Value: state, Path: "/", HttpOnly: true, Secure: s.cfg.Secure, SameSite: http.SameSiteLaxMode, MaxAge: int(oauthTTL.Seconds())})
+	http.SetCookie(w, &http.Cookie{Name: s.oauthCookieName(), Value: state, Path: s.cfg.CookiePath(), HttpOnly: true, Secure: s.cfg.Secure, SameSite: http.SameSiteLaxMode, MaxAge: int(oauthTTL.Seconds())})
 	http.Redirect(w, r, cfg.AuthCodeURL(state, opts...), http.StatusFound)
 }
 

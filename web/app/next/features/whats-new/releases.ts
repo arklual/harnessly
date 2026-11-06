@@ -13,6 +13,29 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-06zf',
+    items: [
+      { key: 'codexApps', icon: 'blocks' },
+      { key: 'appConnection', icon: 'link' },
+      { key: 'appJournal', icon: 'shield-question' },
+    ],
+  },
+  {
+    id: '2026-11-06ze',
+    items: [
+      { key: 'envApps', icon: 'layout-grid' },
+      { key: 'envForms', icon: 'blocks' },
+    ],
+  },
+  {
+    id: '2026-11-06zd',
+    items: [{ key: 'envPresets', icon: 'layers' }],
+  },
+  {
+    id: '2026-11-06zc',
+    items: [{ key: 'groupFolders', icon: 'folder' }],
+  },
+  {
     id: '2026-11-06zb',
     items: [{ key: 'basePackage', icon: 'layers' }],
   },

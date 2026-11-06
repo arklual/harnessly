@@ -51,7 +51,7 @@
     color-mix(in srgb, var(--t-text-primary) 4%, transparent) 70%
   );
   background-size: 300% 100%;
-  animation: an-shimmer 1.4s linear infinite;
+  animation: hx-shimmer 1.4s linear infinite;
   pointer-events: none;
 }
 .ad .anx-viz[data-wait='1'] > * {
@@ -62,14 +62,6 @@
 }
 .ad .anx-viz[data-stale='1'] > * {
   opacity: 0.55;
-}
-@keyframes an-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0 0;
-  }
 }
 
 /* A card with nothing to show says so in one line. */
@@ -136,7 +128,14 @@
     gap: 14px;
   }
   .ad .ad-tools {
+    flex-wrap: wrap;
     padding-top: 0;
+  }
+  .ad .anx-per__d {
+    display: none;
+  }
+  .ad .anx-what {
+    flex: 1 1 100%;
   }
   .ad .ad-tools,
   .ad .anx-per {
@@ -144,11 +143,15 @@
     max-width: 100%;
   }
   .ad .anx-per__row {
+    flex-wrap: wrap;
     justify-content: space-between;
   }
   .ad .anx-per__f {
-    flex: 1 1 0;
+    flex: 1 1 140px;
     min-width: 0;
+  }
+  .ad .anx-per__vs {
+    display: none;
   }
   .ad .anx-per__btn {
     width: 100%;
@@ -172,4 +175,25 @@
   font: var(--t-font-ui-xs);
   color: var(--t-text-muted);
   font-weight: 400;
+}
+
+/* Быстрый период в днях и поля дат (флаг ui.hx.live). */
+.ad .an-quick {
+  margin-right: 8px;
+}
+.ad .an-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+}
+.ad .an-dates__f {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.ad .an-dates__f input {
+  min-width: 0;
 }

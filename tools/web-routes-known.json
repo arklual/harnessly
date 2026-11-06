@@ -1,0 +1,10 @@
+{
+  "comment": "Paths the web calls that the public hub and runtime do not serve (tools/web-routes-check.mjs). Each is bound to a capability of GET /api/capabilities and to the task that closes the gap (server part, or the screen hidden when the capability is off). An entry that is served or no longer called fails the check: delete it then.",
+  "known": [
+    { "path": "/api/platform/efficiency", "capability": "efficiency", "task": "HRN-737", "note": "team report; a gateway route. Screen shows only with RUNTIME_WEB_FEATURES=efficiency, the public runtime has no route behind it." },
+    { "path": "/api/platform/vault", "capability": "vault", "task": "HRN-737", "note": "password safe; a gateway route. Shown only with RUNTIME_WEB_FEATURES=vault." },
+    { "path": "/api/platform/history/conversations", "capability": "history", "task": "HRN-737", "note": "central conversation history (gatewayPath in next/stores/central.ts): a gateway route." },
+    { "path": "/api/platform/voice/takes", "capability": "voice-cloud", "task": "HRN-737", "note": "cloud voice takes: a gateway route." },
+    { "path": "/api/fs", "capability": "disk", "task": "HRN-737", "note": "the disk screen (hl-disk-api.ts, hl-disk-uploader.ts): /api/fs/* has no route in the public runtime." }
+  ]
+}

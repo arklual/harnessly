@@ -45,11 +45,11 @@ install points at your folder and is never deleted by `remove`.
 | `trust` | yes | `declarative` (no outbound `network` for views), `sandboxed` (adds `network` and a framed `https://` view), `trusted` (adds local processes; installed by hand). A view's scripts run on every tier |
 | `targets` | yes | `chat`, `pane`, `app`, `sinopia.<kind>`, `sinopia.*` |
 | `activation` | no | `on`: `document` turns the app on in the documents of its kinds; `always` turns it on in every new Claude chat of the machine (an app the person installed, not a team's); `command:/x` turns it on in a Claude chat when a message starts with `/x` (one app per command, the agent's own commands such as `/clear` are refused). `manual` is checked and turns nothing on; `view` and `template` are refused: not supported yet. `openView`: the view `harnessly open app:<id>` shows |
-| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `pane.open`, `storage`, `storage.space.write`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|kind`, `notify`. `ai`, `users.read` and `sinopia.export` are refused: not supported yet |
+| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `agents.read`, `pane.open`, `storage`, `storage.space.write`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|kind`, `notify`. `ai`, `users.read` and `sinopia.export` are refused: not supported yet |
 | `network` | no | `connect`, `resources`, `frames`: host names; `*` needs `reason` |
 | `secrets` | no | `{name, description, optional}`; each needs the permission `secrets:<name>`. The person puts the value into the machine's safe from «О приложении», off the chat, under `app/<id>/<name>`. It reaches nobody but the app's MCP servers: the runtime's MCP proxy writes it in place of `${secret:<name>}` in a remote server's `headers` on each call (no file holds it), and a launch writes it in `env` of a local server of a `trusted` app (a folder only that chat's wall opens, removed when the agent is gone). A view, the agent, the host tools and the safe's list never get it. A new value is read at the next launch: no reinstall. An app with a required secret that has no value is «ждёт секрет» (shown in «О приложении»); its chat starts, without the servers that need it |
 | `settings` | no | JSON Schema of an object (`properties` of `string`, `number`, `integer`, `boolean`, with `title`, `description`, `enum`, `default`, `minimum`, `maximum`, `required`). The host draws a form from it in «О приложении» and checks the values against it. They are kept in the `install` storage under `_settings` (a view cannot write that key); a view reads them with `hl.settings.get()`, the agent with the host tool `settings_get` |
-| `agent` | no | `instructions` and `tools` (`allow`, `deny`, `confirm`) act. `mcp` is what a Sinopia `tool` must name. `skills` is checked against the files (all of `skills/` loads anyway). `context` items with `mode: on-activation` are called on `SessionStart` and `UserPromptSubmit` and reach the agent when the answer changes (`on-demand` is checked, not used); `validators`, `exclusive` are checked, not used yet; `flow` is refused: not supported yet |
+| `agent` | no | `instructions` and `tools` (`allow`, `deny`, `confirm`) act. `mcp` is what a Sinopia `tool` must name. `skills` is checked against the files (all of `skills/` loads anyway). `context` items with `mode: on-activation` are called on `SessionStart` and `UserPromptSubmit` and reach the agent when the answer changes (`on-demand` is checked, not used); `validators` (`id`, `on` PostToolUse|Stop, `match`, `run`, `maxRetries`) run a package script after a tool call or at Stop and block with its remark on exit code 2, up to `maxRetries`; `exclusive` is checked, not used yet; `flow` is refused: not supported yet |
 | `views` | no | `{id, title, entry, targets}` (`height` is refused: a card sizes itself with `hl.resize`): `entry` is a file of the package or an `https://` address listed in `network.frames` |
 | `icon`, `when`, `storage`, `backend` | no | Refused with «not supported yet»: the host reads them and does nothing. A server is `.mcp.json`; a view keeps its data with `hl.storage` |
 | `chat` | no | `commands` (`/name`, a file `commands/name.md`), `cards` (views with the chat target) |
@@ -118,14 +118,15 @@ One dependency-free file the runtime serves to every view at `/__hl/app-sdk.js` 
 
 | Call | Permission | What it does |
 | --- | --- | --- |
-| `hl.on(event, fn)` | none | `context`, `theme`, `selection`. `tool-result`, `tool-input`, `flow`, `data`, `visibility` are not sent by the page yet |
+| `hl.on(event, fn)` | none | `context`, `theme`, `selection`, `data` (a chat widget's), `storage` (`{scope, key}`, no value: a key of the app's storage was written or deleted by the agent, another view or this one, told within a second from the runtime's stream `GET <platform>/apps/events`; only to views of that app that hold `storage`, and an area of a chat or document only to the views of that chat or document) and `visibility` (`{visible}`: the view was hidden or shown). `tool-result`, `tool-input` are not sent by the page yet |
 | `hl.chat.send(text)` | `chat.prompt` | A message to the agent of this chat; the chat always shows the app's real name before it, on one line |
 | `hl.chat.read({last})` | `chat.read` | The latest messages of the chat |
 | `hl.chat.card(view, data)` | `chat.card` | A card of the app in the feed |
-| `hl.pane.open(target)` | `pane.open` | Opens `app:<id>[/<view>]`; anything else is `invalid_params` |
+| `hl.pane.open(target)` | `pane.open` | Opens `app:<id>[/<view>]`, or `chat:<id>` of a conversation on this machine (also needs `agents.read`); anything else is `invalid_params` |
+| `hl.agents.list()` | `agents.read` | Conversations of the person on this machine: `{id, title, status: working\|waiting\|free, provider, machine}`, no text; the page answers from the list it already holds, and tells the `agents` event when it changes |
 | `hl.tools.call('server.tool', args)` | none | A tool of the app's own remote MCP server (`.mcp.json`), called by the machine: `https://` on a public address, or an internal host the deployment lists (`RUNTIME_APPS_INTERNAL_HOSTS`, `RUNTIME_APPS_CA_FILE`), 30 s, 4 MB. A `command` server is `policy_blocked`, a header with `${` is not sent. Answers the raw MCP result, `isError` included |
-| `hl.storage.<scope>.get/set/delete/keys` | `storage` | Scopes `install`, `user`, `chat`, `space`, `doc`; writing `space` needs `storage.space.write` |
-| `hl.flow.*`, `hl.data.*` | none | Not connected in the page yet: `host_unavailable` |
+| `hl.storage.<scope>.get/getVersioned/set/delete/keys` | `storage` | Scopes `install`, `user`, `chat`, `space`, `doc`; writing `space` needs `storage.space.write`. Every key has a version (a counter that goes up with each write or delete; 0 for a key never written or kept before versions). `getVersioned` answers `{value, version}`; `set(key, value, {ifVersion})` writes only if the key is at that version, else rejects with `conflict` (`error.version` is the current one) and writes nothing; a write past the area's limit is `quota_exceeded` |
+| `hl.flow.*`, `hl.data.*` | none | Removed (they were never connected): a call rejects with `invalid_params` |
 | `hl.ui.toast/confirm`, `hl.notify(text)` | `notify` for the last | A notice, a question, a message to the person |
 | `hl.resize(height)` | none | The height of a card (sent by itself for cards) |
 
@@ -162,7 +163,13 @@ themselves (`form-action 'self'`) and nowhere else.
 Per app, under `<data>/apps/storage/<id>/<scope>/`. An area of scope `chat` is the chat the view is mounted in (the
 runtime reads it from the view's session, a call cannot name another); `doc` is refused until a view is bound to a
 document. Limits: `install` 5 MB, `user` 1 MB, `chat` 256 KB per chat and 20 MB over all chats, `space` 10 MB, `doc` 100
-KB per document and 20 MB in all. A write past a limit is refused whole.
+KB per document and 20 MB in all. A write past a limit is refused whole, with the code `quota_exceeded`.
+
+Each key has a version, kept beside its value in the area's file under the reserved key `__hl_versions` (a key cannot have that name): a counter that goes up with every
+write or delete and never repeats, 0 for a key never written or kept before versions. `get` answers the value and its version; a `set` with `ifVersion` is made only if the key is
+at that version, else it is refused with `conflict` and the current version, and nothing changes. A `set` without it works as it did. The agent's `data_get`/`data_set` and the
+view's `hl.storage` are the same contract. The error codes of the bridge are written out in `internal/apps/bridge.go`, `web/app/next/features/app-views/bridge.ts` and
+`internal/apps/sdk/app-sdk.d.ts`; `TestBridgeCodesAreTheSameInGoPageAndSDK` keeps them equal.
 
 ### Cards in the chat
 
@@ -240,8 +247,13 @@ too), a tool of an MCP server (`bank-cashback.create`, `bank-cashback.*`), the h
 MCP tool or `*`.
 
 **`allow` grants nothing**: the hook answers only for `deny` and `confirm`, so `allow` only beats a broader rule, and a call it wins is left to the
-chat's own permissions. `Edit(<mask>)` is matched against `file_path` exactly as Claude wrote it, normally absolute (`Edit(*/docs/*)`), and `Edit` does
-not cover `Write`, `MultiEdit` or `NotebookEdit`.
+chat's own permissions. A file rule's mask is matched against the path the call writes or reads, made absolute and clean: a
+relative path is taken from the agent's folder, so `../` does not step around a rule. The mask itself: `/abs/*` and `//abs/*` are
+absolute, `~/x/*` is under the home folder, `docs/*` and `./docs/*` are under the folder the chat started in (a `cd` of the
+agent does not move them), `*/docs/*` anywhere. A mask
+with `**` reads as file masks do (`*` within one folder name, `**` across folders: `src/**/*.go`); one without `**` keeps the
+older reading, where `*` crosses folders too. `Edit` covers `Write`, `MultiEdit` and `NotebookEdit`, as Claude's own Edit rules do;
+`Write(<mask>)` names `Write` alone.
 
 Within one app the most specific rule wins: an exact name beats a mask, a longer mask beats a shorter one, `mcp:*` and
 `*` lose to everything; on a tie `deny` beats `confirm`, `confirm` beats `allow`. Across the apps of a chat a `deny` of
@@ -267,7 +279,7 @@ one app is on. Claude writes tool names with `_`, the tool rules with `.`: `mcp_
 | Tool (rule) | What it does |
 | --- | --- |
 | `open` (`app.open`) | Opens the app's view for the pane (`view`, the first one when omitted) in the person's pane |
-| `data_get`, `data_set` (`app.data.get`, `app.data.set`) | The app's `chat` storage of this chat by `key`: the same data its view reads with `hl.storage.chat`, with the same limits |
+| `data_get`, `data_set` (`app.data.get`, `app.data.set`) | The app's `chat` storage of this chat by `key`: the same data its view reads with `hl.storage.chat`, with the same limits. `data_get` answers `{"value", "version"}`; `data_set` takes `ifVersion` and answers `{"version"}`, or is refused with `conflict` (and the current version) or `quota_exceeded`. A write reaches the open views as the `storage` event |
 | `settings_get` (`app.settings.get`) | The app's settings: what the person saved in its form over the defaults (what `hl.settings.get()` gives a view). Secrets are never in it |
 | `ask` (`app.ask`) | Puts a choice (`question`, 2 to 8 `options`) to the person in the app and waits up to ten minutes; answers with the option or `cancelled` |
 
@@ -635,12 +647,32 @@ What stays open, and cannot be closed by this wall:
 - **What the agent is allowed by design:** it runs as the person, so it reads the person's files and tokens outside the data
   folder (`~/.config`, `~/.claude`), uses the safe by name and has the network. The wall does not stop a leak; an app's `network` is
   a rule for its views, not for the agent.
-- **A chat without apps and a Codex chat have no wall.** Apps are on in Claude Code chats only, so no app's instructions reach those
-  agents, and they can change the registry as the person can. The wall keeps an app's chat from reaching out, not the rest of the
+- **A chat without apps has no wall.** Apps are on in Claude Code and Codex chats (docs/build-apps/05-agents.md, "Codex"), so no app's
+  instructions reach a chat without them, and it can change the registry as the person can. The wall keeps an app's chat from reaching out, not the rest of the
   machine from reaching in.
 
 A dev install whose source folder is missing when the chat starts has no bind (bwrap cannot bind what is not there); the hook
 still refuses its being made.
+
+## Slots of the interface
+
+A package can fill places of the interface itself, with no React and no fork. The places are targets of a view, in the
+same `views` list as the pane and chat views, and the view runs in the same sandboxed frame with the same bridge: its
+rights are the manifest's `permissions`, checked by the core.
+
+| Target | Where it shows | View fields it reads |
+| --- | --- | --- |
+| `settings` | a block on Settings → Extensions | `label`, `icon`, `title` |
+| `onboarding` | a step of «First steps» on the same page; the view calls `hl.slot.done()` when it is finished | `label`, `icon`, `order` |
+| `object-action` | a button at an object: a `machine` (Settings → Machines) or a `chat`; the object is `hl.context.data.object` (`{kind, id, name}`) | `objects` (the kinds it is for; all when absent) |
+| `hub-settings` | a page of the hub's settings | declared and checked, not drawn yet (the hub has no apps host) |
+| `branding` | not a view: the app's `branding` block (`name`, `accent` as `#rrggbb`, `supportUrl`, `tagline`) sets the page title and the accent | |
+
+The slots are off until the runtime starts with `HARNESSLY_UI_SLOTS=on`: without it a slot view is not offered, `open` for
+a slot target answers 403 `slots-off`, and the branding is ignored, so the interface looks as it did. A view that fails to
+load or throws is held by a boundary of its own: the block says it failed and offers a retry, the page stays.
+
+`examples/ext-ui-slots` in the repository fills all of them with a neutral name (`example-corp`).
 
 ## Examples
 

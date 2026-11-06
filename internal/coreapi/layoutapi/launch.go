@@ -14,6 +14,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
@@ -21,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/oomguard"
 	"github.com/ly-solutions/harnessly/internal/sidechat"
 	"github.com/ly-solutions/harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // Launch is what the launch slice's routes use besides Deps: the starter and document inbox, the Codex launch lines,
@@ -34,9 +36,9 @@ type Launch struct {
 	// SessionCreated is a tmux session's start, epoch seconds (0 when unknown).
 	SessionCreated func(session string) int64
 	// CodexArgs are the arguments the Codex launcher gets for codex itself.
-	CodexArgs func(workspaceID, resumeID string, launch *agents.Launch) ([]string, error)
+	CodexArgs func(workspaceID, resumeID string, launch *agents.Launch) (codex.Start, error)
 	// CodexForkArgs are the arguments that start codex on a fork of a session; nil when the runtime cannot fork.
-	CodexForkArgs func(workspaceID, sessionID string, launch *agents.Launch) ([]string, error)
+	CodexForkArgs func(workspaceID, sessionID string, launch *agents.Launch) (codex.Start, error)
 	// EvalRuns holds eval runs (<runId>/request.json, state.json, stop); EvalRunner is the runner script, run by Node
 	// detached ("" or missing: this release has none).
 	EvalRuns, EvalRunner, Node string
@@ -447,6 +449,34 @@ func (c *call) launchShape() (*agents.Launch, bool) {
 	if ok && l != nil {
 		l.Profile = profile
 	}
+	// The apps on in the chat (the launcher script tells them as it was typed); each is checked by shape.
+	if raw, present := c.field("apps"); present && raw != nil {
+		list, isList := raw.([]any)
+		if !isList {
+			return nil, false
+		}
+		var ids []string
+		for _, v := range list {
+			id, isStr := v.(string)
+			if !isStr || !agents.AppIDRe.MatchString(id) {
+				return nil, false
+			}
+			ids = append(ids, id)
+		}
+		if len(ids) > 0 {
+			if l == nil {
+				l = &agents.Launch{}
+			}
+			l.Apps = ids
+			// The chat the launch is for, which the apps' grant names (the launcher script tells it with the apps).
+			if conv, _ := c.str("conversation"); conv != "" {
+				if !wire.ValidConvID(conv) {
+					return nil, false
+				}
+				l.Conversation = conv
+			}
+		}
+	}
 	return l, ok
 }
 
@@ -472,22 +502,27 @@ func (a *api) codexLaunchArgs(c *call) {
 		c.fail(400, "Invalid model or effort")
 		return
 	}
-	var args []string
+	var start codex.Start
 	var err error
 	switch {
 	case fork != "" && a.l.CodexForkArgs == nil:
 		err = errors.New("the runtime cannot fork a Codex session")
 	case fork != "":
-		args, err = a.l.CodexForkArgs(ws, fork, l)
+		start, err = a.l.CodexForkArgs(ws, fork, l)
 	default:
-		args, err = a.l.CodexArgs(ws, resume, l)
+		start, err = a.l.CodexArgs(ws, resume, l)
 	}
 	if err != nil {
 		agent.Log("error", "codex launch args build failed", agent.F{K: "err", V: err.Error()})
 		c.fail(500, "Failed to build Codex launch args")
 		return
 	}
-	c.reply(200, jsvalue.NewObject("args", jsvalue.StringArray(args)))
+	reply := jsvalue.NewObject("args", jsvalue.StringArray(start.Args))
+	if start.Prefix != "" {
+		// The words the launcher runs codex behind: the apps' token and wall.
+		reply.Set("prefix", start.Prefix)
+	}
+	c.reply(200, reply)
 }
 
 // POST /api/codex/launch-command: the line that starts or resumes Codex in a tab.

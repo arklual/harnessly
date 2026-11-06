@@ -7,7 +7,15 @@ import {
   monthPeriod,
   type Week,
 } from '../../../org/api/analytics';
-import { dayOfMonth, monthShort, parseDay, rangeLabel } from '../../../org/dates';
+import {
+  addDays,
+  dayOfMonth,
+  daysBetween,
+  isoDay,
+  monthShort,
+  parseDay,
+  rangeLabel,
+} from '../../../org/dates';
 import { ru } from './calc';
 
 /** First and last week index, both included. */
@@ -22,6 +30,14 @@ export interface PickerState {
   anchor: number | null;
   /** The comparison follows the period (the same length right before) until it is chosen by hand. */
   auto: boolean;
+  /** Days that are not whole weeks («Сегодня», «7 дней», chosen dates): they replace the weeks of `a` and `b`. */
+  free: FreePeriod | null;
+}
+
+/** A period of days and its comparison; both ends of each are included. */
+export interface FreePeriod {
+  a: Week;
+  b: Week;
 }
 
 export const sameRange = (x: Range, y: Range): boolean => x[0] === y[0] && x[1] === y[1];
@@ -38,17 +54,18 @@ export const initialState = (a: Range, b: Range | null = null): PickerState => (
   edit: 'a',
   anchor: null,
   auto: b === null,
+  free: null,
 });
 
 /** A click on week `i`: the first click of a range, then the last one (the same week twice is one week). */
 export const pickWeek = (s: PickerState, i: number): PickerState => {
   const key = s.edit;
   if (s.anchor === null) {
-    const next: PickerState = { ...s, [key]: [i, i] as Range, anchor: i };
+    const next: PickerState = { ...s, [key]: [i, i] as Range, anchor: i, free: null };
     return key === 'a' && s.auto ? { ...next, b: prevOf([i, i]) } : next;
   }
   const r: Range = [Math.min(s.anchor, i), Math.max(s.anchor, i)];
-  const next: PickerState = { ...s, [key]: r, anchor: null };
+  const next: PickerState = { ...s, [key]: r, anchor: null, free: null };
   if (key === 'a' && s.auto) return { ...next, b: prevOf(r) };
   return key === 'b' ? { ...next, auto: false } : next;
 };
@@ -62,6 +79,7 @@ export const pickPreset = (s: PickerState, p: Preset): PickerState => ({
   b: p.b,
   anchor: null,
   auto: false,
+  free: null,
 });
 
 export const hintOf = (s: PickerState): string => {
@@ -108,7 +126,13 @@ export const nameOf = (weeks: readonly FrameWeek[], r: Range, opts: { month?: bo
 
 /** What the comparison is called: the same length right before the period, or what was chosen by hand. */
 export const compareNameOf = (weeks: readonly FrameWeek[], s: PickerState): RangeName =>
-  s.auto ? { title: 'Предыдущий период', dates: labelOf(weeks, s.b) } : nameOf(weeks, s.b);
+  s.free
+    ? s.auto
+      ? { title: 'Предыдущий период', dates: freeName(s.free.b).dates }
+      : freeName(s.free.b)
+    : s.auto
+      ? { title: 'Предыдущий период', dates: labelOf(weeks, s.b) }
+      : nameOf(weeks, s.b);
 
 const weekAt = (weeks: readonly FrameWeek[], i: number): FrameWeek => {
   const w = weeks[i];
@@ -125,10 +149,54 @@ export const spanOf = (weeks: readonly FrameWeek[], r: Range): Week => ({
   to: weekAt(weeks, r[1]).to,
 });
 
-export const queryOf = (weeks: readonly FrameWeek[], s: PickerState): AnalyticsQuery => ({
-  period: spanOf(weeks, s.a),
-  compare: spanOf(weeks, s.b),
+export const queryOf = (weeks: readonly FrameWeek[], s: PickerState): AnalyticsQuery =>
+  s.free
+    ? { period: s.free.a, compare: s.free.b }
+    : {
+        period: spanOf(weeks, s.a),
+        compare: spanOf(weeks, s.b),
+      };
+
+/** The quick choices of a period in days; the numbers come by day, so «24 ч» is the one day that is going. */
+export const QUICK = [
+  { id: '1', days: 1, label: 'Сегодня' },
+  { id: '7', days: 7, label: '7 дн' },
+  { id: '30', days: 30, label: '30 дн' },
+] as const;
+
+const DAY_WORD = ['день', 'дня', 'дней'] as const;
+
+const dayWord = (n: number): string =>
+  n % 10 === 1 && n % 100 !== 11
+    ? DAY_WORD[0]
+    : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)
+      ? DAY_WORD[1]
+      : DAY_WORD[2];
+
+/** The same number of days right before `a`. */
+export const prevDays = (a: Week): Week => {
+  const n = daysBetween(a.from, a.to) + 1;
+  return { from: addDays(a.from, -n), to: addDays(a.from, -1) };
+};
+
+/** The last `days` days up to `today` (included) against the same number right before. */
+export const lastDays = (days: number, today: string = isoDay(new Date())): FreePeriod => {
+  const a = { from: addDays(today, 1 - days), to: today };
+  return { a, b: prevDays(a) };
+};
+
+export const pickFree = (s: PickerState, free: FreePeriod, auto = false): PickerState => ({
+  ...s,
+  free,
+  auto,
+  anchor: null,
 });
+
+/** The name of a period of days: «24 часа», «7 дней», «12 дней». */
+export const freeName = (w: Week): RangeName => {
+  const n = daysBetween(w.from, w.to) + 1;
+  return { title: n === 1 ? 'Сегодня' : `${n} ${dayWord(n)}`, dates: rangeLabel(w.from, w.to) };
+};
 
 export interface Preset {
   id: string;
@@ -202,8 +270,8 @@ export const weekCells = (weeks: readonly FrameWeek[], s: PickerState): WeekCell
     const money = spend === null ? '' : ` · $${ru(spend, 0)}`;
     return {
       index: i,
-      inA: i >= s.a[0] && i <= s.a[1],
-      inB: i >= s.b[0] && i <= s.b[1],
+      inA: !s.free && i >= s.a[0] && i <= s.a[1],
+      inB: !s.free && i >= s.b[0] && i <= s.b[1],
       now: w.current === true,
       anchor: s.anchor === i,
       h: spend === null || top === 0 ? MIN_BAR : Math.max(MIN_BAR, spend / top),
@@ -223,10 +291,22 @@ export interface PeriodParams {
 }
 
 /** The URL's `p` and `c`: the dates of the period, and of the comparison when it was chosen by hand. */
-export const encodePeriod = (weeks: readonly FrameWeek[], s: PickerState): PeriodParams => ({
+export const encodePeriod = (weeks: readonly FrameWeek[], s: PickerState): PeriodParams =>
+  s.free ? { p: rangeParam(s.free.a), c: s.auto ? null : rangeParam(s.free.b) } : encodeWeeks(weeks, s);
+
+const encodeWeeks = (weeks: readonly FrameWeek[], s: PickerState): PeriodParams => ({
   p: rangeParam(spanOf(weeks, s.a)),
   c: s.auto ? null : rangeParam(spanOf(weeks, s.b)),
 });
+
+const dayRangeOfParam = (v: string | null): Week | null => {
+  const m = v ? /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(v) : null;
+  if (!m?.[1] || !m[2]) return null;
+  const from = m[1];
+  const to = m[2];
+  const ok = !Number.isNaN(parseDay(from).getTime()) && !Number.isNaN(parseDay(to).getTime());
+  return ok && from <= to && daysBetween(from, to) < 400 ? { from, to } : null;
+};
 
 const rangeOfParam = (weeks: readonly FrameWeek[], v: string | null): Range | null => {
   const m = v ? /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(v) : null;
@@ -246,7 +326,41 @@ export const decodePeriod = (
     Math.max(0, lastFullWeek(weeks)),
     Math.max(0, lastFullWeek(weeks)),
   ];
-  const a = rangeOfParam(weeks, params.p) ?? def;
+  const a = rangeOfParam(weeks, params.p);
   const b = rangeOfParam(weeks, params.c);
-  return initialState(a, b);
+  // Dates that are not whole weeks of the strip are a period of days; a day range reads from the address as it is.
+  const fa = a ? null : dayRangeOfParam(params.p);
+  if (fa) {
+    const fb = dayRangeOfParam(params.c);
+    return { ...initialState(def), free: { a: fa, b: fb ?? prevDays(fa) }, auto: fb === null };
+  }
+  return initialState(a ?? def, b);
+};
+
+/** The name of the chosen period, whole weeks or days. */
+export const periodNameOf = (weeks: readonly FrameWeek[], s: PickerState): RangeName =>
+  s.free ? freeName(s.free.a) : nameOf(weeks, s.a, { month: true });
+
+/** Which quick choice is on (its id), or null for weeks and chosen dates. */
+export const quickOn = (s: PickerState, today: string = isoDay(new Date())): string | null => {
+  if (!s.free) return null;
+  const q = QUICK.find((x) => {
+    const f = lastDays(x.days, today);
+    return f.a.from === s.free?.a.from && f.a.to === s.free.a.to;
+  });
+  return q?.id ?? null;
+};
+
+/** A day typed into a date field moves one end of the period or of its comparison; a reversed pair swaps. */
+export const setFreeDay = (s: PickerState, key: 'a' | 'b', end: 'from' | 'to', day: string): PickerState => {
+  const cur = s.free ?? lastDays(7);
+  const w = { ...cur[key], [end]: day };
+  const fixed = w.from <= w.to ? w : { from: w.to, to: w.from };
+  const next = { ...cur, [key]: fixed };
+  return {
+    ...s,
+    anchor: null,
+    auto: key === 'a' ? true : false,
+    free: key === 'a' ? { a: fixed, b: prevDays(fixed) } : next,
+  };
 };

@@ -5,6 +5,7 @@ import { useInstalledApps, type IInstalledApp } from '@/next/features/app-views/
 import AppsCatalog from '@/next/features/app-catalog/apps-catalog';
 import PublicCatalog from '@/next/features/app-catalog/public-catalog';
 import { useTeam } from '@/next/features/app-catalog/use-team';
+import { muteTeamApp } from '@/next/features/app-catalog/api';
 import { usePublicCatalog } from '@/next/features/app-catalog/use-public';
 import { activeApps } from '@/next/features/app-main/chat-apps';
 import AppsList from '@/next/features/app-main/apps-list';
@@ -20,6 +21,10 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
   const team = useTeam(machine, onChanged);
   const catalog = usePublicCatalog(machine, onChanged);
   const chats = useConversationList(machine);
+  const muteEnv = async (app: IInstalledApp, mute: boolean) => {
+    await muteTeamApp(machine, app.id, mute);
+    onChanged();
+  };
   const open = (app: IInstalledApp) => {
     const chat = activeApps(chats ?? [], [app])[0]?.chat;
     goTo({ kind: ROUTE.app, id: app.id, ...(chat ? { chat } : {}) });
@@ -31,6 +36,8 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
       onOpen={open}
       onOpenDrawer={onOpenDrawer}
       onHelp={() => goTo({ kind: ROUTE.help, section: 'build-apps', page: 'overview' })}
+      team={team}
+      onEnvMute={muteEnv}
       footer={
         <>
           <AppsCatalog team={team} />

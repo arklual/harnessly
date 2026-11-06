@@ -92,6 +92,11 @@ export const machineName = (m: { name: string; host: string }): string =>
 
 const baseName = (path: string): string => path.split('/').filter(Boolean).pop() ?? path;
 
+/** A machine in a list of chats: its name, and the organization it is in when the person's machines are in several
+ *  (two machines of one name in two organizations are told apart by it). */
+export const machineLabel = (m: Machine, orgsSeveral: boolean): string =>
+  orgsSeveral && m.orgName ? `${machineName(m)} · ${m.orgName}` : machineName(m);
+
 /** The projects the list shows: the machine's projects, and a folder a conversation names a project by that the
  *  machine has not listed, named by the folder. */
 export const projectsOf = (
@@ -224,10 +229,11 @@ export const cardOf = (view: MachineView, linkDown: boolean): IMachineCard => {
 };
 
 /** The word under a machine that cannot be chosen; a machine that is fine says nothing (its host is no help to anyone). */
-const noteOf = (view: MachineView): string => {
+export const noteOf = (view: MachineView): string => {
   if (view.runtime === 'outdated') return t('next.shellData.outdated');
   if (view.machine.reach === 'unreachable') return t('next.shellData.away');
-  return '';
+  // A fleet across organizations: which one the machine is in is the only thing that tells two of one name apart.
+  return view.machine.orgName ?? '';
 };
 
 export const choiceOf = (view: MachineView): IMachineChoice => {
@@ -432,8 +438,9 @@ export function useShellModel(): IShellModel {
     const views = new Map((machines ?? []).map((v) => [v.machine.id, v]));
     const nameOf = (m: MachineId): string => {
       const view = views.get(m);
-      return view ? machineName(view.machine) : (central.names.get(m) ?? m);
+      return view ? machineLabel(view.machine, orgsSeveral) : (central.names.get(m) ?? m);
     };
+    const orgsSeveral = new Set([...views.values()].map((v) => v.machine.orgName ?? '')).size > 1;
     const several = new Set([...views.keys(), ...convs.map((c) => c.machineId)]).size > 1;
     const projectOfChat = (c: Conversation): string | null => {
       if (projectIndex) return chatProjectOf(projectIndex, c.machineId, c.projectId);

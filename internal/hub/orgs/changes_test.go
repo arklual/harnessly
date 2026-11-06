@@ -85,7 +85,7 @@ func TestChanges(t *testing.T) {
 	}
 	e := effect(v.anna, org.ID, "")
 	if e.Change.ID != org.ID || e.Before.From != "2026-10-13" || e.Before.To != "2026-10-20" || e.After.To != "2026-10-27" ||
-		len(e.Overlaps) != 0 || len(e.Effects) != 12 || e.Effects[0].Scope.Kind != "org" {
+		len(e.Overlaps) != 0 || len(e.Effects) != 15 || e.Effects[0].Scope.Kind != "org" {
 		t.Errorf("effect = %+v", e)
 	}
 	// On the team the team's own change falls in the windows: the effect is mixed unless too few.

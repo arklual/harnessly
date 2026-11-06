@@ -35,6 +35,7 @@ import {
   splitMention,
   SUB,
   TRIGGER_CHAR,
+  type IAppCommands,
   type IMcpRef,
   type IRowList,
   type ISlashActions,
@@ -61,6 +62,8 @@ export interface ISlashSource {
   /** null: still being read. */
   catalog: readonly ICatalogItem[] | null;
   mcp: readonly IMcpRef[];
+  /** The apps on in the chat with their commands. */
+  appCommands?: readonly IAppCommands[];
   actions: ISlashActions;
   /** The chat is not started yet (the start page): only what may be a first message is offered. */
   starting: boolean;
@@ -258,6 +261,7 @@ export const useSlashPalette = ({
         provider: slash.provider,
         catalog: slash.catalog,
         mcp: slash.mcp,
+        appCommands: slash.appCommands,
         quick,
         starting: slash.starting,
         available: { model: subs.includes(SUB.model), effort: subs.includes(SUB.effort), actions },
@@ -378,6 +382,7 @@ export const useSlashPalette = ({
 const GROUP_KEY: Record<TGroup, string> = {
   [GROUP.setting]: 'next.slash.group.setting',
   [GROUP.command]: 'next.slash.group.command',
+  [GROUP.app]: 'next.slash.group.app',
   [GROUP.skill]: 'next.slash.group.skill',
   [GROUP.mcp]: 'next.slash.group.mcp',
   [GROUP.quick]: 'next.slash.group.quick',
@@ -437,8 +442,9 @@ const SlashPanel = ({ view, state, selected, onHover, onPick }: ISlashPanelProps
         </div>
       )}
       {rows.map((row, index) => {
-        const first = index === 0 || rows[index - 1].group !== row.group;
-        const heading = !view.sub && first ? t(GROUP_KEY[row.group]) : null;
+        const first =
+          index === 0 || rows[index - 1].group !== row.group || rows[index - 1].heading !== row.heading;
+        const heading = !view.sub && first ? (row.heading ?? t(GROUP_KEY[row.group])) : null;
         const setPlace = (element: HTMLDivElement | null) =>
           element?.style.setProperty('--j', String(Math.min(index, 12)));
         return (

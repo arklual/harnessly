@@ -39,8 +39,10 @@ func (s *Service) mountOrg(mux *http.ServeMux) {
 	s.mountSignals(mux)
 	mux.Handle("GET /api/orgs/{org}/waste", s.gate(s.waste))
 	s.mountSubscriptions(mux)
+	s.mountLimitWindows(mux)
 	s.mountAccounts(mux)
 	s.mountMachines(mux)
+	s.mountTools(mux)
 }
 
 // LimitBar is the limit a row is held to.

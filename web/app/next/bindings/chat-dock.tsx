@@ -29,6 +29,7 @@ import { deviceId } from '@/next/core/device';
 import { HOME, ROUTE, goTo } from '@/next/routes/routes';
 import { UI_REQUEST, requestContinue, requestUi } from '@/next/stores/ui-requests';
 import { useSlashSource } from '@/next/bindings/slash-source';
+import { appCommandsOf } from '@/next/features/composer/app-commands';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
 import { failureText, settled } from '@/next/bindings/outcome';
 import { isHanded } from '@/next/bindings/feed-items';
@@ -256,14 +257,6 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     [provider, compact],
   );
   const onChat = useCallback((ref: MessageRef) => addDraftRef(conv, ref, REFS_MAX), [conv]);
-  const slash = useSlashSource({
-    machine,
-    conv,
-    provider,
-    cwd: record?.cwd ?? null,
-    actions: slashActions,
-    onChat,
-  });
 
   // The apps on in this chat: a quiet row over the field, and «+» → «Приложение» to turn one on. The installed list is
   // read only once the chat has an app (the «+» pane reads it when it opens).
@@ -274,6 +267,20 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     0,
     chatApps.on.length > 0 || (provider === 'claude' && text.trimStart().startsWith('/')),
   ).list;
+  // The commands of the apps on in the chat join the «/» palette.
+  const appCommands = useMemo(
+    () => appCommandsOf(installedApps?.apps ?? [], chatApps.on),
+    [installedApps, chatApps.on],
+  );
+  const slash = useSlashSource({
+    machine,
+    conv,
+    provider,
+    cwd: record?.cwd ?? null,
+    actions: slashActions,
+    appCommands,
+    onChat,
+  });
   const cardSend = useRef<(() => boolean) | null>(null);
   const onSubmit = useCallback(
     (sendMode: TSendMode) => {

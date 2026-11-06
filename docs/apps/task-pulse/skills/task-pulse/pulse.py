@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The data of a task's card: the task from the person's tracker (harnessly issue, through Connections) and, when
-GITLAB_TOKEN is in the environment (harnessly secret run), the merge requests that name the task and their pipelines.
-Prints one JSON object; never prints the token. With --show KEY it gathers the card itself (the token from the safe, when
-there is one) and puts it in the chat as a widget."""
+"""The data of a task's card: the task from the person's tracker (harnessly issue, through Connections) and the merge
+requests that name the task with their pipelines (harnessly mrs, through the same Connections; only when that fails, the
+old way with GITLAB_TOKEN from `harnessly secret run`). Prints one JSON object; never prints a token. With --show KEY it
+gathers the card itself and puts it in the chat as a widget."""
 
 import json
 import os
@@ -65,7 +65,27 @@ def gitlab(base, token, path, query):
         return json.load(resp)
 
 
+def connection_mrs(key):
+    """The merge requests through the person's GitLab connection: no token of ours. None when that did not work."""
+    code, out, _ = run("harnessly", "mrs", key, "--state", "all", "--limit", "10", "--json")
+    if code != 0:
+        return None
+    try:
+        found = json.loads(out)["mrs"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    mrs = []
+    for mr in found:
+        mrs.append({"iid": mr.get("iid"), "title": (mr.get("title") or "")[:160], "url": mr.get("url"),
+                    "state": mr.get("state"), "project": mr.get("project") or "", "pipeline": mr.get("pipeline"),
+                    "mergeStatus": mr.get("detailedMergeStatus")})
+    return mrs
+
+
 def merge_requests(key):
+    mrs = connection_mrs(key)
+    if mrs is not None:
+        return mrs, "connections"
     token = os.environ.get("GITLAB_TOKEN", "").strip()
     if not token:
         return None, "no-token"
@@ -125,8 +145,12 @@ def card_of(key):
 
 
 def gathered(key):
-    """The card, with GitLab when the safe holds gitlab-token: this script again under `harnessly secret run`, so the
-    token lives only in that run's environment; without the token (or the safe) the card is the task alone."""
+    """The card with the merge requests from the person's GitLab connection. Only when that did not work and the safe
+    holds gitlab-token: this script again under `harnessly secret run`, so the token lives only in that run's
+    environment; without either the card is the task alone."""
+    card = card_of(key)
+    if card.get("error") or card.get("gitlab") == "connections":
+        return card
     try:
         code, out, _ = run("harnessly", "secret", "run", "--env", "GITLAB_TOKEN=gitlab-token", "--",
                            sys.executable, "-I", os.path.abspath(__file__), key)
@@ -134,7 +158,7 @@ def gathered(key):
             return json.loads(out)
     except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
-    return card_of(key)
+    return card
 
 
 def summary(card):

@@ -51,6 +51,7 @@ const (
 var (
 	// errDisabledMachine is what a switched-off machine answers to anything that needs it.
 	errDisabledMachine = httpx.New(http.StatusLocked, "machine_disabled", "Машина выключена администратором. Включите её, чтобы открыть или перезапустить")
+	errObserveOnly     = httpx.New(http.StatusConflict, "observe_only", "Хаб только наблюдает за этой машиной: её чаты открываются там, где она работает")
 	errRestartVM       = httpx.New(http.StatusNotImplemented, "not_implemented", "Перезапуск ВМ пока недоступен")
 	errRestartOld      = httpx.New(http.StatusUnprocessableEntity, "restart_unsupported", "Эта версия агента не умеет перезапускаться: обновите агента")
 )
@@ -78,6 +79,9 @@ type HubMachine struct {
 	People       []orgs.PersonRef `json:"people"`
 	Access       []AccessView     `json:"access"`
 	Problems     []string         `json:"problems"`
+	// OpensRuntime is false for a machine whose own policy keeps the hub out of its runtime (an observed machine run by
+	// a cluster of its own): the hub lists it, but «Открыть» has nowhere to lead.
+	OpensRuntime bool `json:"opensRuntime"`
 	// Cloud is what the machine runs on, as its provider says; null when the hub knows no server of it.
 	Cloud *CloudView `json:"cloud"`
 	// Hardware is what the machine said it is made of; null when it said nothing.
@@ -231,6 +235,7 @@ func (s *Service) HubMachines(ctx context.Context, st store.Store, ms []store.Ma
 			h.Access = append(h.Access, AccessView{Kind: e.Kind, ID: e.RefID, Label: label})
 		}
 		h.Problems = s.problems(m, h.Status, last, now)
+		h.OpensRuntime = opensRuntime(m)
 		h.ActiveOps = []OpView{}
 		out = append(out, h)
 	}

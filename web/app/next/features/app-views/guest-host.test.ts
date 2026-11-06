@@ -163,6 +163,7 @@ describe('guest host', () => {
     const rpc = over((page.posted[0] as (typeof page.posted)[number]).port as MessagePort);
     expect((await rpc.call(1, 'harnessly/storage.get', { scope: 'user', key: 'a' })).result).toEqual({
       value: { n: 1 },
+      version: 0,
     });
     expect((await rpc.call(2, 'harnessly/storage.keys', { scope: 'space' })).result).toEqual({ keys: ['a'] });
     // The runtime refuses a write on a link that only reads; the view sees the code.

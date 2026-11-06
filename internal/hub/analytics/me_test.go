@@ -200,7 +200,7 @@ func TestMeKPIs(t *testing.T) {
 	}
 	var k analytics.KpisResponse
 	r.JSON(&k)
-	if k.Scope != "me" || k.CmpPeriod.From != "2026-09-01" || k.CmpPeriod.To != "2026-10-01" || len(k.Kpis) != 12 {
+	if k.Scope != "me" || k.CmpPeriod.From != "2026-09-01" || k.CmpPeriod.To != "2026-10-01" || len(k.Kpis) != 15 {
 		t.Fatalf("kpis = %+v", k)
 	}
 	by := map[string]analytics.KpiValue{}

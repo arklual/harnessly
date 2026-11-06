@@ -8,6 +8,7 @@ import {
   putSecret,
   patchSecret,
   removeSecret,
+  type ISafeStore,
   type ISecret,
   type TSafeOutcome,
 } from '@/next/features/safe/api';
@@ -16,7 +17,10 @@ import { useProjects } from '@/next/stores/projects';
 import { useRouter } from '@/platform/router';
 import type { MachineId } from '@/next/protocol/v2';
 
-type TLoad = { k: 'loading' } | { k: 'failed'; text: string } | { k: 'ready'; secrets: readonly ISecret[] };
+type TLoad =
+  | { k: 'loading' }
+  | { k: 'failed'; text: string }
+  | { k: 'ready'; secrets: readonly ISecret[]; store: ISafeStore | null };
 
 /** An answer as the words of why it was not taken, or the value. */
 const outcome = <T,>(res: TSafeOutcome<T>): { value: T } | { error: string } => {
@@ -38,7 +42,7 @@ const SafeMachinePage = ({ machine, now }: { machine: MachineId; now: number }) 
     void loadSafe(machine).then((res) => {
       if (!live) return;
       const got = outcome(res);
-      if ('value' in got) setState({ k: 'ready', secrets: got.value.secrets });
+      if ('value' in got) setState({ k: 'ready', secrets: got.value.secrets, store: got.value.store });
       else setState((cur) => (cur.k === 'ready' ? cur : { k: 'failed', text: got.error }));
     });
     return () => {
@@ -55,6 +59,7 @@ const SafeMachinePage = ({ machine, now }: { machine: MachineId; now: number }) 
     <SafeSection
       secrets={state.k === 'ready' ? state.secrets : null}
       failed={state.k === 'failed' ? { reason: state.text, onRetry: retry } : null}
+      store={state.k === 'ready' ? state.store : null}
       now={now}
       projects={projects}
       editName={typeof edit === 'string' ? edit : undefined}
@@ -64,7 +69,7 @@ const SafeMachinePage = ({ machine, now }: { machine: MachineId; now: number }) 
         setState((cur) =>
           cur.k === 'ready'
             ? {
-                k: 'ready',
+                ...cur,
                 secrets: cur.secrets
                   .map((secret) => (secret.name === name ? got.value : secret))
                   .sort(byName),
@@ -79,7 +84,7 @@ const SafeMachinePage = ({ machine, now }: { machine: MachineId; now: number }) 
         setState((cur) => {
           if (cur.k !== 'ready') return cur;
           const rest = cur.secrets.filter((s) => s.name !== got.value.name);
-          return { k: 'ready', secrets: [...rest, got.value].sort(byName) };
+          return { ...cur, secrets: [...rest, got.value].sort(byName) };
         });
         return null;
       }}
@@ -87,8 +92,10 @@ const SafeMachinePage = ({ machine, now }: { machine: MachineId; now: number }) 
         const got = outcome(await removeSecret(machine, name));
         if ('error' in got) return got.error;
         setState((cur) =>
-          cur.k === 'ready' ? { k: 'ready', secrets: cur.secrets.filter((s) => s.name !== name) } : cur,
+          cur.k === 'ready' ? { ...cur, secrets: cur.secrets.filter((s) => s.name !== name) } : cur,
         );
+        // On a server safe the machine's file may hold a secret of the same name behind it: read the list again.
+        if (state.k === 'ready' && state.store !== null) setAttempt((n) => n + 1);
         return null;
       }}
     />

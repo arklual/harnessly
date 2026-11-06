@@ -89,9 +89,10 @@ func openMoveStore(d deps) *chatmove.Store {
 	return store
 }
 
-// newV2Move assembles the move of this runtime; nil where it cannot run (no secret to seal the bundle with).
+// newV2Move assembles the move of this runtime; nil where it cannot run (no store to remember it in). Without the pair's
+// secret only a move under a one-time key of the hub (chatmove.OpKey) works; the cluster's own move needs the secret.
 func newV2Move(d deps, rt *convo.Runtime, machine wire.MachineSource, store *chatmove.Store) *chatmove.Service {
-	if len(d.Secret) == 0 || store == nil {
+	if store == nil {
 		return nil
 	}
 	m := v2Move{rt: rt, machine: machine}

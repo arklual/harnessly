@@ -152,7 +152,13 @@ func (s *Store) KillPaneSessions(sessions []string) {
 // TabOptions are a new tab's name, folder, panel type and the command typed into its shell.
 type TabOptions struct {
 	Name, Cwd, PanelType, Command string
+	// ID is the tab's id when the caller chose it ahead (NewTabID): a launch line that names its chat needs it before the
+	// tab exists. "" makes a new one.
+	ID string
 }
+
+// NewTabID is an id for a tab yet to be added (TabOptions.ID).
+func (s *Store) NewTabID() string { return "tab-" + s.cfg.NewID() }
 
 func maxOrder(tabs []*jsvalue.Object) float64 {
 	m := math.Inf(-1)
@@ -175,7 +181,10 @@ func (s *Store) AddTab(wsID, paneID string, o TabOptions) (*jsvalue.Object, erro
 	if l := s.readLocked(wsID); l == nil || findPane(root(l), paneID) == nil {
 		return nil, gone
 	}
-	tabID := "tab-" + s.cfg.NewID()
+	tabID := o.ID
+	if tabID == "" {
+		tabID = s.NewTabID()
+	}
 	session := s.cfg.Tmux.SessionName(wsID, paneID, tabID)
 	web := o.PanelType == webBrowser
 	if !web {

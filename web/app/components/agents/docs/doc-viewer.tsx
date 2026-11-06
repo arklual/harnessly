@@ -21,6 +21,7 @@ import { cx } from '@/components/agents/ui';
 import { isPageHidden } from '@/lib/frame-visibility';
 import {
   createDocThread,
+  DocThreadsError,
   docContentSrc,
   fetchDocDetail,
   fetchDocDiff,
@@ -268,6 +269,8 @@ const DocViewer = ({
 
   const [detail, setDetail] = useState<IDocDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The hub has no documents service set up: the error says why, and there is no page to load. */
+  const [notConfigured, setNotConfigured] = useState(false);
   const [filter, setFilter] = useState<TFilter>(DOC_THREAD_STATUS.open);
   const [search, setSearch] = useState('');
   const [railOpen, setRailOpen] = useState(false);
@@ -376,7 +379,9 @@ const DocViewer = ({
       const next = await fetchDocDetail(slug);
       setDetail(next);
       setError(null);
+      setNotConfigured(false);
     } catch (err) {
+      setNotConfigured(err instanceof DocThreadsError && err.code === 'docs_not_configured');
       setError(err instanceof Error ? err.message : t('docs.docViewer.errorLoad'));
     }
   }, [slug]);
@@ -728,9 +733,15 @@ const DocViewer = ({
           </p>
         )}
 
+        {notConfigured && (
+          <p className="td-unbound" role="note">
+            {t('docs.docViewer.notConfiguredHint')}
+          </p>
+        )}
+
         <div className="td-body">
           <main className="td-canvas">
-            {isBoard && detail ? (
+            {notConfigured ? null : isBoard && detail ? (
               <iframe
                 className="td-board"
                 src={detail.doc.url}

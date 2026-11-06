@@ -8,6 +8,69 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `harnessly upgrade plan|apply|rollback`: a signed release manifest (`/dl/release.json`, Ed25519 against a pinned key)
+  ties the hub, runtime, agent, command line and web page to one version and lists the extension protocol ranges. `plan`
+  shows what changes and which registered extensions the new core cannot speak to; `apply` replaces the programs
+  together, restarts, checks and puts the old ones back on failure; the data is not touched. `tools/relmanifest` makes
+  and signs the manifest. The automatic update by `/dl/manifest.json` is unchanged.
+- Model profiles without a rebuild (`RUNTIME_PROFILES_FILE`, `RUNTIME_PROFILES_ADAPTER_URL`, `RUNTIME_PROFILES_SECRET_CMD`, off by
+  default): a file or an adapter adds profiles to the built-in presets or replaces one by id; address, API format, key as
+  a reference to a safe secret, limits and prices. See `docs/model-profiles.md`.
+- The hub behind a reverse proxy and under a path: `HUB_PUBLIC_URL=https://example.com/harnessly` (and `HUB_AGENT_URL`). Routes, links,
+  cookies (`Path`, `__Secure-` name under https), the web client and the machines' dial follow the path; the hub answers
+  with or without the prefix. Without a path nothing changes. See `docs/hub/proxy.md`.
+- `hub doctor` checks the database and its migrations, the sites' S3 bucket, OpenID providers, the public address, the
+  proxy settings and the clock; problems and startup errors carry a code (`HUB-…`), what to do and a link
+  (`docs/hub/doctor.md`). `--offline` skips what needs the public address.
+- UI slots for apps (`HARNESSLY_UI_SLOTS=on`, off by default): view targets `settings`, `onboarding`, `object-action` and
+  `hub-settings`, an app `branding` block, `hl.slot.done()`, a Settings → Extensions page and machine buttons drawn from
+  packages in the existing sandboxed frame; a failing view is held by a boundary. The hub's own page is declared but not
+  drawn yet. Example: `examples/ext-ui-slots`.
+- Connection adapters (`RUNTIME_CONNECTION_ADAPTERS_FILE`, off by default): a product that is not built in, such as a
+  corporate GitLab or an in-house tracker, connects through an HTTP adapter of the extension frame
+  (`harnessly.connection/v1`: detect, link, me, projects, issue search and card, pages) without a rebuild. The
+  credentials come from the runtime's safe and are not in the declaring file; built-in products are unchanged. Example
+  in `examples/connection-adapter-ts`, docs in `docs/connection-adapters.md`.
+- Memory store contract (`internal/memstore`: list, get, put with a version check, text search) and memory adapters
+  (`RUNTIME_MEMORY_ADAPTERS_FILE`, off by default): a team's notes in a wiki or a database connect through an HTTP
+  adapter of the extension frame (`harnessly.memory/v1`) and are read over the files, which stay the default and are
+  used when the adapter is silent or does not have a note. Example in `examples/memory-adapter-ts`, docs in
+  `docs/memory-adapters.md`.
+- Documents and boards provider (`RUNTIME_DOC_ADAPTERS_FILE`, off by default): a contract for reading, publishing,
+  access, comments, embed and boards; the built-in artifacts and boards stay the default, an external service plugs in
+  as an adapter of the extension frame (`harnessly.docs/v1`), with a TypeScript example and docs/doc-adapters.md.
+- An example extension pack (`examples/ext-pack-example`: machine adapter, memory store, tracker, secrets settings and an
+  interface extension, installed by one script), a guide to building your own (`docs/extensions/build-your-pack.md`) and
+  the acceptance scenario of a release, run in CI on release tags: clean install, sign-in, organization, machine, agent,
+  update to the next version and rollback.
+- Extension frame of the hub (`HUB_EXTENSIONS`, `HUB_EXTENSIONS_FILE`, off by default): adapters registered by config
+  with a token file and an expected protocol, describe handshake, timeouts, retries with an idempotency key, a circuit
+  breaker, their state in `hub doctor` and `/api/capabilities`, a Go SDK (`extsdk`) and a TypeScript example. The machine
+  provider protocol now runs on this frame with the same behaviour.
+- Machine adapter protocol v1 (`GET /v1/describe`, create, attach, state, power, resize), chosen by describe with
+  `HUB_PROVIDER_PROTOCOL=auto`; the default `v0` is the behaviour as before. An example adapter in
+  `examples/machine-adapter` and a scenario that updates the hub under a running adapter.
+- Hub: `HUB_AUTH_EMAIL=off` signs people in only through OpenID Connect, GitHub, Yandex or the gateway: no SMTP, no mailed
+  codes, invitations as links; the sign-in screen hides the email form. `HUB_STORAGE=s3` with `HUB_S3_*` keeps the hub's
+  files in one bucket, and `hub storage migrate` moves an existing hub's files there. Both are off by default.
+- The lively hub behind the `ui.hx.live` feature: one motion system on every screen (cascade, count-up numbers,
+  one skeleton, hover and press), analytics periods of 24 hours, 7 and 30 days or any dates kept in the address,
+  sortable and searchable tables, and the «Инструменты» screen over `GET /api/orgs/{org}/tools` — which MCP servers
+  and skills the agents call, how often, with errors and who calls.
+- Installer for a company network: `--check` looks at the machine before installing and changes nothing, `--ca-file`,
+  `--proxy`, `--no-proxy`, `--mirror`, `--npm-registry` and `--pip-index` reach every component (`SSL_CERT_FILE`,
+  `NODE_EXTRA_CA_CERTS`, `NO_PROXY`, and the container profile's mounts), the hub installer tells a Docker daemon that
+  already runs from one it can start of its own (`--docker external|own|auto`), `--offline DIR` installs from a bundle
+  that `scripts/make-offline-bundle.sh` builds, every step goes to a journal, and running again changes nothing that is
+  already right. `harnessly install` runs it with the check first.
+- Several hub replicas (`HUB_REPLICAS=on`, off by default): the machines' links get an owner with a lease and a fencing
+  token in a table in Postgres, a request for a machine on another replica reaches its owner over an internal hop (calls
+  and tunnels), a replica that lost its lease writes nothing, and a killed replica's machines reconnect to a live one. The
+  Helm chart runs 2 replicas with a rolling update on a shared Postgres and stays one replica on SQLite
+  ([docs/hub/replicas.md](docs/hub/replicas.md)).
+- Documents and boards next to the hub (HUB_DOCS, off by default): `doc.publish` and `doc.acl` from agents, `/api/platform/docs`
+  with threads, comments and rights kept in the hub, and "not set up" with the reason on the screens instead of a 404.
+  `compose.docs.yaml` and the chart's `docs.*` run the artifacts and boards services beside the hub; see docs/hub/docs.md.
 - MCP servers in Settings → Connections: a catalog of well-known remote MCP servers (Atlassian, Linear, Notion, Sentry,
   GitHub, Stripe, …) and any MCP URL, streamable HTTP or legacy SSE. The runtime finds how a server signs in: the
   service's own sign-in in a popup (OAuth with dynamic registration and PKCE), a pasted token, or nothing. Every Claude

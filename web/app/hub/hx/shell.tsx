@@ -6,10 +6,16 @@ import { useTheme } from '@kit';
 
 import { navigate } from '../lib/router';
 import { useSession } from '../lib/session';
+import { useSignOut } from '../screens/home';
 import { useOrg } from '../org/context';
 import { ROLE_LABEL, type TenantRef } from '../org/types';
+import { liveOn } from './flag';
+import { LiveCtx } from './live';
 import { navOf } from './nav';
 import { Btn, Icon, initial, LayerCtx, usePop } from './ui';
+import { withBase } from '../lib/base';
+import { canOpen } from './screens/machines/calc';
+import { useHxTheme } from './theme';
 
 const Switcher = () => {
   const { shell, scope } = useOrg();
@@ -169,11 +175,11 @@ const SwitcherPop = ({ closing, onPick }: { closing: '1' | undefined; onPick: ()
 };
 
 const Nav = ({ onPick }: { onPick: () => void }) => {
-  const { shell, base, section } = useOrg();
+  const { shell, base, section, scope } = useOrg();
   const team = shell.teams.find((t) => t.id === shell.viewer.teamId);
   const groups = useMemo(
-    () => navOf(shell.viewer.role, team?.name ?? null, shell.features ?? []),
-    [shell.viewer.role, team?.name, shell.features],
+    () => navOf(shell.viewer.role, team?.name ?? null, shell.features ?? [], scope.kind),
+    [shell.viewer.role, team?.name, shell.features, scope.kind],
   );
   return (
     <nav className="hx-nav ad-hubnav" aria-label="Разделы хаба">
@@ -229,19 +235,17 @@ const Workspace = ({ onPick }: { onPick: () => void }) => {
   const go = async () => {
     if (config.proxied) {
       onPick();
-      window.location.assign('/agents/');
+      window.location.assign(withBase('/agents/'));
       return;
     }
     setBusy(true);
     try {
       const slug = scope.kind === 'org' ? 'all' : scope.tenant.slug;
       const list = await api.machinesList(shell.org.slug, { scope: slug });
-      const on = list.groups
-        .flatMap((g) => g.machines)
-        .filter((m) => m.mine && (m.state === 'online' || m.state === 'idle'));
+      const on = list.groups.flatMap((g) => g.machines).filter((m) => m.mine && canOpen(m));
       if (on.length === 1) {
         const { url } = await api.openMachine(on[0].id);
-        window.location.assign(url);
+        window.location.assign(withBase(url));
         return;
       }
     } catch {
@@ -273,10 +277,18 @@ const Workspace = ({ onPick }: { onPick: () => void }) => {
   );
 };
 
+// The sidebar footer is narrow: the role goes there in one word, the full title stays in the tooltip.
+const SHORT_ROLE: Record<keyof typeof ROLE_LABEL, string> = {
+  admin: 'Админ',
+  lead: 'Руководитель',
+  member: 'Участник',
+};
+
 const User = () => {
   const { shell } = useOrg();
   const { resolved, setMode } = useTheme();
   const { viewer } = shell;
+  const signOut = useSignOut();
   return (
     <div className="hx-user">
       <button
@@ -284,11 +296,12 @@ const User = () => {
         className="hx-user__open"
         onClick={() => navigate('/settings')}
         aria-label={`${viewer.name}, ${ROLE_LABEL[viewer.role]}`}
+        title={`${viewer.name}\n${ROLE_LABEL[viewer.role]}`}
       >
         <span className="hx-avatar">{initial(viewer.name)}</span>
         <span className="hx-user__text">
           <span className="hx-user__name">{viewer.name}</span>
-          <span className="hx-user__meta">{ROLE_LABEL[viewer.role]}</span>
+          <span className="hx-user__meta">{SHORT_ROLE[viewer.role]}</span>
         </span>
       </button>
       <Btn
@@ -301,70 +314,75 @@ const User = () => {
       >
         <Icon i={resolved === 'dark' ? 'sun' : 'moon'} />
       </Btn>
+      <Btn
+        className="hx-user__theme"
+        variant="ghost"
+        size="sm"
+        shape="icon"
+        aria-label="Выйти"
+        onClick={signOut}
+      >
+        <Icon i="log-out" />
+      </Btn>
     </div>
   );
-};
-
-/** The page's theme for the design's tokens: data-hx-theme on <html> (the body's colour) and on the root. */
-const useHxTheme = (): 'light' | 'dark' => {
-  const { resolved } = useTheme();
-  useEffect(() => {
-    const html = document.documentElement;
-    html.dataset.hxTheme = resolved;
-    return () => {
-      delete html.dataset.hxTheme;
-    };
-  }, [resolved]);
-  return resolved;
 };
 
 export const HxShell = ({ children }: { children: ReactNode }) => {
   const theme = useHxTheme();
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
-  const { section } = useOrg();
+  const { section, shell } = useOrg();
+  const live = liveOn(shell.features);
   // The phone menu is open for the screen it was opened on: going to another screen closes it.
   const [sideOn, setSideOn] = useState<string | null>(null);
   const side = sideOn === section;
   const setSide = (open: boolean) => setSideOn(open ? section : null);
   return (
-    <div className="hx-root hx-app ad" data-hx-theme={theme} data-hxh-side={side ? 'open' : undefined}>
-      <Btn
-        className="hxh-menu"
-        variant="ghost"
-        size="sm"
-        shape="icon"
-        aria-label="Меню"
-        onClick={() => setSide(true)}
+    <LiveCtx.Provider value={live}>
+      <div
+        className="hx-root hx-app ad"
+        data-hx-theme={theme}
+        data-live={live ? '1' : undefined}
+        data-hxh-side={side ? 'open' : undefined}
       >
-        <Icon i="menu" />
-      </Btn>
-      <div className="hxh-side-scrim" onClick={() => setSide(false)} />
-      <aside className="hx-sidebar">
-        <div className="hx-brand">
-          <span className="hx-brand__mark">
-            <span className="hx-orb" />
-          </span>
-          <span className="hx-brand__name">harnessly</span>
-          <span className="hx-spacer" />
-          <span className="ad-hubtag">хаб</span>
-        </div>
-        <Switcher />
-        <Nav onPick={() => setSide(false)} />
-        <div className="hx-spacer" />
-        <Workspace onPick={() => setSide(false)} />
-        <User />
-      </aside>
-      <main className="hx-main" data-view="settings">
-        <section className="hx-set" data-page="true">
-          <div className="hx-set__page">
-            <div className="hx-set__page-in">
-              <LayerCtx.Provider value={layer}>{children}</LayerCtx.Provider>
-            </div>
+        <Btn
+          className="hxh-menu"
+          variant="ghost"
+          size="sm"
+          shape="icon"
+          aria-label="Меню"
+          onClick={() => setSide(true)}
+        >
+          <Icon i="menu" />
+        </Btn>
+        <div className="hxh-side-scrim" onClick={() => setSide(false)} />
+        <aside className="hx-sidebar">
+          <div className="hx-brand">
+            <span className="hx-brand__mark">
+              <span className="hx-orb" />
+            </span>
+            <span className="hx-brand__name">harnessly</span>
+            <span className="hx-spacer" />
+            <span className="ad-hubtag">хаб</span>
           </div>
-        </section>
-      </main>
-      <div className="hxh-layer" ref={setLayer} />
-    </div>
+          <Switcher />
+          <Nav onPick={() => setSide(false)} />
+          <div className="hx-spacer" />
+          <Workspace onPick={() => setSide(false)} />
+          <User />
+        </aside>
+        <main className="hx-main" data-view="settings">
+          <section className="hx-set" data-page="true">
+            <div className="hx-set__page">
+              <div className="hx-set__page-in">
+                <LayerCtx.Provider value={layer}>{children}</LayerCtx.Provider>
+              </div>
+            </div>
+          </section>
+        </main>
+        <div className="hxh-layer" ref={setLayer} />
+      </div>
+    </LiveCtx.Provider>
   );
 };
 

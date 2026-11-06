@@ -20,6 +20,8 @@ type ui struct {
 	fsys fs.FS
 	// reload re-reads index.html on each request (HUB_WEB_DIR, for development); otherwise it is read once.
 	reload bool
+	// base is the path the hub is served under ("" at the root of its host).
+	base string
 
 	mu    sync.Mutex
 	index []byte
@@ -53,7 +55,24 @@ func contentSecurityPolicy(index []byte) string {
 	}, "; ")
 }
 
-func newUI(fsys fs.FS, reload bool) *ui { return &ui{fsys: fsys, reload: reload} }
+func newUI(fsys fs.FS, reload bool, base string) *ui {
+	return &ui{fsys: fsys, reload: reload, base: base}
+}
+
+var (
+	baseMeta   = regexp.MustCompile(`(<meta\s+name="hub-base"\s+content=")[^"]*(")`)
+	assetAttrs = regexp.MustCompile(`((?:src|href)=")(/assets/)`)
+)
+
+// underPath writes the base path the hub is served under into the page: the meta the page reads it from, and the
+// address of the files the page names itself. The base is validated at start (config) to plain path segments.
+func underPath(index []byte, base string) []byte {
+	if base == "" {
+		return index
+	}
+	index = baseMeta.ReplaceAll(index, []byte("${1}"+base+"${2}"))
+	return assetAttrs.ReplaceAll(index, []byte("${1}"+base+"${2}"))
+}
 
 func (u *ui) loadIndex() ([]byte, string, error) {
 	u.mu.Lock()
@@ -65,6 +84,7 @@ func (u *ui) loadIndex() ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+	b = underPath(b, u.base)
 	u.index, u.csp = b, contentSecurityPolicy(b)
 	return u.index, u.csp, nil
 }

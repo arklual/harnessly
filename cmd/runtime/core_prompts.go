@@ -279,5 +279,7 @@ func (c *core) tabLaunch(session string) agents.Launch {
 		launched.Profile = *p
 	}
 	launched.Apps = launchpkg.AppsOf(l)
+	// The chat is not kept on the tab: it is the one that runs in this session now.
+	launched.Conversation, _ = convOf(c, session)
 	return launched
 }

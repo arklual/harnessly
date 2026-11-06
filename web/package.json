@@ -17,7 +17,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:smoke": "playwright test e2e/next.spec.ts -g \"ts (1|2|3|3c|3c3|3c3b|4)[.] \""
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

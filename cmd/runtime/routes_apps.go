@@ -5,15 +5,19 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
+	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -37,6 +41,8 @@ type appView struct {
 	Targets     []string       `json:"targets"`
 	Permissions []string       `json:"permissions"`
 	Views       []appViewEntry `json:"views"`
+	// Branding is what the app sets for the `branding` slot; the page shows it only with HARNESSLY_UI_SLOTS on.
+	Branding *apps.Branding `json:"branding,omitempty"`
 	// MCPServers are the names of the servers in the package's .mcp.json: a card's tool is the app's own only when it
 	// comes from one of them.
 	MCPServers []string `json:"mcpServers"`
@@ -44,7 +50,7 @@ type appView struct {
 	InstructionsBytes int `json:"instructionsBytes"`
 	// Command is the slash command that turns the app on in a chat (activation.on "command:/x"); empty when none.
 	Command string `json:"command,omitempty"`
-	// Always: the app is on in every new Claude chat of the machine (activation.on "always"; a team's app is not).
+	// Always: the app is on in every new chat of the machine (activation.on "always"; a team's app is not).
 	Always bool `json:"always,omitempty"`
 	// PluginParts are the hooks, agents and other parts of a Claude Code plugin a trusted package carries (the others
 	// may not): the install's permission request and the app's «О приложении» list them.
@@ -53,12 +59,23 @@ type appView struct {
 	// them only in a document the app is on in.
 	Sinopia *apps.Sinopia `json:"sinopia,omitempty"`
 	Dev     bool          `json:"dev,omitempty"`
+	// Commands are the app's chat.commands for the «/» palette of the page, each with its description.
+	Commands []apps.ChatCommand `json:"commands"`
 	// Setup: the app has settings or secrets, so «О приложении» draws their form. Waiting are the required secrets that
 	// have no value yet: the app is «ждёт секрет».
 	Setup   bool     `json:"setup"`
 	Waiting []string `json:"waiting"`
+	// WaitingConnections are the connections (catalog ids) the app's servers name that the person has not made or not
+	// signed in to: the app is «ждёт вход», its «О приложении» offers «Подключить». Its chat does not fail; those servers
+	// are left out of the launch.
+	WaitingConnections []string `json:"waitingConnections"`
 	// Team: the app is the team's, installed for everybody by an owner; Channel is the channel an install follows.
-	Team        bool   `json:"team,omitempty"`
+	Team bool `json:"team,omitempty"`
+	// Env: the app comes with the organization's environment; Locked: it cannot be turned off; Muted: the person
+	// turned it off.
+	Env         bool   `json:"env,omitempty"`
+	Locked      bool   `json:"locked,omitempty"`
+	Muted       bool   `json:"muted,omitempty"`
 	Channel     string `json:"channel,omitempty"`
 	Dir         string `json:"dir,omitempty"`
 	InstalledAt int64  `json:"installedAt"`
@@ -74,10 +91,35 @@ type appViewEntry struct {
 	Height  string   `json:"height,omitempty"`
 	Path    string   `json:"path,omitempty"`
 	URL     string   `json:"url,omitempty"`
+	// The slots: the name, icon, place and objects of a view that fills one.
+	Label   string   `json:"label,omitempty"`
+	Icon    string   `json:"icon,omitempty"`
+	Order   int      `json:"order,omitempty"`
+	Objects []string `json:"objects,omitempty"`
+}
+
+// uiSlotsOn says whether the interface's slots are on (HARNESSLY_UI_SLOTS=on). Off, the page lists no slot view and no
+// branding, and the runtime refuses a view session for a slot, so an installed app that names slots does nothing.
+func uiSlotsOn() bool { return strings.EqualFold(os.Getenv("HARNESSLY_UI_SLOTS"), "on") }
+
+// withoutSlots takes the slot views and the branding out of the apps a page is given when the slots are off.
+func withoutSlots(list []appView) []appView {
+	for i := range list {
+		list[i].Branding = nil
+		list[i].Targets = slices.DeleteFunc(slices.Clone(list[i].Targets), apps.IsSlot)
+		views := list[i].Views[:0:0]
+		for _, v := range list[i].Views {
+			if v.Targets = slices.DeleteFunc(slices.Clone(v.Targets), apps.IsSlot); len(v.Targets) > 0 {
+				views = append(views, v)
+			}
+		}
+		list[i].Views = views
+	}
+	return list
 }
 
 func viewOfApp(a apps.Installed, withDir bool) appView {
-	v := appView{ID: a.ID, Version: a.Version, Dev: a.Dev, Team: a.Team, Channel: a.Channel, InstalledAt: a.InstalledAt, UpdatedAt: a.UpdatedAt}
+	v := appView{ID: a.ID, Version: a.Version, Dev: a.Dev, Team: a.Team, Env: a.Env, Locked: a.Locked, Muted: a.Muted, Channel: a.Channel, InstalledAt: a.InstalledAt, UpdatedAt: a.UpdatedAt}
 	if m := a.Manifest; m != nil {
 		v.Name, v.Description, v.Icon, v.Trust = m.Name, m.Description, m.Icon, m.Trust
 		v.Targets, v.Permissions = m.Targets, m.Permissions
@@ -91,22 +133,27 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 		v.Permissions = []string{}
 	}
 	v.Waiting = []string{}
+	v.WaitingConnections = []string{}
 	if m := a.Manifest; m != nil {
 		v.Setup = len(m.Settings) > 0 || len(m.Secrets) > 0
 	}
 	v.MCPServers = []string{}
 	v.PluginParts = []string{}
 	if pkg, _ := apps.CachedPackage(a.Dir); pkg != nil {
+		// A server through the person's connection is set up in «Настройка» too: the person allows it there.
+		v.Setup = v.Setup || len(pkg.Connections()) > 0
 		for name := range pkg.MCP {
 			v.MCPServers = append(v.MCPServers, name)
 		}
 		slices.Sort(v.MCPServers)
 		v.PluginParts = append(v.PluginParts, pkg.PluginParts...)
 	}
+	v.Commands = a.Manifest.ChatCommands(a.Dir)
 	v.Views = []appViewEntry{}
 	if m := a.Manifest; m != nil {
+		v.Branding = m.Branding
 		for _, mv := range m.Views {
-			e := appViewEntry{ID: mv.ID, Title: mv.Title, Targets: mv.Targets, Height: mv.Height}
+			e := appViewEntry{ID: mv.ID, Title: mv.Title, Targets: mv.Targets, Height: mv.Height, Label: mv.Label, Icon: mv.Icon, Order: mv.Order, Objects: mv.Objects}
 			if strings.HasPrefix(mv.Entry, "https://") {
 				// A view at an address of the app's own server is framed only when its host is listed in network.frames.
 				if u, ok := m.FrameURL(mv.Entry); ok {
@@ -157,6 +204,9 @@ func appRoutes(d deps, c *core) []gate.Route {
 	return appRouteList(d, reg, version, chats)
 }
 
+// decisionRate is how many decisions a launch may journal in a minute.
+const decisionRate = 30
+
 // appChats is what the routes need of the conversations: the one a tmux session runs, a record, the command entry.
 type appChats struct {
 	ofSession func(session string) string
@@ -179,17 +229,23 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		return true
 	}
 	list := func(withDir bool) ([]appView, error) {
-		installed, err := reg.List()
+		installed, err := reg.ListAll()
 		if err != nil {
 			return nil, err
 		}
 		out := make([]appView, 0, len(installed))
 		for _, a := range installed {
+			// A team app turned off is found in the team's catalog; the environment's has no other place, so it stays
+			// here, marked muted, for the person to turn it on again.
+			if a.Muted && !a.Env {
+				continue
+			}
 			v := viewOfApp(a, withDir)
 			if a.Manifest != nil && len(a.Manifest.Secrets) > 0 {
-				store := safeFor(d).store
+				store := safeFor(d).store.Local // an app's secrets stay in the file
 				v.Waiting = a.Manifest.WaitingFor(func(name string) bool { return store.HasApp(a.ID, name) })
 			}
+			v.WaitingConnections = waitingConnections(mcpFor(d), reg, a)
 			out = append(out, v)
 		}
 		return out, nil
@@ -222,6 +278,10 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			failed(w, err)
 			return
 		}
+		slots := uiSlotsOn()
+		if !slots {
+			views = withoutSlots(views)
+		}
 		// The views' loopback port starts with the first page that lists apps; the page opens a preview slot on it.
 		port, err := viewServer.EnsureServer()
 		if err != nil {
@@ -229,7 +289,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			return
 		}
 		appViewPort.Store(int64(port))
-		secretJSON(w, http.StatusOK, map[string]any{"apps": views, "viewPort": port, "agentWalled": agentWalled(reg.Root)})
+		secretJSON(w, http.StatusOK, map[string]any{"apps": views, "viewPort": port, "agentWalled": agentWalled(reg.Root), "slots": slots})
 	}
 
 	cliList := func(w http.ResponseWriter, r *http.Request) {
@@ -295,6 +355,9 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		if err := reg.Remove(b.ID); errors.Is(err, apps.ErrNotInstalled) {
 			secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
 			return
+		} else if errors.Is(err, apps.ErrTeamApp) || errors.Is(err, apps.ErrEnvApp) {
+			shareRefused(w, err)
+			return
 		} else if err != nil {
 			failed(w, err)
 			return
@@ -352,6 +415,132 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			return
 		}
 		secretJSON(w, http.StatusNotFound, map[string]string{"error": "no-context"})
+	}
+
+	// decision: the guard hook's line for the journal of a chat's decisions (internal/apps decisions.go). Only the agent of
+	// a launch with apps writes it (the hook runs under that token behind the wall); the person's token is refused. The
+	// launch is the token's, and so is its chat (the launch's grant): the body's tab must be that chat's, the app one the
+	// launch was granted and on in the chat; at most decisionRate lines a minute.
+	decisionsDir := filepath.Join(reg.Root, "decisions")
+	var decMu sync.Mutex
+	decTimes := map[string][]time.Time{}
+	decision := func(w http.ResponseWriter, r *http.Request) {
+		if !cliOK(w, r, http.MethodPost) {
+			return
+		}
+		launch, byAgent := d.CLI.AgentOf(r)
+		if !byAgent || launch == "" {
+			secretJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden"})
+			return
+		}
+		var b struct {
+			Session      string `json:"session"`
+			AgentSession string `json:"agentSession"`
+			App          string `json:"app"`
+			Tool         string `json:"tool"`
+			Rule         string `json:"rule"`
+			Decision     string `json:"decision"`
+			Reason       string `json:"reason"`
+		}
+		if !readSecretBody(r, &b) || b.App == "" || b.Tool == "" || b.Rule == "" || len(b.Tool) > 200 || len(b.Rule) > 200 ||
+			(b.Decision != "deny" && b.Decision != "ask") {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		// The chat is the launch's own, from its grant (written when the launch was made, out of the agent's reach); the
+		// body can only name that chat's tab.
+		granted, conv := reg.Grant(launch)
+		rec, ok := chats.record(conv)
+		if conv == "" || !ok || chats.ofSession(b.Session) != conv || !slices.Contains(rec.Apps, b.App) || !slices.Contains(granted, b.App) {
+			secretJSON(w, http.StatusForbidden, map[string]string{"error": "not-on"})
+			return
+		}
+		// The rule is one the app wrote, or a system rule of the guard (Bash(...), Edit(...)).
+		if !strings.HasPrefix(b.Rule, "Bash(") && !strings.HasPrefix(b.Rule, "Edit(") {
+			pkg, err := reg.Package(b.App)
+			if err != nil || pkg.Manifest.Agent == nil || pkg.Manifest.Agent.Tools == nil {
+				secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-rule"})
+				return
+			}
+			t := pkg.Manifest.Agent.Tools
+			if !slices.Contains(t.Deny, b.Rule) && !slices.Contains(t.Confirm, b.Rule) && !slices.Contains(t.Allow, b.Rule) {
+				secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-rule"})
+				return
+			}
+		}
+		now := time.Now()
+		decMu.Lock()
+		recent := slices.DeleteFunc(decTimes[launch], func(t time.Time) bool { return now.Sub(t) >= time.Minute })
+		if len(recent) >= decisionRate {
+			decTimes[launch] = recent
+			decMu.Unlock()
+			secretJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate"})
+			return
+		}
+		decTimes[launch] = append(recent, now)
+		decMu.Unlock()
+		e := apps.DecisionEntry{At: now.UnixMilli(), Session: b.AgentSession, App: b.App, Tool: b.Tool, Rule: b.Rule,
+			Decision: b.Decision, Reason: b.Reason}
+		if err := apps.AppendDecision(decisionsDir, conv, e); err != nil {
+			agent.Log("warn", "apps: a decision not journaled", agent.F{K: "error", V: err.Error()})
+			secretJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed"})
+			return
+		}
+		secretJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	}
+
+	// decisions: the last guard decisions of an app in a chat, for its «О приложении» section: the page's GET.
+	decisions := func(w http.ResponseWriter, r *http.Request) {
+		if sameorigin.Refuse(w, r) {
+			return
+		}
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		if r.Method != http.MethodGet {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		app, conv := r.URL.Query().Get("app"), r.URL.Query().Get("conversation")
+		if app == "" || conv == "" {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		list, err := apps.ReadDecisions(decisionsDir, conv, app, 50)
+		if err != nil {
+			failed(w, err)
+			return
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"decisions": list})
+	}
+
+	// connect is the person's agreement that an app uses their connection (internal/apps/connection_grants.go); the agent's
+	// token never reaches it (agentRefusedAppRoutes).
+	connect := func(w http.ResponseWriter, r *http.Request) {
+		if !cliOK(w, r, http.MethodPost) {
+			return
+		}
+		var b struct {
+			ID         string `json:"id"`
+			Connection string `json:"connection"`
+			On         bool   `json:"on"`
+		}
+		if !readSecretBody(r, &b) || b.ID == "" || b.Connection == "" {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		var err error
+		if b.On {
+			err = reg.GrantConnection(b.ID, b.Connection)
+		} else {
+			err = reg.RevokeConnection(b.ID, b.Connection)
+		}
+		if err != nil {
+			secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
+			return
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"id": b.ID, "connection": b.Connection, "on": b.On})
 	}
 
 	enable := func(w http.ResponseWriter, r *http.Request) {
@@ -415,6 +604,44 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		secretJSON(w, http.StatusOK, answer)
 	}
 
+	// explain: why an app is on or off, layer by layer — the machine, the team, its setup, how it turns on, the
+	// chat of the calling tab and the wall. A read: the agent of a chat with apps may ask it too.
+	explain := func(w http.ResponseWriter, r *http.Request) {
+		if !cliOK(w, r, http.MethodGet) {
+			return
+		}
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		in := apps.ExplainInput{ID: id, HostVersion: version}
+		if a, err := reg.Get(id); err == nil {
+			in.App = &a
+			if a.Manifest != nil && len(a.Manifest.Secrets) > 0 {
+				store := safeFor(d).store.Local // an app's secrets stay in the file
+				in.Waiting = a.Manifest.WaitingFor(func(name string) bool { return store.HasApp(a.ID, name) })
+			}
+		}
+		if session := r.URL.Query().Get("session"); session != "" {
+			if rec, ok := chats.record(chats.ofSession(session)); ok {
+				in.Chat = &apps.ExplainChat{Provider: string(rec.Provider), Apps: rec.Apps}
+				for _, on := range rec.Apps {
+					if a, err := reg.Get(on); err == nil {
+						in.ChatBytes += apps.InstructionsBytes(a)
+					}
+				}
+			}
+		}
+		if runtime.GOOS == "linux" {
+			in.Wall = true
+			if in.WallErr = appBoundary().Ready(reg.Root); in.WallErr == nil {
+				in.WallErr = appBoundary().Gaps()
+			}
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"id": id, "lines": apps.Explain(in)})
+	}
+
 	routes := append(appBridgeRoutes(d, reg, storage, viewServer, chats), appAskRoutes(d, appAsks)...)
 	routes = append(routes, appSetupRoutes(d, reg, storage)...)
 	routes = append(routes, appMCPProxyRoute(d, reg))
@@ -431,7 +658,40 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		{Match: is("/api/cli/apps/install"), Handler: http.HandlerFunc(install)},
 		{Match: is("/api/cli/apps/remove"), Handler: http.HandlerFunc(remove)},
 		{Match: is("/api/cli/apps/enable"), Handler: http.HandlerFunc(enable)},
+		{Match: is("/api/cli/apps/connect"), Handler: http.HandlerFunc(connect)},
 		{Match: is("/api/cli/apps/context"), Handler: http.HandlerFunc(appContext)},
+		{Match: is("/api/cli/apps/decision"), Handler: http.HandlerFunc(decision)},
+		{Match: is(platformAPI + "/apps/decisions"), Handler: http.HandlerFunc(decisions)},
+		{Match: is("/agents" + platformAPI + "/apps/decisions"), Handler: http.HandlerFunc(decisions)},
+		{Match: is("/api/cli/apps/explain"), Handler: http.HandlerFunc(explain)},
 	}...)
 	return refuseAgentAppChanges(d.CLI, routes)
+}
+
+// waitingConnections are the connections the servers of the package in dir name that the person cannot use now.
+func waitingConnections(ms *mcpconn.Service, reg *apps.Registry, a apps.Installed) []string {
+	out := []string{}
+	pkg, _ := apps.CachedPackage(a.Dir)
+	if pkg == nil {
+		return out
+	}
+	out = append(out, waitingConnectionsOf(ms, pkg.Connections())...)
+	for _, id := range pkg.Connections() {
+		if !reg.ConnectionGranted(a.ID, id) && !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// waitingConnectionsOf are those of the catalog ids the person has not made or not signed in to.
+func waitingConnectionsOf(ms *mcpconn.Service, ids []string) []string {
+	out := []string{}
+	for _, id := range ids {
+		if _, ok := ms.ByCatalog(id); !ok {
+			out = append(out, id)
+		}
+	}
+	return out
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
@@ -303,15 +304,11 @@ func (s *Service) putMeGroup(w http.ResponseWriter, r *http.Request, p *auth.Pri
 			return httpx.Conflict("locked", "Обязательная группа: выключить нельзя")
 		}
 		if found.On != *in.On {
-			if err := st.SetEnvPersonGroup(r.Context(), p.User.ID, m.space.ID, found.ID, *in.On, s.now()); err != nil {
-				return err
-			}
 			chain, err := orgs.Chain(r.Context(), st, m.org, authz.Scope{Kind: store.ScopeTenant, ID: m.space.ID})
 			if err != nil {
 				return err
 			}
-			if err := st.AddAudit(r.Context(), orgs.Journal(chain, p.User.ID, "env.person.group", "env_group", found.ID,
-				map[string]any{"on": found.On}, map[string]any{"on": *in.On, "spaceId": m.space.ID}, s.now())); err != nil {
+			if err := s.setPersonGroup(r, st, p, m, chain, *found, *in.On, s.now()); err != nil {
 				return err
 			}
 		}
@@ -327,4 +324,16 @@ func (s *Service) putMeGroup(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil
+}
+
+// setPersonGroup keeps the person's choice of an optional group in the tenant and records it in the audit log.
+func (s *Service) setPersonGroup(r *http.Request, st store.Store, p *auth.Principal, m *me, chain []authz.Scope, g MeGroup, on bool, at time.Time) error {
+	if g.On == on {
+		return nil
+	}
+	if err := st.SetEnvPersonGroup(r.Context(), p.User.ID, m.space.ID, g.ID, on, at); err != nil {
+		return err
+	}
+	return st.AddAudit(r.Context(), orgs.Journal(chain, p.User.ID, "env.person.group", "env_group", g.ID,
+		map[string]any{"on": g.On}, map[string]any{"on": on, "spaceId": m.space.ID}, at))
 }

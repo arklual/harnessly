@@ -7,6 +7,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/secrets"
 )
@@ -19,6 +20,7 @@ import (
 //	POST <platform>/apps/setup           {id}                 the form, the values and what the app waits for
 //	POST <platform>/apps/setup/settings  {id, values}         saves the values once they pass the schema (else problems)
 //	POST <platform>/apps/setup/secret    {id, name, value}    puts a secret's value ({remove: true} forgets it)
+//	POST <platform>/apps/setup/connection {id, name}          allows the app the person's connection ({remove: true} takes it back)
 
 type setupBody struct {
 	ID     string         `json:"id"`
@@ -37,10 +39,21 @@ type setupAnswer struct {
 	Waiting []string `json:"waiting"`
 	// Problems are by setting: what a save did not accept (nothing was saved then); absent after a good save.
 	Problems map[string]string `json:"problems,omitempty"`
+	// Connections are the person's connections the app's servers go through: allowed to this app, and signed in.
+	Connections []setupConnection `json:"connections"`
+}
+
+// setupConnection is one connection an app names: the catalog's id and name, whether the person allowed it to this app
+// and whether they are signed in to it (Настройки → Подключения).
+type setupConnection struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Granted   bool   `json:"granted"`
+	Connected bool   `json:"connected"`
 }
 
 func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Route {
-	store := safeFor(d).store
+	store := safeFor(d).store.Local // an app's secrets stay in the file
 	answer := func(app apps.Installed) (setupAnswer, error) {
 		values, err := storage.Settings(app.Manifest, app.ID)
 		if err != nil {
@@ -53,6 +66,14 @@ func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Ro
 		}
 		if out.Waiting == nil {
 			out.Waiting = []string{}
+		}
+		out.Connections = []setupConnection{}
+		if pkg, _ := apps.CachedPackage(app.Dir); pkg != nil {
+			for _, id := range pkg.Connections() {
+				_, connected := mcpFor(d).ByCatalog(id)
+				out.Connections = append(out.Connections, setupConnection{ID: id, Name: mcpconn.CatalogName(id),
+					Granted: reg.ConnectionGranted(app.ID, id), Connected: connected})
+			}
 		}
 		return out, nil
 	}
@@ -129,12 +150,27 @@ func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Ro
 		}
 		return read(app, b)
 	}
+	// connection: the person allows the app one of the connections its package names, or takes it back. A page route:
+	// the agent has no page session, and its CLI word (harnessly app connect) is refused to it.
+	connection := func(app apps.Installed, b setupBody) (int, any) {
+		var err error
+		if b.Remove {
+			err = reg.RevokeConnection(app.ID, b.Name)
+		} else {
+			err = reg.GrantConnection(app.ID, b.Name)
+		}
+		if err != nil {
+			return http.StatusNotFound, map[string]string{"error": "not-found"}
+		}
+		return read(app, b)
+	}
 	is := func(p string) func(*http.Request) bool { return func(r *http.Request) bool { return pathIs(r, p) } }
 	var routes []gate.Route
 	for _, e := range []struct {
 		path string
 		h    http.HandlerFunc
-	}{{"/apps/setup", handle(read)}, {"/apps/setup/settings", handle(save)}, {"/apps/setup/secret", handle(secret)}} {
+	}{{"/apps/setup", handle(read)}, {"/apps/setup/settings", handle(save)}, {"/apps/setup/secret", handle(secret)},
+		{"/apps/setup/connection", handle(connection)}} {
 		routes = append(routes,
 			gate.Route{Match: is(platformAPI + e.path), Handler: e.h},
 			gate.Route{Match: is("/agents" + platformAPI + e.path), Handler: e.h})
@@ -149,7 +185,9 @@ func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Ro
 // Only an agent's launch token passes, and only for an app on in that launch's chat (the grant the launch wrote). The
 // person's cli-token is refused: the proxy is for the agent's MCP client, which carries the launch's token.
 func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
-	store := safeFor(d).store
+	store := safeFor(d).store.Local // an app's secrets stay in the file
+	ms := mcpFor(d)
+	connProxy := &mcpProxy{d: d, ms: ms, client: mcpProxyClient(nil)}
 	deny := func(w http.ResponseWriter, status int, why string) {
 		secretJSON(w, status, map[string]string{"error": why})
 	}
@@ -164,8 +202,9 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 				return
 			}
 			rest := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/agents"), apps.ProxyPrefix)
-			id, server, ok := strings.Cut(rest, "/")
-			if !ok || id == "" || server == "" || strings.Contains(server, "/") {
+			id, tail, ok := strings.Cut(rest, "/")
+			server, sub, _ := strings.Cut(tail, "/")
+			if !ok || id == "" || server == "" {
 				deny(w, http.StatusNotFound, "not-found")
 				return
 			}
@@ -179,6 +218,21 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 				return
 			}
 			srv, has := pkg.MCP[server]
+			if has && srv.Connection != "" && srv.Command == "" {
+				// The person's own connection: the connections' proxy signs the call in as the person. The legacy
+				// transport's /message follows the server's name.
+				conn, ok := ms.ByCatalog(srv.Connection)
+				if !reg.ConnectionGranted(id, srv.Connection) || !ok {
+					deny(w, http.StatusConflict, "waiting-connection")
+					return
+				}
+				connProxy.serve(w, r, conn.ID+strings.TrimSuffix("/"+sub, "/"))
+				return
+			}
+			if sub != "" {
+				deny(w, http.StatusNotFound, "not-found")
+				return
+			}
 			if !has || srv.Command != "" || len(srv.Secrets()) == 0 {
 				deny(w, http.StatusNotFound, "not-found")
 				return

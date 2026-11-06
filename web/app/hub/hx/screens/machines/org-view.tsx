@@ -21,7 +21,7 @@ import {
   type TenantFilter,
   toggleTenant,
 } from './calc';
-import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles } from './parts';
+import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles, useMachineSort } from './parts';
 import { useSentinel } from './use-sentinel';
 
 type View = 'tenant' | 'flat';
@@ -152,7 +152,8 @@ export const OrgView = ({
   const tiles = useMemo(() => orgTiles(list.summary, list.groups), [list]);
   const inFilter = useMemo(() => filterTenants(list.groups, filter), [list.groups, filter]);
   const shown = useMemo(() => searchGroups(inFilter, q), [inFilter, q]);
-  const rows = useMemo(() => flatRows(inFilter, q), [inFilter, q]);
+  const ms = useMachineSort();
+  const rows = ms.sort(useMemo(() => flatRows(inFilter, q), [inFilter, q]));
   const searching = q.trim() !== '';
   const first = list.groups[0]?.key;
   const gLimit = groupLimit(more);
@@ -227,7 +228,7 @@ export const OrgView = ({
       )}
       {view === 'flat' && rows.length > 0 && (
         <div className="mt">
-          <TableHead />
+          <TableHead sorting={ms} />
           {rows.slice(0, rLimit).map((m) => (
             <MachineRow key={m.id} m={m} mode="flat-org" now={now} onOpen={onOpen} />
           ))}

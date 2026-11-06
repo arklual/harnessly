@@ -3,6 +3,7 @@ package machines
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -78,10 +79,23 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	if oneOf(hello.Arch, "amd64", "arm64") {
 		m.Arch = hello.Arch
 	}
-	if err := st.UpdateMachineHello(ctx, m); err != nil {
-		s.log.Warn("hello not saved", "machine", m.ID, "error", err)
+	var herr error
+	if l.Fence() != 0 {
+		// A stale owner writes nothing: the write is guarded by the fencing token (docs/hub/replicas.md).
+		herr = st.UpdateMachineHelloFenced(ctx, m, l.Owner(), l.Fence())
+		if errors.Is(herr, store.ErrFenced) {
+			s.log.Info("link no longer held, hello dropped", "machine", m.ID)
+			l.Close(websocket.StatusCode(hubproto.CloseReplaced), "taken over by another replica")
+			return
+		}
+		_ = st.TouchMachineFenced(ctx, m.ID, s.now().UTC(), l.Owner(), l.Fence())
+	} else {
+		herr = st.UpdateMachineHello(ctx, m)
+		_ = st.TouchMachine(ctx, m.ID, s.now().UTC())
 	}
-	_ = st.TouchMachine(ctx, m.ID, s.now().UTC())
+	if herr != nil {
+		s.log.Warn("hello not saved", "machine", m.ID, "error", herr)
+	}
 	s.setPolicy(ctx, m, hello.Policy)
 	s.Publish(ctx, m)
 
@@ -138,13 +152,17 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	}
 }
 
-func (s *Service) disconnected(_ *link.Link, m store.Machine, current bool) {
+func (s *Service) disconnected(l *link.Link, m store.Machine, current bool) {
 	if !current {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_ = s.db.S().TouchMachine(ctx, m.ID, s.now().UTC())
+	if l.Fence() != 0 {
+		_ = s.db.S().TouchMachineFenced(ctx, m.ID, s.now().UTC(), l.Owner(), l.Fence())
+	} else {
+		_ = s.db.S().TouchMachine(ctx, m.ID, s.now().UTC())
+	}
 	s.res.mu.Lock()
 	delete(s.res.features, m.ID)
 	delete(s.res.latest, m.ID)
@@ -152,9 +170,12 @@ func (s *Service) disconnected(_ *link.Link, m store.Machine, current bool) {
 	s.Publish(ctx, m)
 }
 
-func (s *Service) onEvent(_ *link.Link, m store.Machine, ev link.Event) {
+func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	if l.Fence() != 0 && !s.db.S().LinkHeld(ctx, m.ID, l.Owner(), l.Fence(), s.now().UTC()) {
+		return // a stale owner records nothing
+	}
 	switch ev.Name {
 	case hubproto.EventJob:
 		var e struct{ Job hubproto.Job }
@@ -209,6 +230,10 @@ func (s *Service) onEvent(_ *link.Link, m store.Machine, ev link.Event) {
 		var e struct{ Design hubproto.DesignEvent }
 		if s.design != nil && json.Unmarshal(ev.Raw, &e) == nil {
 			go s.design.Event(m, e.Design)
+		}
+	case "doc.publish", "doc.acl":
+		if s.docs != nil {
+			s.docs.Event(l, m, ev)
 		}
 	case hubproto.EventUsageAvailable:
 		if s.usage != nil {

@@ -24,6 +24,7 @@ harnessly tab create -t codex-cli --prompt "<вся задача>"   # запу�
 harnessly peers                      # чаты других агентов, которым можно написать
 harnessly secret run --env VAR=NAME -- cmd   # выполнить команду с секретом из сейфа
 harnessly issues --mine --open       # задачи человека в его трекере
+harnessly mrs HRN-796                # MR, где упомянута задача, из GitLab человека
 harnessly --help                     # всё, с примерами
 ```
 

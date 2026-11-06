@@ -244,7 +244,7 @@ func (s *Service) oidcProvider(id string) *oauthProvider {
 			if claims.Email == "" {
 				return identityInfo{}, errNoEmail
 			}
-			return identityInfo{Provider: "oidc:" + id, Subject: idt.Subject, Email: claims.Email, Name: claims.Name, EmailVerified: bool(claims.EmailVerified)}, nil
+			return identityInfo{Provider: "oidc:" + id, Subject: idt.Subject, Email: claims.Email, Name: claims.Name, EmailVerified: bool(claims.EmailVerified) || s.cfg.OIDCEmailTrusted}, nil
 		},
 	}
 }

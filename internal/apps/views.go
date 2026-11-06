@@ -34,6 +34,9 @@ var shimJS []byte
 //go:embed sdk/widget.css
 var widgetCSS []byte
 
+//go:embed sdk/hl-ui.css
+var hlUICSS []byte
+
 // echartsJS is Apache ECharts (Apache-2.0), the charts library the host gives every view as a classic script
 // (window.echarts), so an agent's widget draws a chart without the network.
 //
@@ -51,6 +54,9 @@ const (
 	ShimPath = "/__hl/bridge-shim.js"
 	// WidgetBaseCSSPath is the host's base style of an agent's widget; any view may load it.
 	WidgetBaseCSSPath = "/__hl/widget.css"
+	// UICSSPath is hl-ui.css, the host's primitives (.hl-btn, .hl-card, .hl-stat, …) on the platform's tokens; any view
+	// may load it.
+	UICSSPath = "/__hl/hl-ui.css"
 	// EChartsPath is the charts library every view may load (window.echarts).
 	EChartsPath = "/__hl/lib/echarts.js"
 )
@@ -256,6 +262,9 @@ func (s *ViewServer) Handler() http.Handler {
 			return
 		case WidgetBaseCSSPath:
 			serveBytes(w, r, "text/css; charset=utf-8", widgetCSS)
+			return
+		case UICSSPath:
+			serveBytes(w, r, "text/css; charset=utf-8", hlUICSS)
 			return
 		case EChartsPath:
 			serveBytes(w, r, "text/javascript; charset=utf-8", echartsJS)

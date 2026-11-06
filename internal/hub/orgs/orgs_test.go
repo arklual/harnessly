@@ -219,3 +219,36 @@ func TestMoveTenant(t *testing.T) {
 		t.Errorf("into someone else's org: %s", r)
 	}
 }
+
+// an organization made with a tenant name has its first tenant at once, the creator owns it, and a blank name
+// gets the default; without the field the organization is made as before.
+func TestCreateMakesTheFirstTenant(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"))
+	anna := s.SignIn("anna@example.com")
+
+	r := anna.Do("POST", "/api/orgs", map[string]any{"name": "Acme", "tenantName": "Продажи"})
+	if r.Code != http.StatusCreated {
+		t.Fatalf("create: %s", r)
+	}
+	var v view
+	r.JSON(&v)
+	if len(v.Tenants) != 1 || v.Tenants[0].Name != "Продажи" {
+		t.Fatalf("tenants = %+v", v.Tenants)
+	}
+	if r := anna.Do("GET", "/api/spaces/"+v.Tenants[0].ID+"/machines", nil); r.Code != 200 {
+		t.Errorf("the creator does not own the first tenant: %s", r)
+	}
+
+	r = anna.Do("POST", "/api/orgs", map[string]any{"name": "Beta", "tenantName": "  "})
+	if r.Code != http.StatusCreated {
+		t.Fatalf("create blank: %s", r)
+	}
+	r.JSON(&v)
+	if len(v.Tenants) != 1 || v.Tenants[0].Name != "Основное" {
+		t.Errorf("default tenant = %+v", v.Tenants)
+	}
+
+	if v := create(t, anna, "Gamma"); len(v.Tenants) != 0 {
+		t.Errorf("without tenantName an organization has tenants: %+v", v.Tenants)
+	}
+}

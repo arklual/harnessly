@@ -97,8 +97,9 @@ flowchart TD
 | Поля манифеста `backend.url`, `when`, `storage`, `activation.template`, `views[].height` | Проверяются, не используются |
 | `activation.on`: `manual` | Проверяется, ничего не включает (`view` не пропускается). Действуют `document`, `always`, `command:/x` и `openView` |
 | `agent.context` | Пункты с `mode: on-activation` отправляются (см. [Агенты](05-agents.md#контекст-приложение-передаёт-агенту)); `on-demand` проверяется, не используется |
-| `agent.skills`, `agent.validators`, `agent.flow`, `agent.exclusive` | Проверяются, не используются. Claude Code грузит всё из `skills/`, что бы ни было в списке |
-| `hl.flow.*`, `hl.data.*`; события `flow`, `tool-result`, `tool-input`, `visibility` | В странице не подключены: `host_unavailable` или событие не приходит. Событие `data` приходит окну для чата, показанному виджетом |
+| `agent.skills`, `agent.flow`, `agent.exclusive` | Проверяются, не используются. Claude Code грузит всё из `skills/`, что бы ни было в списке |
+| События `tool-result`, `tool-input` | Страница их не шлёт: событие не приходит. Событие `data` приходит окну для чата, показанному виджетом |
+| `hl.flow.*`, `hl.data.*` | Убраны из SDK: вызов отклоняется с `invalid_params` |
 | `hl.sinopia.render()` | `host_unavailable` |
 | Права `ai`, `users.read` | Принимаются, ни одному вызову не нужны. `hl.context.user` всегда `null` |
 | Серверный процесс, запущенный хостом | Не существует. См. [Бэкенд](03-backend.md) |

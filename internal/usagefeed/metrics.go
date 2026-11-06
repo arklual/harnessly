@@ -20,7 +20,11 @@ type metrics struct {
 	turns, agentMs, waitMs, waits, intervals float64
 	toolCalls, toolErrors                    float64
 	input, cacheRead, cacheWrite, carry      float64
-	firstTs, firstCtx                        float64
+	// cacheWrite5m and cacheWrite1h split cacheWrite by the lifetime the write asked for.
+	cacheWrite5m, cacheWrite1h float64
+	// gaps are the waits in seconds, for the 90th percentile.
+	gaps              []float64
+	firstTs, firstCtx float64
 	// prs are the merge requests of the session: the pr-link ones and the ones its Bash and MCP calls created or pushed
 	// to, by key (hubproto.MRKey); an address that is not a GitLab merge request stays as it is.
 	prs map[string]bool
@@ -50,6 +54,7 @@ func (m *metrics) add(fa *usagereport.Facts) {
 		if gap := prompts[i] - t.Ts; gap > 0 && gap <= maxWait {
 			m.waits++
 			m.waitMs += gap * 1000
+			m.gaps = append(m.gaps, gap)
 		}
 	}
 	// Tool errors leave out the person's refusals: a block is not a failure of the tool.
@@ -67,6 +72,8 @@ func (m *metrics) add(fa *usagereport.Facts) {
 		m.input += r.Input
 		m.cacheRead += r.CacheRead
 		m.cacheWrite += write
+		m.cacheWrite5m += r.W5m
+		m.cacheWrite1h += r.W1h
 		// Carried context: the part of the previous call's context that this call paid for again, not from the cache.
 		if i > 0 {
 			m.carry += math.Min(prev, r.Input+write)
@@ -108,13 +115,29 @@ const maxMRKeys = 200
 
 // values are the hub's metrics keys; the fields the facts do not carry (skills, merged MRs, time to MR) are left out.
 func (m *metrics) values() map[string]float64 {
-	return map[string]float64{
+	v := map[string]float64{
 		"turns": m.turns, "agentMs": math.Round(m.agentMs), "waitMs": math.Round(m.waitMs), "waits": m.waits,
 		"activeIntervals": m.intervals, "toolCalls": m.toolCalls, "toolErrors": m.toolErrors,
 		"inputTokens": math.Round(m.input), "cacheReadTokens": math.Round(m.cacheRead),
 		"cacheWriteTokens": math.Round(m.cacheWrite), "carryTokens": math.Round(m.carry),
 		"firstCtx": math.Round(m.firstCtx), "mrs": float64(len(m.prs)),
+		"cacheWrite5mTokens": math.Round(m.cacheWrite5m), "cacheWrite1hTokens": math.Round(m.cacheWrite1h),
 	}
+	if p := percentile(m.gaps, 0.9); p > 0 {
+		v["waitP90Ms"] = math.Round(p * 1000)
+	}
+	return v
+}
+
+// percentile is the p-quantile (nearest rank) of xs, 0 for none.
+func percentile(xs []float64, p float64) float64 {
+	if len(xs) == 0 {
+		return 0
+	}
+	s := append([]float64(nil), xs...)
+	sort.Float64s(s)
+	i := int(math.Ceil(p*float64(len(s)))) - 1
+	return s[max(0, min(i, len(s)-1))]
 }
 
 // signature says whether the metrics (and the merge request keys, when there are any) changed since the session was

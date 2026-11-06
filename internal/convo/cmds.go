@@ -174,7 +174,7 @@ func (c *conv) recResult(now time.Time) wire.CmdResult {
 // keeps the apps it had until its terminal stops. The record carries the list to the page and to the launch.
 func (c *conv) setApps(ids []string, now time.Time) wire.CmdResult {
 	if len(ids) > 0 {
-		if c.d.AppsOK == nil || c.rec.Provider != wire.ProviderClaude {
+		if c.d.AppsOK == nil {
 			return wire.Refused(wire.RefuseUnsupported)
 		}
 		if bad := c.d.AppsOK(ids); bad != "" {

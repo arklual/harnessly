@@ -21,6 +21,7 @@ type KindCounts struct {
 	// Plugin and ClaudeSettings are left out while there are none (most organizations).
 	Plugin         int `json:"plugin,omitempty"`
 	ClaudeSettings int `json:"claude-settings,omitempty"`
+	App            int `json:"app,omitempty"`
 }
 
 func (c *KindCounts) add(kind string) {
@@ -41,6 +42,8 @@ func (c *KindCounts) add(kind string) {
 		c.Plugin++
 	case store.CatalogClaudeSettings:
 		c.ClaudeSettings++
+	case store.CatalogApp:
+		c.App++
 	}
 }
 
@@ -100,6 +103,8 @@ type LayerView struct {
 	Counts    KindCounts  `json:"counts"`
 	Items     []EntryItem `json:"items"`
 	Groups    []GroupView `json:"groups"`
+	// Presets are the named sets of the layer's groups.
+	Presets []PresetView `json:"presets"`
 }
 
 // TeamRef names a team an audience may list.

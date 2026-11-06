@@ -22,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/notifybots"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
@@ -51,6 +52,9 @@ type coreAgents struct {
 	resume   func() int
 	// preflight answers which CLIs run; the checker's by default.
 	preflight func() preflight.Result
+	// alwaysApps are the installed apps on in every new chat (apps.go); a tab started here gets them as a chat started
+	// from the page does. nil: none.
+	alwaysApps func() []string
 	// envDir holds the env files a machine agent keeps (keys, secrets, proxy): the CLIs' launch lines source them first
 	// (agents.EnvSourcePrefix); "" or no files, nothing is added.
 	envDir string
@@ -106,6 +110,7 @@ func skipPermissions(configFile string) func() bool {
 
 func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	profiles := &providers.Store{Dir: filepath.Join(c.DataDir, "providers"), Logins: profileLogins(c.Home)}
+	loadExtraProfiles(profiles)
 	gpt := gptProxy(c, profiles)
 	profiles.Switches = map[string]providers.Switch{}
 	if gpt != nil {
@@ -131,13 +136,18 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	shared := notifySharedFor(c.DataDir)
 	// The person's MCP servers (Settings → Connections) go to every agent that starts, through the runtime's proxy.
 	mcpEnabled := mcpEnabledOf(c.DataDir)
+	// One launcher gives the apps to both agents: the same registry, wall and rules.
+	appLauncher := &apps.Launcher{Registry: apps.Open(c.DataDir), GuardCommand: appGuardCommand(), GuardProbe: probeAppGuard, MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
+		Boundary: appBoundary(), RequireWall: os.Getenv("RUNTIME_APPS_REQUIRE_WALL") == "1", AgentToken: (&gate.CLIToken{DataDir: c.DataDir}).IssueAgent,
+		Secrets: storeFor(c.DataDir, c.Home), Connections: appConnections{ms: mcpconn.New(c.DataDir, nil, nil)}}
 	return &coreAgents{
-		profiles: profiles,
-		gpt:      gpt,
-		router:   router,
-		checker:  preflight.New(c.Home),
-		envDir:   c.EnvDir,
-		options:  catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
+		profiles:   profiles,
+		alwaysApps: alwaysApps(apps.Open(c.DataDir)),
+		gpt:        gpt,
+		router:     router,
+		checker:    preflight.New(c.Home),
+		envDir:     c.EnvDir,
+		options:    catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
 		claude: claude.LaunchConfig{
 			HooksPath:     filepath.Join(c.DataDir, "hooks.json"),
 			MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
@@ -151,10 +161,8 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			EditorScript:    editor,
 			HumanEditorVar:  c.HumanEditorVar,
 			Profiles:        launcher,
-			Apps: &apps.Launcher{Registry: apps.Open(c.DataDir), GuardCommand: appGuardCommand(), GuardProbe: probeAppGuard, MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
-				Boundary: appBoundary(), AgentToken: (&gate.CLIToken{DataDir: c.DataDir}).IssueAgent,
-				Secrets: storeFor(c.DataDir, c.Home)},
-			ExtraMCP: mcpClaudeConfig(mcpEnabled, filepath.Join(c.DataDir, "preview-mcp.json"), filepath.Join(c.DataDir, "mcp")),
+			Apps:            appLauncher,
+			ExtraMCP:        mcpClaudeConfig(mcpEnabled, filepath.Join(c.DataDir, "preview-mcp.json"), filepath.Join(c.DataDir, "mcp")),
 		},
 		codexLauncher:  filepath.Join(c.DataDir, "codex-launcher.js"),
 		launcherScript: launcherScriptConfig(c),
@@ -170,6 +178,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			ContainerSandbox: c.CodexContainerSandbox,
 			ShellEnvExclude:  []string{c.MCP.TokenEnv},
 			Profiles:         launcher,
+			Apps:             appLauncher,
 		},
 	}
 }
@@ -287,15 +296,15 @@ func launcherScriptConfig(c coreAgentsConfig) *codex.LauncherScriptConfig {
 }
 
 // CodexArgs are codex's own arguments, for the launcher script in a pane.
-func (a *coreAgents) CodexArgs(workspaceID, resumeID string, launch *agents.Launch) ([]string, error) {
-	args, _, err := a.codexArgs.RuntimeArgs(workspaceID, resumeID, launch)
-	return args, err
+func (a *coreAgents) CodexArgs(workspaceID, resumeID string, launch *agents.Launch) (codex.Start, error) {
+	start, _, err := a.codexArgs.RuntimeStart(workspaceID, resumeID, launch)
+	return start, err
 }
 
 // CodexForkArgs are the arguments of codex on a fork of the session.
-func (a *coreAgents) CodexForkArgs(workspaceID, sessionID string, launch *agents.Launch) ([]string, error) {
-	args, _, err := a.codexArgs.ForkArgs(workspaceID, sessionID, launch)
-	return args, err
+func (a *coreAgents) CodexForkArgs(workspaceID, sessionID string, launch *agents.Launch) (codex.Start, error) {
+	start, _, err := a.codexArgs.ForkStart(workspaceID, sessionID, launch)
+	return start, err
 }
 
 // Availability is the previous runtime's agent-availability over the preflight's answer.
@@ -548,7 +557,7 @@ func (a *coreAgents) Start(r layoutapi.StartRequest) layoutapi.StartResult {
 		return layoutapi.StartResult{Status: http.StatusServiceUnavailable, Body: errorJSON(locale.Pick("Could not start the agent: the runtime is starting", "Не удалось запустить агента: рантайм запускается"))}
 	}
 	res, err := a.starter.Start(launch.Options{Provider: r.Provider, WorkspaceID: r.WorkspaceID, Prompt: optionalText(r.Prompt),
-		Launch: r.Launch, TabName: optionalText(r.TabName)})
+		Launch: withAlwaysApps(r.Provider, r.Launch, a.alwaysApps), TabName: optionalText(r.TabName)})
 	if err != nil {
 		agent.Log("error", "core: the conversation did not start", agent.F{K: "provider", V: r.Provider}, agent.F{K: "error", V: err.Error()})
 		return layoutapi.StartResult{Status: http.StatusInternalServerError,
@@ -558,6 +567,24 @@ func (a *coreAgents) Start(r layoutapi.StartRequest) layoutapi.StartResult {
 		return layoutapi.StartResult{ConversationID: res.ConversationID()}
 	}
 	return layoutapi.StartResult{Status: res.Status, Body: jsvalue.Stringify(res.Body, "")}
+}
+
+// withAlwaysApps is the launch of a new tab with the apps on in every chat added: for the agents that take apps (Claude
+// Code and Codex), and only when the request names none of its own (an explicit list is the caller's word).
+func withAlwaysApps(provider string, l *agents.Launch, always func() []string) *agents.Launch {
+	if (provider != "claude" && provider != "codex") || always == nil || (l != nil && len(l.Apps) > 0) {
+		return l
+	}
+	ids := always()
+	if len(ids) == 0 {
+		return l
+	}
+	out := agents.Launch{}
+	if l != nil {
+		out = *l
+	}
+	out.Apps = append([]string(nil), ids...)
+	return &out
 }
 
 // AutoResume resumes the agents that ran before a restart, while the launch slice is on.

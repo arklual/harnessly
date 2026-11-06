@@ -27,7 +27,7 @@ flowchart TB
     c["The harnessly CLI"]
   end
   all --> a["Claude Code, no apps:<br/>plus delegation; no wall, the person's token"]
-  all --> c2["Codex:<br/>plus delegation; no wall; apps cannot be turned on"]
+  all --> c2["Codex, no apps:<br/>plus delegation; no wall.<br/>With apps: guard, servers, instructions and the wall, see Codex"]
   all --> b["Claude Code, app on:<br/>plus the app's files and harnessly-app;<br/>minus delegation; in the wall, its own token"]
 ```
 
@@ -55,6 +55,11 @@ The person turns an app on in a chat with the row over the field. Two more ways 
 - `command:/tasks`: a message that starts with `/tasks` turns the app on in that chat first, then goes to the agent. One app per command;
   the agent's own commands (`/clear`, `/model`, ...) are refused by the check.
 
+The commands in `chat.commands` also show up in the `/` palette of the chat's input field, in a group named after the app, with the
+description from the `description:` line of `commands/<name>.md`. They are listed while the app is on in that chat. Choosing one puts
+`/<plugin>:<name>` into the field, and it goes to the agent like any typed command. A built-in command keeps its name: if an app command
+has the same name, the palette lists it as `<plugin>:<name>`.
+
 ## Context the app hands the agent
 
 `agent.context` names a tool of the app's own remote MCP server (`"<server>.<tool>"`) whose answer the agent should see:
@@ -68,6 +73,27 @@ to the agent as `additionalContext`, **only when it differs from the last one se
 item). So the conversation carries the context once per change, not once per message. A cleared or new chat gets it again; a resumed
 one does not. A tool that fails, answers an error or answers nothing adds nothing and stops nothing. The answer is cut at 16 KB. The
 tool takes no arguments. `on-demand` items are checked and not sent.
+
+## Validators: checks of the agent's turn
+
+`agent.validators` runs local scripts, so it needs `trust: "trusted"`: the install and update lists them among the rights (like `hooks/`), and the scripts get only `PATH`, `HOME`, `LANG`, `LC_*`, `TMPDIR` and `HARNESSLY_*` in their environment. It runs a script of the package after a tool call or before the agent ends its turn, and tells the agent what is wrong:
+
+```json
+"agent": { "validators": [
+  { "id": "tests", "on": "PostToolUse", "match": "Edit", "run": "checks/tests.py", "maxRetries": 3 },
+  { "id": "done", "on": "Stop", "run": "checks/done.sh" }
+] }
+```
+
+- `id`: lower case letters, digits, `-`; unique in the app.
+- `on`: `PostToolUse` or `Stop`.
+- `match`: a tool mask as in `agent.tools` (`Edit`, `Bash(git *)`, `server.*`); only for `PostToolUse`, empty is every tool.
+- `run`: a file of the package. `.py` runs as `python3 -I`, anything else must be executable. It starts in the package folder, gets the hook's JSON on stdin and has 30 s.
+- `maxRetries`: 1..10, default 3.
+
+Exit code `0` is a pass. Exit code `2` is a failure: the first 4 KB of stdout is the remark, and the hook answers `{"decision":"block","reason":...}`, so the agent reads it and fixes the work (after a Stop it carries on instead of ending). Any other code, a timeout or a script that cannot start blocks nothing and is written to the hook's stderr.
+
+Failures in a row are counted per chat and validator (a file beside the launch's policy snapshot). After `maxRetries` blocks the next failure is let go: a Stop ends the turn (the count starts afresh), a `PostToolUse` stops blocking until the validator passes once. A pass resets the count. `stop_hook_active` needs no handling in the script: the hook counts the retries itself.
 
 ## What the app weighs
 
@@ -85,12 +111,12 @@ Everything in the system prompt is paid for on every turn, so it is counted:
 
 ## Access by kind of chat
 
-| Capability | Claude, no apps | Claude, app on | Codex |
+| Capability | Claude, no apps | Claude, app on | Codex, no apps |
 | --- | --- | --- | --- |
 | `app docs`, `new`, `validate` | yes | yes | yes |
 | `app list`, `channels`, `shares` | yes | yes | yes |
 | `app dev`, `install` | yes | **no** | yes |
-| `app enable` in its own chat | yes | **no** | no (`unsupported`) |
+| `app enable` in its own chat | yes | **no** | yes |
 | `app disable` in a chat with apps | page only (`use-page`) | **no** | page only |
 | `app remove`, `promote`, `rollback`, `team`, `share`, `public` (any subcommand, `public list` too), `update` | yes | **no** | yes |
 | `app publish --channel dev\|beta` | yes | yes | yes |
@@ -108,7 +134,37 @@ Everything in the system prompt is paid for on every turn, so it is counted:
 | The app's instructions, skills, commands, tool rules | no | yes | no |
 | Wall | no | yes, where bwrap works | no |
 
-`app eval` uses the person's own Claude Code login. `--agent codex` is not supported.
+`app eval` uses the person's own Claude Code login. `--agent codex` is not supported yet (it refuses with a message): the scenarios run on Claude Code's print mode and its event stream, and Codex's `exec` has a different one.
+
+## Codex
+
+Apps can be turned on in a Codex chat too. What works there, and how it differs from Claude Code:
+
+| | Claude Code | Codex |
+| --- | --- | --- |
+| Tool rules (`allow`, `deny`) | the app-guard hook | the same guard and the same rules, as a Codex `PreToolUse` hook |
+| `confirm` | the person is asked | **refused**: Codex's hook has no "ask" |
+| Instructions | appended to the system prompt | joined to the developer instructions |
+| Skills | plugin skills | **a list in the instructions**: the path of each `SKILL.md`, to be read before use |
+| MCP servers of the app | the plugin's `.mcp.json` | `mcp_servers.plugin_<app>_<server>` flags; a server with `${secret:}` goes through the runtime's proxy as for Claude |
+| Local server that uses a secret | gets the value in a file of the launch | **left out**: a value on Codex's command line could be read by any process of the machine |
+| `harnessly-app` tools | yes | no |
+| Context items (`agent.context`) | on the start of a turn | not yet |
+| Wall, the launch's own token | yes | yes, the same wall |
+
+The differences are deliberate:
+
+- **`confirm` becomes `deny`.** Codex's `PreToolUse` takes only a refusal; an "ask" is dropped and the call goes on, which would turn a
+  confirmation into a permission. The agent reads the reason ("Codex has no step where the person confirms a call") and does it another
+  way. If a rule must not block Codex, write it as `allow`.
+- **Tools are mapped by a table.** Codex's shell tools (`shell`, `shell_command`, `exec_command`, `local_shell`, `unified_exec`) are `Bash` to the
+  rules; `apply_patch` is `Edit` and `Write` for every file the patch names (an `Add`, `Update`, `Delete` or `Move to` line); `read_file`,
+  `list_dir` and `grep_files` are `Read` and `Grep`; `mcp__<server>__<tool>` keeps its name. Tools that change nothing (`update_plan`,
+  `view_image`, `web_search`) are not judged. **A tool the table does not know is refused**, and so is a call whose command or patch
+  cannot be read: the guard never lets through what it cannot read.
+- **The hooks cannot be edited by the agent.** The guard is a `-c hooks.PreToolUse=[…]` flag of the launch line, first among the hooks, before the
+  runtime's and the person's. There is no file in which the agent could remove it. Codex lets a call go on when a hook fails, so the launch
+  checks that the guard answers and does not start without one that does.
 
 ## The wall
 
@@ -150,10 +206,11 @@ This matters for what you ask of an app's agent:
 - `git` over ssh works, with the person's `~/.ssh/config`.
 - A machine without `bwrap`, or with user namespaces refused, starts the chat without the wall and says so: a log warning, the machine check
   `apps_boundary`, a line in «О приложении». What a machine needs is in the [reference](../apps.md#what-keeps-the-agent-out-of-the-apps).
+  A deployment that sets `RUNTIME_APPS_REQUIRE_WALL=1` does not start such a chat: it fails with the reason and the command that puts it right.
 
 What stays open, by nature: the agent runs as the person, so it reads the person's files outside the data folder, uses the safe by name and has
 the network. `network` in the manifest binds views, not the agent. Code it writes in the project is run later by whoever runs it. A chat without
-apps and a Codex chat have no wall at all.
+apps has no wall at all. A Codex chat with apps has the same wall as Claude Code, around the Codex process.
 
 ## Secrets
 

@@ -1,0 +1,9 @@
+[
+  {
+    "name": "example-tracker",
+    "kind": "connection",
+    "url": "http://127.0.0.1:8080",
+    "tokenFile": "/etc/harnessly/example-tracker.token",
+    "protocol": "harnessly.connection/v1"
+  }
+]

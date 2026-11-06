@@ -39,7 +39,7 @@ func DefaultEngineDir(dataDir string) string {
 
 // EngineStatus is what the panel needs to tell the person which engine new designs get and what else the machine has.
 type EngineStatus struct {
-	// Ready: a new project gets an engine. Always true now; older panels read it.
+	// Ready: a new project gets an engine. Always true unless RUNTIME_DESIGN_READY_PROBE=1 (then: the render doctor passed); older panels read it.
 	Ready bool `json:"ready"`
 	// Source is where a new project's engine comes from: EngineSourceOwn or EngineSourceVendor.
 	Source string `json:"source"`
@@ -48,6 +48,8 @@ type EngineStatus struct {
 	// Chrome: a headless browser for checks, pictures and deck exports; Ffmpeg: video exports and recordings.
 	Chrome bool `json:"chrome"`
 	Ffmpeg bool `json:"ffmpeg"`
+	// Render is the render doctor's cached result: set only when RUNTIME_DESIGN_READY_PROBE=1, and then Ready follows it.
+	Render *RenderHealth `json:"render,omitempty"`
 	// Fetch is the command that fetches the vendor's engine with the owner's account (optional), "" where it cannot work.
 	Fetch string `json:"fetch"`
 }
@@ -99,6 +101,12 @@ func (l *Library) Engine() EngineStatus {
 	}
 	if l.cfg.EngineFile != "" {
 		s.Source, s.Release = EngineSourceFile, nil
+	}
+	// Under the switch the engine is ready when a real picture and video came out (harnessly doctor render), not when
+	// the programs merely exist. The result is cached; a request never waits for the check.
+	if readyProbeOn() {
+		h := l.RenderHealth()
+		s.Render, s.Ready = &h, h.OK
 	}
 	return s
 }

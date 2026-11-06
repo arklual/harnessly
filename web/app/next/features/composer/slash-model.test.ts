@@ -14,6 +14,7 @@ import {
   splitMention,
   SUB,
   TRIGGER_CHAR,
+  type IAppCommands,
   type ISlashAvailable,
   type ITrigger,
 } from '@/next/features/composer/slash-model';
@@ -314,5 +315,88 @@ describe('editing the word', () => {
   it('takes the word out with the space after it', () => {
     expect(removeWord('/goal', 0, 5)).toEqual({ text: '', caret: 0 });
     expect(removeWord('a /goal b', 2, 7)).toEqual({ text: 'a b', caret: 2 });
+  });
+});
+
+describe('buildRows: commands of apps', () => {
+  const acme: IAppCommands = {
+    appId: 'acme.tools',
+    appName: 'Acme Tools',
+    plugin: 'acme-tools',
+    commands: [
+      { name: 'lint', slash: '/acme-tools:lint', description: 'Lint the diff' },
+      { name: 'compact', slash: '/acme-tools:compact', description: 'Compact the board' },
+    ],
+  };
+  const other: IAppCommands = {
+    appId: 'zed',
+    appName: 'Zed',
+    plugin: 'zed',
+    commands: [{ name: 'ship', slash: '/zed:ship', description: '' }],
+  };
+  const input = (query: string, over: Partial<Parameters<typeof buildRows>[0]> = {}) => ({
+    trigger: trigger(query),
+    provider: 'claude' as const,
+    catalog: CATALOG,
+    mcp: [],
+    quick: [],
+    appCommands: [acme, other],
+    available: NONE,
+    starting: false,
+    ...over,
+  });
+
+  it('lists a group per app after the agent commands, each row sending the full /plugin:name', () => {
+    const rows = buildRows(input('')).rows.filter((row) => row.group === GROUP.app);
+    expect(rows.map((row) => [row.heading, row.name])).toEqual([
+      ['Acme Tools', 'lint'],
+      ['Acme Tools', 'acme-tools:compact'],
+      ['Zed', 'ship'],
+    ]);
+    expect(rows[0].action).toEqual({ k: 'insert', text: '/acme-tools:lint ' });
+    expect(
+      buildRows(input(''))
+        .rows.map((row) => row.group)
+        .indexOf(GROUP.app),
+    ).toBeGreaterThan(
+      buildRows(input(''))
+        .rows.map((row) => row.group)
+        .indexOf(GROUP.command),
+    );
+  });
+
+  it('lets the built-in command keep its name: the app one keeps the app prefix', () => {
+    const rows = buildRows(input('compact')).rows;
+    expect(rows.find((row) => row.group === GROUP.command)?.name).toBe('compact');
+    const app = rows.find((row) => row.group === GROUP.app);
+    expect(app?.name).toBe('acme-tools:compact');
+    expect(app?.action).toEqual({ k: 'insert', text: '/acme-tools:compact ' });
+  });
+
+  it('gives a chat setting the name too', () => {
+    const rows = buildRows(
+      input('compact', { available: { model: false, effort: false, actions: { compact: () => undefined } } }),
+    ).rows;
+    expect(rows.find((row) => row.group === GROUP.setting)?.name).toBe('compact');
+    expect(rows.find((row) => row.group === GROUP.app)?.name).toBe('acme-tools:compact');
+  });
+
+  it('drops the agent catalog duplicate of the app command', () => {
+    const catalog = [...CATALOG, item({ name: 'acme-tools:lint', source: 'plugin' })];
+    const rows = buildRows(input('lint', { catalog })).rows;
+    expect(rows.filter((row) => row.name.endsWith('lint')).map((row) => row.group)).toEqual([GROUP.app]);
+  });
+
+  it('is silent after the start of the field, on the start page and without apps', () => {
+    const later = { ...trigger('lint'), start: 4 };
+    expect(buildRows(input('lint', { trigger: later })).rows.some((row) => row.group === GROUP.app)).toBe(
+      false,
+    );
+    expect(buildRows(input('lint', { starting: true })).rows.some((row) => row.group === GROUP.app)).toBe(
+      false,
+    );
+    expect(buildRows(input('lint', { appCommands: [] })).rows.some((row) => row.group === GROUP.app)).toBe(
+      false,
+    );
   });
 });

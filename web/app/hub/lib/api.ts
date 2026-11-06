@@ -249,12 +249,13 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
         patch<{ member: Member }>(`/api/spaces/${enc(id)}/members/${enc(userId)}`, { role }),
       removeMember: (id: string, userId: string) => del(`/api/spaces/${enc(id)}/members/${enc(userId)}`),
       /** A role other than member (a co-owner) goes only when asked, so the old body stays as it was. */
-      invite: (id: string, emails: string[], role: Role = 'member') =>
-        post<{ invites: Invite[] }>(
-          `/api/spaces/${enc(id)}/invites`,
-          role === 'member' ? { emails } : { emails, role },
-        ),
-      inviteLink: (id: string, opts: { maxUses?: number; days?: number } = {}) =>
+      invite: (id: string, emails: string[], role: Role = 'member', teamId?: string) =>
+        post<{ invites: Invite[] }>(`/api/spaces/${enc(id)}/invites`, {
+          emails,
+          ...(role === 'member' ? {} : { role }),
+          ...(teamId ? { teamId } : {}),
+        }),
+      inviteLink: (id: string, opts: { maxUses?: number; days?: number; teamId?: string } = {}) =>
         post<{ invite: Invite }>(`/api/spaces/${enc(id)}/invites/link`, opts),
       invites: (id: string) => get<{ invites: Invite[] }>(`/api/spaces/${enc(id)}/invites`),
       revokeInvite: (id: string, inviteId: string) => del(`/api/spaces/${enc(id)}/invites/${enc(inviteId)}`),
@@ -268,6 +269,8 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
           kind: 'email' | 'link';
           email: string | null;
           valid: boolean;
+          /** The team the invitation also puts the person in. */
+          teamName?: string;
         }>(`/api/invites/${enc(token)}`),
       accept: (token: string) => post<{ space: SpaceRef }>(`/api/invites/${enc(token)}/accept`),
     },

@@ -51,6 +51,8 @@ type MeResponse struct {
 	Items []MeItem `json:"items"`
 	// Groups are the groups the person's items are in: required ones (always on) and optional ones (theirs to switch).
 	Groups []MeGroup `json:"groups"`
+	// Presets are the layers' sets of groups with at least one group the person has items in.
+	Presets []MePreset `json:"presets"`
 	// Outdated: some machine of the person in the tenant does not hold the current list or has a setup item that failed.
 	Outdated bool        `json:"outdated"`
 	Machines []MeMachine `json:"machines"`
@@ -165,6 +167,7 @@ func (s *Service) meEnv(w http.ResponseWriter, r *http.Request, p *auth.Principa
 	}
 	eff := m.effective()
 	out.Groups = m.meGroups(eff)
+	out.Presets = m.mePresets(out.Groups)
 	for _, e := range eff {
 		scope := m.org.ID
 		switch e.Layer {

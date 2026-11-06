@@ -197,6 +197,13 @@ const Screen = () => {
       onMove: actions.moveToGroup,
       onMine: member ? (g, on) => actions.mineGroup(g.id, g.name, on, space) : null,
     },
+    presets: {
+      onAdd: (name, groupIds) =>
+        actions.addPreset({ layer: vm.layer.layer, scopeId: vm.layer.scopeId }, name, groupIds),
+      onPatch: actions.patchPreset,
+      onRemove: actions.removePreset,
+      onMine: member ? (p) => actions.minePreset(p, space) : null,
+    },
   });
 
   const text = introText(role);
