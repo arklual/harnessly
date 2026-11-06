@@ -16,6 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/buildinfo"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/designaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/dist"
 	"github.com/ly-solutions/harnessly/internal/hub/env"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
@@ -94,9 +95,11 @@ type Hub struct {
 	// Limits sends the machines their limit lists; nil while HUB_LIMITS_ENFORCE=off.
 	Limits *limits.Pusher
 	// EnvPush sends the machines their environment lists; nil without a feature on.
-	EnvPush  *env.Pusher
-	Relay    *relay.Service
-	Proxy    *proxy.Service
+	EnvPush *env.Pusher
+	Relay   *relay.Service
+	Proxy   *proxy.Service
+	// Design is who may see and change a machine's designs, and the guest links to them.
+	Design   *designaccess.Service
 	Dist     *dist.Handler
 	SSH      *sshinstall.Service
 	Dialer   *link.Dialer
@@ -211,16 +214,20 @@ func New(o Options) (*Hub, error) {
 			return nil, err
 		}
 	}
+	h.Design = designaccess.New(designaccess.Deps{
+		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL,
+		PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
+	})
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
-		Provider: prov, Features: machineFeatures, Publisher: o.Publisher,
+		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design,
 	})
 	h.Analytics.UseMachines(h.Machines)
 	h.Analytics.UseEvents(h.OrgEvents)
 	h.Analytics.UseFeatures(h.Features)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
-	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now})
+	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design})
 	h.Proxy = px
 	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
 	if cfg.SSH {
@@ -304,8 +311,12 @@ func New(o Options) (*Hub, error) {
 	mux.Handle("/", page)
 
 	csrf := h.Auth.CSRF(mux)
+	shares := h.Design.Public()
 	routed := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case h.Design.IsShareHost(r.Host):
+			// A guest link runs on its own origin: the page of one project and nothing of the hub.
+			shares.ServeHTTP(w, r)
 		case h.Sites != nil && h.Sites.IsSiteHost(r.Host):
 			// A published site runs on its own origin and nothing of the hub: no API, no page, no sign-in.
 			h.Sites.Edge().ServeHTTP(w, r)
@@ -320,7 +331,7 @@ func New(o Options) (*Hub, error) {
 	})
 	secured := securityHeaders(cfg.Secure, routed)
 	guarded := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if h.Sites != nil && h.Sites.IsSiteHost(r.Host) {
+		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) {
 			// A published page sets its own headers; the hub's (frame ban, referrer policy) are for the hub's pages.
 			routed.ServeHTTP(w, r)
 			return
@@ -353,6 +364,7 @@ func (h *Hub) Run(ctx context.Context) {
 		go h.runMachineOps(ctx)
 	}
 	go h.Analytics.RunLive(ctx, h.OrgEvents.Active)
+	go h.Design.Run(ctx)
 	if h.Sites != nil {
 		go h.Sites.Run(ctx)
 	}

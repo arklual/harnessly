@@ -25,6 +25,7 @@ func relayTarget(t *testing.T, a *Agent) *[]string {
 	u, _ := url.Parse(srv.URL)
 	a.cfg.RuntimePort, _ = strconv.Atoi(u.Port())
 	a.cfg.RuntimeAPI = "/api/plat"
+	a.cfg.RuntimePlatformAPI = "/api/plat"
 	a.cfg.RuntimeCookie = "session-token"
 	a.secret = []byte(strings.Repeat("s", 32))
 	a.client = srv.Client()
@@ -91,12 +92,12 @@ func TestEmitDesignEventNeverFails(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir+"/agent.json", `{"port":1,"token":"x"}`)
 	done := make(chan struct{})
-	go func() { emitDesignEvent(dir, "", DesignClaim, "p1"); close(done) }()
+	go func() { emitDesignEvent(dir, "", DesignClaim, "p1", ""); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the emitter hung")
 	}
 	writeFile(t, dir+"/agent.json", `not json`)
-	emitDesignEvent(dir, "", DesignClaim, "p1")
+	emitDesignEvent(dir, "", DesignClaim, "p1", "")
 }

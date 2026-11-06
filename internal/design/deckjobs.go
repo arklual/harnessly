@@ -491,7 +491,7 @@ func (a *API) DeckExportFile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if a.denyImage(w, artifact) {
+	if a.denyImage(w, r, artifact) {
 		return
 	}
 	j, path, ok := a.L.DeckExportJobOf(artifact, QueryString(r, "job"))

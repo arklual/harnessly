@@ -44,7 +44,7 @@ func (a *API) Library(r *http.Request) Answer {
 	if v, ok := Query(r, "lite"); ok && v == "1" {
 		return JSON(r, 200, libraryResponse{Port: port, Root: a.L.Root(), SelfTabID: self, Artifacts: []*Artifact{}}, h)
 	}
-	arts := a.L.VisibleTo(a.L.ListArtifacts())
+	arts := a.L.VisibleToFor(a.L.ListArtifacts(), a.PersonOf(r))
 	a.L.AttachChecks(arts)
 	a.L.AttachReleases(arts)
 	if a.L.AttachAgents(arts, deref(self)) != nil || a.L.AttachClaims(arts) != nil {
@@ -472,7 +472,7 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 		if err != nil {
 			return refuse(err)
 		}
-		lines = a.L.visibleClaims(lines)
+		lines = a.L.visibleClaims(lines, a.PersonOf(r))
 		return JSON(r, 200, struct {
 			Claims []ClaimLine `json:"claims"`
 		}{lines}, h)

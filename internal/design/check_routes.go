@@ -185,7 +185,7 @@ func (a *API) Shot(w http.ResponseWriter, r *http.Request) {
 	if !a.imageGuard(w, r) {
 		return
 	}
-	if a.denyImage(w, QueryString(r, "artifact")) {
+	if a.denyImage(w, r, QueryString(r, "artifact")) {
 		return
 	}
 	file := a.L.checkShotPath(QueryString(r, "artifact"), QueryString(r, "file"))
@@ -215,7 +215,7 @@ func (a *API) Thumb(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if a.denyImage(w, artifact) {
+	if a.denyImage(w, r, artifact) {
 		return
 	}
 	var ans ThumbAnswer

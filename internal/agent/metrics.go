@@ -69,17 +69,20 @@ func (l *link) subscribed(event string) bool {
 }
 
 // emitSubscribed sends an event to the hub links that asked for it by name.
-func (h *hub) emitSubscribed(event, key string, value any) {
+func (h *hub) emitSubscribed(event, key string, value any) bool {
 	frame, err := marshal(map[string]any{"event": event, key: value})
 	if err != nil {
 		Log("error", "event not encoded", F{"event", event}, F{"error", err.Error()})
-		return
+		return false
 	}
+	sent := false
 	for _, l := range h.hubLinks() {
 		if l.subscribed(event) {
 			l.sendText(frame)
+			sent = true
 		}
 	}
+	return sent
 }
 
 // startMetrics runs the sampler every minute while a link that asked for it is up.

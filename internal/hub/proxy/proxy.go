@@ -60,6 +60,13 @@ type Deps struct {
 	Log     *slog.Logger
 	// Now is the clock; nil means time.Now.
 	Now func() time.Time
+	// Design answers the design access API before a request would reach the machine; nil leaves it to the machine.
+	Design Interceptor
+}
+
+// Interceptor answers some requests of a signed-in person to a machine itself; false lets them through to it.
+type Interceptor interface {
+	ServeMachine(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) bool
 }
 
 // Service is the runtime proxy.
@@ -73,6 +80,7 @@ type Service struct {
 	log     *slog.Logger
 	now     func() time.Time
 	acc     *machaccess.Checker
+	design  Interceptor
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
@@ -99,7 +107,7 @@ type grantCall struct {
 // New makes the proxy.
 func New(d Deps) *Service {
 	s := &Service{
-		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now,
+		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design,
 		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
 		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}
@@ -314,6 +322,9 @@ func (s *Service) servePath(w http.ResponseWriter, r *http.Request, id string) {
 		s.logout(w, r, "")
 		return
 	}
+	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {
+		return
+	}
 	s.forward(w, r, p.User, m)
 }
 
@@ -361,6 +372,9 @@ func (s *Service) serveRuntimeHost(w http.ResponseWriter, r *http.Request, id st
 	}
 	if r.Method == http.MethodPost && r.URL.Path == "/m/"+id+"/api/auth/logout" {
 		s.logout(w, r, p.Session.TokenHash)
+		return
+	}
+	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {
 		return
 	}
 	s.forward(w, r, p.User, m)
@@ -519,6 +533,9 @@ func (s *Service) dropGrant(userID, machineID string) {
 	delete(s.grants, userID+"/"+machineID)
 	s.mu.Unlock()
 }
+
+// Transport is the machine's HTTP client over its tunnels, for the hub's own requests to it.
+func (s *Service) Transport(id string) http.RoundTripper { return s.transport(id) }
 
 // transport is the machine's HTTP client over tunnels. Connections are shared between the people opening the machine:
 // a request carries its own credentials, and nothing is kept on the connection between requests.

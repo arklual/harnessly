@@ -169,6 +169,7 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute("/api/cli/design/notes", a.CLINotes),
 		designRoute(platformAPI+"/design/library/releases", a.Releases),
 		designRoute(platformAPI+"/design/access", a.PostAccess),
+		designRoute(platformAPI+"/design/guest-token", a.GuestToken),
 		designRoute(platformAPI+"/design/publish", a.Publish),
 		designRoute(platformAPI+"/design/published", a.Published),
 		designRoute(platformAPI+"/design/library/claim", a.ClaimProject),

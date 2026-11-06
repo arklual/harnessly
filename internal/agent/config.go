@@ -46,10 +46,13 @@ type Config struct {
 	DialAudience   string
 
 	// RuntimeAPI is the prefix of the runtime routes the agent calls: <prefix>/machines, <prefix>/automations/start…
-	RuntimeAPI       string
-	StateChangedPath string
-	StatusPath       string
-	SyncPath         string
+	RuntimeAPI string
+	// RuntimePlatformAPI is the prefix of the runtime's platform routes the agent relays the hub's design ops to:
+	// <prefix>/design/access, <prefix>/design/guest-token, <prefix>/design/notify.
+	RuntimePlatformAPI string
+	StateChangedPath   string
+	StatusPath         string
+	SyncPath           string
 	// V2Path is the runtime's v2 API: <prefix>/replica, <prefix>/conversations/<id>/turns.
 	V2Path string
 	// PeersPath is the runtime's API of messages between machines: <prefix>/inbox, <prefix>/directory.
@@ -199,6 +202,7 @@ func LoadConfig() (Config, error) {
 		base = c.Machine.RuntimeBasePath
 	}
 	c.RuntimeAPI = strings.TrimRight(env("AGENT_RUNTIME_API", base+"/api/agent"), "/")
+	c.RuntimePlatformAPI = strings.TrimRight(env("AGENT_RUNTIME_PLATFORM_API", base+"/api/platform"), "/")
 	c.StateChangedPath = env("AGENT_RUNTIME_STATE_CHANGED", c.RuntimeAPI+"/state-changed")
 	c.StatusPath = env("AGENT_RUNTIME_STATUS", base+"/api/status")
 	c.SyncPath = env("AGENT_RUNTIME_SYNC", base+"/api/sync")

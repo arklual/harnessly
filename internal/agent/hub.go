@@ -431,7 +431,7 @@ func (h *hub) hello() hubproto.Hello {
 		features = append(features, hubproto.FeatureMetrics)
 	}
 	if a.cfg.RuntimePort != 0 && !h.observe {
-		features = append(features, hubproto.FeatureDrain)
+		features = append(features, hubproto.FeatureDrain, hubproto.FeatureDesignAccess)
 	}
 	var hw *hubproto.Hardware
 	if h.metrics != nil {

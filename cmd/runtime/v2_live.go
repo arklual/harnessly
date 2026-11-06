@@ -212,11 +212,11 @@ func newV2Live(d deps, c *core) *v2Live {
 	handlers, _ := handlersFor(d)
 	// One index of each transcript serves the merge request links of a message and what the chat made.
 	chatSources := &sources.Route{Links: sourceLinks(), Home: d.Home}
-	v.srv.Made = v2Made{record: v.rt.Record, read: chatSources.ReadBudget, designs: func() madeDesigns {
+	v.srv.Made = v2Made{record: v.rt.Record, read: chatSources.ReadBudget, designs: func(ctx context.Context) madeDesigns {
 		if v.designly == nil {
 			return nil
 		}
-		return madeLibrary{d: v.designly}
+		return madeLibrary{d: v.designly, person: v.designly.personOf(ctx)}
 	}, task: madeTaskOf(handlers.S)}.Made
 	checker := newMRChecker(handlers.S)
 	open := v2Open{record: v.rt.Record, targets: panelTargets(), mrLinks: transcriptMRs(chatSources), mr: checker.lookup, projects: checker.projects, state: &mrState{}}

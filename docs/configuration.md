@@ -28,6 +28,7 @@ it stays with the previous runtime.
 | `AGENT_AUDIENCE`, `AGENT_DIAL_AUDIENCE` | `agent`, `ingest` | token audiences for each direction |
 | `RUNTIME_PORT`, `FILES_PORT` | `0` | the runtime's API and the disk service on loopback; `0` — not here |
 | `AGENT_RUNTIME_API` | `/api/agent` | prefix of the runtime routes the agent calls |
+| `AGENT_RUNTIME_PLATFORM_API` | `/api/platform` | prefix of the runtime platform routes a hub's design ops go to (`design/access`, `design/guest-token`) |
 | `AGENT_RUNTIME_STATUS`, `AGENT_RUNTIME_SYNC` | `/api/status`, `/api/sync` | the runtime's sockets |
 | `AGENT_RUNTIME_STATE_CHANGED` | `$AGENT_RUNTIME_API/state-changed` | where the runtime hears about a layout the cluster wrote |
 | `AGENT_RUNTIME_COOKIE` | `session-token` | session cookie name the runtime checks |

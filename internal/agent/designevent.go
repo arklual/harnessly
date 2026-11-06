@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // design.created and design.claim travel agent → gateway as events: the runtime that made (or owns the files of) a
@@ -24,8 +26,8 @@ const (
 
 var designEventKinds = map[string]bool{DesignCreated: true, DesignClaim: true, DesignDeleted: true}
 
-// designEventRoute is POST /design/event {kind, project}: the event goes to every cluster link. With no link it is
-// dropped (the gateway learns of the project when it lists them), and the answer says so.
+// designEventRoute is POST /design/event {kind, project}: the event goes to every cluster link and to a hub that
+// subscribed to it. With neither it is dropped (the gateway learns of the project when it lists them), and the answer says so.
 func (a *Agent) designEventRoute(w http.ResponseWriter, r *http.Request) {
 	if !tokenMatches(r.Header.Get(a.cfg.LocalTokenHeader), a.localToken) {
 		reply(w, 403, map[string]string{"error": "no local agent token (agent.json in the data directory)"})
@@ -42,24 +44,44 @@ func (a *Agent) designEventRoute(w http.ResponseWriter, r *http.Request) {
 	if sent {
 		a.broadcast(evDesign{Event: kind, Project: *project})
 	}
+	// A hub hears it too, cluster link or not, with the person the owner file names (the hub checks they may open the
+	// machine). An observing link changes nothing, so it is not told.
+	if h := a.hub; h != nil && !h.observe {
+		person := ""
+		if p := str(obj, "person", 254); p != nil {
+			person = *p
+		}
+		if h.emitSubscribed(hubproto.EventDesign, "design", hubproto.DesignEvent{Kind: kind, Project: *project, Person: person}) {
+			sent = true
+		}
+	}
 	reply(w, 202, map[string]bool{"ok": true, "sent": sent})
 }
 
 // EmitDesignEvent asks the machine agent whose agent.json lies in dataDir to send a design event to the cluster. It
 // never blocks the caller and never reports a failure: no agent, no event.
 func EmitDesignEvent(dataDir, tokenHeader, kind, project string) {
+	EmitDesignEventBy(dataDir, tokenHeader, kind, project, "")
+}
+
+// EmitDesignEventBy is EmitDesignEvent with the address of the person the project's owner file names ("" for none).
+func EmitDesignEventBy(dataDir, tokenHeader, kind, project, person string) {
 	if dataDir == "" || !designEventKinds[kind] || project == "" {
 		return
 	}
-	go emitDesignEvent(dataDir, tokenHeader, kind, project)
+	go emitDesignEvent(dataDir, tokenHeader, kind, project, person)
 }
 
-func emitDesignEvent(dataDir, tokenHeader, kind, project string) {
+func emitDesignEvent(dataDir, tokenHeader, kind, project, person string) {
 	port, token, ok := localAgent(dataDir)
 	if !ok {
 		return
 	}
-	body, _ := json.Marshal(map[string]string{"kind": kind, "project": project})
+	msg := map[string]string{"kind": kind, "project": project}
+	if person != "" {
+		msg["person"] = person
+	}
+	body, _ := json.Marshal(msg)
 	ctx, cancel := context.WithTimeout(context.Background(), designEventTO)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://127.0.0.1:"+port+"/design/event", bytes.NewReader(body))

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -31,10 +32,19 @@ type Grant struct {
 }
 
 // AccessSnapshot is the wire body of design.access without its op: the person's roles by project and the team level of
-// every project the gateway knows.
+// every project the gateway knows. People is the same for each other person who may open the machine (a hub's machine is
+// shared by its space): their address, lower-cased, to their own roles and team levels. Absent, the machine has one
+// person and the top level is theirs.
 type AccessSnapshot struct {
-	Enforce  bool              `json:"enforce"`
-	At       time.Time         `json:"at"`
+	Enforce  bool                      `json:"enforce"`
+	At       time.Time                 `json:"at"`
+	Projects map[string]Grant          `json:"projects"`
+	Team     map[string]string         `json:"team"`
+	People   map[string]PersonSnapshot `json:"people,omitempty"`
+}
+
+// PersonSnapshot is one person's part of a shared machine's snapshot.
+type PersonSnapshot struct {
 	Projects map[string]Grant  `json:"projects"`
 	Team     map[string]string `json:"team"`
 }
@@ -45,7 +55,10 @@ var (
 )
 
 const (
-	accessMaxEntries   = 10000
+	accessMaxEntries = 10000
+	// accessMaxPeople bounds the people of a shared machine, accessMaxTotal the entries of all of them together.
+	accessMaxPeople    = 500
+	accessMaxTotal     = 200000
 	accessMaxOwner     = 254
 	accessMaxOwnerName = 64
 )
@@ -92,20 +105,71 @@ func (s AccessSnapshot) Validate() error {
 	if s.At.IsZero() {
 		return errors.New("snapshot has no time")
 	}
-	if len(s.Projects) > accessMaxEntries || len(s.Team) > accessMaxEntries {
+	if err := validSection(s.Projects, s.Team); err != nil {
+		return err
+	}
+	if len(s.People) > accessMaxPeople {
+		return errors.New("too many people")
+	}
+	total := len(s.Projects) + len(s.Team)
+	for email, p := range s.People {
+		if email == "" || email != strings.ToLower(strings.TrimSpace(email)) || !strings.Contains(email, "@") || !cleanLine(email, accessMaxOwner) {
+			return errors.New("bad person in the snapshot")
+		}
+		if err := validSection(p.Projects, p.Team); err != nil {
+			return err
+		}
+		if total += len(p.Projects) + len(p.Team); total > accessMaxTotal {
+			return errors.New("too many entries")
+		}
+	}
+	return nil
+}
+
+func validSection(projects map[string]Grant, team map[string]string) error {
+	if len(projects) > accessMaxEntries || len(team) > accessMaxEntries {
 		return errors.New("too many projects")
 	}
-	for id, g := range s.Projects {
+	for id, g := range projects {
 		if !IsLibraryID(id) || !accessRoles[g.Role] || !cleanLine(g.Owner, accessMaxOwner) || !cleanLine(g.OwnerName, accessMaxOwnerName) {
 			return errors.New("bad grant for " + id)
 		}
 	}
-	for id, level := range s.Team {
+	for id, level := range team {
 		if !IsLibraryID(id) || !teamLevels[level] {
 			return errors.New("bad team level for " + id)
 		}
 	}
 	return nil
+}
+
+// section is the part of the snapshot that speaks for a person: their own on a shared machine, the top level for the
+// machine's person (an empty address, or the machine owner's own). A person a shared snapshot does not name gets no
+// grants and sees every project the snapshot knows as closed (a team level "none" for each), so only what nobody
+// registered yet stays as it was.
+func (s AccessSnapshot) section(person, machinePerson string) (map[string]Grant, map[string]string) {
+	person = strings.ToLower(strings.TrimSpace(person))
+	if s.People != nil && person != "" {
+		if p, ok := s.People[person]; ok {
+			return p.Projects, p.Team
+		}
+	}
+	if person == "" || s.People == nil || person == machinePerson {
+		return s.Projects, s.Team
+	}
+	closed := make(map[string]string, len(s.Team))
+	for id := range s.Team {
+		closed[id] = "none"
+	}
+	for id := range s.Projects {
+		closed[id] = "none"
+	}
+	for _, p := range s.People {
+		for id := range p.Team {
+			closed[id] = "none"
+		}
+	}
+	return nil, closed
 }
 
 type accessState struct {
@@ -228,7 +292,12 @@ func (l *Library) Access() (AccessSnapshot, bool) {
 // or that this runtime's owner file stands over a project the cluster has no row for ("design.claim"). It never waits
 // and never fails the caller: with no agent running the event is simply not sent.
 func (l *Library) EmitDesignEvent(kind, project string) {
-	agent.EmitDesignEvent(l.cfg.DataDir, l.cfg.AgentTokenHeader, kind, project)
+	// The owner file names who made the project: a hub registers that person when they may open the machine.
+	person := ""
+	if o, ok := l.ReadOwner(project); ok {
+		person = o.Person
+	}
+	agent.EmitDesignEventBy(l.cfg.DataDir, l.cfg.AgentTokenHeader, kind, project, person)
 }
 
 const accessBodyMax = 4 << 20

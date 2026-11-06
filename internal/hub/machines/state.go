@@ -108,6 +108,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 			events = append(events, hubproto.EventEnvRun)
 		}
 	}
+	if s.design != nil && slices.Contains(hello.Features, hubproto.FeatureDesignAccess) {
+		events = append(slices.Clone(events), hubproto.EventDesign)
+	}
 	if _, err := s.reg.Do(ctx, m.ID, hubproto.OpLinkSubscribe, map[string]any{"events": events}, callTimeout); err != nil {
 		s.log.Warn("events not subscribed", "machine", m.ID, "error", err)
 	}
@@ -119,6 +122,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	}
 	if s.env != nil {
 		s.env.Connected(m.ID, hello)
+	}
+	if s.design != nil {
+		s.design.Connected(m, hello.Features)
 	}
 	if _, err := s.RunPreflight(ctx, m); err != nil {
 		s.log.Info("first preflight failed", "machine", m.ID, "error", err)
@@ -198,6 +204,11 @@ func (s *Service) onEvent(_ *link.Link, m store.Machine, ev link.Event) {
 		var e struct{ Run hubproto.EnvRun }
 		if s.env != nil && json.Unmarshal(ev.Raw, &e) == nil {
 			s.env.Run(m.ID, e.Run)
+		}
+	case hubproto.EventDesign:
+		var e struct{ Design hubproto.DesignEvent }
+		if s.design != nil && json.Unmarshal(ev.Raw, &e) == nil {
+			go s.design.Event(m, e.Design)
 		}
 	case hubproto.EventUsageAvailable:
 		if s.usage != nil {

@@ -100,6 +100,9 @@ type Stack struct {
 	URL string
 	// DistDir is the folder the hub serves binaries and the installer from.
 	DistDir string
+
+	options    api.Options
+	setHandler func(http.Handler)
 }
 
 type syncBuffer struct {
@@ -134,8 +137,15 @@ func WithOptions(f func(o *api.Options)) Option {
 func New(t *testing.T, opts ...Option) *Stack {
 	t.Helper()
 	s := &Stack{T: t, Mail: &Mail{}, Clock: &Clock{t: time.Now().UTC().Truncate(time.Second)}, Logs: &syncBuffer{}, DistDir: t.TempDir()}
+	var mu sync.RWMutex
 	var handler http.Handler
-	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
+	s.setHandler = func(h http.Handler) { mu.Lock(); handler = h; mu.Unlock() }
+	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.RLock()
+		h := handler
+		mu.RUnlock()
+		h.ServeHTTP(w, r)
+	}))
 	t.Cleanup(s.Server.Close)
 	s.URL = s.Server.URL
 	// HUB_SMTP_URL stands for the stack's own mailer (s.Mail takes the place of the SMTP server): a hub on https or in the
@@ -158,10 +168,24 @@ func New(t *testing.T, opts ...Option) *Stack {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.options = o
 	s.Hub = hub
-	handler = hub.Handler
-	t.Cleanup(hub.Shutdown)
+	s.setHandler(hub.Handler)
+	t.Cleanup(func() { s.Hub.Shutdown() })
 	return s
+}
+
+// Restart stops the hub and starts a new one on the same database, configuration and address: what a hub's process
+// keeps only in memory is gone, and every machine's link is dropped (an agent connects again with Connect).
+func (s *Stack) Restart() {
+	s.T.Helper()
+	s.Hub.Shutdown()
+	hub, err := api.New(s.options)
+	if err != nil {
+		s.T.Fatal(err)
+	}
+	s.Hub = hub
+	s.setHandler(hub.Handler)
 }
 
 // openDB is a SQLite file of its own. With HUB_TEST_POSTGRES_URL set it is a throwaway schema of that Postgres

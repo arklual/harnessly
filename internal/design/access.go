@@ -63,8 +63,19 @@ func (l *Library) RoleOf(id string, who Identity, now time.Time) Role {
 	if !ok || !snap.Enforce {
 		return RoleEdit
 	}
-	level, hasTeam := snap.Team[id]
-	g, hasGrant := snap.Projects[id]
+	projects, team := snap.section(who.PersonID, l.machinePerson())
+	return l.roleIn(projects, team, id, who, now)
+}
+
+// machinePerson is the address of the machine's own person ("" when it cannot be told).
+func (l *Library) machinePerson() string {
+	me, _ := l.Identity()
+	return me.PersonID
+}
+
+func (l *Library) roleIn(projects map[string]Grant, team map[string]string, id string, who Identity, now time.Time) Role {
+	level, hasTeam := team[id]
+	g, hasGrant := projects[id]
 	if hasGrant && (g.Until == nil || g.Until.After(now)) {
 		return maxRole(Role(g.Role), teamRole(level))
 	}
@@ -88,13 +99,22 @@ func (l *Library) RoleOf(id string, who Identity, now time.Time) Role {
 
 // RoleNow is RoleOf for the runtime's own person at the runtime's clock. An identity that cannot be told matches no
 // owner file, so the project falls to the grant and team rules.
-func (l *Library) RoleNow(id string) Role {
-	who, _ := l.Identity()
+func (l *Library) RoleNow(id string) Role { return l.RoleFor(id, "") }
+
+// RoleFor is RoleOf for a person by address (a page session's): on a shared machine every person has their own part of
+// the snapshot; "" is the runtime's own person.
+func (l *Library) RoleFor(id, person string) Role {
+	who, _ := l.IdentityOf(person)
 	return l.RoleOf(id, who, l.clock())
 }
 
-// Can: the person may do what min stands for in the project.
+// Can: the runtime's person may do what min stands for in the project.
 func (l *Library) Can(id string, min Role) bool { return l.RoleNow(id).AtLeast(min) }
+
+// CanFor is Can for a person by address ("" is the runtime's own).
+func (l *Library) CanFor(id string, min Role, person string) bool {
+	return l.RoleFor(id, person).AtLeast(min)
+}
 
 // Enforcing: a snapshot that restricts is held.
 func (l *Library) Enforcing() bool {
@@ -102,12 +122,15 @@ func (l *Library) Enforcing() bool {
 	return ok && s.Enforce
 }
 
-// VisibleTo keeps the projects the person has a role in; the owner always sees what is theirs.
-func (l *Library) VisibleTo(arts []*Artifact) []*Artifact {
+// VisibleTo keeps the projects the runtime's person has a role in; the owner always sees what is theirs.
+func (l *Library) VisibleTo(arts []*Artifact) []*Artifact { return l.VisibleToFor(arts, "") }
+
+// VisibleToFor is VisibleTo for a person by address ("" is the runtime's own).
+func (l *Library) VisibleToFor(arts []*Artifact, person string) []*Artifact {
 	if !l.Enforcing() {
 		return arts
 	}
-	who, _ := l.Identity()
+	who, _ := l.IdentityOf(person)
 	now := l.clock()
 	out := make([]*Artifact, 0, len(arts))
 	for _, a := range arts {
@@ -126,10 +149,14 @@ type NoAccess struct {
 
 // NoAccessOf: who to ask. The snapshot has the owner of the projects the person holds or held a grant in; for others
 // the owner file's name is all there is.
-func (l *Library) NoAccessOf(id string) NoAccess {
+func (l *Library) NoAccessOf(id string) NoAccess { return l.NoAccessFor(id, "") }
+
+// NoAccessFor is NoAccessOf as the person by address sees it ("" is the runtime's own).
+func (l *Library) NoAccessFor(id, person string) NoAccess {
 	var out NoAccess
 	if s, ok := l.Access(); ok {
-		if g, ok := s.Projects[id]; ok {
+		projects, _ := s.section(person, l.machinePerson())
+		if g, ok := projects[id]; ok {
 			out = NoAccess{Owner: g.Owner, OwnerName: g.OwnerName}
 		}
 	}
@@ -166,7 +193,8 @@ func (a *API) gate(r *http.Request, project string, min Role) *Answer {
 	if !IsLibraryID(project) {
 		return nil
 	}
-	role := a.L.RoleNow(project)
+	person := a.PersonOf(r)
+	role := a.L.RoleFor(project, person)
 	if role.AtLeast(min) {
 		return nil
 	}
@@ -174,7 +202,7 @@ func (a *API) gate(r *http.Request, project string, min Role) *Answer {
 		ans := JSON(r, http.StatusNotFound, errorBody(locale.Pick("The design is gone", "Макета больше нет")), noStore())
 		return &ans
 	}
-	who := a.L.NoAccessOf(project)
+	who := a.L.NoAccessFor(project, person)
 	ans := JSON(r, http.StatusForbidden, struct {
 		Error     string `json:"error"`
 		Code      string `json:"code"`
@@ -297,13 +325,13 @@ func historyTarget(r *http.Request, body *jsvalue.Object) any {
 }
 
 // visibleClaims drops the claim lines of projects the person has no role in.
-func (l *Library) visibleClaims(lines []ClaimLine) []ClaimLine {
+func (l *Library) visibleClaims(lines []ClaimLine, person string) []ClaimLine {
 	if !l.Enforcing() {
 		return lines
 	}
 	out := make([]ClaimLine, 0, len(lines))
 	for _, c := range lines {
-		if l.Can(c.Project, RoleView) {
+		if l.CanFor(c.Project, RoleView, person) {
 			out = append(out, c)
 		}
 	}
@@ -312,8 +340,8 @@ func (l *Library) visibleClaims(lines []ClaimLine) []ClaimLine {
 
 // denyImage answers a picture request for a project the person may not see (an empty 404, as for a missing one) and
 // says true.
-func (a *API) denyImage(w http.ResponseWriter, project string) bool {
-	if !IsLibraryID(project) || a.L.Can(project, RoleView) {
+func (a *API) denyImage(w http.ResponseWriter, r *http.Request, project string) bool {
+	if !IsLibraryID(project) || a.L.CanFor(project, RoleView, a.PersonOf(r)) {
 		return false
 	}
 	w.Header().Set("Cache-Control", "no-store")

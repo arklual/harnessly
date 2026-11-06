@@ -256,7 +256,7 @@ func (a *API) DesignImageFile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if a.denyImage(w, artifact) {
+	if a.denyImage(w, r, artifact) {
 		return
 	}
 	var path string

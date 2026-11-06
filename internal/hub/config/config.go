@@ -119,6 +119,12 @@ type Config struct {
 	// Peers (HUB_PEERS=on) lets the machines' agents exchange messages between their chats through the hub
 	// (docs/hub/peers.md); off: POST /agent/peers/* answer 404.
 	Peers bool
+	// DesignShareURL (HUB_DESIGN_SHARE_URL) is the origin of the guest links to designs (docs/hub/design-access.md); it
+	// must be an origin of its own, not the hub's and not a machine's. Empty: links to designs are off.
+	DesignShareURL string
+	// DesignPlatformAPI (HUB_DESIGN_PLATFORM_API) is the runtime's platform prefix the design page calls, /api/platform
+	// by default; the hub learns a machine's own prefix from its page's first request.
+	DesignPlatformAPI string
 	// MRSourceURL, MRSourceGroups and MRSourceToken (HUB_MR_SOURCE_GITLAB_URL, _GROUPS, _TOKEN) name the GitLab whose merged
 	// merge requests the hub polls for the KPI of docs/hub/analytics.md; no URL: it polls nothing. The token needs read_api.
 	MRSourceURL    string
@@ -411,6 +417,22 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_PEERS must be on or off")
+	}
+	if u := get("HUB_DESIGN_SHARE_URL"); u != "" {
+		pu, err := url.Parse(u)
+		if err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Host == "" || (pu.Path != "" && pu.Path != "/") {
+			bad("HUB_DESIGN_SHARE_URL must be an http(s) origin")
+		} else if hu, err := url.Parse(c.PublicURL); err == nil && strings.EqualFold(hu.Host, pu.Host) {
+			bad("HUB_DESIGN_SHARE_URL must not be the hub's own origin")
+		}
+		c.DesignShareURL = strings.TrimRight(u, "/")
+	}
+	c.DesignPlatformAPI = "/api/platform"
+	if p := get("HUB_DESIGN_PLATFORM_API"); p != "" {
+		if !regexp.MustCompile(`^/api/[A-Za-z0-9_-]+$`).MatchString(p) {
+			bad("HUB_DESIGN_PLATFORM_API must look like /api/<name>")
+		}
+		c.DesignPlatformAPI = p
 	}
 	if u := get("HUB_MR_SOURCE_GITLAB_URL"); u != "" {
 		pu, err := url.Parse(u)

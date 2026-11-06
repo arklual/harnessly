@@ -9,6 +9,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/convo"
+	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -81,6 +82,6 @@ func v2Session(d deps, next http.Handler) http.Handler {
 			_, _ = w.Write([]byte(`{"r":"refused","code":"forbidden"}`))
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(design.WithPerson(r.Context(), sessionPerson(d.Claims)(r))))
 	})
 }

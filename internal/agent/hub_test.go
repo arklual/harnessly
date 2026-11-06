@@ -298,7 +298,7 @@ func startHubAgent(t *testing.T, o rigOptions) *hubRig {
 		Home: rig.Home, Host: "127.0.0.1", Port: port, Version: "9.9.9-test", ScanInterval: time.Hour,
 		DataDir: dataDir, ConfigFile: filepath.Join(dataDir, "config.json"), SecretFile: secretFile,
 		RuntimePort: rt.port, ListenAudience: "agent", DialAudience: "ingest",
-		RuntimeAPI: base + "/api/agent", StateChangedPath: base + "/api/agent/state-changed", StatusPath: base + "/api/status", SyncPath: base + "/api/sync", PeersPath: base + "/api/peers",
+		RuntimeAPI: base + "/api/agent", RuntimePlatformAPI: base + "/api/platform", StateChangedPath: base + "/api/agent/state-changed", StatusPath: base + "/api/status", SyncPath: base + "/api/sync", PeersPath: base + "/api/peers",
 		RuntimeCookie: "session-token", LocalTokenHeader: "x-agent-local-token", ReportPortEnv: "AGENT_REPORT_PORT",
 		Auth: AuthEd25519, Machine: m, MachineFile: filepath.Join(dataDir, "machine.json"), PolicyFile: policyFile,
 		EnvDir: rig.EnvDir, WorkDir: rig.Home, UsageFeed: o.usageFeed,
@@ -531,7 +531,7 @@ func TestHubObserveLinkHasNoDrain(t *testing.T) {
 func TestHubV1OperationsAreDeniedAndUnknownOnesUnsupported(t *testing.T) {
 	r := startHubAgent(t, rigOptions{})
 	c := r.connect()
-	for _, op := range []string{"state.list", "transcripts.list", "transcripts.read", "conversations.start", "docs.deliver", "eval.start", "status.send", "design.access"} {
+	for _, op := range []string{"state.list", "transcripts.list", "transcripts.read", "conversations.start", "docs.deliver", "eval.start", "status.send", "design.notify"} {
 		if _, e := c.call(op, nil); !strings.HasPrefix(e, "policy_denied: ") {
 			t.Errorf("%s: %q", op, e)
 		}
@@ -1193,15 +1193,17 @@ func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
 	}
 	m := r.machine
 	for op, params := range map[string]map[string]any{
-		"key.deliver":     {"provider": "claude", "envelope": seal(t, m, "key:claude", "sk-x")},
-		"env.deliver":     {"name": "A_TOKEN", "envelope": seal(t, m, "env:A_TOKEN", "v")},
-		"gitkey.ensure":   nil,
-		"proxy.set":       {"scope": "all", "url": "http://a:1"},
-		"agents.install":  {"jobId": strings.Repeat("a", 32), "provider": "claude"},
-		"login.start":     {"loginId": "l", "provider": "claude", "method": "link"},
-		"runtime.session": {"subject": "a@example.com"},
-		"tunnel.open":     {"spec": map[string]string{"tunnelId": strings.Repeat("a", 32), "target": "runtime"}},
-		"budget.set":      {"version": 1, "mode": "stop", "entries": []any{}},
+		"key.deliver":         {"provider": "claude", "envelope": seal(t, m, "key:claude", "sk-x")},
+		"env.deliver":         {"name": "A_TOKEN", "envelope": seal(t, m, "env:A_TOKEN", "v")},
+		"gitkey.ensure":       nil,
+		"proxy.set":           {"scope": "all", "url": "http://a:1"},
+		"agents.install":      {"jobId": strings.Repeat("a", 32), "provider": "claude"},
+		"login.start":         {"loginId": "l", "provider": "claude", "method": "link"},
+		"runtime.session":     {"subject": "a@example.com"},
+		"tunnel.open":         {"spec": map[string]string{"tunnelId": strings.Repeat("a", 32), "target": "runtime"}},
+		"budget.set":          {"version": 1, "mode": "stop", "entries": []any{}},
+		"design.access":       {"enforce": true, "projects": map[string]any{}},
+		"design.public.token": {"project": "p1"},
 	} {
 		if _, e := c.call(op, params); !strings.HasPrefix(e, "policy_denied: ") {
 			t.Errorf("%s: %q", op, e)

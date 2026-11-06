@@ -29,7 +29,7 @@ func (a *API) VideoFrame(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if a.denyImage(w, artifact) {
+	if a.denyImage(w, r, artifact) {
 		return
 	}
 	at, okAt := videoMsParam(QueryString(r, "at"))
@@ -263,7 +263,7 @@ func (a *API) VideoFile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if a.denyImage(w, id) {
+	if a.denyImage(w, r, id) {
 		return
 	}
 	notFound := func() {

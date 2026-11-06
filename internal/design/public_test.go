@@ -487,3 +487,59 @@ func TestPublicAppWithoutABuild(t *testing.T) {
 		t.Fatalf("no manifest: %d", w.Code)
 	}
 }
+
+func TestPublicSignIsWhatCheckTakes(t *testing.T) {
+	a, _ := publicAPI(t, "")
+	tok, until, err := a.PublicToken.Sign("p1", "", false, nil)
+	if err != nil || until != (publicNow.Unix()+60)*1000 {
+		t.Fatalf("sign: %v %d", err, until)
+	}
+	if w := publicGet(a, "GET", "p1", tok); w.Code != 200 {
+		t.Fatalf("own token: %d", w.Code)
+	}
+	if w := publicGet(a, "GET", "p2", tok); w.Code != 403 {
+		t.Fatalf("other project: %d", w.Code)
+	}
+	if _, _, err := a.PublicToken.Sign("p1", "", true, []string{"a"}); err == nil {
+		t.Fatal("pin with pages was signed")
+	}
+	limited, _, err := a.PublicToken.Sign("p1", "", false, []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, scope := a.PublicToken.check(limited, "p1")
+	if code != 0 || !scope.limited || len(scope.pages) != 0 {
+		t.Fatalf("empty page list: %d %+v", code, scope)
+	}
+}
+
+func TestGuestTokenIsTheMachineAgentsOnly(t *testing.T) {
+	a, _ := publicAPI(t, "")
+	agent := false
+	a.MachineAgent = func(*http.Request) bool { return agent }
+	ask := func(body string) (int, map[string]any) {
+		r := httptest.NewRequest(http.MethodPost, "/agents/api/acme/design/guest-token", strings.NewReader(body))
+		status, out, _ := a.GuestToken(r).Split()
+		var m map[string]any
+		if b, ok := out.(json.RawMessage); ok {
+			_ = json.Unmarshal(b, &m)
+		}
+		return status, m
+	}
+	if code, _ := ask(`{"project":"p1"}`); code != 403 {
+		t.Fatalf("a page session got a guest token: %d", code)
+	}
+	agent = true
+	for _, bad := range []string{`{}`, `{"project":"../x"}`, `{"project":"p1","rev":"abc"}`, `{"project":"p1","pin":true,"pages":["a"]}`, `not json`} {
+		if code, _ := ask(bad); code != 400 {
+			t.Errorf("%s: %d", bad, code)
+		}
+	}
+	code, out := ask(`{"project":"p1","pages":["Main.dc.html"]}`)
+	if code != 200 || out["header"] != testHeader {
+		t.Fatalf("%d %v", code, out)
+	}
+	if w := publicGet(a, "GET", "p1", out["token"].(string)); w.Code != 200 {
+		t.Fatalf("the token does not read: %d", w.Code)
+	}
+}

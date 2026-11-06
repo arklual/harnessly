@@ -24,7 +24,7 @@ var (
 	// closedClusterOps are protocol 1's operations. A hub does not use them, and a hub link may not.
 	closedClusterOps = map[string]bool{
 		"transcripts.list": true, "transcripts.read": true, "state.list": true, "state.put": true, "state.mode": true,
-		"state.result": true, "conversations.start": true, "docs.deliver": true, "docs.notify": true, "design.access": true,
+		"state.result": true, "conversations.start": true, "docs.deliver": true, "docs.notify": true,
 		"design.notify": true, "apps.team": true, "apps.team.snapshot": true, "apps.public": true, "apps.public.snapshot": true, "eval.start": true, "eval.poll": true, "eval.stop": true, "status.send": true,
 	}
 
@@ -135,6 +135,8 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 			return nil, nil, err
 		}
 		return h.opEnvRun(req)
+	case hubproto.OpDesignAccess, hubproto.OpDesignPublicToken:
+		return h.opDesign(op, req)
 	case hubproto.OpEnvSet:
 		// Served on an observe link too: the list is applied only into the link's own folder (a plugin the runtime adds
 		// to new chats) and changes nothing the cluster set up.
@@ -437,4 +439,25 @@ func (h *hub) opTunnel(l *link, req map[string]json.RawMessage, pol hubproto.Pol
 		return nil, nil, err
 	}
 	return map[string]bool{"opened": true}, start, nil
+}
+
+// opDesign is design.access (the hub's access snapshot for the runtime to enforce) and design.public.token (a short
+// read-only token over one project for a guest of a share link, signed by the runtime). An observe link changes nothing
+// of the machine, and its hub has no business opening the cluster's projects to guests.
+func (h *hub) opDesign(op string, req map[string]json.RawMessage) (any, func(), error) {
+	if h.observe || h.a.cfg.RuntimePort == 0 {
+		return nil, nil, h.allow(op, false, "designs' access")
+	}
+	route := h.a.cfg.RuntimePlatformAPI + "/design/access"
+	if op == hubproto.OpDesignPublicToken {
+		route = h.a.cfg.RuntimePlatformAPI + "/design/guest-token"
+	}
+	res, err := h.a.callRuntime(route, body(req))
+	if op == hubproto.OpDesignAccess {
+		h.audit.Record(op, err == nil, nil)
+	}
+	if err != nil {
+		return nil, nil, hubproto.Errf(hubproto.CodeFailed, "%s", err.Error())
+	}
+	return res, nil, nil
 }

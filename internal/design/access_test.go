@@ -671,7 +671,7 @@ func TestGateWithoutARoleAnswersAsMissing(t *testing.T) {
 		t.Fatalf("view asked for edit: %+v", no)
 	}
 	w := httptest.NewRecorder()
-	if !a.denyImage(w, "hidden") || w.Code != 404 {
+	if !a.denyImage(w, httptest.NewRequest(http.MethodGet, "/x", nil), "hidden") || w.Code != 404 {
 		t.Errorf("image: %d", w.Code)
 	}
 }

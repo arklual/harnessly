@@ -44,7 +44,7 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 				secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 				return
 			}
-			status, out := handle(r.Context(), b)
+			status, out := handle(design.WithPerson(r.Context(), designAPI(d).PersonOf(r)), b)
 			secretJSON(w, status, out)
 		}
 	}
@@ -60,7 +60,7 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 	})
 
 	// docs are the documents of the apps' types that the person may see, for the library's list beside the others.
-	docs := page(http.MethodGet, func(context.Context, kindBody) (int, any) {
+	docs := page(http.MethodGet, func(ctx context.Context, _ kindBody) (int, any) {
 		type doc struct {
 			Document  string `json:"document"`
 			Title     string `json:"title"`
@@ -81,7 +81,7 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 		lib := designAPI(d).L
 		have := reg.DocKinds()
 		out := []doc{}
-		for _, a := range lib.VisibleTo(lib.ListArtifacts()) {
+		for _, a := range lib.VisibleToFor(lib.ListArtifacts(), design.PersonIn(ctx)) {
 			kind, ok := have[a.ID]
 			if !ok {
 				continue
@@ -95,7 +95,7 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 		return http.StatusOK, map[string]any{"docs": out}
 	})
 
-	create := page(http.MethodPost, func(_ context.Context, b kindBody) (int, any) {
+	create := page(http.MethodPost, func(ctx context.Context, b kindBody) (int, any) {
 		info, _, err := reg.Kind(b.Kind)
 		if errors.Is(err, apps.ErrNotInstalled) {
 			return http.StatusNotFound, notFound
@@ -120,7 +120,7 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 			agent.Log("warn", "apps: kinds: create: "+err.Error())
 			return http.StatusInternalServerError, map[string]string{"error": "failed"}
 		}
-		lib.AnnounceNew(project.ID)
+		lib.AnnounceNewBy(project.ID, design.PersonIn(ctx))
 		if err := reg.SetDocKind(project.ID, info.ID); err != nil {
 			agent.Log("warn", "apps: kinds: record: "+err.Error())
 			return http.StatusInternalServerError, map[string]string{"error": "failed"}
@@ -132,7 +132,7 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 		return http.StatusOK, map[string]any{"document": project.ID, "title": project.Title, "kind": info}
 	})
 
-	open := page(http.MethodPost, func(_ context.Context, b kindBody) (int, any) {
+	open := page(http.MethodPost, func(ctx context.Context, b kindBody) (int, any) {
 		if !design.IsLibraryID(b.Document) {
 			return http.StatusBadRequest, map[string]string{"error": "bad-request"}
 		}
@@ -154,7 +154,7 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 		// A person who may only view the project is shown the editor too, told the document is for reading; opening does
 		// not migrate it then, for a migration writes.
 		var opened apps.KindOpen
-		if designAPI(d).L.Can(b.Document, design.RoleEdit) {
+		if designAPI(d).L.CanFor(b.Document, design.RoleEdit, design.PersonIn(ctx)) {
 			opened = reg.OpenDocument(storage, b.Document, info, k)
 		} else {
 			opened = apps.KindOpen{ReadOnly: true, Code: apps.ReadOnlyViewOnly}
@@ -164,9 +164,13 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 	})
 
 	// revert puts a migrated document back to the version it was, from the copy the migration kept.
-	revert := page(http.MethodPost, func(_ context.Context, b kindBody) (int, any) {
+	revert := page(http.MethodPost, func(ctx context.Context, b kindBody) (int, any) {
 		if !design.IsLibraryID(b.Document) || b.To < 1 {
 			return http.StatusBadRequest, map[string]string{"error": "bad-request"}
+		}
+		// Putting a document back writes it: only a person who may edit it. Anyone else is told it is not there.
+		if !designAPI(d).L.CanFor(b.Document, design.RoleEdit, design.PersonIn(ctx)) {
+			return http.StatusNotFound, notFound
 		}
 		kind, ok := reg.DocKind(b.Document)
 		if !ok {

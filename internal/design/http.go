@@ -235,3 +235,20 @@ func (a *API) PersonOf(r *http.Request) string {
 }
 
 func (a *API) person(r *http.Request) string { return a.PersonOf(r) }
+
+type personKey struct{}
+
+// WithPerson carries the address of the person who made a request into the work it starts (the v2 services take a
+// context, not the request): their own section of the access snapshot decides what they may see.
+func WithPerson(ctx context.Context, person string) context.Context {
+	return context.WithValue(ctx, personKey{}, person)
+}
+
+// PersonIn is the person WithPerson put in ctx, or "" (then the runtime's own person stands for them).
+func PersonIn(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	p, _ := ctx.Value(personKey{}).(string)
+	return p
+}

@@ -49,6 +49,8 @@ type Deps struct {
 	Budget BudgetSink
 	// Env sends the machines their environment lists and keeps what they report (internal/hub/env); nil: off.
 	Env EnvSink
+	// Design keeps the machines' design access (internal/hub/designaccess); nil: off.
+	Design DesignSink
 	// Provider runs the machines' virtual servers (docs/hub/provider.md); nil means provider.None.
 	Provider provider.Provider
 	// Publisher carries machine.op and machine.status to the organization's live channel; nil: they go to the space's
@@ -65,6 +67,12 @@ type EnvSink interface {
 	Reported(machineID string, st hubproto.EnvState)
 	// Run keeps a run of the machine's setup (the env.run event).
 	Run(machineID string, run hubproto.EnvRun)
+}
+
+// DesignSink is what keeps a machine's design access (internal/hub/designaccess).
+type DesignSink interface {
+	Connected(m store.Machine, features []string)
+	Event(m store.Machine, e hubproto.DesignEvent)
 }
 
 // BudgetSink is what keeps a machine's limit list current (internal/hub/limits).
@@ -94,6 +102,7 @@ type Service struct {
 	usage   UsageSink
 	budget  BudgetSink
 	env     EnvSink
+	design  DesignSink
 	prov    provider.Provider
 	pub     Publisher
 	gate    FeatureGate
@@ -111,7 +120,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, prov: d.Provider, pub: d.Publisher, gate: d.Features}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, prov: d.Provider, pub: d.Publisher, gate: d.Features}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now

@@ -233,6 +233,93 @@ func (c PublicConfig) check(token, project string) (int, publicScope) {
 	return 0, scope
 }
 
+// publicSignTTL is how long a token the runtime signs for a hub lasts: the hub asks for one per guest's request burst.
+const publicSignTTL = 60
+
+// Sign is a guest's token over one project, as the gateway signs it: the hub of a self-hosted machine has no share of
+// the pair's secret, so the runtime signs for it (GuestToken, the machine agent only). At most one of rev, pin and
+// pages, as check reads them.
+func (c PublicConfig) Sign(project, rev string, pin bool, pages []string) (string, int64, error) {
+	if len(c.Secret) == 0 {
+		return "", 0, errors.New("no secret")
+	}
+	key, err := hkdf.Key(sha256.New, c.Secret, []byte(c.Salt), publicInfo, 32)
+	if err != nil {
+		return "", 0, err
+	}
+	now := c.now().Unix()
+	claims := map[string]any{"aud": c.Audience, "iat": now, "exp": now + publicSignTTL, "prj": project}
+	if rev != "" {
+		claims["rev"] = rev
+	}
+	if pin {
+		claims["pin"] = true
+	}
+	if pages != nil {
+		claims["pages"] = pages
+	}
+	if _, ok := scopeOf(jsonRoundTrip(claims)); !ok {
+		return "", 0, errors.New("rev, pin and pages do not go together")
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		return "", 0, err
+	}
+	enc := base64.RawURLEncoding
+	signing := enc.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`)) + "." + enc.EncodeToString(payload)
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(signing))
+	return signing + "." + enc.EncodeToString(mac.Sum(nil)), (now + publicSignTTL) * 1000, nil
+}
+
+func jsonRoundTrip(v map[string]any) map[string]any {
+	raw, _ := json.Marshal(v)
+	var out map[string]any
+	_ = json.Unmarshal(raw, &out)
+	return out
+}
+
+// Limits of a guest token's request.
+const (
+	guestTokenBodyMax = 64 << 10
+	guestTokenPages   = 500
+)
+
+// GuestToken is POST design/guest-token {project, rev?, pin?, pages?} of the platform's API, for the machine agent
+// only: a short token for the public read of one project, which the hub carries to fetch a share link's guest view.
+func (a *API) GuestToken(r *http.Request) Answer {
+	h := noStore()
+	if a.MachineAgent == nil || !a.MachineAgent(r) {
+		return JSON(r, http.StatusForbidden, errorBody("Forbidden"), h)
+	}
+	if r.Method != http.MethodPost {
+		h.Set("Allow", "POST")
+		return Empty(http.StatusMethodNotAllowed, h)
+	}
+	raw, err := io.ReadAll(io.LimitReader(r.Body, guestTokenBodyMax+1))
+	var req struct {
+		Project string   `json:"project"`
+		Rev     string   `json:"rev"`
+		Pin     bool     `json:"pin"`
+		Pages   []string `json:"pages"`
+	}
+	bad := err != nil || len(raw) > guestTokenBodyMax || json.Unmarshal(raw, &req) != nil || !IsLibraryID(req.Project) ||
+		(req.Rev != "" && !fullSHA.MatchString(req.Rev)) || len(req.Pages) > guestTokenPages
+	for _, p := range req.Pages {
+		if p == "" || len(p) > 512 {
+			bad = true
+		}
+	}
+	if bad {
+		return JSON(r, http.StatusBadRequest, errorBody("Bad request"), h)
+	}
+	token, until, err := a.PublicToken.Sign(req.Project, req.Rev, req.Pin, req.Pages)
+	if err != nil {
+		return JSON(r, http.StatusBadRequest, errorBody("Bad request"), h)
+	}
+	return JSON(r, http.StatusOK, map[string]any{"token": token, "header": a.PublicToken.Header, "expiresAt": until}, h)
+}
+
 type publicBoard struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`

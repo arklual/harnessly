@@ -68,7 +68,7 @@ func TestMadeJoinsDocsAndVisibleDesigns(t *testing.T) {
 	lines = append(lines, pairLines(3, "Write", `{"file_path":"/w/design-artifacts/touched/project/index.html","content":"x"}`, "ok")...)
 	m, _ := madeFixture(t, lines...)
 	cover := "/c.png"
-	m.designs = func() madeDesigns {
+	m.designs = func(context.Context) madeDesigns {
 		return fakeMadeLib{
 			visible: map[string]madeDesign{
 				"touched": {Title: "Touched", Kind: wire.DesignSite, UpdatedAt: 1},
@@ -109,7 +109,7 @@ func TestMadeIsCapped(t *testing.T) {
 		lib.visible[id] = madeDesign{Title: id, Kind: wire.DesignSite, UpdatedAt: wire.Ms(i)}
 		lib.tied = append(lib.tied, id)
 	}
-	m.designs = func() madeDesigns { return lib }
+	m.designs = func(context.Context) madeDesigns { return lib }
 	got, err := m.Made(context.Background(), "tab-1")
 	if err != nil || len(got.Items) != wire.MadeMax {
 		t.Fatalf("cap: %d %v", len(got.Items), err)

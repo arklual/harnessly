@@ -24,7 +24,7 @@ type v2Made struct {
 	// read is sources.Route.ReadBudget.
 	read func(path, cwd string, budget int64) (res sources.Result, found, failed, complete bool)
 	// designs is the design library; nil when this runtime has none.
-	designs func() madeDesigns
+	designs func(ctx context.Context) madeDesigns
 	// task reads a task of the tracker (its key); nil when this runtime has no tracker.
 	task madeTaskReader
 }
@@ -83,7 +83,7 @@ func (m v2Made) Made(ctx context.Context, conv string) (wire.ChatMade, error) {
 		}
 	}
 	if m.designs != nil {
-		if lib := m.designs(); lib != nil {
+		if lib := m.designs(ctx); lib != nil {
 			out.Items = append(out.Items, designItems(lib, rec, touched)...)
 		}
 	}
@@ -181,13 +181,15 @@ func designItems(lib madeDesigns, rec wire.Conversation, touched map[string]sour
 // madeLibrary is the design library of a v2Designly.
 type madeLibrary struct {
 	d *v2Designly
+	// person is whose page asked: their own section of the access snapshot decides what they see.
+	person string
 }
 
 func (m madeLibrary) Visible() map[string]madeDesign {
 	lib := m.d.api.L
 	st := m.d.state()
 	out := map[string]madeDesign{}
-	for _, a := range lib.VisibleTo(lib.ListArtifacts()) {
+	for _, a := range lib.VisibleToFor(lib.ListArtifacts(), m.person) {
 		var cover *string
 		if a.Cover != nil && *a.Cover != "" {
 			cover = a.Cover

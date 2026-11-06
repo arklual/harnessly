@@ -158,7 +158,7 @@ func (d *v2Designly) Create(ctx context.Context, c wire.DesignlyCreate) (wire.De
 	}
 	systemLine := ""
 	if c.DesignSystem != nil {
-		line, ok := d.systemLine(*c.DesignSystem)
+		line, ok := d.systemLine(*c.DesignSystem, d.personOf(ctx))
 		if !ok {
 			return wire.DesignlyCreated{}, designlyFail(wire.RefuseBadRequest, locale.Pick("Unknown design system", "Неизвестная дизайн-система"), "")
 		}
@@ -368,8 +368,8 @@ func deckLine(d *wire.DesignlyDeck, cli, project string) string {
 }
 
 // systemLine is the line of the first message that names the design system to build on.
-func (d *v2Designly) systemLine(sys string) (string, bool) {
-	for _, s := range d.systems() {
+func (d *v2Designly) systemLine(sys, person string) (string, bool) {
+	for _, s := range d.systems(person) {
 		if s.info.ID != sys {
 			continue
 		}
@@ -396,9 +396,17 @@ func (d *v2Designly) recordCreated(conv, design string) {
 	}
 }
 
+// personOf is the address of the person whose page made the call, or "" (the runtime's own person).
+func (d *v2Designly) personOf(ctx context.Context) string {
+	if p := design.PersonIn(ctx); p != "" {
+		return p
+	}
+	return d.api.PersonOf(wire.RequestOf(ctx))
+}
+
 // Chat records that the person started conversation conv from the design's own column (POST /api/v2/designly/chat).
 func (d *v2Designly) Chat(ctx context.Context, id, conv string) error {
-	if d.api.L.ReadArtifact(id) == nil || !d.api.L.Can(id, design.RoleView) {
+	if d.api.L.ReadArtifact(id) == nil || !d.api.L.CanFor(id, design.RoleView, d.personOf(ctx)) {
 		return designlyFail(wire.RefuseNotFound, locale.Pick("The design is gone", "Макета больше нет"), "")
 	}
 	convs, err := d.v.rt.Conversations(ctx)
@@ -412,9 +420,9 @@ func (d *v2Designly) Chat(ctx context.Context, id, conv string) error {
 	return nil
 }
 
-func (d *v2Designly) Pin(_ context.Context, id string, pinned bool) error {
+func (d *v2Designly) Pin(ctx context.Context, id string, pinned bool) error {
 	// A project the person has no role in answers as a missing one.
-	if d.api.L.ReadArtifact(id) == nil || !d.api.L.Can(id, design.RoleView) {
+	if d.api.L.ReadArtifact(id) == nil || !d.api.L.CanFor(id, design.RoleView, d.personOf(ctx)) {
 		return designlyFail(wire.RefuseNotFound, locale.Pick("The design is gone", "Макета больше нет"), "")
 	}
 	return d.change(func(st *designlyState) {
@@ -462,11 +470,12 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 		return wire.DesignLibrary{}, err
 	}
 	st := d.state()
-	arts := lib.VisibleTo(lib.ListArtifacts())
+	person := d.personOf(ctx)
+	arts := lib.VisibleToFor(lib.ListArtifacts(), person)
 	out := wire.DesignLibrary{Port: port, Root: lib.Root(), Artifacts: make([]wire.DesignArtifact, 0, len(arts))}
 	touched := d.touched(convs.Conversations)
 	// Without an identity nobody is "me": the owners still show.
-	me, _ := lib.Identity()
+	me, _ := lib.IdentityOf(person)
 	now := time.Now()
 	// A document of a type an app adds is opened in the app's editor, not listed as a site, a deck or a video.
 	var appDocs map[string]string
@@ -586,7 +595,7 @@ func prettify(base string) string {
 
 // systems are the design systems the machine has: those the library's template carries in its project/_ds, the projects
 // of the library made as design systems, and the UI kits installed on the machine.
-func (d *v2Designly) systems() []designSystem {
+func (d *v2Designly) systems(person string) []designSystem {
 	lib := d.api.L
 	var out []designSystem
 	seen := map[string]bool{}
@@ -626,7 +635,7 @@ func (d *v2Designly) systems() []designSystem {
 	sort.Strings(ds)
 	for _, id := range ds {
 		a := lib.ReadArtifact(id)
-		if a == nil || !lib.Can(id, design.RoleView) {
+		if a == nil || !lib.CanFor(id, design.RoleView, person) {
 			continue
 		}
 		scan(lib.ArtifactDir(id))
@@ -641,9 +650,9 @@ func (d *v2Designly) systems() []designSystem {
 	return out
 }
 
-func (d *v2Designly) Systems(context.Context) ([]wire.DesignSystemInfo, error) {
+func (d *v2Designly) Systems(ctx context.Context) ([]wire.DesignSystemInfo, error) {
 	out := []wire.DesignSystemInfo{}
-	for _, s := range d.systems() {
+	for _, s := range d.systems(d.personOf(ctx)) {
 		out = append(out, s.info)
 	}
 	return out, nil

@@ -211,6 +211,8 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 | `HUB_SSH` | `on` | [The SSH way](#the-ssh-way) of connecting a server |
 | `HUB_SSH_ALLOW_PRIVATE` | `off` | Let the SSH way reach private, loopback and link-local addresses. Off in every edition by default; the cloud edition ignores it |
 | `HUB_SECRET_KEY` | a key file in the data folder | At least 32 characters (`openssl rand -base64 32`): what the spaces' SSH keys are sealed with. `_FILE` is read as a file name. Losing it makes the stored keys useless (they are made again) |
+| `HUB_DESIGN_SHARE_URL` | off | Origin of the [design guest links](design-access.md) (`https://share.example.com`, no path): a host of its own that points at the hub, never the hub's host. Without it links cannot be made |
+| `HUB_DESIGN_PLATFORM_API` | `/api/platform` | The runtime's platform prefix (`/api/<name>`) the hub uses for a machine whose page has not called the access API yet; must match the machines' `AGENT_RUNTIME_PLATFORM_API` |
 | `HUB_CONTAINER_IMAGE` | hidden | The image the «В контейнере» way runs; must be pullable by the machines |
 | `HUB_LOCAL_CODE_FILE` | off | Keep a registration code for the machine next to the hub (compose.hub.yaml); the file is `0600`, in a `0700` folder |
 | `HUB_LOCAL_CODE_GROUP` | none | A numeric group id that may read that file instead (`0640`, folder `0750`): the machine's container group |

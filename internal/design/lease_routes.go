@@ -52,7 +52,7 @@ func (a *API) Leases(r *http.Request) Answer {
 		}
 		visible := []LeaseView{}
 		for _, v := range views {
-			if a.L.Can(v.Project, RoleView) {
+			if a.L.CanFor(v.Project, RoleView, a.PersonOf(r)) {
 				visible = append(visible, v)
 			}
 		}
