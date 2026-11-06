@@ -29,6 +29,9 @@ const (
 
 // Env is what the watcher reads and writes.
 type Env struct {
+	// Browser enables the managed browser pane; BrowserServer names the runtime MCP server.
+	Browser       bool
+	BrowserServer string
 	// Targets classifies the links a call names, by the rules of `open`.
 	Targets panel.Targets
 	// DesignOf is the design of the library an absolute path lies in, "" for none; nil: the machine has no library.
@@ -57,8 +60,12 @@ var (
 	boardEditRe = regexp.MustCompile(`(?:^|[\s;&|(/])[\w-]*board\s+(?:create|edit|bind)\b`)
 )
 
-// Detect is what a finished, successful tool call worked on; nothing for any other entry.
+// Detect opens the browser as soon as its tool starts, including calls waiting for a login.
+// Other panes require a successful result because their target may not exist before completion.
 func Detect(e wire.Entry, env Env) []Found {
+	if e.T == wire.EntryTool && env.Browser && IsBrowserTool(e.Tool, env.BrowserServer) {
+		return []Found{{Tab: "agent-browser"}}
+	}
 	if e.T != wire.EntryTool || e.OK == nil || !*e.OK {
 		return nil
 	}

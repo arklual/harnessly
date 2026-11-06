@@ -1,0 +1,62 @@
+.hx-project-settings > form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.hx-project-settings > .hx-modal__head,
+.hx-project-settings .hx-modal__foot {
+  flex-shrink: 0;
+}
+.hx-project-settings .hx-modal__body {
+  min-height: 0;
+}
+.hx-project-safe p {
+  margin: 4px 0;
+}
+.hx-project-access h3 {
+  margin: 18px 0 0;
+  font-size: var(--hx-text-md);
+}
+.hx-project-safe {
+  min-width: 0;
+  margin: 18px 0 0;
+  padding: 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}
+.hx-project-safe__list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-project-safe__list > li + li {
+  padding-top: 12px;
+  border-top: 1px solid var(--hx-border);
+}
+.hx-project-safe__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hx-project-safe__head .hx-safe__name {
+  white-space: normal;
+}
+.hx-project-safe__head a {
+  flex-shrink: 0;
+  color: var(--hx-accent);
+}
+.hx-project-safe__uses {
+  margin-top: 8px;
+  font-size: var(--hx-text-xs);
+}
+.hx-project-safe__uses ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}

@@ -38,10 +38,16 @@ const (
 	maxWhy   = 300
 )
 
-// Ask is an agent's request that the person put a secret in the safe, as the page shows it.
+// Ask requests a value or approval to use an existing safe entry.
 type Ask struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	Origin  string `json:"origin,omitempty"`
+	Project string `json:"project,omitempty"`
+	// Grant permits the requested project and site.
+	Grant bool `json:"grant,omitempty"`
+	// OriginGrant permits only the requested site, without adding project access.
+	OriginGrant bool   `json:"originGrant,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
 	// Why is the agent's one line of what it needs the secret for.
 	Why string `json:"why"`
 	// Conv and Title are the conversation that asked ("" when the asking command ran outside one).
@@ -102,6 +108,18 @@ func (a *Asks) prune(now time.Time) {
 // Open is an ask of name: the waiting one of that name when there is one (an agent asking again keeps waiting on it),
 // a declined one of the last two minutes (the person said no), else a new one.
 func (a *Asks) Open(name, why, conv, title string, replace bool) (Ask, string, error) {
+	return a.OpenScoped(Ask{Name: name, Why: why, Conv: conv, Title: title, Replace: replace})
+}
+
+// NeedsGrant reports whether this card approves access without accepting a value.
+func (a Ask) NeedsGrant() bool { return a.Grant || a.OriginGrant }
+
+// OpenScoped deduplicates only requests with the same chat, project and requested origin.
+func (a *Asks) OpenScoped(request Ask) (Ask, string, error) {
+	if request.NeedsGrant() {
+		request.Replace = false
+	}
+	name, why, conv, title, replace := request.Name, request.Why, request.Conv, request.Title, request.Replace
 	if !ValidName(name) {
 		return Ask{}, "", refuse(ReasonBadName, nil)
 	}
@@ -110,7 +128,7 @@ func (a *Asks) Open(name, why, conv, title string, replace bool) (Ask, string, e
 	now := a.Now()
 	a.prune(now)
 	for _, x := range a.list {
-		if x.Name == name && (x.state == AskWaiting || x.state == AskDeclined) {
+		if x.Name == name && x.Conv == conv && x.Project == request.Project && x.Origin == request.Origin && x.Grant == request.Grant && x.OriginGrant == request.OriginGrant && x.Replace == request.Replace && (x.state == AskWaiting || x.state == AskDeclined) {
 			return x.Ask, x.state, nil
 		}
 	}
@@ -127,7 +145,7 @@ func (a *Asks) Open(name, why, conv, title string, replace bool) (Ask, string, e
 		return Ask{}, "", refuse(ReasonRateLimited, nil)
 	}
 	x := &ask{Ask: Ask{ID: newID(), Name: name, Why: CleanWhy(why), Conv: conv, Title: jscompat.Slice(tmux.OneLineSafe(title), 200),
-		Replace: replace, At: now.UnixMilli()}, state: AskWaiting, done: make(chan struct{})}
+		Replace: replace, Origin: request.Origin, Project: request.Project, Grant: request.Grant, OriginGrant: request.OriginGrant, At: now.UnixMilli()}, state: AskWaiting, done: make(chan struct{})}
 	a.list[x.ID] = x
 	return x.Ask, AskWaiting, nil
 }
@@ -190,7 +208,7 @@ func (a *Asks) Fulfil(name string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for _, x := range a.list {
-		if x.Name == name {
+		if x.Name == name && !x.NeedsGrant() {
 			a.settle(x, AskReady)
 		}
 	}
@@ -206,4 +224,25 @@ func (a *Asks) Decline(id string) bool {
 	}
 	a.settle(x, AskDeclined)
 	return true
+}
+
+// Get returns a still-pending card for a page answer.
+func (a *Asks) Get(id string) (Ask, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.prune(a.Now())
+	x := a.list[id]
+	if x == nil || x.state != AskWaiting {
+		return Ask{}, false
+	}
+	return x.Ask, true
+}
+
+// Ready settles only the card that the person answered.
+func (a *Asks) Ready(id string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if x := a.list[id]; x != nil {
+		a.settle(x, AskReady)
+	}
 }

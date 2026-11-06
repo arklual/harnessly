@@ -16,6 +16,7 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
   voice: { icon: 'mic' },
   notifications: { icon: 'bell' },
   safe: { icon: 'lock' },
+  browser: { icon: 'agent-browser' },
   takes: { icon: 'mic' },
   accounts: { icon: 'key-round' },
   claude: { agent: 'claude' },
@@ -31,7 +32,7 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
 /** The groups of the list, in the order of SETTINGS_SECTIONS. */
 const NAV_GROUPS = [
   { id: 'app', sections: ['general', 'appearance', 'keys', 'notifications', 'voice', 'takes'] },
-  { id: 'agents', sections: ['accounts', 'claude', 'codex', 'skills', 'safe'] },
+  { id: 'agents', sections: ['accounts', 'claude', 'codex', 'skills', 'safe', 'browser'] },
   { id: 'machine', sections: ['machines', 'apps', 'connections', 'design', 'beta'] },
 ] as const satisfies readonly { id: string; sections: readonly SettingsSection[] }[];
 

@@ -334,3 +334,52 @@ tab, issue and pull request links show as chips with their state.
 | `RUNTIME_GITHUB_HOST` | the web host, default `github.com`; for GitHub Enterprise its host (the API is then `https://<host>/api/v3`) |
 | `RUNTIME_GITHUB_API` | the REST API root when it is elsewhere |
 | `RUNTIME_GITHUB_REPOS` | repositories the page may read, `owner/repo` or `owner/*`, comma separated; empty allows any |
+
+### Agent browser
+
+The agent browser starts lazily with a project-specific profile, separate from the VNC browser.
+Its detached `browser-host` process keeps Chrome alive across runtime restarts. Managed
+profiles live in `<data>/agent-browser/profiles/<id>/chrome`; metadata and the bounded
+`host.log` live beside that directory. Private sockets live in `<data>/agent-browser/run`,
+with a private hashed directory under `/tmp` when the Unix socket path would be too long.
+The runtime service must use `KillMode=process` to preserve the host on restart.
+
+| Variable | Meaning |
+| --- | --- |
+| `RUNTIME_BROWSER` | `off` disables the agent browser; unset enables lazy startup |
+| `RUNTIME_BROWSER_CDP` | external Chrome HTTP debugging address, e.g. `http://127.0.0.1:9333`; uses a WebSocket attached profile without launching or stopping processes; unset uses the private host pipe |
+| `RUNTIME_BROWSER_CHROME` | optional Chrome executable; otherwise searches system Chrome/Chromium, macOS applications, then the pinned cache; downloads on first use. Snap is the last resort and must pass a private-pipe probe |
+| `RUNTIME_BROWSER_DOWNLOAD` | `off` forbids automatic downloads; system browsers and the verified installed cache remain usable |
+| `RUNTIME_BROWSER_CHROME_URL` | full archive URL for an internal mirror; the pinned SHA-256 is still mandatory |
+| `RUNTIME_BROWSER_MODE` | `auto` (default), `xvfb`, or `headless`; auto uses a private Xvfb when available, otherwise `--headless=new` |
+| `RUNTIME_BROWSER_CHROME_ARGS` | extra whitespace-separated Chrome arguments, also used by the VNC browser; managed agent profiles follow the Settings → Browser sandbox preference, and `--no-sandbox` here turns their sandbox off as well (the container image sets it) |
+| `RUNTIME_BROWSER_IDLE` | opt-in idle shutdown as a Go duration, e.g. `30m`; unset or `0` disables it. A profile with no viewers or calls stops and restores tabs on next use. Sites that keep you signed in only until the browser closes will ask you to sign in again. Idle shutdown is disabled by default |
+
+Profiles and machine-local project/chat permissions are stored atomically in
+`<data>/agent-browser/profiles.json` with mode `0600`. Each project gets its own managed profile on first use.
+Chats without a project use the existing `common` directory. Sharing requires a person to grant access through
+Settings → Browser, project settings, or a `chrome_request_profile` card. MCP and CLI share the same permission
+checks; `chrome_profiles` and `chrome_use_profile` never enumerate other projects' profile names.
+
+Settings → Browser can copy an existing Chrome user-data folder after its Chrome has stopped. Every import shows an explicit warning that cookies depending on a system key store may require signing in again;
+managed profiles use
+`--password-store=basic`. The sandbox switch is an explicit fallback for machines without a usable sandbox,
+affects new managed launches, and never changes the externally owned browser of an attached profile.
+
+### Browser preparation and diagnostics
+
+The runtime pins Chrome for Testing 157.0.8103.38 for Linux and macOS on amd64/arm64. Archives install atomically
+under `<data>/agent-browser/chrome/<version>/` after SHA-256 verification. Interrupted downloads restart from zero;
+profiles and runtime processes share a download lock. Old versions are removed only after their browser hosts exit;
+active hosts retain a shared lease on their Chrome resources.
+
+The first request starts preparation. Panels use `Manager.ReadyFor(ctx, conv)` before `InstanceFor`: `preparing` includes
+`progress` (0–100) and `hint`; retry in 20 seconds. The panel receives the same status until ready. Readiness `up` means
+the executable passed its pipe/renderer probe; a profile still starts through `InstanceFor`. A failed preparation
+reports `error` with a copyable `command`. After a system repair, `Ready` retries once 15 seconds have passed;
+`Manager.Retry(ctx)` or the panel socket command `{t:"browser.retry"}` retries immediately. No runtime restart is
+needed for system repairs. Changing the service environment still requires restarting the runtime.
+
+Settings → machine checks includes `agent_browser`: executable, version, Xvfb/headless and sandbox. Opening checks
+does not download Chrome. Missing Xvfb selects headless in `auto`; explicitly requesting `xvfb` requires it installed.
+`--no-sandbox` is never silently added. See [deployment](deploy.md#browser-sandbox) for sandbox remedies.

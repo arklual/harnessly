@@ -1,6 +1,8 @@
 // The shell's dialogs over the machine: «Новый проект» (a name), «Настройки проекта» (its name and folder) and
 // «Продолжить сессию» (what terminal agents kept there). The last asks the machine when it opens; a list that did not
 // come says why.
+import { ProjectSafeAccess } from '@/next/bindings/project-safe-access';
+import { useProjectBrowserSettings } from '@/next/features/browser/project-browser-settings';
 import { useMemo, useState } from 'react';
 import { failureText, settled, pageText } from '@/next/bindings/outcome';
 import { createProject, resumeSession, updateProject } from '@/next/commands';
@@ -56,7 +58,8 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
   const [openId, setOpenId] = useState<string | null>(null);
   const projects = useProjects(person ? null : machine);
   const project = projects.find((p) => p.id === openId) ?? null;
-  // the same object while the project is the same: the dialog takes its fields from it when it changes
+  const browserSettings = useProjectBrowserSettings(person ? null : machine, project?.id ?? null);
+  // Keep the persisted values stable while the dialog maintains its editable draft.
   const name = project?.name;
   const path = project?.path;
   const current = useMemo(
@@ -80,7 +83,12 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
 
   const dialog = machine && !person && (
     <ProjectSettingsDialog
+      key={project?.id ?? 'closed'}
       project={current}
+      browserSettings={browserSettings}
+      secretAccess={
+        project && <ProjectSafeAccess machine={machine} project={project.id} onEdit={() => setOpenId(null)} />
+      }
       folders={folders}
       onClose={() => setOpenId(null)}
       onSave={async (change) => {

@@ -146,7 +146,7 @@ func (c *cli) run(args []string) error {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
-		case a == "--json":
+		case a == "--json" && !(len(rest) > 0 && rest[0] == "browser"):
 			c.json = true
 		case a == "-w" || a == "--workspace":
 			if i+1 >= len(args) {
@@ -203,6 +203,8 @@ func (c *cli) run(args []string) error {
 		return c.panel(rest)
 	case "deliver":
 		return c.deliver(rest)
+	case "browser":
+		return c.browser(rest)
 	case "status":
 		return c.status()
 	case "api-guide":

@@ -2,7 +2,7 @@
 // it last — with a new value (rotation) and removal. A value is typed here and never comes back: the machine answers
 // with the name and the dates only. Agents ask for a missing secret with a card (ask-dialog), not through the chat.
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { SAFE_REASONS, SECRET_NAME, type ISecret } from '@/next/features/safe/api';
+import { SAFE_REASONS, SECRET_NAME, type ISecret, type ISecretMetadata } from '@/next/features/safe/api';
 import { FormError, Group, SetButton } from '@/next/features/settings/rows';
 import { formatAgoFull } from '@/next/i18n/format';
 import { t } from '@/next/i18n';
@@ -32,6 +32,7 @@ type TDone = Promise<string | null>;
 export interface ISafeActions {
   onPut: (name: string, value: string) => TDone;
   onRemove: (name: string) => TDone;
+  onPatch: (name: string, metadata: ISecretMetadata) => TDone;
 }
 
 export interface ISafeSectionProps extends ISafeActions {
@@ -39,6 +40,13 @@ export interface ISafeSectionProps extends ISafeActions {
   secrets: readonly ISecret[] | null;
   failed?: { reason: string; onRetry: () => void | Promise<unknown> } | null;
   now: number;
+  projects?: readonly ISafeProject[];
+  editName?: string;
+}
+
+export interface ISafeProject {
+  id: string;
+  name: string;
 }
 
 /** A local action's wait and its error line, kept on screen while the line folds away. */
@@ -74,7 +82,7 @@ const Reveal = ({ open, children }: { open: boolean; children: ReactNode }) => (
   </div>
 );
 
-/** «Добавлен вчера», or «Заменён 2 ч назад» after a new value. */
+/** Both rotation and metadata changes advance updatedAt. */
 export const putLine = (secret: ISecret, now: number): string => {
   const ago = formatAgoFull(secret.updatedAt, now);
   return secret.updatedAt > secret.createdAt ? t('next.safe.replaced', { ago }) : t('next.safe.put', { ago });
@@ -93,9 +101,12 @@ interface IRowProps {
   leaving: boolean;
   now: number;
   actions: ISafeActions;
+  projects: readonly ISafeProject[];
+  editName?: string;
 }
 
-const SecretRow = ({ secret, leaving, now, actions }: IRowProps) => {
+const SecretRow = ({ secret, leaving, now, actions, projects, editName }: IRowProps) => {
+  const [editing, setEditing] = useState(secret.name === editName);
   const [replacing, setReplacing] = useState(false);
   const [draft, setDraft] = useState('');
   const [sure, setSure] = useState(false);
@@ -143,20 +154,56 @@ const SecretRow = ({ secret, leaving, now, actions }: IRowProps) => {
               </span>
             </span>
             <span className="hx-safe__actions">
-              <SetButton tone="ghost" disabled={leaving || replacing} onClick={() => setReplacing(true)}>
+              <SetButton
+                tone="ghost"
+                disabled={leaving || editing || act.busy !== null}
+                onClick={() => setEditing(true)}
+              >
+                {t('next.safe.editAccess')}
+              </SetButton>
+              <SetButton
+                tone="ghost"
+                disabled={leaving || replacing || act.busy !== null}
+                onClick={() => setReplacing(true)}
+              >
                 {t('next.safe.replace')}
               </SetButton>
               <SetButton
                 tone="ghost"
                 icon="trash-2"
                 busy={act.busy === 'remove'}
-                disabled={leaving}
+                disabled={leaving || act.busy !== null}
                 onClick={remove}
               >
                 {sure ? t('next.safe.removeSure') : t('next.safe.remove')}
               </SetButton>
             </span>
           </div>
+          <div className="hx-safe__metadata">
+            <p>
+              <strong>{t('next.safe.origins')}:</strong>{' '}
+              {secret.origins?.join(', ') || t('next.safe.origins.empty')}
+            </p>
+            <p>
+              <strong>{t('next.safe.projects')}:</strong>{' '}
+              {secret.projects?.map((id) => projects.find((p) => p.id === id)?.name ?? id).join(', ') ||
+                t('next.safe.projects.empty')}
+            </p>
+          </div>
+          {editing && !leaving && (
+            <MetadataEditor
+              secret={secret}
+              projects={projects}
+              busy={act.busy !== null}
+              onCancel={() => {
+                setEditing(false);
+                act.clear();
+              }}
+              onSave={async (metadata) => {
+                if (await act.run('patch', () => actions.onPatch(secret.name, metadata))) setEditing(false);
+              }}
+            />
+          )}
           <Reveal open={replacing && !leaving}>
             <div className="hx-safe__form">
               <SecretField
@@ -192,6 +239,94 @@ const SecretRow = ({ secret, leaving, now, actions }: IRowProps) => {
             </div>
           </Reveal>
         </div>
+      </div>
+    </div>
+  );
+};
+
+/** Metadata stays separate from rotation: this action never needs a value. */
+const MetadataEditor = ({
+  secret,
+  projects,
+  busy,
+  onCancel,
+  onSave,
+}: {
+  secret: ISecret;
+  projects: readonly ISafeProject[];
+  busy: boolean;
+  onCancel: () => void;
+  onSave: (metadata: ISecretMetadata) => Promise<void>;
+}) => {
+  const [origins, setOrigins] = useState((secret.origins ?? []).join('\n'));
+  const [selected, setSelected] = useState(secret.projects ?? []);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    field.current?.focus();
+  }, []);
+  const choices = [
+    ...projects,
+    ...selected.filter((id) => !projects.some((p) => p.id === id)).map((id) => ({ id, name: id })),
+  ];
+  return (
+    <div className="hx-safe__form" role="group" aria-label={t('next.safe.editAccess')}>
+      <label className="hx-safe__field">
+        <span className="hx-safe__label">{t('next.safe.origins')}</span>
+        <textarea
+          ref={field}
+          className="hx-set__input hx-set__input--mono"
+          rows={3}
+          value={origins}
+          disabled={busy}
+          autoCapitalize="off"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => setOrigins(event.target.value)}
+        />
+        <span className="hx-safe__hint">{t('next.safe.origins.hint')}</span>
+      </label>
+      <fieldset className="hx-safe__projects" disabled={busy}>
+        <legend className="hx-safe__label">{t('next.safe.projects')}</legend>
+        <p className="hx-safe__hint">{t('next.safe.projects.hint')}</p>
+        {choices.length === 0 && <p className="hx-safe__hint">{t('next.safe.projects.none')}</p>}
+        {choices.map((project) => (
+          <label key={project.id}>
+            <input
+              type="checkbox"
+              checked={selected.includes(project.id)}
+              onChange={(event) =>
+                setSelected((current) =>
+                  event.target.checked ? [...current, project.id] : current.filter((id) => id !== project.id),
+                )
+              }
+            />
+            <span>{project.name}</span>
+          </label>
+        ))}
+      </fieldset>
+      <div className="hx-preset__row">
+        <SetButton
+          tone="primary"
+          busy={busy}
+          onClick={() =>
+            void onSave({
+              origins: [
+                ...new Set(
+                  origins
+                    .split(/[\n,]+/)
+                    .map((origin) => origin.trim())
+                    .filter(Boolean),
+                ),
+              ],
+              projects: selected,
+            })
+          }
+        >
+          {t('next.safe.save')}
+        </SetButton>
+        <SetButton tone="ghost" disabled={busy} onClick={onCancel}>
+          {t('next.safe.cancel')}
+        </SetButton>
       </div>
     </div>
   );
@@ -290,7 +425,14 @@ const AddSecret = ({ onPut, taken }: { onPut: ISafeActions['onPut']; taken: (nam
   );
 };
 
-const SafeSection = ({ secrets, failed = null, now, ...actions }: ISafeSectionProps) => {
+const SafeSection = ({
+  secrets,
+  failed = null,
+  now,
+  projects = [],
+  editName,
+  ...actions
+}: ISafeSectionProps) => {
   const rows = useLeavingList(secrets ?? NO_SECRETS, (secret) => secret.name, LEAVE_MS);
   return (
     <Group title={t('next.safe.title')} foot={t('next.safe.foot')}>
@@ -304,7 +446,15 @@ const SafeSection = ({ secrets, failed = null, now, ...actions }: ISafeSectionPr
         <>
           {secrets.length === 0 && <p className="hx-safe-empty">{t('next.safe.empty')}</p>}
           {rows.map(({ item, leaving }) => (
-            <SecretRow key={item.name} secret={item} leaving={leaving} now={now} actions={actions} />
+            <SecretRow
+              key={item.name}
+              secret={item}
+              leaving={leaving}
+              now={now}
+              actions={actions}
+              projects={projects}
+              editName={editName}
+            />
           ))}
           <AddSecret onPut={actions.onPut} taken={(name) => secrets.some((s) => s.name === name)} />
         </>

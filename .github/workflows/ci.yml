@@ -31,7 +31,10 @@ jobs:
       - run: go mod download
       - run: make fmt-check
       - run: make vet
+      # The runner has Chrome: the agent browser tests must run here, not skip (our GitLab runners have none).
       - run: make test-race
+        env:
+          HARNESSLY_REQUIRE_CHROME: "1"
 
   build:
     name: build ${{ matrix.goos }}/${{ matrix.goarch }}
@@ -180,3 +183,41 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
       - run: tools/hub-e2e.sh
+
+  browser-install:
+    name: fresh browser install (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    env:
+      # The checkout belongs to another user than the container's root, so git refuses to answer for VCS stamping.
+      GOFLAGS: -buildvcs=false
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:24.04", "debian:12"]
+    steps:
+      - name: Bootstrap clean container
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq ca-certificates curl git tar make gcc libc6-dev python3 procps
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Build and install this branch
+        run: |
+          mkdir -p /tmp/browser-release
+          go build -o /tmp/browser-release/runtime ./cmd/runtime
+          go build -o /tmp/browser-release/agent ./cmd/agent
+          go build -o /tmp/browser-release/harnessly ./cmd/harnessly
+          tar -czf /tmp/browser-release.tar.gz -C /tmp/browser-release runtime agent harnessly
+          sh install.sh --archive /tmp/browser-release.tar.gz --prefix /opt/browser-test --no-service
+          go test -c -o /tmp/browser-test ./internal/agentbrowser
+          useradd --create-home browser-test
+      - name: Download Chrome and capture a real frame
+        # Container kernels may deny user namespaces. This explicit choice matches Dockerfile, never host defaults.
+        env:
+          RUNTIME_BROWSER_CHROME_ARGS: --no-sandbox
+        run: |
+          su -s /bin/sh browser-test -c 'python3 tools/browser-install-smoke.py \
+            --runtime /opt/browser-test/bin/harnessly-runtime --test-binary /tmp/browser-test'

@@ -29,6 +29,8 @@ harnessly installer
   --prefix DIR      where bin/ goes (default ~/.local)
   --no-service      install the programs only, do not start anything
   --no-deps         do not install tmux and git, only check for them
+  --no-browser      skip optional browser libraries, Xvfb and fonts (or HARNESSLY_NO_BROWSER=1)
+  --archive FILE    install a locally built release archive (trusted input)
   --uninstall       stop the service and remove the programs; your data in ~/.harnessly stays
   -h, --help        this text
 EOF
@@ -50,6 +52,8 @@ parse_args() {
 	SERVICE=1
 	DEPS=1
 	UNINSTALL=0
+	BROWSER=1
+	LOCAL_ARCHIVE=
 	while [ $# -gt 0 ]; do
 		case $1 in
 		--*=*)
@@ -59,17 +63,19 @@ parse_args() {
 			set -- "$_k" "$_v" "$@"
 			continue
 			;;
-		--version | --port | --prefix)
+		--version | --port | --prefix | --archive)
 			[ $# -ge 2 ] || die "$1 needs a value"
 			case $1 in
 			--version) VERSION=${2#v} ;;
 			--port) PORT=$2 ;;
 			--prefix) PREFIX=$2 ;;
+			--archive) LOCAL_ARCHIVE=$2 ;;
 			esac
 			shift
 			;;
 		--no-service) SERVICE=0 ;;
 		--no-deps) DEPS=0 ;;
+		--no-browser) BROWSER=0 ;;
 		--uninstall) UNINSTALL=1 ;;
 		-h | --help)
 			usage
@@ -148,7 +154,160 @@ ensure_deps() {
 	fi
 }
 
+# Keep browser privilege escalation optional, including when curl pipes the installer into sh.
+browser_has_tty() { ( : </dev/tty ) 2>/dev/null; }
+browser_noninteractive_root() {
+	if [ "$(id -u)" = 0 ]; then "$@"; else have sudo && sudo -n "$@"; fi
+}
+
+browser_system_chrome() {
+	for browser in google-chrome google-chrome-stable chromium chromium-browser; do
+		browser_path=$(command -v "$browser" 2>/dev/null) || continue
+		case "$browser_path" in /snap/*) continue ;; esac
+		# Ubuntu's transitional package installs a shell wrapper, not a native browser.
+		if head -c 4096 "$browser_path" | grep -Eq '/snap/bin/chromium|exec snap run chromium'; then continue; fi
+		return 0
+	done
+	return 1
+}
+
+browser_libraries_present() {
+	if have ldconfig; then
+		library_cache=$(ldconfig -p 2>/dev/null) || return 1
+	else
+		library_cache=$(/sbin/ldconfig -p 2>/dev/null) || return 1
+	fi
+	for library in libnss3 libnspr4 libatk-1.0 libatk-bridge-2.0 libatspi libcups libdrm libxkbcommon \
+		libX11 libXcomposite libXdamage libXext libXfixes libXrandr libgbm libasound libpango-1.0 libcairo \
+		libdbus-1 libxcb libexpat libglib-2.0 libgio-2.0 libgobject-2.0 libudev; do
+		printf '%s\n' "$library_cache" | grep -F "$library.so" >/dev/null || return 1
+	done
+}
+
+browser_data_dir() {
+	# Match the runtime default and the environment file used by its service. The file is in systemd's format,
+	# not shell, so it is read, never sourced: a value like `pa ss` or `a&b` must not run anything.
+	data_value=
+	if [ -f "$ENV_FILE" ]; then
+		data_value=$(sed -n 's/^[[:space:]]*\(export[[:space:]][[:space:]]*\)\{0,1\}AGENT_DATA_DIR=//p' "$ENV_FILE" | tail -n 1)
+		case "$data_value" in
+		\"*\") data_value=${data_value#\"} && data_value=${data_value%\"} && data_value=$(printf '%s' "$data_value" | sed 's/\\\(.\)/\1/g') ;;
+		\'*\') data_value=${data_value#\'} && data_value=${data_value%\'} ;;
+		esac
+	fi
+	[ -n "$data_value" ] || data_value=${AGENT_DATA_DIR:-$HOME/.harnessly}
+	case "$data_value" in /*) ;; *) data_value=$HOME/$data_value ;; esac
+	printf '%s\n' "$data_value"
+}
+
+browser_restricted() { [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" = 1 ]; }
+browser_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\"'\\\"'/g")"; }
+
+browser_profile() {
+	browser_abi=
+	for abi in 5.0 4.0; do
+		if [ -f "/etc/apparmor.d/abi/$abi" ]; then browser_abi=$abi; break; fi
+	done
+	[ -n "$browser_abi" ] || { warn "AppArmor ABI 4.0 or 5.0 is required; update AppArmor outside harnessly."; return 1; }
+	data=$(browser_data_dir)
+	case "$data" in /*) ;; *) data="$HOME/$data" ;; esac
+	if have realpath; then data=$(realpath -m -- "$data") || return 1; fi
+	# Quote literal path metacharacters before adding the intentional version wildcard.
+	data=$(printf '%s' "$data" | sed 's/[][\\"*?{}]/\\&/g')
+	browser_platform=linux64
+	[ "${ARCH:-amd64}" != arm64 ] || browser_platform=linux-arm64
+	cat <<EOF
+# Managed by harnessly's installer; the version wildcard survives Chrome updates.
+abi <abi/$browser_abi>,
+include <tunables/global>
+profile harnessly-browser "$data/agent-browser/chrome/*/chrome-$browser_platform/chrome" flags=(unconfined) {
+  userns,
+}
+EOF
+}
+
+ensure_browser() {
+	[ "$BROWSER" = 1 ] && [ "${HARNESSLY_NO_BROWSER:-0}" != 1 ] && [ "$OS" = linux ] || return 0
+	browser_native=0
+	if browser_system_chrome; then browser_native=1; fi
+	browser_script=
+	if ! have Xvfb || { [ "$browser_native" = 0 ] && ! browser_libraries_present; }; then
+		if have apt-get; then
+			suffix=
+			distro=$(sed -n 's/^ID=//p' /etc/os-release | tr -d '"')
+			release=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"')
+			case "$distro:$release" in ubuntu:2[4-9].* | debian:1[3-9]) suffix=t64 ;; esac
+			packages="xvfb fonts-liberation fonts-noto-color-emoji libnss3 libnspr4 libatk1.0-0$suffix"
+			packages="$packages libatk-bridge2.0-0$suffix libatspi2.0-0$suffix libcups2$suffix libdrm2 libxkbcommon0"
+			packages="$packages libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2$suffix"
+			packages="$packages libpango-1.0-0 libcairo2 libudev1 libx11-6 libxext6 libdbus-1-3 libxcb1 libexpat1"
+			packages="$packages libglib2.0-0$suffix"
+			browser_script="apt-get update -qq && env DEBIAN_FRONTEND=noninteractive apt-get install -y $packages"
+		elif have dnf; then
+			browser_script="dnf install -y chromium xorg-x11-server-Xvfb liberation-fonts google-noto-color-emoji-fonts"
+		elif have apk; then
+			browser_script="apk add chromium xvfb font-liberation font-noto-emoji"
+		elif have pacman; then
+			browser_script="pacman -S --noconfirm --needed chromium xorg-server-xvfb ttf-liberation noto-fonts-emoji"
+		else
+			warn "Install Chromium, Xvfb and fonts with your package manager; without Xvfb the browser uses headless mode."
+		fi
+	fi
+	if [ "$browser_native" = 0 ] && browser_restricted; then
+		if profile=$(browser_profile); then
+			if [ "$(cat /etc/apparmor.d/harnessly-browser 2>/dev/null)" != "$profile" ]; then
+				[ -z "$browser_script" ] || browser_script="$browser_script && "
+				# Publish the file only after loading succeeds, so a failed attempt can be retried.
+				browser_script="$browser_script""profile_file=\$(mktemp /etc/apparmor.d/.harnessly-browser.XXXXXX) &&
+trap 'rm -f \"\$profile_file\"' EXIT &&
+printf '%s\\n' $(browser_quote "$profile") > \"\$profile_file\" &&
+chmod 644 \"\$profile_file\" && apparmor_parser -r \"\$profile_file\" &&
+mv \"\$profile_file\" /etc/apparmor.d/harnessly-browser"
+			fi
+		fi
+	fi
+	[ -n "$browser_script" ] || return 0
+	step "Preparing browser libraries, Xvfb, fonts and sandbox access where needed"
+	if ! browser_noninteractive_root sh -c "$browser_script"; then
+		if browser_has_tty; then
+			say "    These dependencies let Chrome render pages safely. Administrator password is needed once."
+			if as_root sh -c "$browser_script"; then return 0; fi
+		fi
+		warn "Browser setup is incomplete. Run outside harnessly (normal SSH or local terminal):"
+		warn "Processes in harnessly use NoNewPrivileges and cannot use sudo."
+		warn "sudo sh -c $(browser_quote "$browser_script")"
+	fi
+	return 0
+}
+
+remove_browser_profile() {
+	[ "$OS" = linux ] && [ -f /etc/apparmor.d/harnessly-browser ] || return 0
+	remove_command='apparmor_parser -R /etc/apparmor.d/harnessly-browser && rm -f /etc/apparmor.d/harnessly-browser'
+	if ! browser_noninteractive_root sh -c "$remove_command"; then
+		warn "Remove the browser profile outside harnessly (normal SSH or local terminal):"
+		warn "sudo sh -c $(browser_quote "$remove_command")"
+	fi
+}
+
+# Verify both ownership and the command before trusting a stale host.pid.
+stop_browser_hosts() {
+	# Enumerate this user's hosts so custom data roots also stop, without trusting unrelated PID files.
+	ps -u "$(id -u)" -o pid= -o args= | while read -r host_pid command; do
+		case "$command" in *" browser-host --profile "*" --socket "*) ;; *) continue ;; esac
+		profile=${command#* browser-host --profile }
+		profile=${profile% --socket *}
+		pid_file=$profile/host.pid
+		[ -f "$pid_file" ] || continue
+		recorded=$(cat "$pid_file")
+		[ "$recorded" = "$host_pid" ] || continue
+		case $host_pid in '' | *[!0-9]*) continue ;; esac
+		[ "$host_pid" -gt 1 ] || continue
+		kill -TERM "$host_pid" 2>/dev/null || true
+	done
+}
+
 resolve_version() {
+	if [ -n "$LOCAL_ARCHIVE" ]; then VERSION=${VERSION:-local}; return 0; fi
 	[ -z "$VERSION" ] || return 0
 	# The /releases/latest page redirects to the tag; this needs no API token and no rate limit.
 	tag_url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest") ||
@@ -166,6 +325,12 @@ sha256_of() {
 }
 
 download_and_verify() {
+	if [ -n "$LOCAL_ARCHIVE" ]; then
+		TMP=$(mktemp -d)
+		trap 'rm -rf "$TMP"' EXIT
+		tar -xzf "$LOCAL_ARCHIVE" -C "$TMP" || die "could not unpack local archive"
+		return 0
+	fi
 	ARCHIVE=harnessly_${VERSION}_${OS}_${ARCH}.tar.gz
 	base=https://github.com/$REPO/releases/download/v$VERSION
 	TMP=$(mktemp -d)
@@ -215,18 +380,28 @@ user_systemd_works() {
 }
 
 write_env_file() {
-	[ -f "$ENV_FILE" ] && return 0
 	mkdir -p "$(dirname "$ENV_FILE")"
 	umask 077
-	cat >"$ENV_FILE" <<'EOF'
+	if [ ! -f "$ENV_FILE" ]; then
+		cat >"$ENV_FILE" <<'EOF'
 # Environment of the harnessly service; every variable is in docs/configuration.md.
 # The page listens on 127.0.0.1 only. To reach it from another computer, use an SSH tunnel or put a TLS proxy in front
 # and set INIT_PASSWORD first (docs/deploy.md, "The first visit").
 # RUNTIME_WORKSPACE_DIR=
 # INIT_PASSWORD=
 EOF
+	fi
+	# Preserve an explicitly supplied data root across later installer runs from another shell.
+	if [ -n "${AGENT_DATA_DIR:-}" ] && ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?AGENT_DATA_DIR=' "$ENV_FILE"; then
+		data_value=$(printf '%s' "$AGENT_DATA_DIR" | sed 's/[\\"$`]/\\&/g')
+		printf '\nAGENT_DATA_DIR="%s"\n' "$data_value" >>"$ENV_FILE"
+	fi
 	umask 022
 }
+
+systemd_quote() { printf '%s' "$1" | sed 's/[\\"]/\\&/g; s/%/%%/g'; }
+# EnvironmentFile= takes the path as is (quotes would become part of it); only % needs escaping there.
+systemd_path() { printf '%s' "$1" | sed 's/%/%%/g'; }
 
 start_systemd() {
 	mkdir -p "$UNIT_DIR"
@@ -243,11 +418,12 @@ Type=simple
 Environment=RUNTIME_GATE_LISTEN=127.0.0.1:$PORT
 Environment=RUNTIME_GATE_UPSTREAM=
 Environment=RUNTIME_APP_BASE_PATH=/
+Environment="AGENT_DATA_DIR=$(systemd_quote "$(browser_data_dir)")"
 Environment=PATH=$BIN:$PATH
-EnvironmentFile=-%h/.config/harnessly/env
+EnvironmentFile=-$(systemd_path "$ENV_FILE")
 WorkingDirectory=%h
 ExecStart=$BIN/harnessly-runtime
-# Only the runtime stops with the service: tmux and the agents keep working through a restart or an update.
+# Only the runtime stops: tmux, agents and browser-host processes survive a restart or update.
 KillMode=process
 Restart=on-failure
 RestartSec=2
@@ -399,6 +575,8 @@ uninstall() {
 		systemctl --user daemon-reload
 	fi
 	stop_background
+	stop_browser_hosts
+	remove_browser_profile
 	rm -f "$BIN/harnessly-runtime" "$BIN/harnessly-agent" "$BIN/harnessly"
 	say "Removed the programs and the service. Kept: your data (~/.harnessly), settings ($ENV_FILE) and tmux sessions."
 }
@@ -411,6 +589,7 @@ main() {
 		return 0
 	fi
 	ensure_deps
+	ensure_browser
 	resolve_version
 	download_and_verify
 	install_programs

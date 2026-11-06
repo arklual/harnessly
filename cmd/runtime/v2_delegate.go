@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	browsertools "github.com/ly-solutions/harnessly/internal/agentbrowser/tools"
 	"github.com/ly-solutions/harnessly/internal/browseract"
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/delivery"
@@ -97,7 +98,11 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		if rec, ok := v.rt.Record(id); ok {
 			video.Project = video.L.VideoProjectOf(rec.Cwd)
 		}
-		return toolsets{t, hand, pics, video, place, browse}
+		browser := browsertools.Tools{S: v.d.BrowserTools, Caller: id, Why: why}
+		if rec, ok := v.rt.Record(id); ok {
+			browser.Cwd = rec.Cwd
+		}
+		return toolsets{t, hand, pics, video, place, browser, browse}
 	}
 	set := previewOf(v.d)
 	set.agentTools.Store(&tools)

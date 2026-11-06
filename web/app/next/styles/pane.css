@@ -1185,10 +1185,9 @@ input.hx-tbrowser__url:focus {
   gap: 8px;
   padding: 0 6px 0 14px;
 }
-/* iOS zooms into a field under 16px on focus (as the design's search field does). */
+/* The address field uses base.css's touch-only zoom guard, even inside a narrow desktop pane. */
 @media (max-width: 900px) {
-  .hx-tl__search input,
-  input.hx-tbrowser__url {
+  .hx-tl__search input {
     font-size: 16px;
   }
 }
@@ -2417,6 +2416,341 @@ input.hx-tbrowser__url:focus {
   }
 }
 
+/* Keep letterboxing outside the input surface so page coordinates stay accurate. */
+.hx-agent-browser {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.hx-agent-browser button {
+  cursor: pointer;
+}
+.hx-agent-browser button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hx-agent-browser__profile {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-agent-browser__tabrow {
+  display: flex;
+  border-bottom: 1px solid var(--hx-border);
+  min-width: 0;
+}
+.hx-agent-browser__tabs {
+  display: flex;
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1;
+  gap: 4px;
+  padding: 5px;
+}
+.hx-agent-browser__tab {
+  display: flex;
+  flex: 0 0 auto;
+  max-width: 210px;
+  border-radius: 6px;
+  border: 1px solid var(--hx-border);
+}
+.hx-agent-browser__tab[data-active='true'] {
+  background: var(--hx-bg-active);
+  color: var(--hx-accent);
+}
+.hx-agent-browser__tab button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 6px 8px;
+}
+.hx-agent-browser__tab button span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hx-agent-browser__others {
+  border-bottom: 1px solid var(--hx-border);
+  font-size: 12px;
+}
+.hx-agent-browser__others summary {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.hx-agent-browser__size-button {
+  width: auto;
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 0 6px;
+}
+.hx-cmenu.hx-agent-browser__sizes {
+  position: absolute;
+  z-index: 5;
+  top: 40px;
+  right: 4px;
+  display: grid;
+  padding: 8px;
+  gap: 4px;
+  max-width: calc(100% - 8px);
+  border: 1px solid var(--hx-border);
+  border-radius: 8px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+}
+.hx-agent-browser__sizes form button,
+.hx-agent-browser__note button,
+.hx-agent-browser__modal button {
+  padding: 7px 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 5px;
+  color: inherit;
+  background: var(--hx-bg-active);
+}
+.hx-agent-browser__sizes form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.hx-agent-browser__sizes label {
+  display: grid;
+  grid-template-columns: 68px 12px 68px;
+  align-items: center;
+  gap: 4px;
+}
+.hx-agent-browser__sizes label > span {
+  grid-column: 1 / -1;
+  color: var(--hx-fg-2);
+  font-size: 12px;
+}
+.hx-agent-browser__sizes input {
+  width: 68px;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--hx-border);
+  border-radius: 5px;
+  background: var(--hx-bg);
+  color: inherit;
+}
+.hx-agent-browser__view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: var(--hx-bg);
+}
+.hx-agent-browser__image {
+  position: relative;
+  flex: none;
+}
+.hx-agent-browser canvas {
+  display: block;
+  touch-action: none;
+  outline: none;
+}
+.hx-agent-browser canvas[data-shown='false'] {
+  visibility: hidden;
+}
+.hx-agent-browser__resize {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize !important;
+  touch-action: none;
+}
+.hx-agent-browser__note {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.hx-agent-browser__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+}
+.hx-agent-browser__modal {
+  display: grid;
+  place-items: center;
+  background: #0005;
+  padding: 16px;
+}
+.hx-agent-browser__modal form {
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  padding: 20px;
+  width: min(360px, 100%);
+  overflow-wrap: anywhere;
+}
+.hx-agent-browser__modal form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.hx-agent-browser__modal input {
+  width: 100%;
+}
+.hx-agent-browser__select {
+  position: absolute;
+  max-height: min(240px, 80%);
+  max-width: 100%;
+  overflow: auto;
+  display: grid;
+  padding: 4px;
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border);
+  box-shadow: 0 4px 20px #0004;
+  border-radius: 6px;
+}
+.hx-agent-browser__select button {
+  text-align: left;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+}
+.hx-agent-browser__select button[aria-selected='true'],
+.hx-agent-browser__select button:hover {
+  background: var(--hx-bg-active);
+}
+.hx-agent-browser__toast {
+  position: absolute;
+  z-index: 6;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  padding: 12px;
+  border: 1px solid var(--hx-border);
+  background: var(--hx-bg-raised);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.hx-agent-browser__status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--hx-border);
+  font-size: 11px;
+}
+.hx-agent-browser__status span {
+  flex: 1;
+}
+.hx-agent-browser__status button {
+  color: inherit;
+  background: none;
+  border: 1px solid var(--hx-border);
+  border-radius: 5px;
+  padding: 5px 8px;
+}
+@media (max-width: 600px) {
+  .hx-agent-browser__profile {
+    display: none;
+  }
+  .hx-agent-browser .hx-tbrowser__bar {
+    gap: 2px;
+    padding: 4px;
+  }
+  .hx-agent-browser__tab {
+    max-width: 150px;
+  }
+}
+.hx-tv[data-tool='agent-browser'] {
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.hx-agent-browser {
+  flex: 1;
+  gap: 0;
+  min-height: 0;
+}
+.hx-agent-browser .hx-head-btn {
+  flex: none;
+}
+.hx-agent-browser .hx-agent-browser__size-button {
+  width: auto;
+  border-radius: 6px;
+}
+.hx-agent-browser .hx-tbrowser__bar {
+  padding: 6px;
+}
+.hx-agent-browser__profile {
+  flex: 0 1 70px;
+  min-width: 0;
+}
+.hx-agent-browser__resize {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 6px 0 0;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+}
+
+.hx-agent-browser__keyboard {
+  display: none;
+}
+@media (pointer: coarse) {
+  .hx-agent-browser__keyboard {
+    display: inline-flex;
+  }
+}
+/* Remain focusable on mobile without retaining or displaying the person's input. */
+.hx-agent-browser__keyboard-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+  font-size: 16px;
+  pointer-events: none;
+}
+.hx-agent-browser__command {
+  max-width: 100%;
+}
+.hx-agent-browser__command pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.hx-agent-browser__sizes .hx-cmenu__item {
+  flex-shrink: 0;
+}
+.hx-agent-browser__scripted-warning {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--hx-warning);
+  border-radius: 5px;
+  color: var(--hx-warning);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 /* A font as a specimen: the person's text in it at several sizes, then its letters and digits. */
 .hx-font {
   display: flex;

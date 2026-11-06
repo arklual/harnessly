@@ -75,9 +75,9 @@ func TestMatchTrustPromptCaptures(t *testing.T) {
 }
 
 func TestTrustAcceptKeys(t *testing.T) {
-	// Claude focuses "No, exit" above "Yes"; Codex focuses "1. Yes, continue".
+	// Claude focuses "No, exit" above "Yes", so its first step is the arrow alone; Codex focuses "1. Yes, continue".
 	for name, want := range map[string][]string{
-		"claude-trust-folder.txt":   {"Down", "Enter"},
+		"claude-trust-folder.txt":   {"Down"},
 		"codex-trust-directory.txt": {"Enter"},
 	} {
 		if got := TrustAcceptKeys(fixture(t, name)); !reflect.DeepEqual(got, want) {

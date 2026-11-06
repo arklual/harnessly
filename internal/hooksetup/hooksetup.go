@@ -146,9 +146,10 @@ TOKEN=$(cat "$TOKEN_FILE")
 func (c Config) StatusHookScript() []byte {
 	return []byte(`#!/bin/sh
 EVENT="${1:-poll}"
-` + c.preamble() + `AT=$(date +%s%3N 2>/dev/null)
+` + c.preamble() + `AT=$(date +%s%N 2>/dev/null)
 case "$AT" in ''|*[!0-9]*) AT="" ;; esac
-# some date builds (uutils) ignore the width in %3N and print nanoseconds: keep the first 13 digits, milliseconds
+# nanoseconds cut to the first 13 digits, milliseconds: uutils date gets %3N wrong below 100 ms, and a date without %N
+# prints a letter and leaves AT empty
 [ "${#AT}" -gt 13 ] && AT=$(printf '%.13s' "$AT")
 
 # Claude's JSON on stdin, read once (a hook run by hand from a terminal has none to give)

@@ -25,10 +25,12 @@ type MCP struct {
 	TokenEnv    string
 }
 
-// MCPArgs are the two `-c mcp_servers.<name>.…` flags.
+// MCPArgs configures a server already authorized by the runtime or by the person's connections.
+// Server-level approval avoids a hidden terminal prompt in otherwise unattended conversations.
 func MCPArgs(m MCP) []string {
 	return []string{
 		"-c", "mcp_servers." + m.Server + ".url=" + string(nodejson.Marshal(m.URL)),
+		"-c", "mcp_servers." + m.Server + `.default_tools_approval_mode="approve"`,
 		"-c", "mcp_servers." + m.Server + ".env_http_headers={" + string(nodejson.Marshal(m.TokenHeader)) + "=" + string(nodejson.Marshal(m.TokenEnv)) + "}",
 	}
 }

@@ -1,6 +1,7 @@
 // The Settings screen (the design's «Настройки»): the person's and the machine's settings in three groups of sections. Each page
 // works on what is really there — the person's settings record, the CLIs' own files on the machine, the fleet's list,
 // the apps the machine reads — and says plainly what it cannot change from here.
+import { BrowserPage } from '@/next/bindings/settings-browser';
 import { useEffect, useState } from 'react';
 import {
   AgentPage,
@@ -91,6 +92,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
         <AsksSettingsPage machine={machine} />
       </>
     );
+  else if (active === 'browser') body = <BrowserPage machine={machine} now={now} />;
   else if (active === 'safe') body = <SafePage machine={machine} now={now} />;
   else if (active === 'takes') body = <TakesPage now={now} />;
   else if (active === 'accounts') body = <AccountsPage machine={machine} pages={pages} pending={pending} />;

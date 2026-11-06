@@ -1,0 +1,26 @@
+.hx-browser-login {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--hx-line, currentColor);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.hx-browser-login > div:first-child {
+  flex: 1;
+  min-width: 150px;
+}
+.hx-browser-login p {
+  margin: 4px 0;
+}
+.hx-browser-login__actions {
+  display: flex;
+  gap: 8px;
+}
+.hx-agent-browser__status:has(.hx-browser-login) {
+  flex-wrap: wrap;
+}

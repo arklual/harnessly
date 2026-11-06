@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/web"
 )
@@ -47,9 +48,12 @@ func webExport(dir string) error {
 	return err
 }
 
-// subcommand runs `runtime web export <dir>` and `runtime sandbox-exec -- <command>`; false when the arguments name no subcommand and the runtime should serve
-// (arguments it never took before are left alone as they were).
+// subcommand handles browser-host, web export and sandbox-exec before the runtime starts serving.
+// Unknown arguments retain their previous meaning to the server.
 func subcommand(args []string) (bool, error) {
+	if len(args) > 0 && args[0] == "browser-host" {
+		return true, host.Main(args[1:])
+	}
 	if len(args) >= 2 && args[0] == SandboxExec && args[1] == "--" {
 		// It only returns when it could not become the command.
 		return true, apps.ForegroundExec(args[2:])

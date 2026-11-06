@@ -500,5 +500,7 @@
   "next.settings.voice.words.problem.twice": "Такое слово уже есть",
   "next.settings.voice.words.problem.full": "Слов уже слишком много",
   "next.settings.voice.words.problem.heardLong": "Вариант слишком длинный",
-  "next.settings.voice.words.problem.heardMany": "Вариантов слишком много"
+  "next.settings.voice.words.problem.heardMany": "Вариантов слишком много",
+  "next.settings.section.browser": "Браузер",
+  "next.settings.lead.browser": "Профили браузера, доступ проектов и безопасность Chrome на этой машине."
 }

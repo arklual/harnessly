@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
@@ -10,13 +12,30 @@ import (
 // autoOpenPublisher is the hub as the conversations' actors publish to it, with the pane's watcher looking at the
 // finished tool calls on the way (internal/paneauto): what the agent works on opens in the person's pane by itself.
 type autoOpenPublisher struct {
-	hub   *wire.Hub
-	watch *paneauto.Watcher
+	hub     *wire.Hub
+	watch   *paneauto.Watcher
+	browser *agentbrowser.ProfileAccess
 }
 
 var _ convo.Publisher = autoOpenPublisher{}
 
 func (p autoOpenPublisher) Publish(ch wire.Channel, e wire.Event) int64 {
+	if p.browser != nil {
+		var err error
+		switch ev := e.(type) {
+		case wire.ConversationRemovedEv:
+			err = p.browser.ConversationChanged(ev.ID, "", true)
+		case wire.ConversationUpsertEv:
+			project := ""
+			if ev.Conv.ProjectID != nil {
+				project = *ev.Conv.ProjectID
+			}
+			err = p.browser.ConversationChanged(ev.Conv.ID, project, false)
+		}
+		if err != nil {
+			agent.Log("warn", "browser conversation cleanup failed", agent.F{K: "error", V: err.Error()})
+		}
+	}
 	seq := p.hub.Publish(ch, e)
 	if p.watch == nil {
 		return seq
@@ -48,9 +67,11 @@ func (v *v2Live) newPaneWatcher() *paneauto.Watcher {
 	}
 	tmux := c.cfg.Tmux
 	return paneauto.New(paneauto.Env{
-		Targets:  panelTargets(),
-		DesignOf: designAPI(v.d).L.DesignOfPath,
-		Intents:  c.intents,
+		Targets:       panelTargets(),
+		Browser:       !agentbrowser.ConfigFromEnv(v.d.DataDir).Off,
+		BrowserServer: env("RUNTIME_MCP_SERVER", "harnessly"),
+		DesignOf:      designAPI(v.d).L.DesignOfPath,
+		Intents:       c.intents,
 		TabOf: func(conv string) string {
 			if v.rt == nil {
 				return ""

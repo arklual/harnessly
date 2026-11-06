@@ -121,14 +121,15 @@ func MatchTrustPrompt(text string) *TrustPrompt {
 }
 
 var (
-	trustYesRE    = re(`(?i)Yes,` + sp + `+(?:I trust this folder|continue)`)
-	trustNoRE     = re(`(?i)No,` + sp + `+(?:exit|quit)`)
-	trustFocusRE  = re(`^` + sp + `*[❯›>]`)
-	trustAnswered = []string{"Enter"}
+	trustYesRE   = re(`(?i)Yes,` + sp + `+(?:I trust this folder|continue)`)
+	trustNoRE    = re(`(?i)No,` + sp + `+(?:exit|quit)`)
+	trustFocusRE = re(`^` + sp + `*[❯›>]`)
 )
 
-// TrustAcceptKeys are the keys that answer a folder trust dialog with yes: arrows from the focused option to the yes
-// option, then Enter. Nil when the text is not such a dialog or its focus cannot be read.
+// TrustAcceptKeys is the next step of answering a folder trust dialog with yes: the arrows to the yes option while
+// another one is focused, and Enter only once the yes option is. They never go out together: an agent drops part of
+// what it gets around its first paint, and an arrow lost in front of Enter answers "No, exit", which ends the agent.
+// Nil when the text is not such a dialog or its focus cannot be read.
 func TrustAcceptKeys(text string) []string {
 	if MatchTrustPrompt(text) == nil {
 		return nil
@@ -150,6 +151,9 @@ func TrustAcceptKeys(text string) []string {
 	if yes < 0 || focused < 0 {
 		return nil
 	}
+	if focused == yes {
+		return []string{"Enter"}
+	}
 	keys := []string{}
 	for ; focused < yes; focused++ {
 		keys = append(keys, "Down")
@@ -157,5 +161,5 @@ func TrustAcceptKeys(text string) []string {
 	for ; focused > yes; focused-- {
 		keys = append(keys, "Up")
 	}
-	return append(keys, trustAnswered...)
+	return keys
 }

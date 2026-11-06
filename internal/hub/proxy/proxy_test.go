@@ -100,6 +100,18 @@ func (f *fixture) runtime() http.Handler {
 			}
 		}
 	})
+	mux.HandleFunc("/m/{id}/api/agent-browser", func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
+		if err != nil {
+			return
+		}
+		defer c.CloseNow()
+		_ = c.Write(r.Context(), websocket.MessageText, []byte(r.URL.Query().Get("conv")))
+		typ, raw, err := c.Read(r.Context())
+		if err == nil {
+			_ = c.Write(r.Context(), typ, raw)
+		}
+	})
 	mux.HandleFunc("/api/browser/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
 		if err != nil {
@@ -906,5 +918,38 @@ func TestSubdomainWebSocket(t *testing.T) {
 	_ = c.Write(ctx, websocket.MessageText, []byte("hi"))
 	if _, got, err := c.Read(ctx); err != nil || string(got) != "echo:hi" {
 		t.Errorf("echo = %q %v", got, err)
+	}
+}
+
+func TestAgentBrowserSocketThroughHub(t *testing.T) {
+	f := setup(t)
+	u, _ := url.Parse(f.s.URL)
+	var cookies []string
+	for _, c := range f.owner.Client.Jar.Cookies(u) {
+		cookies = append(cookies, c.Name+"="+c.Value)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	address := "ws://" + u.Host + "/m/" + f.id + "/api/agent-browser?conv=chat-a&machine=" + f.id
+	c, _, err := websocket.Dial(ctx, address, &websocket.DialOptions{HTTPHeader: http.Header{
+		"Cookie": {strings.Join(cookies, "; ")}, "Origin": {f.s.URL}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	_, raw, err := c.Read(ctx)
+	if err != nil || string(raw) != "chat-a" {
+		t.Fatalf("conversation: %q %v", raw, err)
+	}
+	if err = c.Write(ctx, websocket.MessageBinary, []byte{0, 0, 1, 128, 255, 216}); err != nil {
+		t.Fatal(err)
+	}
+	typ, raw, err := c.Read(ctx)
+	if err != nil || typ != websocket.MessageBinary || len(raw) != 6 {
+		t.Fatalf("frame: %v %v %v", typ, raw, err)
+	}
+	_, res, err := websocket.Dial(ctx, address, nil)
+	if err == nil || res == nil || (res.StatusCode != 302 && res.StatusCode != 401) {
+		t.Fatalf("anonymous: %v %v", res, err)
 	}
 }

@@ -1,0 +1,7 @@
+{
+  "next.safe.latestUses": "Latest uses",
+  "next.safe.use.agent": "Agent",
+  "next.safe.project.access": "Access",
+  "next.safe.project.note": "Secrets available to this project. Edit origins and project access in Safe.",
+  "next.safe.project.empty": "No secrets available to this project yet"
+}
