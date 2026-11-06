@@ -75,7 +75,7 @@ type EnvResponse = {
   // How far the list got: the screen's working machines (not revoked or disabled; of the team when `team` is set),
   // those that reported what they hold, those whose hash is the one the hub computes for them now.
   // A machine whose list is empty counts as current without a report: the hub sends no first empty list.
-  delivery: { machines: number; reported: number; current: number; lastAt: string | null };
+  delivery: { machines: number; reported: number; current: number; lastAt: string | null } | null;   // null past 200 working machines
 };
 type EnvLayer = {
   layer: 'org' | 'tenant' | 'team'; scopeId: string; tenantId: string;  // tenantId "" on the organization layer
@@ -193,11 +193,150 @@ more than one secret, is `pending` with the reason; a bad id or an unknown kind 
 plugin. The runtime passes `--plugin-dir` for every such folder that exists to each new Claude chat; the list reaches a
 running chat with its next start. The screen shows this as «Доехало до машин» and, per row, what did not go in.
 
+## Machine setup
+
+Besides what the chats load, a list can say what the **machine** is to have: repositories cloned, the forges' CLIs
+logged in, Linux scripts run in order. Machines are Linux only. Types: `internal/hubproto/envsetup.go`.
+
+### Kinds and their `source`
+
+| Kind | Keys |
+| --- | --- |
+| `repo` | `url`, `branch` (as before), `dir` (the folder on the machine: `~/…` or relative to the home; empty: `~/code/<name of the repository>`) |
+| `access` | `service` (`gitlab` or `github`), `host` (empty: `gitlab.com` / `github.com`), `secret` (the safe's name of the token; empty: `gitlab-token` / `github-token`) |
+| `script` | `from` (`text`, `repo`, `file`, `url`); `body` (the commands for `text`, the file's text for `file`, ≤ 48 KiB); `fileName` (for `file`); `repo` (the item id of a `repo` of the list, for `repo`), `repoUrl` + `branch` (a repository outside the list, cloned only to run the script); `path` (the file in the repository); `url` (for `url`, https only); `run` (how to start it, ≤ 4 KiB, lines run in order; empty: `bash <file>`); `rerun` (`once` or `check`); `check` (for `check`: a command, exit 0 means ready); `secrets` (≤ 16 names of the safe, `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`) |
+
+A script that calls `brew` is refused (400, `details.field` `source.body` or `source.run`): the machines are Linux.
+
+### Order
+
+Scripts run in the order of the list: the organization's first, then the tenant's, then the team's, each layer in its
+editors' order (`env_entries.position`). `EnvItem.order` carries the place (1, 2, …) of a script; other kinds have none.
+A machine without the feature `environment.setup` (the agent offers it only when the policy `setup` allows, and on an
+observe link only with `AGENT_HUB_SETUP=on`) gets neither the order nor the `script` and `access` items (an older
+agent would refuse a list it cannot hash the same way).
+
+`PUT /api/orgs/{org}/env/order` `{layer, scopeId, entryIds: string[]}` → 200 `{entryIds}`: the scripts of a layer in
+their new order (all of the layer's script entries, each once). Manage of the layer. A changed order is a changed list.
+
+### What the machine does
+
+The agent keeps the list as before and the runtime (the person's process, with the safe) does the setup:
+
+1. **Access.** `glab auth status --hostname <host>` / `gh auth status --hostname <host>`; logged in: `ok`. Otherwise
+   the token from the safe (`secret`) logs the CLI in (`glab auth login --hostname <host> --stdin`, `gh auth login
+   --hostname <host> --with-token`), then `gh auth setup-git` / a git credential helper for the GitLab host so
+   `git clone` over https uses it. No token in the safe: `pending` «положите токен <name> в сейф», and the runtime opens
+   the safe's ask on the person's page. No CLI: `error` (a script of the list may install it; access is tried again
+   after the scripts).
+2. **Repositories.** The folder exists and is a clone of the same address: `ok` (never pulled, never reset: it may hold
+   the person's work). Missing: `git clone --branch <branch> <url> <dir>`. Exists and is something else: `error`.
+3. **Scripts**, in order. A script gets `HOME`, the safe's `secrets` as variables (`npm-token` → `$NPM_TOKEN`), its
+   folder as the working directory (the repository's for `repo`, a fresh temporary one otherwise), 15 minutes. `once`
+   runs on a machine once per source: a changed script runs again. `check` runs the check first and the script only
+   when it fails. A failed script stops the scripts after it (`pending` «ждёт, пока починят <name>»).
+4. Access and repositories that failed are tried once more after the scripts.
+
+Output goes to the run's log with the values of the secrets replaced by `••••••`, at most 16 KiB per step (the tail).
+
+### Runs
+
+A run is the machine doing the list: `apply` (the machine took a new list), `update` (asked: apply now, every
+script's check again), `check` (only look; nothing changes), `sandbox` (the whole list from scratch in a home of its
+own, a temporary folder with HOME, the XDG folders and the git config inside it, wrapped in bubblewrap too where the machine
+has a working one; the ledger and the setup file stay as they are, and each step's log opens with a line saying which). Agent ↔ hub:
+
+- `env.run` (hub → agent) `{runId, mode, items?, by?}` → `{runId, accepted: true}` at once. `items` only for `sandbox`
+  (a draft that is not saved). Whether a machine serves it, and the setup kinds at all, is the machine's own choice:
+  an own link follows the policy `setup` (a policy file without the key means off); an observe link serves `env.run`
+  and the setup kinds only when the machine's operator opts in with `AGENT_HUB_SETUP=on`. A machine that serves them
+  advertises `environment.setup` in `hello`, and only while its runtime's setup runner is alive (the runtime
+  heartbeats; the hub learns a change at the machine's next connect, and meanwhile the machine reports its setup
+  items as «настройщик машины не запущен»). `busy` for a runId the machine already has; runs of one runtime go one at a
+  time, a later request waits.
+- `env.run` (agent → hub, event) `{"event":"env.run","run":EnvRun}` when a step changes and at the end; the same
+  `runId` replaces. After a connect the agent sends the runs of the last 24 hours again; the hub upserts.
+- `env.state` keeps saying how each item went; for the setup kinds the status is the runtime's for the list held
+  (`pending` «машина ещё настраивается» until it worked on that list).
+
+Runs are kept 14 days on the machine and on the hub (`env_runs`). A run the hub holds as `running` that nothing has
+updated for 30 minutes is ended by the hub as `error` («машина не ответила»); the hub looks every 5 minutes. The hub
+keeps at most 30 runs of their own a machine starts per hour (`apply`), and at most 512 KiB of steps per run (the logs of
+the oldest steps are dropped first); a run beyond that is dropped. A run id is kept only for the machine it belongs to,
+and a run of the modes `update`, `check` and `sandbox` only if the hub asked that machine for it.
+
+### Endpoints
+
+| Method and path | Who | Answer |
+| --- | --- | --- |
+| `GET /api/orgs/{org}/env/runs?layer=&scopeId=&errors=1&limit=` | managers of the layer | `layer` and `scopeId` are required (400 `invalid_request` otherwise); `{runs: EnvRunRow[]}` of the machines the layer reaches, newest first, 14 days; `errors=1`: only runs with an error. A machine changes what it offers (the setup on or off) by calling the hub again |
+| `GET /api/orgs/{org}/env/runs/{runId}` | as above, or the machine's owner | `{run: EnvRunRow}` with `log` on every step |
+| `POST /api/orgs/{org}/env/try` `{layer, scopeId, draft?: {entryId?, kind, name, source}, machineId?}` | managers of the layer | 202 `{runId, machine: {id, name}}`: a sandbox run of the layer's list (a team: the team's list) with the draft added or put in place of `entryId`, on one of the asker's own online machines with `environment.setup` (`machineId` picks; none: 409 `no_machine`) |
+| `GET /api/me/env/machines?space=` | the person | `{machines: MeMachine[]}` |
+| `POST /api/me/env/run?space=` `{mode: 'update' \| 'check', machineId?}` | the person | 202 `{runs: {runId, machineId}[]}` — on every online machine of theirs in the tenant (or the one) |
+| `GET /api/me/env/runs?space=` | the person | `{runs: EnvRunRow[]}` of their machines |
+
+```ts
+type EnvRunRow = { id: string; machine: { id: string; name: string }; person: { id: string; name: string };
+  mode: 'apply' | 'update' | 'check' | 'sandbox'; by: string | null; status: 'running' | 'ok' | 'error' | 'pending';
+  startedAt: string; finishedAt: string | null;
+  steps: { itemId: string; kind: Kind; name: string; status: string; message: string | null; exit: number | null;
+    ms: number; log?: string }[] };
+type MeMachine = { id: string; name: string; online: boolean; setup: boolean;   // setup: has environment.setup
+  team: { id: string; name: string } | null;   // the team whose list it holds
+  current: boolean;          // holds the list the hub computes for it now
+  failed: number;            // setup items in error or waiting for the person
+  lastRun: EnvRunRow | null };
+```
+
+`MeMachine.team` is `{id, name}` of the team whose list the machine holds (null: no team). `failed` counts the setup
+items in `error` and those `pending` with the ask «положите токен … в сейф». `GET /api/me/env` gets `outdated: boolean`
+(some machine of theirs in the tenant that serves the setup is not current or has a failed item; a machine with
+`setup: false` is not counted)
+and `machines: MeMachine[]`.
+
+### Who writes the catalog
+
+An organization admin writes any item. A tenant admin or a team lead creates items for their layer: `POST
+/api/orgs/{org}/catalog` takes `owner: {layer, scopeId}` (default the organization); the item is changed and archived
+by the managers of its owner layer and by organization admins. `CatalogItem` gets `owner: {layer, scopeId} | null`
+(null: the organization). The screen's «Редактор команды» is the team's lead.
+
+**Secrets and accesses are the organization admins'.** A script that takes `secrets` from the safe, and every `access`
+item, are allowed only in items of the organization (`owner` null): a team lead or a tenant admin could otherwise read
+the members' tokens through a script. `POST`/`PATCH /catalog` with an `owner` refuses them with 400, `details.field`
+`source.secrets` (or `kind` for an access): «Токены из сейфа и доступы подключает админ организации». The same holds for
+`hub env-seed` and for the drafts of `POST /env/try` (a draft of anybody but an organization admin, or of an owned
+item, with secrets or of the kind access, is refused).
+
+An item with an owner (`owner` not null) can be carried only by the entries of exactly that layer and scope: `POST
+/api/orgs/{org}/env/entries` refuses another one with 400 `itemId` («Этот пункт принадлежит другому слою — скопируйте
+его»), and the resolver skips such an entry. An item of the organization (`owner` null) goes into any layer. «Copy from
+another team» is a new item (`POST /catalog` with `owner`). Otherwise whoever edits a team's item could change what
+runs on the machines of wider layers.
+
+### Details of the answers
+
+- `POST /env/try`: `409 conflict` with `details.reason` `no_machine` when the asker has no online machine with
+  `environment.setup` (or the `machineId` is not one of them). The list sent is the layer's own with the draft; a new
+  draft script goes last. The run row is stored as `running` at once; the machine's `env.run` events replace it.
+- The hub keeps an `env.run` event only for a run of that machine: a run it asked for (`update`, `check`, `sandbox`) must
+  already have a row of the same machine, an `apply` run may be new; a run id held by another machine is dropped.
+- `POST /api/me/env/run` with no online machine: 409 `no_machine`. `MeMachine.current` is true when the machine reported
+  the hash the hub computes for it now (and for a machine whose list is empty, always).
+- Script `source.url` is https only. `repoUrl` and the repository's `url` are https or ssh (`ssh://git@host/…` is fine,
+  a password never is).
+- `hub env-seed --file env.yaml [--dry-run]` moves catalog items (`kind`, `name`, `hint`, `source`, `owner`) and entries
+  (`layer`, `tenant`, `team`, `item`, `pinned`, `disabled`, `audience`, `position`) of organizations named by slug, matched
+  by (kind, name) and (layer, scope, item); in a script `source.repo` may be the repository item's name.
+
 ## Storage
 
 Migration `0012_environment.sql`, additive only (SQLite and Postgres; the previous binary ignores the tables):
 `catalog_items`, `env_entries` (unique per organization, layer, scope and item), `env_person_off`, `env_state` (per
-machine: what was sent and what the agent reported), `tool_usage_day`.
+machine: what was sent and what the agent reported), `tool_usage_day`. Migration `0015_environment_setup.sql`:
+`env_entries.position`, `catalog_items.owner_layer` / `owner_scope`, `env_runs` (one row per run: machine, org, mode,
+status, the steps with their logs; removed after 14 days).
 
 ## Flags
 

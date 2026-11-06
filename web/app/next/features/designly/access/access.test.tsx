@@ -342,6 +342,25 @@ describe('the share dialog', () => {
     await waitFor(() => expect(screen.queryByRole('heading', { name: t('next.access.history') })).toBeNull());
   });
 
+  it('a view opened again shows what it read, without reading it again (HRN-675)', async () => {
+    const fetchMock = gateway();
+    vi.stubGlobal('fetch', fetchMock);
+    inRoot(<ShareDialog {...shareProps(manager)} />);
+    const openLog = async () => {
+      const menu = await openMenu(t('next.access.more'));
+      fireEvent.click(within(menu).getByRole('menuitem', { name: t('next.access.history') }));
+      expect(await screen.findByText(/boss@x\.ru · дал доступ|boss@x\.ru · gave access/)).toBeTruthy();
+    };
+    await openLog();
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.backView') }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: t('next.access.history') })).toBeNull());
+    await openLog();
+    const reads = calls(fetchMock).filter(
+      ([url, method]) => String(url).includes('/p1/log') && method === 'GET',
+    );
+    expect(reads).toHaveLength(1);
+  });
+
   it('the link settings list the links and revoke them', async () => {
     const fetchMock = gateway();
     vi.stubGlobal('fetch', fetchMock);

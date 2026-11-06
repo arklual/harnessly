@@ -1,0 +1,20 @@
+{
+  "title": { "en": "Self-hosting", "ru": "Свой сервер" },
+  "audience": "people",
+  "order": 60,
+  "pages": [
+    "README.md",
+    "own-docs.md",
+    "../getting-started.md",
+    "../deploy.md",
+    "../configuration.md",
+    "../hub/deploy.md",
+    "../hub/machine.md",
+    "../hub/environment.md",
+    "../safe.md",
+    "../connections.md",
+    "../mcp-connections.md",
+    "../integrations.md",
+    "../voice.md"
+  ]
+}

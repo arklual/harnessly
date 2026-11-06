@@ -13,6 +13,38 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-06',
+    items: [
+      { key: 'docsLibrary', icon: 'book-open' },
+      { key: 'docsTeam', icon: 'folder-open' },
+      { key: 'docsAgents', icon: 'square-pen' },
+    ],
+  },
+  {
+    id: '2026-11-05r',
+    items: [
+      { key: 'setupCard', icon: 'laptop' },
+      { key: 'reposSkill', icon: 'folder-git' },
+    ],
+  },
+  {
+    id: '2026-11-05q',
+    items: [
+      { key: 'envScripts', icon: 'file-terminal' },
+      { key: 'envSandbox', icon: 'shield-check' },
+      { key: 'envMachine', icon: 'server' },
+    ],
+  },
+  {
+    id: '2026-11-05p',
+    items: [
+      { key: 'modeSwitch', icon: 'pencil' },
+      { key: 'shareSmooth', icon: 'gauge' },
+      { key: 'designLinks', icon: 'external-link' },
+      { key: 'agentFiles', icon: 'file-text' },
+    ],
+  },
+  {
     id: '2026-11-05n',
     items: [{ key: 'designChats', icon: 'messages-square' }],
   },

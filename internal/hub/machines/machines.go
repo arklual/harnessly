@@ -63,6 +63,8 @@ type Deps struct {
 type EnvSink interface {
 	Connected(machineID string, hello hubproto.Hello)
 	Reported(machineID string, st hubproto.EnvState)
+	// Run keeps a run of the machine's setup (the env.run event).
+	Run(machineID string, run hubproto.EnvRun)
 }
 
 // BudgetSink is what keeps a machine's limit list current (internal/hub/limits).

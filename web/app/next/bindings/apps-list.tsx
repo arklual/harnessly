@@ -30,7 +30,7 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
       error={error}
       onOpen={open}
       onOpenDrawer={onOpenDrawer}
-      onHelp={() => goTo({ kind: ROUTE.help, page: 'overview' })}
+      onHelp={() => goTo({ kind: ROUTE.help, section: 'build-apps', page: 'overview' })}
       footer={
         <>
           <AppsCatalog team={team} />

@@ -634,13 +634,19 @@ const Feed = (props: IFeedProps) => {
   );
 
   const docs = useMemo(() => docPathsOf(items ?? []), [items]);
+  const canOpenRef = props.onOpenRef !== undefined;
   const refContext = useMemo<IRefContext>(
     () => ({
       refs: props.refs ?? {},
-      onOpen: (kind, label, href) => latest.current.onOpenRef?.(kind, label, href),
+      // No opener, no «Open» buttons: a button that opens nothing is worse than none.
+      onOpen: canOpenRef
+        ? (kind, label, href) => {
+            latest.current.onOpenRef?.(kind, label, href);
+          }
+        : null,
       docs,
     }),
-    [props.refs, docs],
+    [props.refs, docs, canOpenRef],
   );
 
   const drawn = items === null ? [] : items.slice(win.start, win.end);

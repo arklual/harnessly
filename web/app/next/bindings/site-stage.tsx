@@ -6,7 +6,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { interrupt, sendMessage } from '@/next/commands';
 import { uploadSrc } from '@/next/commands/uploads';
-import ChatView from '@/next/bindings/chat-view';
+import ChatView, { type TChatOpeners } from '@/next/bindings/chat-view';
+import { openFileInChat } from '@/next/bindings/open-file-in-chat';
 import { keepLayout, keptLayout } from '@/next/features/designly/site-layout';
 import type { IDockExtra } from '@/next/bindings/chat-dock';
 import { outgoingItem, useFeedItems } from '@/next/bindings/feed-items';
@@ -307,10 +308,11 @@ interface IDesignChatProps extends Omit<INewChatProps, 'draftKey'> {
   onOpenChat: () => void;
   /** A chat this one gave way to (another model, a fork) comes into the design's column. */
   onPickChat: (id: string) => void;
+  open?: TChatOpeners;
 }
 
 /** The open chat's body: the design's current chat as it is anywhere, or a new one for the design. */
-const DesignChat = ({ picked, designDraft, onOpenChat, onPickChat, ...rest }: IDesignChatProps) => {
+const DesignChat = ({ picked, designDraft, onOpenChat, onPickChat, open, ...rest }: IDesignChatProps) => {
   const { machine, creating, extra } = rest;
   const first = useMessage(creating?.clientId ?? null);
   const id = picked.k === DESIGN_CONV.conv ? (picked.id as ConvId) : null;
@@ -328,8 +330,10 @@ const DesignChat = ({ picked, designDraft, onOpenChat, onPickChat, ...rest }: ID
           machine={machine}
           onRetryLoad={() => hub.client(machine)?.reconnectNow()}
           onShowBackground={onOpenChat}
+          onOpenFile={(path) => openFileInChat(id, machine, path, onOpenChat)}
           dockExtra={extra}
           pendingItems={pendingItems}
+          {...open}
         />
       </ChatOpener.Provider>
     );
@@ -378,6 +382,8 @@ export interface IStageOptions {
   /** The library server's port; null while the library loads. */
   port: number | null;
   onOpenDrawer: () => void;
+  /** Where a link, a file or a card of the design's chat opens (the pane beside the design); without it they stay put. */
+  open?: TChatOpeners;
   /** The design's own page keeps where its chat stands; the right pane's copy has its own choice (pane-chat.ts). */
   keep?: boolean;
 }
@@ -393,6 +399,7 @@ export const useSiteStage = ({
   pageUrl,
   port,
   onOpenDrawer,
+  open,
   keep = false,
 }: IStageOptions): ISiteStage => {
   const key = designKey(machine, design);
@@ -788,6 +795,7 @@ export const useSiteStage = ({
         onFirst={sendFirst}
         onOpenChat={openChatPage}
         onPickChat={pickChat}
+        open={open}
       />
     ),
     chat: (
@@ -802,6 +810,7 @@ export const useSiteStage = ({
           onFirst={sendFirst}
           onOpenChat={openChatPage}
           onPickChat={pickChat}
+          open={open}
         />
       </SiteChat>
     ),

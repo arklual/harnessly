@@ -452,12 +452,18 @@ func (s *Service) addEntry(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		if !ok || it.ArchivedAt != nil || (it.OrgID != "" && it.OrgID != q.w.org.ID) {
 			return httpx.Invalid("itemId", "Такого элемента нет в каталоге")
 		}
+		if !FitsLayer(it.OwnerLayer, it.OwnerScope, in.Layer, in.ScopeID) {
+			return httpx.Invalid("itemId", "Этот пункт принадлежит другому слою — скопируйте его")
+		}
 		aud, err := CleanAudience(in.Layer, in.Audience, q.w.audienceTeams(in.Layer, in.ScopeID))
 		if err != nil {
 			return err
 		}
 		e := store.EnvEntry{OrgID: q.w.org.ID, Layer: in.Layer, ScopeID: in.ScopeID, ItemID: it.ID, Enabled: in.Enabled == nil || *in.Enabled,
 			Pinned: in.Pinned != nil && *in.Pinned, Audience: AudienceJSON(aud), Rev: 1, UpdatedAt: s.now(), UpdatedBy: p.User.ID}
+		if it.Kind == store.CatalogScript {
+			e.Position = q.w.nextPosition(in.Layer, in.ScopeID)
+		}
 		if !e.Enabled && in.Layer != store.EnvLayerOrg {
 			if LockedAbove(resolverEntries(q.w.entries), in.Layer, q.w.org.ID, q.w.tenantOf(in.Layer, in.ScopeID), it.ID) != "" {
 				return httpx.Conflict("locked", "Закреплено выше: выключить здесь нельзя")

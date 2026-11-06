@@ -20,6 +20,8 @@
       "env": false,
       "install": false,
       "runtimeSession": false,
+      "setup": false,
+      "peers": false,
       "denyRoutes": null,
       "source": ""
     },

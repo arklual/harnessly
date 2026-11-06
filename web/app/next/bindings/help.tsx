@@ -1,8 +1,18 @@
-// The documentation on the machine: the list of pages and the page the address names, in the person's language. The
-// address is the page (/help/<page>#<heading>); a fresh page starts at its top, a heading is scrolled to once it is drawn.
+// The documentation on the machine: the sections with their pages and the page the address names, in the person's
+// language, and the search over every page. The address is the page (/help/<section>/<page>#<heading>); a fresh page
+// starts at its top, a heading is scrolled to once it is drawn.
 import { useCallback, useEffect, useState } from 'react';
-import { HelpError, loadGuide, loadGuidePage, type IGuidePage } from '@/next/features/help/api';
-import HelpView from '@/next/features/help/help-view';
+import {
+  HelpError,
+  loadGuidePage,
+  loadLibrary,
+  pictureUrl,
+  searchGuide,
+  type IGuideSection,
+} from '@/next/features/help/api';
+import HelpView, { type TSearch } from '@/next/features/help/help-view';
+import { placeOf } from '@/next/features/help/model';
+import { pageClock } from '@/next/core/clock';
 import { locale } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
@@ -40,25 +50,75 @@ const useAsk = <T,>(load: (() => Promise<T>) | null) => {
   return { data: fresh?.data ?? null, error: fresh?.error ?? null, retry: () => setAttempt((n) => n + 1) };
 };
 
+/** How long typing pauses before the search is asked. */
+const SEARCH_PAUSE_MS = 200;
+
+/** The search of the words typed, asked once typing pauses; a newer query drops the older answer. */
+const useSearch = (
+  machine: MachineId,
+  lang: ReturnType<typeof locale>,
+  query: string,
+  attempt: number,
+): TSearch => {
+  const [state, setState] = useState<{ query: string; attempt: number; search: TSearch } | null>(null);
+  const words = query.trim();
+  useEffect(() => {
+    if (words === '') return;
+    const ctl = new AbortController();
+    const clock = pageClock();
+    const timer = clock.setTimeout(() => {
+      searchGuide(machine, lang, words, ctl.signal).then(
+        (hits) => setState({ query: words, attempt, search: { kind: 'hits', hits } }),
+        (error: unknown) => {
+          if (ctl.signal.aborted) return;
+          setState({
+            query: words,
+            attempt,
+            search: {
+              kind: 'failed',
+              error: error instanceof HelpError ? error : new HelpError(String(error), false),
+            },
+          });
+        },
+      );
+    }, SEARCH_PAUSE_MS);
+    return () => {
+      clock.clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [machine, lang, words, attempt]);
+  if (words === '') return { kind: 'idle' };
+  return state?.query === words && state.attempt === attempt ? state.search : { kind: 'loading' };
+};
+
 const HelpPage = ({
   machine,
+  section,
   page,
   anchor,
   onOpenDrawer,
 }: {
   machine: MachineId;
+  section: string | null;
   page: string | null;
   anchor: string | null;
   onOpenDrawer: () => void;
 }) => {
   const lang = locale();
-  const guide = useAsk<IGuidePage[]>(useCallback(() => loadGuide(machine, lang), [machine, lang]));
-  const pages = guide.data;
-  // The address names a page, else the first one is shown; a name the guide does not have is the first too.
-  const current = pages ? ((pages.find((p) => p.name === page) ?? pages[0])?.name ?? null) : null;
-  const loadOne = useCallback(() => loadGuidePage(machine, lang, current ?? ''), [machine, lang, current]);
-  const one = useAsk<string>(current ? loadOne : null);
-  const markdown = current ? one.data : null;
+  const library = useAsk<IGuideSection[]>(useCallback(() => loadLibrary(machine, lang), [machine, lang]));
+  const sections = library.data;
+  const place = sections ? placeOf(sections, section, page) : null;
+  const sectionId = place?.section.id ?? null;
+  const pageName = place?.page.name ?? null;
+  const loadOne = useCallback(
+    () => loadGuidePage(machine, lang, sectionId ?? '', pageName ?? ''),
+    [machine, lang, sectionId, pageName],
+  );
+  const one = useAsk<string>(sectionId && pageName ? loadOne : null);
+  const markdown = place ? one.data : null;
+  const [query, setQuery] = useState('');
+  const [searchAttempt, setSearchAttempt] = useState(0);
+  const search = useSearch(machine, lang, query, searchAttempt);
 
   // A heading named by the address, once the page is drawn; a page without one starts at its top.
   useEffect(() => {
@@ -66,17 +126,33 @@ const HelpPage = ({
     const target = anchor ? document.getElementById(anchor) : null;
     if (target) target.scrollIntoView({ block: 'start' });
     else document.querySelector('.hx-help')?.scrollTo({ top: 0 });
-  }, [markdown, current, anchor]);
+  }, [markdown, sectionId, pageName, anchor]);
+
+  const pictureSrc = useCallback(
+    (src: string) => pictureUrl(machine, lang, sectionId ?? '', pageName ?? '', src),
+    [machine, lang, sectionId, pageName],
+  );
+  const onOpen = useCallback((to: string, name: string, heading?: string) => {
+    goTo({ kind: ROUTE.help, section: to, page: name, ...(heading ? { anchor: heading } : {}) });
+  }, []);
+
+  let onRetry = one.retry;
+  if (library.error) onRetry = library.retry;
+  else if (search.kind === 'failed') onRetry = () => setSearchAttempt((n) => n + 1);
 
   return (
     <HelpView
-      pages={pages}
-      pagesError={guide.error}
-      current={current}
+      sections={sections}
+      sectionsError={library.error}
+      place={place}
       markdown={markdown}
-      pageError={current ? one.error : null}
-      onOpen={(name, to) => goTo({ kind: ROUTE.help, page: name, ...(to ? { anchor: to } : {}) })}
-      onRetry={guide.error ? guide.retry : one.retry}
+      pageError={place ? one.error : null}
+      query={query}
+      search={search}
+      onQuery={setQuery}
+      onOpen={onOpen}
+      pictureSrc={pictureSrc}
+      onRetry={onRetry}
       onOpenDrawer={onOpenDrawer}
     />
   );

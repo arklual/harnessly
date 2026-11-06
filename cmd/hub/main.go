@@ -81,6 +81,8 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 		return runSites(ctx, args, lookup, stdout, stderr)
 	case "seed":
 		return runSeed(ctx, args, lookup, stdout, stderr)
+	case "env-seed":
+		return runEnvSeed(ctx, args, lookup, stdout, stderr)
 	case "machine-code":
 		return runMachineCode(ctx, args, lookup, stdout, stderr)
 	case "help", "-h", "--help":
@@ -92,7 +94,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 }
 
-const usage = `usage: hub [serve | check-config | healthcheck | sites | seed --file seed.yaml [--dry-run] | machine-code --space <slug> --owner <email> [--profile p] | version]
+const usage = `usage: hub [serve | check-config | healthcheck | sites | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | machine-code --space <slug> --owner <email> [--profile p] | version]
 
 The hub is configured by HUB_* environment variables; see docs/hub/deploy.md.
 `

@@ -37,7 +37,7 @@ jobs:
           chmod 0755 whisper-server-linux-${{ matrix.arch }}
           # It must start on this runner (a missing library or instruction set would not).
           ./whisper-server-linux-${{ matrix.arch }} -h >/dev/null 2>&1
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: whisper-server-linux-${{ matrix.arch }}
           path: whisper-server-linux-${{ matrix.arch }}
@@ -49,7 +49,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true

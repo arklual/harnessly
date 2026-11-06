@@ -5,6 +5,13 @@ import type {
   CatalogResponse,
   EnvCard,
   EnvEntryRow,
+  EnvOrderResponse,
+  EnvRunResponse,
+  EnvRunsResponse,
+  EnvTryResponse,
+  MeMachinesResponse,
+  MeRunResponse,
+  MeRunsResponse,
   EnvResponse,
   MeEnvItem,
   MeEnvResponse,
@@ -15,6 +22,9 @@ import { http, orgPath, type Query } from './http';
 
 /** `?scope=` of the environment screen: a tenant's slug, or nothing for all the tenants the person looks at. */
 export const scopeQuery = (scope: string): Query => ({ scope: scope === ALL_SCOPE ? undefined : scope });
+
+const withSpace = (path: string, space?: string): string =>
+  space ? `${path}?space=${encodeURIComponent(space)}` : path;
 
 const entry = (org: string, id: string): string => orgPath(org, `/env/entries/${encodeURIComponent(id)}`);
 
@@ -42,4 +52,25 @@ export const liveEnv = (): EnvApi => ({
   envMine: (space) => http.get<MeEnvResponse>('/api/me/env', { space }),
   envMineSet: (itemId, off, space) =>
     http.put<MeEnvItem>(`/api/me/env/${encodeURIComponent(itemId)}`, { off, space }),
+  catalogPatch: async (org, itemId, req) =>
+    (await http.patch<CatalogItemResponse>(orgPath(org, `/catalog/${encodeURIComponent(itemId)}`), req)).item,
+  catalogDelete: async (org, itemId) => {
+    await http.del(orgPath(org, `/catalog/${encodeURIComponent(itemId)}`));
+  },
+  envOrder: async (org, req) => (await http.put<EnvOrderResponse>(orgPath(org, '/env/order'), req)).entryIds,
+  envRuns: async (org, target, errors) =>
+    (
+      await http.get<EnvRunsResponse>(orgPath(org, '/env/runs'), {
+        layer: target.layer,
+        scopeId: target.scopeId,
+        errors: errors ? '1' : undefined,
+      })
+    ).runs,
+  envRun: async (org, runId) =>
+    (await http.get<EnvRunResponse>(orgPath(org, `/env/runs/${encodeURIComponent(runId)}`))).run,
+  envTry: (org, req) => http.post<EnvTryResponse>(orgPath(org, '/env/try'), req),
+  meMachines: async (space) =>
+    (await http.get<MeMachinesResponse>('/api/me/env/machines', { space })).machines,
+  meRun: (req, space) => http.post<MeRunResponse>(withSpace('/api/me/env/run', space), req),
+  meRuns: async (space) => (await http.get<MeRunsResponse>('/api/me/env/runs', { space })).runs,
 });

@@ -52,10 +52,10 @@ func (s Sender) MachineLabel() string {
 // A token with an audience is never a page session (agent.SessionSubject refuses it), and a page session is never one
 // of these (VerifiedAudience requires the audience).
 const (
-	RelayAudience = "harnessly-peer-relay"
-	InboxAudience = "harnessly-peer"
+	RelayAudience = agent.PeerRelayAudience
+	InboxAudience = agent.PeerInboxAudience
 	// TokenTTL: a token is made for one request.
-	TokenTTL = 60 * time.Second
+	TokenTTL = agent.PeerTokenTTL
 )
 
 var machineID = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)

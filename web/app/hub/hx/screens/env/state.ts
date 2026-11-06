@@ -1,114 +1,115 @@
-// The environment view with optimistic writes. A change shows at once; when the hub refuses, only that change is taken
-// back (so other changes still on their way stay) and the caller says why. When the last write has settled, the view is
-// fetched again without a spinner, so what the hub counted replaces what the screen counted.
+// The data of the screen. Loading is `null` (a list that came back empty is `[]`). A change goes to the hub first and the
+// screen shows what the hub kept: after it the view is fetched again, and only then does the caller say it is done.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { EnvResponse } from '../../../../hub-api/env';
+import type { CatalogItem, EnvLayer, EnvResponse, MeMachine } from '../../../../hub-api/env';
 import { useOrg } from '../../../org/context';
+import type { Target } from './scope';
+import { layersOfMe } from './scope';
 
-export type Result<T> = { ok: true; value: T } | { ok: false; error: unknown };
-
-export interface Write<T> {
-  /** The change as the screen shows it before the answer. */
-  apply: (v: EnvResponse) => EnvResponse;
-  /** Takes exactly that change back. */
-  undo: (v: EnvResponse) => EnvResponse;
-  run: () => Promise<T>;
-  /** Folds the hub's answer into the view. */
-  settle?: (v: EnvResponse, value: T) => EnvResponse;
-}
-
-export interface EnvView {
+export interface EnvData {
+  /** The layers (a member's: what their team gets); null while loading. */
+  layers: EnvLayer[] | null;
+  /** The teams of the layers, for the picker's counts (a member has none). */
   view: EnvResponse | null;
+  machines: MeMachine[];
+  outdated: boolean;
   error: unknown;
   reload: () => void;
-  write: <T>(w: Write<T>) => Promise<Result<T>>;
-  /** The number of writes on their way. */
-  pending: number;
+  /** Fetches again behind the screen and answers when the new data is in. */
+  refresh: () => Promise<void>;
 }
 
-export const useEnvView = (): EnvView => {
+export const useEnvData = (): EnvData => {
   const { api, shell, scope } = useOrg();
   const org = shell.org.slug;
-  const key = scope.kind === 'org' ? 'all' : scope.tenant.slug;
-  const [state, setState] = useState<{ view: EnvResponse | null; error: unknown }>({
-    view: null,
-    error: null,
-  });
-  const [pending, setPending] = useState(0);
+  const member = shell.viewer.role === 'member';
+  const key = `${org}/${member ? 'me' : 'org'}/${scope.kind === 'org' ? 'all' : scope.tenant.slug}`;
+  const space = scope.kind === 'tenant' ? scope.tenant.slug : undefined;
+  const [state, setState] = useState<{
+    view: EnvResponse | null;
+    layers: EnvLayer[] | null;
+    machines: MeMachine[];
+    outdated: boolean;
+    error: unknown;
+  }>({ view: null, layers: null, machines: [], outdated: false, error: null });
+  const [seen, setSeen] = useState(key);
   const [tick, setTick] = useState(0);
-  const latest = useRef<EnvResponse | null>(null);
-  const inFlight = useRef(0);
-  const [seen, setSeen] = useState(`${org}/${key}`);
+  const alive = useRef(true);
 
-  if (seen !== `${org}/${key}`) {
-    setSeen(`${org}/${key}`);
-    setState({ view: null, error: null });
+  if (seen !== key) {
+    setSeen(key);
+    setState({ view: null, layers: null, machines: [], outdated: false, error: null });
   }
 
-  // Another scope starts empty: forget the view of the last one (a ref is not written while rendering).
-  useEffect(() => {
-    latest.current = null;
-  }, [org, key]);
+  const fetchNow = useCallback(async () => {
+    if (member) {
+      const me = await api.envMine(space);
+      return { view: null, layers: layersOfMe(me), machines: me.machines, outdated: me.outdated };
+    }
+    const view = await api.envView(org, scope.kind === 'org' ? 'all' : scope.tenant.slug);
+    return { view, layers: view.layers, machines: [], outdated: false };
+  }, [api, org, member, space, scope]);
 
-  const put = useCallback((view: EnvResponse | null) => {
-    latest.current = view;
-    setState((s) => ({ ...s, view, error: null }));
-  }, []);
-
   useEffect(() => {
-    let alive = true;
-    api.envView(org, key).then(
-      (view) => {
-        if (alive && inFlight.current === 0) put(view);
+    alive.current = true;
+    fetchNow().then(
+      (d) => {
+        if (alive.current) setState({ ...d, error: null });
       },
       (error: unknown) => {
-        if (alive && latest.current === null) setState({ view: null, error });
+        if (alive.current) setState((s) => ({ ...s, error }));
       },
     );
     return () => {
-      alive = false;
+      alive.current = false;
     };
-  }, [api, org, key, tick, put]);
+  }, [fetchNow, tick]);
 
   const reload = useCallback(() => {
-    latest.current = null;
-    setState({ view: null, error: null });
+    setState({ view: null, layers: null, machines: [], outdated: false, error: null });
     setTick((n) => n + 1);
   }, []);
 
-  const write = useCallback(
-    async <T>(w: Write<T>): Promise<Result<T>> => {
-      const cur = latest.current;
-      if (cur) put(w.apply(cur));
-      inFlight.current += 1;
-      setPending(inFlight.current);
-      let out: Result<T>;
-      try {
-        const value = await w.run();
-        const now = latest.current;
-        if (now) put(w.settle ? w.settle(now, value) : now);
-        out = { ok: true, value };
-      } catch (error) {
-        const now = latest.current;
-        if (now) put(w.undo(now));
-        out = { ok: false, error };
-      }
-      inFlight.current -= 1;
-      setPending(inFlight.current);
-      if (inFlight.current === 0) {
-        // Silent refetch: the hub's own counts replace ours.
-        api.envView(org, key).then(
-          (view) => {
-            if (inFlight.current === 0) put(view);
-          },
-          () => undefined,
-        );
-      }
-      return out;
-    },
-    [api, org, key, put],
-  );
+  const refresh = useCallback(async () => {
+    const d = await fetchNow();
+    if (alive.current) setState({ ...d, error: null });
+  }, [fetchNow]);
 
-  return { view: state.view, error: state.error, reload, write, pending };
+  return { ...state, reload, refresh };
+};
+
+/** The organization's catalog, read once for the layer the person is setting up (a manager's right). */
+export const useCatalog = (enabled: boolean, target: Target | null) => {
+  const { api, shell } = useOrg();
+  const org = shell.org.slug;
+  const [items, setItems] = useState<CatalogItem[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [tick, setTick] = useState(0);
+  const layer = target?.layer;
+  const scopeId = target?.scopeId;
+  useEffect(() => {
+    if (!enabled || !layer || !scopeId) return;
+    let live = true;
+    api.envCatalog(org, { layer, scopeId }).then(
+      (list) => {
+        if (live) {
+          setItems(list);
+          setError(null);
+        }
+      },
+      (e: unknown) => {
+        if (live) setError(e);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, org, enabled, layer, scopeId, tick]);
+  const refresh = useCallback(async () => {
+    if (!layer || !scopeId) return;
+    setItems(await api.envCatalog(org, { layer, scopeId }));
+  }, [api, org, layer, scopeId]);
+  const reload = useCallback(() => setTick((n) => n + 1), []);
+  return { items, error, refresh, reload };
 };

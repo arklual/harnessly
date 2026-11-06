@@ -109,6 +109,18 @@ func (h *hub) dialOnce(ctx context.Context, pause *time.Duration) (time.Duration
 	heard := make(chan struct{}, 1)
 	done := make(chan struct{})
 	go keepAlive(ctx, conn, heard, done)
+	select { // a relink asked before this link came up is already answered by this link's hello
+	case <-h.relink:
+	default:
+	}
+	go func() {
+		select {
+		case <-h.relink:
+			Log("info", "calling the hub again: what this machine offers changed")
+			_ = conn.Close(websocket.StatusNormalClosure, "features changed")
+		case <-done:
+		}
+	}()
 	err = h.a.serveLink(conn, heard, true)
 	close(done)
 	switch websocket.CloseStatus(err) {

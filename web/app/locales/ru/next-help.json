@@ -2,7 +2,9 @@
   "next.sidebar.help": "Документация",
   "next.appslist.help": "Как написать приложение",
   "next.help.title": "Документация",
-  "next.help.filter": "Найти в оглавлении",
+  "next.help.filter": "Поиск по документации",
   "next.help.none": "Ничего не нашлось",
-  "next.help.failed": "Страница не открылась"
+  "next.help.failed": "Страница не открылась",
+  "next.help.found": "Найденные страницы",
+  "next.help.empty": "На этой машине пока нет документации"
 }

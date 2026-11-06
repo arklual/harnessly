@@ -1,11 +1,13 @@
-// The layers of the environment as the board draws them: a group per layer (organization, tenant, team), each opening
-// onto a table of rows; or one table of every row.
-import type { CSSProperties, KeyboardEvent } from 'react';
+// The layers of the board: a card per layer (organization, tenant, team), each opening onto its items grouped by kind.
+// The layer being set up is editable: a switch «обязательно», the pencil, «Добавить», and the scripts' dots to pull.
+import { type KeyboardEvent, useState } from 'react';
 
+import type { EnvEntryRow, EnvLayer } from '../../../../hub-api/env';
 import { Icon } from '../../ui';
-import { type Group, LOCK_TITLE, type RowVM } from './helpers';
-
-type Vars = CSSProperties & Record<`--${string}`, string | number>;
+import { Help } from './bits';
+import { type DragLock, keyMove, startDrag } from './drag';
+import { KIND } from './model';
+import { type Block, blocksOf, type LayerMeta } from './scope';
 
 const onKey = (fn: () => void) => (e: KeyboardEvent) => {
   if (e.target !== e.currentTarget) return;
@@ -15,150 +17,213 @@ const onKey = (fn: () => void) => (e: KeyboardEvent) => {
   }
 };
 
-export const Row = ({
+export interface LayerVM {
+  layer: EnvLayer;
+  meta: LayerMeta;
+  index: number;
+  open: boolean;
+  /** This is the layer being set up and the person may change it. */
+  edit: boolean;
+  /** The person's own team of a member: the line says editors change it. */
+  sub: string;
+}
+
+export interface LayerActions {
+  onToggle: () => void;
+  onAdd: () => void;
+  /** null: the row opens nothing (a member's). */
+  onOpen: ((row: EnvEntryRow) => void) | null;
+  onPin: (row: EnvEntryRow) => void;
+  /** Asks the hub for a new order of the layer's scripts; true: kept. */
+  onReorder: (entryIds: string[]) => Promise<boolean>;
+}
+
+const SCRIPT_TIP = (edit: boolean): string =>
+  `Запускаются сверху вниз${edit ? ' — тяните за точки слева, чтобы поменять порядок' : ''}. Сначала ставим доступы и репозитории, потом скрипты организации, тенанта и команды, потом скиллы и MCP`;
+
+const Row = ({
   r,
-  onOpen,
-  onToggle,
+  vm,
+  a,
+  fresh,
+  drag,
+  scriptIds,
 }: {
-  r: RowVM;
-  onOpen: (entryId: string) => void;
-  onToggle: (entryId: string, on: boolean) => void;
-}) => (
-  <div
-    className="pt-row en-row"
-    role="button"
-    tabIndex={0}
-    data-off={r.off ? '1' : '0'}
-    onClick={() => onOpen(r.entryId)}
-    onKeyDown={onKey(() => onOpen(r.entryId))}
-  >
-    <span className="pt-name">
-      <span className="ad-ic">
-        <Icon i={r.icon} size="sm" />
-      </span>
-      <span className="mt-name__t">
-        <b>{r.name}</b>
-        {r.issue ? (
-          <small data-warn="1" title={r.why ?? undefined}>
-            {r.issue}
-          </small>
-        ) : (
-          <small>{r.sub}</small>
-        )}
-      </span>
-    </span>
-    <span className="en-who">{r.who}</span>
-    <span className="en-use">
-      <span className="en-spark" data-zero={r.zero ? '1' : '0'} aria-hidden="true">
-        {r.spark.map((h, i) => (
-          <i key={i} style={{ '--h': h } as Vars} />
-        ))}
-      </span>
-      <b>{r.wk}</b>
-    </span>
-    <span className="pt-last" data-warn={r.stale ? '1' : '0'}>
-      {r.last}
-    </span>
-    <span className="en-ctl">
-      {r.locked && r.lockedReason ? (
-        <span
-          className="en-lock"
-          title={LOCK_TITLE[r.lockedReason]}
-          role="img"
-          aria-label={LOCK_TITLE[r.lockedReason]}
-        >
-          <Icon i="lock" size="sm" />
-        </span>
-      ) : (
-        <button
-          type="button"
-          className="hx-switch"
-          role="switch"
-          aria-checked={r.off ? 'false' : 'true'}
-          aria-label={`${r.off ? 'Включить' : 'Выключить'} «${r.name}»`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(r.entryId, r.off);
-          }}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <i />
-        </button>
-      )}
-    </span>
-  </div>
-);
-
-const Head = () => (
-  <div className="pt-row en-row mt-head">
-    <span>Название</span>
-    <span>Кому</span>
-    <span>Вызовов за неделю</span>
-    <span>Последний раз</span>
-    <span />
-  </div>
-);
-
-export const GroupCard = ({
-  g,
-  onToggleOpen,
-  onOpen,
-  onToggle,
-}: {
-  g: Group;
-  onToggleOpen: (key: string) => void;
-  onOpen: (entryId: string) => void;
-  onToggle: (entryId: string, on: boolean) => void;
-}) => (
-  <div className="mo-g tg" aria-expanded={g.open ? 'true' : 'false'} style={{ '--i': g.i } as Vars}>
+  r: EnvEntryRow;
+  vm: LayerVM;
+  a: LayerActions;
+  fresh: boolean;
+  drag: DragLock;
+  scriptIds: string[];
+}) => {
+  const canEdit = vm.edit && !r.locked;
+  const canDrag = canEdit && r.kind === 'script' && scriptIds.length > 1;
+  const group = `${vm.layer.layer}:${vm.layer.scopeId}`;
+  const open = () => a.onOpen?.(r);
+  const opts = { ids: scriptIds, commit: a.onReorder, group };
+  return (
     <div
-      className="mo-g__head en-head"
-      role="button"
-      tabIndex={0}
-      aria-expanded={g.open ? 'true' : 'false'}
-      onClick={() => onToggleOpen(g.key)}
-      onKeyDown={onKey(() => onToggleOpen(g.key))}
+      className="ev-row"
+      data-fresh={fresh ? 'true' : undefined}
+      data-dg={canDrag ? group : undefined}
+      role={a.onOpen ? 'button' : undefined}
+      tabIndex={a.onOpen ? 0 : undefined}
+      onClick={a.onOpen ? open : undefined}
+      onKeyDown={a.onOpen ? onKey(open) : undefined}
+      aria-label={a.onOpen ? undefined : r.name}
     >
-      <Icon i="chevron-right" className="mo-g__chev" />
-      <span className="ad-dot tg-dot" style={{ '--c': g.color } as Vars}>
-        {g.initial}
+      {canDrag && (
+        <span
+          className="ev-grip"
+          role="button"
+          tabIndex={0}
+          aria-label={`Порядок: «${r.name}». Тяните или жмите стрелки`}
+          onPointerDown={(e) => startDrag(e, r.entryId, opts, drag)}
+          onKeyDown={(e) => void keyMove(e, r.entryId, opts, drag)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
+      <span className="ad-ic">
+        <Icon i={KIND[r.kind].icon} size="sm" />
       </span>
-      <span className="mo-g__t">
-        <b>{g.layer.title}</b>
-        <small>{g.layer.subtitle}</small>
+      <span className="ev-row__t">
+        <b>{r.name}</b>
+        <small>{r.hint}</small>
       </span>
-      <span className="en-chips">{g.kinds}</span>
-      <span className="mo-g__s">
-        {g.calls}
-        <small> вызовов</small>
-      </span>
+      {canEdit ? (
+        <>
+          <span className="ev-req hx-tipped" onClick={(e) => e.stopPropagation()}>
+            <span className="ev-req__l">{r.pinned ? 'обязательно' : 'по желанию'}</span>
+            <button
+              type="button"
+              className="hx-switch"
+              role="switch"
+              aria-checked={r.pinned ? 'true' : 'false'}
+              aria-label="Обязательно"
+              onClick={() => a.onPin(r)}
+            >
+              <i />
+            </button>
+            <span className="hx-tip pz-tip" data-align="end">
+              {r.pinned
+                ? 'Поставится всем. Выключите — человек сможет пропустить'
+                : 'Человек может пропустить. Включите — поставится всем'}
+            </span>
+          </span>
+          <span className="ev-pen-w hx-tipped">
+            <button
+              type="button"
+              className="hx-btn ev-pen"
+              data-variant="ghost"
+              data-size="sm"
+              data-shape="icon"
+              aria-label="Изменить"
+              onClick={(e) => {
+                e.stopPropagation();
+                open();
+              }}
+            >
+              <Icon i="pencil" size="sm" />
+            </button>
+            <span className="hx-tip pz-tip" data-align="end">
+              Изменить
+            </span>
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="ev-req__ro">{r.pinned ? 'обязательно' : 'по желанию'}</span>
+          {a.onOpen && (
+            <span className="ev-go">
+              <Icon i="chevron-right" size="sm" />
+            </span>
+          )}
+        </>
+      )}
     </div>
-    <div className="mo-g__body">
-      <div>
-        <div className="mt mt--in">
-          <Head />
-          {g.rows.map((r) => (
-            <Row key={r.entryId} r={r} onOpen={onOpen} onToggle={onToggle} />
+  );
+};
+
+export const LayerCard = ({
+  vm,
+  rows,
+  q,
+  a,
+  fresh,
+}: {
+  vm: LayerVM;
+  rows: Block[];
+  q: string;
+  a: LayerActions;
+  fresh: ReadonlySet<string>;
+}) => {
+  const [drag] = useState<DragLock>(() => ({ busy: false }));
+  const { layer, meta, edit } = vm;
+  const scriptIds = layer.items.filter((r) => r.enabled && r.kind === 'script').map((r) => r.entryId);
+  const empty = rows.length === 0 && q.trim() === '';
+  return (
+    <section className="ev-layer" aria-expanded={vm.open ? 'true' : 'false'} data-i={vm.index}>
+      <div className="ev-layer__hd">
+        <button type="button" className="ev-layer__head" onClick={a.onToggle}>
+          <Icon i="chevron-right" size="sm" className="ev-chev" />
+          <span className="ad-dot" data-l={meta.kind}>
+            {meta.initial}
+          </span>
+          <span className="ev-layer__t">
+            <b>{layer.layer === 'org' ? `${meta.short} — вся организация` : layer.title}</b>
+            <small>{vm.sub}</small>
+          </span>
+          {!edit && <Icon i="lock" size="sm" className="ev-lock" />}
+        </button>
+        {edit && (
+          <button
+            type="button"
+            className="hx-btn ev-layer__add"
+            data-size="sm"
+            onClick={a.onAdd}
+            aria-label="Добавить в окружение"
+          >
+            <Icon i="plus" size="sm" />
+            <span className="ev-tl">Добавить в окружение</span>
+          </button>
+        )}
+      </div>
+      <div className="ev-layer__body">
+        <div>
+          {rows.map((b) => (
+            <div key={b.kind}>
+              <div className="ev-kindh">
+                <span>{KIND[b.kind].many}</span>
+                {b.kind === 'script' && <Help text={SCRIPT_TIP(edit && q.trim() === '')} />}
+              </div>
+              {b.rows.map((r) => (
+                <Row
+                  key={r.entryId}
+                  r={r}
+                  vm={vm}
+                  a={a}
+                  fresh={fresh.has(r.entryId)}
+                  drag={drag}
+                  scriptIds={q.trim() === '' ? scriptIds : []}
+                />
+              ))}
+            </div>
           ))}
+          {empty && (
+            <div className="ev-layer__empty">
+              {edit ? 'Пока пусто — добавьте то, что нужно именно здесь' : 'Пусто'}
+            </div>
+          )}
+          {edit && q.trim() === '' && (
+            <button type="button" className="ev-addrow" onClick={a.onAdd}>
+              <Icon i="plus" size="sm" />
+              {`Добавить в ${meta.acc}`}
+            </button>
+          )}
         </div>
       </div>
-    </div>
-  </div>
-);
+    </section>
+  );
+};
 
-export const FlatList = ({
-  rows,
-  onOpen,
-  onToggle,
-}: {
-  rows: RowVM[];
-  onOpen: (entryId: string) => void;
-  onToggle: (entryId: string, on: boolean) => void;
-}) => (
-  <div className="mt">
-    <Head />
-    {rows.map((r) => (
-      <Row key={r.entryId} r={r} onOpen={onOpen} onToggle={onToggle} />
-    ))}
-  </div>
-);
+export { blocksOf };

@@ -30,15 +30,17 @@ type PersonSettings struct {
 	Voice VoiceSettings       `json:"voice"`
 }
 
-// VoiceEngines are the recognition models a person may pick for dictation: the machine's own, OpenAI's, Yandex's.
+// VoiceEngines are the recognition models a person may pick for dictation: the machine's own, the ChatGPT plan's, OpenAI's,
+// Yandex's.
 const (
-	VoiceEngineLocal  = "local"
-	VoiceEngineOpenAI = "openai"
-	VoiceEngineYandex = "yandex"
+	VoiceEngineLocal   = "local"
+	VoiceEngineChatGPT = "chatgpt"
+	VoiceEngineOpenAI  = "openai"
+	VoiceEngineYandex  = "yandex"
 )
 
 // VoiceEngines is every recognition model, in the order Settings lists them.
-var VoiceEngines = []string{VoiceEngineLocal, VoiceEngineOpenAI, VoiceEngineYandex}
+var VoiceEngines = []string{VoiceEngineLocal, VoiceEngineChatGPT, VoiceEngineOpenAI, VoiceEngineYandex}
 
 // VoiceSettings are the dictation's: which model recognizes and the person's own words.
 type VoiceSettings struct {

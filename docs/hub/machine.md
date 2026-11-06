@@ -9,6 +9,7 @@ runtime through it. How the link, the operations and the files are specified is 
 - [Connect a machine](#connect-a-machine)
 - [Profiles](#profiles)
 - [What the hub can and cannot do to the machine](#what-the-hub-can-and-cannot-do-to-the-machine)
+- [Machine setup](#machine-setup)
 - [Files](#files)
 - [The local policy](#the-local-policy)
 - [The kill switch and the audit log](#the-kill-switch-and-the-audit-log)
@@ -113,10 +114,52 @@ What the agent does for the hub, always on the machine's side of the policy:
 - mints a session for a person the hub has signed in, and opens a tunnel from the hub to the runtime.
 
 What it does not do: it takes no command line from the hub, never lets the hub write a file or run a program of its
-choice outside the operations above, never touches an account other than its own, and never stores or logs a key or
+choice outside the operations above (the one exception is the [machine setup](#machine-setup): the scripts of the
+person's own organization's environment list, run by the person's runtime and only under the policy `setup`), never touches an account other than its own, and never stores or logs a key or
 secret anywhere but the 0600 env files. `env.deliver` takes only names that look like secrets (`…_TOKEN`, `…_KEY`,
 `…_PASSWORD`…) and refuses anything that would change how a shell, git, a pager, a package manager or an interpreter
 behaves, and every address (`…_URL`, `…_HOST`) ([api.md](api.md)).
+
+## Machine setup
+
+Besides what the chats load, the organization's environment list can say what the machine is to have: the forges' CLIs
+logged in (`access`), repositories cloned (`repo`) and Linux scripts run in order (`script`). What the items mean and
+the runs are in [environment.md](environment.md#machine-setup); this is who does it on the machine.
+
+- **The runtime does it, not the agent.** The agent is sandboxed by systemd on the managed profiles (the home is
+  read-only, its own folder the only place to write) and must not run a program of anyone's choosing. The runtime runs as
+  the person, holds the person's safe (`internal/secrets`) and already runs their commands. So the agent is the courier
+  and the runtime (`internal/envsetup`, started by `cmd/runtime`) does the work, one runner for each link folder
+  (`$AGENT_DATA_DIR`, `$AGENT_DATA_DIR/hub`, the folder of `AGENT_HUB_OBSERVE_FILE`).
+- **Hand-off by files** in the link folder, which survive a restart of either process: `environment.json` (the list the
+  agent holds) and `environment-requests/<runId>.json` (a run the hub asked for) go to the runtime;
+  `environment-setup.json` (the hash worked on, each item's status, the ledger of scripts run once) and
+  `environment-runs/<runId>.json` (a run as it stands, rewritten as steps move, kept 14 days) come back. The agent
+  turns the first into the items' status in `env.state` and the second into `env.run` events (re-sent for the last 24
+  hours after a connect).
+- **When.** A list the runtime has not worked on is applied within seconds (`apply`); `env.run` asks for `update`,
+  `check` (changes nothing) or `sandbox` (the list from scratch in a temporary home of its own, removed after the run; also inside bubblewrap
+  where a probe shows it works — many machines refuse unprivileged user namespaces, and then the run goes on without it and
+  says so in the log of every step). One run at a time. A run a crash cut short is marked «прервано
+  перезапуском» and the list is applied again, the ledger sparing what already ran once.
+- **Secrets.** A script gets the safe's secrets it names as variables (`npm-token` → `NPM_TOKEN`) and the output is
+  masked. A secret that is not in the safe opens the safe's ask on the person's page («Положить в сейф»); the run waits
+  and goes on once the secret is there.
+- **Policy `setup`** (on when the machine has no policy file; a policy file must say `setup = true`, a file without the key means off). The agent writes its decision into the link
+  folder (`environment-allow.json`, `{"setup": bool}`) and the runtime runs **nothing** (no apply, update, check or
+  sandbox) unless it says true; a missing file is a no. With it off, `env.run` answers `policy_denied`, `hello` does not
+  offer the feature `environment.setup` (so the hub sends no setup items) and the setup items are `pending` «настройка
+  машины выключена на этой машине (политика setup)». The kill switch turns it off too.
+- **Observe links are off by default.** The machine of a closed cluster is not the hub's to set up on the hub's say. The
+  operator opts in on the machine with `AGENT_HUB_SETUP=on` in the agent's environment; without it the observe link
+  gets no feature, `env.run` is `policy_denied`, and the runtime is told no. `RUNTIME_ENV_SETUP=off` in the runtime's
+  environment switches the runner off on the machine itself (the items then stay «машина ещё настраивается»).
+- **Limits of what is promised.** Scripts run as the person with a minimal environment; they can do what the person can.
+  A script by address is fetched over https only (no redirect to http), a repository over https or ssh only. The sandbox
+  is for finding what a fresh machine lacks, not for containing a script: without bubblewrap nothing stops a script
+  from leaving the sandbox home. The runtime runs setup programs with lowered CPU and disk priority, one run at a time,
+  and clones only with 2 GiB free. A list that is not done (an error, a token missing) is tried again every 30 minutes.
+  The runtime's heartbeat `environment-runner.json` (every 30 s) tells the agent a setup is there to offer the feature.
 
 ## Files
 
@@ -149,6 +192,8 @@ keys = true              # API keys and secrets delivered from the hub
 env = true               # environment variables delivered from the hub
 install = true           # installing Claude Code and Codex
 runtime_session = true   # the hub opening this machine's page for a person, and the tunnel it needs
+setup = true             # the environment list setting the machine up: logins, clones, scripts (env.run)
+peers = true             # messages from and to agents of other machines of the hub (peers.md)
 deny_routes = []         # route prefixes of the runtime to refuse, e.g. ["/api/terminal", "/api/fs/write"]
 ```
 

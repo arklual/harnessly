@@ -61,6 +61,14 @@ PUBLISH A SITE
   harnessly site list|versions|rollback    see the sites, their versions, go back to an earlier one
                                     needs --url (the hub) and a deploy token; harnessly site --help has the rest
 
+DOCUMENTATION (harnessly's own and this team's: how it works, how to use it, how it is built; needs no runtime)
+  harnessly docs                    the sections and pages: for people, for agents, the architecture, self-hosting
+  harnessly docs search WORDS...    the pages that have every word, with the line that matched: ask here before guessing
+  harnessly docs read SECTION/PAGE  print a page
+  harnessly docs add SECTION/PAGE [FILE|-] [--title T] [--picture FILE]...
+                                    write a page into this machine's own docs; it shows on the /help page at once
+  harnessly docs help               every option
+
 APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skills, MCP, views; turned on per chat)
   harnessly app docs [PAGE]         the guide, step by step, with diagrams and examples: start here (needs no runtime)
   harnessly app docs export DIR     write the guide and the example packages into DIR, to search and copy
@@ -167,6 +175,7 @@ Exit codes: 0 done, 1 refused or failed (the reason is printed), 2 wrong usage.
 `
 
 var commandHelp = map[string]string{
+	"docs":         docsUsage,
 	"design video": videoHelp,
 	"open": `harnessly open <target>
 

@@ -104,6 +104,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	}
 	if s.env != nil && slices.Contains(hello.Features, hubproto.FeatureEnvironment) {
 		events = append(slices.Clone(events), hubproto.EventEnvState)
+		if slices.Contains(hello.Features, hubproto.FeatureEnvSetup) {
+			events = append(events, hubproto.EventEnvRun)
+		}
 	}
 	if _, err := s.reg.Do(ctx, m.ID, hubproto.OpLinkSubscribe, map[string]any{"events": events}, callTimeout); err != nil {
 		s.log.Warn("events not subscribed", "machine", m.ID, "error", err)
@@ -190,6 +193,11 @@ func (s *Service) onEvent(_ *link.Link, m store.Machine, ev link.Event) {
 		var e struct{ State hubproto.EnvState }
 		if s.env != nil && json.Unmarshal(ev.Raw, &e) == nil {
 			s.env.Reported(m.ID, e.State)
+		}
+	case hubproto.EventEnvRun:
+		var e struct{ Run hubproto.EnvRun }
+		if s.env != nil && json.Unmarshal(ev.Raw, &e) == nil {
+			s.env.Run(m.ID, e.Run)
 		}
 	case hubproto.EventUsageAvailable:
 		if s.usage != nil {

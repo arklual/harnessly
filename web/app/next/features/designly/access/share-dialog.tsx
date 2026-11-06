@@ -5,11 +5,11 @@
 // What is needed rarely or is dangerous sits in «…» of the head; the journal, the link settings and the hand-over are
 // views that slide in inside the dialog with a way back. One who may only look sees their own role and a way to ask
 // for more. Every change waits for the gateway and shows what it answered. On the phone it is a bottom sheet.
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import AccessAdd from '@/next/features/designly/access/access-add';
 import AccessGeneral from '@/next/features/designly/access/access-general';
 import AccessLinks from '@/next/features/designly/access/access-links';
-import AccessLog from '@/next/features/designly/access/access-log';
+import AccessLog, { warmLog } from '@/next/features/designly/access/access-log';
 import AccessPeople from '@/next/features/designly/access/access-people';
 import AccessRequests from '@/next/features/designly/access/access-requests';
 import AccessTransfer from '@/next/features/designly/access/access-transfer';
@@ -24,11 +24,11 @@ import { roleLabel } from '@/next/features/designly/access/labels';
 import type { IScopePage } from '@/next/features/designly/access/link-scope';
 import RequestForm from '@/next/features/designly/access/request-form';
 import ShareMenu, { SUB_VIEW, type TSubView } from '@/next/features/designly/access/share-menu';
-import { useAction } from '@/next/features/designly/access/use-action';
+import { useAction, type IAction } from '@/next/features/designly/access/use-action';
 import Modal from '@/next/features/shell/modal';
 import { useMe } from '@/next/stores/me';
 import Icon from '@/next/ui/icon';
-import { usePresence } from '@/next/ui/presence';
+import { usePresence, type TPresenceState } from '@/next/ui/presence';
 import Sheet from '@/next/ui/sheet';
 import Tooltip from '@/next/ui/tooltip';
 import { usePhone } from '@/next/ui/use-media';
@@ -131,6 +131,57 @@ export const Frame = ({
   );
 };
 
+/** A view kept in the dialog while it is hidden: it was opened once since the dialog opened. */
+export const IDLE = 'idle';
+
+/** The main view fades out in this long before it is skipped (styles/design-access.css, .hx-acc-view--main). */
+const MAIN_OUT_MS = 280;
+
+/** True once a view has covered the main one for its whole fade, false at once when the view goes. The covered main
+ *  view is skipped by the browser (content-visibility) instead of being made inert: inert restyled every row of it on
+ *  each switch, the skip keeps what was computed. */
+export const useCovered = (on: boolean): boolean => {
+  const [covered, setCovered] = useState(false);
+  if (!on && covered) setCovered(false);
+  useEffect(() => {
+    if (!on) return;
+    const timer = setTimeout(() => setCovered(true), MAIN_OUT_MS);
+    return () => clearTimeout(timer);
+  }, [on]);
+  return covered;
+};
+
+/** Holds what a view last drew while it is out of sight or on its way out: the dialog drawing again for the view that
+ *  shows does not draw the hidden ones. */
+export const Still = memo(
+  ({ children }: { still: boolean; children: ReactNode }) => children,
+  (before, after) => before.still && after.still,
+);
+
+interface IMainProps {
+  project: string;
+  access: IProjectAccess;
+  action: IAction;
+  onNext: (next: IProjectAccess) => void;
+  me: string | null;
+  field: RefObject<HTMLInputElement | null>;
+  extra?: ReactNode;
+}
+
+/** The main view, drawn again only when what it shows changes, not when a view slides over it. */
+const Main = memo(({ project, access, action, onNext, me, field, extra }: IMainProps) => {
+  const section = { project, access, action, onNext };
+  return (
+    <>
+      <AccessAdd {...section} inputRef={field} />
+      <AccessRequests {...section} />
+      <AccessPeople {...section} me={me} />
+      <AccessGeneral {...section} />
+      {extra}
+    </>
+  );
+});
+
 const ShareDialog = ({
   open,
   onClose,
@@ -152,6 +203,9 @@ const ShareDialog = ({
   const field = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<TSubView | null>(null);
   const sub = usePresence(view, VIEW_OUT_MS);
+  // The views opened since the dialog opened stay mounted while hidden: nothing is drawn or read again on the way back.
+  const [seen, setSeen] = useState<readonly TSubView[]>([]);
+  if (view !== null && !seen.includes(view)) setSeen([...seen, view]);
   const idle = action.busy === null;
   const section = { project, access, action, onNext };
   const manages = access.canManage;
@@ -161,8 +215,13 @@ const ShareDialog = ({
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setView(null);
+    if (open) {
+      setView(null);
+      setSeen([]);
+    }
   }
+
+  useEffect(() => (open ? warmLog() : undefined), [open]);
 
   // A push says which block it is about: the dialog opens with that one in view.
   useEffect(() => {
@@ -173,10 +232,16 @@ const ShareDialog = ({
     return () => clearTimeout(timer);
   }, [open, focus, access.canManage]);
 
-  const go = (next: TSubView | null) => {
-    action.clear();
-    setView(next);
-  };
+  const { clear } = action;
+  const go = useCallback(
+    (next: TSubView | null) => {
+      clear();
+      setView(next);
+    },
+    [clear],
+  );
+  const covered = useCovered(view !== null);
+  const stateOf = (v: TSubView): TPresenceState | typeof IDLE => (v === sub.value ? sub.state : IDLE);
 
   const shareTitle = t('next.access.shareTitle', { name: title || t('next.access.untitled') });
 
@@ -190,34 +255,45 @@ const ShareDialog = ({
     >
       <div className="hx-modal__body hx-acc-body" ref={body}>
         {manages ? (
-          <div className="hx-acc-views" data-sub={view !== null}>
-            <div className="hx-acc-view hx-acc-view--main" inert={view !== null}>
-              <AccessAdd {...section} inputRef={field} />
-              <AccessRequests {...section} />
-              <AccessPeople {...section} me={me.k === 'ready' ? me.me.email : null} />
-              <AccessGeneral {...section} />
-              {extra}
+          <div className="hx-acc-views" data-sub={view !== null} data-covered={covered}>
+            <div className="hx-acc-view hx-acc-view--main" aria-hidden={view !== null || undefined}>
+              <Main
+                project={project}
+                access={access}
+                action={action}
+                onNext={onNext}
+                me={me.k === 'ready' ? me.me.email : null}
+                field={field}
+                extra={extra}
+              />
             </div>
-            {sub.value && (
-              <div className="hx-acc-view hx-acc-view--sub" data-state={sub.state} inert={view === null}>
-                <div className="hx-acc-back">
-                  <button
-                    type="button"
-                    className="hx-head-btn"
-                    aria-label={t('next.access.backView')}
-                    onClick={() => go(null)}
-                  >
-                    <Icon name="arrow-left" />
-                  </button>
-                  <h3 className="hx-acc-back__title">{t(VIEW_TITLE[sub.value])}</h3>
-                </div>
-                {sub.value === SUB_VIEW.log && <AccessLog project={project} />}
-                {sub.value === SUB_VIEW.links && (
-                  <AccessLinks {...section} pages={pages} guestRights={guestRights} />
-                )}
-                {sub.value === SUB_VIEW.transfer && <AccessTransfer {...section} onDone={() => go(null)} />}
+            {seen.map((v) => (
+              <div
+                key={v}
+                className="hx-acc-view hx-acc-view--sub"
+                data-state={stateOf(v)}
+                aria-hidden={view !== v || undefined}
+              >
+                <Still still={view !== v}>
+                  <div className="hx-acc-back">
+                    <button
+                      type="button"
+                      className="hx-head-btn"
+                      aria-label={t('next.access.backView')}
+                      onClick={() => go(null)}
+                    >
+                      <Icon name="arrow-left" />
+                    </button>
+                    <h3 className="hx-acc-back__title">{t(VIEW_TITLE[v])}</h3>
+                  </div>
+                  {v === SUB_VIEW.log && <AccessLog project={project} />}
+                  {v === SUB_VIEW.links && (
+                    <AccessLinks {...section} pages={pages} guestRights={guestRights} />
+                  )}
+                  {v === SUB_VIEW.transfer && <AccessTransfer {...section} onDone={() => go(null)} />}
+                </Still>
               </div>
-            )}
+            ))}
           </div>
         ) : (
           <section className="hx-acc-sec" data-section="own">

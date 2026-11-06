@@ -51,11 +51,14 @@ type EnvSet struct {
 // source.secretRefs and the machine looks it up by that name. Layer is the highest layer that puts the item in
 // (org, tenant, team); Pinned says nobody below may switch it off.
 type EnvItem struct {
-	ItemID string          `json:"itemId"`
-	Kind   string          `json:"kind"`
-	Name   string          `json:"name"`
-	Layer  string          `json:"layer"`
-	Pinned bool            `json:"pinned"`
+	ItemID string `json:"itemId"`
+	Kind   string `json:"kind"`
+	Name   string `json:"name"`
+	Layer  string `json:"layer"`
+	Pinned bool   `json:"pinned"`
+	// Order is the place of a script in the run (1, 2, …: the organization's first, then the tenant's, then the team's,
+	// each layer in its editors' order); 0 and absent for every other kind. Only a machine with FeatureEnvSetup gets it.
+	Order  int             `json:"order,omitempty"`
 	Source json.RawMessage `json:"source"`
 }
 

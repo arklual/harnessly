@@ -128,10 +128,20 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 			return nil, nil, h.allow(op, false, "the hub's limits")
 		}
 		return h.opBudget(req)
+	case hubproto.OpEnvRun:
+		// Own link: the policy's `setup`. Observe link: only when the operator opted in with AGENT_HUB_SETUP=on (the closed
+		// cluster's machine is not the hub's to set up on its own say).
+		if err := h.allow(op, h.setupAllowed(), "setting the machine up from the environment list"); err != nil {
+			return nil, nil, err
+		}
+		return h.opEnvRun(req)
 	case hubproto.OpEnvSet:
 		// Served on an observe link too: the list is applied only into the link's own folder (a plugin the runtime adds
 		// to new chats) and changes nothing the cluster set up.
 		return h.opEnvSet(req)
+	case hubproto.OpPeersDeliver, hubproto.OpPeersDirectory:
+		// Served on an observe link only when the operator opted in with AGENT_HUB_PEERS=on.
+		return h.opPeers(op, req)
 	}
 	if closedClusterOps[op] {
 		return nil, nil, hubproto.Errf(hubproto.CodePolicyDenied, "%s is not served on a hub link", op)

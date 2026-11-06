@@ -2,6 +2,7 @@ package wire_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -95,12 +96,19 @@ func TestMeVoiceSettings(t *testing.T) {
 	if voice["engine"] != "openai" || len(voice["words"].([]any)) != 2 {
 		t.Fatalf("saved voice: %v", voice)
 	}
+	// Every model Settings offers can be picked: the page's list and this one must not part.
+	for i, engine := range []string{"local", "chatgpt", "openai", "yandex"} {
+		pick := fmt.Sprintf(`{"rev":%d,"patch":{"voice":{"engine":%q,"words":[]}}}`, 2+i, engine)
+		if code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", pick); code != 200 || res["r"] != "accepted" {
+			t.Fatalf("pick %s: %d %v", engine, code, res)
+		}
+	}
 	for _, bad := range []string{
-		`{"rev":2,"patch":{"voice":{"engine":"whisper","words":[]}}}`,
-		`{"rev":2,"patch":{"voice":{"engine":"local","words":[{"word":"","heard":[]}]}}}`,
-		`{"rev":2,"patch":{"voice":{"engine":"local","words":[{"word":"a","heard":[""]}]}}}`,
-		`{"rev":2,"patch":{"voice":{"engine":"local"}}}`,
-		`{"rev":2,"patch":{"voice":{"engine":"local","words":[],"extra":1}}}`,
+		`{"rev":6,"patch":{"voice":{"engine":"whisper","words":[]}}}`,
+		`{"rev":6,"patch":{"voice":{"engine":"local","words":[{"word":"","heard":[]}]}}}`,
+		`{"rev":6,"patch":{"voice":{"engine":"local","words":[{"word":"a","heard":[""]}]}}}`,
+		`{"rev":6,"patch":{"voice":{"engine":"local"}}}`,
+		`{"rev":6,"patch":{"voice":{"engine":"local","words":[],"extra":1}}}`,
 	} {
 		if code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", bad); code != http.StatusBadRequest || res["code"] != "bad-request" {
 			t.Fatalf("%s: %d %v", bad, code, res)

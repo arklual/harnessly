@@ -19,10 +19,19 @@ export interface IGreetingProps {
   into?: { name: string; onClear: () => void } | null;
   /** The page opens from a chat: its field rises up under the greeting; from any other screen it stands in place. */
   fromChat?: boolean;
+  /** The machine's setup card («Настройка машины»), under the greeting. */
+  setup?: ReactNode;
 }
 
 /** The start page (`/`): the question in the middle of the stage, the way to continue a terminal session, the field. */
-const Greeting = ({ name, onResume, composer, into = null, fromChat = false }: IGreetingProps) => {
+const Greeting = ({
+  name,
+  onResume,
+  composer,
+  into = null,
+  fromChat = false,
+  setup = null,
+}: IGreetingProps) => {
   const chip = usePresence(into, INTO_EXIT_MS);
   const hello = (
     <div className="hx-hello" data-dock={composer ? '' : undefined}>
@@ -55,6 +64,7 @@ const Greeting = ({ name, onResume, composer, into = null, fromChat = false }: I
           </button>
         )}
       </div>
+      {setup}
     </div>
   );
   return (

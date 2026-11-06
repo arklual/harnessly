@@ -5,6 +5,14 @@ import type {
   AddEntryRequest,
   CatalogItem,
   CatalogKind,
+  EnvOrderRequest,
+  EnvRunRow,
+  EnvTryRequest,
+  EnvTryResponse,
+  MeMachine,
+  MeRunRequest,
+  MeRunResponse,
+  PatchCatalogRequest,
   EnvCard,
   EnvEntryRow,
   EnvLayerKind,
@@ -35,4 +43,23 @@ export interface EnvApi {
   /** A person's own environment in a tenant (its slug; absent: the hub picks the one they are in). */
   envMine(space?: string): Promise<MeEnvResponse>;
   envMineSet(itemId: string, off: boolean, space?: string): Promise<MeEnvItem>;
+
+  /** Changes an item of the catalog (its owner layer's managers, the organization's admins); the change shows in every layer that has it. */
+  catalogPatch(org: string, itemId: string, req: PatchCatalogRequest): Promise<CatalogItem>;
+  /** Archives an item: the entries that used it stop putting it in. */
+  catalogDelete(org: string, itemId: string): Promise<void>;
+  /** The scripts of a layer in their new order: all of its script entries, each once. Answers the order the hub kept. */
+  envOrder(org: string, req: EnvOrderRequest): Promise<string[]>;
+  /** The runs of the machines a layer reaches, newest first, 14 days; `errors`: only runs with an error. */
+  envRuns(org: string, target: CatalogTarget, errors: boolean): Promise<EnvRunRow[]>;
+  /** One run with the log of every step. */
+  envRun(org: string, runId: string): Promise<EnvRunRow>;
+  /** A sandbox run of a layer's list with a draft added or put in place of an entry. */
+  envTry(org: string, req: EnvTryRequest): Promise<EnvTryResponse>;
+  /** The person's machines in a tenant, and how far each one got. */
+  meMachines(space?: string): Promise<MeMachine[]>;
+  /** Asks the person's online machines in the tenant (or the one) to update or to check. */
+  meRun(req: MeRunRequest, space?: string): Promise<MeRunResponse>;
+  /** The runs of the person's machines. */
+  meRuns(space?: string): Promise<EnvRunRow[]>;
 }

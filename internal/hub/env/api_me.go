@@ -1,15 +1,19 @@
 package env
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // MeSpace and MeOrg name where a person's environment is.
@@ -44,6 +48,22 @@ type MeResponse struct {
 	Space MeSpace  `json:"space"`
 	Org   *MeOrg   `json:"org"`
 	Items []MeItem `json:"items"`
+	// Outdated: some machine of the person in the tenant does not hold the current list or has a setup item that failed.
+	Outdated bool        `json:"outdated"`
+	Machines []MeMachine `json:"machines"`
+}
+
+// MeMachine is a machine of the person with what its setup looks like.
+type MeMachine struct {
+	ID      string     `json:"id"`
+	Name    string     `json:"name"`
+	Online  bool       `json:"online"`
+	Setup   bool       `json:"setup"`   // has environment.setup
+	Current bool       `json:"current"` // holds the list the hub computes for it now
+	Failed  int        `json:"failed"`  // setup items in error or waiting for the person
+	LastRun *EnvRunRow `json:"lastRun"`
+	// Team is the team whose list the machine holds; null for a machine of no team.
+	Team *NameRef `json:"team"`
 }
 
 // me is a request about the environment of the person themself in one tenant.
@@ -130,6 +150,15 @@ func (s *Service) meEnv(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		return err
 	}
 	out := MeResponse{Space: MeSpace{ID: m.space.ID, Slug: m.space.Slug, Name: m.space.Name}, Org: &MeOrg{ID: m.org.ID, Name: m.org.Name}, Items: []MeItem{}}
+	if out.Machines, err = s.meMachineList(m, p.User.ID); err != nil {
+		return err
+	}
+	for _, mm := range out.Machines {
+		// A machine that cannot do the setup is not behind on it: it is left out.
+		if mm.Setup && (!mm.Current || mm.Failed > 0) {
+			out.Outdated = true
+		}
+	}
 	for _, e := range m.effective() {
 		scope := m.org.ID
 		switch e.Layer {
@@ -224,4 +253,166 @@ func (s *Service) putMeEnv(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil
+}
+
+// meMachineList are the person's machines in the tenant: the working ones, with what their setup looks like.
+func (s *Service) meMachineList(m *me, userID string) ([]MeMachine, error) {
+	out := []MeMachine{}
+	ms, err := m.st.MachinesByUser(m.ctx, m.space.ID, userID)
+	if err != nil {
+		return nil, err
+	}
+	var online []string
+	if s.reg != nil {
+		online = s.reg.Online()
+	}
+	names := newRunNames(m.ctx, m.st)
+	for _, mc := range ms {
+		if mc.RevokedAt != nil {
+			continue
+		}
+		mm := MeMachine{ID: mc.ID, Name: mc.Name, Online: mc.DisabledAt == nil && slices.Contains(online, mc.ID)}
+		if t, ok := m.w.teamByID[mc.TeamID]; ok {
+			mm.Team = &NameRef{ID: t.ID, Name: t.Name}
+		}
+		if s.push != nil {
+			mm.Setup, _ = s.push.SetupOf(mc.ID)
+		}
+		want := s.machineList(m.w, m.space.ID, mc)
+		st, err := m.st.EnvStateByMachine(m.ctx, mc.ID)
+		reported := err == nil && !st.At.IsZero()
+		if err != nil && !store.IsNotFound(err) {
+			return nil, err
+		}
+		mm.Current = want.empty() || (reported && want.holds(st.Hash))
+		if reported && mm.Setup {
+			mm.Failed = m.failedSetup(st.Applied)
+		}
+		runs, err := m.st.EnvRunsOf(m.ctx, store.EnvRunQuery{OrgID: m.org.ID, MachineIDs: []string{mc.ID}, Since: s.runsSince(), Limit: 1})
+		if err != nil {
+			return nil, err
+		}
+		if len(runs) > 0 {
+			row, err := names.row(runs[0], false)
+			if err != nil {
+				return nil, err
+			}
+			mm.LastRun = &row
+		}
+		out = append(out, mm)
+	}
+	return out, nil
+}
+
+// tokenAsk starts the message of a setup item that waits for a token of the person's safe («положите токен <name> в
+// сейф»); any other pending is the machine still working.
+const tokenAsk = "положите токен"
+
+// failedSetup counts the setup items a machine reported in error, or waiting for a token the person has to put in the safe.
+func (m *me) failedSetup(applied string) int {
+	var items []hubproto.EnvApplied
+	if json.Unmarshal([]byte(applied), &items) != nil {
+		return 0
+	}
+	n := 0
+	for _, a := range items {
+		waits := a.Status == hubproto.EnvPending && strings.Contains(a.Message, tokenAsk)
+		if (a.Status == hubproto.EnvError || waits) && hubproto.IsSetupKind(m.w.items[a.ItemID].Kind) {
+			n++
+		}
+	}
+	return n
+}
+
+func (s *Service) meMachines(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	m, err := s.openMe(r, s.db.S(), p, r.URL.Query().Get("space"))
+	if err != nil {
+		return err
+	}
+	list, err := s.meMachineList(m, p.User.ID)
+	if err != nil {
+		return err
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"machines": list})
+	return nil
+}
+
+type meRunIn struct {
+	Mode      string `json:"mode"`
+	MachineID string `json:"machineId"`
+	Space     string `json:"space"`
+}
+
+// meRun asks the person's machines in the tenant to update or check their setup.
+func (s *Service) meRun(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	var in meRunIn
+	if err := httpx.Decode(r, &in); err != nil {
+		return err
+	}
+	if in.Mode != hubproto.RunUpdate && in.Mode != hubproto.RunCheck {
+		return httpx.Invalid("mode", "update или check")
+	}
+	space := r.URL.Query().Get("space")
+	if space == "" {
+		space = in.Space
+	}
+	m, err := s.openMe(r, s.db.S(), p, space)
+	if err != nil {
+		return err
+	}
+	cands, err := s.ownSetupMachines(m.ctx, m.st, p.User.ID, m.space.ID)
+	if err != nil {
+		return err
+	}
+	if in.MachineID != "" {
+		cands = slices.DeleteFunc(cands, func(mc store.Machine) bool { return mc.ID != in.MachineID })
+	}
+	if len(cands) == 0 {
+		return errNoMachine
+	}
+	by := cmp.Or(p.User.Name, p.User.Email)
+	type started struct {
+		RunID     string `json:"runId"`
+		MachineID string `json:"machineId"`
+	}
+	runs := []started{}
+	var firstErr error
+	for _, mc := range cands {
+		id, err := s.startRun(m.ctx, m.org.ID, mc, in.Mode, nil, by)
+		if err != nil {
+			s.log.Warn("environment run not accepted", "machine", mc.ID, "error", err)
+			firstErr = cmp.Or(firstErr, err)
+			continue
+		}
+		runs = append(runs, started{id, mc.ID})
+	}
+	if len(runs) == 0 {
+		return firstErr
+	}
+	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"runs": runs})
+	return nil
+}
+
+func (s *Service) meRuns(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	m, err := s.openMe(r, s.db.S(), p, r.URL.Query().Get("space"))
+	if err != nil {
+		return err
+	}
+	limit, err := runLimit(r)
+	if err != nil {
+		return err
+	}
+	ms, err := m.st.MachinesByUser(m.ctx, m.space.ID, p.User.ID)
+	if err != nil {
+		return err
+	}
+	ids := []string{}
+	for _, mc := range ms {
+		ids = append(ids, mc.ID)
+	}
+	rows, err := m.st.EnvRunsOf(m.ctx, store.EnvRunQuery{OrgID: m.org.ID, MachineIDs: ids, Since: s.runsSince(), Limit: limit})
+	if err != nil {
+		return err
+	}
+	return writeRuns(w, newRunNames(m.ctx, m.st), rows)
 }

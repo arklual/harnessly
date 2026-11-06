@@ -1,9 +1,17 @@
-// The documentation, /help: the contents on the left (above the page on a phone, one layout), the page on the right drawn
-// by the chat's Markdown, so its code, tables and diagrams look as they do in a chat. The name of the page is the largest
-// thing; nothing counts or labels. A filter over the contents looks at titles and headings.
-import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
-import type { HelpError, IGuidePage } from '@/next/features/help/api';
-import { filterContents, LINK, resolveLink, slugOf } from '@/next/features/help/model';
+// The documentation, /help: the contents on the left by section (above the page on a phone, one layout), the page on
+// the right drawn by the chat's Markdown, so its code, tables and diagrams look as they do in a chat, and its pictures
+// come from the page's own folder. The name of the page is the largest thing; nothing counts or labels. The field above
+// the contents searches every page's text; the current page's headings sit under it in the contents.
+import { lazy, Suspense, useMemo, type ReactNode } from 'react';
+import type { HelpError, IGuideHit, IGuideSection } from '@/next/features/help/api';
+import {
+  filterContents,
+  isOwnPicture,
+  LINK,
+  resolveLink,
+  slugOf,
+  type IGuidePlace,
+} from '@/next/features/help/model';
 import { t } from '@/next/i18n';
 import { appBasePath } from '@/platform/config';
 import { ROUTE, routePath } from '@/next/routes/routes';
@@ -14,16 +22,28 @@ import '@/next/styles/help.css';
 
 const Markdown = lazy(() => import('@/next/features/chat/markdown'));
 
+/** The search: nothing asked, asked and waiting, or its answer. */
+export type TSearch =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'hits'; hits: readonly IGuideHit[] }
+  | { kind: 'failed'; error: HelpError };
+
 export interface IHelpViewProps {
-  /** null while the list loads. */
-  pages: readonly IGuidePage[] | null;
-  pagesError: HelpError | null;
+  /** null while the library loads. */
+  sections: readonly IGuideSection[] | null;
+  sectionsError: HelpError | null;
   /** The page on screen: the one the address names, else the first. */
-  current: string | null;
+  place: IGuidePlace | null;
   /** null while the page loads. */
   markdown: string | null;
   pageError: HelpError | null;
-  onOpen: (page: string, anchor?: string) => void;
+  query: string;
+  search: TSearch;
+  onQuery: (query: string) => void;
+  onOpen: (section: string, page: string, anchor?: string) => void;
+  /** The address of a picture of the current page. */
+  pictureSrc: (src: string) => string;
   onRetry: () => void;
   onOpenDrawer: () => void;
 }
@@ -52,31 +72,78 @@ const PageSkeleton = () => (
   </div>
 );
 
+const pageHref = (section: string, page: string) =>
+  `${appBasePath()}${routePath({ kind: ROUTE.help, section, page })}`;
+
+const Hits = ({
+  search,
+  onOpen,
+  onRetry,
+}: {
+  search: TSearch;
+  onOpen: IHelpViewProps['onOpen'];
+  onRetry: () => void;
+}) => {
+  switch (search.kind) {
+    case 'idle':
+    case 'loading':
+      return <ContentsSkeleton />;
+    case 'failed':
+      return <Failure error={search.error} onRetry={onRetry} />;
+    default:
+      if (search.hits.length === 0) return <p className="hx-help__none">{t('next.help.none')}</p>;
+      return (
+        <nav className="hx-help__rows" aria-label={t('next.help.found')}>
+          {search.hits.map((hit) => (
+            <a
+              key={`${hit.section}/${hit.name}`}
+              className="hx-help__hit"
+              href={pageHref(hit.section, hit.name)}
+              onClick={(event) => {
+                event.preventDefault();
+                onOpen(hit.section, hit.name, hit.heading ? slugOf(hit.heading) : undefined);
+              }}
+            >
+              <span className="hx-help__hit-title">
+                {hit.title}
+                {hit.heading && <span className="hx-help__hit-heading"> · {hit.heading}</span>}
+              </span>
+              {hit.snippet && <span className="hx-help__hit-text">{hit.snippet}</span>}
+            </a>
+          ))}
+        </nav>
+      );
+  }
+};
+
 const HelpView = ({
-  pages,
-  pagesError,
-  current,
+  sections,
+  sectionsError,
+  place,
   markdown,
   pageError,
+  query,
+  search,
+  onQuery,
   onOpen,
+  pictureSrc,
   onRetry,
   onOpenDrawer,
 }: IHelpViewProps) => {
-  const [query, setQuery] = useState('');
-  const rows = useMemo(() => (pages ? filterContents(pages, query) : null), [pages, query]);
+  const groups = useMemo(() => (sections ? filterContents(sections, '') : null), [sections]);
   const guide = useMemo(
     () => ({
       headingId: slugOf,
       link: (href: string, children: ReactNode): ReactNode => {
-        const link = resolveLink(href, pages ?? []);
+        const link = resolveLink(href, place, sections ?? []);
         switch (link.kind) {
           case LINK.page:
             return (
               <a
-                href={`${appBasePath()}${routePath({ kind: ROUTE.help, page: link.name })}`}
+                href={pageHref(link.section, link.name)}
                 onClick={(event) => {
                   event.preventDefault();
-                  onOpen(link.name, link.anchor ?? undefined);
+                  onOpen(link.section, link.name, link.anchor ?? undefined);
                 }}
               >
                 {children}
@@ -88,7 +155,7 @@ const HelpView = ({
                 href={`#${link.anchor}`}
                 onClick={(event) => {
                   event.preventDefault();
-                  if (current) onOpen(current, link.anchor);
+                  if (place) onOpen(place.section.id, place.page.name, link.anchor);
                 }}
               >
                 {children}
@@ -104,37 +171,54 @@ const HelpView = ({
             return <span className="hx-help__plain">{children}</span>;
         }
       },
+      image: (src: string, alt: string): ReactNode =>
+        isOwnPicture(src) ? (
+          <img className="hx-help__img" src={pictureSrc(src)} alt={alt} loading="lazy" decoding="async" />
+        ) : (
+          <span className="hx-help__plain">{alt}</span>
+        ),
     }),
-    [pages, current, onOpen],
+    [place, sections, onOpen, pictureSrc],
   );
 
+  const searching = query.trim() !== '';
   let contents: ReactNode = <ContentsSkeleton />;
-  if (pagesError) contents = <Failure error={pagesError} onRetry={onRetry} />;
-  else if (rows !== null && rows.length === 0)
-    contents = <p className="hx-help__none">{t('next.help.none')}</p>;
-  else if (rows !== null) {
+  if (searching) contents = <Hits search={search} onOpen={onOpen} onRetry={onRetry} />;
+  else if (sectionsError) contents = <Failure error={sectionsError} onRetry={onRetry} />;
+  else if (groups !== null && groups.length === 0)
+    contents = <p className="hx-help__none">{t('next.help.empty')}</p>;
+  else if (groups !== null) {
     contents = (
       <nav className="hx-help__rows" aria-label={t('next.help.title')}>
-        {rows.map(({ page, headings }) => (
-          <div key={page.name} className="hx-help__group">
-            <button
-              type="button"
-              className="hx-help__row"
-              aria-current={page.name === current ? 'page' : undefined}
-              onClick={() => onOpen(page.name)}
-            >
-              {page.title}
-            </button>
-            {headings.map((heading) => (
-              <button
-                key={heading}
-                type="button"
-                className="hx-help__sub"
-                onClick={() => onOpen(page.name, slugOf(heading))}
-              >
-                {heading}
-              </button>
-            ))}
+        {groups.map(({ section, rows }) => (
+          <div key={section.id} className="hx-help__section">
+            <p className="hx-help__section-title">{section.title}</p>
+            {rows.map(({ page }) => {
+              const current = place?.section.id === section.id && place.page.name === page.name;
+              return (
+                <div key={page.name} className="hx-help__group">
+                  <button
+                    type="button"
+                    className="hx-help__row"
+                    aria-current={current ? 'page' : undefined}
+                    onClick={() => onOpen(section.id, page.name)}
+                  >
+                    {page.title}
+                  </button>
+                  {current &&
+                    page.headings.map((heading) => (
+                      <button
+                        key={heading}
+                        type="button"
+                        className="hx-help__sub"
+                        onClick={() => onOpen(section.id, page.name, slugOf(heading))}
+                      >
+                        {heading}
+                      </button>
+                    ))}
+                </div>
+              );
+            })}
           </div>
         ))}
       </nav>
@@ -176,7 +260,7 @@ const HelpView = ({
             aria-label={t('next.help.filter')}
             autoComplete="off"
             spellCheck={false}
-            onChange={(event) => setQuery(event.currentTarget.value)}
+            onChange={(event) => onQuery(event.currentTarget.value)}
           />
           {contents}
         </aside>

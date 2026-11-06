@@ -44,8 +44,11 @@ vi.mock('@/next/features/designly/site-view', () => ({
     tab: string;
     onNavigate: (page: string) => void;
     onReload: () => void;
+    mode?: { editing: boolean; action: { onClick: () => void } | null };
   }) => (
     <div>
+      <output data-testid="mode">{props.mode ? String(props.mode.editing) : ''}</output>
+      <button onClick={() => props.mode?.action?.onClick()}>switch</button>
       <output data-testid="src">{props.src ?? ''}</output>
       <button onClick={() => props.onNavigate('b.html')}>b</button>
       <button onClick={() => props.onNavigate('a.html')}>a</button>
@@ -224,6 +227,47 @@ describe('DesignlySite page switch', () => {
     await act(async () => {});
     expect(open).toHaveBeenCalledTimes(2);
     expect(src()).toBe(`${ORIGIN}/enter?t=2`);
+  });
+});
+
+// the switch of the bar turns the design between looking and editing, both ways, with or without its chat.
+describe('DesignlySite mode', () => {
+  const Routed = ({ chat = null }: { chat?: string | null }) => {
+    const [edit, setEdit] = useState(false);
+    return (
+      <DesignlySite
+        machine={M}
+        id="d1"
+        chat={chat}
+        edit={edit}
+        onMode={setEdit}
+        maxed={false}
+        onToggleMax={() => undefined}
+        onOpenDrawer={() => undefined}
+        onMissing={() => undefined}
+      />
+    );
+  };
+  const mode = () => screen.getByTestId('mode').textContent;
+
+  it('goes to editing and back from a link', async () => {
+    render(<Routed />);
+    await act(async () => {});
+    expect(mode()).toBe('false');
+    await click('switch');
+    expect(mode()).toBe('true');
+    await click('switch');
+    expect(mode()).toBe('false');
+  });
+
+  it('goes to looking and back from its chat', async () => {
+    render(<Routed chat="c1" />);
+    await act(async () => {});
+    expect(mode()).toBe('true');
+    await click('switch');
+    expect(mode()).toBe('false');
+    await click('switch');
+    expect(mode()).toBe('true');
   });
 });
 

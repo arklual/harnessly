@@ -178,12 +178,12 @@ export interface ISiteGuest {
 
 /** The switch between looking at the design and editing it, in the bar (the one place it stands on both sizes). */
 export interface ISiteMode {
-  /** What the screen is in: «Редактирование макета» while editing, «Макет» while looking. */
+  /** What the screen is in, said alone where there is no switch: «Редактирование макета» or «Макет». */
   state: string;
   editing: boolean;
-  /** The way to the other mode: «Редактировать» or «Запросить доступ» while looking (loud), «Просмотр» while
-      editing (quiet); null: there is none. */
-  action: { label: string; icon: string; onClick: () => void } | null;
+  /** The way to the other mode (the switch's other part); null: there is none, the mode is a label. ask: editing is
+      not allowed, its part asks for access. */
+  action: { onClick: () => void; ask: boolean } | null;
 }
 
 export interface ISiteViewProps {

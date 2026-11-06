@@ -1,9 +1,9 @@
 package hlcli
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/secretmask"
 	"io"
 	"os"
 	"os/exec"
@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -363,61 +362,5 @@ func (c *cli) secretFile(args []string) error {
 	return nil
 }
 
-// masker writes through to w with every value replaced by a mark. It holds back only the end of what it was given that
-// could be the start of a value, so a value split between two writes is masked too, and output is not delayed otherwise.
-type masker struct {
-	w      io.Writer
-	values [][]byte
-	mu     sync.Mutex
-	held   []byte
-}
-
-var maskMark = []byte("••••••")
-
-// minMasked: shorter values are not masked (they would mangle ordinary output).
-const minMasked = 4
-
-func newMasker(w io.Writer, values []string) *masker {
-	m := &masker{w: w}
-	for _, v := range values {
-		if len(v) >= minMasked {
-			m.values = append(m.values, []byte(v))
-		}
-	}
-	// The longer first: a value that contains another is masked whole.
-	sort.Slice(m.values, func(i, j int) bool { return len(m.values[i]) > len(m.values[j]) })
-	return m
-}
-
-func (m *masker) Write(p []byte) (int, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	buf := append(m.held, p...)
-	for _, v := range m.values {
-		buf = bytes.ReplaceAll(buf, v, maskMark)
-	}
-	keep := 0
-	for _, v := range m.values {
-		for n := min(len(v)-1, len(buf)); n > keep; n-- {
-			if bytes.HasSuffix(buf, v[:n]) {
-				keep = n
-				break
-			}
-		}
-	}
-	m.held = append([]byte(nil), buf[len(buf)-keep:]...)
-	if _, err := m.w.Write(buf[:len(buf)-keep]); err != nil {
-		return 0, err
-	}
-	return len(p), nil
-}
-
-// Flush writes what was held back: the output ended, it was not a value.
-func (m *masker) Flush() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if len(m.held) > 0 {
-		_, _ = m.w.Write(m.held)
-		m.held = nil
-	}
-}
+// newMasker masks the values in what is written to w (internal/secretmask).
+func newMasker(w io.Writer, values []string) *secretmask.Masker { return secretmask.New(w, values) }

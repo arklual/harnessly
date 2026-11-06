@@ -1,11 +1,13 @@
 {
   "summary": {
-    "total": 3,
+    "total": 7,
     "byKind": {
       "skill": 2,
       "mcp": 1,
-      "repo": 0,
-      "doc": 0
+      "repo": 1,
+      "doc": 0,
+      "script": 2,
+      "access": 1
     },
     "callsWeek": 4,
     "top": [
@@ -15,7 +17,7 @@
       }
     ],
     "unused": 0,
-    "pinnedByOrg": 1
+    "pinnedByOrg": 2
   },
   "layers": [
     {
@@ -30,7 +32,9 @@
         "skill": 1,
         "mcp": 0,
         "repo": 0,
-        "doc": 0
+        "doc": 0,
+        "script": 0,
+        "access": 1
       },
       "items": [
         {
@@ -57,6 +61,31 @@
             "error": 0,
             "message": null
           }
+        },
+        {
+          "entryId": "entry-org-gitlab",
+          "itemId": "item-gitlab",
+          "kind": "access",
+          "name": "GitLab",
+          "hint": "glab и git · каждый входит своим аккаунтом",
+          "audience": {
+            "mode": "tenant",
+            "teams": []
+          },
+          "pinned": true,
+          "locked": false,
+          "lockedReason": null,
+          "enabled": true,
+          "callsWeek": null,
+          "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "lastUsedAt": null,
+          "unused": null,
+          "delivery": {
+            "ok": 1,
+            "pending": 0,
+            "error": 0,
+            "message": null
+          }
         }
       ]
     },
@@ -72,7 +101,9 @@
         "skill": 0,
         "mcp": 0,
         "repo": 0,
-        "doc": 0
+        "doc": 0,
+        "script": 0,
+        "access": 0
       },
       "items": []
     },
@@ -88,7 +119,9 @@
         "skill": 0,
         "mcp": 1,
         "repo": 0,
-        "doc": 0
+        "doc": 0,
+        "script": 0,
+        "access": 0
       },
       "items": [
         {
@@ -124,8 +157,10 @@
       "counts": {
         "skill": 1,
         "mcp": 0,
-        "repo": 0,
-        "doc": 0
+        "repo": 1,
+        "doc": 0,
+        "script": 2,
+        "access": 0
       },
       "items": [
         {
@@ -152,6 +187,81 @@
             "error": 0,
             "message": null
           }
+        },
+        {
+          "entryId": "entry-core-repo",
+          "itemId": "item-web",
+          "kind": "repo",
+          "name": "web",
+          "hint": "gitlab.example.org/frontend/web · ветка main",
+          "audience": {
+            "mode": "tenant",
+            "teams": []
+          },
+          "pinned": true,
+          "locked": false,
+          "lockedReason": null,
+          "enabled": true,
+          "callsWeek": null,
+          "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "lastUsedAt": null,
+          "unused": null,
+          "delivery": {
+            "ok": 1,
+            "pending": 0,
+            "error": 0,
+            "message": null
+          }
+        },
+        {
+          "entryId": "entry-core-setup",
+          "itemId": "item-setup",
+          "kind": "script",
+          "name": "Настройка web",
+          "hint": "scripts/setup-dev.sh из web · после клона",
+          "audience": {
+            "mode": "tenant",
+            "teams": []
+          },
+          "pinned": true,
+          "locked": false,
+          "lockedReason": null,
+          "enabled": true,
+          "callsWeek": null,
+          "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "lastUsedAt": null,
+          "unused": null,
+          "delivery": {
+            "ok": 1,
+            "pending": 0,
+            "error": 0,
+            "message": null
+          }
+        },
+        {
+          "entryId": "entry-core-node",
+          "itemId": "item-node",
+          "kind": "script",
+          "name": "Node и pnpm",
+          "hint": "3 команды · при настройке машины",
+          "audience": {
+            "mode": "tenant",
+            "teams": []
+          },
+          "pinned": true,
+          "locked": false,
+          "lockedReason": null,
+          "enabled": true,
+          "callsWeek": null,
+          "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "lastUsedAt": null,
+          "unused": null,
+          "delivery": {
+            "ok": 1,
+            "pending": 0,
+            "error": 0,
+            "message": null
+          }
         }
       ]
     },
@@ -167,7 +277,9 @@
         "skill": 0,
         "mcp": 0,
         "repo": 0,
-        "doc": 0
+        "doc": 0,
+        "script": 0,
+        "access": 0
       },
       "items": []
     }

@@ -63,6 +63,7 @@ import ChatStage from '@/next/features/shell/chat-stage';
 import QuietChat from '@/next/bindings/quiet-chat';
 import { PHONE_QUERY } from '@/next/features/shell/gestures';
 import Greeting from '@/next/features/shell/greeting';
+import { MachineSetup } from '@/next/bindings/machine-setup';
 import HomeTools, { type IHomeTool } from '@/next/features/shell/home-tools';
 import { PeopleBlock } from '@/next/bindings/asks';
 import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
@@ -501,7 +502,7 @@ const Shell = ({ owner }: IShellProps) => {
       icon: 'book-open',
       label: t('next.sidebar.help'),
       current: route.kind === ROUTE.help,
-      onSelect: () => openScreen({ kind: ROUTE.help, page: null }),
+      onSelect: () => openScreen({ kind: ROUTE.help, section: null, page: null }),
     },
   ];
 
@@ -537,6 +538,12 @@ const Shell = ({ owner }: IShellProps) => {
     paneStrip,
     route.kind === ROUTE.site,
   );
+  // A full-screen design has no chat page around it: its chat opens links, files and cards in the pane beside it.
+  const designOpeners = {
+    onOpenRef: pane.openRef,
+    onOpenFile: pane.openFile,
+    onOpenOutput: pane.openOutput,
+  };
   const projectDialog = useProjectDialog(model.active, model.personSidebar);
   const projectSettings = useProjectSettingsDialog(model.active, model.personSidebar);
   const resumeDialog = useResumeDialog(model.active, machineName, now, (id) =>
@@ -861,6 +868,12 @@ const Shell = ({ owner }: IShellProps) => {
           fromChat={screens.before === ROUTE.chat}
           onResume={resumeDialog.show}
           into={into}
+          setup={
+            <MachineSetup
+              machine={startOn}
+              onOpenSafe={() => openScreen({ kind: ROUTE.settings, section: 'safe' })}
+            />
+          }
           composer={(hello) => (
             <HomeComposer
               above={hello}
@@ -938,6 +951,7 @@ const Shell = ({ owner }: IShellProps) => {
         <HelpPage
           key={model.active}
           machine={model.active}
+          section={route.section}
           page={route.page}
           anchor={route.anchor ?? null}
           onOpenDrawer={() => setDrawerOpen(true)}
@@ -995,6 +1009,7 @@ const Shell = ({ owner }: IShellProps) => {
                 goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true })
               }
               toolPane={pane.header}
+              open={designOpeners}
               onToggleMax={null}
               onOpenDrawer={() => setDrawerOpen(true)}
               onMissing={() => goTo({ kind: ROUTE.designly }, { replace: true })}

@@ -103,6 +103,16 @@ assertType<Equal<Infer<typeof es.catalogResponse>, E.CatalogResponse>>(true);
 assertType<Equal<Infer<typeof es.catalogItemResponse>, E.CatalogItemResponse>>(true);
 assertType<Equal<Infer<typeof es.meEnvItem>, E.MeEnvItem>>(true);
 assertType<Equal<Infer<typeof es.meEnvResponse>, E.MeEnvResponse>>(true);
+assertType<Equal<Infer<typeof es.envRunStep>, E.EnvRunStep>>(true);
+assertType<Equal<Infer<typeof es.envRunRow>, E.EnvRunRow>>(true);
+assertType<Equal<Infer<typeof es.envRunsResponse>, E.EnvRunsResponse>>(true);
+assertType<Equal<Infer<typeof es.envRunResponse>, E.EnvRunResponse>>(true);
+assertType<Equal<Infer<typeof es.envTryResponse>, E.EnvTryResponse>>(true);
+assertType<Equal<Infer<typeof es.envOrderResponse>, E.EnvOrderResponse>>(true);
+assertType<Equal<Infer<typeof es.meMachine>, E.MeMachine>>(true);
+assertType<Equal<Infer<typeof es.meMachinesResponse>, E.MeMachinesResponse>>(true);
+assertType<Equal<Infer<typeof es.meRunResponse>, E.MeRunResponse>>(true);
+assertType<Equal<Infer<typeof es.meRunsResponse>, E.MeRunsResponse>>(true);
 
 const fixtures = import.meta.glob<unknown>('./fixtures/**/*.json', { eager: true, import: 'default' });
 
@@ -150,6 +160,13 @@ const schemaOf: Record<string, Schema<unknown>> = {
   'env/card.json': es.envCard,
   'env/catalog.json': es.catalogResponse,
   'env/me.json': es.meEnvResponse,
+  'env/me-machines.json': es.meMachinesResponse,
+  'env/me-runs.json': es.meRunsResponse,
+  'env/me-run.json': es.meRunResponse,
+  'env/runs.json': es.envRunsResponse,
+  'env/run.json': es.envRunResponse,
+  'env/try.json': es.envTryResponse,
+  'env/order.json': es.envOrderResponse,
 };
 
 describe('hub contract fixtures', () => {

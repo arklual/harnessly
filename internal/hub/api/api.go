@@ -108,9 +108,10 @@ type Hub struct {
 	// Sites is the published-sites module; nil when HARNESSLY_SITES is off.
 	Sites *sites.Service
 
-	cfg *config.Config
-	db  *store.DB
-	log *slog.Logger
+	cfg     *config.Config
+	db      *store.DB
+	log     *slog.Logger
+	limiter *ratelimit.Limiter
 }
 
 // New builds the hub.
@@ -131,7 +132,7 @@ func New(o Options) (*Hub, error) {
 		return nil, err
 	}
 
-	h := &Hub{cfg: cfg, db: db, log: log, Registry: link.NewRegistry(), Events: events.NewBroker(), Tickets: ticket.New(o.Now)}
+	h := &Hub{cfg: cfg, db: db, log: log, limiter: o.Limiter, Registry: link.NewRegistry(), Events: events.NewBroker(), Tickets: ticket.New(o.Now)}
 	h.Auth, err = auth.New(auth.Deps{Config: cfg, DB: db, Mailer: o.Mailer, Limiter: o.Limiter, Log: log, Now: o.Now, HTTPClient: o.HTTPClient, Endpoints: o.Endpoints})
 	if err != nil {
 		return nil, err
@@ -158,7 +159,7 @@ func New(o Options) (*Hub, error) {
 	if envFeatures == nil {
 		envFeatures = anyGate{env.StaticFeatures(cfg.EnvFeatures), h.Features}
 	}
-	h.Env = env.New(env.Deps{DB: db, Gate: h.Orgs.Gate, Features: envFeatures, Publisher: orgEvents{db: db, broker: h.Events}, Log: log, Now: o.Now,
+	h.Env = env.New(env.Deps{DB: db, Gate: h.Orgs.Gate, Features: envFeatures, Publisher: orgEvents{db: db, broker: h.Events}, Reg: h.Registry, Log: log, Now: o.Now,
 		Changed: func() {
 			if h.EnvPush != nil {
 				h.EnvPush.Kick()
@@ -193,7 +194,8 @@ func New(o Options) (*Hub, error) {
 	var envSink machines.EnvSink
 	// An organization may switch the environment on at any time, so the pusher is always there; it pushes nothing to the
 	// machines of an organization whose feature is off.
-	h.EnvPush = env.NewPusher(env.PushDeps{DB: db, Reg: h.Registry, Features: envFeatures, Log: log, Now: o.Now})
+	h.EnvPush = env.NewPusher(env.PushDeps{DB: db, Reg: h.Registry, Features: envFeatures, Publisher: orgEvents{db: db, broker: h.Events}, Log: log, Now: o.Now})
+	h.Env.UsePusher(h.EnvPush)
 	envSink = h.EnvPush
 	machineFeatures := o.Features
 	if machineFeatures == nil {
@@ -289,6 +291,12 @@ func New(o Options) (*Hub, error) {
 	}
 	mux.Handle("GET /agent/v1", h.Dialer)
 	mux.HandleFunc("DELETE /agent/v1", h.Dialer.ServeUnlink)
+	// Messages between agents of different machines (docs/hub/peers.md): off unless HUB_PEERS=on, and then the paths
+	// fall through to the 404 below, which the agent reads as "this hub does not carry them".
+	if h.cfg.Peers {
+		mux.Handle("POST /agent/peers/send", httpx.Handler(h.peersSend))
+		mux.Handle("POST /agent/peers/directory", httpx.Handler(h.peersDirectory))
+	}
 	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { httpx.WriteError(w, r, httpx.ErrNotFound) })
 	mux.Handle("/api/", notFound)
 	mux.Handle("/agent/", notFound)

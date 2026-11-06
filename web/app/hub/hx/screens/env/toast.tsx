@@ -1,46 +1,69 @@
-// A small notice that a change did not go through (the screen already took it back). It slides in with transform and
-// opacity only and goes away on its own.
-import { type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+// The notice of the board: it says what was done (and «Отменить» takes it back) or why a change did not go through. It
+// slides in from the top with transform and opacity, and goes away on its own with the same ease-out.
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useClosing } from '../../../org/ui/closing';
 import { closingAttr, Icon, LayerCtx } from '../../ui';
 
-const SHOW_MS = 5000;
-const OUT_MS = 200;
+const SHOW_MS = 4800;
+const OUT_MS = 180;
+
+export interface ToastState {
+  text: string;
+  error: boolean;
+  undo: (() => void) | null;
+  n: number;
+}
 
 export const useToast = () => {
-  const [text, setText] = useState<string | null>(null);
-  const [n, setN] = useState(0);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const seq = useRef(0);
   const timer = useRef<number | undefined>(undefined);
-  const show = useCallback((t: string) => {
+  const put = useCallback((text: string, error: boolean, undo: (() => void) | null) => {
     window.clearTimeout(timer.current);
-    setText(t);
-    setN((x) => x + 1);
-    timer.current = window.setTimeout(() => setText(null), SHOW_MS);
+    seq.current += 1;
+    setToast({ text, error, undo, n: seq.current });
+    timer.current = window.setTimeout(() => setToast(null), SHOW_MS);
   }, []);
+  const say = useCallback((text: string, undo?: () => void) => put(text, false, undo ?? null), [put]);
+  const fail = useCallback((text: string) => put(text, true, null), [put]);
   const hide = useCallback(() => {
     window.clearTimeout(timer.current);
-    setText(null);
+    setToast(null);
   }, []);
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  return { text, n, show, hide };
+  return { toast, say, fail, hide };
 };
 
-export const Toast = ({ text, id, onClose }: { text: string | null; id: number; onClose: () => void }) => {
+export const Toast = ({ toast, onClose }: { toast: ToastState | null; onClose: () => void }) => {
   const layer = useContext(LayerCtx);
-  const { mounted, closing } = useClosing(text !== null, OUT_MS);
-  // Keep the last text on screen while it slides out.
-  const [last, setLast] = useState<ReactNode>(null);
-  if (text !== null && last !== text) setLast(text);
-  if (!mounted) return null;
+  const { mounted, closing } = useClosing(toast !== null, OUT_MS);
+  const [last, setLast] = useState<ToastState | null>(null);
+  if (toast !== null && last !== toast) setLast(toast);
+  const shown = toast ?? last;
+  if (!mounted || !shown) return null;
   const el = (
-    <div className="env-toast" data-closing={closingAttr(closing)} role="status" key={id}>
-      <Icon i="circle-alert" size="sm" />
-      <span>{text ?? last}</span>
-      <button type="button" className="env-toast__x" onClick={onClose} aria-label="Закрыть">
-        <Icon i="x" size="sm" />
-      </button>
+    <div
+      className="ev-toast"
+      data-closing={closingAttr(closing)}
+      data-error={shown.error ? '1' : undefined}
+      role="status"
+      key={shown.n}
+    >
+      <Icon i={shown.error ? 'circle-alert' : 'check'} size="sm" />
+      <span>{shown.text}</span>
+      {shown.undo && (
+        <button
+          type="button"
+          onClick={() => {
+            shown.undo?.();
+            onClose();
+          }}
+        >
+          Отменить
+        </button>
+      )}
     </div>
   );
   return layer ? createPortal(el, layer) : el;

@@ -120,19 +120,8 @@ const AppDocPage = ({ machine, id, chat = null, edit = false, onMode, onOpenDraw
   const mode: ISiteMode | null = (() => {
     if (!onMode) return null;
     const state = t(modeStateKey(MODE_KIND.doc, asked));
-    if (asked)
-      return {
-        state,
-        editing: true,
-        action: { label: t('next.site.modeView'), icon: 'eye', onClick: () => setMode(false) },
-      };
-    return {
-      state,
-      editing: false,
-      action: mayEdit
-        ? { label: t('next.site.modeEdit'), icon: 'pencil', onClick: () => setMode(true) }
-        : null,
-    };
+    if (asked) return { state, editing: true, action: { onClick: () => setMode(false), ask: false } };
+    return { state, editing: false, action: mayEdit ? { onClick: () => setMode(true), ask: false } : null };
   })();
   useTabTitle(routePath({ kind: ROUTE.appDoc, id }), title);
   return (

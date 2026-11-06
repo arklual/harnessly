@@ -196,6 +196,8 @@ export interface IGuideLinks {
   link: (href: string, children: ReactNode) => ReactNode;
   /** The id of a heading, so `#anchor` links reach it. */
   headingId: (text: string) => string;
+  /** A picture of the page (a chat shows none): the page says where it comes from. */
+  image?: (src: string, alt: string) => ReactNode;
 }
 
 const heading = (Tag: 'h1' | 'h2' | 'h3' | 'h4', guide: IGuideLinks) => {
@@ -209,6 +211,7 @@ const guideComponents = (guide: IGuideLinks): Components =>
   ({
     ...components,
     a: ({ href, children }) => guide.link(href ?? '', children),
+    img: ({ src, alt }) => (guide.image && typeof src === 'string' ? guide.image(src, alt ?? '') : null),
     h1: heading('h1', guide),
     h2: heading('h2', guide),
     h3: heading('h3', guide),

@@ -12,7 +12,8 @@
       "builtIn": false,
       "archived": false,
       "added": false,
-      "createdAt": "2026-10-20T09:00:00Z"
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": null
     },
     {
       "id": "item-review",
@@ -25,7 +26,119 @@
       "builtIn": false,
       "archived": false,
       "added": true,
-      "createdAt": "2026-10-20T09:00:00Z"
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": null
+    },
+    {
+      "id": "item-web",
+      "kind": "repo",
+      "name": "web",
+      "hint": "gitlab.example.org/frontend/web · ветка main",
+      "source": {
+        "url": "https://gitlab.example.org/frontend/web",
+        "branch": "main",
+        "dir": "~/code/web"
+      },
+      "builtIn": false,
+      "archived": false,
+      "added": true,
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": {
+        "layer": "team",
+        "scopeId": "team-core"
+      }
+    },
+    {
+      "id": "item-gitlab",
+      "kind": "access",
+      "name": "GitLab",
+      "hint": "glab и git · каждый входит своим аккаунтом",
+      "source": {
+        "service": "gitlab",
+        "host": "gitlab.example.org",
+        "secret": "gitlab-token"
+      },
+      "builtIn": false,
+      "archived": false,
+      "added": true,
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": null
+    },
+    {
+      "id": "item-setup",
+      "kind": "script",
+      "name": "Настройка web",
+      "hint": "scripts/setup-dev.sh из web · после клона",
+      "source": {
+        "from": "repo",
+        "repo": "item-web",
+        "path": "scripts/setup-dev.sh",
+        "run": "bash scripts/setup-dev.sh",
+        "rerun": "check",
+        "check": "test -f ~/code/web/.env.local",
+        "secrets": ["npm-token"]
+      },
+      "builtIn": false,
+      "archived": false,
+      "added": true,
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": {
+        "layer": "team",
+        "scopeId": "team-core"
+      }
+    },
+    {
+      "id": "item-node",
+      "kind": "script",
+      "name": "Node и pnpm",
+      "hint": "3 команды · при настройке машины",
+      "source": {
+        "from": "text",
+        "body": "curl -fsSL https://fnm.vercel.app/install | bash\nfnm install 22\ncorepack enable pnpm",
+        "rerun": "check",
+        "check": "node -v | grep -q v22"
+      },
+      "builtIn": false,
+      "archived": false,
+      "added": true,
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": {
+        "layer": "team",
+        "scopeId": "team-core"
+      }
+    },
+    {
+      "id": "item-hooks",
+      "kind": "script",
+      "name": "Git-хуки",
+      "hint": "файл install-hooks.sh · при настройке машины",
+      "source": {
+        "from": "file",
+        "fileName": "install-hooks.sh",
+        "body": "#!/bin/bash\ngit config core.hooksPath .githooks\n",
+        "rerun": "once"
+      },
+      "builtIn": false,
+      "archived": false,
+      "added": false,
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": null
+    },
+    {
+      "id": "item-lint",
+      "kind": "script",
+      "name": "Линтер",
+      "hint": "по ссылке · при настройке машины",
+      "source": {
+        "from": "url",
+        "url": "https://gitlab.example.org/-/snippets/12/raw",
+        "rerun": "once"
+      },
+      "builtIn": false,
+      "archived": false,
+      "added": false,
+      "createdAt": "2026-10-20T09:00:00Z",
+      "owner": null
     }
   ]
 }

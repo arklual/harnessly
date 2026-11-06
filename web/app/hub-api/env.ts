@@ -2,7 +2,7 @@
 // (organization, tenant, team), the catalog the entries are picked from, and a person's own switches. Times are RFC 3339
 // UTC strings, days are YYYY-MM-DD (UTC). A number the hub has no facts for is null, never 0.
 
-export type CatalogKind = 'skill' | 'mcp' | 'repo' | 'doc';
+export type CatalogKind = 'skill' | 'mcp' | 'repo' | 'doc' | 'script' | 'access';
 export type EnvLayerKind = 'org' | 'tenant' | 'team';
 export type AudienceMode = 'tenant' | 'teams' | 'off';
 
@@ -10,7 +10,9 @@ export type AudienceMode = 'tenant' | 'teams' | 'off';
 export type LockedReason = 'pinned_by_org' | 'pinned_by_tenant' | 'no_rights';
 
 // The source of a catalog item. Only the keys of its kind are accepted (skill: body, ref; mcp: transport, command, args, url,
-// secretRefs; repo: url, branch; doc: url, text); secrets are named in secretRefs, never carried.
+// secretRefs; repo: url, branch, dir; doc: url, text; access: service, host, secret; script: from, body, fileName, repo,
+// repoUrl, branch, path, url, run, rerun, check, secrets); secrets are named, never carried.
+export type ScriptFrom = 'text' | 'repo' | 'file' | 'url';
 export type CatalogSource = {
   body?: string;
   ref?: string;
@@ -21,9 +23,33 @@ export type CatalogSource = {
   secretRefs?: string[];
   branch?: string;
   text?: string;
+  // repo: the folder on the machine (`~/…` or relative to the home); empty: `~/code/<name of the repository>`
+  dir?: string;
+  // access
+  service?: 'gitlab' | 'github';
+  host?: string;
+  secret?: string;
+  // script
+  from?: ScriptFrom;
+  fileName?: string;
+  repo?: string; // the item id of a `repo` of the list
+  repoUrl?: string;
+  path?: string;
+  run?: string;
+  rerun?: 'once' | 'check';
+  check?: string;
+  secrets?: string[];
 };
 
-export type KindCounts = { skill: number; mcp: number; repo: number; doc: number };
+// `script` and `access` are counted by a hub that has the machine setup; an older one omits them.
+export type KindCounts = {
+  skill: number;
+  mcp: number;
+  repo: number;
+  doc: number;
+  script?: number;
+  access?: number;
+};
 
 export type Audience = {
   mode: AudienceMode; // 'tenant': everyone the layer reaches; 'teams': only the listed teams; 'off': nobody
@@ -100,7 +126,7 @@ export type EnvResponse = {
   layers: EnvLayer[];
   teams: TeamRef[];
   observed: ObservedTool[];
-  delivery: EnvDelivery;
+  delivery: EnvDelivery | null;
 };
 
 export type EnvCard = {
@@ -150,11 +176,20 @@ export type CatalogItem = {
   archived: boolean;
   added: boolean; // the layer named by ?layer=&scopeId= already has it
   createdAt: string;
+  // The layer that owns the item; null: the organization. Its managers (and the organization's admins) change it.
+  owner: CatalogOwner | null;
 };
+export type CatalogOwner = { layer: EnvLayerKind; scopeId: string };
 // GET /api/orgs/{org}/catalog?kind=&layer=&scopeId=
 export type CatalogResponse = { items: CatalogItem[] };
 // POST /api/orgs/{org}/catalog → 201 CatalogItemResponse; PATCH …/catalog/{itemId} → 200; DELETE archives → 204
-export type AddCatalogRequest = { kind: CatalogKind; name: string; hint?: string; source: CatalogSource };
+export type AddCatalogRequest = {
+  kind: CatalogKind;
+  name: string;
+  hint?: string;
+  source: CatalogSource;
+  owner?: CatalogOwner; // default the organization
+};
 export type PatchCatalogRequest = {
   name?: string;
   hint?: string;
@@ -181,6 +216,72 @@ export type MeEnvResponse = {
   space: { id: string; slug: string; name: string };
   org: { id: string; name: string };
   items: MeEnvItem[];
+  // Some machine of theirs in the tenant is not current or has a failed item.
+  outdated: boolean;
+  machines: MeMachine[];
 };
 // PUT /api/me/env/{itemId}?space= → 200 MeEnvItem
 export type MeEnvToggleRequest = { off: boolean; space?: string };
+
+// ── machine setup (docs/hub/environment.md, «Machine setup») ──────────────────────────────────────────────────────
+
+// PUT /api/orgs/{org}/env/order → 200 { entryIds }: the scripts of a layer in their new order (all of them, each once).
+export type EnvOrderRequest = { layer: EnvLayerKind; scopeId: string; entryIds: string[] };
+export type EnvOrderResponse = { entryIds: string[] };
+
+export type RunMode = 'apply' | 'update' | 'check' | 'sandbox';
+export type RunStatus = 'running' | 'ok' | 'error' | 'pending';
+// A step is `pending` (not started, or waits for the person), `running`, `ok`, `skipped` or `error`.
+export type StepStatus = 'pending' | 'running' | 'ok' | 'skipped' | 'error';
+export type EnvRunStep = {
+  itemId: string;
+  kind: CatalogKind;
+  name: string;
+  status: StepStatus;
+  message: string | null;
+  exit: number | null;
+  ms: number;
+  log?: string; // only in GET …/runs/{runId}; secrets are replaced by ••••••
+};
+export type EnvRunRow = {
+  id: string;
+  machine: { id: string; name: string };
+  person: { id: string; name: string };
+  mode: RunMode;
+  by: string | null;
+  status: RunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  steps: EnvRunStep[];
+};
+// GET /api/orgs/{org}/env/runs?layer=&scopeId=&errors=1&limit=
+export type EnvRunsResponse = { runs: EnvRunRow[] };
+// GET /api/orgs/{org}/env/runs/{runId}
+export type EnvRunResponse = { run: EnvRunRow };
+
+// POST /api/orgs/{org}/env/try → 202: a sandbox run of the layer's list with the draft added (or put in place of `entryId`)
+export type EnvTryRequest = {
+  layer: EnvLayerKind;
+  scopeId: string;
+  draft?: { entryId?: string; kind: CatalogKind; name: string; source: CatalogSource };
+  machineId?: string;
+};
+export type EnvTryResponse = { runId: string; machine: { id: string; name: string } };
+
+export type MeMachine = {
+  id: string;
+  name: string;
+  online: boolean;
+  team: { id: string; name: string };
+  setup: boolean; // has the feature environment.setup; false: not «устарело», the machine cannot be set up
+  current: boolean; // holds the list the hub computes for it now
+  failed: number; // setup items in error or waiting for the person
+  lastRun: EnvRunRow | null;
+};
+// GET /api/me/env/machines?space=
+export type MeMachinesResponse = { machines: MeMachine[] };
+// POST /api/me/env/run?space= → 202
+export type MeRunRequest = { mode: 'update' | 'check'; machineId?: string };
+export type MeRunResponse = { runs: { runId: string; machineId: string }[] };
+// GET /api/me/env/runs?space=
+export type MeRunsResponse = { runs: EnvRunRow[] };

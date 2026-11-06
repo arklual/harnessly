@@ -46,8 +46,10 @@ type Deps struct {
 	Publisher Publisher
 	// Changed runs after the environment of an organization changed (the machines' lists are recomputed); nil: nothing.
 	Changed func()
-	Log     *slog.Logger
-	Now     func() time.Time
+	// Reg is the link to the machines (env.run); nil: no run can be asked for.
+	Reg Caller
+	Log *slog.Logger
+	Now func() time.Time
 }
 
 // Service is the environment and the catalog of the organizations.
@@ -57,13 +59,15 @@ type Service struct {
 	feat    FeatureGate
 	pub     Publisher
 	changed func()
+	reg     Caller
+	push    *Pusher
 	log     *slog.Logger
 	now     func() time.Time
 }
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, log: d.Log, now: d.Now}
+	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -84,9 +88,19 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/orgs/{org}/catalog", s.gate(s.addCatalog))
 	mux.Handle("PATCH /api/orgs/{org}/catalog/{itemId}", s.gate(s.patchCatalog))
 	mux.Handle("DELETE /api/orgs/{org}/catalog/{itemId}", s.gate(s.deleteCatalog))
+	mux.Handle("PUT /api/orgs/{org}/env/order", s.gate(s.putOrder))
+	mux.Handle("GET /api/orgs/{org}/env/runs", s.gate(s.listRuns))
+	mux.Handle("GET /api/orgs/{org}/env/runs/{runId}", s.gate(s.getRun))
+	mux.Handle("POST /api/orgs/{org}/env/try", s.gate(s.tryDraft))
+	mux.Handle("GET /api/me/env/machines", s.gate(s.meMachines))
+	mux.Handle("POST /api/me/env/run", s.gate(s.meRun))
+	mux.Handle("GET /api/me/env/runs", s.gate(s.meRuns))
 	mux.Handle("GET /api/me/env", s.gate(s.meEnv))
 	mux.Handle("PUT /api/me/env/{itemId}", s.gate(s.putMeEnv))
 }
+
+// UsePusher gives the service the pusher that remembers what the machines can do (the pusher is made after the service).
+func (s *Service) UsePusher(p *Pusher) { s.push = p }
 
 // feature is nil when the feature is on for the organization, ErrNotEnabled otherwise.
 func (s *Service) feature(ctx context.Context, orgID, name string) error {
@@ -206,7 +220,8 @@ func (w *world) layerExists(layer, scopeID string) bool {
 func (w *world) resolverItems() map[string]Item {
 	out := make(map[string]Item, len(w.items))
 	for id, it := range w.items {
-		out[id] = Item{ID: it.ID, Kind: it.Kind, Name: it.Name, Hint: it.Hint, Source: []byte(it.Source), Archived: it.ArchivedAt != nil}
+		out[id] = Item{ID: it.ID, Kind: it.Kind, Name: it.Name, Hint: it.Hint, Source: []byte(it.Source), Archived: it.ArchivedAt != nil,
+			OwnerLayer: it.OwnerLayer, OwnerScope: it.OwnerScope}
 	}
 	return out
 }
@@ -215,7 +230,7 @@ func resolverEntries(es []store.EnvEntry) []Entry {
 	out := make([]Entry, len(es))
 	for i, e := range es {
 		out[i] = Entry{ID: e.ID, Layer: e.Layer, ScopeID: e.ScopeID, ItemID: e.ItemID, Enabled: e.Enabled, Pinned: e.Pinned,
-			Audience: ParseAudience(e.Audience)}
+			Audience: ParseAudience(e.Audience), Position: e.Position}
 	}
 	return out
 }
@@ -285,7 +300,8 @@ func (r *rights) visibleTenants(w *world) ([]store.Space, error) {
 	return out, nil
 }
 
-var kindRu = map[string]string{store.CatalogSkill: "скилл", store.CatalogMCP: "MCP", store.CatalogRepo: "репозиторий", store.CatalogDoc: "документ"}
+var kindRu = map[string]string{store.CatalogSkill: "скилл", store.CatalogMCP: "MCP", store.CatalogRepo: "репозиторий", store.CatalogDoc: "документ",
+	store.CatalogScript: "скрипт", store.CatalogAccess: "доступ"}
 
 // whereRu says where a layer is, for the title of a change.
 func (w *world) whereRu(layer, scopeID string) string {

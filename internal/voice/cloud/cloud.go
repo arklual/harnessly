@@ -9,7 +9,8 @@ import "context"
 type Options struct {
 	// Lang is "ru", "en" or "auto".
 	Lang string
-	// Key is the provider's API key; Folder is Yandex's folder id ("" when the key needs none).
+	// Key is the provider's API key (for ChatGPT, the Codex sign-in's token); Folder is Yandex's folder id ("" when the
+	// key needs none) or the ChatGPT account.
 	Key    string
 	Folder string
 	// Hints are the person's dictionary words, passed to a provider that takes them as a prompt.

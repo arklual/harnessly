@@ -111,6 +111,42 @@ func TestCloudEngineWithoutKey(t *testing.T) {
 	}
 }
 
+// The ChatGPT plan's model has no key to add: without the sign-in the words say what it needs, and the audio goes nowhere.
+func TestChatGPTEngineWithoutLogin(t *testing.T) {
+	var seen atomic.Int64
+	var opts cloud.Options
+	cfg := Config{
+		Cloud:       map[string]cloud.Func{"chatgpt": fakeCloud("x", &seen, &opts)},
+		Credentials: func(string) (string, string, error) { return "", "", errors.New("no login") },
+	}
+	got := dictate(t, cfg, `{"type":"start","lang":"ru","engine":"chatgpt"}`)
+	if len(got) != 1 || !strings.Contains(got[0], `"code":"failed"`) || !strings.Contains(got[0], "codex login") {
+		t.Fatalf("messages: %q", got)
+	}
+	if seen.Load() != 0 {
+		t.Fatal("audio reached the engine")
+	}
+}
+
+// The engine gets the sign-in's token and account, and the person's words are put over its text.
+func TestChatGPTEngineWithLogin(t *testing.T) {
+	var seen atomic.Int64
+	var opts cloud.Options
+	cfg := Config{
+		Cloud: map[string]cloud.Func{"chatgpt": fakeCloud("открой синопию", &seen, &opts)},
+		Credentials: func(engine string) (string, string, error) {
+			if engine != "chatgpt" {
+				t.Errorf("engine %q", engine)
+			}
+			return "tok", "acc", nil
+		},
+	}
+	got := dictate(t, cfg, `{"type":"start","lang":"ru","engine":"chatgpt","dict":[{"word":"Sinopia","heard":[]}]}`)
+	if got[len(got)-1] != `{"type":"final","text":"открой Sinopia"}` || opts.Key != "tok" || opts.Folder != "acc" || seen.Load() == 0 {
+		t.Fatalf("messages: %q, options: %+v, %d bytes", got, opts, seen.Load())
+	}
+}
+
 func TestCloudEngineUnknown(t *testing.T) {
 	got := dictate(t, Config{Credentials: func(string) (string, string, error) { return "k" + "ey-test", "", nil }},
 		`{"type":"start","engine":"whisperx"}`)

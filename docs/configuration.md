@@ -42,6 +42,8 @@ it stays with the previous runtime.
 | `AGENT_HUB_OBSERVE_FILE` | — | a closed cluster's agent that a hub should also see: the machine.json of that hub, registered into a folder of its own (`AGENT_MACHINE_FILE=$AGENT_DATA_DIR/hub/machine.json harnessly-agent register …`). The agent keeps its cluster link and dials the hub besides; the hub sees the machine, its agents, preflight and spend, under a policy that allows nothing else (no tunnel, keys, logins, installs or limits); it does take the environment list of the hub (skills, MCP servers, references) into its folder. No file yet: no link. Ignored when the agent is a hub's machine already |
 | `AGENT_POLICY_FILE` | `/etc/harnessly/policy.toml` if it exists, else `~/.config/harnessly/policy.toml` | the local policy the hub cannot change |
 | `AGENT_ENV_DIR` | `$AGENT_DATA_DIR/agent-env` | the env files agent launches source: keys, delivered secrets, the proxy (the runtime reads the same variable) |
+| `AGENT_RUNTIME_PEERS` | `<runtime base>/api/peers` | the runtime's inbox and directory of messages between machines ([hub/peers.md](hub/peers.md)) |
+| `AGENT_HUB_PEERS` | — | `on` lets an observe link (`AGENT_HUB_OBSERVE_FILE`) carry messages between machines; a hub's own machine follows the policy's `peers` |
 | `AGENT_WORK_DIR` | `$RUNTIME_WORKSPACE_DIR`, else the home | the folder the agent's sign-in and status commands run in |
 
 Registered with a hub (`harnessly-agent register`), the agent dials it instead of a cluster: `AGENT_CLUSTER_URL` and
@@ -80,6 +82,7 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_API_GUIDE_FILE` | the CLI's API guide served at `/api/cli/api-guide` (default `runtime-static/api-guide.md` beside `RUNTIME_RELEASE_FILE`; no file: the previous runtime's) |
 | `RUNTIME_REACT_SCAN_FILE` | the render inspector script a developer's page may ask for at `/api/react-scan` (unset: none) |
 | `RUNTIME_LAYOUT_KEY` | the runtime config's field holding the workspace's column widths (default `layout`) |
+| `RUNTIME_PEER_RELAY_URL` | the relay of messages to other machines' agents: on a hub's machine its agent, `http://127.0.0.1:<AGENT_PORT>/peers` ([hub/peers.md](hub/peers.md)); unset: messages stay on this machine |
 | `RUNTIME_OWNER_EMAIL` | the owner of automations when the runtime config names none (`automationOwnerEmail`) |
 
 ### tmux, tabs and agents

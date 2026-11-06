@@ -12,6 +12,13 @@ describe('the speech keys the runtime lists', () => {
     expect(keys.yandex.configured).toBe(false);
   });
 
+  it('reads whether Codex is signed in by a plan; an older runtime does not say', () => {
+    const keys = { openai: none, yandex: none, 'yandex-folder': none };
+    expect(readSpeechKeys({ keys, chatgpt: true }).chatgpt).toBe(true);
+    expect(readSpeechKeys({ keys }).chatgpt).toBe(false);
+    expect(readSpeechKeys({ keys, chatgpt: 'yes' }).chatgpt).toBe(false);
+  });
+
   it('refuses an answer that is not the list or whose tail is not a tail', () => {
     expect(() => readSpeechKeys({})).toThrow();
     expect(() => readSpeechKeys({ keys: { openai: none, yandex: none } })).toThrow();

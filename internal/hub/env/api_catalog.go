@@ -23,6 +23,14 @@ type CatalogItemView struct {
 	Archived  bool            `json:"archived"`
 	Added     bool            `json:"added"`
 	CreatedAt string          `json:"createdAt"`
+	// Owner is the layer that owns the item; null: the organization.
+	Owner *OwnerRef `json:"owner"`
+}
+
+// OwnerRef names the layer that owns a catalog item and may change it.
+type OwnerRef struct {
+	Layer   string `json:"layer"`
+	ScopeID string `json:"scopeId"`
 }
 
 // CatalogResponse is GET /api/orgs/{org}/catalog.
@@ -35,8 +43,12 @@ func catalogView(c store.CatalogItem, added bool) CatalogItemView {
 	if len(src) == 0 {
 		src = json.RawMessage("{}")
 	}
-	return CatalogItemView{ID: c.ID, Kind: c.Kind, Name: c.Name, Hint: c.Hint, Source: src, BuiltIn: c.OrgID == "", Archived: c.ArchivedAt != nil,
+	v := CatalogItemView{ID: c.ID, Kind: c.Kind, Name: c.Name, Hint: c.Hint, Source: src, BuiltIn: c.OrgID == "", Archived: c.ArchivedAt != nil,
 		Added: added, CreatedAt: httpx.Time(c.CreatedAt)}
+	if c.OwnerLayer != "" {
+		v.Owner = &OwnerRef{Layer: c.OwnerLayer, ScopeID: c.OwnerScope}
+	}
+	return v
 }
 
 // canBrowse: the person manages something in the organization, so the catalog is theirs to add from.
@@ -67,7 +79,7 @@ func (s *Service) listCatalog(w http.ResponseWriter, r *http.Request, p *auth.Pr
 	qs := r.URL.Query()
 	kind := qs.Get("kind")
 	if kind != "" && !ValidKind(kind) {
-		return httpx.Invalid("kind", "skill, mcp, repo или doc")
+		return httpx.Invalid("kind", kindsRu)
 	}
 	added := map[string]bool{}
 	if layer, scopeID := qs.Get("layer"), qs.Get("scopeId"); layer != "" || scopeID != "" {
@@ -101,10 +113,80 @@ type catalogIn struct {
 	Hint     *string         `json:"hint"`
 	Source   json.RawMessage `json:"source"`
 	Archived *bool           `json:"archived"`
+	// Owner (POST only) is the layer the item is made for; absent: the organization.
+	Owner *OwnerRef `json:"owner"`
 }
 
 func (q *req) requireOrgAdmin() error {
 	return q.rt.require(authz.Scope{Kind: store.ScopeOrg, ID: q.w.org.ID})
+}
+
+// consentMsg: a secret of someone's safe is read by a script, and a forge's login uses a token of the safe; whoever
+// writes such an item can read every member's token, so only the organization's admins do.
+const consentMsg = "Токены из сейфа и доступы подключает админ организации"
+
+// CheckConsent refuses the items only an organization admin may write: an access, and a script that takes secrets from
+// the safe. It is asked for every item a team or a tenant owns.
+func CheckConsent(kind string, src json.RawMessage) error {
+	switch kind {
+	case store.CatalogAccess:
+		return httpx.Invalid("kind", consentMsg)
+	case store.CatalogScript:
+		var s struct {
+			Secrets []string `json:"secrets"`
+		}
+		if json.Unmarshal(src, &s) == nil && len(s.Secrets) > 0 {
+			return httpx.Invalid("source.secrets", consentMsg)
+		}
+	}
+	return nil
+}
+
+// requireItemRights: an organization admin changes any item of the organization, the managers of the owner layer their own.
+func (q *req) requireItemRights(c store.CatalogItem) error {
+	orgScope := authz.Scope{Kind: store.ScopeOrg, ID: q.w.org.ID}
+	if c.OwnerLayer == "" {
+		return q.rt.require(orgScope)
+	}
+	ok, err := q.rt.manages(orgScope)
+	if err != nil || ok {
+		return err
+	}
+	return q.rt.require(scopeOf(c.OwnerLayer, c.OwnerScope))
+}
+
+// checkOwner checks the owner a new item is made for and that the person manages it. nil owner: the organization.
+func (q *req) checkOwner(o *OwnerRef) (layer, scope string, err error) {
+	if o == nil || (o.Layer == store.EnvLayerOrg && (o.ScopeID == q.w.org.ID || o.ScopeID == "")) {
+		return "", "", q.requireOrgAdmin()
+	}
+	if o.Layer != store.EnvLayerTenant && o.Layer != store.EnvLayerTeam {
+		return "", "", httpx.Invalid("owner.layer", "org, tenant или team")
+	}
+	if !q.w.layerExists(o.Layer, o.ScopeID) {
+		return "", "", httpx.Invalid("owner.scopeId", "Такого слоя нет")
+	}
+	if err := q.rt.require(scopeOf(o.Layer, o.ScopeID)); err != nil {
+		return "", "", err
+	}
+	return o.Layer, o.ScopeID, nil
+}
+
+// checkSource refuses a script that takes its file from a repository item the catalog does not have.
+func (q *req) checkSource(kind string, src json.RawMessage) error {
+	if kind != store.CatalogScript {
+		return nil
+	}
+	var s struct {
+		Repo string `json:"repo"`
+	}
+	if err := json.Unmarshal(src, &s); err != nil || s.Repo == "" {
+		return nil
+	}
+	if r, ok := q.w.items[s.Repo]; !ok || r.Kind != store.CatalogRepo || r.ArchivedAt != nil {
+		return httpx.Invalid("source.repo", "Такого репозитория нет в каталоге")
+	}
+	return nil
 }
 
 // nameTaken: another live item of the organization (or a built-in one) has the kind and the name.
@@ -117,8 +199,13 @@ func (q *req) nameTaken(kind, name, except string) bool {
 	return false
 }
 
-func (s *Service) catalogChanged(q *req, st store.Store, p *auth.Principal, title, action, id string, before, after any) error {
-	return s.record(q.ctx, st, q.w, p, store.EnvLayerOrg, q.w.org.ID, title, action, "catalog_item", id, before, after, s.now())
+// catalogChanged writes the change on the item's owner layer (the organization's by default).
+func (s *Service) catalogChanged(q *req, st store.Store, p *auth.Principal, c store.CatalogItem, title, action string, before, after any) error {
+	layer, scope := store.EnvLayerOrg, q.w.org.ID
+	if c.OwnerLayer != "" {
+		layer, scope = c.OwnerLayer, c.OwnerScope
+	}
+	return s.record(q.ctx, st, q.w, p, layer, scope, title, action, "catalog_item", c.ID, before, after, s.now())
 }
 
 func catalogJournal(c store.CatalogItem) map[string]any {
@@ -137,11 +224,12 @@ func (s *Service) addCatalog(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		if q, err = s.open(r, st, p, FeatureCatalog); err != nil {
 			return err
 		}
-		if err := q.requireOrgAdmin(); err != nil {
+		ownerLayer, ownerScope, err := q.checkOwner(in.Owner)
+		if err != nil {
 			return err
 		}
 		if !ValidKind(in.Kind) {
-			return httpx.Invalid("kind", "skill, mcp, repo или doc")
+			return httpx.Invalid("kind", kindsRu)
 		}
 		name, err := CleanText("name", deref(in.Name), maxNameRunes, true)
 		if err != nil {
@@ -155,14 +243,23 @@ func (s *Service) addCatalog(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		if err != nil {
 			return err
 		}
+		if err := q.checkSource(in.Kind, src); err != nil {
+			return err
+		}
+		if ownerLayer != "" {
+			if err := CheckConsent(in.Kind, src); err != nil {
+				return err
+			}
+		}
 		if q.nameTaken(in.Kind, name, "") {
 			return httpx.Conflict("name_taken", "Такое название уже есть в каталоге")
 		}
-		c := store.CatalogItem{OrgID: q.w.org.ID, Kind: in.Kind, Name: name, Hint: hint, Source: string(src), CreatedAt: s.now(), CreatedBy: p.User.ID}
+		c := store.CatalogItem{OrgID: q.w.org.ID, Kind: in.Kind, Name: name, Hint: hint, Source: string(src), CreatedAt: s.now(), CreatedBy: p.User.ID,
+			OwnerLayer: ownerLayer, OwnerScope: ownerScope}
 		if out, err = st.AddCatalogItem(r.Context(), c); err != nil {
 			return err
 		}
-		return s.catalogChanged(q, st, p, fmt.Sprintf("Каталог: добавлен %s «%s»", kindRu[out.Kind], out.Name), "catalog.add", out.ID, nil, catalogJournal(out))
+		return s.catalogChanged(q, st, p, out, fmt.Sprintf("Каталог: добавлен %s «%s»", kindRu[out.Kind], out.Name), "catalog.add", nil, catalogJournal(out))
 	})
 	if err != nil {
 		return err
@@ -204,11 +301,11 @@ func (s *Service) patchCatalog(w http.ResponseWriter, r *http.Request, p *auth.P
 		if q, err = s.open(r, st, p, FeatureCatalog); err != nil {
 			return err
 		}
-		if err := q.requireOrgAdmin(); err != nil {
-			return err
-		}
 		c, err := q.ownItem(r.PathValue("itemId"))
 		if err != nil {
+			return err
+		}
+		if err := q.requireItemRights(c); err != nil {
 			return err
 		}
 		before := catalogJournal(c)
@@ -241,6 +338,14 @@ func (s *Service) patchCatalog(w http.ResponseWriter, r *http.Request, p *auth.P
 			if err != nil {
 				return err
 			}
+			if err := q.checkSource(c.Kind, src); err != nil {
+				return err
+			}
+			if c.OwnerLayer != "" {
+				if err := CheckConsent(c.Kind, src); err != nil {
+					return err
+				}
+			}
 			if string(src) != string(CanonicalSource(c.Source)) {
 				c.Source = string(src)
 				verbs = append(verbs, "изменён источник")
@@ -267,7 +372,7 @@ func (s *Service) patchCatalog(w http.ResponseWriter, r *http.Request, p *auth.P
 		if err := st.UpdateCatalogItem(r.Context(), c); err != nil {
 			return err
 		}
-		return s.catalogChanged(q, st, p, fmt.Sprintf("Каталог: %s «%s» %s", kindRu[c.Kind], c.Name, strings.Join(verbs, ", ")), "catalog.update", c.ID,
+		return s.catalogChanged(q, st, p, c, fmt.Sprintf("Каталог: %s «%s» %s", kindRu[c.Kind], c.Name, strings.Join(verbs, ", ")), "catalog.update",
 			before, catalogJournal(c))
 	})
 	if err != nil {
@@ -303,11 +408,11 @@ func (s *Service) deleteCatalog(w http.ResponseWriter, r *http.Request, p *auth.
 		if q, err = s.open(r, st, p, FeatureCatalog); err != nil {
 			return err
 		}
-		if err := q.requireOrgAdmin(); err != nil {
-			return err
-		}
 		c, err := q.ownItem(r.PathValue("itemId"))
 		if err != nil {
+			return err
+		}
+		if err := q.requireItemRights(c); err != nil {
 			return err
 		}
 		if c.ArchivedAt != nil {
@@ -320,7 +425,7 @@ func (s *Service) deleteCatalog(w http.ResponseWriter, r *http.Request, p *auth.
 		if err := st.UpdateCatalogItem(r.Context(), c); err != nil {
 			return err
 		}
-		return s.catalogChanged(q, st, p, fmt.Sprintf("Каталог: %s «%s» убран из каталога", kindRu[c.Kind], c.Name), "catalog.archive", c.ID,
+		return s.catalogChanged(q, st, p, c, fmt.Sprintf("Каталог: %s «%s» убран из каталога", kindRu[c.Kind], c.Name), "catalog.archive",
 			before, catalogJournal(c))
 	})
 	if err != nil {

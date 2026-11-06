@@ -1,0 +1,58 @@
+{
+  "run": {
+    "id": "run-3f9a1c2e",
+    "machine": {
+      "id": "m-andrey",
+      "name": "vm-andrey"
+    },
+    "person": {
+      "id": "u-andrey",
+      "name": "Андрей"
+    },
+    "mode": "update",
+    "by": null,
+    "status": "error",
+    "startedAt": "2026-11-05T10:04:00Z",
+    "finishedAt": "2026-11-05T10:05:12Z",
+    "steps": [
+      {
+        "itemId": "item-gitlab",
+        "kind": "access",
+        "name": "GitLab",
+        "status": "ok",
+        "message": null,
+        "exit": 0,
+        "ms": 2100,
+        "log": "$ glab auth status --hostname gitlab.example.org\nLogged in to gitlab.example.org as andrey"
+      },
+      {
+        "itemId": "item-web",
+        "kind": "repo",
+        "name": "web",
+        "status": "ok",
+        "message": null,
+        "exit": 0,
+        "ms": 9000
+      },
+      {
+        "itemId": "item-node",
+        "kind": "script",
+        "name": "Node и pnpm",
+        "status": "ok",
+        "message": null,
+        "exit": 0,
+        "ms": 6400
+      },
+      {
+        "itemId": "item-setup",
+        "kind": "script",
+        "name": "Настройка web",
+        "status": "error",
+        "message": "pnpm: command not found",
+        "exit": 127,
+        "ms": 3000,
+        "log": "HOME=/home/andrey NPM_TOKEN=••••••\n$ cd ~/code/web && bash scripts/setup-dev.sh\n+ pnpm install --frozen-lockfile\nscripts/setup-dev.sh: line 4: pnpm: command not found\nexit 127"
+      }
+    ]
+  }
+}

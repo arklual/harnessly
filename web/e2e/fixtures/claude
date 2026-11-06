@@ -87,6 +87,8 @@ turn() {
   # link a tool printed (the grep) does not make a merge request of anyone.
   case "$1" in *references*) reply="Fake agent reply: ABC-12 is done, notes at https://example.com/notes. Merged model-gateway !104 and harnessly !80, !999 and !502 are typos." ;; esac
   case "$1" in *links*) reply="Fake agent reply: see [the release notes](https://docs.example.com/notes) and https://gitlab.com/acme/app/-/merge_requests/7" ;; esac
+  # The documentation's screenshots (docs-shots.spec.ts) give it a real answer to show.
+  if [ -f "$HOME/.fake-reply.md" ]; then reply=$(cat "$HOME/.fake-reply.md"); fi
   # Asked to draw, it does what the boards and artifacts skills do with the environment the runtime gave it: a board
   # from a graph and a document of this conversation, and it answers with their links.
   case "$1" in *draw*)

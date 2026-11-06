@@ -41,7 +41,8 @@ func (t *Tmux) readPanesOn(socket string) (map[string]PaneInfo, bool) {
 		if f[0] == "" || f[1] == "" || !t.onSocket(f[0], socket) {
 			continue
 		}
-		panes[f[0]] = PaneInfo{Command: f[1], Path: f[2], PID: int(leadingInt(f[3])), WindowActivity: leadingInt(f[4])}
+		pid := int(leadingInt(f[3]))
+		panes[f[0]] = PaneInfo{Command: ForegroundCommand(f[1], pid), Path: f[2], PID: pid, WindowActivity: leadingInt(f[4])}
 	}
 	return panes, true
 }
@@ -143,13 +144,19 @@ func (t *Tmux) SessionsOfPane(paneID, socket string) []string {
 	return out
 }
 
-// PaneCurrentCommand is the program in the foreground of the session's pane, or "".
+// PaneCurrentCommand is the program in the foreground of the session's pane, or "". It is checked against /proc
+// (see foregroundOf): tmux alone answers `nice` for a pane whose foreground it cannot read.
 func (t *Tmux) PaneCurrentCommand(name string) string {
-	r := t.on(name, "list-panes", "-t", name, "-F", "#{pane_current_command}")
+	r := t.on(name, "list-panes", "-t", name, "-F", "#{pane_current_command}\t#{pane_pid}")
 	if r.err != nil {
 		return ""
 	}
-	return strings.TrimSpace(r.stdout)
+	line, _, _ := strings.Cut(strings.TrimSpace(r.stdout), "\n")
+	cmd, pid, _ := strings.Cut(line, "\t")
+	if cmd == "" {
+		return ""
+	}
+	return ForegroundCommand(cmd, int(leadingInt(pid)))
 }
 
 // SafeShells are the foreground programs that mean "nothing runs in the pane but its shell".
@@ -186,8 +193,9 @@ func (t *Tmux) PaneDetail(name string) PaneDetail {
 	for len(f) < 6 {
 		f = append(f, "")
 	}
+	pid := int(leadingInt(f[2]))
 	return PaneDetail{
-		Cwd: f[0], Command: f[1], PID: int(leadingInt(f[2])), Width: int(leadingInt(f[3])), Height: int(leadingInt(f[4])),
+		Cwd: f[0], Command: ForegroundCommand(f[1], pid), PID: pid, Width: int(leadingInt(f[3])), Height: int(leadingInt(f[4])),
 		SessionCreated: leadingInt(f[5]),
 	}
 }

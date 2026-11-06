@@ -17,12 +17,14 @@ import (
 // The engines a page may name in `start`. Anything but "local" sends the audio to the provider, and only a person who
 // picked that model in Settings makes the page name it.
 const (
-	engineOpenAI = "openai"
-	engineYandex = "yandex"
+	engineOpenAI  = "openai"
+	engineYandex  = "yandex"
+	engineChatGPT = "chatgpt"
 )
 
 var (
 	msgNoCloudKey = locale.T("No key is saved for this recognition model: add it in Settings, Models and keys.", "Для этой модели распознавания не сохранён ключ: добавьте его в «Модели и ключи».")
+	msgNoChatGPT  = locale.T("Codex is not signed in with a ChatGPT plan: sign in with codex login.", "Codex не вошёл по подписке ChatGPT: войдите командой codex login.")
 	msgBadEngine  = locale.T("Unknown recognition model.", "Неизвестная модель распознавания.")
 )
 
@@ -60,15 +62,22 @@ func (s *Server) cloudDial(engine string, words []dict.Entry, lang string) (dial
 	if fn == nil && engine == engineYandex {
 		fn = cloud.Yandex
 	}
-	if fn == nil || (engine != engineOpenAI && engine != engineYandex) {
+	if fn == nil && engine == engineChatGPT {
+		fn = cloud.ChatGPT
+	}
+	if fn == nil || (engine != engineOpenAI && engine != engineYandex && engine != engineChatGPT) {
 		return nil, &failure{msgBadEngine.String(), "failed"}
 	}
+	noKey := msgNoCloudKey
+	if engine == engineChatGPT {
+		noKey = msgNoChatGPT
+	}
 	if s.cfg.Credentials == nil {
-		return nil, &failure{msgNoCloudKey.String(), "failed"}
+		return nil, &failure{noKey.String(), "failed"}
 	}
 	key, folder, err := s.cfg.Credentials(engine)
 	if err != nil || key == "" {
-		return nil, &failure{msgNoCloudKey.String(), "failed"}
+		return nil, &failure{noKey.String(), "failed"}
 	}
 	opts := cloud.Options{Lang: lang, Key: key, Folder: folder, Hints: dict.Hints(words)}
 	return func(ctx context.Context) (net.Conn, error) {

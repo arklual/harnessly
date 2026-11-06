@@ -84,3 +84,31 @@ func TestVoiceKeyIsMaskedByTheRuntimesStore(t *testing.T) {
 		t.Fatalf("a removed key is still masked: %s", out)
 	}
 }
+
+// The ChatGPT plan's model runs on the Codex CLI's sign-in by a plan, and on no other.
+func TestVoiceChatGPTLogin(t *testing.T) {
+	home, data := t.TempDir(), t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	auth := filepath.Join(home, "auth.json")
+	if voiceChatGPTReady(data) {
+		t.Fatal("ready without a sign-in")
+	}
+	if key, _, err := voiceCredentials(data)("chatgpt"); err == nil || key != "" {
+		t.Fatalf("no sign-in: %q, %v", key, err)
+	}
+	if err := os.WriteFile(auth, []byte(`{"auth_mode":"apikey","OPENAI_API_KEY":"sk-x"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if voiceChatGPTReady(data) {
+		t.Fatal("ready on an API key")
+	}
+	if err := os.WriteFile(auth, []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"tok","refresh_token":"r","account_id":"acc"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !voiceChatGPTReady(data) {
+		t.Fatal("not ready on a plan's sign-in")
+	}
+	if key, account, err := voiceCredentials(data)("chatgpt"); err != nil || key != "tok" || account != "acc" {
+		t.Fatalf("sign-in: %q, %q, %v", key, account, err)
+	}
+}

@@ -550,6 +550,7 @@ keys = true              # API keys and secrets delivered from the hub
 env = true               # environment variables delivered from the hub
 install = true           # installing Claude Code and Codex
 runtime_session = true   # the hub opening this machine's page for a person
+setup = true             # the hub's environment list setting the machine up: logins, clones, scripts
 deny_routes = []         # route prefixes of the runtime to refuse, e.g. ["/api/terminal", "/api/fs/write"]
 EOF
 }

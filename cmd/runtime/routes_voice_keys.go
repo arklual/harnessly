@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -17,7 +19,7 @@ import (
 
 // The keys of the cloud recognition models, beside the keys of the agents' vendors (Settings → «Модели и ключи»):
 //
-//	GET    <platform>/voice/keys           {keys: {openai, yandex, yandex-folder: {configured, tail}}}
+//	GET    <platform>/voice/keys           {keys: {openai, yandex, yandex-folder: {configured, tail}}, chatgpt: bool}
 //	PUT    <platform>/voice/keys/<id>      {key}   the same list after it, or 400 {error}
 //	DELETE <platform>/voice/keys/<id>              the same list after it
 //
@@ -62,19 +64,52 @@ func voiceCredentials(dataDir string) func(engine string) (string, string, error
 				return "", "", err
 			}
 			return key, folder, nil
+		case "chatgpt":
+			login := voiceCodexLogin(dataDir)
+			if login == nil {
+				return "", "", providers.ErrNoLogin
+			}
+			token, err := login.Token(context.Background())
+			if err != nil {
+				return "", "", err
+			}
+			return token, login.AccountID(), nil
 		}
 		return "", "", errors.New("not a cloud engine")
 	}
 }
 
+// voiceCodexLogin is the Codex CLI's sign-in by a ChatGPT plan: the store's when the runtime keeps one, so that a renewal
+// is not run twice at once, else one on the same file; nil without a home.
+func voiceCodexLogin(dataDir string) *providers.CodexLogin {
+	if login, ok := voiceStore(dataDir).Logins["gpt"].(*providers.CodexLogin); ok && login != nil {
+		return login
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return &providers.CodexLogin{Path: filepath.Join(providers.CodexHome(home), "auth.json")}
+}
+
+// voiceChatGPTReady says the machine's Codex is signed in by a plan, so the dictation can be offered it.
+func voiceChatGPTReady(dataDir string) bool {
+	login := voiceCodexLogin(dataDir)
+	if login == nil {
+		return false
+	}
+	_, ok := login.Account()
+	return ok
+}
+
 func voiceKeysRoutes(d deps, _ *voice.Server) []gate.Route {
-	list := func() map[string]map[string]wire.ProfileKey {
+	list := func() map[string]any {
 		st := voiceStore(d.DataDir)
 		keys := map[string]wire.ProfileKey{}
 		for _, id := range providers.SpeechKeys {
 			keys[id] = st.State(id)
 		}
-		return map[string]map[string]wire.ProfileKey{"keys": keys}
+		return map[string]any{"keys": keys, "chatgpt": voiceChatGPTReady(d.DataDir)}
 	}
 	return []gate.Route{{
 		Slice: "voice",

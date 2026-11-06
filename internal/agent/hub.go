@@ -65,6 +65,11 @@ type hub struct {
 	dir string
 	// policyChanged wakes keepRuntimePolicy when the policy file changes.
 	policyChanged chan struct{}
+	// relink asks the live hub link to close and call again, so that a new `hello` tells the hub what changed (whether
+	// this machine is set up by the list).
+	relink chan struct{}
+	// setupSaid is what the last `hello` offered of the setup (setupOffered at that time).
+	setupSaid bool
 
 	// Set by start.
 	ctx      context.Context
@@ -75,6 +80,14 @@ type hub struct {
 	// metrics samples the machine's load for the hub; restarts serves runtime.restart.
 	metrics  *sampler
 	restarts *restarter
+
+	// runsSent is the time of each run file as it was last sent to the hub (env.run).
+	runsMu sync.Mutex
+	// allowWritten is the last decision written to environment-allow.json (allowKnown: there is one).
+	allowMu      sync.Mutex
+	allowWritten bool
+	allowKnown   bool
+	runsSent     map[string]time.Time
 
 	mu      sync.Mutex
 	checks  map[string]hubproto.ProviderCheck // the last provider check of each agent, for its status
@@ -124,9 +137,12 @@ func newHub(a *Agent, m *MachineFile, dir string, observe bool) *hub {
 		shell:         &preflight.Checker{Home: cfg.Home, Env: os.Environ()},
 		checks:        map[string]hubproto.ProviderCheck{},
 		policyChanged: make(chan struct{}, 1),
+		relink:        make(chan struct{}, 1),
 		state:         LinkState{PID: os.Getpid(), MachineID: m.MachineID, HubURL: m.HubURL, Version: cfg.Version},
 	}
 	h.environment.hasSecret = h.hasSecret
+	h.environment.setupAllowed = h.setupAllowed
+	h.environment.runnerAlive = h.runnerAlive
 	h.proxies = agentnet.NewProxies(h.env)
 	h.metrics = &sampler{sys: newSysReader(), path: diskPath(cfg), chats: h.chatsNow, now: time.Now}
 	h.restarts = h.newRestarter()
@@ -140,6 +156,7 @@ func (h *hub) start(ctx context.Context) error {
 	h.ctx = ctx
 	cfg := h.a.cfg
 	h.policy.Reload(true)
+	h.writeSetupAllow()
 	// An observe link changes nothing of the machine: the proxies stay as the cluster's runtime set them.
 	if !h.observe {
 		if err := h.proxies.Start(); err != nil {
@@ -198,6 +215,7 @@ func (h *hub) start(ctx context.Context) error {
 	h.goBG(func() { every(ctx, linkStateEvery, false, h.heartbeat) })
 	h.goBG(func() { every(ctx, agentsEvery, false, func() { h.refreshAgents(false) }) })
 	h.goBG(func() { every(ctx, preflightEvery, false, h.sendPreflight) })
+	h.goBG(func() { h.watchEnvSetup(ctx) })
 	h.startUsage()
 	h.startMetrics()
 	return nil
@@ -300,6 +318,7 @@ func (h *hub) linkUp(l *link) {
 	if rev, _ := h.environment.Held(); rev > 0 {
 		h.emit(hubproto.EventEnvState, "state", h.environment.State()) // how the held list went, for a hub that lost it
 	}
+	h.goBG(func() { h.shipRuns(true) }) // the runs of the last day, for a hub that lost them
 }
 
 func (h *hub) linkDown(l *link) {
@@ -313,6 +332,9 @@ func (h *hub) linkDown(l *link) {
 
 // onPolicy: the policy file changed. The hub is told, and what was open under a wider policy is closed.
 func (h *hub) onPolicy(old, now hubproto.Policy) {
+	if h.writeSetupAllow() { // a narrowing reaches the runtime at once, not at the watcher's next look
+		h.setupChanged()
+	}
 	h.audit.Record("policy.changed", true, map[string]any{"policy": now})
 	Log("info", "policy changed", F{"source", now.Source})
 	if Narrowed(old, now) && !h.observe {
@@ -363,6 +385,7 @@ func (h *hub) keepRuntimePolicy(ctx context.Context) {
 
 // onSwitch: the kill switch moved. Switched off, the hub is told and the link goes; the dial loop waits for it to be on.
 func (h *hub) onSwitch(off bool) {
+	h.writeSetupAllow()
 	h.audit.Record("killswitch", true, map[string]any{"off": off})
 	if !off {
 		Log("info", "the agent is switched on again")
@@ -393,6 +416,14 @@ func (h *hub) hello() hubproto.Hello {
 		features = append(features, hubproto.FeatureUsage)
 	}
 	features = append(features, hubproto.FeatureEnvironment)
+	// The runtime ships in the same release and does the setup; an own link takes it only under the policy's `setup`.
+	offered := h.setupOffered()
+	if offered {
+		features = append(features, hubproto.FeatureEnvSetup)
+	}
+	h.mu.Lock()
+	h.setupSaid = offered
+	h.mu.Unlock()
 	if !h.observe {
 		features = append(features, hubproto.FeatureBudget)
 	}

@@ -170,3 +170,63 @@
     transition: none;
   }
 }
+
+/* The sections of the contents: a quiet name over its pages. */
+.hx-help__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-help__section + .hx-help__section {
+  margin-top: var(--hx-space-3);
+}
+.hx-help__section-title {
+  margin: 0;
+  padding: 4px 12px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+/* A page the search found: its title, the heading it is under, the line that matched. */
+.hx-help__hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--hx-radius-md);
+  color: var(--hx-fg-2);
+  text-decoration: none;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-help__hit:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-help__hit:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -2px;
+}
+.hx-help__hit-title {
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-help__hit-heading {
+  color: var(--hx-fg-3);
+  font-weight: var(--hx-weight-regular);
+}
+.hx-help__hit-text {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* A screenshot or a diagram of the page: as wide as the text, framed so a light shot does not melt into a light page. */
+.hx-help__img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--hx-space-2) 0;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-pane);
+}

@@ -87,6 +87,31 @@ func (s Store) MachinesBySpace(ctx context.Context, spaceID string) ([]Machine, 
 	return out, rows.Err()
 }
 
+// MachinesByUser lists the machines of a space that a person made (registered with their code) and that are not revoked.
+func (s Store) MachinesByUser(ctx context.Context, spaceID, userID string) ([]Machine, error) {
+	rows, err := s.q.Query(ctx, `SELECT `+machineCols+` FROM machines WHERE space_id = ? AND created_by = ? AND revoked_at IS NULL ORDER BY created_at, id`, spaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Machine
+	for rows.Next() {
+		m, err := scanMachine(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// CountWorkingMachines is how many machines of a space are neither revoked nor switched off.
+func (s Store) CountWorkingMachines(ctx context.Context, spaceID string) (int, error) {
+	var n int
+	err := s.q.QueryRow(ctx, `SELECT COUNT(*) FROM machines WHERE space_id = ? AND revoked_at IS NULL AND disabled_at IS NULL`, spaceID).Scan(&n)
+	return n, err
+}
+
 // UnclaimedLocalMachine is the local machine that registered into no space yet, if any.
 func (s Store) UnclaimedLocalMachine(ctx context.Context) (Machine, error) {
 	return scanMachine(s.q.QueryRow(ctx, `SELECT `+machineCols+` FROM machines WHERE space_id IS NULL AND via = 'local' AND revoked_at IS NULL ORDER BY created_at DESC, id LIMIT 1`))

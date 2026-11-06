@@ -62,7 +62,8 @@ type Config struct {
 	// ReadyTimeout is how long the service may take to load its model (30 s).
 	ReadyTimeout time.Duration
 	Log          func(level, msg string, kv ...any)
-	// Credentials gives the saved key (and Yandex's folder id) of a cloud engine ("openai", "yandex"); an error says
+	// Credentials gives the saved key and Yandex's folder id of a cloud engine ("openai", "yandex"), or the Codex
+	// sign-in's token and ChatGPT account ("chatgpt"); an error says
 	// there is none. nil: no cloud engine is offered.
 	Credentials func(engine string) (key, folder string, err error)
 	// Cloud replaces the cloud recognizers (tests); nil is the real ones.

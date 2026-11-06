@@ -55,9 +55,10 @@ characters at most), `rate-limited` (20 a minute from one machine), `no-relay`, 
 The receiving side decides who may write (Settings → Machines → «Связь между агентами») and keeps an audit of every
 message in and out.
 
-Between machines the message goes through the fleet's gateway (`RUNTIME_PEER_RELAY_URL`): the sending runtime signs
-the request with its own secret, the gateway checks it and forwards it signed with the receiving runtime's secret
-(`POST /api/peers/inbox`, `GET /api/peers/directory`). No other token exists, and an agent never sees one.
+Between machines the message goes through a relay (`RUNTIME_PEER_RELAY_URL`; on a hub's machine its agent, which
+hands it to the hub): the sending runtime signs the request with its own secret, the relay checks it and the receiving
+side forwards it signed with the receiving runtime's secret (`POST /api/peers/inbox`, `GET /api/peers/directory`).
+Another machine of a hub is `m-<machine id>/<conversation id>`. No other token exists, and an agent never sees one.
 
 ## Telegram notifications
 

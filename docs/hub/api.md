@@ -385,6 +385,7 @@ HTML page «Машина не на связи» with status 502.
 | `GET /dl/{name}` | | the binary (`application/octet-stream`), from `HUB_DIST_DIR` |
 | `POST /agent/register` | `RegisterRequest` | 201 `RegisterResponse`; 410 `expired`, 400, 429 |
 | `GET /agent/v1` | WebSocket upgrade with the signed `Authorization` header | 101; 401 bad signature/unknown key/old time/replayed nonce; 403 revoked; 426 agent older than `HUB_MIN_AGENT_VERSION` |
+| `POST /agent/peers/send`, `POST /agent/peers/directory` | signed like the dial, under `harnessly-agent-peers-v1` | messages between machines, [peers.md](peers.md); 404 unless `HUB_PEERS=on` |
 | `DELETE /agent/v1` | the machine removes itself: an `Authorization` header made like the dial's, signed under the domain `harnessly-agent-unlink-v1` (a dial's signature does not do) | 204 (revoked as `DELETE /api/machines/{id}` does: link closed with 4010, `machineRemoved` event); 401 bad signature/unknown key/old time/replayed nonce; 403 already revoked |
 
 ```ts
@@ -486,6 +487,8 @@ Protocol 2 error strings start with a code and a colon. Codes and the hub's HTTP
 | `usage.ack` | `{ epoch, seq }` | `{}` — [usage.md](usage.md) |
 | `budget.set` | `{ version, mode, issuedAt, entries }` | `{ version }` — the limits the machine applies, [limits.md](limits.md#on-the-machine); only when `hello.features` has `budget` |
 | `env.set` | `{ rev, hash, items: EnvItem[] }` | `EnvState` `{ rev, hash, applied: { itemId, status: 'ok' \| 'error' \| 'pending', message? }[] }` — the machine's whole environment list, [environment.md](environment.md#machines); only when `hello.features` has `environment`. A wrong `hash` is refused |
+| `peers.deliver` | `{ sender, message }` | `PeerResult` — a message from an agent of another machine for a chat of this one, [peers.md](peers.md); `policy_denied` with the policy's `peers` off |
+| `peers.directory` | `{ sender }` | `{ chats }` — the chats of this machine that sender may write to, [peers.md](peers.md) |
 | `tunnel.open` | v1, unchanged; target `runtime` only for the hub (passes the policy's route filter) | v1 |
 
 The v1 operations (`transcripts.*`, `state.*`, `conversations.start`, `docs.*`, `design.*`, `eval.*`, `status.send`)
@@ -524,6 +527,7 @@ type Policy = {
   env: boolean;                // env.deliver, gitkey.ensure
   install: boolean;            // agents.install
   runtimeSession: boolean;     // runtime.session and tunnel.open (off = nobody opens the runtime through the hub)
+  peers: boolean;              // peers.deliver, peers.directory: messages from agents of other machines (peers.md)
   denyRoutes: string[];        // runtime path prefixes after the base path, e.g. ["/api/terminal"]
   source: string;              // the file it was read from, or "default"
 };
@@ -752,6 +756,8 @@ keys = true
 env = true
 install = true
 runtime_session = true
+setup = true       # the environment list setting the machine up; a file without this key means false
+peers = true       # messages between agents of different machines (peers.md); a file without this key means false
 deny_routes = []   # e.g. ["/api/terminal", "/api/fs/write"]
 ```
 
@@ -852,6 +858,7 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_PROXY_JWT_ISSUER` | | when set, the `iss` the token must carry |
 | `HUB_PROXY_JWT_HEADER` | `X-Forwarded-Access-Token` | the header the proxy passes the token in (`Authorization` takes `Bearer <token>`) |
 | `HUB_PROXY_JWT_EMAIL_CLAIM` | `email` | the claim that holds the person's email |
+| `HUB_PEERS` | `off` | `on`: the hub carries messages between the agents of its machines ([peers.md](peers.md)); `off`: `/agent/peers/*` answer 404 |
 | `HUB_MIN_AGENT_VERSION` | | refuse older agents (426 / 4012) |
 | `HUB_TERMS_URL` | | shown under the sign-up |
 | `HUB_WEB_DIR` | | serve the UI from this folder instead of the embedded files (development) |
@@ -867,6 +874,8 @@ Secrets (`*_SECRET`, `HUB_SMTP_URL`, `HUB_DATABASE_URL`, `HUB_SECRET_KEY`) may a
 | `AGENT_MACHINE_FILE` | `$AGENT_DATA_DIR/machine.json` | |
 | `AGENT_POLICY_FILE` | `/etc/harnessly/policy.toml` if it exists, else `~/.config/harnessly/policy.toml` | |
 | `AGENT_ENV_DIR` | `$AGENT_DATA_DIR/agent-env` | |
+| `AGENT_RUNTIME_PEERS` | `<runtime base>/api/peers` | the runtime's inbox and directory of messages between machines ([peers.md](peers.md)) |
+| `AGENT_HUB_PEERS` | | `on` lets an observe link take part in messages between machines |
 
 All v1 variables keep their meaning. In Ed25519 mode `AGENT_CLUSTER_URL` and `AGENT_RUNTIME_ID` are ignored, and the
 agent starts even while the runtime has not written its secret yet (`runtime.session` answers `failed` until then).
@@ -875,6 +884,7 @@ agent starts even while the runtime has not written its secret yet (`runtime.ses
 
 | Variable | What |
 | --- | --- |
+| `RUNTIME_PEER_RELAY_URL` | `http://127.0.0.1:<AGENT_PORT>/peers` on a hub's machine: the agent relays the runtime's messages to other machines ([peers.md](peers.md)) |
 | `RUNTIME_HUB_URL` | the hub's public URL; goes into the page config as `hubUrl`. With it set a hub signs the people in: `GET /api/auth/setup` answers `{ needsSetup: false, requiresAuth: false, hostEnvLocked: false }` and `POST` answers 400, because a first-run password would replace the secret the agent signs page sessions with. The page offers no password setup or login (`hubUrl` is the cue) |
 
 ## UI routes

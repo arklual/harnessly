@@ -31,6 +31,7 @@ import {
 import { openPreview, slotNonce } from '@/next/core/net/preview';
 import { slotLeases } from '@/next/features/pane/slot-lease';
 import type { IStageOptions } from '@/next/bindings/site-stage';
+import type { TChatOpeners } from '@/next/bindings/chat-view';
 import { usePaneChatStage, useSiteOnlyStage, type IStageWithChat } from '@/next/bindings/pane-stage';
 import { useTabState, useTabTitle } from '@/next/stores/tabs';
 import { useChatPaneView } from '@/next/stores/pane-state';
@@ -111,6 +112,8 @@ export interface IDesignlySiteProps {
   onMode?: (edit: boolean) => void;
   /** The right pane of the design's chat, as a chat has it: its button in the design's strip; null without a chat. */
   toolPane?: { open: boolean; onToggle: () => void } | null;
+  /** Where a link, a file or a card of the design's chat opens: the pane beside the design, as a chat's open there. */
+  open?: TChatOpeners;
 }
 
 /** The design in the right pane: the chat it sits beside edits it; the way back is to the library. */
@@ -145,6 +148,7 @@ const DesignlySiteBody = ({
   edit = false,
   onMode,
   toolPane = null,
+  open,
   pane,
 }: IBodyProps) => {
   // The library the home has just read starts the design: its page is asked for at once, the library is read anew behind.
@@ -351,6 +355,7 @@ const DesignlySiteBody = ({
     pageUrl: boardHref(id, shownPath),
     port: project?.port ?? null,
     onOpenDrawer,
+    open,
   });
 
   const current = tabs.find((x) => x.id === tab) ?? tabs[0];
@@ -593,25 +598,9 @@ const DesignlySiteBody = ({
   const modeButton: ISiteMode | undefined = (() => {
     if (pane || !onMode) return undefined;
     const state = t(modeStateKey(modeKindOf(project?.design.kind), editing));
-    if (editing)
-      return {
-        state,
-        editing,
-        action: { label: t('next.site.modeView'), icon: 'eye', onClick: () => setMode(false) },
-      };
-    if (mayEdit)
-      return {
-        state,
-        editing,
-        action: { label: t('next.site.modeEdit'), icon: 'pencil', onClick: () => setMode(true) },
-      };
-    return {
-      state,
-      editing,
-      action: shareButton
-        ? { label: t('next.site.modeAsk'), icon: 'lock-keyhole', onClick: () => openShare(true) }
-        : null,
-    };
+    if (editing) return { state, editing, action: { onClick: () => setMode(false), ask: false } };
+    if (mayEdit) return { state, editing, action: { onClick: () => setMode(true), ask: false } };
+    return { state, editing, action: shareButton ? { onClick: () => openShare(true), ask: true } : null };
   })();
 
   // Before the project is known (the library, the gateway's answer, the waits for a role just given) the design's

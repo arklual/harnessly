@@ -1,0 +1,17 @@
+{
+  "title": { "en": "Apps and plugins", "ru": "Приложения и плагины" },
+  "audience": "all",
+  "order": 70,
+  "pages": [
+    "README.md",
+    "01-first-plugin.md",
+    "02-views.md",
+    "03-backend.md",
+    "04-sinopia.md",
+    "05-agents.md",
+    "06-debugging.md",
+    "07-sharing.md",
+    "08-worked-example.md",
+    "../apps.md"
+  ]
+}

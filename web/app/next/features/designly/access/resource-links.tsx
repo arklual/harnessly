@@ -4,7 +4,7 @@
 // by its maker or by a manager: someone else's link has no menu (the gateway refuses it anyway). The screen of a link
 // is one field and rows of which one is open at a time: «Доступ», «Срок», «Скачивание», «Копирование текста» (a
 // document), «Ещё» by kind. A made link is copied at once.
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { copied } from '@/next/features/designly/access/access-link-rows';
 import { copyText } from '@/next/features/designly/access/copy-link';
 import {
@@ -128,17 +128,20 @@ export const useLinksScreen = ({
       await copied(copy);
     });
 
-  return {
-    editing,
-    form,
-    setForm: (patch) => setFormState((now) => ({ ...now, ...patch })),
-    start: (link) => {
+  // Kept the same between renders: the list of links takes them, and it should not be drawn again as the form changes.
+  const setForm = useCallback(
+    (patch: Partial<ILinkForm>) => setFormState((now) => ({ ...now, ...patch })),
+    [],
+  );
+  const start = useCallback(
+    (link: IAccessLink | null) => {
       setEditing(link);
       setFormState(link ? formOf(link, ctx) : blankForm(ctx));
     },
-    submit,
-    fresh,
-  };
+    [ctx],
+  );
+
+  return { editing, form, setForm, start, submit, fresh };
 };
 
 const LinkMenu = ({
@@ -258,7 +261,8 @@ export const ResourceLinks = ({
   onNext: (next: IResourceView) => void;
   ctx: ILinkContext;
   me: string | null;
-  screen: ILinksScreen;
+  /** What the list needs of the link screen: how to start it, and the link just made. */
+  screen: Pick<ILinksScreen, 'start' | 'fresh'>;
   /** Opens the screen of a link (after `screen.start`). */
   onOpen: () => void;
 }) => {

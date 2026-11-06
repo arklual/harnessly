@@ -168,14 +168,20 @@ type Hello struct {
 
 // Policy is what the machine's own policy file allows. The hub reads it and cannot change it.
 type Policy struct {
-	Terminal       bool     `json:"terminal"`
-	AgentLogin     bool     `json:"agentLogin"`
-	Keys           bool     `json:"keys"`
-	Env            bool     `json:"env"`
-	Install        bool     `json:"install"`
-	RuntimeSession bool     `json:"runtimeSession"`
-	DenyRoutes     []string `json:"denyRoutes"`
-	Source         string   `json:"source"`
+	Terminal       bool `json:"terminal"`
+	AgentLogin     bool `json:"agentLogin"`
+	Keys           bool `json:"keys"`
+	Env            bool `json:"env"`
+	Install        bool `json:"install"`
+	RuntimeSession bool `json:"runtimeSession"`
+	// Setup lets the hub's environment set the machine up: clone repositories, log the forges' CLIs in and run the
+	// scripts of the list (env.run and the setup kinds of env.set).
+	Setup bool `json:"setup"`
+	// Peers lets the agents of this machine's chats exchange messages with the chats of other machines of the hub
+	// (peers.deliver, peers.directory and the runtime's relay; docs/hub/peers.md).
+	Peers      bool     `json:"peers"`
+	DenyRoutes []string `json:"denyRoutes"`
+	Source     string   `json:"source"`
 }
 
 // Check is one line of a preflight report.

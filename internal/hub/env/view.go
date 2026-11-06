@@ -12,10 +12,12 @@ import (
 
 // KindCounts is a number per kind of item.
 type KindCounts struct {
-	Skill int `json:"skill"`
-	MCP   int `json:"mcp"`
-	Repo  int `json:"repo"`
-	Doc   int `json:"doc"`
+	Skill  int `json:"skill"`
+	MCP    int `json:"mcp"`
+	Repo   int `json:"repo"`
+	Doc    int `json:"doc"`
+	Script int `json:"script"`
+	Access int `json:"access"`
 }
 
 func (c *KindCounts) add(kind string) {
@@ -28,6 +30,10 @@ func (c *KindCounts) add(kind string) {
 		c.Repo++
 	case store.CatalogDoc:
 		c.Doc++
+	case store.CatalogScript:
+		c.Script++
+	case store.CatalogAccess:
+		c.Access++
 	}
 }
 
@@ -102,7 +108,8 @@ type Response struct {
 	// not: the list the environment is filled from.
 	Observed []ObservedTool `json:"observed"`
 	// Delivery is how many of the screen's machines hold the list.
-	Delivery Delivery `json:"delivery"`
+	// Null when the screen reaches more than maxDeliveryMachines machines.
+	Delivery *Delivery `json:"delivery"`
 }
 
 // ObservedTool is a skill or an MCP server the machines called: Name is as the chats name it (the skill, the MCP

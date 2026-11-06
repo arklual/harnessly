@@ -11,6 +11,7 @@ import '@/next/styles/shell.css';
 import '@/next/styles/pane.css';
 import '@/next/styles/picker.css';
 import '@/next/styles/composer.css';
+import '@/next/styles/setup.css';
 import '@/next/styles/goal.css';
 import '@/next/styles/limits.css';
 import '@/next/styles/manage.css';

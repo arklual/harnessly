@@ -116,6 +116,9 @@ type Config struct {
 	// UsageIngest (HUB_USAGE_INGEST=on) lets the hub pull the machines' spend facts (docs/hub/usage.md); off: it never
 	// asks, and the spend tables stay empty.
 	UsageIngest bool
+	// Peers (HUB_PEERS=on) lets the machines' agents exchange messages between their chats through the hub
+	// (docs/hub/peers.md); off: POST /agent/peers/* answer 404.
+	Peers bool
 	// MRSourceURL, MRSourceGroups and MRSourceToken (HUB_MR_SOURCE_GITLAB_URL, _GROUPS, _TOKEN) name the GitLab whose merged
 	// merge requests the hub polls for the KPI of docs/hub/analytics.md; no URL: it polls nothing. The token needs read_api.
 	MRSourceURL    string
@@ -401,6 +404,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_USAGE_INGEST must be on or off")
+	}
+	switch strings.ToLower(def("HUB_PEERS", "off")) {
+	case "on", "true", "1", "yes":
+		c.Peers = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_PEERS must be on or off")
 	}
 	if u := get("HUB_MR_SOURCE_GITLAB_URL"); u != "" {
 		pu, err := url.Parse(u)

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import type { MachineId } from '@/next/protocol/v2';
 
 vi.mock('@/next/core/net/runtime-json', async (orig) => ({
@@ -152,6 +153,32 @@ describe('a document of an app type, opened', () => {
     page();
     expect(await screen.findByText(t('next.appdoc.code.view-only'))).toBeTruthy();
     expect((await screen.findByTestId('frame')).dataset.readonly).toBe('true');
+  });
+
+  // the switch at the head of the bar turns the document between looking and editing, both ways.
+  it('goes between looking and editing by the parts of the mode switch', async () => {
+    runtime({
+      kind: 'acme.moodboard',
+      needsApp: false,
+      app: 'acme.moodboard',
+      editor: 'editor',
+      target: 'sinopia.acme.moodboard',
+      readOnly: false,
+    });
+    const Routed = () => {
+      const [edit, setEdit] = useState(false);
+      return <AppDocPage machine={M} id="idei-1" edit={edit} onMode={setEdit} onOpenDrawer={vi.fn()} />;
+    };
+    render(<Routed />);
+    const readOnly = () => screen.getByTestId('frame').dataset.readonly;
+    await waitFor(() => expect(readOnly()).toBe('true'));
+    fireEvent.click(await screen.findByRole('button', { name: t('next.site.stateEditShort') }));
+    await waitFor(() => expect(readOnly()).toBe('false'));
+    expect(
+      screen.getByRole('button', { name: t('next.site.stateEditShort') }).getAttribute('aria-pressed'),
+    ).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: t('next.site.modeView') }));
+    await waitFor(() => expect(readOnly()).toBe('true'));
   });
 
   it('says so when the runtime refuses', async () => {

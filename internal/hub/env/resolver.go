@@ -49,6 +49,16 @@ type Item struct {
 	Hint     string
 	Source   json.RawMessage
 	Archived bool
+	// OwnerLayer and OwnerScope: the one layer scope whose entries may carry the item ("": any layer).
+	OwnerLayer string
+	OwnerScope string
+}
+
+// FitsLayer says whether an item may be carried by an entry of the layer's scope: an item the organization owns is
+// usable anywhere, an item a tenant or a team owns only in its own layer. Otherwise whoever edits the item (a team's
+// lead) could change what runs on machines of wider layers.
+func FitsLayer(ownerLayer, ownerScope, layer, scopeID string) bool {
+	return ownerLayer == "" || (ownerLayer == layer && ownerScope == scopeID)
 }
 
 // Entry is one entry of a layer as the resolver needs it.
@@ -60,6 +70,7 @@ type Entry struct {
 	Enabled  bool
 	Pinned   bool
 	Audience Audience
+	Position int // the place among the layer's entries (scripts run in this order)
 }
 
 // Person is whom the environment is computed for: where they are and what they switched off.
@@ -76,6 +87,7 @@ type Effective struct {
 	Layer    string // the highest layer that puts the item in: org, tenant or team
 	EntryID  string // that layer's entry
 	Pinned   bool   // some layer pinned it: the person cannot switch it off
+	Position int    // the place of that layer's entry among the layer's entries
 	LockedBy string // the highest layer that pinned it, "" when none
 	Off      bool   // the person switched it off (and could)
 }
@@ -133,7 +145,7 @@ func Resolve(items map[string]Item, entries []Entry, p Person) []Effective {
 	byItem := map[string][]Entry{}
 	for _, e := range entries {
 		it, ok := items[e.ItemID]
-		if !ok || it.Archived || !reaches(e, p) {
+		if !ok || it.Archived || !FitsLayer(it.OwnerLayer, it.OwnerScope, e.Layer, e.ScopeID) || !reaches(e, p) {
 			continue
 		}
 		byItem[e.ItemID] = append(byItem[e.ItemID], e)
@@ -148,7 +160,7 @@ func Resolve(items map[string]Item, entries []Entry, p Person) []Effective {
 			case e.Enabled:
 				present = true
 				if eff.EntryID == "" {
-					eff.Layer, eff.EntryID = e.Layer, e.ID
+					eff.Layer, eff.EntryID, eff.Position = e.Layer, e.ID, e.Position
 				}
 				if e.Pinned && eff.LockedBy == "" {
 					eff.Pinned, eff.LockedBy = true, e.Layer

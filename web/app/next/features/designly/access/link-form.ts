@@ -272,13 +272,21 @@ export const linkSub = (link: IAccessLink, kind: TLinkKind, now: number): string
 };
 
 /** «до 11 ноября» of a stop, from now; «Без срока» for ever. */
+// One formatter per language: toLocaleDateString builds a new one per call, and the slider of a term asks for each step.
+const DAY_MONTH = new Map<string, Intl.DateTimeFormat>();
+const dayMonth = (locale: string): Intl.DateTimeFormat => {
+  const known = DAY_MONTH.get(locale);
+  if (known) return known;
+  const made = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' });
+  DAY_MONTH.set(locale, made);
+  return made;
+};
+
 export const termDate = (term: TTerm, now: number): string => {
   if (term === null) return t('next.access.links.termForever');
   const days = Number.parseInt(term, 10);
   const end = new Date(now + days * MS_DAY);
-  return t('next.access.links.termUntil', {
-    date: end.toLocaleDateString(t('next.access.links.locale'), { day: 'numeric', month: 'long' }),
-  });
+  return t('next.access.links.termUntil', { date: dayMonth(t('next.access.links.locale')).format(end) });
 };
 
 /** The short word of «Ещё» on its closed row. */

@@ -62,31 +62,51 @@
   align-content: start;
   gap: 20px;
   min-width: 0;
+  /* Each view keeps its own layer: a switch moves and fades layers already drawn, it does not paint them again */
+  will-change: opacity, translate;
   transition:
     opacity 240ms var(--hx-ease-out),
-    translate 280ms var(--hx-ease-out),
-    visibility 0s linear 0s;
+    translate 280ms var(--hx-ease-out);
+}
+/* Who takes the clicks goes by z-index, which restyles one element: the main view over a view on its way out, the open
+   view over the main one. No inert, visibility or pointer-events on a whole view: each of them restyled every row of it
+   on a switch (HRN-675). */
+.hx-acc-view--main {
+  z-index: 1;
+  /* Skipped, it keeps its height: the dialog does not jump when the main view leaves the layout */
+  contain-intrinsic-size: auto none;
+}
+.hx-acc-view--sub[data-state='open'] {
+  z-index: 2;
+}
+/* Faded out under the open view, the main one is skipped: out of focus and of the accessibility tree, and the browser
+   keeps what it computed for it, so going back shows it without restyling its rows. */
+.hx-acc-views[data-covered='true'] > .hx-acc-view--main {
+  content-visibility: hidden;
 }
 .hx-acc-views[data-sub='true'] > .hx-acc-view--main {
   opacity: 0;
   translate: -24px 0;
-  visibility: hidden;
   transition:
-    opacity 180ms cubic-bezier(0.4, 0, 1, 1),
-    translate 280ms var(--hx-ease-out),
-    visibility 0s linear 280ms;
+    opacity 180ms var(--hx-ease-out),
+    translate 280ms var(--hx-ease-out);
 }
 .hx-acc-view--sub {
   gap: 14px;
   animation: hx-acc-slide 300ms var(--hx-ease-out) backwards;
 }
-.hx-acc-view--sub[data-state='closing'] {
+.hx-acc-view--sub[data-state='closing'],
+.hx-acc-view--sub[data-state='idle'] {
   opacity: 0;
   translate: 24px 0;
   transition:
-    opacity 200ms cubic-bezier(0.4, 0, 1, 1),
-    translate 220ms cubic-bezier(0.4, 0, 1, 1);
-  pointer-events: none;
+    opacity 200ms var(--hx-ease-out),
+    translate 220ms var(--hx-ease-out);
+}
+/* A view opened before and gone back from stays mounted and skipped: it takes no height, the browser keeps what it
+   computed for it, and coming back slides it in from where it left without drawing or reading it again (HRN-675). */
+.hx-acc-view--sub[data-state='idle'] {
+  content-visibility: hidden;
 }
 .hx-acc-back {
   display: flex;
@@ -752,6 +772,10 @@
    wide window; on the phone the sheet's head stays, only the body scrolls, and the sheet rides over the keyboard. */
 .hx-acc--one {
   max-height: min(600px, calc(100dvh - 48px));
+}
+/* The dialog leaves on the same soft curve it came in on */
+.hx-modal__box.hx-acc[data-ending-style] {
+  animation-timing-function: var(--hx-ease-out);
 }
 .hx-acc-sheet--one {
   bottom: calc(8px + max(env(safe-area-inset-bottom), var(--hx-kb, 0px)));

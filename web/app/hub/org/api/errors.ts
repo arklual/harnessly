@@ -26,6 +26,9 @@ export class OrgApiError extends Error {
     | 'name_taken'
     | 'built_in'
     | 'not_enabled'
+    // Machine setup: no online machine of the person with the setup feature; the machine is already running something.
+    | 'no_machine'
+    | 'busy'
     // A refusal of the space endpoints (machine codes, invites, members): the message is already the text to show.
     | 'hub'
     | 'internal';
@@ -56,6 +59,9 @@ export const orgErrorText = (e: unknown): string => {
     if (e.code === 'name_taken') return 'Такое название в каталоге уже есть.';
     if (e.code === 'built_in') return 'Встроенное из каталога не изменить.';
     if (e.code === 'not_enabled') return 'Окружение для этой организации не включено.';
+    if (e.code === 'no_machine')
+      return 'Нет вашей машины в сети, которая умеет настраиваться. Включите машину и попробуйте ещё раз.';
+    if (e.code === 'busy') return 'На машине уже что-то идёт. Подождите, пока закончится.';
     if (e.code === 'not_ready') return 'Живые данные хаба ещё не подключены.';
     if (e.code === 'network') return 'Нет связи с хабом.';
   }

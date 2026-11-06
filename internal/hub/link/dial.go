@@ -124,7 +124,7 @@ func (d *Dialer) Sweep() {
 }
 
 func (d *Dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	m, err := d.admit(r, hubproto.VerifyDial, true)
+	m, err := d.admit(r, hubproto.VerifyDial, true, "")
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -162,7 +162,7 @@ func (d *Dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // asks to be removed from the hub, which is what `harnessly-agent unlink` and the installer's --uninstall do. An
 // answer of 204 means the machine is no longer the hub's; a machine already removed answers 403.
 func (d *Dialer) ServeUnlink(w http.ResponseWriter, r *http.Request) {
-	m, err := d.admit(r, hubproto.VerifyUnlink, false)
+	m, err := d.admit(r, hubproto.VerifyUnlink, false, "")
 	if err == nil && d.Hooks.Unlink != nil {
 		err = d.Hooks.Unlink(r, m)
 	}
@@ -176,9 +176,20 @@ func (d *Dialer) ServeUnlink(w http.ResponseWriter, r *http.Request) {
 // AdmitSites checks the signed request of a machine for a publishing session (POST /agent/sites) and returns the
 // machine. Like an unlink it needs no live link, only the machine's key.
 func (d *Dialer) AdmitSites(r *http.Request) (store.Machine, error) {
-	m, err := d.admit(r, hubproto.VerifySites, false)
+	m, err := d.admit(r, hubproto.VerifySites, false, "")
 	if err == nil && m.RevokedAt != nil {
 		err = errRevoked
+	}
+	return m, err
+}
+
+// AdmitPeers checks the signed request of a machine about messages between machines (POST /agent/peers/send and
+// /agent/peers/directory) and returns the machine. Its nonces are kept apart from the dial's: a chatty machine must not
+// fill the table its own link's dial needs.
+func (d *Dialer) AdmitPeers(r *http.Request) (store.Machine, error) {
+	m, err := d.admit(r, hubproto.VerifyPeers, false, "peers:")
+	if err == nil && m.DisabledAt != nil {
+		err = errDisabled
 	}
 	return m, err
 }
@@ -196,8 +207,9 @@ func describe(err error) string {
 	return err.Error()
 }
 
-// admit checks the signed dial: the machine, its key, the time, the host and a nonce not seen before.
-func (d *Dialer) admit(r *http.Request, verify func(ed25519.PublicKey, hubproto.DialAuth, string, time.Time) error, checkVersion bool) (store.Machine, error) {
+// admit checks the signed dial: the machine, its key, the time, the host and a nonce not seen before (in nonceSpace, a
+// prefix of the machine's id that keeps a kind of request's nonces apart).
+func (d *Dialer) admit(r *http.Request, verify func(ed25519.PublicKey, hubproto.DialAuth, string, time.Time) error, checkVersion bool, nonceSpace string) (store.Machine, error) {
 	ip := ratelimit.IPKey(d.ClientIP(r))
 	if ok, _ := d.Limiter.Peek("dialfail:"+ip, failedDials, failWindow); !ok {
 		return store.Machine{}, errDialFlooded
@@ -233,7 +245,7 @@ func (d *Dialer) admit(r *http.Request, verify func(ed25519.PublicKey, hubproto.
 	if m.DisabledAt != nil && checkVersion {
 		return store.Machine{}, errDisabled
 	}
-	if !d.remember(m.ID, a.Nonce, now) {
+	if !d.remember(nonceSpace+m.ID, a.Nonce, now) {
 		return bad("replayed nonce", m.ID)
 	}
 	if v := strings.TrimSpace(r.Header.Get("X-Harnessly-Agent-Version")); checkVersion && d.MinAgentVersion != "" && OlderThan(v, d.MinAgentVersion) {

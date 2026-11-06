@@ -16,6 +16,8 @@ func TestParsePolicy(t *testing.T) {
 	with := func(f func(p *hubproto.Policy)) hubproto.Policy {
 		p := DefaultPolicy()
 		p.Source = "x.toml"
+		p.Setup = false // a file that does not say `setup` does not allow it
+		p.Peers = false // nor `peers`
 		f(&p)
 		return p
 	}
@@ -32,6 +34,8 @@ func TestParsePolicy(t *testing.T) {
 			with(func(p *hubproto.Policy) {
 				p.Terminal, p.AgentLogin, p.Keys, p.Env, p.Install, p.RuntimeSession = false, false, false, false, false, false
 			}), ""},
+		{"setup named", "setup = true\n", with(func(p *hubproto.Policy) { p.Setup = true }), ""},
+		{"peers named", "peers = true\n", with(func(p *hubproto.Policy) { p.Peers = true }), ""},
 		{"routes", `deny_routes = ["/api/terminal", "/api/fs/write"]`, with(func(p *hubproto.Policy) { p.DenyRoutes = []string{"/api/terminal", "/api/fs/write"} }), ""},
 		{"an explicit true stays true", "keys = true\n", with(func(*hubproto.Policy) {}), ""},
 		{"unknown key", "termnial = false\n", hubproto.Policy{}, "unknown setting termnial"},

@@ -93,6 +93,9 @@ interface IChatViewProps {
   onOpenTerminal?: (() => void) | null;
 }
 
+/** Where the chat's chips, links and cards open: a host without a right pane of its own passes its pane's. */
+export type TChatOpeners = Pick<IChatViewProps, 'onOpenFile' | 'onOpenOutput' | 'onOpenRef'>;
+
 interface IGateOfProps {
   machine: MachineId;
   conv: ConvId;
@@ -419,10 +422,14 @@ const ChatView = ({
                           onShareFile={(path) => setSharing({ path, open: true })}
                           shown={shown}
                           downloadUrl={(path) => downloadUrl(machine, path)}
-                          onOpenRef={(kind, label, href) => {
-                            if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
-                            else onOpenRef?.(href ?? label);
-                          }}
+                          onOpenRef={
+                            onOpenFile || onOpenRef
+                              ? (kind, label, href) => {
+                                  if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
+                                  else onOpenRef?.(href ?? label);
+                                }
+                              : undefined
+                          }
                           onLoadSteps={onLoadSteps}
                           onContinueTurn={() => resend(t('next.turnEnd.continueText'))}
                           onRetryTurn={(turnId) =>

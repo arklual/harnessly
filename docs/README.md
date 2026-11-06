@@ -1,5 +1,12 @@
 # Documentation
 
+The same pages are built into harnessly: the **/help** page of every install shows them by section, and agents read
+them with `harnessly docs`. The sections are folders with a `section.json`: [Getting started](start/README.md),
+[For agents](agents/README.md), [Architecture](inside/README.md), [Self-hosting](self-host/README.md) and
+[Apps and plugins](build-apps/README.md); a team adds its own without a rebuild
+([your own documentation](self-host/own-docs.md)). The screenshots are shot from the real page by
+`web/e2e/docs-shots.spec.ts`.
+
 | Page | What it covers |
 | --- | --- |
 | [Compared](comparison.md) | harnessly next to Happy, Paseo, T3 Code, Orca and Claude Code Remote Control |

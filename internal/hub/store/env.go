@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,6 +21,9 @@ const (
 	CatalogMCP   = "mcp"
 	CatalogRepo  = "repo"
 	CatalogDoc   = "doc"
+	// CatalogScript is a Linux script the machine runs; CatalogAccess the login of a forge's CLI.
+	CatalogScript = "script"
+	CatalogAccess = "access"
 )
 
 // CatalogItem is something an environment can hold: a skill, an MCP server, a repository or a document. OrgID is ""
@@ -34,19 +38,23 @@ type CatalogItem struct {
 	CreatedAt  time.Time
 	CreatedBy  string
 	ArchivedAt *time.Time
+	// OwnerLayer and OwnerScope name the layer that owns the item and may change it; "" for the organization.
+	OwnerLayer string
+	OwnerScope string
 }
 
-const catalogCols = `id, org_id, kind, name, hint, source, created_at, created_by, archived_at`
+const catalogCols = `id, org_id, kind, name, hint, source, created_at, created_by, archived_at, owner_layer, owner_scope`
 
 func scanCatalogItem(row interface{ Scan(...any) error }) (CatalogItem, error) {
 	var c CatalogItem
-	var org, by sql.NullString
+	var org, by, ownerLayer, ownerScope sql.NullString
 	var created int64
 	var archived sql.NullInt64
-	if err := row.Scan(&c.ID, &org, &c.Kind, &c.Name, &c.Hint, &c.Source, &created, &by, &archived); err != nil {
+	if err := row.Scan(&c.ID, &org, &c.Kind, &c.Name, &c.Hint, &c.Source, &created, &by, &archived, &ownerLayer, &ownerScope); err != nil {
 		return CatalogItem{}, err
 	}
 	c.OrgID, c.CreatedBy, c.CreatedAt, c.ArchivedAt = org.String, by.String, fromMs(created), fromNullMs(archived)
+	c.OwnerLayer, c.OwnerScope = ownerLayer.String, ownerScope.String
 	return c, nil
 }
 
@@ -58,8 +66,9 @@ func (s Store) AddCatalogItem(ctx context.Context, c CatalogItem) (CatalogItem, 
 	if c.Source == "" {
 		c.Source = "{}"
 	}
-	_, err := s.q.Exec(ctx, `INSERT INTO catalog_items (`+catalogCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, nullStr(c.OrgID), c.Kind, c.Name, c.Hint, c.Source, Ms(c.CreatedAt), nullStr(c.CreatedBy), nullMs(c.ArchivedAt))
+	_, err := s.q.Exec(ctx, `INSERT INTO catalog_items (`+catalogCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, nullStr(c.OrgID), c.Kind, c.Name, c.Hint, c.Source, Ms(c.CreatedAt), nullStr(c.CreatedBy), nullMs(c.ArchivedAt),
+		nullStr(c.OwnerLayer), nullStr(c.OwnerScope))
 	return c, err
 }
 
@@ -91,10 +100,10 @@ func (s Store) CatalogItems(ctx context.Context, orgID string, withArchived bool
 	return out, rows.Err()
 }
 
-// UpdateCatalogItem writes the name, hint, source and archive time of c.
+// UpdateCatalogItem writes the name, hint, source, owner and archive time of c.
 func (s Store) UpdateCatalogItem(ctx context.Context, c CatalogItem) error {
-	_, err := s.q.Exec(ctx, `UPDATE catalog_items SET name = ?, hint = ?, source = ?, archived_at = ? WHERE id = ?`,
-		c.Name, c.Hint, c.Source, nullMs(c.ArchivedAt), c.ID)
+	_, err := s.q.Exec(ctx, `UPDATE catalog_items SET name = ?, hint = ?, source = ?, archived_at = ?, owner_layer = ?, owner_scope = ? WHERE id = ?`,
+		c.Name, c.Hint, c.Source, nullMs(c.ArchivedAt), nullStr(c.OwnerLayer), nullStr(c.OwnerScope), c.ID)
 	return err
 }
 
@@ -111,18 +120,22 @@ type EnvEntry struct {
 	Rev       int64
 	UpdatedAt time.Time
 	UpdatedBy string
+	// Position is the place among the layer's entries; scripts run in this order (1, 2, …; 0 until placed).
+	Position int
 }
 
-const envEntryCols = `id, org_id, layer, scope_id, item_id, enabled, audience, pinned, rev, updated_at, updated_by`
+const envEntryCols = `id, org_id, layer, scope_id, item_id, enabled, audience, pinned, rev, updated_at, updated_by, position`
 
 func scanEnvEntry(row interface{ Scan(...any) error }) (EnvEntry, error) {
 	var e EnvEntry
 	var enabled, pinned int
 	var at int64
 	var by sql.NullString
-	if err := row.Scan(&e.ID, &e.OrgID, &e.Layer, &e.ScopeID, &e.ItemID, &enabled, &e.Audience, &pinned, &e.Rev, &at, &by); err != nil {
+	var position sql.NullInt64
+	if err := row.Scan(&e.ID, &e.OrgID, &e.Layer, &e.ScopeID, &e.ItemID, &enabled, &e.Audience, &pinned, &e.Rev, &at, &by, &position); err != nil {
 		return EnvEntry{}, err
 	}
+	e.Position = int(position.Int64)
 	e.Enabled, e.Pinned, e.UpdatedAt, e.UpdatedBy = enabled != 0, pinned != 0, fromMs(at), by.String
 	return e, nil
 }
@@ -145,9 +158,9 @@ func (s Store) AddEnvEntry(ctx context.Context, e EnvEntry) (EnvEntry, bool, err
 	if e.Audience == "" {
 		e.Audience = `{"mode":"tenant","teams":[]}`
 	}
-	res, err := s.q.Exec(ctx, `INSERT INTO env_entries (`+envEntryCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	res, err := s.q.Exec(ctx, `INSERT INTO env_entries (`+envEntryCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (layer, scope_id, item_id) DO NOTHING`,
-		e.ID, e.OrgID, e.Layer, e.ScopeID, e.ItemID, envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy))
+		e.ID, e.OrgID, e.Layer, e.ScopeID, e.ItemID, envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy), e.Position)
 	if err != nil {
 		return EnvEntry{}, false, err
 	}
@@ -184,10 +197,10 @@ func (s Store) EnvEntriesOfOrg(ctx context.Context, orgID string) ([]EnvEntry, e
 	return out, rows.Err()
 }
 
-// UpdateEnvEntry writes enabled, audience, pinned, rev, updated_at and updated_by of e.
+// UpdateEnvEntry writes enabled, audience, pinned, position, rev, updated_at and updated_by of e.
 func (s Store) UpdateEnvEntry(ctx context.Context, e EnvEntry) error {
-	_, err := s.q.Exec(ctx, `UPDATE env_entries SET enabled = ?, audience = ?, pinned = ?, rev = ?, updated_at = ?, updated_by = ? WHERE id = ?`,
-		envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy), e.ID)
+	_, err := s.q.Exec(ctx, `UPDATE env_entries SET enabled = ?, audience = ?, pinned = ?, position = ?, rev = ?, updated_at = ?, updated_by = ? WHERE id = ?`,
+		envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Position, e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy), e.ID)
 	return err
 }
 
@@ -272,6 +285,27 @@ func (s Store) EnvStateByMachine(ctx context.Context, machineID string) (EnvStat
 	return e, nil
 }
 
+// EnvStatesBySpace are the states of the machines of a space, by machine id: one query for all of them.
+func (s Store) EnvStatesBySpace(ctx context.Context, spaceID string) (map[string]EnvState, error) {
+	rows, err := s.q.Query(ctx, `SELECT e.machine_id, e.rev, e.hash, e.applied, e.at, e.sent_rev, e.sent_hash, e.sent_at
+		FROM env_state e JOIN machines m ON m.id = e.machine_id WHERE m.space_id = ?`, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]EnvState{}
+	for rows.Next() {
+		var e EnvState
+		var at, sentAt int64
+		if err := rows.Scan(&e.MachineID, &e.Rev, &e.Hash, &e.Applied, &at, &e.SentRev, &e.SentHash, &sentAt); err != nil {
+			return nil, err
+		}
+		e.At, e.SentAt = fromMs(at), fromMs(sentAt)
+		out[e.MachineID] = e
+	}
+	return out, rows.Err()
+}
+
 // SaveEnvReported keeps what a machine reported (rev, hash, applied).
 func (s Store) SaveEnvReported(ctx context.Context, machineID string, rev int64, hash, applied string, at time.Time) error {
 	if applied == "" {
@@ -289,6 +323,151 @@ func (s Store) SaveEnvSent(ctx context.Context, machineID string, rev int64, has
 		ON CONFLICT (machine_id) DO UPDATE SET sent_rev = excluded.sent_rev, sent_hash = excluded.sent_hash, sent_at = excluded.sent_at`,
 		machineID, rev, hash, Ms(at))
 	return err
+}
+
+// EnvRun is one run of the setup on a machine, as the hub keeps it. Steps is JSON (hubproto.EnvStep with the logs).
+type EnvRun struct {
+	ID         string
+	OrgID      string
+	MachineID  string
+	UserID     string // the machine's owner
+	SpaceID    string
+	TeamID     string
+	Mode       string
+	Status     string
+	Hash       string
+	ByName     string
+	StartedAt  time.Time
+	FinishedAt time.Time // zero while running
+	Steps      string
+	UpdatedAt  time.Time
+}
+
+const envRunCols = `id, org_id, machine_id, user_id, space_id, team_id, mode, status, hash, by_name, started_at, finished_at, steps, updated_at`
+
+func scanEnvRun(row interface{ Scan(...any) error }) (EnvRun, error) {
+	var r EnvRun
+	var started, finished, updated int64
+	if err := row.Scan(&r.ID, &r.OrgID, &r.MachineID, &r.UserID, &r.SpaceID, &r.TeamID, &r.Mode, &r.Status, &r.Hash, &r.ByName,
+		&started, &finished, &r.Steps, &updated); err != nil {
+		return EnvRun{}, err
+	}
+	r.StartedAt, r.UpdatedAt = fromMs(started), fromMs(updated)
+	if finished > 0 {
+		r.FinishedAt = fromMs(finished)
+	}
+	return r, nil
+}
+
+// UpsertEnvRun keeps a run; a later frame of the same id replaces the earlier one (who it belongs to stays). A frame
+// whose id is held by a run of another machine or organization changes nothing and answers false.
+func (s Store) UpsertEnvRun(ctx context.Context, r EnvRun) (bool, error) {
+	if r.Steps == "" {
+		r.Steps = "[]"
+	}
+	var finished int64
+	if !r.FinishedAt.IsZero() {
+		finished = Ms(r.FinishedAt)
+	}
+	res, err := s.q.Exec(ctx, `INSERT INTO env_runs (`+envRunCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (id) DO UPDATE SET mode = excluded.mode, status = excluded.status, hash = excluded.hash, by_name = excluded.by_name,
+		started_at = excluded.started_at, finished_at = excluded.finished_at, steps = excluded.steps, updated_at = excluded.updated_at
+		WHERE env_runs.org_id = excluded.org_id AND env_runs.machine_id = excluded.machine_id`,
+		r.ID, r.OrgID, r.MachineID, r.UserID, r.SpaceID, r.TeamID, r.Mode, r.Status, r.Hash, r.ByName, Ms(r.StartedAt), finished, r.Steps, Ms(r.UpdatedAt))
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// EnvRunQuery picks runs: of an organization, of some machines (empty: any of the organization), since a time, only
+// those that went wrong (error, or waiting for the person), newest first.
+type EnvRunQuery struct {
+	OrgID      string
+	MachineIDs []string
+	SpaceID    string // only the runs of machines of this space ("": any)
+	TeamID     string // only the runs of machines of this team ("": any)
+	Since      time.Time
+	ErrorsOnly bool
+	Limit      int
+}
+
+// EnvRunsOf are the runs the query picks. A query for machines with no ids at all (MachineIDs non-nil and empty) picks
+// nothing.
+func (s Store) EnvRunsOf(ctx context.Context, q EnvRunQuery) ([]EnvRun, error) {
+	if q.MachineIDs != nil && len(q.MachineIDs) == 0 {
+		return nil, nil
+	}
+	where := `org_id = ? AND started_at >= ?`
+	args := []any{q.OrgID, Ms(q.Since)}
+	if q.MachineIDs != nil {
+		where += ` AND machine_id IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(q.MachineIDs)), ", ") + `)`
+		for _, id := range q.MachineIDs {
+			args = append(args, id)
+		}
+	}
+	if q.SpaceID != "" {
+		where += ` AND space_id = ?`
+		args = append(args, q.SpaceID)
+	}
+	if q.TeamID != "" {
+		where += ` AND team_id = ?`
+		args = append(args, q.TeamID)
+	}
+	if q.ErrorsOnly {
+		where += ` AND status IN ('error', 'pending')`
+	}
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := s.q.Query(ctx, `SELECT `+envRunCols+` FROM env_runs WHERE `+where+` ORDER BY started_at DESC, id LIMIT `+strconv.Itoa(limit), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []EnvRun
+	for rows.Next() {
+		r, err := scanEnvRun(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// StuckEnvRuns are the runs still «running» that nothing has updated since the time given.
+func (s Store) StuckEnvRuns(ctx context.Context, updatedBefore time.Time) ([]EnvRun, error) {
+	rows, err := s.q.Query(ctx, `SELECT `+envRunCols+` FROM env_runs WHERE status = 'running' AND updated_at < ? ORDER BY started_at, id LIMIT 500`, Ms(updatedBefore))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []EnvRun
+	for rows.Next() {
+		r, err := scanEnvRun(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// EnvRunByID is one run of an organization, or ErrNotFound: a run id of another organization is not found.
+func (s Store) EnvRunByID(ctx context.Context, orgID, id string) (EnvRun, error) {
+	return scanEnvRun(s.q.QueryRow(ctx, `SELECT `+envRunCols+` FROM env_runs WHERE org_id = ? AND id = ?`, orgID, id))
+}
+
+// DeleteEnvRunsBefore removes the runs that started before t and returns how many.
+func (s Store) DeleteEnvRunsBefore(ctx context.Context, t time.Time) (int64, error) {
+	res, err := s.q.Exec(ctx, `DELETE FROM env_runs WHERE started_at < ?`, Ms(t))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // ToolUsage is the calls of one tool of one session on one UTC day.

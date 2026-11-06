@@ -79,8 +79,11 @@ export type TRoute =
   | { kind: typeof ROUTE.apps }
   /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it). */
   | { kind: typeof ROUTE.app; id: string; chat?: string }
-  /** The documentation: `/help` (its first page) and `/help/:page`, `#anchor` a heading of it. */
-  | { kind: typeof ROUTE.help; page: string | null; anchor?: string }
+  /**
+   * The documentation: `/help` (its first page), `/help/:section` (the section's first page) and `/help/:section/:page`,
+   * `#anchor` a heading of it. An older `/help/:page` of the apps guide comes as a section the page resolves.
+   */
+  | { kind: typeof ROUTE.help; section: string | null; page: string | null; anchor?: string }
   /** Settings: `/settings` (the list of sections; on a wide window the first one is open) and `/settings/:section`. */
   | { kind: typeof ROUTE.settings; section: SettingsSection | null };
 
@@ -99,7 +102,7 @@ const EFFICIENCY_RE = /^\/efficiency\/?$/;
 const TASKS_RE = /^\/tasks\/?$/;
 const APPS_RE = /^\/apps\/?$/;
 const APP_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/?$/;
-const HELP_RE = /^\/help(?:\/([a-z0-9][a-z0-9-]{0,62}))?\/?$/;
+const HELP_RE = /^\/help(?:\/([a-z0-9][a-z0-9-]{0,62})(?:\/([a-z0-9][a-z0-9-]{0,62}))?)?\/?$/;
 const SETTINGS_RE = /^\/settings(?:\/([a-z]+))?\/?$/;
 
 /** One parameter of an address's query, when it names one. */
@@ -143,7 +146,12 @@ export const parseRoute = (path: string): TRoute => {
   const help = HELP_RE.exec(pathname);
   if (help) {
     const anchor = hashOf(path);
-    return { kind: ROUTE.help, page: help[1] ?? null, ...(anchor ? { anchor } : {}) };
+    return {
+      kind: ROUTE.help,
+      section: help[1] ?? null,
+      page: help[2] ?? null,
+      ...(anchor ? { anchor } : {}),
+    };
   }
   const settings = SETTINGS_RE.exec(pathname);
   if (settings) {
@@ -231,7 +239,9 @@ export const routePath = (route: TRoute): string => {
         ? `/apps/${route.id}?${new URLSearchParams({ chat: route.chat })}`.replace(/%3A/gi, ':')
         : `/apps/${route.id}`;
     case ROUTE.help: {
-      const base = route.page ? `/help/${route.page}` : '/help';
+      let base = '/help';
+      if (route.section) base += `/${route.section}`;
+      if (route.section && route.page) base += `/${route.page}`;
       return route.anchor ? `${base}#${encodeURIComponent(route.anchor)}` : base;
     }
     case ROUTE.settings:

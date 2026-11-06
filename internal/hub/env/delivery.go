@@ -2,6 +2,8 @@ package env
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
@@ -26,40 +28,58 @@ type ItemDelivery struct {
 	Message *string `json:"message"`
 }
 
+// maxDeliveryMachines: past this many working machines the screen's delivery is not computed (null): it is read from every
+// machine's state, and the screen shows no per-machine statuses anyway.
+var maxDeliveryMachines = 200
+
 // delivery reads what the machines of the screen hold. Only the reports of machines whose list is the current one are
-// counted per item: an older list says nothing about the items the screen shows now.
-func (q *req) delivery(tenants []store.Space, team string) (Delivery, map[string]*ItemDelivery, error) {
-	var d Delivery
+// counted per item: an older list says nothing about the items the screen shows now. Nil when the screen reaches more
+// than maxDeliveryMachines machines.
+func (q *req) delivery(tenants []store.Space, team string) (*Delivery, map[string]*ItemDelivery, error) {
+	total := 0
+	for _, sp := range tenants {
+		n, err := q.st.CountWorkingMachines(q.ctx, sp.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		total += n
+	}
+	if total > maxDeliveryMachines {
+		return nil, nil, nil
+	}
+	d := &Delivery{}
 	items := map[string]*ItemDelivery{}
 	var last int64
 	for _, sp := range tenants {
 		ms, err := q.st.MachinesBySpace(q.ctx, sp.ID)
 		if err != nil {
-			return d, nil, err
+			return nil, nil, err
 		}
+		states, err := q.st.EnvStatesBySpace(q.ctx, sp.ID) // one query for the tenant, not one per machine
+		if err != nil {
+			return nil, nil, err
+		}
+		memo := map[string]wantList{}
 		for _, m := range ms {
 			if m.RevokedAt != nil || m.DisabledAt != nil || (team != "" && m.TeamID != team) {
 				continue
 			}
 			d.Machines++
-			want := MachineItems(q.w, sp.ID, m.TeamID)
-			st, err := q.st.EnvStateByMachine(q.ctx, m.ID)
-			if store.IsNotFound(err) || (err == nil && st.At.IsZero()) {
+			want := q.s.machineListMemo(q.w, sp.ID, m, memo)
+			st, found := states[m.ID]
+			if !found || st.At.IsZero() {
 				// The hub sends no first empty list, so a machine that should hold nothing and never got anything holds
 				// what it should.
-				if len(want) == 0 {
+				if want.empty() {
 					d.Current++
 				}
 				continue
-			}
-			if err != nil {
-				return d, nil, err
 			}
 			d.Reported++
 			if ms := st.At.UnixMilli(); ms > last {
 				last = ms
 			}
-			if st.Hash != hubproto.EnvHash(want) {
+			if !want.holds(st.Hash) {
 				continue
 			}
 			d.Current++
@@ -89,4 +109,48 @@ func (q *req) delivery(tenants []store.Space, team string) (Delivery, map[string
 	}
 	d.LastAt = msStr(last)
 	return d, items, nil
+}
+
+// wantList is the list the hub computes for a machine. A machine that has not said hello to this hub process yet has
+// not told whether it has the feature environment.setup, so both lists (with and without the setup kinds) count as its
+// own: what it reported last is one of them.
+type wantList struct {
+	items  []hubproto.EnvItem
+	hashes []string
+}
+
+func (w wantList) empty() bool { return len(w.items) == 0 }
+
+// holds says whether a reported hash is the machine's current list.
+func (w wantList) holds(hash string) bool { return slices.Contains(w.hashes, hash) }
+
+// machineList is the list a machine of a tenant is to hold now.
+func (s *Service) machineList(w *world, spaceID string, m store.Machine) wantList {
+	return s.machineListMemo(w, spaceID, m, nil)
+}
+
+// machineListMemo is machineList that computes the list once per (team, features) in memo: the machines of a team hold
+// the same list.
+func (s *Service) machineListMemo(w *world, spaceID string, m store.Machine, memo map[string]wantList) wantList {
+	setup, known := false, true
+	if s.push != nil {
+		setup, known = s.push.SetupOf(m.ID)
+	}
+	key := fmt.Sprintf("%s/%s/%t/%t", spaceID, m.TeamID, setup, known)
+	if v, ok := memo[key]; ok {
+		return v
+	}
+	items := MachineItems(w, spaceID, m.TeamID, setup)
+	out := wantList{items: items, hashes: []string{hubproto.EnvHash(items)}}
+	if !known {
+		full := MachineItems(w, spaceID, m.TeamID, true)
+		out.hashes = append(out.hashes, hubproto.EnvHash(full))
+		if len(items) == 0 {
+			out.items = full
+		}
+	}
+	if memo != nil {
+		memo[key] = out
+	}
+	return out
 }

@@ -9,7 +9,8 @@ const TIMEOUT_MS = 10_000;
 
 export const SPEECH_KEYS = ['openai', 'yandex', 'yandex-folder'] as const;
 export type SpeechKeyId = (typeof SPEECH_KEYS)[number];
-export type SpeechKeys = Readonly<Record<SpeechKeyId, ProfileKey>>;
+/** chatgpt: the machine's Codex is signed in by a ChatGPT plan; an older runtime does not say. */
+export type SpeechKeys = Readonly<Record<SpeechKeyId, ProfileKey>> & { readonly chatgpt?: boolean };
 
 const TAIL = /^….{4}$/u;
 
@@ -31,7 +32,10 @@ export const readSpeechKeys = (v: unknown): SpeechKeys => {
     if (!key) throw new Error(`not a key: ${id}`);
     out[id] = key;
   }
-  return out as SpeechKeys;
+  return {
+    ...(out as Record<SpeechKeyId, ProfileKey>),
+    chatgpt: (v as { chatgpt?: unknown }).chatgpt === true,
+  };
 };
 
 const keysPath = (machine: MachineId, id?: SpeechKeyId) =>

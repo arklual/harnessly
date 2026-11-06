@@ -51,7 +51,9 @@ type Config struct {
 	StatusPath       string
 	SyncPath         string
 	// V2Path is the runtime's v2 API: <prefix>/replica, <prefix>/conversations/<id>/turns.
-	V2Path        string
+	V2Path string
+	// PeersPath is the runtime's API of messages between machines: <prefix>/inbox, <prefix>/directory.
+	PeersPath     string
 	RuntimeCookie string
 	// CLITokenHeaders carry the runtime's cli-token when the agent tells it a state file changed.
 	CLITokenHeaders []string
@@ -204,6 +206,7 @@ func LoadConfig() (Config, error) {
 	c.EnvDir = env("AGENT_ENV_DIR", filepath.Join(c.DataDir, agents.EnvDirName))
 	c.WorkDir = env("AGENT_WORK_DIR", env("RUNTIME_WORKSPACE_DIR", home))
 	c.V2Path = strings.TrimRight(env("AGENT_RUNTIME_V2", base+"/api/v2"), "/")
+	c.PeersPath = strings.TrimRight(env("AGENT_RUNTIME_PEERS", base+"/api/peers"), "/")
 	c.RuntimeCookie = env("AGENT_RUNTIME_COOKIE", "session-token")
 	for _, h := range strings.Split(env("AGENT_RUNTIME_CLI_HEADERS", "x-cli-token"), ",") {
 		if h = strings.TrimSpace(h); h != "" {

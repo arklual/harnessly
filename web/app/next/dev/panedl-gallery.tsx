@@ -247,6 +247,7 @@ const Viewer = ({
 }) => {
   const [tab, setTab] = useState(FIRST);
   const [reloadKey, setReloadKey] = useState(0);
+  const [editing, setEditing] = useState(false);
   const all = many ? MANY_PAGES : PAGES;
   const pages = single ? all.slice(0, 1) : all;
   // A blob page is of the gallery's own origin, which the view can post to (a data: page has the origin «null»).
@@ -298,9 +299,9 @@ const Viewer = ({
       mode={
         site
           ? {
-              state: 'Макет',
-              editing: false,
-              action: { label: 'Редактировать', icon: 'pencil', onClick: () => {} },
+              state: editing ? 'Редактирование макета' : 'Макет',
+              editing,
+              action: { onClick: () => setEditing(!editing), ask: false },
             }
           : undefined
       }

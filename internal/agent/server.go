@@ -68,6 +68,12 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 		a.stateRoute(w, r)
 		return
 	}
+	// The relay of this machine's runtime for messages between machines: authenticated by the runtime's relay token
+	// (signed with the pair's secret), not by agent.json.
+	if (r.Method == http.MethodPost && r.URL.RequestURI() == "/peers/send") || (r.Method == http.MethodGet && r.URL.RequestURI() == "/peers/directory") {
+		a.peersRoute(w, r)
+		return
+	}
 	switch {
 	case r.URL.RequestURI() == "/healthz":
 		reply(w, 200, map[string]any{"ok": true, "version": a.cfg.Version})

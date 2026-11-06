@@ -30,7 +30,7 @@ import (
 
 // DefaultPolicy is what a machine without a policy file allows: everything.
 func DefaultPolicy() hubproto.Policy {
-	return hubproto.Policy{Terminal: true, AgentLogin: true, Keys: true, Env: true, Install: true, RuntimeSession: true,
+	return hubproto.Policy{Terminal: true, AgentLogin: true, Keys: true, Env: true, Install: true, RuntimeSession: true, Setup: true, Peers: true,
 		DenyRoutes: []string{}, Source: "default"}
 }
 
@@ -47,6 +47,8 @@ type policyFile struct {
 	Env            *bool    `toml:"env"`
 	Install        *bool    `toml:"install"`
 	RuntimeSession *bool    `toml:"runtime_session"`
+	Setup          *bool    `toml:"setup"`
+	Peers          *bool    `toml:"peers"`
 	DenyRoutes     []string `toml:"deny_routes"`
 }
 
@@ -80,6 +82,11 @@ func ParsePolicy(text, source string) (hubproto.Policy, error) {
 	set(&p.Env, f.Env)
 	set(&p.Install, f.Install)
 	set(&p.RuntimeSession, f.RuntimeSession)
+	// A policy file that does not mention `setup` does not allow it: a file written before the setup existed is the owner's
+	// word about a machine that never ran the hub's scripts. Only no file at all means the default, on.
+	p.Setup = f.Setup != nil && *f.Setup
+	// The same for `peers`: a file written before messages between machines existed did not allow them.
+	p.Peers = f.Peers != nil && *f.Peers
 	if len(f.DenyRoutes) > maxDenyRoutes {
 		return hubproto.Policy{}, fmt.Errorf("deny_routes has more than %d entries", maxDenyRoutes)
 	}
@@ -330,7 +337,7 @@ func samePolicy(a, b hubproto.Policy) bool { return reflect.DeepEqual(a, b) }
 func meet(a, b hubproto.Policy) hubproto.Policy {
 	out := hubproto.Policy{
 		Terminal: a.Terminal && b.Terminal, AgentLogin: a.AgentLogin && b.AgentLogin, Keys: a.Keys && b.Keys, Env: a.Env && b.Env,
-		Install: a.Install && b.Install, RuntimeSession: a.RuntimeSession && b.RuntimeSession, DenyRoutes: []string{}, Source: b.Source,
+		Install: a.Install && b.Install, RuntimeSession: a.RuntimeSession && b.RuntimeSession, Setup: a.Setup && b.Setup, Peers: a.Peers && b.Peers, DenyRoutes: []string{}, Source: b.Source,
 	}
 	seen := map[string]bool{}
 	for _, r := range append(append([]string{}, a.DenyRoutes...), b.DenyRoutes...) {
@@ -345,7 +352,7 @@ func meet(a, b hubproto.Policy) hubproto.Policy {
 // Narrowed says the new policy allows less than the old one did: something was switched off or a route denied.
 func Narrowed(old, now hubproto.Policy) bool {
 	if (old.Terminal && !now.Terminal) || (old.AgentLogin && !now.AgentLogin) || (old.Keys && !now.Keys) ||
-		(old.Env && !now.Env) || (old.Install && !now.Install) || (old.RuntimeSession && !now.RuntimeSession) {
+		(old.Env && !now.Env) || (old.Install && !now.Install) || (old.RuntimeSession && !now.RuntimeSession) || (old.Setup && !now.Setup) || (old.Peers && !now.Peers) {
 		return true
 	}
 	have := map[string]bool{}

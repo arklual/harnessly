@@ -233,6 +233,8 @@ func (c *cli) run(args []string) error {
 		return c.pages(rest)
 	case "page":
 		return c.page(rest)
+	case "docs", "doc":
+		return c.docs(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }

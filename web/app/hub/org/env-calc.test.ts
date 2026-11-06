@@ -17,7 +17,7 @@ describe('countsOf', () => {
         { kind: 'skill', enabled: false },
         { kind: 'mcp', enabled: true },
       ]),
-    ).toEqual({ skill: 1, mcp: 1, repo: 0, doc: 0 });
+    ).toEqual({ skill: 1, mcp: 1, repo: 0, doc: 0, script: 0, access: 0 });
   });
 });
 
@@ -35,10 +35,13 @@ describe('recount', () => {
     if (!row) throw new Error('fixture has no rows');
     const off = recount({
       ...admin,
-      layers: [{ ...org, items: [{ ...row, enabled: false }] }, ...admin.layers.slice(1)],
+      layers: [
+        { ...org, items: org.items.map((r) => (r === row ? { ...r, enabled: false } : r)) },
+        ...admin.layers.slice(1),
+      ],
     });
     expect(off.layers[0]?.counts.skill).toBe(0);
     expect(off.summary.total).toBe(admin.summary.total - 1);
-    expect(off.summary.pinnedByOrg).toBe(0);
+    expect(off.summary.pinnedByOrg).toBe(admin.summary.pinnedByOrg - (row.pinned ? 1 : 0));
   });
 });

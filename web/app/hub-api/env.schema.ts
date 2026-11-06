@@ -1,9 +1,9 @@
 import { arr, bool, lit, nullable, num, obj, opt, str, time, day } from './schema';
 
-const catalogKind = lit('skill', 'mcp', 'repo', 'doc');
+const catalogKind = lit('skill', 'mcp', 'repo', 'doc', 'script', 'access');
 const layerKind = lit('org', 'tenant', 'team');
 const lockedReason = nullable(lit('pinned_by_org', 'pinned_by_tenant', 'no_rights'));
-const kindCounts = obj({ skill: num, mcp: num, repo: num, doc: num });
+const kindCounts = obj({ skill: num, mcp: num, repo: num, doc: num, script: opt(num), access: opt(num) });
 const audience = obj({ mode: lit('tenant', 'teams', 'off'), teams: arr(str) });
 
 export const envSummary = obj({
@@ -59,7 +59,7 @@ export const envResponse = obj({
   layers: arr(envLayer),
   teams: arr(teamRef),
   observed: arr(observedTool),
-  delivery: obj({ machines: num, reported: num, current: num, lastAt: nullable(time) }),
+  delivery: nullable(obj({ machines: num, reported: num, current: num, lastAt: nullable(time) })),
 });
 export const envCard = obj({
   entryId: str,
@@ -92,7 +92,21 @@ const source = obj({
   secretRefs: opt(arr(str)),
   branch: opt(str),
   text: opt(str),
+  dir: opt(str),
+  service: opt(lit('gitlab', 'github')),
+  host: opt(str),
+  secret: opt(str),
+  from: opt(lit('text', 'repo', 'file', 'url')),
+  fileName: opt(str),
+  repo: opt(str),
+  repoUrl: opt(str),
+  path: opt(str),
+  run: opt(str),
+  rerun: opt(lit('once', 'check')),
+  check: opt(str),
+  secrets: opt(arr(str)),
 });
+const catalogOwner = obj({ layer: layerKind, scopeId: str });
 export const catalogItem = obj({
   id: str,
   kind: catalogKind,
@@ -103,6 +117,7 @@ export const catalogItem = obj({
   archived: bool,
   added: bool,
   createdAt: time,
+  owner: nullable(catalogOwner),
 });
 export const catalogResponse = obj({ items: arr(catalogItem) });
 export const catalogItemResponse = obj({ item: catalogItem });
@@ -120,8 +135,50 @@ export const meEnvItem = obj({
   off: bool,
   canToggle: bool,
 });
+
+const runStatus = lit('running', 'ok', 'error', 'pending');
+export const envRunStep = obj({
+  itemId: str,
+  kind: catalogKind,
+  name: str,
+  status: lit('pending', 'running', 'ok', 'skipped', 'error'),
+  message: nullable(str),
+  exit: nullable(num),
+  ms: num,
+  log: opt(str),
+});
+export const envRunRow = obj({
+  id: str,
+  machine: obj({ id: str, name: str }),
+  person: obj({ id: str, name: str }),
+  mode: lit('apply', 'update', 'check', 'sandbox'),
+  by: nullable(str),
+  status: runStatus,
+  startedAt: time,
+  finishedAt: nullable(time),
+  steps: arr(envRunStep),
+});
+export const envRunsResponse = obj({ runs: arr(envRunRow) });
+export const envRunResponse = obj({ run: envRunRow });
+export const envTryResponse = obj({ runId: str, machine: obj({ id: str, name: str }) });
+export const envOrderResponse = obj({ entryIds: arr(str) });
+export const meMachine = obj({
+  id: str,
+  name: str,
+  online: bool,
+  team: obj({ id: str, name: str }),
+  setup: bool,
+  current: bool,
+  failed: num,
+  lastRun: nullable(envRunRow),
+});
+export const meMachinesResponse = obj({ machines: arr(meMachine) });
+export const meRunResponse = obj({ runs: arr(obj({ runId: str, machineId: str })) });
+export const meRunsResponse = obj({ runs: arr(envRunRow) });
 export const meEnvResponse = obj({
   space: obj({ id: str, slug: str, name: str }),
   org: obj({ id: str, name: str }),
   items: arr(meEnvItem),
+  outdated: bool,
+  machines: arr(meMachine),
 });

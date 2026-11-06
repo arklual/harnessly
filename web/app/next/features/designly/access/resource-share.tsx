@@ -4,9 +4,19 @@
 // «Передать владение» (the owner, the lead and the admin of a team resource). One who may only look gets the address,
 // «Копировать ссылку» and «Попросить правку». Views slide in inside the dialog; on the phone it is a bottom sheet whose
 // head stays while its body scrolls, lifted over the keyboard. Every change waits for the gateway.
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import AccessLinks from '@/next/features/designly/access/access-links';
-import AccessLog, { type ILogNames } from '@/next/features/designly/access/access-log';
+import AccessLog, { warmLog, type ILogNames } from '@/next/features/designly/access/access-log';
 import { EMAIL, type IProjectAccess } from '@/next/features/designly/access/api';
 import type { IScopePage } from '@/next/features/designly/access/link-scope';
 import { LINK_KIND, type ILinkContext } from '@/next/features/designly/access/link-form';
@@ -24,13 +34,18 @@ import ResourcePeople, {
   ResourceRequests,
   type IResourceSection,
 } from '@/next/features/designly/access/resource-people';
-import { LinkScreen, ResourceLinks, useLinksScreen } from '@/next/features/designly/access/resource-links';
-import { Frame } from '@/next/features/designly/access/share-dialog';
+import {
+  LinkScreen,
+  ResourceLinks,
+  useLinksScreen,
+  type ILinksScreen,
+} from '@/next/features/designly/access/resource-links';
+import { Frame, IDLE, Still, useCovered } from '@/next/features/designly/access/share-dialog';
 import { useAction } from '@/next/features/designly/access/use-action';
 import { useMe } from '@/next/stores/me';
 import Icon from '@/next/ui/icon';
 import Popover from '@/next/ui/popover';
-import { usePresence } from '@/next/ui/presence';
+import { usePresence, type TPresenceState } from '@/next/ui/presence';
 import { usePhone } from '@/next/ui/use-media';
 import PublishSection, { PublishForm } from '@/next/features/designly/publish/publish-section';
 import type { IPublishState } from '@/next/features/designly/publish/use-publish';
@@ -355,6 +370,79 @@ const logNamesOf = (view: IResourceView): ILogNames => {
   return { teams, links: new Map((view.links ?? []).map((link) => [link.id, link.forWhom])) };
 };
 
+type TSubState = TPresenceState | typeof IDLE;
+
+interface IMainProps extends IResourceSection {
+  me: string | null;
+  phone: boolean;
+  ownLinks: boolean;
+  legacy: boolean;
+  linkContext: ILinkContext;
+  links: Pick<ILinksScreen, 'start' | 'fresh'>;
+  field: RefObject<HTMLInputElement | null>;
+  extra?: ReactNode;
+  publish?: IPublishState;
+  onView: (view: TView) => void;
+}
+
+/** The main view: who has access, the links, publishing. Drawn again only when what it shows changes, not when a view
+ *  slides over it — the rows' menus made each switch a long task. */
+const Main = memo(
+  ({
+    target,
+    view,
+    action,
+    onNext,
+    me,
+    phone,
+    ownLinks,
+    legacy,
+    linkContext,
+    links,
+    field,
+    extra,
+    publish,
+    onView,
+  }: IMainProps) => {
+    const props: IResourceSection = { target, view, action, onNext };
+    return (
+      <>
+        <ResourceAdd {...props} inputRef={field} />
+        <ResourceRequests {...props} />
+        <ResourcePeople {...props} me={me} />
+        {ownLinks && (
+          <ResourceLinks
+            {...props}
+            ctx={linkContext}
+            me={me}
+            screen={links}
+            onOpen={() => onView(VIEW.link)}
+          />
+        )}
+        {!ownLinks && legacy && (
+          <section className="hx-acc-sec" data-section="links">
+            <h3 className="hx-acc-sec__title">{t('next.access.guestLinks')}</h3>
+            <button type="button" className="hx-acc-row hx-acc-golinks" onClick={() => onView(VIEW.links)}>
+              <span className="hx-acc-av" aria-hidden="true">
+                <Icon name="link" size="sm" />
+              </span>
+              <span className="hx-acc-row__who">
+                <span className="hx-acc-row__nm">{t('next.access.guestLinksOpen')}</span>
+                <span className="hx-acc-row__sub">{t('next.access.guestLinksLead')}</span>
+              </span>
+              <Icon name="chevron-right" size="sm" />
+            </button>
+          </section>
+        )}
+        {extra}
+        {publish && (
+          <PublishSection state={publish} onPush={phone ? () => onView(VIEW.publish) : undefined} />
+        )}
+      </>
+    );
+  },
+);
+
 const ResourceShare = ({
   open,
   onClose,
@@ -379,7 +467,12 @@ const ResourceShare = ({
   const [body, setBody] = useState<HTMLDivElement | null>(null);
   const [sub, setSub] = useState<TView | null>(null);
   const shown = usePresence(sub, VIEW_OUT_MS);
+  // The views opened since the dialog opened stay mounted while hidden: going back and there again draws nothing anew
+  // and reads nothing again (the history).
+  const [seen, setSeen] = useState<readonly TView[]>([]);
+  if (sub !== null && !seen.includes(sub)) setSeen([...seen, sub]);
   const props: IResourceSection = { target, view, action, onNext };
+  const email = me.k === 'ready' ? me.me.email : null;
   const manages = view.canManage;
   const linkForm = useId();
   const screen = useLinksScreen({ target, view, ctx: linkContext, action, onNext });
@@ -391,8 +484,13 @@ const ResourceShare = ({
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setSub(null);
+    if (open) {
+      setSub(null);
+      setSeen([]);
+    }
   }
+
+  useEffect(() => (open ? warmLog() : undefined), [open]);
 
   useEffect(() => {
     if (!open || !focus || !body) return;
@@ -402,12 +500,25 @@ const ResourceShare = ({
     return () => clearTimeout(timer);
   }, [open, focus, body]);
 
-  const go = (next: TView | null) => {
-    action.clear();
-    setSub(next);
-    // A view opens at its top, wherever the main one was scrolled to.
-    body?.scrollTo?.({ top: 0 });
-  };
+  const { clear } = action;
+  const go = useCallback(
+    (next: TView | null) => {
+      clear();
+      setSub(next);
+      // A view opens at its top, wherever the main one was scrolled to.
+      body?.scrollTo?.({ top: 0 });
+    },
+    [clear, body],
+  );
+  const listScreen = useMemo(
+    () => ({ start: screen.start, fresh: screen.fresh }),
+    [screen.start, screen.fresh],
+  );
+  const names = useMemo(() => logNamesOf(view), [view]);
+  const covered = useCovered(sub !== null);
+  const stateOf = (v: TView): TSubState => (v === shown.value ? shown.state : IDLE);
+  const headOf = (v: TView): string =>
+    v === VIEW.link && screen.editing ? t('next.access.links.editTitle') : t(VIEW_TITLE[v]);
 
   return (
     <Frame
@@ -420,77 +531,63 @@ const ResourceShare = ({
     >
       <div className="hx-modal__body hx-acc-body" ref={setBody}>
         {manages ? (
-          <div className="hx-acc-views" data-sub={sub !== null}>
-            <div className="hx-acc-view hx-acc-view--main" inert={sub !== null}>
-              <ResourceAdd {...props} inputRef={field} />
-              <ResourceRequests {...props} />
-              <ResourcePeople {...props} me={me.k === 'ready' ? me.me.email : null} />
-              {ownLinks && (
-                <ResourceLinks
-                  {...props}
-                  ctx={linkContext}
-                  me={me.k === 'ready' ? me.me.email : null}
-                  screen={screen}
-                  onOpen={() => go(VIEW.link)}
-                />
-              )}
-              {!ownLinks && links && (
-                <section className="hx-acc-sec" data-section="links">
-                  <h3 className="hx-acc-sec__title">{t('next.access.guestLinks')}</h3>
-                  <button type="button" className="hx-acc-row hx-acc-golinks" onClick={() => go(VIEW.links)}>
-                    <span className="hx-acc-av" aria-hidden="true">
-                      <Icon name="link" size="sm" />
-                    </span>
-                    <span className="hx-acc-row__who">
-                      <span className="hx-acc-row__nm">{t('next.access.guestLinksOpen')}</span>
-                      <span className="hx-acc-row__sub">{t('next.access.guestLinksLead')}</span>
-                    </span>
-                    <Icon name="chevron-right" size="sm" />
-                  </button>
-                </section>
-              )}
-              {extra}
-              {publish && (
-                <PublishSection state={publish} onPush={phone ? () => go(VIEW.publish) : undefined} />
-              )}
+          <div className="hx-acc-views" data-sub={sub !== null} data-covered={covered}>
+            <div className="hx-acc-view hx-acc-view--main" aria-hidden={sub !== null || undefined}>
+              <Main
+                target={target}
+                view={view}
+                action={action}
+                onNext={onNext}
+                me={email}
+                phone={phone}
+                ownLinks={ownLinks}
+                legacy={links !== undefined}
+                linkContext={linkContext}
+                links={listScreen}
+                field={field}
+                extra={extra}
+                publish={publish}
+                onView={go}
+              />
             </div>
-            {shown.value && (
-              <div className="hx-acc-view hx-acc-view--sub" data-state={shown.state} inert={sub === null}>
-                <div className="hx-acc-back">
-                  <button
-                    type="button"
-                    className="hx-head-btn"
-                    aria-label={t('next.access.backView')}
-                    onClick={() => go(null)}
-                  >
-                    <Icon name="arrow-left" />
-                  </button>
-                  <h3 className="hx-acc-back__title">
-                    {shown.value === VIEW.link && screen.editing
-                      ? t('next.access.links.editTitle')
-                      : t(VIEW_TITLE[shown.value])}
-                  </h3>
-                </div>
-                {shown.value === VIEW.log && (
-                  <AccessLog project={target.id} kind={target.kind} names={logNamesOf(view)} />
-                )}
-                {shown.value === VIEW.transfer && <Transfer props={props} onDone={() => go(null)} />}
-                {shown.value === VIEW.links && links && <LegacyLinks links={links} />}
-                {shown.value === VIEW.link && (
-                  <LinkScreen
-                    id={linkForm}
-                    screen={screen}
-                    ctx={linkContext}
-                    onSubmit={() =>
-                      void screen.submit().then((done) => {
-                        if (done) go(null);
-                      })
-                    }
-                  />
-                )}
-                {shown.value === VIEW.publish && publish && <PublishForm state={publish} />}
+            {seen.map((v) => (
+              <div
+                key={v}
+                className="hx-acc-view hx-acc-view--sub"
+                data-state={stateOf(v)}
+                aria-hidden={sub !== v || undefined}
+              >
+                <Still still={sub !== v}>
+                  <div className="hx-acc-back">
+                    <button
+                      type="button"
+                      className="hx-head-btn"
+                      aria-label={t('next.access.backView')}
+                      onClick={() => go(null)}
+                    >
+                      <Icon name="arrow-left" />
+                    </button>
+                    <h3 className="hx-acc-back__title">{headOf(v)}</h3>
+                  </div>
+                  {v === VIEW.log && <AccessLog project={target.id} kind={target.kind} names={names} />}
+                  {v === VIEW.transfer && <Transfer props={props} onDone={() => go(null)} />}
+                  {v === VIEW.links && links && <LegacyLinks links={links} />}
+                  {v === VIEW.link && (
+                    <LinkScreen
+                      id={linkForm}
+                      screen={screen}
+                      ctx={linkContext}
+                      onSubmit={() =>
+                        void screen.submit().then((done) => {
+                          if (done) go(null);
+                        })
+                      }
+                    />
+                  )}
+                  {v === VIEW.publish && publish && <PublishForm state={publish} />}
+                </Still>
               </div>
-            )}
+            ))}
           </div>
         ) : (
           <Looker props={props} address={address} askFirst={ask} />

@@ -1,6 +1,6 @@
 // A pessimistic change of the access screens: pressing marks the control busy and the screen shows the new state only
 // after the gateway has answered; a refusal is said in its own words. A second press while one runs does nothing.
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { t } from '@/next/i18n';
 
 export interface IAction {
@@ -34,5 +34,6 @@ export const useAction = (): IAction => {
   }, []);
 
   const clear = useCallback(() => setError(null), []);
-  return { busy, error, run, clear };
+  // The same object while nothing changes, so a list that takes it is not drawn again for nothing.
+  return useMemo(() => ({ busy, error, run, clear }), [busy, error, run, clear]);
 };

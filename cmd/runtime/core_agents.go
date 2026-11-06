@@ -192,15 +192,9 @@ func pluginDirOnce(dir string) func() string {
 // Only folders the agent has written a plugin into count, looked at on every launch: a list that came after the
 // runtime started reaches the next chat.
 func hubEnvPluginDirs(dataDir, observeFile string) func() []string {
-	links := []string{dataDir, filepath.Join(dataDir, "hub")}
-	if observeFile != "" {
-		links = append(links, filepath.Dir(observeFile))
-	}
 	var dirs []string
-	for _, l := range links {
-		if d := filepath.Join(l, hubproto.EnvPluginDir); !slices.Contains(dirs, d) {
-			dirs = append(dirs, d)
-		}
+	for _, l := range hubLinkDirs(dataDir, observeFile) {
+		dirs = append(dirs, filepath.Join(l, hubproto.EnvPluginDir))
 	}
 	return func() []string {
 		var out []string
@@ -211,6 +205,22 @@ func hubEnvPluginDirs(dataDir, observeFile string) func() []string {
 		}
 		return out
 	}
+}
+
+// hubLinkDirs are the folders of the hub links the machine agent keeps its files in: the data folder, <data>/hub and the
+// folder of the observe link's file; each once.
+func hubLinkDirs(dataDir, observeFile string) []string {
+	links := []string{dataDir, filepath.Join(dataDir, "hub")}
+	if observeFile != "" {
+		links = append(links, filepath.Dir(observeFile))
+	}
+	var dirs []string
+	for _, l := range links {
+		if !slices.Contains(dirs, l) {
+			dirs = append(dirs, l)
+		}
+	}
+	return dirs
 }
 
 func codexMCP(c coreAgentsConfig) codex.MCP {

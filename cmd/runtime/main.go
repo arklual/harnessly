@@ -20,6 +20,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/browser"
+	"github.com/ly-solutions/harnessly/internal/envsetup"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/limits"
@@ -122,6 +123,8 @@ type runtimeGate struct {
 	update *updatecheck.Checker
 	// self keeps the programs of a machine a hub carries the hub's; nil for any other runtime.
 	self *selfupdate.Updater
+	// envSetup does the machine setup of the hub's environment list, one runner per link folder; none when it is off.
+	envSetup []*envsetup.Runner
 }
 
 // configFileOf is the runtime's config (the pair's secret, the person's settings).
@@ -143,6 +146,10 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	// addresses and tokens come with them when boards or artifacts are configured.
 	paneEnv := func(conversation string) []string {
 		env := []string{"HARNESSLY_DATA_DIR=" + cfg.DataDir}
+		// The machine's own documentation folders, so `harnessly docs add` writes where the /help page reads.
+		if dirs := os.Getenv("HARNESSLY_DOCS_DIR"); dirs != "" {
+			env = append(env, "HARNESSLY_DOCS_DIR="+dirs)
+		}
 		if integ.Enabled() {
 			env = append(env, integ.AgentEnv(conversation)...)
 		}
@@ -427,6 +434,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(notifyBotRoutes(d)...)
 	f.Add(askRoutes(d, ref.c)...)
 	f.Add(secretRoutes(d, ref.c)...)
+	setupRunners := envSetupRunners(d, os.Getenv("AGENT_HUB_OBSERVE_FILE"), cfg.Version)
+	f.Add(envSetupRoutes(d, setupRunners)...)
 	f.Add(connectionRoutes(d)...)
 	f.Add(mcpRoutes(d)...)
 	f.Add(appRoutes(d, ref.c)...)
@@ -442,7 +451,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		// The old runtime behind the gate does not get an install socket, or a socket of anyone without a session.
 		f.Add(upstreamGuard(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, previewOf(d).proxy.Matches))
 	}
-	rg := &runtimeGate{Gate: f, terms: terms, browser: remoteBrowser, core: ref, tmux: tm, home: home, self: self}
+	rg := &runtimeGate{Gate: f, terms: terms, browser: remoteBrowser, core: ref, tmux: tm, home: home, self: self,
+		envSetup: setupRunners}
 	if checkOn {
 		rg.update = checker
 	}
@@ -532,6 +542,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		go alone.cleanUp(f.home, env("RUNTIME_UPLOADS_DIR", filepath.Join(cfg.DataDir, "uploads")))
 	}
 	f.startUpdateCheck(ctx)
+	f.startEnvSetup(ctx)
 	// A GPT switch left on brings its proxy up again.
 	if a := f.core.c.agents; a != nil && a.gpt != nil {
 		a.gpt.Resume()

@@ -2,20 +2,20 @@
 // counts and what the summary tiles add up to, from the rows alone.
 import type { CatalogKind, EnvLayer, EnvResponse, KindCounts } from '../../hub-api/env';
 
-export const KINDS: readonly CatalogKind[] = ['skill', 'mcp', 'repo', 'doc'];
+export const KINDS: readonly CatalogKind[] = ['skill', 'mcp', 'repo', 'doc', 'script', 'access'];
 
-export const noCounts = (): KindCounts => ({ skill: 0, mcp: 0, repo: 0, doc: 0 });
+export const noCounts = (): KindCounts => ({ skill: 0, mcp: 0, repo: 0, doc: 0, script: 0, access: 0 });
 
 /** The entries a layer counts: those that are switched on. */
 export const countsOf = (rows: readonly { kind: CatalogKind; enabled: boolean }[]): KindCounts => {
   const out = noCounts();
-  for (const r of rows) if (r.enabled) out[r.kind] += 1;
+  for (const r of rows) if (r.enabled) out[r.kind] = (out[r.kind] ?? 0) + 1;
   return out;
 };
 
 const sumCounts = (layers: readonly EnvLayer[]): KindCounts => {
   const out = noCounts();
-  for (const l of layers) for (const k of KINDS) out[k] += l.counts[k];
+  for (const l of layers) for (const k of KINDS) out[k] = (out[k] ?? 0) + (l.counts[k] ?? 0);
   return out;
 };
 
@@ -34,7 +34,7 @@ export const recount = (view: EnvResponse): EnvResponse => {
     layers,
     summary: {
       ...view.summary,
-      total: KINDS.reduce((n, k) => n + byKind[k], 0),
+      total: KINDS.reduce((n, k) => n + (byKind[k] ?? 0), 0),
       byKind,
       pinnedByOrg,
     },

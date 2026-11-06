@@ -2,7 +2,7 @@
 // installation's next-ui feature. The gateway is played in the page: every change answers with the new state, the people
 // search knows two people. &role=view opens it for a person who may only look, &theme=light|dark and &lang=en|ru pick
 // the look, &v=one the one dialog of HRN-675 (its own gateway, /access/…), with &kind=deck|video|doc|board the same
-// dialog of another kind. Never part of a production path.
+// dialog of another kind, &people=N that many more people in it (to feel a long list). Never part of a production path.
 import '@/next/styles/tokens.css';
 import '@/next/styles/base.css';
 import '@/next/styles/shell.css';
@@ -434,10 +434,33 @@ const KINDS: Record<string, { title: string; ref: 'design' | 'doc'; subkind: str
   board: { title: 'Схема доступа', ref: 'doc', subkind: 'board', ctx: { kind: LINK_KIND.board } },
 };
 
-const OneGallery = ({ viewer, kind, ask }: { viewer: boolean; kind: string; ask: boolean }) => {
+/** `count` more people of made-up names after the seed's own, for a long list. */
+const crowd = (count: number): IGrant[] =>
+  Array.from({ length: count }, (_, i) => ({
+    type: 'user',
+    id: `person${i + 1}@example.com`,
+    name: `Участник ${i + 1}`,
+    sub: `person${i + 1}@example.com`,
+    role: i % 3 === 0 ? 'edit' : 'view',
+    canShare: false,
+    expiresAt: null,
+  }));
+
+const OneGallery = ({
+  viewer,
+  kind,
+  ask,
+  people,
+}: {
+  viewer: boolean;
+  kind: string;
+  ask: boolean;
+  people: number;
+}) => {
   const shape = KINDS[kind] ?? KINDS.design!;
   const [view, setView] = useState<IResourceView>(() => {
-    const seed = viewer ? ONE_VIEWER : ONE;
+    const base = viewer ? ONE_VIEWER : ONE;
+    const seed = people > 0 ? { ...base, grants: [...(base.grants ?? []), ...crowd(people)] } : base;
     const box = {
       view: {
         ...seed,
@@ -523,6 +546,7 @@ const ShareGallery = () => {
             viewer={query.role === 'view'}
             kind={typeof query.kind === 'string' ? query.kind : 'design'}
             ask={query.ask === '1'}
+            people={Number(query.people ?? 0) || 0}
           />
         ) : (
           <>

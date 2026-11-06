@@ -298,7 +298,7 @@ func startHubAgent(t *testing.T, o rigOptions) *hubRig {
 		Home: rig.Home, Host: "127.0.0.1", Port: port, Version: "9.9.9-test", ScanInterval: time.Hour,
 		DataDir: dataDir, ConfigFile: filepath.Join(dataDir, "config.json"), SecretFile: secretFile,
 		RuntimePort: rt.port, ListenAudience: "agent", DialAudience: "ingest",
-		RuntimeAPI: base + "/api/agent", StateChangedPath: base + "/api/agent/state-changed", StatusPath: base + "/api/status", SyncPath: base + "/api/sync",
+		RuntimeAPI: base + "/api/agent", StateChangedPath: base + "/api/agent/state-changed", StatusPath: base + "/api/status", SyncPath: base + "/api/sync", PeersPath: base + "/api/peers",
 		RuntimeCookie: "session-token", LocalTokenHeader: "x-agent-local-token", ReportPortEnv: "AGENT_REPORT_PORT",
 		Auth: AuthEd25519, Machine: m, MachineFile: filepath.Join(dataDir, "machine.json"), PolicyFile: policyFile,
 		EnvDir: rig.EnvDir, WorkDir: rig.Home, UsageFeed: o.usageFeed,
@@ -938,7 +938,8 @@ func TestHubKillSwitch(t *testing.T) {
 	if err := c.closeError(); websocket.CloseStatus(err) != websocket.StatusNormalClosure {
 		t.Fatalf("the link did not close cleanly: %v", err)
 	}
-	if st := r.waitLinkState(func(s LinkState) bool { return !s.Linked && s.Note != "" }); st.Note != "switched off on this machine" {
+	// The link may pass «dialling the hub» on its way down; what counts is that it settles on switched off.
+	if st := r.waitLinkState(func(s LinkState) bool { return !s.Linked && s.Note == "switched off on this machine" }); st.Note != "switched off on this machine" {
 		t.Errorf("%+v", st)
 	}
 	// Off, it does not call again.

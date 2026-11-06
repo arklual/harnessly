@@ -62,13 +62,25 @@ const lineOf = (entry: ILogEntry, names: ILogNames): string => {
 
 const NO_NAMES: ILogNames = {};
 
-const when = (iso: string): string =>
-  new Date(iso).toLocaleString(undefined, {
+// One formatter for every line: toLocaleString builds a new one per call, and a hundred lines took a frame and more.
+let stamp: Intl.DateTimeFormat | null = null;
+const when = (iso: string): string => {
+  stamp ??= new Intl.DateTimeFormat(undefined, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
   });
+  return stamp.format(new Date(iso));
+};
+
+/** Makes the formatter while the dialog stands idle: the first one of a page loads the language's data, and that was
+ *  most of the first opening of «История доступа». */
+export const warmLog = (): (() => void) => {
+  if (typeof window.requestIdleCallback !== 'function') return () => undefined;
+  const handle = window.requestIdleCallback(() => void when(new Date().toISOString()), { timeout: 2000 });
+  return () => window.cancelIdleCallback(handle);
+};
 
 /** `kind` reads the log through the one access API; without it, the design's older route. */
 const AccessLog = ({

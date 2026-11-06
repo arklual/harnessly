@@ -44,7 +44,7 @@ func TestEnvKeeperKeepsAppliesAndReports(t *testing.T) {
 		by[a.ItemID] = a
 	}
 	// Every valid kind is applied; the MCP server waits for its secret, the bad ones say why.
-	for id, want := range map[string]string{"skill1": hubproto.EnvOK, "skill2": hubproto.EnvOK, "mcp1": hubproto.EnvPending, "repo1": hubproto.EnvOK,
+	for id, want := range map[string]string{"skill1": hubproto.EnvOK, "skill2": hubproto.EnvOK, "mcp1": hubproto.EnvPending, "repo1": hubproto.EnvPending,
 		"doc1": hubproto.EnvOK, "../evil": hubproto.EnvError, "odd1": hubproto.EnvError} {
 		if by[id].Status != want || (want != hubproto.EnvOK && by[id].Message == "") {
 			t.Errorf("%s = %+v, want %s", id, by[id], want)
@@ -59,8 +59,8 @@ func TestEnvKeeperKeepsAppliesAndReports(t *testing.T) {
 	if raw, err := os.ReadFile(skill); err != nil || !strings.Contains(string(raw), "Пиши коротко.") || !strings.Contains(string(raw), `description: "Ревью кода"`) {
 		t.Errorf("skill file: %q %v", raw, err)
 	}
-	// A skill by a reference, a document and a repository are skills that say where the thing is.
-	for id, want := range map[string]string{"skill2": "https://example.org/skill", "doc1": "https://docs.example.org/rules", "repo1": "git clone https://git.example.org/acme/mono.git"} {
+	// A skill by a reference and a document are skills that say where the thing is; the repositories are one skill of them all.
+	for id, want := range map[string]string{"skill2": "https://example.org/skill", "doc1": "https://docs.example.org/rules", reposSkillID: "https://git.example.org/acme/mono.git"} {
 		if raw, err := os.ReadFile(filepath.Join(plugin, "skills", id, "SKILL.md")); err != nil || !strings.Contains(string(raw), want) {
 			t.Errorf("%s: %q %v", id, raw, err)
 		}

@@ -27,6 +27,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/settings"
 	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The state slice: the settings files the cluster serves from its database first (this runtime is their fallback and
@@ -365,7 +366,7 @@ func tmuxInfo(d deps) settings.Handler {
 				}
 				return nil
 			}
-			info = jsvalue.NewObject("cwd", orNil(f[0]), "command", orNil(f[1]), "pid", num(f[2]), "width", num(f[3]), "height", num(f[4]),
+			info = jsvalue.NewObject("cwd", orNil(f[0]), "command", orNil(tmux.ForegroundCommand(f[1], atoiOr0(f[2]))), "pid", num(f[2]), "width", num(f[3]), "height", num(f[4]),
 				"sessionCreated", num(f[5]))
 		}
 		_, last := machine.SessionCwd(d.Tmux, name)
@@ -862,3 +863,9 @@ func fileExists(p string) bool {
 //
 //go:embed api-guide.md
 var builtInAPIGuide string
+
+// atoiOr0 is s as a whole number, 0 when it is not one.
+func atoiOr0(s string) int {
+	n, _ := strconv.Atoi(strings.TrimSpace(s))
+	return n
+}

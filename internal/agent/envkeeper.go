@@ -48,6 +48,11 @@ type envKeeper struct {
 	plugin string // the plugin folder the list is applied into
 	// hasSecret says whether a secret an MCP server names is on this machine; nil knows none.
 	hasSecret func(name string) bool
+	// setupAllowed says whether the machine may be set up by the list; nil allows (tests).
+	setupAllowed func() bool
+	// runnerAlive says the runtime that does the setup is running; nil says yes (tests). aliveSeen is what the watcher saw last.
+	runnerAlive func() bool
+	aliveSeen   bool
 
 	mu   sync.Mutex
 	held envHeld
@@ -166,6 +171,9 @@ func (k *envKeeper) apply(items []hubproto.EnvItem) []hubproto.EnvApplied {
 	skills := map[string]string{} // item id → SKILL.md
 	servers := map[string]any{}   // server name → its .mcp.json entry
 	kindOf := map[string]string{} // item id → kind
+	var repos []string            // a line per repository, for the one skill of them all
+	// The setup kinds (access, scripts, repositories) are done by the runtime; their outcome is what it wrote for this very list.
+	setup := k.setupStatuses(hubproto.EnvHash(items))
 	for _, it := range items {
 		a := hubproto.EnvApplied{ItemID: it.ItemID, Status: hubproto.EnvOK}
 		var src envSource
@@ -181,18 +189,44 @@ func (k *envKeeper) apply(items []hubproto.EnvItem) []hubproto.EnvApplied {
 		case it.Kind == hubproto.EnvKindDoc:
 			a.Status, a.Message = putDoc(skills, it, src)
 		case it.Kind == hubproto.EnvKindRepo:
-			a.Status, a.Message = putRepo(skills, it, src)
+			var line string
+			line, a.Status, a.Message = repoLine(it, src)
+			if line != "" {
+				repos = append(repos, line)
+			}
 		case it.Kind == hubproto.EnvKindMCP:
 			a.Status, a.Message = k.putMCP(servers, it, src)
+		case it.Kind == hubproto.EnvKindScript || it.Kind == hubproto.EnvKindAccess:
+			// Nothing for the chats; the runtime's account below says how the machine's side went.
 		default:
 			a.Status, a.Message = hubproto.EnvError, "unknown kind "+it.Kind
+		}
+		if hubproto.IsSetupKind(it.Kind) && a.Status != hubproto.EnvError {
+			if k.setupAllowed != nil && !k.setupAllowed() {
+				// A repository keeps its reference for the chats, which needs no setup: its status stays what the chat part is.
+				if it.Kind != hubproto.EnvKindRepo {
+					a.Status, a.Message = hubproto.EnvPending, "настройка машины выключена на этой машине (политика setup)"
+				}
+			} else if k.runnerAlive != nil && !k.runnerAlive() {
+				a.Status, a.Message = hubproto.EnvPending, "настройщик машины не запущен"
+			} else if got, ok := setup[it.ItemID]; ok {
+				a.Status, a.Message = got.Status, got.Message
+			} else {
+				a.Status, a.Message = hubproto.EnvPending, "машина ещё настраивается"
+			}
 		}
 		kindOf[it.ItemID] = it.Kind
 		out = append(out, a)
 	}
+	if len(repos) > 0 {
+		skills[reposSkillID] = reposSkill(repos)
+	}
 	skillErr, mcpErr := k.write(skills, servers)
 	for i, a := range out {
 		err := skillErr[a.ItemID]
+		if kindOf[a.ItemID] == hubproto.EnvKindRepo {
+			err = skillErr[reposSkillID]
+		}
 		if kindOf[a.ItemID] == hubproto.EnvKindMCP && a.Status != hubproto.EnvError {
 			err = mcpErr
 		}
@@ -210,6 +244,7 @@ type envSource struct {
 	URL        string   `json:"url"`
 	Text       string   `json:"text"`
 	Branch     string   `json:"branch"`
+	Dir        string   `json:"dir"`
 	Transport  string   `json:"transport"`
 	Command    string   `json:"command"`
 	Args       []string `json:"args"`
@@ -248,18 +283,30 @@ func putDoc(skills map[string]string, it hubproto.EnvItem, src envSource) (strin
 	return hubproto.EnvOK, ""
 }
 
-func putRepo(skills map[string]string, it hubproto.EnvItem, src envSource) (string, string) {
+// reposSkillID is the one skill that tells the chats where all the team's repositories are. One skill and not one per
+// repository: every skill's description is in every chat's prompt, and a team has dozens of repositories.
+const reposSkillID = "team-repositories"
+
+// repoLine is a repository's line in that skill.
+func repoLine(it hubproto.EnvItem, src envSource) (string, string, string) {
 	if src.URL == "" {
-		return hubproto.EnvError, "the repository has no address"
+		return "", hubproto.EnvError, "the repository has no address"
 	}
 	branch := ""
 	if src.Branch != "" {
 		branch = fmt.Sprintf(", branch %s", src.Branch)
 	}
-	body := fmt.Sprintf("The team's repository «%s» is %s%s. When the task needs its code and it is not in the workspace yet, clone it next to the workspace (`git clone %s`) and work there.",
-		it.Name, src.URL, branch, src.URL)
-	skills[it.ItemID] = skillFile(it, "The team's repository «"+it.Name+"»: where it is and how to get it.", body)
-	return hubproto.EnvOK, ""
+	where := src.Dir
+	if where == "" {
+		where = "~/code/" + repoDirName(src.URL)
+	}
+	return fmt.Sprintf("- «%s»: `%s` — %s%s", it.Name, where, src.URL, branch), hubproto.EnvOK, ""
+}
+
+func reposSkill(lines []string) string {
+	body := "The team's repositories and where the machine's setup clones them. Work in that folder; if it is not there yet, " +
+		"clone it there (`git clone <address> <folder>`).\n\n" + strings.Join(lines, "\n")
+	return skillFile(hubproto.EnvItem{ItemID: reposSkillID}, "The team's repositories: which folder each one is in and its address.", body)
 }
 
 func (k *envKeeper) putMCP(servers map[string]any, it hubproto.EnvItem, src envSource) (string, string) {
@@ -418,4 +465,16 @@ func (h *hub) opEnvSet(req map[string]json.RawMessage) (any, func(), error) {
 	}
 	h.audit.Record(hubproto.OpEnvSet, true, map[string]any{"rev": rev, "items": len(items)})
 	return st, nil, nil
+}
+
+// repoDirName is the folder name the setup gives a repository by default: the last part of its address without .git.
+func repoDirName(addr string) string {
+	a := strings.TrimSuffix(strings.TrimRight(strings.TrimSpace(addr), "/"), ".git")
+	if k := strings.LastIndexAny(a, "/:"); k >= 0 {
+		a = a[k+1:]
+	}
+	if a == "" {
+		return "repo"
+	}
+	return a
 }

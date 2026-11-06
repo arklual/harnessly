@@ -80,6 +80,24 @@ if the account needs it, the folder id). The keys sit beside the vendors' keys i
 and go only to that provider. The recording is sent to a provider only while its model is the picked one; text arrives
 in the field as you speak, as with the machine's own model.
 
+### The ChatGPT plan (unofficial)
+
+_Model_ → _ChatGPT plan_ recognizes on the plan the machine's Codex CLI is signed in with (`codex login`), with no key
+and no separate payment. The recording is held in memory and sent whole after the stop to
+`https://chatgpt.com/backend-api/transcribe`, so:
+
+- This is **not a documented API**. OpenAI's
+  [plan usage for other apps](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations.md)
+  covers the Responses API and says the transcription API is not supported. The address can change or close at any time,
+  and using it is at the risk of the account; read OpenAI's terms before relying on it. Use it for your own machine and
+  your own sign-in; it is off until you pick it.
+- No words appear while you speak; the text comes after the stop. The endpoint takes no prompt, so _My words_ work only
+  as replacements.
+- The answer carries `asset_ttl: 30d`, so OpenAI appears to keep the recording for 30 days. Do not pick this model for what
+  must not leave the machine.
+- The model cannot be chosen: the request names none. Limits are not published.
+- The request names this client as itself (`User-Agent: harnessly-voice`) and does not pass for one of OpenAI's apps.
+
 _My words_ (in the same section, kept with the account) fix what the recognizer gets wrong. A word may have _how it is
 heard_ variants (replaced exactly, ignoring case); without them it is found by how it sounds (a Cyrillic word that is
 a transliteration of a Latin one, conservatively: «синопию» becomes `Sinopia`). The replacement is made by the runtime on

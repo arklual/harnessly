@@ -1,0 +1,15 @@
+{
+  "title": { "en": "Architecture", "ru": "Архитектура" },
+  "audience": "all",
+  "order": 50,
+  "pages": [
+    "README.md",
+    "../architecture.md",
+    "../slices.md",
+    "../hub/architecture.md",
+    "../hub/api.md",
+    "../design-engine.md",
+    "../design-pages.md",
+    "../comparison.md"
+  ]
+}

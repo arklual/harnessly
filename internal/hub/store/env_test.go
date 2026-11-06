@@ -113,6 +113,89 @@ func exerciseEnv(t *testing.T, db *DB) {
 		t.Fatalf("state %+v, %v", st, err)
 	}
 
+	// Owner and position are kept; a script entry carries its place.
+	sc, err := s.AddCatalogItem(ctx, CatalogItem{OrgID: "org1", Kind: CatalogScript, Name: "setup", CreatedAt: now, OwnerLayer: EnvLayerTeam, OwnerScope: "t1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.CatalogItemByID(ctx, sc.ID); got.OwnerLayer != EnvLayerTeam || got.OwnerScope != "t1" {
+		t.Fatalf("owner %+v", got)
+	}
+	if got, _ := s.CatalogItemByID(ctx, builtin.ID); got.OwnerLayer != "" || got.OwnerScope != "" {
+		t.Fatalf("no owner %+v", got)
+	}
+	pe, _, err := s.AddEnvEntry(ctx, EnvEntry{OrgID: "org1", Layer: EnvLayerTeam, ScopeID: "t1", ItemID: sc.ID, Enabled: true, UpdatedAt: now, Position: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pe.Position = 1
+	if err := s.UpdateEnvEntry(ctx, pe); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.EnvEntryByID(ctx, pe.ID); got.Position != 1 {
+		t.Fatalf("position %+v", got)
+	}
+
+	// Runs: a later frame of a run replaces the earlier one, the query filters, the sweep removes the old.
+	run := EnvRun{ID: "run-aaaaaaaa", OrgID: "org1", MachineID: "m1", UserID: alice.ID, SpaceID: "sp1", Mode: "update", Status: "running",
+		StartedAt: now, Steps: "[]", UpdatedAt: now}
+	if ok, err := s.UpsertEnvRun(ctx, run); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	run.Status, run.FinishedAt, run.Steps, run.UserID = "error", now.Add(time.Minute), `[{"itemId":"a","log":"boom"}]`, "someone-else"
+	if ok, err := s.UpsertEnvRun(ctx, run); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	ok2 := EnvRun{ID: "run-bbbbbbbb", OrgID: "org1", MachineID: "m2", Mode: "check", Status: "ok", StartedAt: now.Add(time.Hour), UpdatedAt: now}
+	old := EnvRun{ID: "run-cccccccc", OrgID: "org1", MachineID: "m1", Mode: "apply", Status: "ok", StartedAt: now.Add(-48 * time.Hour), UpdatedAt: now}
+	foreign := EnvRun{ID: "run-dddddddd", OrgID: "org2", MachineID: "m3", Mode: "apply", Status: "ok", StartedAt: now, UpdatedAt: now}
+	for _, r := range []EnvRun{ok2, old, foreign} {
+		if ok, err := s.UpsertEnvRun(ctx, r); err != nil || !ok {
+			t.Fatal(ok, err)
+		}
+	}
+	got1, err := s.EnvRunByID(ctx, "org1", run.ID)
+	if err != nil || got1.Status != "error" || got1.UserID != alice.ID || got1.Steps != run.Steps || !got1.FinishedAt.Equal(run.FinishedAt) {
+		t.Fatalf("run %+v, %v", got1, err)
+	}
+	if _, err := s.EnvRunByID(ctx, "org1", "nope"); !IsNotFound(err) {
+		t.Fatalf("missing run: %v", err)
+	}
+	if _, err := s.EnvRunByID(ctx, "org2", run.ID); !IsNotFound(err) {
+		t.Fatalf("run of another organization: %v", err)
+	}
+	// Another machine's frame with the same id changes nothing.
+	hijack := run
+	hijack.MachineID, hijack.Status, hijack.Steps = "m9", "ok", "[]"
+	if ok, err := s.UpsertEnvRun(ctx, hijack); err != nil || ok {
+		t.Fatalf("hijack: %v %v", ok, err)
+	}
+	if again, _ := s.EnvRunByID(ctx, "org1", run.ID); again.Status != "error" || again.MachineID != "m1" {
+		t.Fatalf("hijacked %+v", again)
+	}
+	since := now.Add(-time.Hour)
+	if rs, err := s.EnvRunsOf(ctx, EnvRunQuery{OrgID: "org1", Since: since}); err != nil || len(rs) != 2 || rs[0].ID != ok2.ID {
+		t.Fatalf("runs %+v, %v", rs, err)
+	}
+	if rs, _ := s.EnvRunsOf(ctx, EnvRunQuery{OrgID: "org1", Since: since, ErrorsOnly: true}); len(rs) != 1 || rs[0].ID != run.ID {
+		t.Fatalf("errors only %+v", rs)
+	}
+	if rs, _ := s.EnvRunsOf(ctx, EnvRunQuery{OrgID: "org1", Since: since, MachineIDs: []string{"m2"}}); len(rs) != 1 || rs[0].ID != ok2.ID {
+		t.Fatalf("machine %+v", rs)
+	}
+	if rs, _ := s.EnvRunsOf(ctx, EnvRunQuery{OrgID: "org1", Since: since, MachineIDs: []string{}}); len(rs) != 0 {
+		t.Fatalf("no machines %+v", rs)
+	}
+	if rs, _ := s.EnvRunsOf(ctx, EnvRunQuery{OrgID: "org1", Since: since, Limit: 1}); len(rs) != 1 {
+		t.Fatalf("limit %+v", rs)
+	}
+	if n, err := s.DeleteEnvRunsBefore(ctx, now.Add(-24*time.Hour)); err != nil || n != 1 {
+		t.Fatalf("sweep %d, %v", n, err)
+	}
+	if rs, _ := s.EnvRunsOf(ctx, EnvRunQuery{OrgID: "org1", Since: now.Add(-100 * time.Hour)}); len(rs) != 2 {
+		t.Fatalf("after the sweep %+v", rs)
+	}
+
 	// A repeated fact of a session replaces its row; the read sums the sessions.
 	u := ToolUsage{OrgKey: "org1", SpaceID: "sp1", UserID: alice.ID, MachineID: "m1", SessionKey: "s1", ToolKind: "mcp", ToolName: "tracker", Day: "2026-10-30", Calls: 2, Errors: 1, LastAt: 1700000000000}
 	if err := s.UpsertToolUsage(ctx, u); err != nil {

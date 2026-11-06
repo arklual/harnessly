@@ -80,9 +80,7 @@ const ViewModeGallery = () => {
   const mode: ISiteMode = {
     state: t(modeStateKey(word, edit)),
     editing: edit,
-    action: edit
-      ? { label: t('next.site.modeView'), icon: 'eye', onClick: () => setEdit(false) }
-      : { label: t('next.site.modeEdit'), icon: 'pencil', onClick: () => setEdit(true) },
+    action: { onClick: () => setEdit(!edit), ask: false },
   };
   const common = {
     machine: 'm1' as MachineId,
