@@ -43,10 +43,12 @@ func init() {
 var designLibraryPort = func() int { return 0 }
 
 type previewSet struct {
-	store   *devtools.Store
-	api     *devtools.API
-	mcp     *devtools.MCP
-	mcpName string
+	// storageDir keeps the localStorage of the pages shown by path (preview_storage.go).
+	storageDir string
+	store      *devtools.Store
+	api        *devtools.API
+	mcp        *devtools.MCP
+	mcpName    string
 	// agentTools are the MCP tools besides the DevTools for the agent that calls (delegation, v2_delegate.go): set once
 	// the conversations run, nil before.
 	agentTools atomic.Pointer[func(*http.Request) mcpserver.Toolset]
@@ -175,7 +177,7 @@ func previewOf(d deps) *previewSet {
 		cfg.LocalOrigins = true
 	}
 	s := &previewSet{store: store, api: api, mcp: &devtools.MCP{API: api}, mcpName: env("RUNTIME_MCP_SERVER", "harnessly"), scanner: scanner,
-		logs: logs, proxy: preview.New(cfg), cfg: cfg}
+		logs: logs, proxy: preview.New(cfg), cfg: cfg, storageDir: filepath.Join(d.DataDir, "preview-storage")}
 	previewSets[d.CLI] = s
 	if d.Standalone {
 		standaloneSlots.attach(s, secret)

@@ -155,12 +155,20 @@ var (
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if id := s.cfg.MachineIDFromHost(r.Host); id != "" {
+		if previewPath(r.URL.Path, id) {
+			s.servePreview(w, r, id)
+			return
+		}
 		s.serveRuntimeHost(w, r, id)
 		return
 	}
 	id, ok := pathMachine(r.URL.Path)
 	if !ok {
 		s.page(w, r, http.StatusNotFound, "Не найдено", "Такой машины нет.")
+		return
+	}
+	if previewPath(r.URL.Path, id) && !s.cfg.SubdomainMode() {
+		s.servePreview(w, r, id)
 		return
 	}
 	if s.cfg.SubdomainMode() {

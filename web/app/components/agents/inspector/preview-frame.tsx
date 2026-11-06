@@ -38,6 +38,9 @@ import { isLibraryPort } from '@/hooks/use-design-library';
 import { locateDesignElement } from '@/lib/hl-design-library-client';
 import {
   acceptsBridgeEvent,
+  frameSandbox,
+  reloadAsked,
+  slotByPath,
   parseBridgeMessage,
   pathInTarget,
   postToBridge,
@@ -299,7 +302,19 @@ export const PreviewFrame = ({
   };
 
   const onMessage = useEffectEvent((event: MessageEvent) => {
-    if (!acceptsBridgeEvent(event, frameRef.current?.contentWindow ?? null, origin)) return;
+    const frame = frameRef.current?.contentWindow ?? null;
+    // The page that asks for a reload stands outside the slot's prefix and knows no key: only a path of the person's
+    // own server is reopened, in this frame's slot.
+    const again = event.source === frame && slotByPath(origin) ? reloadAsked(event.data) : null;
+    if (again === null && !acceptsBridgeEvent(event, frame, origin)) return;
+    if (again !== null) {
+      setPath(again);
+      const current = readPreview(previewKey).state;
+      if (current.kind === 'open' && current.path !== again)
+        patchPreview(previewKey, { state: { ...current, path: again } });
+      onReload();
+      return;
+    }
     const message = parseBridgeMessage(event.data);
     if (!message) return;
     for (const listener of bridgeListeners.current) listener(message);
@@ -586,7 +601,7 @@ export const PreviewFrame = ({
       className="tw-preview-frame"
       src={src ?? undefined}
       title={t('inspector.previewFrame.frameTitle', { target: targetLabel(state.target) })}
-      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+      sandbox={frameSandbox(origin)}
       allow="clipboard-read; clipboard-write"
       onLoad={() => {
         frameLoaded();

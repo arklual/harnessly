@@ -36,12 +36,52 @@ export type TBridgeMessage =
   /** A board of the design library failed: the panel puts the error in the composer by itself. */
   | { type: 'tk:board-error'; url: string; message: string; stack: string };
 
+/**
+ * A slot by path (`https://host/<base>/__pv/<n>-<key>`): the page runs sandboxed on an opaque origin under that prefix
+ * of the platform's own host. null for a slot with an origin of its own.
+ */
+export const slotByPath = (previewOrigin: string): { origin: string; prefix: string } | null => {
+  try {
+    const url = new URL(previewOrigin);
+    const prefix = url.pathname.replace(/\/+$/, '');
+    return prefix ? { origin: url.origin, prefix } : null;
+  } catch {
+    return null;
+  }
+};
+
 /** Only the frame of this preview, from its slot origin: another frame or tab of the page must not drive the island. */
 export const acceptsBridgeEvent = (
-  event: { source: unknown; origin: string },
+  event: { source: unknown; origin: string; data?: unknown },
   frame: Window | null,
   previewOrigin: string,
-): boolean => frame !== null && event.source === frame && event.origin === previewOrigin;
+): boolean => {
+  if (frame === null || event.source !== frame) return false;
+  if (event.origin === previewOrigin) return true;
+  // An opaque origin proves nothing: the frame may have navigated to another site. Only the page that was given the
+  // slot's address knows its key.
+  const byPath = slotByPath(previewOrigin);
+  const data = (event as { data?: unknown }).data;
+  return (
+    event.origin === 'null' &&
+    byPath !== null &&
+    typeof data === 'object' &&
+    data !== null &&
+    (data as { hlSlot?: unknown }).hlSlot === byPath.prefix
+  );
+};
+
+/** The page by path reloaded past its prefix: the runtime's page asks the pane to open this path again. */
+export const reloadAsked = (data: unknown): string | null => {
+  if (typeof data !== 'object' || data === null) return null;
+  const { type, path } = data as { type?: unknown; path?: unknown };
+  return type === 'hl-preview-reload' &&
+    typeof path === 'string' &&
+    path.startsWith('/') &&
+    !path.startsWith('//')
+    ? path.slice(0, 2048)
+    : null;
+};
 
 /** The bridge clips to these already; a page can post its own messages, so the island clips again. */
 const MAX_TEXT = 120;
@@ -169,12 +209,35 @@ export const parseBridgeMessage = (data: unknown): TBridgeMessage | null => {
 export const pathInTarget = (url: string, previewOrigin: string): string | null => {
   try {
     const parsed = new URL(url);
+    const byPath = slotByPath(previewOrigin);
+    if (byPath) {
+      if (parsed.origin !== byPath.origin) return null;
+      const { pathname } = parsed;
+      const inside = pathname.startsWith(`${byPath.prefix}/`)
+        ? pathname.slice(byPath.prefix.length)
+        : pathname;
+      return `${inside}${parsed.search}${parsed.hash}`;
+    }
     return parsed.origin === previewOrigin ? `${parsed.pathname}${parsed.search}${parsed.hash}` : null;
   } catch {
     return null;
   }
 };
 
+/** Fills carry a vault ticket: never posted to a frame whose origin the browser cannot check. */
+const OPAQUE_REFUSED: ReadonlySet<string> = new Set(['tk:fill', 'tk:probe-login']);
+
 export const postToBridge = (frame: Window | null, previewOrigin: string, message: TParentMessage): void => {
+  // An opaque origin cannot be named as the target: '*' is the only address it receives at, so nothing secret goes.
+  if (slotByPath(previewOrigin)) {
+    if (!OPAQUE_REFUSED.has(message.type)) frame?.postMessage(message, '*');
+    return;
+  }
   frame?.postMessage(message, previewOrigin);
 };
+
+/** The frame's sandbox: a slot by path shares the platform's host, so its page must not share its origin. */
+export const frameSandbox = (previewOrigin: string): string =>
+  slotByPath(previewOrigin)
+    ? 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads'
+    : 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads';

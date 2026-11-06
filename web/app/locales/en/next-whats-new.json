@@ -1,4 +1,6 @@
 {
+  "next.whatsNew.2026-11-06b.previewByPath.title": "The preview works on one address",
+  "next.whatsNew.2026-11-06b.previewByPath.text": "When a company gives harnessly one address and no subdomains, the preview of local servers still opens in the pane. Nothing to set up.",
   "next.whatsNew.2026-11-06.docsLibrary.title": "Documentation of all of harnessly",
   "next.whatsNew.2026-11-06.docsLibrary.text": "«More → Documentation» now has sections for people, for agents, the architecture with diagrams and self-hosting, with screenshots. The search looks through the text of every page.",
   "next.whatsNew.2026-11-06.docsTeam.title": "Your team's own documentation",

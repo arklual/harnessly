@@ -138,8 +138,11 @@ not the machine's), unless it is a GET/HEAD navigation of a whole page (`Sec-Fet
 page of another site cannot show a machine under its buttons. The sockets (`/ws`) are refused before the upgrade by the
 same check. Browsers without Fetch Metadata are left with the `Origin` check, which is the reason to give machines a registrable domain of their own.
 
-The runtime's preview slots (its extra ports) are not carried by the hub in this version: the installer sets
-`RUNTIME_PREVIEW_LISTEN=off`. Boards and artifacts integrations work as before when configured on the runtime.
+The runtime's preview goes by path behind the hub (the installer sets `RUNTIME_PREVIEW_MODE=path`):
+`/m/<machine>/__pv/<slot>-<key>/…`. The hub passes these paths without its session and its cross-site check, since the
+previewed page runs sandboxed on an opaque origin and sends neither; the key in the address, made by the runtime for a
+signed-in person's open, is what the runtime admits. Only the previewed target's own cookies (`__t_…`, scoped under the
+machine's `/__pv/`) travel, both ways. A frame that reloads past its prefix gets a page that asks the pane to reopen it. Boards and artifacts integrations work as before when configured on the runtime.
 
 ### Hub ↔ runtime, everything else
 

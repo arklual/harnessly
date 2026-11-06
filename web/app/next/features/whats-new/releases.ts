@@ -13,6 +13,10 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-06b',
+    items: [{ key: 'previewByPath', icon: 'shield-check' }],
+  },
+  {
     id: '2026-11-06',
     items: [
       { key: 'docsLibrary', icon: 'book-open' },

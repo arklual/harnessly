@@ -55,6 +55,10 @@ type previewSlots struct {
 	// public are the slots' origins behind a reverse proxy (RUNTIME_PREVIEW_PUBLIC_ORIGINS), in slot order; nil when
 	// a slot's origin is the app's host with the slot's port.
 	public []string
+	// mode is RUNTIME_PREVIEW_MODE (preview_path.go): "auto", "ports", "origins" or "path".
+	mode string
+	// byPath are the open slots by path, by their address key (preview_path.go).
+	byPath pathSessions
 	set    atomic.Pointer[previewSet]
 	secret atomic.Pointer[[]byte]
 
@@ -70,6 +74,10 @@ var standaloneSlots *previewSlots
 // preview, never the runtime.
 func listenPreviewSlots(gateListen string, gatePort int) *previewSlots {
 	asked := strings.TrimSpace(os.Getenv("RUNTIME_PREVIEW_LISTEN"))
+	mode := previewModeSetting()
+	if mode == "path" {
+		return pathOnlySlots()
+	}
 	if asked == "off" {
 		return nil
 	}
@@ -78,8 +86,8 @@ func listenPreviewSlots(gateListen string, gatePort int) *previewSlots {
 		h, p, err := net.SplitHostPort(asked)
 		n, perr := strconv.Atoi(p)
 		if err != nil || perr != nil || n < 0 || n > 65535-previewSlotCount {
-			agent.Log("warn", "preview: RUNTIME_PREVIEW_LISTEN is not host:port; the preview is off", agent.F{K: "value", V: asked})
-			return nil
+			agent.Log("warn", "preview: RUNTIME_PREVIEW_LISTEN is not host:port; the preview goes by path", agent.F{K: "value", V: asked})
+			return pathOnlySlots()
 		}
 		host, first = h, n
 	} else {
@@ -88,7 +96,7 @@ func listenPreviewSlots(gateListen string, gatePort int) *previewSlots {
 			first = gatePort + 1
 		}
 	}
-	s := &previewSlots{spent: map[string]int64{}}
+	s := &previewSlots{spent: map[string]int64{}, mode: mode}
 	for i := 0; i < previewSlotCount; i++ {
 		port := 0
 		if first > 0 {
@@ -99,9 +107,9 @@ func listenPreviewSlots(gateListen string, gatePort int) *previewSlots {
 			for _, l := range s.listeners {
 				_ = l.Close()
 			}
-			agent.Log("warn", "preview: a slot port is taken; the preview is off (set RUNTIME_PREVIEW_LISTEN to move the slots)",
+			agent.Log("warn", "preview: a slot port is taken; the preview goes by path (set RUNTIME_PREVIEW_LISTEN to move the slots)",
 				agent.F{K: "error", V: err.Error()})
-			return nil
+			return pathOnlySlots()
 		}
 		s.listeners = append(s.listeners, ln)
 		s.ports = append(s.ports, ln.Addr().(*net.TCPAddr).Port)
@@ -225,7 +233,7 @@ func (s *previewSlots) guard(next http.Handler) http.Handler {
 		if from == "" {
 			from = r.Header.Get("Referer")
 		}
-		if s.isSlotOrigin(from) {
+		if s.isSlotOrigin(from) || opaqueRequest(r) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte(`{"error":"Forbidden"}`))
@@ -413,6 +421,9 @@ func (s *previewSlots) open(d deps, r *http.Request, body any) (int, any, http.H
 	if !ok {
 		return refuse(400, "invalid origin")
 	}
+	if s.usesPath(app) {
+		return s.openByPath(d, r, app, slot, path, target, neighbours, set)
+	}
 	origin, ok := s.slotOrigin(slot, app)
 	if !ok {
 		return refuse(503, "preview slots need https origins")
@@ -522,7 +533,8 @@ func (s *previewSlots) slotCookie(slot int, secure bool) string {
 }
 
 func isSlotCookieLine(line string) bool {
-	return strings.HasPrefix(line, previewCookieName) || strings.HasPrefix(line, "__Host-"+previewCookieName)
+	return strings.HasPrefix(line, previewCookieName) || strings.HasPrefix(line, "__Host-"+previewCookieName) ||
+		strings.HasPrefix(line, "__Secure-"+previewCookieName)
 }
 
 // session is the slot's newest valid cookie that names this slot. A browser may hold several: a plain and a secure
@@ -674,6 +686,10 @@ func previewFrameAncestors(apps ...string) string {
 func (s *previewSlots) forward(w http.ResponseWriter, r *http.Request, set *previewSet, secret []byte, sess *previewSession) {
 	cfg := set.cfg
 	claim := map[string]any{"sub": sess.sub, "target": sess.targetJSON, "slotOrigin": sess.origin, "portSlots": sess.portSlots}
+	prefix := prefixOf(sess.origin)
+	if prefix != "" {
+		claim["pathPrefix"] = prefix
+	}
 	if cfg.Bridge != nil {
 		if _, ok := cfg.Bridge(); ok {
 			claim["parentOrigin"] = sess.app
@@ -705,15 +721,16 @@ func (s *previewSlots) forward(w http.ResponseWriter, r *http.Request, set *prev
 		u.RawPath = cfg.Path + r.URL.RawPath
 	}
 	out.URL = &u
-	set.proxy.ServeHTTP(&slotWriter{ResponseWriter: w, frame: previewFrameAncestors(sess.framers()...)}, out)
+	set.proxy.ServeHTTP(&slotWriter{ResponseWriter: w, frame: previewFrameAncestors(sess.framers()...), byPath: prefix != ""}, out)
 }
 
 // slotWriter puts the slot's own headers on what the proxy answers: no shared cache, no indexing, framed only by the
 // app, and no slot cookie set by a target.
 type slotWriter struct {
 	http.ResponseWriter
-	frame string
-	fixed bool
+	frame  string
+	byPath bool
+	fixed  bool
 }
 
 func (w *slotWriter) fix() {
@@ -725,6 +742,9 @@ func (w *slotWriter) fix() {
 	h.Set("X-Robots-Tag", "noindex, nofollow")
 	h.Set("Cache-Control", previewPrivateCacheControl(strings.Join(h.Values("Cache-Control"), ", ")))
 	h.Add("Content-Security-Policy", w.frame)
+	if w.byPath {
+		pathSlotHeaders(h)
+	}
 	if lines := h.Values("Set-Cookie"); len(lines) > 0 {
 		h.Del("Set-Cookie")
 		for _, line := range lines {

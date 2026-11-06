@@ -304,7 +304,7 @@ func TestInstallDirProfile(t *testing.T) {
 
 	rt := e.read(e.path("/etc/harnessly/runtime.env"))
 	mustContain(t, "runtime.env", rt, "RUNTIME_GATE_LISTEN=127.0.0.1:18022\n", "RUNTIME_GATE_UPSTREAM=\n", "RUNTIME_APP_BASE_PATH=/m/"+machineID+"\n",
-		"RUNTIME_HUB_URL="+e.hub.URL+"\n", "RUNTIME_PREVIEW_LISTEN=off\n", "RUNTIME_WORKSPACE_DIR=/srv/harnessly/work\n",
+		"RUNTIME_HUB_URL="+e.hub.URL+"\n", "RUNTIME_PREVIEW_MODE=path\n", "RUNTIME_WORKSPACE_DIR=/srv/harnessly/work\n",
 		"AGENT_DATA_DIR=/var/lib/harnessly/.harnessly\n", "AGENT_POLICY_FILE=/etc/harnessly/policy.toml\n", "TMUX_TMPDIR=/var/lib/harnessly/tmux\n")
 	ag := e.read(e.path("/etc/harnessly/agent.env"))
 	mustContain(t, "agent.env", ag, "AGENT_PORT=18023\n", "RUNTIME_PORT=18022\n", "AGENT_DATA_DIR=/var/lib/harnessly/.harnessly\n",

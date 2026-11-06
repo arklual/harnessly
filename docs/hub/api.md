@@ -802,7 +802,7 @@ unit has no `PrivateTmp` (the tmux server and the agents outlive the runtime pro
 
 Ports on the machine: the runtime on `127.0.0.1:18022`, the agent on `127.0.0.1:18023` (next free if taken; written
 into the units). Runtime environment: `RUNTIME_GATE_LISTEN`, `RUNTIME_GATE_UPSTREAM=` (standalone),
-`RUNTIME_APP_BASE_PATH=<runtimeBasePath>`, `RUNTIME_HUB_URL=<hubUrl>`, `RUNTIME_PREVIEW_LISTEN=off`,
+`RUNTIME_APP_BASE_PATH=<runtimeBasePath>`, `RUNTIME_HUB_URL=<hubUrl>`, `RUNTIME_PREVIEW_MODE=path`,
 `RUNTIME_WORKSPACE_DIR` (dir: `/srv/harnessly/work`; full: `~/work`). Agent environment: `AGENT_PORT`,
 `RUNTIME_PORT`. In Ed25519 mode the agent puts `runtimeBasePath` in front of the runtime routes it calls itself
 (`AGENT_RUNTIME_API`, `AGENT_RUNTIME_STATUS`, `AGENT_RUNTIME_SYNC`, `AGENT_RUNTIME_STATE_CHANGED` defaults become

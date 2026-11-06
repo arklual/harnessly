@@ -30,6 +30,9 @@ type Claim struct {
 	// ParentOrigin is the platform's page origin the in-page bridge talks to; "" when the gateway sent none, and then
 	// there is no bridge.
 	ParentOrigin string
+	// PathPrefix is the slot's path on the page's own origin when the slot goes by path (<appBase>/__pv/<n>, a
+	// standalone runtime's preview without origins of its own); "" for a slot origin of its own. SlotOrigin ends with it.
+	PathPrefix string
 }
 
 // CookieTag names a target in its cookies on the slot host, so targets taking turns in a slot never share cookies.
@@ -48,7 +51,9 @@ var (
 	slotOriginRe   = regexp.MustCompile(`^https://[a-z0-9-]+(\.[a-z0-9-]+)+$`)
 	parentOriginRe = regexp.MustCompile(`^https://[a-z0-9-]+(\.[a-z0-9-]+)*(:\d{1,5})?$`)
 	// localOriginRe is a standalone runtime's slot or page origin: http or https, a host, maybe a port.
-	localOriginRe  = regexp.MustCompile(`^https?://(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)
+	localOriginRe = regexp.MustCompile(`^https?://(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)
+	// pathPrefixRe is a slot's path on the page's origin: the app base path's segments, then /__pv/<1–6>.
+	pathPrefixRe   = regexp.MustCompile(`^(?:/[A-Za-z0-9._~-]+)*/__pv/[1-6]-[0-9a-f]{32}$`)
 	targetOriginRe = regexp.MustCompile(`^https?://(?:[a-z0-9_-]+(?:\.[a-z0-9_-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)
 )
 
@@ -138,14 +143,25 @@ func parseClaim(payload *jsvalue.Object, local bool) (*Claim, bool) {
 		return nil, false
 	}
 	slot, ok := field(payload, "slotOrigin").(string)
-	if !ok || !originOK(slotOriginRe, slot) {
+	if !ok {
+		return nil, false
+	}
+	prefix := ""
+	if raw, present := payload.Get("pathPrefix"); present {
+		p, isString := raw.(string)
+		if !local || !isString || !pathPrefixRe.MatchString(p) || !strings.HasSuffix(slot, p) || target.Kind != "port" {
+			return nil, false
+		}
+		prefix = p
+	}
+	if !originOK(slotOriginRe, strings.TrimSuffix(slot, prefix)) {
 		return nil, false
 	}
 	slots, ok := portSlotsOf(field(payload, "portSlots"), target, slot)
 	if !ok {
 		return nil, false
 	}
-	c := &Claim{Sub: sub, Target: target, SlotOrigin: slot, PortSlots: slots}
+	c := &Claim{Sub: sub, Target: target, SlotOrigin: slot, PortSlots: slots, PathPrefix: prefix}
 	if raw, present := payload.Get("parentOrigin"); present {
 		parent, ok := raw.(string)
 		if !ok || !originOK(parentOriginRe, parent) {

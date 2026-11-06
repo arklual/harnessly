@@ -561,7 +561,7 @@ runtime_env() {
 	printf 'RUNTIME_GATE_UPSTREAM=\n'
 	printf 'RUNTIME_APP_BASE_PATH=%s\n' "$BASE_PATH"
 	printf 'RUNTIME_HUB_URL=%s\n' "$HUB_URL"
-	printf 'RUNTIME_PREVIEW_LISTEN=off\n'
+	printf 'RUNTIME_PREVIEW_MODE=path\n'
 	printf 'RUNTIME_WORKSPACE_DIR=%s\n' "$WORK_DIR"
 	printf 'AGENT_DATA_DIR=%s\n' "$DATA_DIR"
 	printf 'AGENT_POLICY_FILE=%s\n' "$POLICY"

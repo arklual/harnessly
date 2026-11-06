@@ -552,7 +552,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	var confined http.Handler = confineAgentToken(&gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}, f)
 	handler := confined
 	if cfg.Standalone() {
-		handler = standaloneSlots.guard(apiAlias(appBase(), confined))
+		handler = standaloneSlots.mount(apiAlias(appBase(), confined))
 		standaloneSlots.serve(ctx)
 	}
 	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}

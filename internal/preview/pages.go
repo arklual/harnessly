@@ -89,11 +89,21 @@ func signInPage(signInURL, parentOrigin, nonce string) string {
 // bridgeTag is the script element of the page's bridge: the parent it talks to, the target's cookie tag, and the
 // DevTools conditions as JSON so it applies them from the first request on.
 func bridgeTag(parentOrigin, cookieTag string, devtoolsJSON string, hasDevtools bool) string {
+	return bridgeTagAt("", parentOrigin, cookieTag, devtoolsJSON, hasDevtools)
+}
+
+// bridgeTagAt is the bridge's tag of a slot by path: its script under the slot's prefix, and the prefix of the
+// document (the slot's, or a neighbour's under it) for the bridge to take off the page's address and put on the
+// root-absolute ones the page builds.
+func bridgeTagAt(prefix, parentOrigin, cookieTag string, devtoolsJSON string, hasDevtools bool) string {
 	conditions := ""
 	if hasDevtools {
 		conditions = ` data-devtools="` + escapeHTML(devtoolsJSON) + `"`
 	}
-	return `<script src="` + BridgePath + `" data-parent="` + escapeHTML(parentOrigin) + `" data-tag="` + escapeHTML(cookieTag) + `"` + conditions + `></script>`
+	if prefix != "" {
+		conditions += ` data-prefix="` + escapeHTML(prefix) + `"`
+	}
+	return `<script src="` + prefix + BridgePath + `" data-parent="` + escapeHTML(parentOrigin) + `" data-tag="` + escapeHTML(cookieTag) + `"` + conditions + `></script>`
 }
 
 // WritePage answers with one of the runtime's own status pages: a slot listener's refusals look like the proxy's.

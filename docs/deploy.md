@@ -465,6 +465,39 @@ compose, keep the published slot ports on 127.0.0.1 and let only Caddy reach the
 The Helm chart does not route the slots yet: the pod listens on `8023`–`8030`, and a Service port and an Ingress host
 per slot, with `RUNTIME_PREVIEW_PUBLIC_ORIGINS` in `extraEnv`, are yours to add.
 
+### The preview without subdomains (one host, one certificate)
+
+A company load balancer often gives harnessly exactly one name, one certificate and port 443: no wildcard, no extra
+names, no extra ports. Then the preview goes **by path**, on the page's own origin:
+`<page>/__pv/<slot>-<key>/…` (behind the hub, `/m/<machine>/__pv/<slot>-<key>/…`). Nothing is to add to DNS, the
+certificate or the balancer. It is what a runtime does by itself when it has no origins for its slots: an https page
+without `RUNTIME_PREVIEW_PUBLIC_ORIGINS`, slot ports that are taken, or a runtime behind the hub (the installer sets
+`RUNTIME_PREVIEW_MODE=path`). `RUNTIME_PREVIEW_MODE=ports|origins|path` forces a way, `auto` (the default) picks one.
+
+How the page by path is kept apart from the page that drives the agents:
+
+- every answer of the slot carries `Content-Security-Policy: sandbox` without `allow-same-origin`, and the pane frames it
+  the same way: the previewed page runs on an opaque origin, sees none of the page's cookies or storage, and every
+  request it makes is cross-site, which carries no session; the runtime refuses `Origin: null` and cross-site requests
+  on every other path, sockets included;
+- the `<key>` (128 random bits, new with every open, kept 12 hours in the runtime's memory) is the slot's only
+  authority: no cookie, so a page of another site cannot name the slot, and `Referrer-Policy: no-referrer` keeps the
+  address in;
+- answers of the dev server that act on a whole origin (`Clear-Site-Data`, HSTS, `Service-Worker-Allowed`, COOP/COEP,
+  NEL and the like) are dropped.
+
+What the page sees is what it had on localhost: root-absolute addresses in HTML, CSS and JavaScript (`<base href="/">`,
+`/@vite/client`, `url(/x.png)`, `import("/x")`) get the prefix from the proxy, and the page bridge does the same for
+addresses built at run time (fetch, XHR, WebSocket, EventSource, workers, `src`/`href` set by a script); the page's path
+is its own (`/users/7`, not the prefix), so React, Vue and Angular routers need no `basename`; its cookies stay under
+the slot's path, `localStorage` lives with the runtime (per person and dev server), and a reload or a link past the
+prefix asks the pane to open the path again.
+
+Limits: only the machine's own servers (slots 1–6), never a site of the outside world; no service workers or indexedDB;
+the page bridge's DevTools record is off (the proxy's network log stays); a company SSO proxy in front of harnessly that
+wants its own `Lax` cookie on every request must let `/__pv/` through, since the sandboxed page cannot send that cookie.
+Chromium browsers fully, Safari 17.4+ as far as it keeps `SameSite=None` cookies.
+
 ## Updates
 
 A standalone runtime built from a release looks for a newer one: at start and then every 12 hours it makes one

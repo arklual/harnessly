@@ -320,6 +320,10 @@ func New(o Options) (*Hub, error) {
 		case h.Sites != nil && h.Sites.IsSiteHost(r.Host):
 			// A published site runs on its own origin and nothing of the hub: no API, no page, no sign-in.
 			h.Sites.Edge().ServeHTTP(w, r)
+		case proxy.ReloadAsked(r) && !strings.HasPrefix(r.URL.Path, "/m/"):
+			// A machine's preview by path reloaded past its slot's prefix (its path is the target's, off /m/): the pane
+			// opens it again. A frame of a machine's own page from elsewhere stays refused below.
+			proxy.ServeReload(w, r)
 		case cfg.MachineIDFromHost(r.Host) != "":
 			// A machine's own origin runs the machine and nothing of the hub: no API, no page, no sign-in.
 			h.Proxy.ServeHTTP(w, r)

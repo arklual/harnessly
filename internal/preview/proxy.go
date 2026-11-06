@@ -731,9 +731,9 @@ func (p *Proxy) deliver(w *trackedWriter, r *http.Request, c *Claim, rt *route, 
 	bridge := plan.rewrite && c.ParentOrigin != "" && html && isDocumentRequest(r)
 	basePath := ""
 	if rt.kind == "port" {
-		basePath = rt.basePath
+		basePath = c.PathPrefix + rt.basePath
 	}
-	h := ctx.rewriteResponseHeaders(a.headers, p.cfg.Stands, headerOptions{bodyRewritten: plan.rewrite, basePath: basePath, cookieTag: tag, stand: p.isStandRoute(rt)})
+	h := ctx.rewriteResponseHeaders(a.headers, p.cfg.Stands, headerOptions{bodyRewritten: plan.rewrite, basePath: basePath, cookieTag: tag, stand: p.isStandRoute(rt), cookiePath: c.PathPrefix})
 	if d.noStore {
 		h.Set("cache-control", "no-store")
 	} else {
@@ -773,12 +773,23 @@ func (p *Proxy) deliver(w *trackedWriter, r *http.Request, c *Claim, rt *route, 
 	}
 	if bridge {
 		devJSON, has := p.bridgeDevtools(c)
-		j := &bridgeInjector{w: out, tag: []byte(bridgeTag(c.ParentOrigin, tag, devJSON, has))}
+		j := &bridgeInjector{w: out, tag: []byte(bridgeTagAt(basePath, c.ParentOrigin, tag, devJSON, has))}
+		if c.PathPrefix == "" {
+			j.tag = []byte(bridgeTag(c.ParentOrigin, tag, devJSON, has))
+		}
 		out, closers = j, append(closers, j)
 	}
 	if plan.rewrite && basePath != "" && scriptTypes.MatchString(a.headers.Get("content-type")) {
 		mr := newModuleRewriter(out, basePath)
 		out, closers = mr, append(closers, mr)
+	}
+	if plan.rewrite && c.PathPrefix != "" && (html || cssType.MatchString(a.headers.Get("content-type"))) {
+		kind := "css"
+		if html {
+			kind = "html"
+		}
+		rr := newRootPathRewriter(out, kind, basePath)
+		out, closers = rr, append(closers, rr)
 	}
 	if plan.rewrite {
 		rw := newOriginRewriter(out, ctx)

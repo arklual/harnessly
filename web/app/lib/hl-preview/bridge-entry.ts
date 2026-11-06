@@ -4,6 +4,7 @@
  * cookie tag and the DevTools conditions come as the tag's attributes.
  */
 import * as functions from './bridge-core';
+import { installPathMode } from './bridge-path';
 
 const script = document.currentScript;
 const parentOrigin = script?.getAttribute('data-parent') ?? null;
@@ -15,10 +16,14 @@ const core = {
   prefixSetCookie: (value: string, tag: string) => functions.prefixSetCookie(value, tag, plain),
 };
 
-functions.installCookieShim(document, core, cookieTag);
+// A slot by path: the page runs sandboxed on an opaque origin under the slot's prefix (bridge-path.ts).
+const prefix = script?.getAttribute('data-prefix') ?? '';
+if (prefix) installPathMode(window, document, prefix);
+else functions.installCookieShim(document, core, cookieTag);
 try {
   functions.installDevtools(window, document, core, devtools);
 } catch {
   // The page works without its DevTools record.
 }
-if (parentOrigin && window.parent !== window) functions.installBridge(window, document, parentOrigin, core);
+if (parentOrigin && window.parent !== window)
+  functions.installBridge(window, document, parentOrigin, core, prefix);

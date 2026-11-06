@@ -1531,7 +1531,11 @@ export const installTouch = (win: any, doc: any, core: any): ((on: boolean) => v
   };
 };
 
-export const installBridge = (win: any, doc: any, parentOrigin: string, core: any): void => {
+/**
+ * `slotKey` is a slot by path's prefix (bridge-path.ts): the pane cannot check an opaque origin, so every message
+ * carries the prefix with the slot's key, which a page the frame navigated to elsewhere does not know.
+ */
+export const installBridge = (win: any, doc: any, parentOrigin: string, core: any, slotKey = ''): void => {
   // Taken before any script of the page runs (the bridge is the first one in <head>): the page cannot swap them later.
   const parent = win.parent;
   const nonce = Array.from(win.crypto.getRandomValues(new win.Uint8Array(16)) as ArrayLike<number>, (byte) =>
@@ -1540,7 +1544,8 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   const siteTools = core.makeSiteTools();
   const bound = { ...core.captureNatives(win), origin: win.location.origin, parent, siteTools };
   core.installModelContext(win, siteTools);
-  const post = (message: Record<string, unknown>) => parent.postMessage(message, parentOrigin);
+  const post = (message: Record<string, unknown>) =>
+    parent.postMessage(slotKey ? { ...message, hlSlot: slotKey } : message, parentOrigin);
   const actRefs = core.makeActRefs();
   const setTouch = core.installTouch(win, doc, core);
   const domState = core.makeDomState(actRefs);

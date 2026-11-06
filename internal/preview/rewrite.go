@@ -249,6 +249,32 @@ func prefixSetCookie(value, tag string, plain bool) string {
 	return strings.Join(append(out, "Secure", "SameSite=None", "Partitioned"), "; ")
 }
 
+// pathSetCookie tags a target's cookie for a slot by path: its Path goes under the slot's prefix, and it is
+// SameSite=None and Secure, the only kind an opaque-origin page's requests carry (browsers keep Secure on loopback
+// http too). Not partitioned: the enter navigation and the frame's own loads land in different partitions.
+func pathSetCookie(value, tag, prefix string) string {
+	parts := strings.Split(value, ";")
+	for i := range parts {
+		parts[i] = jscompat.Trim(parts[i])
+	}
+	out := []string{"__t_" + tag + "_" + parts[0]}
+	path := "/"
+	for _, attr := range parts[1:] {
+		lower := strings.ToLower(attr)
+		if strings.HasPrefix(lower, "path") && (len(lower) == 4 || !isWord(lower[4])) {
+			if _, v, ok := strings.Cut(attr, "="); ok && strings.HasPrefix(jscompat.Trim(v), "/") {
+				path = jscompat.Trim(v)
+			}
+			continue
+		}
+		if attrDropped(attr) {
+			continue
+		}
+		out = append(out, attr)
+	}
+	return strings.Join(append(out, "Path="+prefix+path, "Secure", "SameSite=None"), "; ")
+}
+
 // attrDropped: domain, secure, samesite and partitioned attributes, whatever follows the word.
 func attrDropped(attr string) bool {
 	lower := strings.ToLower(attr)
@@ -326,8 +352,10 @@ func (ctx rewriteCtx) rewriteLocation(location, basePath string) string {
 type headerOptions struct {
 	bodyRewritten bool
 	basePath      string
-	cookieTag     string
-	stand         bool
+	// cookiePath is the slot's prefix when it goes by path: the target's cookies stay under it.
+	cookiePath string
+	cookieTag  string
+	stand      bool
 }
 
 func (ctx rewriteCtx) rewriteResponseHeaders(h Headers, stands Stands, o headerOptions) Headers {
@@ -359,7 +387,11 @@ func (ctx rewriteCtx) rewriteResponseHeaders(h Headers, stands Stands, o headerO
 			if o.stand && stands.isSessionSetCookie(line) {
 				continue
 			}
-			kept = append(kept, prefixSetCookie(line, o.cookieTag, strings.HasPrefix(ctx.slotOrigin, "http:")))
+			if o.cookiePath != "" {
+				kept = append(kept, pathSetCookie(line, o.cookieTag, o.cookiePath))
+			} else {
+				kept = append(kept, prefixSetCookie(line, o.cookieTag, strings.HasPrefix(ctx.slotOrigin, "http:")))
+			}
 		}
 		if len(kept) > 0 {
 			out["set-cookie"] = kept

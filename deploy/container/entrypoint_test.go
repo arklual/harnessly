@@ -45,7 +45,7 @@ echo "$$" > "$here/runtime.pid"
 {
 	echo "BASE=$RUNTIME_APP_BASE_PATH"
 	echo "HUB=$RUNTIME_HUB_URL"
-	echo "LISTEN=$RUNTIME_GATE_LISTEN UPSTREAM=[$RUNTIME_GATE_UPSTREAM] PREVIEW=$RUNTIME_PREVIEW_LISTEN"
+	echo "LISTEN=$RUNTIME_GATE_LISTEN UPSTREAM=[$RUNTIME_GATE_UPSTREAM] PREVIEW=$RUNTIME_PREVIEW_MODE"
 	echo "WORK=$RUNTIME_WORKSPACE_DIR"
 } > "$here/runtime.env.out"
 if [ -f "$here/runtime.exit" ]; then
@@ -166,7 +166,7 @@ func TestEntrypointRunsBothAndEndsWithTheOneThatEnded(t *testing.T) {
 	}
 	rt := r.file("runtime.env.out")
 	for _, want := range []string{
-		"BASE=/m/abcdefghijklmnopqrst", "HUB=https://hub.example.com", "LISTEN=127.0.0.1:18022 UPSTREAM=[] PREVIEW=off",
+		"BASE=/m/abcdefghijklmnopqrst", "HUB=https://hub.example.com", "LISTEN=127.0.0.1:18022 UPSTREAM=[] PREVIEW=path",
 		"WORK=" + r.home + "/work",
 	} {
 		if !strings.Contains(rt, want) {
