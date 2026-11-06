@@ -19,8 +19,11 @@ build: ## Build agent, harnessly, runtime, agentprobe and hub into ./bin (static
 test: ## Run the tests
 	$(GO) test -count=1 ./...
 
+# The live browser's tests time Chrome's pictures (motion vs a still page), so they run alone after the rest:
+# beside the agent browser's Chrome tests on a busy runner the pictures bunch up and the checks fail for nothing.
 test-race: ## Run the tests with the race detector
-	$(GO) test -race -count=1 -timeout 20m ./...
+	$(GO) test -race -count=1 -timeout 20m $$($(GO) list ./... | grep -v '/internal/livebrowser$$')
+	$(GO) test -race -count=1 -timeout 5m ./internal/livebrowser
 
 lint: ## Run golangci-lint (.golangci.yml)
 	$(GOLANGCI_LINT) run ./...
