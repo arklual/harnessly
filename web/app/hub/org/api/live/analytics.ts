@@ -4,6 +4,7 @@ import type {
   Change as ApiChange,
   ChangesResponse,
   EffectResponse,
+  EffectsResponse,
   KpiId as ApiKpi,
   KpiSeriesResponse,
   KpisResponse,
@@ -394,18 +395,16 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
       };
     }
     const scope = scopeParam(c);
-    const [kpis, overview, waste, changes, signals] = await Promise.all([
+    // The effects of all the changes come in one request: one per change made the screen wait for a hundred of them.
+    const [kpis, overview, waste, changes, signals, effects] = await Promise.all([
       contractGet<KpisResponse>(orgPath(c.org, '/kpis'), { scope, ...range(period), ...cmp, series: 'team' }),
       contractGet<OverviewResponse>(orgPath(c.org, '/overview'), { scope, ...range(period) }),
       contractGet<WasteResponse>(orgPath(c.org, '/waste'), { scope, ...range(period) }),
       contractGet<ChangesResponse>(orgPath(c.org, '/changes'), { scope, ...range(period) }),
       contractGet<SignalsResponse>(orgPath(c.org, '/signals'), { scope }),
+      contractGet<EffectsResponse>(orgPath(c.org, '/changes/effects'), { scope, ...range(period) }),
     ]);
-    const effects = await Promise.all(
-      changes.changes.map((ch) =>
-        contractGet<EffectResponse>(orgPath(c.org, `/changes/${ch.id}/effect`), { scope }),
-      ),
-    );
+    const effectOf = new Map(effects.effects.map((e) => [e.change.id, e]));
     const items = waste.items.map((w, i) => ({
       id: w.kind,
       title: w.title,
@@ -423,7 +422,7 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
       },
       kpis: kpis.kpis.map(kpiOf),
       signals: signals.signals.map(signalOf),
-      changes: changes.changes.map((ch, i) => changeOf(ch, effects[i] ?? null)),
+      changes: changes.changes.map((ch) => changeOf(ch, effectOf.get(ch.id) ?? null)),
       waste: items.length
         ? { wasteUsd: items.reduce((n, w) => n + w.usd, 0), totalUsd: overview.spend.list.usd, items }
         : null,

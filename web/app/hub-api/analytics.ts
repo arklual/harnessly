@@ -344,6 +344,9 @@ export type EffectResponse = {
   effects: Effect[];
 };
 
+// GET …/changes/effects: every change of …/changes on the same scope and range with its effect, in one request.
+export type EffectsResponse = { effects: EffectResponse[] };
+
 // ── Waste ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 // Four ways money goes to waste. A kind with nothing wasted is left out of items (zero is not shown); a session can be

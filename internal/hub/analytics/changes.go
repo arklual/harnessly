@@ -60,7 +60,13 @@ type EffectResponse struct {
 func (s *Service) mountChanges(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs/{org}/changes", s.gate(s.listChanges))
 	mux.Handle("POST /api/orgs/{org}/changes", s.gate(s.createChange))
+	mux.Handle("GET /api/orgs/{org}/changes/effects", s.gate(s.changeEffects))
 	mux.Handle("GET /api/orgs/{org}/changes/{id}/effect", s.gate(s.changeEffect))
+}
+
+// EffectsResponse is the effect of every change of a list, in the list's order.
+type EffectsResponse struct {
+	Effects []EffectResponse `json:"effects"`
 }
 
 func changeScopes(chain []authz.Scope) []store.ChangeScope {
@@ -241,19 +247,28 @@ func (s *Service) changeEffect(w http.ResponseWriter, r *http.Request, p *auth.P
 	if err != nil {
 		return err
 	}
-	out := EffectResponse{Change: cv, Before: before.period(), After: after.period(), Overlaps: []string{}, Effects: []Effect{}}
 	bf, _ := before.ms()
 	_, af := after.ms()
 	others, err := st.ChangesOn(ctx, x.org.ID, changeScopes(chain), bf, af)
 	if err != nil {
 		return err
 	}
+	httpx.WriteJSON(w, http.StatusOK, effectOf(cv, c.ID, before, after, others, kv, x.sc))
+	return nil
+}
+
+// effectOf is the effect of the change id: kv are the KPI of after against before, others the changes of the scope
+// (the change itself among them is ignored) that might overlap its weeks.
+func effectOf(cv Change, id string, before, after span, others []store.Change, kv []KpiValue, sc authz.Scope) EffectResponse {
+	out := EffectResponse{Change: cv, Before: before.period(), After: after.period(), Overlaps: []string{}, Effects: []Effect{}}
+	bf, _ := before.ms()
+	_, af := after.ms()
 	for _, o := range others {
-		if o.ID != c.ID {
+		if at := o.At.UnixMilli(); o.ID != id && at >= bf && at < af {
 			out.Overlaps = append(out.Overlaps, o.ID)
 		}
 	}
-	scope := orgs.ScopeView{Kind: x.sc.Kind, ID: x.sc.ID}
+	scope := orgs.ScopeView{Kind: sc.Kind, ID: sc.ID}
 	for _, k := range kv {
 		e := Effect{Kpi: k.Kpi, Scope: scope, Before: k.CmpValue, After: k.Value, Delta: k.Delta, Noise: k.Noise, NBefore: k.CmpN,
 			NAfter: k.N, Verdict: k.Verdict}
@@ -261,6 +276,85 @@ func (s *Service) changeEffect(w http.ResponseWriter, r *http.Request, p *auth.P
 			e.Verdict = "mixed"
 		}
 		out.Effects = append(out.Effects, e)
+	}
+	return out
+}
+
+// changeEffects is changeEffect for every change listChanges gives for the same scope and range, in one pass: the
+// sessions and their money are read once for all the changes' weeks, not once a change.
+func (s *Service) changeEffects(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	ctx := r.Context()
+	st := s.db.S()
+	x, err := s.orgScope(ctx, st, p, r, authz.View)
+	if err != nil {
+		return err
+	}
+	chain, err := orgs.Chain(ctx, st, x.org, x.sc)
+	if err != nil {
+		return err
+	}
+	var from, to int64
+	if sp, ok, err := parseRange(r.URL.Query(), "from", "to", x.loc); err != nil {
+		return err
+	} else if ok {
+		from, to = sp.ms()
+	}
+	scopes := changeScopes(chain)
+	cs, err := st.ChangesOn(ctx, x.org.ID, scopes, from, to)
+	if err != nil {
+		return err
+	}
+	out := EffectsResponse{Effects: []EffectResponse{}}
+	if len(cs) == 0 {
+		httpx.WriteJSON(w, http.StatusOK, out)
+		return nil
+	}
+	type weeks struct{ before, after span }
+	ws := make([]weeks, len(cs))
+	var lo, hi, bLo, aHi int64
+	for i, c := range cs {
+		b, a := effectSpans(c.At, x.loc)
+		ws[i] = weeks{b, a}
+		f, t := kpiRange(a, b)
+		bf, _ := b.ms()
+		_, af := a.ms()
+		if i == 0 {
+			lo, hi, bLo, aHi = f, t, bf, af
+		}
+		lo, hi, bLo, aHi = min(lo, f), max(hi, t), min(bLo, bf), max(aHi, af)
+	}
+	ss, err := st.ScopeSessions(ctx, x.filter(lo, hi))
+	if err != nil {
+		return err
+	}
+	ks, err := kSessionsOf(ctx, st, x.loc, ss, true)
+	if err != nil {
+		return err
+	}
+	others, err := st.ChangesOn(ctx, x.org.ID, scopes, bLo, aHi)
+	if err != nil {
+		return err
+	}
+	authors := map[string]*orgs.PersonRef{} // a change's author is read once, not once a change
+	for i, c := range cs {
+		author := c.AuthorID
+		c.AuthorID = ""
+		cv, err := changeView(ctx, st, c)
+		if err != nil {
+			return err
+		}
+		if author != "" {
+			ref, ok := authors[author]
+			if !ok {
+				v, err := changeView(ctx, st, store.Change{AuthorID: author})
+				if err != nil {
+					return err
+				}
+				ref, authors[author] = v.Author, v.Author
+			}
+			cv.Author = ref
+		}
+		out.Effects = append(out.Effects, effectOf(cv, c.ID, ws[i].before, ws[i].after, others, kpisOfK(ks, ws[i].after, ws[i].before), x.sc))
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil

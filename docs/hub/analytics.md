@@ -425,6 +425,7 @@ Markers (here and in the organization's series) carry what the chart draws:
 | `GET …/changes?scope=&from=&to=` | view | | `ChangesResponse` — the scope's changes and its ancestors' (they touch it too) |
 | `POST …/changes` | manage of the scope | `{ scope, title, at }` | 201 `{ change: Change }`; journal `change.create` |
 | `GET …/changes/{id}/effect?scope=` | view | | `EffectResponse` — 7 days before against 7 after, live sessions, every KPI; `overlaps` lists other changes in the windows (then `verdict: 'mixed'`) |
+| `GET …/changes/effects?scope=&from=&to=` | view | | `EffectsResponse` — `{ effects: EffectResponse[] }`: the effect of every change `…/changes` gives for the same scope and range, in one request (the screen asks this, not one `…/effect` per change) |
 | `GET …/waste?scope=&period=` | money | | `WasteResponse` — «Куда уходят деньги впустую» |
 | `GET …/tools?scope=&from=&to=` (or `period=`) | view | | `ToolsResponse` — MCP servers, skills and built-in tools the agents called: calls, errors, people and teams, calls by day, the last call; at most 400 days |
 | `GET …/people?scope=&period=` | money | | `PeopleResponse` — «Расход по людям» of a team or tenant: each person's money, share, personal limit, week's chats and MRs ([below](#people-and-the-week)) |
@@ -600,6 +601,8 @@ As built (machines):
   (view; `scope` the change's own by default, else one the change touches) compares the 7 days before the change's day
   with the 7 days from it, by the KPI of `…/kpis` (`before` = `cmpValue`, `after` = `value`); any other change of the
   scope's chain in those 14 days goes to `overlaps` and turns each verdict but `too_few` into `mixed`.
+  `…/changes/effects` gives the same for each change of `…/changes` on the same scope and range, oldest first, reading
+  the sessions once for the union of the windows.
 - **`…/waste`** (money) is where the organization's list money went to waste, over the live top-level sessions of the
   scope that started in the period with `funding: 'org'` only; each session counts at its list money (subagents'
   calls included). Exactly four kinds, each `{kind, money, share, sessions, explain}` (plus `title`, `hint`, and `amount`,

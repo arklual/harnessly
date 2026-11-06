@@ -497,6 +497,12 @@ func kpisOf(ctx context.Context, st store.Store, loc *time.Location, ss []store.
 	if err != nil {
 		return nil, err
 	}
+	return kpisOfK(ks, sp, cmp), nil
+}
+
+// kpisOfK is kpisOf over sessions already turned into what the KPI see: ks may hold more than kpiRange, every
+// count picks its own sessions by their start.
+func kpisOfK(ks []kSession, sp, cmp span) []KpiValue {
 	out := kpisFrom(ks, sp, cmp)
 	by := "day"
 	if sp.days() > 45 {
@@ -506,7 +512,7 @@ func kpisOf(ctx context.Context, st store.Store, loc *time.Location, ss []store.
 	for i, d := range kpis {
 		out[i].Spark, out[i].CmpSpark = sparkOf(d, ks, cur), sparkOf(d, ks, prev)
 	}
-	return out, nil
+	return out
 }
 
 // kSessionsOf turns sessions into what the KPI see, with their money.

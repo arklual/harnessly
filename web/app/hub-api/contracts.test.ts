@@ -50,6 +50,7 @@ assertType<Equal<Infer<typeof as_.overviewResponse>, A.OverviewResponse>>(true);
 assertType<Equal<Infer<typeof as_.change>, A.Change>>(true);
 assertType<Equal<Infer<typeof as_.changesResponse>, A.ChangesResponse>>(true);
 assertType<Equal<Infer<typeof as_.effectResponse>, A.EffectResponse>>(true);
+assertType<Equal<Infer<typeof as_.effectsResponse>, A.EffectsResponse>>(true);
 assertType<Equal<Infer<typeof as_.wasteResponse>, A.WasteResponse>>(true);
 assertType<Equal<Infer<typeof as_.peopleResponse>, A.PeopleResponse>>(true);
 assertType<Equal<Infer<typeof as_.meWeek>, A.MeWeek>>(true);

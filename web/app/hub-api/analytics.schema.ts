@@ -295,6 +295,8 @@ export const effectResponse = obj({
   effects: arr(effect),
 });
 
+export const effectsResponse = obj({ effects: arr(effectResponse) });
+
 export const wasteResponse = obj({
   scope,
   period,

@@ -2,6 +2,7 @@ package orgs_test
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/hub/analytics"
@@ -104,6 +105,35 @@ func TestChanges(t *testing.T) {
 	}
 	if r := v.vera.Do("GET", v.url("/changes/"+org.ID+"/effect"), nil); r.Code != 403 {
 		t.Errorf("vera's effect: %s", r)
+	}
+
+	// The batch gives, in one request, what each change's own effect gives on the same scope.
+	batch := func(p *hubtest.Person, q string) []analytics.EffectResponse {
+		t.Helper()
+		r := p.Do("GET", v.url("/changes/effects"+q), nil)
+		if r.Code != http.StatusOK {
+			t.Fatalf("effects %s: %s", q, r)
+		}
+		var out analytics.EffectsResponse
+		r.JSON(&out)
+		return out.Effects
+	}
+	q := "?scope=team:" + v.team.ID
+	all := batch(v.boris, q)
+	if len(all) != 2 || all[0].Change.ID != org.ID || all[1].Change.ID != team.ID {
+		t.Fatalf("batch = %+v", all)
+	}
+	for _, b := range all {
+		one := effect(v.boris, b.Change.ID, q)
+		if !reflect.DeepEqual(one, b) {
+			t.Errorf("batch effect of %s differs:\n one  %+v\n batch %+v", b.Change.ID, one, b)
+		}
+	}
+	if got := batch(v.anna, "?from=2026-11-01&to=2026-11-05"); len(got) != 0 {
+		t.Errorf("batch on an empty range = %+v", got)
+	}
+	if r := v.vera.Do("GET", v.url("/changes/effects"), nil); r.Code != 403 {
+		t.Errorf("vera's effects: %s", r)
 	}
 
 	evs, _ := v.audit(t, v.anna, "")
