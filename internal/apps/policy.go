@@ -318,6 +318,8 @@ type SnapshotApp struct {
 	ID    string      `json:"id"`
 	Name  string      `json:"name"`
 	Tools *ToolPolicy `json:"tools,omitempty"`
+	// Context are the items the context hook sends (context.go).
+	Context []ContextItem `json:"context,omitempty"`
 }
 
 // The subcommands of `harnessly app` (with their aliases, internal/hlcli app.go) that change what is on: the agent of a

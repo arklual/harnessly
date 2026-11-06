@@ -1,10 +1,13 @@
 package hlcli
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/apps"
 )
@@ -132,6 +135,9 @@ func (c *cli) appValidate(args []string) error {
 	}
 	dir = c.appDir(dir)
 	pkg, problems := apps.LoadPackage(dir)
+	if strict && pkg != nil {
+		problems = append(problems, c.weighPackage(pkg)...)
+	}
 	if c.json {
 		raw, _ := json.Marshal(map[string]any{"ok": pkg != nil && failing(problems, strict) == 0, "problems": orEmpty(problems)})
 		c.printRaw(raw)
@@ -302,6 +308,13 @@ func (c *cli) appEnable(args []string, on bool) error {
 		return nil
 	}
 	if on {
+		var r struct {
+			Warnings []string `json:"warnings"`
+		}
+		_ = json.Unmarshal(raw, &r)
+		for _, w := range r.Warnings {
+			c.out("warning: %s\n", w)
+		}
 		c.out("%s is on in this chat; the agent gets it when it starts next\n", id)
 	} else {
 		c.out("%s is off in this chat\n", id)
@@ -347,4 +360,111 @@ func (c *cli) appGuard(policyPath string) error {
 	}
 	// No rule of the apps, or one that allows: the chat's own permissions decide.
 	return nil
+}
+
+// appContext is the SessionStart and UserPromptSubmit hook that hands the agent the context of the chat's apps
+// (internal/apps context.go): each on-activation item of the snapshot is asked of the runtime, and its text goes out as
+// additionalContext only when it differs from what this chat got last (a digest per chat, app and item kept beside the
+// snapshot). A SessionStart that begins a fresh context (startup, clear, compact) sends it whatever the digest says. The
+// hook never blocks: an item it cannot get is skipped, and the turn goes on without it.
+func (c *cli) appContext(policyPath string) error {
+	in := c.env.Stdin
+	if in == nil {
+		in = os.Stdin
+	}
+	raw, err := io.ReadAll(io.LimitReader(in, 4<<20))
+	if err != nil {
+		return nil
+	}
+	var ev struct {
+		Event  string `json:"hook_event_name"`
+		Source string `json:"source"`
+	}
+	if json.Unmarshal(raw, &ev) != nil || (ev.Event != "SessionStart" && ev.Event != "UserPromptSubmit") {
+		return nil
+	}
+	var snap apps.Snapshot
+	rawSnap, err := os.ReadFile(policyPath)
+	if err != nil || !apps.SnapshotIntact(policyPath, rawSnap) || json.Unmarshal(rawSnap, &snap) != nil {
+		return nil
+	}
+	session := c.session()
+	if session == "" {
+		return nil
+	}
+	fresh := ev.Event == "SessionStart" && ev.Source != "resume"
+	var blocks []string
+	for _, a := range snap.Apps {
+		for _, item := range a.Context {
+			status, body, err := c.call("POST", "/api/cli/apps/context", nil, map[string]any{"session": session, "app": a.ID, "id": item.ID})
+			if err != nil || status != 200 {
+				continue
+			}
+			var r struct {
+				Text string `json:"text"`
+			}
+			if json.Unmarshal(body, &r) != nil || strings.TrimSpace(r.Text) == "" {
+				continue
+			}
+			digest := apps.ContextDigest(r.Text)
+			state := policyPath + ".ctx-" + apps.ContextDigest(session + "\x00" + a.ID + "\x00" + item.ID)[:16]
+			if prev, err := os.ReadFile(state); err == nil && string(prev) == digest && !fresh {
+				continue
+			}
+			_ = os.WriteFile(state, []byte(digest), 0o600)
+			blocks = append(blocks, fmt.Sprintf("## Context of the app %s (%s)\n\n%s", a.Name, item.ID, r.Text))
+		}
+	}
+	if len(blocks) == 0 {
+		return nil
+	}
+	out, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
+		"hookEventName": ev.Event, "additionalContext": strings.Join(blocks, "\n\n"),
+	}})
+	_, _ = c.env.Stdout.Write(append(out, '\n'))
+	return nil
+}
+
+// weighPackage is the strict check of what the app costs the agent's context on every turn: its instructions, the
+// descriptions of the tools of the remote servers it turns on (agent.mcp) and those servers' own `instructions`, in
+// tokens (bytes / 4). The line is printed; past apps.AppContextWarnBytes it is a warning, which strict fails on. A
+// server that does not answer is a warning too: the weight is unknown, not zero.
+func (c *cli) weighPackage(pkg *apps.Package) apps.Problems {
+	var out apps.Problems
+	warn := func(path, format string, a ...any) {
+		out = append(out, apps.Problem{Path: path, Message: fmt.Sprintf(format, a...), Warning: true})
+	}
+	own := 0
+	if ag := pkg.Manifest.Agent; ag != nil && ag.Instructions != "" {
+		if raw, err := pkg.File(ag.Instructions); err == nil {
+			own = len(raw)
+		}
+	}
+	total, tools, servers := own, 0, 0
+	if ag := pkg.Manifest.Agent; ag != nil {
+		for _, name := range ag.MCP {
+			srv, ok := pkg.MCP[name]
+			if !ok || srv.URL == "" {
+				continue
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			instr, toolBytes, err := apps.MCPWeight(ctx, srv)
+			cancel()
+			if err != nil {
+				warn(".mcp.json:"+name, "could not read the tools and instructions of the server, so their weight is not counted: %v", err)
+			}
+			servers += instr
+			tools += toolBytes
+			total += instr + toolBytes
+		}
+	}
+	if !c.json {
+		c.out("context weight: ~%d tokens per turn (instructions ~%d, tool descriptions ~%d, server instructions ~%d)\n",
+			apps.EstimateTokens(total), apps.EstimateTokens(own), apps.EstimateTokens(tools), apps.EstimateTokens(servers))
+	}
+	if total > apps.AppContextWarnBytes {
+		warn("agent", "the app puts ~%d tokens into every turn of a chat, more than the ~%d it should: cut the instructions and the tool descriptions",
+			apps.EstimateTokens(total), apps.EstimateTokens(apps.AppContextWarnBytes))
+	}
+	return out
 }

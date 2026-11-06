@@ -16,9 +16,15 @@ const (
 	CodeNotInTarget      = "not_in_target"
 	CodePolicyBlocked    = "policy_blocked"
 	CodeNetworkDenied    = "network_denied"
-	CodeRateLimited      = "rate_limited"
-	CodeHostUnavailable  = "host_unavailable"
-	CodeInvalidParams    = "invalid_params"
+	// CodeHostNotAllowed: the server's address is no https one and no internal host the deployment lists.
+	CodeHostNotAllowed = "host_not_allowed"
+	// CodeTLSUntrusted: the server's certificate ends in no root the machine trusts (RUNTIME_APPS_CA_FILE adds some).
+	CodeTLSUntrusted = "tls_untrusted"
+	// CodeUpstreamError: the server answered, with an HTTP error or with something else than JSON-RPC.
+	CodeUpstreamError   = "upstream_error"
+	CodeRateLimited     = "rate_limited"
+	CodeHostUnavailable = "host_unavailable"
+	CodeInvalidParams   = "invalid_params"
 )
 
 // BridgeError is a refusal with the code a view sees.
@@ -50,6 +56,7 @@ var methodPermission = map[string]string{
 	"harnessly/storage.set":         "storage",
 	"harnessly/storage.delete":      "storage",
 	"harnessly/storage.keys":        "storage",
+	"harnessly/settings.get":        "",
 	"harnessly/notify":              "notify",
 	"harnessly/files.read":          "files.read",
 	"harnessly/files.write":         "files.write",

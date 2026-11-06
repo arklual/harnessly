@@ -5,6 +5,9 @@ export type HarnesslyErrorCode =
   | 'not_in_target'
   | 'policy_blocked'
   | 'network_denied'
+  | 'host_not_allowed'
+  | 'tls_untrusted'
+  | 'upstream_error'
   | 'rate_limited'
   | 'host_unavailable'
   | 'invalid_params';
@@ -100,6 +103,8 @@ export interface Harnessly {
   flow: { status(): Promise<unknown>; go(state: string): Promise<unknown> };
   data: { get<T = unknown>(): Promise<T>; set(patch: Record<string, unknown>): Promise<unknown> };
   storage: Record<StorageScope, StorageArea>;
+  /** The values the person saved in the app's settings form (the manifest's `settings` schema), over its defaults. */
+  settings: { get(): Promise<Record<string, unknown>> };
   /** Files of the chat's workspace; needs `files.read:<mask>` / `files.write:<mask>`. Paths are relative to the workspace. */
   files: { read(path: string): Promise<string>; write(path: string, text: string): Promise<void> };
   ui: { toast(text: string): Promise<void>; confirm(text: string): Promise<boolean> };

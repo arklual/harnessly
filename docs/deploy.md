@@ -494,9 +494,41 @@ the slot's path, `localStorage` lives with the runtime (per person and dev serve
 prefix asks the pane to open the path again.
 
 Limits: only the machine's own servers (slots 1–6), never a site of the outside world; no service workers or indexedDB;
-the page bridge's DevTools record is off (the proxy's network log stays); a company SSO proxy in front of harnessly that
-wants its own `Lax` cookie on every request must let `/__pv/` through, since the sandboxed page cannot send that cookie.
-Chromium browsers fully, Safari 17.4+ as far as it keeps `SameSite=None` cookies.
+the page bridge's DevTools record is off (the proxy's network log stays). Chromium browsers fully, Safari 17.4+ as far
+as it keeps `SameSite=None` cookies.
+
+#### A company SSO proxy in front of harnessly
+
+The sandboxed page sends no cookie of the company's sign-in (its module scripts, styles and fonts load in CORS mode
+from an opaque origin, which never carries cookies of another origin), so an SSO proxy that wants its cookie on every
+request answers the preview with its sign-in page. Let the preview's paths through without the proxy's check: the
+`<key>` in the path is their authority, and the hub (or the runtime) checks it and the machine on every request; nothing
+else of harnessly is reachable that way.
+
+The paths, as a regular expression: `^/(m/[a-z0-9]+/)?__pv/[1-6]-[0-9a-f]{32}/` (add the page's base path in front
+when harnessly is not at the root of its host).
+
+```nginx
+# nginx with auth_request
+location ~ ^/(m/[a-z0-9]+/)?__pv/[1-6]-[0-9a-f]{32}/ {
+    auth_request off;
+    proxy_pass http://harnessly;   # the same upstream as location /
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_set_header Host $host;
+}
+```
+
+```
+# oauth2-proxy
+--skip-auth-route='^/(m/[a-z0-9]+/)?__pv/[1-6]-[0-9a-f]{32}/'
+```
+
+Envoy, Keycloak Gatekeeper, Pomerium and the like take the same path as a public route. Keep WebSocket upgrades on it:
+the dev server's live reload (Vite HMR) goes through it. Without the exception the pane shows the SSO sign-in inside the
+frame. A reload or a link of the page past its prefix still needs the person's own SSO cookie (it goes to the page's
+path, which the proxy checks); when the proxy refuses it, the pane's reload button opens the slot again.
 
 ## Updates
 

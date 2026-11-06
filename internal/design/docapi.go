@@ -413,6 +413,15 @@ type DocActor struct {
 	Tab     string
 }
 
+// DocTemplate is the template a board is made from: the app, the template, and how it locks the board.
+type DocTemplate struct {
+	App     string
+	ID      string
+	Version string
+	// Lock is TemplateLockStrict or TemplateLockOpen.
+	Lock string
+}
+
 // DocPatched is what a patch did.
 type DocPatched struct {
 	Rev   int64    `json:"rev"`
@@ -708,6 +717,9 @@ func (l *Library) DocPatch(project string, ops []DocOp, who DocActor, now time.T
 		if err := l.docClaimed(project, r.w.page, who, now); err != nil {
 			return DocPatched{}, err
 		}
+		if err := l.checkBoardLock(r.w.page, r.next); err != nil {
+			return DocPatched{}, err
+		}
 	}
 	if len(results) > 0 {
 		runtime := ""
@@ -969,13 +981,21 @@ func docCleanInsert(markup string) (string, error) {
 }
 
 // DocAddBoard adds a page whose board is src (a board with a template, <x-dc>), as one history entry.
-func (l *Library) DocAddBoard(project, title string, src []byte, who DocActor, now time.Time) (Page, error) {
+//
+// The board is cleaned first (CleanTemplateBoard): a template's scripts and handlers do not run on the project of
+// whoever installs the app. tpl, when given, makes the board a locked one: the record goes into the page's meta.
+func (l *Library) DocAddBoard(project, title string, src []byte, tpl *DocTemplate, who DocActor, now time.Time) (Page, error) {
 	if _, err := l.DocPages(project); err != nil {
 		return Page{}, err
 	}
 	if len(src) == 0 || len(src) > deckBoardMax {
 		return Page{}, docInvalid("A board is 1 byte to 8 MB", "Доска — от 1 байта до 8 МБ")
 	}
+	cleaned, cerr := CleanTemplateBoard(src)
+	if cerr != nil {
+		return Page{}, docInvalid("The template could not be cleaned of scripts", "Шаблон не удалось очистить от скриптов")
+	}
+	src = cleaned
 	if _, ok := parseDcBoard(string(src)); !ok {
 		return Page{}, docInvalid("The template is not a board: it has no <x-dc>", "Шаблон — не доска: в нём нет <x-dc>")
 	}
@@ -999,6 +1019,13 @@ func (l *Library) DocAddBoard(project, title string, src []byte, who DocActor, n
 	}
 	if _, err := writeIfChanged(filepath.Join(l.ProjectDir(project), pageFileOf(p.File)), src); err != nil {
 		return Page{}, docErr(DocErrFailed, "Could not save the board", "Не удалось сохранить доску")
+	}
+	if tpl != nil {
+		rec := NewPageTemplate(tpl.App, tpl.ID, tpl.Version, tpl.Lock, src)
+		p.setTemplate(&rec)
+		if _, err := l.writePage(project, p); err != nil {
+			return Page{}, docErr(DocErrFailed, "Could not save the board", "Не удалось сохранить доску")
+		}
 	}
 	l.deckSnapshot(runtime, editors, locale.Pick("Board by "+who.Subject+": "+p.Title, "Доска приложения «"+who.Subject+"»: "+p.Title), now)
 	return p, nil

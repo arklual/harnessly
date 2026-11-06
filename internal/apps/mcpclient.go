@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,22 +13,31 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strings"
-	"syscall"
 	"time"
 )
 
 // CallTool runs one tool of an app's remote MCP server for a view (hl.tools.call): Streamable HTTP, one initialize and
 // one tools/call per call, nothing kept between calls. The server is the package's own (.mcp.json, an https address);
-// the call goes from the machine, so the address must be a public one.
+// the call goes from the machine, so the address must be a public one, or the host one the deployment's admin listed
+// as internal (DeployNetwork), which may also be plain http.
 func CallTool(ctx context.Context, srv MCPServer, tool string, args map[string]any) (json.RawMessage, error) {
-	if !strings.HasPrefix(srv.URL, "https://") {
-		return nil, &BridgeError{Code: CodePolicyBlocked, Message: ToolRefused, Detail: "only a remote (https) MCP server can be called from a view"}
+	u, err := url.Parse(srv.URL)
+	if err != nil || u.Hostname() == "" {
+		return nil, &BridgeError{Code: CodeHostNotAllowed, Message: ToolRefused, Detail: "the MCP server has no address"}
+	}
+	network := currentNetwork()
+	internal := network.IsInternal(u.Hostname())
+	if u.Scheme != "https" && (u.Scheme != "http" || !internal) {
+		return nil, &BridgeError{Code: CodeHostNotAllowed, Message: ToolRefused,
+			Detail: "only a remote https MCP server, or an internal host the deployment lists, can be called from a view"}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	c := &mcpConn{url: srv.URL, headers: srv.Headers, http: &http.Client{
-		Transport:     &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: 10 * time.Second, Control: publicOnly}).DialContext},
+		Transport: &http.Transport{Proxy: nil, TLSClientConfig: network.tlsConfig(),
+			DialContext: (&net.Dialer{Timeout: 10 * time.Second, Control: dialControl(internal)}).DialContext},
 		CheckRedirect: noRedirects,
 	}}
 	if _, err := c.rpc(ctx, 1, "initialize", map[string]any{
@@ -70,10 +81,22 @@ func transportFailure(ctx context.Context, err error) *BridgeError {
 	switch {
 	case errors.As(err, &be):
 		return &BridgeError{Code: be.Code, Message: ToolRefused, Detail: err.Error()}
+	case untrustedTLS(err):
+		return &BridgeError{Code: CodeTLSUntrusted, Message: ToolUnreachable, Detail: err.Error()}
 	case errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded):
 		return &BridgeError{Code: CodeHostUnavailable, Message: ToolTimeout, Detail: err.Error()}
 	}
 	return &BridgeError{Code: CodeHostUnavailable, Message: ToolUnreachable, Detail: err.Error()}
+}
+
+// untrustedTLS says whether a request failed on the server's certificate: a chain the machine's roots do not end, a name
+// it is not for, or one out of date.
+func untrustedTLS(err error) bool {
+	var unknown x509.UnknownAuthorityError
+	var host x509.HostnameError
+	var invalid x509.CertificateInvalidError
+	var verify *tls.CertificateVerificationError
+	return errors.As(err, &unknown) || errors.As(err, &host) || errors.As(err, &invalid) || errors.As(err, &verify)
 }
 
 // reserved are the ranges that are no public host though some are "global unicast" to the standard library: the
@@ -105,20 +128,6 @@ func publicAddress(ip netip.Addr) bool {
 		}
 	}
 	return true
-}
-
-// publicOnly is the dialer's Control: it sees the address the connection is really going to (after DNS), so a name
-// that answers a public address to a check and a private one to the dial cannot get through.
-func publicOnly(_, address string, _ syscall.RawConn) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return err
-	}
-	ip, err := netip.ParseAddr(host)
-	if err != nil || !publicAddress(ip) {
-		return &BridgeError{Code: CodeNetworkDenied, Message: "refused"}
-	}
-	return nil
 }
 
 const maxMCPAnswer = 4 << 20
@@ -155,7 +164,7 @@ func (c *mcpConn) rpc(ctx context.Context, id int, method string, params any) (j
 		c.session = s
 	}
 	if resp.StatusCode >= 300 {
-		return nil, &BridgeError{Code: CodeHostUnavailable, Message: ToolUnreachable, Detail: fmt.Sprintf("the MCP server answered %d", resp.StatusCode)}
+		return nil, &BridgeError{Code: CodeUpstreamError, Message: ToolUnreachable, Detail: fmt.Sprintf("the MCP server answered %d", resp.StatusCode)}
 	}
 	if id == 0 {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxMCPAnswer))
@@ -172,7 +181,7 @@ func (c *mcpConn) rpc(ctx context.Context, id int, method string, params any) (j
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(raw, &rpc); err != nil {
-		return nil, &BridgeError{Code: CodeHostUnavailable, Message: ToolUnreachable, Detail: "the MCP server answered with something else than JSON-RPC"}
+		return nil, &BridgeError{Code: CodeUpstreamError, Message: ToolUnreachable, Detail: "the MCP server answered with something else than JSON-RPC"}
 	}
 	if rpc.Error != nil {
 		return nil, &BridgeError{Code: CodePolicyBlocked, Message: ToolError, Detail: rpc.Error.Message}

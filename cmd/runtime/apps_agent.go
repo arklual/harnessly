@@ -79,6 +79,11 @@ func agentRouteAllowed(r *http.Request) bool {
 	if slices.Contains(agentReadRoutes[:], path) {
 		return true
 	}
+	// The person's connections (harnessly connections | issues | issue | pages | page): reads through the runtime,
+	// which holds the tokens; nothing of them is changed by a GET.
+	if path == "/api/cli/connections" || strings.HasPrefix(path, "/api/cli/connections/") {
+		return true
+	}
 	// One tab's status, not what is on its screen (.../result) and not its browser.
 	rest, ok := strings.CutPrefix(path, "/api/cli/tabs/")
 	return ok && rest != "" && !strings.Contains(rest, "/")

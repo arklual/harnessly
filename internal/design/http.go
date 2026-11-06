@@ -47,6 +47,9 @@ type API struct {
 	Images *imagegen.Service
 	// PublicToken checks the tokens of the public read (design-public).
 	PublicToken PublicConfig
+	// ShareGate runs the apps' checks of the share trigger before a link to a project is made; it answers the refusal
+	// when one blocks, nil to let the link be made (and while no apps are wired).
+	ShareGate func(ctx context.Context, project string) *ShareRefusal
 	// GuestApp is the built web page (web/dist): the guest page of a link without sign-in is served from it.
 	GuestApp  fs.FS
 	guestOnce sync.Once

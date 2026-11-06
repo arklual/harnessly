@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
@@ -42,9 +43,27 @@ type safe struct {
 	identity func(string) secrets.Use
 }
 
+var (
+	storesMu sync.Mutex
+	stores   = map[string]*secrets.Store{}
+)
+
+// storeFor is the process's one store of a data folder's safe: the routes and the apps' launches share its lock, so a
+// reveal (which records the use) and a put never write the file over each other.
+func storeFor(dataDir, home string) *secrets.Store {
+	storesMu.Lock()
+	defer storesMu.Unlock()
+	if s := stores[dataDir]; s != nil {
+		return s
+	}
+	s := secrets.Open(filepath.Join(dataDir, "secrets"), secrets.DefaultKeyFile(os.Getenv, home))
+	stores[dataDir] = s
+	return s
+}
+
 func newSafe(d deps) *safe {
 	return &safe{
-		store: secrets.Open(filepath.Join(d.DataDir, "secrets"), secrets.DefaultKeyFile(os.Getenv, d.Home)),
+		store: storeFor(d.DataDir, d.Home),
 		asks:  secrets.NewAsks(),
 		files: secrets.NewFiles(os.Getenv("RUNTIME_SECRETS_FILES_DIR")),
 	}

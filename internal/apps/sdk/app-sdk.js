@@ -169,6 +169,11 @@ export async function connect(options = {}) {
       keys: () => request('harnessly/storage.keys', { scope }).then((r) => r.keys),
     };
   }
+  // The values the person saved in the app's settings form (the manifest's `settings` schema), over its defaults. A
+  // secret is not among them: the host fills it in on the machine, into the app's MCP servers, and nowhere else.
+  hl.settings = {
+    get: () => request('harnessly/settings.get', {}).then((r) => r.value),
+  };
   // Files of the chat's workspace, inside the masks of files.read:<mask> and files.write:<mask>. A path is relative to
   // the workspace; a text moves, up to 4 MB.
   hl.files = {

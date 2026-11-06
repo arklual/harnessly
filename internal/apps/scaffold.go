@@ -16,7 +16,7 @@ import (
 const FirstVersion = "0.16.36"
 
 // Templates are the starting points of `harnessly app new --template`.
-var Templates = []string{"chat", "pane-chat"}
+var Templates = []string{"chat", "pane-chat", "widget"}
 
 // Scaffold writes a new package for id into dir, which must not exist or be empty.
 func Scaffold(dir, id, name, template string) error {
@@ -66,7 +66,7 @@ func Scaffold(dir, id, name, template string) error {
 	if template == "pane-chat" {
 		m.Trust = TrustSandboxed
 		m.Targets = append(m.Targets, TargetPane, TargetApp)
-		m.Activation = &Activation{On: []string{OnManual, OnView}, OpenView: "main"}
+		m.Activation = &Activation{On: []string{OnManual}, OpenView: "main"}
 		m.Permissions = []string{"chat.prompt", "pane.open", "storage"}
 		m.Views = []View{{ID: "main", Title: name, Entry: "ui/index.html", Targets: []string{TargetPane, TargetApp}}}
 		files["ui/index.html"] = "<!doctype html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"utf-8\">\n" +
@@ -77,6 +77,27 @@ func Scaffold(dir, id, name, template string) error {
 			"<script src=\"/__hl/app-sdk.js\"></script>\n<script src=\"main.js\"></script>\n</body>\n</html>\n"
 		files["ui/main.js"] = "// window.harnessly is the app SDK (docs/apps.md); connect() rejects with host_unavailable outside Harnessly.\n" +
 			"window.harnessly.connect().then(function (hl) {\n  console.log('" + name + "', hl.context.target);\n}).catch(function () {});\n"
+	}
+	if template == "widget" {
+		// A widget of the chat: the agent shows it in the feed with app.widget.show (or `harnessly widget show`) and the
+		// data to draw; the same id again sends the view new data.
+		m.Trust = TrustSandboxed
+		m.Permissions = []string{"chat.prompt"}
+		m.Views = []View{{ID: "card", Title: name, Entry: "ui/card.html", Targets: []string{TargetChat}}}
+		m.Chat = &Chat{Cards: []string{"card"}}
+		files["instructions.md"] = "# " + name + "\n\nShow the result to the person as the widget of this app: call the tool " +
+			"mcp__harnessly-app__widget_show with view \"card\" and the data as JSON ({\"title\": ..., \"value\": ...}). " +
+			"To change it later (progress, fresh numbers), call it again with the id it answered.\n"
+		files["ui/card.html"] = "<!doctype html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"utf-8\">\n" +
+			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>" + name + "</title>\n" +
+			"<link rel=\"stylesheet\" href=\"/__hl/widget.css\">\n</head>\n" +
+			"<body>\n<p class=\"muted\" id=\"title\"></p>\n<p class=\"stat\" id=\"value\"></p>\n" +
+			"<script src=\"/__hl/app-sdk.js\"></script>\n<script src=\"card.js\"></script>\n</body>\n</html>\n"
+		files["ui/card.js"] = "// The widget's data is hl.context.data; when the agent shows the same id again, the `data` event brings the new one.\n" +
+			"window.harnessly.connect().then(function (hl) {\n" +
+			"  function draw(d) {\n    d = d || {};\n    document.getElementById('title').textContent = d.title || '';\n" +
+			"    document.getElementById('value').textContent = d.value == null ? '' : String(d.value);\n  }\n" +
+			"  draw(hl.context.data);\n  hl.on('data', draw);\n}).catch(function () {});\n"
 	}
 	raw, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {

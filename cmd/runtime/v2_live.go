@@ -169,6 +169,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		TerminalOff: chatGuard.Off,
 		AppsOK:      appsOK(apps.Open(d.DataDir)),
+		AlwaysApps:  alwaysApps(apps.Open(d.DataDir)),
 		Rewinder:    v2Rewinder{c},
 		Window:      v2Window(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
 		AutoContinue: func() (bool, bool) {

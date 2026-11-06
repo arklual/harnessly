@@ -1364,5 +1364,6 @@
   "next.setup.action.start": "Запустить",
   "next.setup.hide": "Скрыть",
   "next.setup.more": "и ещё {n}",
-  "next.setup.askFailed": "Машина не ответила — попробуйте ещё раз"
+  "next.setup.askFailed": "Машина не ответила — попробуйте ещё раз",
+  "next.appview.widget": "Виджет"
 }

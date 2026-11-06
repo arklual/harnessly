@@ -52,7 +52,7 @@ type SinopiaDocs interface {
 	Node(project, id string) (design.DocNode, error)
 	Fields(project string) ([]design.DocField, error)
 	Patch(project string, ops []design.DocOp, who design.DocActor) (design.DocPatched, error)
-	AddBoard(project, title string, src []byte, who design.DocActor) (design.DocPageRef, error)
+	AddBoard(project, title string, src []byte, tpl *design.DocTemplate, who design.DocActor) (design.DocPageRef, error)
 }
 
 // SelectedNode is a node the person picked in the editor, as the page reports it.
@@ -545,7 +545,13 @@ func (c SinopiaCall) addBoard(p map[string]any) (any, error) {
 	if strings.TrimSpace(title) == "" {
 		title = c.App.Manifest.Name
 	}
-	page, err := c.Docs.AddBoard(c.Project, title, src, c.actor())
+	// A board of an app that keeps free hand edits off (lockUnbound) is locked: the record goes into the project's meta.
+	lock := design.TemplateLockOpen
+	if sin.Bindings != nil && sin.Bindings.LockUnbound {
+		lock = design.TemplateLockStrict
+	}
+	tpl := &design.DocTemplate{App: c.App.ID, ID: strings.TrimSuffix(dir, "/"), Version: c.App.Version, Lock: lock}
+	page, err := c.Docs.AddBoard(c.Project, title, src, tpl, c.actor())
 	if err != nil {
 		return nil, sinopiaErr(err)
 	}

@@ -42,6 +42,47 @@ The MCP server is called `harnessly` by default; a deployment can rename it with
 | `delegate_task`, `read_conversation`, `send_to_conversation`, `wait_conversation`, `list_children` | Another agent. Not in a chat with apps |
 | `sinopia_view_*`, `sinopia_frame`, `sinopia_check`, `sinopia_video_render` | Only in a chat working in a video project |
 
+## When the app is on
+
+The person turns an app on in a chat with the row over the field. Two more ways come from `activation.on`:
+
+```json
+"activation": { "on": ["always", "command:/tasks"] }
+```
+
+- `always`: on in every new Claude chat of the machine, when the person installed the app themselves (a team's app is not). Every such
+  chat runs inside the wall, so keep it for a plugin the person wants everywhere.
+- `command:/tasks`: a message that starts with `/tasks` turns the app on in that chat first, then goes to the agent. One app per command;
+  the agent's own commands (`/clear`, `/model`, ...) are refused by the check.
+
+## Context the app hands the agent
+
+`agent.context` names a tool of the app's own remote MCP server (`"<server>.<tool>"`) whose answer the agent should see:
+
+```json
+"agent": { "context": [{ "id": "queue", "tool": "api.queue", "mode": "on-activation" }] }
+```
+
+A hook of the chat calls the tool of every `on-activation` item on `SessionStart` and on each `UserPromptSubmit`, and hands the text
+to the agent as `additionalContext`, **only when it differs from the last one sent to that chat** (a hash is kept per chat, app and
+item). So the conversation carries the context once per change, not once per message. A cleared or new chat gets it again; a resumed
+one does not. A tool that fails, answers an error or answers nothing adds nothing and stops nothing. The answer is cut at 16 KB. The
+tool takes no arguments. `on-demand` items are checked and not sent.
+
+## What the app weighs
+
+Everything in the system prompt is paid for on every turn, so it is counted:
+
+- `instructions.md`: at most 16 KB per app (more fails the check), a warning past 4 KB.
+- **The chat's budget** for the instructions of all its apps together is 48 KB (about 12k tokens; a token is estimated as bytes / 4).
+  An app that takes the chat past it is **still turned on**: the answer of `harnessly app enable` says so (`warning: ...`), and the person
+  decides what to take off.
+- The app's page, "About the app", shows `~N tokens of instructions`.
+- `harnessly app validate --strict` prints `context weight: ~N tokens per turn` for the package: the instructions, the names,
+  descriptions and schemas of the tools of every remote server in `agent.mcp` (the first page of `tools/list`), and the server's own
+  `instructions`. Past 16 KB (~4k tokens) it is a warning, which `--strict` fails on. A server that does not answer is a warning too:
+  its weight is unknown, not zero.
+
 ## Access by kind of chat
 
 | Capability | Claude, no apps | Claude, app on | Codex |
@@ -109,7 +150,7 @@ apps and a Codex chat have no wall at all.
 
 ## Secrets
 
-Manifest `secrets` do nothing yet. What works today: the agent asks the safe of the machine by name.
+Manifest `secrets` are for your server, not for the agent: the person puts the value in from «О приложении» and the machine fills `${secret:name}` into the server's headers (see [Secrets, once more](03-backend.md#secrets-once-more)). The agent can neither read nor ask for them. For a secret of the agent's own, it asks the safe of the machine by name.
 
 ```sh
 harnessly secret ask my-api-key --why "the bank API for the cashback app"   # the person puts it in, outside the chat

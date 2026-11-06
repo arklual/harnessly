@@ -5,6 +5,7 @@ import { slotLeases } from '@/next/features/pane/slot-lease';
 import { openPreview } from '@/next/core/net/preview';
 import {
   callFiles,
+  callSettings,
   callSinopia,
   callStorage,
   callTool,
@@ -90,6 +91,8 @@ export interface IAppFrameProps {
   readOnly?: boolean;
   /** A notification to send the view when `seq` changes (the Sinopia selection): the host's word, not the view's. */
   notice?: IViewNotice | null;
+  /** The view belongs to the chat whatever its apps (an agent's own widget): it gets the chat without being turned on. */
+  inChat?: boolean;
   /** A Document API call of the view that went through (the host may do more: a comment also goes to the chat). */
   onSinopiaCall?: (method: string, params: Record<string, unknown>) => void;
 }
@@ -126,6 +129,7 @@ const AppFrame = ({
   readOnly = false,
   notice = null,
   onSinopiaCall,
+  inChat = false,
 }: IAppFrameProps) => {
   const { resolvedTheme } = useTheme();
   const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
@@ -136,7 +140,8 @@ const AppFrame = ({
   const lease = `app:${app.id}`;
   const key = `${machine}|${app.id}|${view.id}|${viewPort}|${reload}|${reloadToken}`;
   // An app gets a chat only where the person turned it on; the runtime checks the same when it issues the session.
-  const on = useConversation(conversation)?.apps?.includes(app.id) ?? false;
+  const turnedOn = useConversation(conversation)?.apps?.includes(app.id) ?? false;
+  const on = inChat || turnedOn;
   const chat = on ? conversation : null;
   const work = useHostHandlers(machine, conversation, app, on);
 
@@ -244,6 +249,10 @@ const AppFrame = ({
       storage: (op, scope, k, value) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
         return callStorage(machine, { session, op, scope, key: k, value });
+      },
+      settings: () => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callSettings(machine, session);
       },
       files: (op, path, text) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');

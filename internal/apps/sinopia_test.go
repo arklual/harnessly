@@ -128,7 +128,7 @@ func (f *fakeDocs) Patch(p string, ops []design.DocOp, who design.DocActor) (des
 	f.patched = append(f.patched, ops)
 	return design.DocPatched{Rev: 9}, nil
 }
-func (f *fakeDocs) AddBoard(p, title string, src []byte, who design.DocActor) (design.DocPageRef, error) {
+func (f *fakeDocs) AddBoard(p, title string, src []byte, tpl *design.DocTemplate, who design.DocActor) (design.DocPageRef, error) {
 	f.added = title + "|" + string(src)
 	return design.DocPageRef{ID: "NEW", Title: title}, nil
 }

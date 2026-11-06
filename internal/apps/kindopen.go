@@ -84,7 +84,7 @@ func (r *Registry) OpenDocument(st *Storage, project string, info KindInfo, k Si
 	var pkg *Package
 	for _, a := range list {
 		if a.ID == info.App {
-			pkg, _ = LoadPackage(a.Dir)
+			pkg, _ = CachedPackage(a.Dir)
 		}
 	}
 	if pkg == nil {

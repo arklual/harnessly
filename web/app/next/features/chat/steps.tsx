@@ -22,6 +22,9 @@ import { parseAskCall } from '@/next/features/asks/parse';
 import { AskStep } from '@/next/features/asks/ask-step';
 import AppCard from '@/next/features/app-views/app-card';
 import { parseAppCard } from '@/next/features/app-views/card';
+import ChatWidget from '@/next/features/app-views/chat-widget';
+import CardOutput, { cardOutputPending } from '@/next/features/app-views/card-output';
+import { parseWidgetRef } from '@/next/features/app-views/widgets';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { useSeen } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
@@ -256,6 +259,9 @@ const peerOutOf = (entry: ToolEntry) =>
 /** An app's card (MCP Apps) that a tool of the app's own server returned: drawn under its step, never folded away. */
 const appCardOf = (entry: ToolEntry) => parseAppCard(entry.tool, entry.output?.text ?? null);
 
+/** The widget a step showed (widget_show, widget_render or `harnessly widget`): drawn under its step, never folded away. */
+const widgetOf = (entry: ToolEntry) => parseWidgetRef(entry.tool, entry.summary, entry.output?.text ?? null);
+
 /** A question of the agent to a person (`harnessly ask`): its card, not a line among the tools. */
 const askCallOf = (entry: ToolEntry) => parseAskCall(entry.tool, entry.summary, entry.output?.text ?? null);
 
@@ -311,7 +317,9 @@ export const groupSteps = (rawSteps: Entry[], live: boolean): TStepNode[] => {
       !peerOutOf(entry) &&
       !askCallOf(entry) &&
       !imageEntryOf(entry) &&
-      !appCardOf(entry)
+      !appCardOf(entry) &&
+      !widgetOf(entry) &&
+      !cardOutputPending(entry)
     ) {
       run.push(entry);
       return;
@@ -362,6 +370,21 @@ const Step = ({ entry, renderGate }: { entry: Entry; renderGate?: (permissionId:
       if (out) return <PeerOutStep out={out} />;
       const ask = askCallOf(entry);
       if (ask) return <AskStep call={ask} ran={entry.ok !== false} />;
+      const widget = widgetOf(entry);
+      if (widget)
+        return (
+          <>
+            <ToolOrImages entry={entry} />
+            <ChatWidget id={widget} />
+          </>
+        );
+      if (cardOutputPending(entry))
+        return (
+          <>
+            <ToolOrImages entry={entry} />
+            <CardOutput entry={entry} />
+          </>
+        );
       const card = appCardOf(entry);
       return card ? (
         <>

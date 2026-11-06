@@ -22,6 +22,9 @@ import (
 type Seal struct {
 	// Data is the runtime's data folder, Home the person's; "" leaves that part out.
 	Data, Home string
+	// Open are folders of the data folder that stay readable (read-only) in the wall: the launch folders of this
+	// chat's own apps (launch_secrets.go). Every other launch's folder is not there.
+	Open []string
 }
 
 // What the agent's launch and CLI read from the data folder. Everything else there reads as nothing: the password and the
@@ -56,6 +59,11 @@ func (s *Seal) dataArgs(bound []string) []string {
 	}
 	for _, rel := range dataReadonly {
 		open("--ro-bind", rel)
+	}
+	for _, p := range s.Open {
+		if rp, err := realPath(p); err == nil && within(data, rp) {
+			args = append(args, "--ro-bind", rp, rp)
+		}
 	}
 	for _, name := range dataWorkspaceFiles {
 		found, _ := filepath.Glob(filepath.Join(data, "workspaces", "*", name))

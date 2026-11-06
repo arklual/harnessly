@@ -64,7 +64,9 @@ At each launch, for each app on in that chat:
 | `skills/<name>/SKILL.md` | A skill it reads on demand, `<plugin>:<name>` | Every folder under `skills/` loads, whatever `agent.skills` says |
 | `commands/<name>.md` | A slash command, `/<plugin>:<name>` | `chat.commands` is checked against the files; Claude Code loads the folder |
 | `.mcp.json` | MCP servers, started by Claude Code | See [Backend](03-backend.md) |
-| `agent.tools` | The guard hook decides each tool call | Below |
+| `agent.tools` | The guard hook decides each tool call; `deny` and `confirm` also go to Claude's own permissions | Below |
+
+A `declarative` or `sandboxed` package may not carry `hooks/`, `agents/`, `output-styles/` or other parts of a Claude Code plugin: they run outside the guard, and `harnessly app validate` refuses them by folder.
 
 Instructions are always in context and cost tokens in every message: say what to do and when, and put the long parts in a skill.
 Measure with `baseline: true` in an [eval](07-sharing.md#evals).

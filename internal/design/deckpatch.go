@@ -914,6 +914,11 @@ func (l *Library) patchDeckBoard(req DeckPatchRequest, now time.Time) (int64, st
 	if err != nil {
 		return 0, "", err
 	}
+	if tp, has := l.pageOfFile(req.Artifact, file); has {
+		if lerr := l.checkBoardLock(tp, next); lerr != nil {
+			return 0, "", &deckPatchErr{http.StatusForbidden, DeckPatchLocked, lerr.Error()}
+		}
+	}
 	board := BoardTitleOf(file)
 	if page.Title != "" {
 		board = page.Title

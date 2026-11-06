@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -38,10 +40,23 @@ type appView struct {
 	// MCPServers are the names of the servers in the package's .mcp.json: a card's tool is the app's own only when it
 	// comes from one of them.
 	MCPServers []string `json:"mcpServers"`
+	// InstructionsBytes is what the app's instructions weigh in the prompt; the page shows it as tokens (bytes / 4).
+	InstructionsBytes int `json:"instructionsBytes"`
+	// Command is the slash command that turns the app on in a chat (activation.on "command:/x"); empty when none.
+	Command string `json:"command,omitempty"`
+	// Always: the app is on in every new Claude chat of the machine (activation.on "always"; a team's app is not).
+	Always bool `json:"always,omitempty"`
+	// PluginParts are the hooks, agents and other parts of a Claude Code plugin a trusted package carries (the others
+	// may not): the install's permission request and the app's «О приложении» list them.
+	PluginParts []string `json:"pluginParts"`
 	// Sinopia is what the app puts into the document editor (panels, selection items, bindings, checks); the page shows
 	// them only in a document the app is on in.
 	Sinopia *apps.Sinopia `json:"sinopia,omitempty"`
 	Dev     bool          `json:"dev,omitempty"`
+	// Setup: the app has settings or secrets, so «О приложении» draws their form. Waiting are the required secrets that
+	// have no value yet: the app is «ждёт секрет».
+	Setup   bool     `json:"setup"`
+	Waiting []string `json:"waiting"`
 	// Team: the app is the team's, installed for everybody by an owner; Channel is the channel an install follows.
 	Team        bool   `json:"team,omitempty"`
 	Channel     string `json:"channel,omitempty"`
@@ -66,6 +81,8 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 	if m := a.Manifest; m != nil {
 		v.Name, v.Description, v.Icon, v.Trust = m.Name, m.Description, m.Icon, m.Trust
 		v.Targets, v.Permissions = m.Targets, m.Permissions
+		v.Command = m.Command()
+		v.Always = !a.Team && m.HasTarget(apps.TargetChat) && m.ActivatesOn(apps.OnAlways)
 		if sin, err := m.SinopiaOf(); err == nil && (len(sin.Panels) > 0 || len(sin.Selection) > 0 || sin.Bindings != nil || len(sin.Checks) > 0) {
 			v.Sinopia = &sin
 		}
@@ -73,12 +90,18 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 	if v.Permissions == nil {
 		v.Permissions = []string{}
 	}
+	v.Waiting = []string{}
+	if m := a.Manifest; m != nil {
+		v.Setup = len(m.Settings) > 0 || len(m.Secrets) > 0
+	}
 	v.MCPServers = []string{}
-	if pkg, _ := apps.LoadPackage(a.Dir); pkg != nil {
+	v.PluginParts = []string{}
+	if pkg, _ := apps.CachedPackage(a.Dir); pkg != nil {
 		for name := range pkg.MCP {
 			v.MCPServers = append(v.MCPServers, name)
 		}
 		slices.Sort(v.MCPServers)
+		v.PluginParts = append(v.PluginParts, pkg.PluginParts...)
 	}
 	v.Views = []appViewEntry{}
 	if m := a.Manifest; m != nil {
@@ -95,6 +118,7 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 			v.Views = append(v.Views, e)
 		}
 	}
+	v.InstructionsBytes = apps.InstructionsBytes(a)
 	if withDir {
 		v.Dir = a.Dir
 	}
@@ -103,6 +127,13 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 
 func appRoutes(d deps, c *core) []gate.Route {
 	reg := apps.Open(d.DataDir)
+	// What the apps' MCP calls may reach besides the public internet: the deployment's internal hosts and root
+	// certificates. A bad CA file is logged and the calls keep the system's roots.
+	network, err := apps.NetworkFromEnv(os.Getenv)
+	if err != nil {
+		jsonlog.Log("warn", "apps: the network of the apps' calls", jsonlog.F{K: "error", V: err.Error()})
+	}
+	apps.SetNetwork(network)
 	version := env("AGENT_VERSION", agent.BuildVersion)
 	chats := appChats{
 		ofSession: func(session string) string { id, _ := convOf(c, session); return id },
@@ -122,6 +153,7 @@ func appRoutes(d deps, c *core) []gate.Route {
 		},
 	}
 	installLock(d, reg)
+	installShareGate(d, reg)
 	return appRouteList(d, reg, version, chats)
 }
 
@@ -153,11 +185,18 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		}
 		out := make([]appView, 0, len(installed))
 		for _, a := range installed {
-			out = append(out, viewOfApp(a, withDir))
+			v := viewOfApp(a, withDir)
+			if a.Manifest != nil && len(a.Manifest.Secrets) > 0 {
+				store := safeFor(d).store
+				v.Waiting = a.Manifest.WaitingFor(func(name string) bool { return store.HasApp(a.ID, name) })
+			}
+			out = append(out, v)
 		}
 		return out, nil
 	}
 	viewServer := apps.NewViewServer(reg)
+	widgets := apps.OpenWidgets(d.DataDir)
+	viewServer.Widgets = widgets
 	storage := apps.OpenStorage(d.DataDir)
 	guests := apps.NewGuests(reg, storage)
 	wireAppsEvents(d, reg, guests)
@@ -228,6 +267,9 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		case errors.Is(err, apps.ErrKindTaken):
 			secretJSON(w, http.StatusConflict, map[string]any{"error": "kind-taken", "message": err.Error()})
 			return
+		case errors.Is(err, apps.ErrCommandTaken):
+			secretJSON(w, http.StatusConflict, map[string]any{"error": "command-taken", "message": err.Error()})
+			return
 		case errors.Is(err, apps.ErrHostVersion), errors.Is(err, apps.ErrPluginName):
 			secretJSON(w, http.StatusConflict, map[string]any{"error": "host-version", "message": err.Error()})
 			return
@@ -268,6 +310,50 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	// enable turns an app on or off in the chat of the calling tab, through the same command the page sends; a tab
 	// changes its own chat only. Turning an app off from the tab is refused in a chat that has apps (use-page): that is the
 	// page's toggle; the agent of such a chat is also kept from running the command by its guard.
+	// context: the answer of an app's agent.context tool for the chat of a tab (harnessly hook app-context). The app must
+	// be on in the chat and name the tool in its context; the call is the one a view would make, so the same wall applies.
+	appContext := func(w http.ResponseWriter, r *http.Request) {
+		if !cliOK(w, r, http.MethodPost) {
+			return
+		}
+		var b struct {
+			Session string `json:"session"`
+			App     string `json:"app"`
+			ID      string `json:"id"`
+		}
+		if !readSecretBody(r, &b) || b.App == "" || b.ID == "" {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		rec, ok := chats.record(chats.ofSession(b.Session))
+		if !ok || !slices.Contains(rec.Apps, b.App) {
+			secretJSON(w, http.StatusNotFound, map[string]string{"error": "no-chat"})
+			return
+		}
+		pkg, err := reg.Package(b.App)
+		if err != nil {
+			secretJSON(w, http.StatusNotFound, map[string]string{"error": "no-app"})
+			return
+		}
+		for _, item := range apps.ContextItems(pkg.Manifest) {
+			if item.ID != b.ID {
+				continue
+			}
+			server, name, err := pkg.CanCallTool(item.Tool)
+			if err != nil {
+				break
+			}
+			result, err := apps.CallTool(r.Context(), pkg.MCP[server], name, nil)
+			if err != nil {
+				secretJSON(w, http.StatusBadGateway, map[string]string{"error": "tool-failed"})
+				return
+			}
+			secretJSON(w, http.StatusOK, map[string]string{"text": apps.ContextText(result)})
+			return
+		}
+		secretJSON(w, http.StatusNotFound, map[string]string{"error": "no-context"})
+	}
+
 	enable := func(w http.ResponseWriter, r *http.Request) {
 		if !cliOK(w, r, http.MethodPost) {
 			return
@@ -313,12 +399,28 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			secretJSON(w, status, map[string]string{"error": string(res.Code)})
 			return
 		}
-		secretJSON(w, http.StatusOK, map[string]any{"conversation": conv, "apps": next})
+		// An app over the chat's budget is still on: the answer says so, and the person decides what to take off.
+		answer := map[string]any{"conversation": conv, "apps": next}
+		if b.On {
+			total := 0
+			for _, id := range next {
+				if a, err := reg.Get(id); err == nil {
+					total += apps.InstructionsBytes(a)
+				}
+			}
+			if warning := apps.ChatBudgetWarning(total); warning != "" {
+				answer["warnings"] = []string{warning}
+			}
+		}
+		secretJSON(w, http.StatusOK, answer)
 	}
 
 	routes := append(appBridgeRoutes(d, reg, storage, viewServer, chats), appAskRoutes(d, appAsks)...)
+	routes = append(routes, appSetupRoutes(d, reg, storage)...)
+	routes = append(routes, appMCPProxyRoute(d, reg))
 	routes = append(routes, sinopiaRoutes(d, reg, viewServer)...)
 	routes = append(routes, kindRoutes(d, reg)...)
+	routes = append(routes, appWidgetRoutes(d, reg, widgets, chats)...)
 	routes = append(routes, helpRoutes(d)...)
 	routes = append(routes, appPublicRoutes(d, reg, version)...)
 	routes = append(routes, appShareRoutes(d, reg, guests, version)...)
@@ -329,6 +431,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		{Match: is("/api/cli/apps/install"), Handler: http.HandlerFunc(install)},
 		{Match: is("/api/cli/apps/remove"), Handler: http.HandlerFunc(remove)},
 		{Match: is("/api/cli/apps/enable"), Handler: http.HandlerFunc(enable)},
+		{Match: is("/api/cli/apps/context"), Handler: http.HandlerFunc(appContext)},
 	}...)
 	return refuseAgentAppChanges(d.CLI, routes)
 }

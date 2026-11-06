@@ -261,4 +261,8 @@ type Deps struct {
 	// AppsOK checks the apps a conversation is asked to turn on: each installed on this machine and working in a chat.
 	// It answers the id of the first that is not, or "". nil: no app can be turned on (refused{unsupported}).
 	AppsOK func(ids []string) string
+
+	// AlwaysApps are the apps a new Claude chat starts with: the installed ones that ask to be on in every chat. nil or
+	// empty: a new chat has none.
+	AlwaysApps func() []string
 }

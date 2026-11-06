@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -319,5 +320,34 @@ func TestAppAskRoutes(t *testing.T) {
 	}
 	if code, _ := call("POST", platformAPI+"/apps/asks/answer", `{"id":"`+id+`","answer":null}`, true); code != http.StatusNotFound {
 		t.Fatalf("answer twice: %d", code)
+	}
+}
+
+func TestAppEnableWarnsOverTheInstructionsBudget(t *testing.T) {
+	call, conv := appRig(t)
+	cli := map[string]string{"x-cli-token": "tok"}
+	for i := 1; i <= 4; i++ {
+		id := "acme.big" + strconv.Itoa(i)
+		pkg := filepath.Join(t.TempDir(), "p")
+		if err := apps.Scaffold(pkg, id, "Big", "chat"); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(pkg, "instructions.md"), []byte(strings.Repeat("x", 15<<10)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkg+`"}`, cli); code != http.StatusOK {
+			t.Fatalf("install: %d %s", code, body)
+		}
+		code, body := call("POST", "/api/cli/apps/enable", `{"session":"hs-agent","id":"`+id+`","on":true}`, cli)
+		if code != http.StatusOK {
+			t.Fatalf("enable %s: %d %s", id, code, body)
+		}
+		// 15 KB each: the fourth (60 KB) passes 48 KB, and is on all the same.
+		if got := strings.Contains(body, `"warnings"`); got != (i == 4) {
+			t.Errorf("app %d: warnings=%v: %s", i, got, body)
+		}
+	}
+	if len(conv.Apps) != 4 {
+		t.Errorf("an app over the budget is still on: %v", conv.Apps)
 	}
 }

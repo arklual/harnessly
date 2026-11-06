@@ -79,6 +79,12 @@ export async function startRuntime(
       env: { ...process.env, GOFLAGS: '-mod=readonly' },
     });
   }
+  // The agent's own CLI, which the fake agent calls as a real one would (harnessly widget).
+  execFileSync('go', ['build', '-o', join(bin, 'harnessly'), './cmd/harnessly'], {
+    cwd: repo,
+    stdio: 'inherit',
+    env: { ...process.env, GOFLAGS: '-mod=readonly' },
+  });
   const port = opts.port ?? (await freePort());
   const socket = `hs-test-web-${process.pid}-${port}`;
   const env: Record<string, string> = {

@@ -1,6 +1,8 @@
 package transcript
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -296,9 +298,39 @@ func firstLineSummary(text string) string {
 	return sliceJS(lines[0], 100)
 }
 
+// maxCardResult is how much of a tool result an app's card (MCP Apps) may weigh to reach the feed whole.
+const maxCardResult = 64 << 10
+
+// cardResult is a tool result that names an app's view (`_meta.ui.resourceUri`), as one line of compact JSON: the feed
+// draws the card from it, so it is kept whole instead of cut to a first line. "" for any other result.
+func cardResult(text string) string {
+	t := strings.TrimSpace(text)
+	if len(t) > maxCardResult || !strings.HasPrefix(t, "{") || !strings.Contains(t, `"resourceUri"`) {
+		return ""
+	}
+	var probe struct {
+		Meta struct {
+			UI struct {
+				ResourceURI string `json:"resourceUri"`
+			} `json:"ui"`
+		} `json:"_meta"`
+	}
+	if json.Unmarshal([]byte(t), &probe) != nil || !strings.HasPrefix(probe.Meta.UI.ResourceURI, "ui://") {
+		return ""
+	}
+	var out bytes.Buffer
+	if json.Compact(&out, []byte(t)) != nil {
+		return ""
+	}
+	return out.String()
+}
+
 func summarizeToolResult(content any, isError any) string {
 	if truthy(isError) {
 		return "error"
+	}
+	if card := cardResult(contentText(content)); card != "" {
+		return card
 	}
 	switch c := content.(type) {
 	case string:

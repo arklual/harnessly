@@ -13,6 +13,14 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-06w',
+    items: [
+      { key: 'chatWidgets', icon: 'layout-grid' },
+      { key: 'appsAlways', icon: 'blocks' },
+      { key: 'appsSafer', icon: 'shield-check' },
+    ],
+  },
+  {
     id: '2026-11-06b',
     items: [{ key: 'previewByPath', icon: 'shield-check' }],
   },

@@ -41,9 +41,19 @@ export interface IInstalledApp {
   views: IAppView[];
   /** The servers of the package's .mcp.json. */
   mcpServers: string[];
+  /** What the app's instructions weigh in the prompt of every turn; the page shows tokens (bytes / 4). */
+  instructionsBytes?: number;
+  /** The slash command that turns the app on in a chat (`activation.on: ["command:/x"]`); absent when none. */
+  command?: string;
+  /** On in every new Claude chat of the machine (`activation.on: ["always"]`, an app the person installed). */
+  always?: boolean;
   /** What the app puts into the document editor; absent for an app that puts nothing. */
   sinopia?: ISinopia;
   dev?: boolean;
+  /** The app has settings or secrets: «О приложении» draws their form. */
+  setup?: boolean;
+  /** The required secrets without a value: the app is «ждёт секрет». */
+  waiting?: string[];
 }
 
 export interface IInstalledApps {
@@ -185,6 +195,20 @@ export const callStorage = async (m: MachineId, call: IStorageCall): Promise<unk
   }
 };
 
+/** hl.settings.get(): what the person saved in the app's form. The runtime reads the app from the session. */
+export const callSettings = async (m: MachineId, session: string): Promise<unknown> => {
+  try {
+    const r = await runtimeJson<{ value?: unknown }>(
+      m,
+      platformPath('/apps/settings'),
+      postJson({ session }),
+    );
+    return r.value ?? {};
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
 /** hl.files: a file of the chat's workspace. The runtime holds the app's masks and says no to anything outside them. */
 export const callFiles = async (
   m: MachineId,
@@ -282,3 +306,50 @@ export const useInstalledApps = (
   }, [m, reload, key, enabled]);
   return enabled && state?.key === key ? state : { list: null, error: null };
 };
+
+/** One setting of an app, as its form draws it (internal/apps/setup.go). */
+export interface ISettingField {
+  name: string;
+  type: 'string' | 'number' | 'integer' | 'boolean';
+  title: string;
+  description?: string;
+  enum?: (string | number | boolean)[];
+  default?: unknown;
+  required?: boolean;
+  minimum?: number;
+  maximum?: number;
+}
+
+/** A secret the app asks for: whether it has a value, never the value. */
+export interface ISecretState {
+  name: string;
+  description: string;
+  optional: boolean;
+  set: boolean;
+}
+
+export interface IAppSetup {
+  fields: ISettingField[];
+  values: Record<string, unknown>;
+  secrets: ISecretState[];
+  waiting: string[];
+  /** After a save the runtime did not accept: the reason by setting. Nothing was saved. */
+  problems?: Record<string, string>;
+}
+
+export const loadAppSetup = (m: MachineId, id: string): Promise<IAppSetup> =>
+  runtimeJson<IAppSetup>(m, platformPath('/apps/setup'), postJson({ id }));
+
+export const saveAppSettings = (
+  m: MachineId,
+  id: string,
+  values: Record<string, unknown>,
+): Promise<IAppSetup> =>
+  runtimeJson<IAppSetup>(m, platformPath('/apps/setup/settings'), postJson({ id, values }));
+
+/** Puts a secret's value into the machine's safe; the value goes in and never comes back. */
+export const putAppSecret = (m: MachineId, id: string, name: string, value: string): Promise<IAppSetup> =>
+  runtimeJson<IAppSetup>(m, platformPath('/apps/setup/secret'), postJson({ id, name, value }));
+
+export const removeAppSecret = (m: MachineId, id: string, name: string): Promise<IAppSetup> =>
+  runtimeJson<IAppSetup>(m, platformPath('/apps/setup/secret'), postJson({ id, name, remove: true }));

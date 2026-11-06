@@ -1,0 +1,28 @@
+.tp { display: grid; gap: 10px; }
+.tp-head { display: flex; align-items: center; gap: 8px; }
+.tp-key { font-weight: 600; color: var(--t-text-secondary, #666); font-variant-numeric: tabular-nums; }
+.tp-status { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: var(--t-surface-hover, #f1f1f1); }
+.tp-status[data-cat="done"] { background: color-mix(in oklab, var(--t-success, #16a34a) 18%, transparent); }
+.tp-status[data-cat="doing"] { background: color-mix(in oklab, var(--t-accent, #2563eb) 16%, transparent); }
+.tp-title { font-size: 18px; margin: 0; }
+.tp-meta { margin: 0; font-size: 13px; }
+.tp-dod:empty, .tp-mrs:empty, .tp-problem:empty { display: none; }
+.tp-bar { height: 6px; border-radius: 3px; background: var(--t-border, #e5e5e5); overflow: hidden; }
+.tp-bar > i { display: block; height: 100%; background: var(--t-success, #16a34a); transition: width 300ms ease-out; }
+.tp-sub { font-size: 13px; color: var(--t-text-secondary, #666); margin: 0 0 6px; }
+.tp-items { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.tp-items li { display: flex; gap: 6px; }
+.tp-items li[data-done="true"] { color: var(--t-text-secondary, #666); text-decoration: line-through; }
+.tp-mr { display: flex; align-items: baseline; gap: 8px; font-size: 13px; padding: 6px 0;
+  border-top: 1px solid var(--t-border, #e5e5e5); }
+.tp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--t-text-secondary, #999); }
+.tp-dot[data-s="success"] { background: var(--t-success, #16a34a); }
+.tp-dot[data-s="failed"] { background: var(--t-danger, #dc2626); }
+.tp-dot[data-s="running"], .tp-dot[data-s="pending"], .tp-dot[data-s="created"] {
+  background: var(--t-accent, #2563eb); animation: tp-pulse 1.4s ease-in-out infinite; }
+@keyframes tp-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tp-dot { animation: none !important; } .tp-bar > i { transition: none; } }
+.tp-mr-text { flex: 1; min-width: 0; }
+.tp-mr-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-problem { margin: 0; font-size: 13px; color: var(--t-text-secondary, #666); }
+.tp-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }

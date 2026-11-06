@@ -265,6 +265,15 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     onChat,
   });
 
+  // The apps on in this chat: a quiet row over the field, and «+» → «Приложение» to turn one on. The installed list is
+  // read only once the chat has an app (the «+» pane reads it when it opens).
+  const chatApps = useChatApps(machine, conv);
+  // A command of an app turns it on (see onSubmit): the list is read once the field starts with one.
+  const installedApps = useInstalledApps(
+    machine,
+    0,
+    chatApps.on.length > 0 || (provider === 'claude' && text.trimStart().startsWith('/')),
+  ).list;
   const cardSend = useRef<(() => boolean) | null>(null);
   const onSubmit = useCallback(
     (sendMode: TSendMode) => {
@@ -276,37 +285,46 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         toast(t('next.composer.uploadingWait'), { tone: 'info' });
         return;
       }
-      const clientId = sendMessage(machine, {
-        conversationId: conv,
-        text: withAnnotations((extra?.wrap ?? keepText)(withQuotes(quotes, text.trim())), [
-          ...carried.map((note, i) => renumberBlock(note.raw, i + 1)),
-          ...designNotes.map((note, i) =>
-            formatAnnotation({
-              n: carried.length + i + 1,
-              picked: note.picked,
-              comment: note.text,
-              style: note.style,
-              url: note.page,
-              port: note.port,
-            }),
-          ),
-          ...(fileChip
-            ? [
-                formatFileSelection(
-                  carried.length + designNotes.length + 1,
-                  fileChip.path,
-                  fileChip.selection,
-                ),
-              ]
-            : []),
-        ]),
-        attachments: uploads.ready,
-        refs,
-        mode: sendMode === 'now' ? straightTo(working) : 'queue',
-      });
-      extra?.onSent();
+      // A command an installed app answers to (`activation.on: ["command:/x"]`) turns the app on in this chat first: the
+      // resting agent is stopped, and this message brings it back with the app.
+      const word = text.trim().split(/\s/, 1)[0] ?? '';
+      const byCommand =
+        provider === 'claude' && word.startsWith('/')
+          ? installedApps?.apps.find((a) => a.command === word && !chatApps.on.includes(a.id))
+          : undefined;
+      const send = () =>
+        sendMessage(machine, {
+          conversationId: conv,
+          text: withAnnotations((extra?.wrap ?? keepText)(withQuotes(quotes, text.trim())), [
+            ...carried.map((note, i) => renumberBlock(note.raw, i + 1)),
+            ...designNotes.map((note, i) =>
+              formatAnnotation({
+                n: carried.length + i + 1,
+                picked: note.picked,
+                comment: note.text,
+                style: note.style,
+                url: note.page,
+                port: note.port,
+              }),
+            ),
+            ...(fileChip
+              ? [
+                  formatFileSelection(
+                    carried.length + designNotes.length + 1,
+                    fileChip.path,
+                    fileChip.selection,
+                  ),
+                ]
+              : []),
+          ]),
+          attachments: uploads.ready,
+          refs,
+          mode: sendMode === 'now' ? straightTo(working) : 'queue',
+        });
+      if (byCommand) void chatApps.turn(byCommand.id, true).finally(send);
       // The bubble of this message grows out of the place the text left (ui/flight.ts).
-      bindLaunch(clientId);
+      else bindLaunch(send());
+      extra?.onSent();
       // The message is on its way as its own record (submitting), the field is free for the next one.
       clearDraft(conv);
       clearQuotes(conv);
@@ -315,7 +333,23 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       putFileSelectionChip(conv, null);
       uploads.reset();
     },
-    [machine, conv, text, refs, quotes, designNotes, carried, fileChip, uploads, question, working, extra],
+    [
+      machine,
+      conv,
+      text,
+      refs,
+      quotes,
+      designNotes,
+      carried,
+      fileChip,
+      uploads,
+      question,
+      working,
+      extra,
+      provider,
+      installedApps,
+      chatApps,
+    ],
   );
 
   // «Изменить»: the runtime lets the message go (pessimistic), and only then its text is back in the field.
@@ -341,10 +375,6 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         : null,
     [record, machine, cwd, attachedKeys, conv],
   );
-  // The apps on in this chat: a quiet row over the field, and «+» → «Приложение» to turn one on. The installed list is
-  // read only once the chat has an app (the «+» pane reads it when it opens).
-  const chatApps = useChatApps(machine, conv);
-  const installedApps = useInstalledApps(machine, 0, chatApps.on.length > 0).list;
   const appChips = useMemo(
     () => chatApps.on.map((id) => ({ id, name: installedApps?.apps.find((a) => a.id === id)?.name ?? id })),
     [chatApps.on, installedApps],

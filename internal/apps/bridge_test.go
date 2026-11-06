@@ -120,7 +120,7 @@ func TestPublicOnlyIsTheDialersControl(t *testing.T) {
 	for addr, refused := range map[string]bool{
 		"127.0.0.1:443": true, "[::1]:443": true, "100.64.0.1:443": true, "93.184.216.34:443": false, "not-an-address": true,
 	} {
-		if err := publicOnly("tcp", addr, nil); (err != nil) != refused {
+		if err := dialControl(false)("tcp", addr, nil); (err != nil) != refused {
 			t.Errorf("%s: %v", addr, err)
 		}
 	}
@@ -163,7 +163,7 @@ func TestToolFailuresAreShortWords(t *testing.T) {
 func TestCallToolRefusesPlainHTTP(t *testing.T) {
 	_, err := CallTool(context.Background(), MCPServer{URL: "http://x.test/mcp"}, "t", nil)
 	var be *BridgeError
-	if !errors.As(err, &be) || be.Code != CodePolicyBlocked {
+	if !errors.As(err, &be) || be.Code != CodeHostNotAllowed {
 		t.Errorf("%v", err)
 	}
 	// A loopback https server is no public address: the call must not reach it.

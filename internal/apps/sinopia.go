@@ -181,6 +181,14 @@ func (m *Manifest) checkSinopia(targets map[string]bool, add func(path, format s
 		add("sinopia", "%s", decodeMessage(m.Sinopia, err))
 		return
 	}
+	for _, field := range []struct {
+		name string
+		n    int
+	}{{"import", len(s.Import)}, {"export", len(s.Export)}} {
+		if field.n > 0 {
+			add("sinopia."+field.name, "not supported yet: the host does not run it, remove it from the manifest")
+		}
+	}
 	// A contribution to a kind the app does not work in is a mistake: the app would put something where it is not on.
 	kindsOK := func(path string, kinds []string) {
 		for i, k := range kinds {

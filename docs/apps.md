@@ -44,13 +44,14 @@ install points at your folder and is never deleted by `remove`.
 | `harnessly` | yes | Host versions it works with (apps came in 0.16.36): `>=0.16.36`, `>=0.17`, `^0.17`, `>=0.17 <1`, `0.16 \|\| >=0.18` |
 | `trust` | yes | `declarative` (no outbound `network` for views), `sandboxed` (adds `network` and a framed `https://` view), `trusted` (adds local processes; installed by hand). A view's scripts run on every tier |
 | `targets` | yes | `chat`, `pane`, `app`, `sinopia.<kind>`, `sinopia.*` |
-| `activation` | no | `on`: `document` turns the app on in the documents of its kinds. `manual`, `command:/x`, `view`, `always` are checked and turn nothing on. `openView`: the view `harnessly open app:<id>` shows |
-| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `pane.open`, `storage`, `storage.space.write`, `ai`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|export\|kind`, `users.read`, `notify` |
+| `activation` | no | `on`: `document` turns the app on in the documents of its kinds; `always` turns it on in every new Claude chat of the machine (an app the person installed, not a team's); `command:/x` turns it on in a Claude chat when a message starts with `/x` (one app per command, the agent's own commands such as `/clear` are refused). `manual` is checked and turns nothing on; `view` and `template` are refused: not supported yet. `openView`: the view `harnessly open app:<id>` shows |
+| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `pane.open`, `storage`, `storage.space.write`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|kind`, `notify`. `ai`, `users.read` and `sinopia.export` are refused: not supported yet |
 | `network` | no | `connect`, `resources`, `frames`: host names; `*` needs `reason` |
-| `secrets` | no | `{name, description}`: checked, not used yet. There is no install prompt and nothing can read a value. An agent uses `harnessly secret` instead |
-| `settings` | no | JSON Schema of an object: checked, not used yet. There is no install form |
-| `agent` | no | `instructions` and `tools` (`allow`, `deny`, `confirm`) act. `mcp` is what a Sinopia `tool` must name. `skills` is checked against the files (all of `skills/` loads anyway). `context`, `validators`, `flow`, `exclusive` are checked, not used yet |
-| `views` | no | `{id, title, entry, targets}`: `entry` is a file of the package or an `https://` address listed in `network.frames` |
+| `secrets` | no | `{name, description, optional}`; each needs the permission `secrets:<name>`. The person puts the value into the machine's safe from «О приложении», off the chat, under `app/<id>/<name>`. It reaches nobody but the app's MCP servers: the runtime's MCP proxy writes it in place of `${secret:<name>}` in a remote server's `headers` on each call (no file holds it), and a launch writes it in `env` of a local server of a `trusted` app (a folder only that chat's wall opens, removed when the agent is gone). A view, the agent, the host tools and the safe's list never get it. A new value is read at the next launch: no reinstall. An app with a required secret that has no value is «ждёт секрет» (shown in «О приложении»); its chat starts, without the servers that need it |
+| `settings` | no | JSON Schema of an object (`properties` of `string`, `number`, `integer`, `boolean`, with `title`, `description`, `enum`, `default`, `minimum`, `maximum`, `required`). The host draws a form from it in «О приложении» and checks the values against it. They are kept in the `install` storage under `_settings` (a view cannot write that key); a view reads them with `hl.settings.get()`, the agent with the host tool `settings_get` |
+| `agent` | no | `instructions` and `tools` (`allow`, `deny`, `confirm`) act. `mcp` is what a Sinopia `tool` must name. `skills` is checked against the files (all of `skills/` loads anyway). `context` items with `mode: on-activation` are called on `SessionStart` and `UserPromptSubmit` and reach the agent when the answer changes (`on-demand` is checked, not used); `validators`, `exclusive` are checked, not used yet; `flow` is refused: not supported yet |
+| `views` | no | `{id, title, entry, targets}` (`height` is refused: a card sizes itself with `hl.resize`): `entry` is a file of the package or an `https://` address listed in `network.frames` |
+| `icon`, `when`, `storage`, `backend` | no | Refused with «not supported yet»: the host reads them and does nothing. A server is `.mcp.json`; a view keeps its data with `hl.storage` |
 | `chat` | no | `commands` (`/name`, a file `commands/name.md`), `cards` (views with the chat target) |
 
 A target with nothing of the app in it is an error, and so is a contribution to a target the app does not list.
@@ -62,7 +63,7 @@ later. An agent at rest is stopped at once and the next message brings it back w
 what it had until its terminal stops. The launch then gets:
 
 - the package as a Claude Code plugin (`--plugin-dir`): its skills, commands and `.mcp.json` servers;
-- the instructions files of all its apps in the system prompt, under `# Apps on in this chat`;
+- the instructions files of all its apps in the system prompt, under `# Apps on in this chat` (at most 16 KB each; the chat's budget for all of them is 48 KB, about 12k tokens: an app that goes past it is still turned on, with a warning);
 - a snapshot of the apps' tool rules (`<data>/apps/launch/policy-*.json`) and the chat's own settings plus the
   `harnessly hook app-guard --policy <snapshot>` PreToolUse hook, which decides each tool call by it, locally.
 
@@ -122,7 +123,7 @@ One dependency-free file the runtime serves to every view at `/__hl/app-sdk.js` 
 | `hl.chat.read({last})` | `chat.read` | The latest messages of the chat |
 | `hl.chat.card(view, data)` | `chat.card` | A card of the app in the feed |
 | `hl.pane.open(target)` | `pane.open` | Opens `app:<id>[/<view>]`; anything else is `invalid_params` |
-| `hl.tools.call('server.tool', args)` | none | A tool of the app's own remote MCP server (`.mcp.json`), called by the machine: `https://` on a public address only, 30 s, 4 MB. A `command` server is `policy_blocked`, a header with `${` is not sent. Answers the raw MCP result, `isError` included |
+| `hl.tools.call('server.tool', args)` | none | A tool of the app's own remote MCP server (`.mcp.json`), called by the machine: `https://` on a public address, or an internal host the deployment lists (`RUNTIME_APPS_INTERNAL_HOSTS`, `RUNTIME_APPS_CA_FILE`), 30 s, 4 MB. A `command` server is `policy_blocked`, a header with `${` is not sent. Answers the raw MCP result, `isError` included |
 | `hl.storage.<scope>.get/set/delete/keys` | `storage` | Scopes `install`, `user`, `chat`, `space`, `doc`; writing `space` needs `storage.space.write` |
 | `hl.flow.*`, `hl.data.*` | none | Not connected in the page yet: `host_unavailable` |
 | `hl.ui.toast/confirm`, `hl.notify(text)` | `notify` for the last | A notice, a question, a message to the person |
@@ -171,9 +172,8 @@ A tool of the app's own MCP server names a view of the app and the data to draw 
 {"_meta":{"ui":{"resourceUri":"ui://acme.cashback/card"}},"data":{"percent":5}}
 ```
 
-The feed draws the app's view `card` (a view with the `chat` target) under that tool step, through the same bridge; the data is `hl.context.data`. The feed reads this
-from the agent's transcript, where a result is the first line of its text, cut at 100 characters: so the answer's `text` has to be this one line, under 100 characters, and a card
-with more to show reads it from a file or storage. "Open in the pane" opens the app's pane view. Only a tool of the app's own server may name the app's view.
+The feed draws the app's view `card` (a view with the `chat` target) under that tool step, through the same bridge; the data is `hl.context.data`. The whole answer may
+run up to 64 KB. A card the agent shows or changes on its own is a widget (`harnessly widget`, tools `widget_show` and `widget_render`). "Open in the pane" opens the app's pane view. Only a tool of the app's own server may name the app's view.
 
 ### The app as the main thing
 
@@ -268,6 +268,7 @@ one app is on. Claude writes tool names with `_`, the tool rules with `.`: `mcp_
 | --- | --- |
 | `open` (`app.open`) | Opens the app's view for the pane (`view`, the first one when omitted) in the person's pane |
 | `data_get`, `data_set` (`app.data.get`, `app.data.set`) | The app's `chat` storage of this chat by `key`: the same data its view reads with `hl.storage.chat`, with the same limits |
+| `settings_get` (`app.settings.get`) | The app's settings: what the person saved in its form over the defaults (what `hl.settings.get()` gives a view). Secrets are never in it |
 | `ask` (`app.ask`) | Puts a choice (`question`, 2 to 8 `options`) to the person in the app and waits up to ten minutes; answers with the option or `cancelled` |
 
 The host's choice is drawn over the app's view with the app's name and answered through `GET <platform>/apps/asks?conversation=`
@@ -296,13 +297,13 @@ The document types an app adds are `sinopia.kinds`, below.
 | `selection` | An item of the bar that shows while elements are picked. `agent`: a task for the chat linked to the document, with the elements as an `<annotation>`; `tool`: a tool `<server>.<tool>` of the app's own MCP server, called with `{document, nodes}` |
 | `bindings` | Elements of a board with `data-hl-field="<name>"` belong to the app. A click on one opens `inspector` (a view of the app) on that field: the element is put into the selection first (`hl.sinopia.selection()`), an inspector already open is told by the `selection` event `{document, field, nodes}`. `data-hl-attr="<attribute>"` makes the field set that attribute, else it is the element's words. `schema` is a JSON Schema (type, enum, minimum/maximum, minLength/maxLength, pattern) that every written value must meet. `lockUnbound` refuses hand edits of the elements that carry no binding |
 | `checks` | Run when the document is saved (the boards changed) and when it is shared or published (`on`). A finding is a mark on the element: the board outlines it and shows the note. `blockShare` (`error` or `warning`) is the level from which a finding stops the share: the share and publish buttons ask the checks first and, if one blocks, show what it found instead of opening |
+| `import`, `export` | Refused: not supported yet (the document's `render()` is not available either) |
 | `templates` | Folders of the package with a `board.dc.html`; `hl.sinopia.boards.add({template})` adds a board made from one |
 
 A check is one of two kinds. `rules` are evaluated by the host and need no server: `{id, select, level, message, fix?}` plus one
 limit, `maxWords` or `maxChars` (the element's own text, not its block children's) or `minFontPx` (its inline `font-size`);
 `message` may say `{n}` and `{limit}`. `tool` names a tool `<server>.<tool>` of the app's MCP server, called with
-`{trigger, document, nodes}` and answering `{findings: [{node, level, message, rule?, fix?}]}`. `when` expressions are not
-evaluated yet.
+`{trigger, document, nodes}` and answering `{findings: [{node, level, message, rule?, fix?}]}`.
 
 The Document API is the same for a view (`hl.sinopia.*`, over the bridge) and the agent (the tools `sinopia_*` of
 `harnessly-app`, rule `app.sinopia.*`). It reads and writes the boards of a document that has `meta/` and `.dc.html` boards
@@ -540,6 +541,21 @@ holds now, in layers:
 - **Claude's own deny rules** are written into the chat's settings: `Edit(//<registry>/**)` for the registry and each app's
   package (Edit's rule covers Write, MultiEdit and NotebookEdit), so the file tools are refused by Claude itself, not only by
   the hook.
+- **The apps' rules in Claude's permissions too.** A hook that did not start or ran past its 15 s is a non-blocking error to
+  Claude Code, and the call would go through. So each `deny` of an app is also written as `permissions.deny` and each `confirm`
+  as `permissions.ask`, in Claude's syntax: `Bash(git push*)` as `Bash(git push:*)`, `bank.drop` as
+  `mcp__plugin_<plugin>_bank__drop` and `mcp__bank__drop`, `bank.*` as the whole server, `app.*` as `mcp__harnessly-app`,
+  `Edit(/abs/*)` as `Edit(//abs/*)` (it covers Write, MultiEdit and NotebookEdit too). What Claude cannot say exactly stays with
+  the hook alone: `*` and `mcp:*`, a mask on a MCP tool name, a path mask that is not absolute, rules on other tools with a
+  mask. Claude ranks deny, ask, allow whatever the specificity, so a `deny`/`confirm` that a narrower rule of the same app
+  overrides is not written (`confirm Bash(git*)` with `allow Bash(git status*)`). A chat with apps also does not start when
+  the guard does not answer a probe run at the launch («the apps' guard does not answer»).
+- **Plugin parts.** A `declarative` or `sandboxed` package carries only `skills/`, `commands/`, `.mcp.json` (remote servers),
+  `harnessly/`, `ui/` and its own data. `hooks/`, `agents/`, `output-styles/`, `monitors/`, `themes/`, `bin/`, `settings.json`,
+  `.lsp.json` and the keys of `.claude-plugin/plugin.json` that name them (or declare MCP servers) are refused on validate,
+  install and when a catalog takes the package, naming the folder: Claude Code loads them from the plugin's root, outside the
+  guard. A `trusted` package may carry them; `validate` lists each as a warning and the app's description (`pluginParts`)
+  shows them.
 - **Off from the page only.** `POST /api/cli/apps/enable` with `on: false` from the tab of a chat that has apps is refused
   (`use-page`); the page's switch (`conversation.apps`) does it.
 - **The source of every app is out of reach.** The registry and the package and source folder of every installed app are read-only in a chat with any app,
@@ -547,7 +563,7 @@ holds now, in layers:
 
 - **A token of the launch, not the person's.** The agent's CLI calls the runtime with a token of its own launch,
   `agent.<launch>.<expMs>.<hmac>` signed with the runtime's `agent-token-key` and good for 30 days (a resume issues a new one),
-  read from the private file `HARNESSLY_CLI_TOKEN_FILE` names. With it, the routes that change the apps (`install`, `remove`,
+  read from the private file `HARNESSLY_CLI_TOKEN_FILE` names. That file, the launch's grant and its MCP configs live in the launch's own folder `<data>/app-launch/<launch>/`, which the wall binds read-only for that chat only: another chat's agent does not see them, and the runtime removes the folder when the launch's agent is gone. With it, the routes that change the apps (`install`, `remove`,
   `enable`, `promote`, `rollback`, `follow`, `sync`, `team/*`, `share`, `unshare`, `public/install`, `public/publish`, and
   `publish` past dev and beta) answer 403 `agent_cannot_change_apps`, however the request was sent; the rest of the CLI
   (tabs, `open`, notifications, reading the apps) takes it as the cli-token. A forged or expired agent token is no token.

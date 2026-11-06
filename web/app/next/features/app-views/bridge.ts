@@ -11,6 +11,9 @@ export type TBridgeCode =
   | 'not_in_target'
   | 'policy_blocked'
   | 'network_denied'
+  | 'host_not_allowed'
+  | 'tls_untrusted'
+  | 'upstream_error'
   | 'rate_limited'
   | 'host_unavailable'
   | 'invalid_params';
@@ -20,6 +23,9 @@ const CODES: readonly string[] = [
   'not_in_target',
   'policy_blocked',
   'network_denied',
+  'host_not_allowed',
+  'tls_untrusted',
+  'upstream_error',
   'rate_limited',
   'host_unavailable',
   'invalid_params',
@@ -52,6 +58,7 @@ export const METHOD_PERMISSION = {
   'harnessly/storage.set': 'storage',
   'harnessly/storage.delete': 'storage',
   'harnessly/storage.keys': 'storage',
+  'harnessly/settings.get': '',
   'harnessly/notify': 'notify',
   'harnessly/files.read': 'files.read',
   'harnessly/files.write': 'files.write',
@@ -163,6 +170,8 @@ export interface IBridgeHandlers {
     key: string,
     value?: unknown,
   ) => Promise<unknown>;
+  /** The settings the person saved in the app's form, over the schema's defaults. */
+  settings?: () => Promise<unknown>;
   chatSend?: (text: string) => Promise<void>;
   chatRead?: (last: number) => Promise<{ role: string; text: string }[]>;
   chatCard?: (view: string, data: unknown) => Promise<void>;
@@ -507,6 +516,8 @@ export class AppBridge {
         return {};
       case 'harnessly/storage.keys':
         return { keys: await this.need('storage')('keys', scope(), '-') };
+      case 'harnessly/settings.get':
+        return { value: (await this.need('settings')()) ?? {} };
       case 'harnessly/notify':
         await this.need('notify')(str('text', 2000));
         return {};

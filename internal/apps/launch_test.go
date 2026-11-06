@@ -158,7 +158,7 @@ func TestLaunchMCPConfigsCarryTheAgentToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := &Launcher{Registry: reg, MCPConfigPath: cfg, AgentToken: func(session string, _ time.Duration) (string, error) { return "agent." + session + ".1.mac", nil }}
-	path, token, err := l.agentTokenFile(dir)
+	path, token, _, err := l.agentTokenFile()
 	if err != nil || path == "" {
 		t.Fatal(err)
 	}
@@ -183,5 +183,39 @@ func TestLaunchMCPConfigsCarryTheAgentToken(t *testing.T) {
 		if strings.Contains(string(raw), "person-token") || !strings.Contains(string(raw), token) {
 			t.Fatalf("%s: %s", f, raw)
 		}
+	}
+}
+
+func TestLauncherWritesClaudeRulesAndProbesGuard(t *testing.T) {
+	data := t.TempDir()
+	reg := &Registry{Root: filepath.Join(data, "apps")}
+	pkg := scaffold(t, "acme.review", "chat")
+	raw, _ := os.ReadFile(filepath.Join(pkg, ManifestPath))
+	raw = []byte(strings.Replace(string(raw), `"instructions"`, `"tools": {"deny": ["Bash(git push*)"], "confirm": ["Bash(npm publish*)"]}, "instructions"`, 1))
+	if !strings.Contains(string(raw), `"tools"`) {
+		t.Skip("the chat template has no agent.instructions to hang the rules on")
+	}
+	if err := os.WriteFile(filepath.Join(pkg, ManifestPath), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := reg.Install(pkg, InstallOptions{Dev: true, HostVersion: "0.17.0"}); err != nil {
+		t.Fatal(err)
+	}
+	base := filepath.Join(t.TempDir(), "s.json")
+	_ = os.WriteFile(base, []byte(`{}`), 0o600)
+	l := &Launcher{Registry: reg, GuardCommand: "/bin/harnessly hook app-guard"}
+	got, err := l.Claude([]string{"acme.review"}, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := os.ReadFile(got.Settings)
+	for _, want := range []string{`"Bash(git push:*)"`, `"ask"`, `"Bash(npm publish:*)"`} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("settings lack %s: %s", want, body)
+		}
+	}
+	l.GuardProbe = func(string) error { return os.ErrNotExist }
+	if _, err := l.Claude([]string{"acme.review"}, base); err == nil || !strings.Contains(err.Error(), "guard does not answer") {
+		t.Errorf("a guard that does not answer must stop the launch: %v", err)
 	}
 }

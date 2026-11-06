@@ -8,6 +8,7 @@ import {
   type IAppView,
   type IInstalledApp,
 } from '@/next/features/app-views/api';
+import AppSetup from '@/next/features/app-views/app-setup';
 import { clearLog, logKey, useBridgeLog } from '@/next/features/app-views/bridge-log';
 import type { IBridgeLogEntry, TStorageScope, TTarget } from '@/next/features/app-views/bridge';
 import { clock } from '@/next/i18n/format';
@@ -121,6 +122,9 @@ export interface IAppInspectorProps {
   agentWalled: boolean;
 }
 
+/** The size of instructions in tokens, estimated as bytes / 4 (the runtime's apps.EstimateTokens). */
+export const instructionTokens = (bytes: number): number => Math.ceil(bytes / 4);
+
 const AppInspector = ({
   machine,
   app,
@@ -147,9 +151,17 @@ const AppInspector = ({
           <span>{app.id}</span>
           <span>{app.version}</span>
           <span>{t(`next.inspector.trust.${app.trust}`)}</span>
+          {!!app.instructionsBytes && (
+            <span>{t('next.inspector.tokens', { n: instructionTokens(app.instructionsBytes) })}</span>
+          )}
         </div>
+        {app.always && <p className="hx-insp__text">{t('next.inspector.always')}</p>}
+        {app.command && (
+          <p className="hx-insp__text">{t('next.inspector.command', { command: app.command })}</p>
+        )}
         {showsUnwalled(app, agentWalled) && <p className="hx-insp__warn">{t('next.inspector.unwalled')}</p>}
       </div>
+      <AppSetup machine={machine} app={app} />
       <div className="hx-insp__sec">
         <h3 className="hx-insp__h">{t('next.inspector.rights')}</h3>
         {app.permissions.length === 0 ? (

@@ -291,7 +291,7 @@ step "Run the machine's runtime and agent"
 (
 	export HOME="$MHOME" TMUX_TMPDIR="$T/tmux" AGENT_DATA_DIR="$MHOME/.harnessly" AGENT_POLICY_FILE="$MHOME/policy.toml"
 	export RUNTIME_GATE_LISTEN="127.0.0.1:$RT_PORT" RUNTIME_GATE_UPSTREAM='' RUNTIME_APP_BASE_PATH="$BASE" RUNTIME_HUB_URL="$HUB"
-	export RUNTIME_PREVIEW_LISTEN=off RUNTIME_WORKSPACE_DIR="$MHOME/work"
+	export RUNTIME_PREVIEW_MODE=path RUNTIME_WORKSPACE_DIR="$MHOME/work"
 	exec "$T/bin/harnessly-runtime"
 ) >"$T/runtime.log" 2>&1 &
 PIDS+=($!)
@@ -440,6 +440,52 @@ fi
 SET_COOKIES=$(curl -sS -o /dev/null -D - -b "$OWNER" "$HUB$BASE/api/auth/setup" | grep -ci '^set-cookie:' || true)
 expect "no cookie of the runtime reaches the browser" "$SET_COOKIES" 0
 
+# --- the preview by path through the hub (one host, no subdomains: docs/deploy.md) -------------------------------
+
+step "The preview of a localhost server by path, through the hub"
+PV_PORT=$((RT_PORT + 30))
+mkdir -p "$T/devsite/api"
+printf '<!doctype html><base href="/"><script type="module" src="/app.js"></script><link rel="stylesheet" href="/a.css">' >"$T/devsite/index.html"
+printf 'import "/dep.js"; fetch("/api/x.json")' >"$T/devsite/app.js"
+printf 'body{background:url(/bg.png)}' >"$T/devsite/a.css"
+printf '{"dev":true}' >"$T/devsite/api/x.json"
+(cd "$T/devsite" && exec python3 -m http.server "$PV_PORT" --bind 127.0.0.1) >"$T/devsite.log" 2>&1 &
+PIDS+=($!)
+wait_for "the dev server answers" 20 curl -fsS -o /dev/null "http://127.0.0.1:$PV_PORT/" || die "no dev server"
+OPEN=$(curl -sS -o "$T/pv.json" -w '%{http_code}' -b "$OWNER" -X POST -H 'Content-Type: application/json' -H "Origin: $HUB" \
+	--data "{\"target\":{\"kind\":\"port\",\"port\":$PV_PORT},\"slot\":1,\"path\":\"/\"}" "$HUB$BASE/api/preview/open")
+expect "the page opens a slot by path" "$OPEN" 200
+expect "…it is a slot by path" "$(jq -r .byPath "$T/pv.json")" true
+PV=$(jq -r .origin "$T/pv.json")
+PVP=${PV#"$HUB"}
+check "…on the hub's own host, under the machine's path ($PVP)" bash -c "[[ '$PVP' =~ ^$BASE/__pv/1-[0-9a-f]{32}\$ ]]"
+# The frame is sandboxed (opaque origin): its requests carry neither the hub's session nor Origin of the hub.
+DOC=$(curl -sS -o "$T/pv.html" -D "$T/pvh.txt" -w '%{http_code}' -H 'Sec-Fetch-Dest: iframe' -H 'Sec-Fetch-Mode: navigate' "$PV/")
+expect "the document comes without the hub's session" "$DOC" 200
+check "…its root paths get the slot's prefix" grep -q "src=\"$PVP/app.js\"" "$T/pv.html"
+check "…<base href> too" grep -q "href=\"$PVP/\"" "$T/pv.html"
+if [[ $HUB == https://* ]]; then
+	check "…the bridge is in it" grep -q "$PVP/__tk/bridge.js" "$T/pv.html"
+else
+	say "  info  no bridge over plain http: the bridge talks only to an https parent"
+fi
+check "…sandboxed without allow-same-origin" bash -c "grep -i '^content-security-policy:.*sandbox' '$T/pvh.txt' | grep -vqi allow-same-origin"
+JS=$(curl -sS -o "$T/pv.js" -D "$T/pvjs.txt" -w '%{http_code}' -H 'Origin: null' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: cross-site' "$PV/app.js")
+expect "a module of the page loads from the opaque frame" "$JS" 200
+check "…its imports get the prefix" grep -q "$PVP/dep.js" "$T/pv.js"
+check "…CORS lets the opaque frame read it" grep -qi '^access-control-allow-origin: null' "$T/pvjs.txt"
+check "…the style's url() gets the prefix" bash -c "curl -fsS -H 'Origin: null' '$PV/a.css' | grep -q 'url($PVP/bg.png)'"
+expect "the page's fetch to its own API goes to the dev server" "$(curl -sS -H 'Origin: null' "$PV/api/x.json")" '{"dev":true}'
+BADKEY=$(curl -sS -H 'Origin: null' "$HUB$BASE/__pv/1-$(printf '0b%.0s' $(seq 16))/api/x.json")
+check "a made-up key reaches nothing of the dev server (it gets the way back)" bash -c "grep -q hl-preview-reload <<<'$BADKEY' && ! grep -q dev <<<'$BADKEY'"
+STATE=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Origin: null' -H 'Sec-Fetch-Site: cross-site' "$HUB$BASE/api/state")
+check "the runtime's API stays closed to the frame ($STATE)" bash -c "[ '$STATE' != 200 ]"
+SW=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Service-Worker: script' "$PV/app.js")
+expect "no service worker on the hub's origin" "$SW" 403
+BACK=$(curl -sS -o "$T/back.html" -w '%{http_code}' -H 'Sec-Fetch-Dest: iframe' -H 'Sec-Fetch-Site: cross-site' -H 'Sec-Fetch-Mode: navigate' "$HUB/users/7")
+expect "a reload of the frame past the prefix gets the way back" "$BACK" 200
+check "…it asks the pane to reopen the path" grep -q 'hl-preview-reload' "$T/back.html"
+
 # --- organizations: a space moves into one (HUB_ORGS=shadow, docs/hub/orgs.md) ------------------------------------
 
 step "The space moves into an organization: its machine stays online, the open runtime keeps its session"
@@ -582,7 +628,7 @@ if [ -n "$SHOTS_DIR" ] && [ -n "$WEB_DIR" ]; then
 	(
 		export HOME="$SHOT_HOME" TMUX_TMPDIR="$T/tmux" AGENT_DATA_DIR="$SHOT_HOME/.harnessly" AGENT_POLICY_FILE="$SHOT_HOME/policy.toml"
 		export RUNTIME_GATE_LISTEN="127.0.0.1:$RT2" RUNTIME_GATE_UPSTREAM='' RUNTIME_APP_BASE_PATH="$BASE2" RUNTIME_HUB_URL="$HUB"
-		export RUNTIME_PREVIEW_LISTEN=off RUNTIME_WORKSPACE_DIR="$SHOT_HOME/work"
+		export RUNTIME_PREVIEW_MODE=path RUNTIME_WORKSPACE_DIR="$SHOT_HOME/work"
 		exec "$T/bin/harnessly-runtime"
 	) >"$T/runtime2.log" 2>&1 &
 	PIDS+=($!)

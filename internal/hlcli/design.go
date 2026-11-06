@@ -266,8 +266,11 @@ func (c *cli) hook(args []string) error {
 	if len(args) == 3 && args[0] == "app-guard" && args[1] == "--policy" {
 		return c.appGuard(args[2])
 	}
+	if len(args) == 3 && args[0] == "app-context" && args[1] == "--policy" {
+		return c.appContext(args[2])
+	}
 	if len(args) != 1 || (args[0] != "design-guard" && args[0] != "design-release") {
-		return usageErr("hook design-guard|design-release|app-guard --policy <file>")
+		return usageErr("hook design-guard|design-release|app-guard --policy <file>|app-context --policy <file>")
 	}
 	if args[0] == "design-release" {
 		c.releaseLeases()

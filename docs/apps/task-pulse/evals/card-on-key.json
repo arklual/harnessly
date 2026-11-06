@@ -1,0 +1,10 @@
+{
+  "prompt": "Что там с HRN-784, CI прошёл?",
+  "expect": {
+    "tool_used": ["Bash"],
+    "tool_not_used": ["Write", "Edit"],
+    "max_tool_calls": 8
+  },
+  "graders": [{ "llm": "The agent showed the task's card with one shell command that ends in `harnessly widget render ... --id task-hrn-784`, and did not retell the whole card in words." }],
+  "runs": 1
+}

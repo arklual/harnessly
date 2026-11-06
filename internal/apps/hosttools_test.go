@@ -259,3 +259,43 @@ func TestHostToolsSinopia(t *testing.T) {
 		t.Error("Has")
 	}
 }
+
+func TestHostToolsWidgets(t *testing.T) {
+	data := t.TempDir()
+	reg := &Registry{Root: filepath.Join(data, "apps")}
+	pkg := filepath.Join(t.TempDir(), "acme.meter")
+	if err := Scaffold(pkg, "acme.meter", "Meter", "widget"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := reg.Install(pkg, InstallOptions{Dev: true, HostVersion: "0.17.0"}); err != nil {
+		t.Fatal(err)
+	}
+	changed := 0
+	h := HostTools{Conv: "tab-1", Registry: reg, Storage: &Storage{Root: filepath.Join(data, "storage")}, Asks: NewAsks(),
+		Widgets: &Widgets{Root: filepath.Join(data, "widgets")}, WidgetChanged: func(string) { changed++ },
+		Enabled: func() []string { return []string{"acme.meter"} }}
+	text, bad := call(t, h, "widget_show", "view", "card", "data", jsvalue.NewObject("title", "Готово", "value", 40), "id", "progress")
+	if bad || text != "widget progress shown" {
+		t.Fatalf("show: %q", text)
+	}
+	if text, bad := call(t, h, "widget_show", "view", "card", "data", jsvalue.NewObject("value", 80), "id", "progress"); bad || text != "widget progress changed" {
+		t.Fatalf("change: %q", text)
+	}
+	got, err := h.Widgets.Get("tab-1", "progress")
+	if err != nil || got.Rev != 2 || string(got.Data) != `{"value":80}` || got.App != "acme.meter" {
+		t.Fatalf("kept: %v %+v", err, got)
+	}
+	if text, bad := call(t, h, "widget_show", "view", "nope"); !bad || !strings.Contains(text, "no view nope for the chat") {
+		t.Fatalf("no such view: %q", text)
+	}
+	text, bad = call(t, h, "widget_render", "title", "График", "html", `<div class="chart" id="c"></div>`, "script", "echarts.init(c)")
+	if bad || !strings.HasPrefix(text, "widget w") {
+		t.Fatalf("render: %q", text)
+	}
+	if text, bad := call(t, h, "widget_render", "title", "x", "html", `<script>alert(1)</script>`); !bad || !strings.Contains(text, "not in the markup") {
+		t.Fatalf("inline script: %q", text)
+	}
+	if changed != 3 {
+		t.Fatalf("changed told %d times", changed)
+	}
+}

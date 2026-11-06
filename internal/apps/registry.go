@@ -105,6 +105,8 @@ var (
 	ErrInvalid = errors.New("apps: the package has errors")
 	// ErrPluginName: another installed app has the same plugin name.
 	ErrPluginName = errors.New("apps: another installed app has the same plugin name")
+	// ErrCommandTaken: another installed app turns on by the same slash command.
+	ErrCommandTaken = errors.New("apps: another installed app has the same command")
 	// ErrHostVersion: the app does not work with this host's version.
 	ErrHostVersion = errors.New("apps: needs another harnessly version")
 )
@@ -198,6 +200,14 @@ type InstallOptions struct {
 // all the check found (warnings included); an install with errors is refused with ErrInvalid.
 func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems, error) {
 	pkg, ps := LoadPackage(dir)
+	if pkg == nil {
+		// A manifest this host cannot read may ask for a newer one: say which.
+		if raw, err := os.ReadFile(filepath.Join(dir, ManifestPath)); err == nil {
+			if ok, wanted := HostAllows(raw, opt.HostVersion); !ok {
+				return Installed{}, ps, fmt.Errorf("%w: the app wants harnessly %s, this is %s (%s)", ErrHostVersion, wanted, opt.HostVersion, ps.Error())
+			}
+		}
+	}
 	if pkg == nil || len(ps.Errors()) > 0 {
 		return Installed{}, ps, ErrInvalid
 	}
@@ -226,6 +236,15 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 	for _, other := range everyone {
 		if other.ID != m.ID && PluginName(other.ID) == PluginName(m.ID) {
 			return Installed{}, ps, fmt.Errorf("%w: %s and %s would be the same plugin %s", ErrPluginName, m.ID, other.ID, PluginName(m.ID))
+		}
+	}
+
+	// A slash command turns one app on: a second app with the same command is refused.
+	if cmd := m.Command(); cmd != "" {
+		for _, other := range everyone {
+			if other.ID != m.ID && other.Manifest != nil && other.Manifest.Command() == cmd {
+				return Installed{}, ps, fmt.Errorf("%w: %s is %s's", ErrCommandTaken, cmd, other.ID)
+			}
 		}
 	}
 
@@ -412,7 +431,7 @@ func (r *Registry) Package(id string) (*Package, error) {
 	if err != nil {
 		return nil, err
 	}
-	pkg, ps := LoadPackage(a.Dir)
+	pkg, ps := CachedPackage(a.Dir)
 	if pkg == nil {
 		return nil, fmt.Errorf("apps: %s: %s", id, ps.Error())
 	}

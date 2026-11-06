@@ -1333,6 +1333,11 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 		Provider: m.Provider, Model: m.Model, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
 		ParentID: parentID, Rev: 1}
+	if m.Provider == wire.ProviderClaude && r.d.AlwaysApps != nil {
+		if ids := r.d.AlwaysApps(); len(ids) > 0 && (r.d.AppsOK == nil || r.d.AppsOK(ids) == "") {
+			rec.Apps = append([]string(nil), ids...)
+		}
+	}
 	if m.First != nil {
 		rec.Title = titleOf(firstMessageTitle(m.First.Text))
 	}
@@ -1391,6 +1396,9 @@ func (r *Runtime) openConv(rec wire.Conversation, req LaunchRequest, first *wire
 	r.add(c)
 	id := rec.ID
 	req.ID = id
+	// The chat's apps ride with its first launch as with every relaunch (conv.go): a chat that lists an app always runs
+	// its agent with it.
+	req.Apps = rec.Apps
 	var res wire.CmdResult
 	// The conversation was added a line above, so only a stop of its actor fails this call; it is then gone.
 	_ = r.call(context.Background(), id, func(c *conv, now time.Time) {

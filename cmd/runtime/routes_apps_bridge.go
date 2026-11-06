@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/secrets"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -107,6 +108,10 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		if !ok {
 			return apps.Session{}, apps.Installed{}, &apps.BridgeError{Code: apps.CodeHostUnavailable, Message: "no such view session"}
 		}
+		// An agent's own widget has no package: no storage, tools or files of an app.
+		if sess.App == apps.WidgetsApp {
+			return apps.Session{}, apps.Installed{}, apps.ErrNotInstalled
+		}
 		app, err := reg.Get(sess.App)
 		if err != nil {
 			return apps.Session{}, apps.Installed{}, err
@@ -120,6 +125,22 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 	// open issues the session of a view the page mounts: the app has to be installed and the view has to be one for the
 	// target. The reply is the address to open on the view server.
 	open := session(func(_ context.Context, b bridgeBody) (int, any) {
+		// The agent's own widget: no package, the chat's widget names it, and only its files are served.
+		if b.App == apps.WidgetsApp {
+			if b.Target != apps.TargetChat || b.Conversation == "" || views.Widgets == nil {
+				return refused(&apps.BridgeError{Code: apps.CodeNotInTarget, Message: "a widget is shown in a chat"})
+			}
+			wd, err := views.Widgets.Get(b.Conversation, b.View)
+			if err != nil || wd.Kind != apps.WidgetHTML {
+				return http.StatusNotFound, map[string]string{"error": "not-found"}
+			}
+			sess, err := views.Sessions.IssueIn(apps.WidgetsApp, wd.ID, apps.TargetChat, b.Conversation, "")
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"session": sess.Token, "nonce": sess.Nonce,
+				"path": "/" + sess.Token + "/" + apps.WidgetsApp + "/" + wd.ID + "/index.html"}
+		}
 		app, err := reg.Get(b.App)
 		if err != nil {
 			return refused(err)
@@ -183,6 +204,10 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 			return refused(err)
 		}
 		scope := apps.Scope(b.Scope)
+		// The settings are written by the form, which checks them against the schema; a view reads them with hl.settings.
+		if scope == apps.ScopeInstall && b.Key == apps.SettingsKey && (b.Op == "set" || b.Op == "delete") {
+			return refused(apps.ErrStorageArgs)
+		}
 		// An area of a chat is the chat the view is mounted in; a view with no chat has none, and no view is bound to a
 		// document yet.
 		owner := ""
@@ -244,11 +269,33 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		if err != nil {
 			return refused(err)
 		}
-		result, err := apps.CallTool(ctx, pkg.MCP[server], name, b.Args)
+		// The machine fills the app's secrets into the server's headers; the view never holds one. A server whose secret
+		// has no value is not called: the app waits for it.
+		srv, missing := pkg.MCP[server].Filled(revealApp(safeFor(d).store, sess.App, pkg.MCP[server].Secrets()))
+		if len(missing) > 0 {
+			return refused(&apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a secret"})
+		}
+		result, err := apps.CallTool(ctx, srv, name, b.Args)
 		if err != nil {
 			return refused(err)
 		}
 		return http.StatusOK, map[string]any{"result": result}
+	})
+
+	// settings: hl.settings.get(), the values the person saved in the app's form over the schema's defaults.
+	settings := session(func(_ context.Context, b bridgeBody) (int, any) {
+		sess, app, err := live(b)
+		if err != nil {
+			return refused(err)
+		}
+		if err := app.Manifest.Authorize("harnessly/settings.get", sess.Target, nil); err != nil {
+			return refused(err)
+		}
+		values, err := storage.Settings(app.Manifest, sess.App)
+		if err != nil {
+			return refused(err)
+		}
+		return http.StatusOK, map[string]any{"value": values}
 	})
 
 	// files: a file of the workspace of the chat the view is in. The workspace is the chat's own folder, read from the
@@ -305,9 +352,22 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		{Match: is("/agents" + platformAPI + "/apps/session"), Handler: open},
 		{Match: is(platformAPI + "/apps/session/renew"), Handler: renew},
 		{Match: is("/agents" + platformAPI + "/apps/session/renew"), Handler: renew},
+		{Match: is(platformAPI + "/apps/settings"), Handler: settings},
+		{Match: is("/agents" + platformAPI + "/apps/settings"), Handler: settings},
 		{Match: is(platformAPI + "/apps/storage"), Handler: store},
 		{Match: is(platformAPI + "/apps/tool"), Handler: tool},
 		{Match: is("/agents" + platformAPI + "/apps/storage"), Handler: store},
 		{Match: is("/agents" + platformAPI + "/apps/tool"), Handler: tool},
 	}
+}
+
+// revealApp is the values of an app's secrets by their names; one with no value is left out.
+func revealApp(store *secrets.Store, app string, names []string) map[string]string {
+	out := map[string]string{}
+	for _, n := range names {
+		if v, err := store.RevealApp(app, []string{n}); err == nil {
+			out[n] = v[n]
+		}
+	}
+	return out
 }

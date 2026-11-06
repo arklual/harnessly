@@ -31,6 +31,15 @@ var sdkDTS []byte
 //go:embed sdk/bridge-shim.js
 var shimJS []byte
 
+//go:embed sdk/widget.css
+var widgetCSS []byte
+
+// echartsJS is Apache ECharts (Apache-2.0), the charts library the host gives every view as a classic script
+// (window.echarts), so an agent's widget draws a chart without the network.
+//
+//go:embed sdk/lib/echarts.min.js
+var echartsJS []byte
+
 // SDKPath is where every view finds @harnessly/app-sdk as a classic script (window.harnessly); SDKModulePath is the
 // same code as an ES module. A view runs on an opaque origin (see ViewCSP), where a module script cannot carry the
 // slot's cookie, so the classic one is what a view loads.
@@ -40,6 +49,10 @@ const (
 	// ShimPath is the script the server puts first in every page it serves: it makes the handshake with the page's nonce
 	// and gives the view a window.parent that speaks on the MessageChannel port the host hands over.
 	ShimPath = "/__hl/bridge-shim.js"
+	// WidgetBaseCSSPath is the host's base style of an agent's widget; any view may load it.
+	WidgetBaseCSSPath = "/__hl/widget.css"
+	// EChartsPath is the charts library every view may load (window.echarts).
+	EChartsPath = "/__hl/lib/echarts.js"
 )
 
 // classicSDK is the SDK as a classic script: the module without its exports, publishing window.harnessly.
@@ -147,6 +160,8 @@ func cspSources(list []string) []string {
 // SDK's carries the token of a view session (/<token>/<app>/<file>) and the session's app must be the path's.
 type ViewServer struct {
 	reg *Registry
+	// Widgets are the agents' own widgets (WidgetsApp), served under a session for their chat; nil serves none.
+	Widgets *Widgets
 	// Sessions are the mounted views; the page issues one per view it shows.
 	Sessions *ViewSessions
 
@@ -239,12 +254,22 @@ func (s *ViewServer) Handler() http.Handler {
 		case "/__hl/app-sdk.d.ts":
 			serveBytes(w, r, "text/plain; charset=utf-8", sdkDTS)
 			return
+		case WidgetBaseCSSPath:
+			serveBytes(w, r, "text/css; charset=utf-8", widgetCSS)
+			return
+		case EChartsPath:
+			serveBytes(w, r, "text/javascript; charset=utf-8", echartsJS)
+			return
 		}
 		token, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 		sess, live := s.Sessions.Get(token)
 		id, rel, ok := strings.Cut(rest, "/")
 		if !live || !ok || id != sess.App || !idRe.MatchString(id) {
 			http.NotFound(w, r)
+			return
+		}
+		if id == WidgetsApp {
+			s.serveWidget(w, r, sess, rel)
 			return
 		}
 		app, err := s.reg.Get(id)
@@ -298,6 +323,32 @@ func (s *ViewServer) Handler() http.Handler {
 		}
 		_, _ = io.Copy(w, f)
 	})
+}
+
+// serveWidget answers a file of an agent's own widget: the session names the chat and the widget (its view), and only
+// that widget's files are served, with the CSP of a view that has no network.
+func (s *ViewServer) serveWidget(w http.ResponseWriter, r *http.Request, sess Session, rel string) {
+	widget, name, ok := strings.Cut(rel, "/")
+	if s.Widgets == nil || !ok || widget != sess.View || sess.Conversation == "" || strings.Contains(name, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	body, typ, ok := s.Widgets.WidgetFile(sess.Conversation, widget, name, sess.Nonce)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", typ)
+	h.Set("Content-Security-Policy", WidgetCSP())
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Content-Length", strconv.Itoa(len(body)))
+	if r.Method == http.MethodHead {
+		return
+	}
+	_, _ = w.Write(body)
 }
 
 // NonceMeta is the name of the meta tag that carries a view session's nonce in the view's pages; the SDK reads it.

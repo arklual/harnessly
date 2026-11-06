@@ -217,6 +217,8 @@ func (c *cli) run(args []string) error {
 		return c.notify(rest)
 	case "ask":
 		return c.ask(rest)
+	case "widget", "widgets":
+		return c.widget(rest)
 	case "peers", "peer":
 		return c.peers(rest)
 	case "secret", "secrets":

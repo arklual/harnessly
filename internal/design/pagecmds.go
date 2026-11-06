@@ -538,6 +538,10 @@ func (l *Library) editPages(id string, e BoardEdit) ([]Board, error) {
 			return nil, err
 		}
 		dup := Page{ID: NewPageID(), Title: page.Title + locale.Pick(" copy", " копия"), File: name, W: page.W, H: page.H, Expand: page.Expand}
+		// A copy of a locked board is locked the same way: a copy is no way round the lock.
+		if t, has := page.Template(); has {
+			dup.setTemplate(&t)
+		}
 		pages = append(pages[:pos+1], append([]Page{dup}, pages[pos+1:]...)...)
 		if err := l.renumber(id, pages); err != nil {
 			return nil, err

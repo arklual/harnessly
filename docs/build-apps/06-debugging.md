@@ -88,7 +88,10 @@ link: `harnessly app share <id> --view <view> --ttl 1d --write`, then drive `/ap
 | `permission_denied` | The right is missing; the app is off in this chat; a protected file; a document opened read-only | Add the permission, then `app dev` again. Turn the app on. Check the mask |
 | `not_in_target` | The view's target is not in the app's `targets`, or `open` refuses the view there | Fix `targets` and `views[].targets` |
 | `policy_blocked` | No such server in your `.mcp.json`; the server is not https; the remote tool's JSON-RPC error; a board another chat holds | A view cannot call a `command` server: see [Backend](03-backend.md) |
-| `network_denied` | The tool's address is not public | Use a public https address |
+| `network_denied` | The tool's address is not public | Use a public https address, or ask the admin to list the host in `RUNTIME_APPS_INTERNAL_HOSTS` |
+| `host_not_allowed` | The server is no `https://` one and no listed internal host | Use https |
+| `tls_untrusted` | The server's certificate ends in no root the machine trusts | The admin adds the organization's root with `RUNTIME_APPS_CA_FILE` |
+| `upstream_error` | The server answered an HTTP error or no JSON-RPC | Look at the server's log |
 | `rate_limited` | Over 60 calls a second | Slow down, batch |
 | `host_unavailable` | Outside harnessly; no chat; `hl.flow`, `hl.data` and other things not connected; the machine did not answer; the runtime answered `quota`, `not-on`, `failed` | Read the error's message for the word |
 | `invalid_params` | A bad argument; an unknown view for a card; data too big | See the limits |
@@ -124,7 +127,7 @@ The view gets only the runtime's error word. The longer reason is in the runtime
 | An `allow` rule does not stop the prompts | `allow` grants nothing |
 | `hl.tools.call` to a local server is `policy_blocked` | Only public https remote servers: see [Backend](03-backend.md) |
 | `host-version` on an example | Its range is above your host: check it |
-| A tool's card does not appear | Its answer is not one line of JSON under 100 characters: see [Backend](03-backend.md#cards-from-a-tool) |
+| A tool's card does not appear | Its answer is not JSON with `_meta.ui.resourceUri`, is over 64 KB, or the tool is not from the app's own server: see [Backend](03-backend.md#cards-from-a-tool) |
 | `app dev` added `.claude-plugin/plugin.json` | The install writes it into your folder: commit it |
 | `.harnessly/` appeared in the package | `app eval` writes its report there: add it to `.gitignore` |
 | The view's styles flash at load | There are no tokens before `connect`: give defaults |

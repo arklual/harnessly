@@ -715,6 +715,20 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 	if existed.code != 0 {
 		return restoreResult{}, historyErr(locale.Pick("This board did not exist in that version yet", "В этой версии такой доски ещё не было"))
 	}
+	// A locked board takes back only a version that keeps what is closed; an older one goes with an unbinding.
+	if page, has := l.pageOfFile(project, file); has {
+		if t, rec := page.Template(); rec && t.Locked() {
+			shown, err := l.git(repo, "show", revision+":"+target)
+			if err != nil {
+				return restoreResult{}, err
+			}
+			if shown.code != 0 || l.checkBoardLock(page, shown.stdout) != nil {
+				return restoreResult{}, historyErr(locale.Pick(
+					"The board \""+board+"\" is locked by the app \""+t.App+"\", and that version does not keep what is closed: unbind the board from the template first",
+					"Доска «"+board+"» закрыта приложением «"+t.App+"», а в этой версии закрытая часть другая: сначала отвяжите доску от шаблона"))
+			}
+		}
+	}
 	editors := []string{actor.line}
 	pre, err := l.snapshotNow(actor.runtime, editors, locale.Pick("Before restoring \""+board+"\"", "Перед возвратом «"+board+"»"), now)
 	if err != nil {

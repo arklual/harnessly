@@ -51,6 +51,7 @@ func shareRefused(w http.ResponseWriter, err error) {
 		{apps.ErrHostVersion, "host-version", http.StatusConflict},
 		{apps.ErrPluginName, "host-version", http.StatusConflict},
 		{apps.ErrKindTaken, "kind-taken", http.StatusConflict},
+		{apps.ErrCommandTaken, "command-taken", http.StatusConflict},
 		{apps.ErrStaleTeam, "stale", http.StatusConflict},
 		{apps.ErrGuestTarget, "not-app-view", http.StatusUnprocessableEntity},
 		{apps.ErrGuestGone, "not-found", http.StatusNotFound},

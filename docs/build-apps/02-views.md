@@ -197,14 +197,13 @@ A view with the `chat` target draws a tool result:
 "chat": { "cards": ["card"] }
 ```
 
-A tool of your own server (a local one too) answers with one line of JSON under 100 characters, in its `text`:
+A tool of your own server (a local one too) answers with JSON in its `text`, up to 64 KB:
 
 ```json
 {"_meta":{"ui":{"resourceUri":"ui://acme.notes/card"}},"data":{"date":"2026-11-03"}}
 ```
 
-The feed draws the view under that step, with `data` in `hl.context.data`. Pass an id, and read the rest in the card. The limit and the reason are in
-[Backend](03-backend.md#cards-from-a-tool). Only a tool of the app's own server may name its view.
+The feed draws the view under that step, with `data` in `hl.context.data`. Only a tool of the app's own server may name its view.
 
 ## The agent's host tools
 
@@ -215,7 +214,30 @@ A chat with apps gets the MCP server `harnessly-app`. In tool rules they are `ap
 | `open` | `app.open` | Opens the view in the pane |
 | `data_get`, `data_set` | `app.data.get`, `app.data.set` | Chat storage by `key` |
 | `ask` | `app.ask` | Puts a choice (2 to 8 options) over the view, waits up to ten minutes, answers with the option or `cancelled`; at most 5 open per chat |
+| `widget_show` | `app.widget.show` | Draws a chat view of an app on in this chat with the given `data`, under this step |
+| `widget_render` | `app.widget.render` | Draws a widget the agent writes itself: `html`, `css`, `script`, `data` |
 
 Tell the agent about them in `instructions.md`: `app.ask` is how it confirms something inside your interface.
+
+## Widgets in the chat
+
+A widget is a card the agent puts in the feed when it decides to, not only as a tool's result. Shown again with the same `id`, it changes
+where it stands: an app's view gets the new data as the `data` event and in `hl.context.data`, the agent's own widget reloads. The step
+that drew it says `widget <id> shown`; a step that changes it says `widget <id> changed` and draws nothing new.
+
+```sh
+harnessly widget show acme.notes/card --data '{"date":"2026-11-03"}' --id today   # an app's chat view; the app is on in this chat
+harnessly widget render --title "Sales" --html @w.html --css @w.css --js @w.js --data @rows.json --id sales
+harnessly widget list
+harnessly widget remove sales
+```
+
+In a chat with apps the same is the host tools `widget_show` and `widget_render`. An agent's own widget runs in the same sandbox as a view,
+with no network at all: `window.widgetData` holds its data, `window.echarts` draws charts, `/__hl/widget.css` gives base styles (`.row`,
+`.muted`, `.stat`, `.chart`, `button.primary`, tables), and `harnessly.connect()` gives `hl.chat.send(text)` for a button that answers the
+agent. The markup takes no inline script: put it in `--js`. Limits: data 64 KB, html 128 KB, css 64 KB, js 256 KB, 200 widgets per chat.
+
+A plugin teaches its agent when to show which widget in `instructions.md` or a skill; `harnessly app new acme.x --template widget`
+starts one with a chat view.
 
 Next: [Backend](03-backend.md), or copy [`cashback`](../apps/cashback).

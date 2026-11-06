@@ -89,8 +89,8 @@ func (l libraryDocs) Patch(project string, ops []design.DocOp, who design.DocAct
 	return l.lib.DocPatch(project, ops, who, time.Now())
 }
 
-func (l libraryDocs) AddBoard(project, title string, src []byte, who design.DocActor) (design.DocPageRef, error) {
-	p, err := l.lib.DocAddBoard(project, title, src, who, time.Now())
+func (l libraryDocs) AddBoard(project, title string, src []byte, tpl *design.DocTemplate, who design.DocActor) (design.DocPageRef, error) {
+	p, err := l.lib.DocAddBoard(project, title, src, tpl, who, time.Now())
 	if err != nil {
 		return design.DocPageRef{}, err
 	}
@@ -103,6 +103,40 @@ func installLock(d deps, reg *apps.Registry) {
 	docs.lib.LockUnbound = func(project string) bool {
 		list, err := reg.List()
 		return err == nil && apps.LocksUnbound(list, docs.kind(project))
+	}
+}
+
+// installShareGate makes the machine check a project before a link to it is made: the platform asks design-public
+// (<project>/__share, and __rev for a pinned link) and a check of an app on in the document that blocks sharing
+// refuses it with its findings. The editor's own call (POST <platform>/apps/sinopia/checks) stays a convenience: this
+// is the check that holds.
+func installShareGate(d deps, reg *apps.Registry) {
+	api := designAPI(d)
+	api.ShareGate = func(ctx context.Context, project string) *design.ShareRefusal {
+		docs := sinopiaDocs(d)
+		doc, err := docs.Document(project)
+		if err != nil {
+			return nil
+		}
+		list, _ := reg.List()
+		active := apps.ActiveInDocument(list, doc.Kind)
+		if len(active) == 0 {
+			return nil
+		}
+		pkgOf := func(id string) *apps.Package {
+			pkg, err := reg.Package(id)
+			if err != nil {
+				return nil
+			}
+			return pkg
+		}
+		ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+		defer cancel()
+		results := apps.RunChecks(ctx, docs, appSinopia, project, doc.Kind, apps.CheckOnShare, active, pkgOf)
+		if !slices.ContainsFunc(results, func(r apps.CheckResult) bool { return r.Blocks }) {
+			return nil
+		}
+		return &design.ShareRefusal{Code: design.ShareBlocked, Error: "The checks of the apps keep this document from being shared as it is", Blocked: true, Results: results}
 	}
 }
 

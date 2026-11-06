@@ -264,6 +264,10 @@ func (s *Store) List() ([]View, error) {
 	}
 	out := make([]View, 0, len(f.Secrets))
 	for _, e := range f.Secrets {
+		// An app's secret is the app's: the safe's list and the agent's CLI do not show it.
+		if IsAppName(e.Name) {
+			continue
+		}
 		out = append(out, viewOf(e))
 	}
 	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
@@ -280,18 +284,22 @@ func (s *Store) Has(name string) bool {
 
 // Put keeps value under name, a new secret or a new value of one (its uses stay); created says which.
 func (s *Store) Put(name, value string) (v View, created bool, err error) {
+	if !ValidName(name) {
+		return View{}, false, refuse(ReasonBadName, nil)
+	}
 	return s.put(name, value, nil)
 }
 
 // PutAsked stores a value from a specific card without overwriting a foreign project entry.
 func (s *Store) PutAsked(a Ask, value string) (View, bool, error) {
+	if !ValidName(a.Name) {
+		return View{}, false, refuse(ReasonBadName, nil)
+	}
 	return s.put(a.Name, value, &a)
 }
 
+// put keeps a value under a name its caller checked: a person's (ValidName) or an app's (AppName, with its slash).
 func (s *Store) put(name, value string, asked *Ask) (v View, created bool, err error) {
-	if !ValidName(name) {
-		return View{}, false, refuse(ReasonBadName, nil)
-	}
 	value = Clean(value)
 	if value == "" {
 		return View{}, false, refuse(ReasonEmpty, nil)

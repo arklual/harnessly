@@ -40,7 +40,8 @@ flowchart TB
 | Data shared by that program and a view | Files of the chat's folder | `trusted`, `files.*` |
 | A value stored per person, seen by a view and the agent | `hl.storage.chat` and `app.data_*` | any |
 | A secret for the agent | `harnessly secret`, see [Agents](05-agents.md#secrets) | any |
-| A secret per install, handed to a view or a server | **Not supported** | |
+| A secret per install, for your server | Manifest `secrets` and `${secret:name}` in the `headers` of `.mcp.json`; see [Secrets, once more](#secrets-once-more) | `declarative` or `sandboxed` (remote), `trusted` (local, in `env`) |
+| Choices the person makes once for the app | Manifest `settings`, read with `hl.settings.get()` | any |
 
 ## A remote MCP server
 
@@ -65,12 +66,14 @@ if (res.isError) throw new Error(res.content?.[0]?.text);
 
 What `hl.tools.call` does:
 
-- **The machine makes the call, not the browser**, so it refuses to be a way into the person's network. It resolves the name and checks the address: `https://`
-  and a public address only. Loopback, private ranges, link-local and carrier-grade NAT (`100.64.0.0/10`) are `network_denied`; other schemes and `command` servers are `policy_blocked`. No
-  proxy, no redirects.
+- **The machine makes the call, not the browser**, so it refuses to be a way into the person's network. It resolves the name and checks the address it really
+  dials: `https://` and a public address. Loopback, private ranges, link-local and carrier-grade NAT (`100.64.0.0/10`) are `network_denied`; another scheme is
+  `host_not_allowed`, a `command` server `policy_blocked`. No proxy, no redirects.
+- **Internal hosts** are opened by the admin of the deployment, never by an app: `RUNTIME_APPS_INTERNAL_HOSTS=gitlab.corp,*.svc` on the machine lets those names
+  resolve to private, loopback or shared addresses and use plain `http://` too; link-local (the cloud's metadata) stays closed. `RUNTIME_APPS_CA_FILE` adds the
+  organization's root certificates. A certificate the machine does not trust is `tls_untrusted`; a server that answers an HTTP error or no JSON-RPC is `upstream_error`.
 - Each call is a new connection: `initialize`, `notifications/initialized`, `tools/call`. 30 s overall, a 4 MB answer, JSON or an event stream.
-- **A header containing `${` is not sent** on this path. Literal headers are, and anyone holding the package reads them. So a view's call cannot carry a per-person secret: authorize by what your
-  server knows, or by a token the person signs in for (below). In the agent's use of the same server, `${VAR}` is Claude Code's expansion from its environment.
+- **A header with `${secret:name}` is filled by the machine** from the app's secret of that name; the view never holds the value. Any other header containing `${` is not sent. Literal headers are sent, and anyone holding the package reads them, so keep tokens out of them. If a secret has no value yet, the call is refused and the app waits for it. In the agent's use of the same server, `${VAR}` is Claude Code's expansion from its environment, and `${secret:name}` is filled by the host.
 - You get the raw MCP result. `isError: true` is not an error of the call: check it.
 - Failures arrive as a word only: `host_unavailable` for unreachable and timeout, `policy_blocked` for refusals and a JSON-RPC error.
 
@@ -156,18 +159,33 @@ A tool of your own server can name a card:
 { "_meta": { "ui": { "resourceUri": "ui://acme.thing/card" } }, "data": { "date": "2026-11-03" } }
 ```
 
-**Today the feed reads this from the agent's transcript, where a result is only the first line of its text, cut at 100 characters.** So the whole answer has to be one line of JSON under 100 characters, in the
-tool's `text`: pass an id or a date, and have the card read the rest from a file or storage. Longer data shows no card. The view reads it as `hl.context.data`.
+The whole JSON may run up to 64 KB, on one line or several. The view reads `data` as `hl.context.data`. To change a card later, or to
+show one without a tool call, use a [widget](02-views.md#widgets-in-the-chat).
 
 ## Secrets, once more
 
 | Where | Today |
 | --- | --- |
-| Manifest `secrets` | Nothing reads them |
+| Manifest `secrets` + `permissions: ["secrets:name"]` | The person puts the value into the machine's safe from «О приложении» (`app/<id>/<name>`). Neither a view nor the agent can read it |
+| A header with `${secret:name}`, agent's use and `hl.tools.call` | The machine writes the value into the header when the chat starts (or the call is made). A new value needs no reinstall: it is read at the next launch |
+| `${secret:name}` in `env` of a local server | Same, for a `trusted` app only. Not in `args` (a command line shows in the process list) and not in the `url` |
+| A required secret without a value | The app is «ждёт секрет» in «О приложении». The chat starts; the servers that need the secret are left out |
 | A header with `${VAR}`, agent's use | Claude Code expands it from the agent's environment |
 | A header with `${VAR}`, `hl.tools.call` | The header is not sent |
 | The agent | `harnessly secret run --env VAR=name -- command` |
 | A view | A token the person gave it, in `hl.storage.user` |
 | A local server | It inherits the agent's environment, and may run `harnessly secret run` like the agent. Not tested from inside the runtime's wall |
+
+For an app with a secret, Claude loads a copy of the package folder made for the launch (links to the real files and its own `.mcp.json`); the installed package is never changed. **A remote server gets no value in any file**: its entry points at the runtime's proxy (`/api/cli/apps/mcp/<app>/<server>`) with the launch's token, and the proxy, for an app on in that chat only, adds the package's headers with the secrets and calls the real https address under the rules of `hl.tools.call` (streams pass through; a missing secret answers 409). A local server of a `trusted` app takes the value in `env`, so that file holds it: it lives in a folder of this launch outside the registry, which the wall opens for this chat only, and the runtime removes it once the launch's agent is gone.
+
+### Settings
+
+```json
+"settings": {"type": "object", "required": ["region"], "properties": {
+  "region": {"type": "string", "title": "Region", "enum": ["eu", "us"], "default": "eu"},
+  "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}}}
+```
+
+The form is in «О приложении»; a view reads `await hl.settings.get()` and the agent calls the host tool `settings_get`. Types other than `string`, `number`, `integer` and `boolean` are refused by the validator.
 
 Next: [the worked example](08-worked-example.md).

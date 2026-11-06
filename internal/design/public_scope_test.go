@@ -1,6 +1,7 @@
 package design
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"path/filepath"
@@ -179,5 +180,31 @@ func TestPublicLimitedLinkServesOnlyChosenMarkup(t *testing.T) {
 	// Without a limit nothing changes.
 	if w := publicGet(a, "GET", "p1/notes.html", scopeToken(t, nil)); w.Code != 200 {
 		t.Fatalf("unlimited: %d", w.Code)
+	}
+}
+
+// A link is made only when the apps' checks of the share trigger let it: __share and __rev both ask the gate, and a
+// guest's own token reaches neither.
+func TestShareGateRefusesLinks(t *testing.T) {
+	a, _ := publicAPI(t, "")
+	pin := scopeToken(t, map[string]any{"pin": true})
+	if w := publicGet(a, "GET", "p1/"+PublicShareDir, pin); w.Code != 200 {
+		t.Fatalf("no gate: %d", w.Code)
+	}
+	a.ShareGate = func(_ context.Context, project string) *ShareRefusal {
+		return &ShareRefusal{Code: ShareBlocked, Error: "blocked", Blocked: true, Results: []string{project}}
+	}
+	for _, p := range []string{PublicShareDir, PublicRevDir} {
+		w := publicGet(a, "GET", "p1/"+p, pin)
+		if w.Code != 409 || !strings.Contains(w.Body.String(), `"code":"share_blocked"`) {
+			t.Errorf("%s: %d %s", p, w.Code, w.Body.String())
+		}
+		if c := publicGet(a, "GET", "p1/"+p, scopeToken(t, map[string]any{})).Code; c != 403 {
+			t.Errorf("%s with a guest token: %d", p, c)
+		}
+	}
+	a.ShareGate = func(context.Context, string) *ShareRefusal { return nil }
+	if w := publicGet(a, "GET", "p1/"+PublicShareDir, pin); w.Code != 200 {
+		t.Errorf("an open gate: %d", w.Code)
 	}
 }

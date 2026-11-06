@@ -20,6 +20,7 @@ func (v *v2Live) serveAppTools(done <-chan struct{}) {
 	c := v.c
 	reg := apps.Open(v.d.DataDir)
 	storage := apps.OpenStorage(v.d.DataDir)
+	widgets := apps.OpenWidgets(v.d.DataDir)
 	callers := &callerCache{panes: c.cfg.Tmux, convOf: v.rt.ConvOfSession}
 	tools := func(r *http.Request) mcpserver.Toolset {
 		conv, why := callers.of(r)
@@ -27,7 +28,7 @@ func (v *v2Live) serveAppTools(done <-chan struct{}) {
 			return noAppTools{why: why}
 		}
 		return apps.HostTools{
-			Conv: conv, Registry: reg, Storage: storage, Asks: appAsks,
+			Conv: conv, Registry: reg, Storage: storage, Asks: appAsks, Widgets: widgets,
 			Enabled: func() []string {
 				rec, _ := v.rt.Record(conv)
 				return rec.Apps

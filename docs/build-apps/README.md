@@ -100,11 +100,11 @@ in the pages above.
 
 | Thing | State |
 | --- | --- |
-| Manifest `secrets`, `settings` | Checked and otherwise unused: no install form, and nothing can read a value |
 | Manifest `backend.url`, `when`, `storage`, `activation.template`, `views[].height` | Checked, unused |
-| `activation.on`: `manual`, `view`, `always`, `command:/x` | Checked, turn nothing on. Only `document` and `openView` act |
-| `agent.skills`, `agent.context`, `agent.validators`, `agent.flow`, `agent.exclusive` | Checked, unused. Claude Code loads all of `skills/` whatever the list says |
-| `hl.flow.*`, `hl.data.*`; events `flow`, `data`, `tool-result`, `tool-input`, `visibility` | Not connected in the page: `host_unavailable`, or the event never comes |
+| `activation.on`: `manual` | Checked, turns nothing on (`view` is refused). `document`, `always`, `command:/x` and `openView` act |
+| `agent.skills`, `agent.validators`, `agent.flow`, `agent.exclusive` | Checked, unused. Claude Code loads all of `skills/` whatever the list says |
+| `agent.context` | Items with `mode: on-activation` are sent (see [Agents](05-agents.md#context-the-app-hands-the-agent)); `on-demand` is checked, not used |
+| `hl.flow.*`, `hl.data.*`; events `flow`, `tool-result`, `tool-input`, `visibility` | Not connected in the page: `host_unavailable`, or the event never comes. The `data` event comes to a chat view shown as a widget |
 | `hl.sinopia.render()` | `host_unavailable` |
 | Permissions `ai`, `users.read` | Accepted, no call needs them. `hl.context.user` is always `null` |
 | A server process run by the host | Does not exist. See [Backend](03-backend.md) |

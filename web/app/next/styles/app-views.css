@@ -50,3 +50,23 @@
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
 }
+
+/* A widget or a card while its data comes: the card's frame at a card's height, breathing. */
+.hx-appcard--loading {
+  min-height: 120px;
+  animation: hx-appcard-wait 1.4s ease-in-out infinite;
+}
+@keyframes hx-appcard-wait {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-appcard--loading {
+    animation: none;
+  }
+}

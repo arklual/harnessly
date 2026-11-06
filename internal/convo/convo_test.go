@@ -1540,3 +1540,31 @@ func TestAppsCommand(t *testing.T) {
 		t.Fatalf("no apps on the runtime: %+v", res)
 	}
 }
+
+// A new Claude chat starts with the apps that ask to be on in every chat; a Codex chat starts with none.
+func TestCreateStartsWithAlwaysApps(t *testing.T) {
+	r := newRig(t)
+	r.deps = func(d *Deps) {
+		d.AppsOK = func([]string) string { return "" }
+		d.AlwaysApps = func() []string { return []string{"acme.meter"} }
+	}
+	r.rt = r.runtime()
+	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude})
+	if res.R != wire.ResultAccepted || res.ID == nil {
+		t.Fatalf("create: %+v", res)
+	}
+	if rec, _ := r.rt.Record(*res.ID); !slices.Equal(rec.Apps, []string{"acme.meter"}) {
+		t.Fatalf("claude chat apps: %v", rec.Apps)
+	}
+	// The first launch carries them too, not only a relaunch: else the chat lists the app and its agent runs without it.
+	if len(r.launcher.launched) != 1 || !slices.Equal(r.launcher.launched[0].Apps, []string{"acme.meter"}) {
+		t.Fatalf("launched %+v", r.launcher.launched)
+	}
+	res = r.do(wire.ConversationCreateCmd{OpID: "c2", Cwd: "/w", Provider: wire.ProviderCodex})
+	if res.R != wire.ResultAccepted || res.ID == nil {
+		t.Fatalf("create codex: %+v", res)
+	}
+	if rec, _ := r.rt.Record(*res.ID); len(rec.Apps) != 0 {
+		t.Fatalf("codex chat apps: %v", rec.Apps)
+	}
+}

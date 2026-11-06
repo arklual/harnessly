@@ -39,6 +39,9 @@ const (
 	PublicVendorDir = "__vendor"
 	// PublicRevDir answers the revision a new pinned link should hold (see PinRevision).
 	PublicRevDir = "__rev"
+	// PublicShareDir answers whether a link to the project may be made: the apps' checks of the share trigger ran and
+	// none blocks (200), or one does (409, ShareRefusal). The gateway asks before it makes any link, pinned or not.
+	PublicShareDir = "__share"
 	// PublicRevHeader and PublicPagesHeader say on an answer which version and whether a page list it served.
 	PublicRevHeader   = "X-Design-Rev"
 	PublicPagesHeader = "X-Design-Pages"
@@ -475,6 +478,10 @@ func (a *API) Public(w http.ResponseWriter, r *http.Request) {
 			publicText(w, 403, "Forbidden")
 			return
 		}
+		// The same checks as for any other link: a pinned one is a link too.
+		if a.refuseShare(w, r, project) {
+			return
+		}
 		rev, err := a.L.PinRevision()
 		if err != nil {
 			a.warn("could not take the version for a guest link", err)
@@ -490,6 +497,26 @@ func (a *API) Public(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		if !head {
 			_, _ = w.Write(body)
+		}
+		return
+	case PublicShareDir:
+		if len(segments) != 1 {
+			publicText(w, 404, "Not found")
+			return
+		}
+		if !scope.pin {
+			publicText(w, 403, "Forbidden")
+			return
+		}
+		if a.refuseShare(w, r, project) {
+			return
+		}
+		h := w.Header()
+		h.Set("Content-Type", "application/json; charset=utf-8")
+		h.Set("Cache-Control", "no-store")
+		w.WriteHeader(200)
+		if r.Method != http.MethodHead {
+			_, _ = w.Write([]byte(`{"blocked":false}`))
 		}
 		return
 	case PublicMediaDir:
@@ -640,4 +667,37 @@ func readPublicFile(f *os.File, limit int64) ([]byte, error) {
 		return nil, errPublicFileLimit
 	}
 	return body, nil
+}
+
+// ShareRefusal is the answer when the checks of the share trigger block a link: Code is for the page, Results are the
+// findings as POST <platform>/apps/sinopia/checks gives them, so the page shows the same list.
+type ShareRefusal struct {
+	Code    string `json:"code"`
+	Error   string `json:"error"`
+	Blocked bool   `json:"blocked"`
+	Results any    `json:"results"`
+}
+
+// ShareBlocked is the code of a refused link.
+const ShareBlocked = "share_blocked"
+
+// refuseShare answers 409 with the findings when the apps' checks block a link to the project; false lets it go on.
+// A gate that cannot say (a check that could not run is not a finding) lets it go, as the editor's check does.
+func (a *API) refuseShare(w http.ResponseWriter, r *http.Request, project string) bool {
+	if a.ShareGate == nil {
+		return false
+	}
+	ref := a.ShareGate(r.Context(), project)
+	if ref == nil {
+		return false
+	}
+	body, _ := json.Marshal(ref)
+	h := w.Header()
+	h.Set("Content-Type", "application/json; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusConflict)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(body)
+	}
+	return true
 }

@@ -7,7 +7,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 // A package on disk: the manifest plus the files it names. Every path the manifest names stays inside the package (no
@@ -31,6 +34,10 @@ type Package struct {
 	Manifest *Manifest
 	// MCP is the package's .mcp.json servers by name, as written.
 	MCP map[string]MCPServer
+	// PluginParts are the parts of a Claude Code plugin the package carries beyond what an app is made of: hooks that
+	// run commands on the agent's events, agents, output styles and the like (pluginParts). A declarative or sandboxed
+	// package may carry none; a trusted one shows them in its permissions.
+	PluginParts []string
 }
 
 // MCPServer is one server of .mcp.json: a remote one (url) or, for a trusted app, a local process (command).
@@ -43,9 +50,55 @@ type MCPServer struct {
 	Headers map[string]string `json:"headers,omitempty"`
 }
 
+// loads counts the full reads of a package (a test watches that a repeated call does not make another).
+var loads atomic.Int64
+
+type cachedPackage struct {
+	stamp string
+	pkg   *Package
+	ps    Problems
+}
+
+var packageCache sync.Map // abs dir -> cachedPackage
+
+// packageStamp is what a package read depends on without walking its files: the manifest, .mcp.json, the plugin's
+// manifest and the package's top folder (a part of a plugin appearing in it). Size and modification time of each.
+func packageStamp(dir string) string {
+	var b strings.Builder
+	for _, rel := range []string{".", ManifestPath, ".mcp.json", ".claude-plugin/plugin.json"} {
+		info, err := os.Stat(filepath.Join(dir, rel))
+		if err != nil {
+			b.WriteString("-;")
+			continue
+		}
+		fmt.Fprintf(&b, "%d:%d;", info.Size(), info.ModTime().UnixNano())
+	}
+	return b.String()
+}
+
+// CachedPackage is LoadPackage for a caller that asks again and again (every tool call, every Sinopia call, every row of
+// a list): the package is read once and kept until the stamp of its manifest files changes. The Package it returns is
+// shared: read it, do not change it.
+func CachedPackage(dir string) (*Package, Problems) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return LoadPackage(dir)
+	}
+	stamp := packageStamp(abs)
+	if v, ok := packageCache.Load(abs); ok {
+		if c := v.(cachedPackage); c.stamp == stamp {
+			return c.pkg, c.ps
+		}
+	}
+	pkg, ps := LoadPackage(abs)
+	packageCache.Store(abs, cachedPackage{stamp: stamp, pkg: pkg, ps: ps})
+	return pkg, ps
+}
+
 // LoadPackage reads the package in dir and checks it whole. The package comes back whenever the manifest could be read,
 // with the problems found; nil means there is no manifest to read.
 func LoadPackage(dir string) (*Package, Problems) {
+	loads.Add(1)
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, Problems{{Message: err.Error()}}
@@ -135,6 +188,15 @@ func (p *Package) checkFiles() Problems {
 		}
 	}
 
+	p.PluginParts = p.pluginParts()
+	for _, part := range p.PluginParts {
+		if m.Trust == TrustTrusted {
+			warn(part, "this trusted app carries %s, a part of a Claude Code plugin that runs on the agent's events or outside the app's rules; it is listed with its rights", part)
+		} else {
+			add(part, "a %s app may not carry %s: it is a part of a Claude Code plugin that runs outside the app's rules (only skills/, commands/, .mcp.json with remote servers, harnessly/, ui/ and the app's own data); a trusted app may", m.Trust, part)
+		}
+	}
+
 	mcpRaw, err := p.read(".mcp.json")
 	switch {
 	case err == nil:
@@ -159,6 +221,9 @@ func (p *Package) checkFiles() Problems {
 		}
 	case !errors.Is(err, fs.ErrNotExist):
 		add(".mcp.json", "%v", err)
+	}
+	for _, why := range m.secretUseProblems(p.MCP) {
+		add(".mcp.json", "%s", why)
 	}
 	if ag := m.Agent; ag != nil {
 		for i, name := range ag.MCP {
@@ -293,3 +358,47 @@ func (p *Package) checkJSON(field, rel string, ps *Problems) {
 
 // File reads a file of the package by a manifest path.
 func (p *Package) File(rel string) ([]byte, error) { return p.read(rel) }
+
+// pluginPartDirs are the folders of a Claude Code plugin that an app does not use and that Claude loads from the root of
+// a plugin by default; pluginPartFiles are the files. Names are compared in lower case: on a case-insensitive disk
+// Hooks/ is hooks/.
+var pluginPartDirs = []string{"hooks", "agents", "output-styles", "monitors", "themes", "bin"}
+var pluginPartFiles = []string{"settings.json", ".lsp.json"}
+
+// pluginManifestKeys are the keys of .claude-plugin/plugin.json that point the plugin at such parts (or declare MCP
+// servers inline, past the check of .mcp.json).
+var pluginManifestKeys = []string{"hooks", "agents", "outputStyles", "lspServers", "monitors", "themes", "mcpServers", "userConfig", "channels"}
+
+// pluginParts lists the parts of a Claude Code plugin the package carries: a folder with a trailing slash, a file by its
+// name, a key of .claude-plugin/plugin.json as ".claude-plugin/plugin.json: <key>".
+func (p *Package) pluginParts() []string {
+	var out []string
+	if entries, err := os.ReadDir(p.Dir); err == nil {
+		for _, e := range entries {
+			name := strings.ToLower(e.Name())
+			isDir := e.IsDir()
+			if e.Type()&fs.ModeSymlink != 0 {
+				if info, err := os.Stat(filepath.Join(p.Dir, e.Name())); err == nil {
+					isDir = info.IsDir()
+				}
+			}
+			switch {
+			case isDir && slices.Contains(pluginPartDirs, name):
+				out = append(out, e.Name()+"/")
+			case !isDir && slices.Contains(pluginPartFiles, name):
+				out = append(out, e.Name())
+			}
+		}
+	}
+	if raw, err := p.read(".claude-plugin/plugin.json"); err == nil {
+		var pj map[string]json.RawMessage
+		if json.Unmarshal(raw, &pj) == nil {
+			for _, k := range pluginManifestKeys {
+				if _, ok := pj[k]; ok {
+					out = append(out, ".claude-plugin/plugin.json: "+k)
+				}
+			}
+		}
+	}
+	return out
+}

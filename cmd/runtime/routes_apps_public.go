@@ -121,6 +121,10 @@ func appPublicRoutes(d deps, reg *apps.Registry, version string) []gate.Route {
 			secretJSON(w, http.StatusConflict, map[string]any{"error": "kind-taken", "message": err.Error()})
 			return
 		}
+		if errors.Is(err, apps.ErrCommandTaken) {
+			secretJSON(w, http.StatusConflict, map[string]any{"error": "command-taken", "message": err.Error()})
+			return
+		}
 		if err != nil {
 			publicRefused(w, err)
 			return

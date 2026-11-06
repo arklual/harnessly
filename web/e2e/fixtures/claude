@@ -73,9 +73,22 @@ turn() {
   # A message asking for a long task runs a tool for a while: its call stands in the transcript without a result.
   case "$1" in *long*) long=1 ;; *) long=0 ;; esac
   if [ $long = 0 ]; then wait_for 1000; fi
-  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_%s","name":"Bash","input":{"command":"ls -la","description":"List files"}}]},"uuid":"t-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  # Asked for a widget, it draws one with the real CLI: «widget N» shows the number N in the widget «sales», so the
+  # same message with another number changes that widget where it stands.
+  command='ls -la'; widget=0
+  case "$1" in *widget*) widget=$(printf '%s' "$1" | grep -o '[0-9][0-9]*' | head -1); widget=${widget:-1}
+    command="harnessly widget render --title Sales --html @w.html --js @w.js --data @d.json --id sales" ;;
+  esac
+  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_%s","name":"Bash","input":{"command":"%s","description":"List files"}}]},"uuid":"t-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$command" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
   if [ $long = 1 ]; then wait_for 20000; else wait_for 500; fi
   out='total 0'
+  if [ "$widget" != 0 ]; then
+    printf '<div class="stat" id="n"></div>' > "$HOME/w.html"
+    printf 'document.getElementById("n").textContent = "Sales " + window.widgetData.n;' > "$HOME/w.js"
+    printf '{"n":%s}' "$widget" > "$HOME/d.json"
+    # The CLI lies beside this script: the pane's PATH is the login shell's.
+    raw=$(cd "$HOME" && PATH="${BASH_SOURCE[0]%/*}:$PATH" $command 2>&1); out=$(json "$raw")
+  fi
   case "$1" in *references*) out='total 0\nfixtures: https://gitlab.example.test/team/admin/-/merge_requests/502' ;; esac
   printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%s","content":"%s"}]},"uuid":"r-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$out" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
   deliver_held

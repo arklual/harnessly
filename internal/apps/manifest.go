@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -199,6 +200,9 @@ var permissions = map[string]bool{
 	"users.read": true, "notify": true,
 }
 
+// unsupportedPermissions are rights the host accepts in no call yet.
+var unsupportedPermissions = map[string]bool{"ai": true, "users.read": true, "sinopia.export": true}
+
 var paramPermissions = map[string]bool{"files.read": true, "files.write": true, "secrets": true}
 
 // ParseManifest reads the manifest. A syntax error, or a field of the wrong type, comes back as one problem with the
@@ -208,7 +212,17 @@ func ParseManifest(raw []byte) (*Manifest, Problems) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&m); err != nil {
-		return nil, Problems{{Message: decodeMessage(raw, err)}}
+		msg := decodeMessage(raw, err)
+		if strings.HasPrefix(msg, "unknown field") {
+			// A field this host does not know: before saying so, read the range the app asks for. An app written for a
+			// newer harnessly gets the version it needs, not a complaint about its fields.
+			if rng, text := peekRange(raw); rng != nil {
+				if v := rng.lowest(); v != "" {
+					return nil, Problems{{Path: "harnessly", Message: fmt.Sprintf("this app asks for harnessly %s and has a field this version does not know (%s): it needs harnessly %s", text, msg, v)}}
+				}
+			}
+		}
+		return nil, Problems{{Message: msg}}
 	}
 	if dec.More() {
 		return nil, Problems{{Message: "the file holds more than one JSON value"}}
@@ -251,6 +265,9 @@ func (m *Manifest) Check() Problems {
 		add("id", "is required: <publisher>.<name>, e.g. acme.cashback")
 	case !idRe.MatchString(m.ID):
 		add("id", "%q is not <publisher>.<name> in lower case latin letters, digits and '-'", m.ID)
+	case m.ID == WidgetsApp:
+		// The agents' own widgets are served and bridged under this id; a package with it would lend them its rights.
+		add("id", "%q is reserved for the agents' own widgets", m.ID)
 	}
 	if strings.TrimSpace(m.Name) == "" {
 		add("name", "is required: the name people see")
@@ -265,6 +282,23 @@ func (m *Manifest) Check() Problems {
 		add("harnessly", "is required: the host versions it works with, e.g. >=0.17")
 	} else if _, err := ParseRange(m.Harnessly); err != nil {
 		add("harnessly", "%v", err)
+	}
+	// Fields the host reads and does nothing with are refused, so an author does not write what never happens. Each is
+	// taken off this list when the host starts to run it.
+	notYet := func(path string) {
+		add(path, "not supported yet: the host does not run it, remove it from the manifest")
+	}
+	if m.Icon != "" {
+		notYet("icon")
+	}
+	if m.When != "" {
+		notYet("when")
+	}
+	if len(m.Storage) > 0 {
+		notYet("storage")
+	}
+	if m.Backend != nil {
+		notYet("backend")
 	}
 	switch m.Trust {
 	case TrustDeclarative, TrustSandboxed, TrustTrusted:
@@ -291,13 +325,21 @@ func (m *Manifest) Check() Problems {
 	}
 
 	if a := m.Activation; a != nil {
+		if a.Template != "" {
+			notYet("activation.template")
+		}
 		for i, on := range a.On {
 			path := fmt.Sprintf("activation.on[%d]", i)
 			switch {
-			case on == OnManual || on == OnView || on == OnDocument || on == OnAlways:
+			case on == OnView:
+				notYet(path)
+			case on == OnManual || on == OnDocument || on == OnAlways:
 			case strings.HasPrefix(on, "command:"):
-				if !commandRe.MatchString(strings.TrimPrefix(on, "command:")) {
+				switch cmd := strings.TrimPrefix(on, "command:"); {
+				case !commandRe.MatchString(cmd):
 					add(path, "%q: a command is command:/name", on)
+				case slices.Contains(agentCommands, cmd):
+					add(path, "%q is the agent's own command: pick another name", on)
 				}
 			default:
 				add(path, "%q is not manual, view, document, always or command:/name", on)
@@ -321,6 +363,10 @@ func (m *Manifest) Check() Problems {
 			add(path, "%q is listed twice", p)
 		}
 		seen[p] = true
+		if unsupportedPermissions[p] {
+			notYet(path)
+			continue
+		}
 		if permissions[p] {
 			continue
 		}
@@ -377,6 +423,14 @@ func (m *Manifest) Check() Problems {
 		var schema map[string]any
 		if err := json.Unmarshal(m.Settings, &schema); err != nil || schema["type"] != "object" {
 			add("settings", "must be a JSON Schema of an object")
+		} else {
+			for _, f := range m.SettingFields() {
+				switch f.Type {
+				case "string", "number", "integer", "boolean":
+				default:
+					add("settings.properties."+f.Name, "the type %q is not drawn by the form: use string, number, integer or boolean", f.Type)
+				}
+			}
 		}
 	}
 
@@ -405,6 +459,9 @@ func (m *Manifest) Check() Problems {
 				}
 			}
 		}
+		if ag.Flow != "" {
+			notYet("agent.flow")
+		}
 		if ag.Exclusive && !targets[TargetChat] {
 			add("agent.exclusive", "only a chat app can be exclusive")
 		}
@@ -432,6 +489,9 @@ func (m *Manifest) Check() Problems {
 		}
 		if m.Trust == TrustDeclarative && strings.HasPrefix(v.Entry, "https://") {
 			add(path+".entry", "a declarative app serves its views from the package")
+		}
+		if v.Height != "" {
+			notYet(path + ".height")
 		}
 		if len(v.Targets) == 0 {
 			add(path+".targets", "is required: where the view shows")
@@ -469,9 +529,6 @@ func (m *Manifest) Check() Problems {
 		add("sinopia", "sinopia contributions need a sinopia target")
 	}
 	m.checkSinopia(targets, add, warn)
-	if b := m.Backend; b != nil && !strings.HasPrefix(b.URL, "https://") {
-		add("backend.url", "must be an https:// address")
-	}
 
 	// Rights the app asks for and has no use of are a warning: people see the list at install.
 	if seen["pane.open"] && !targets[TargetPane] && !targets[TargetApp] {
@@ -628,4 +685,55 @@ func sortedKeys(m map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// ActivatesOn says whether the manifest's activation lists the value (OnAlways, OnDocument, "command:/x").
+func (m *Manifest) ActivatesOn(on string) bool {
+	return m.Activation != nil && slices.Contains(m.Activation.On, on)
+}
+
+// agentCommands are the slash commands of the agents themselves (Claude Code, Codex): an app may not take one, or a
+// person's /clear would turn an app on instead of clearing the chat.
+var agentCommands = []string{"/add-dir", "/agents", "/approvals", "/bug", "/clear", "/compact", "/config", "/context", "/cost",
+	"/diff", "/doctor", "/exit", "/export", "/help", "/hooks", "/ide", "/init", "/login", "/logout", "/mcp", "/memory", "/mention",
+	"/model", "/new", "/permissions", "/plugin", "/plugins", "/pr-comments", "/quit", "/release-notes", "/resume", "/review",
+	"/rewind", "/security-review", "/skills", "/status", "/statusline", "/terminal-setup", "/todos", "/upgrade", "/usage", "/vim"}
+
+// Command is the slash command that turns the app on in a chat (`activation.on: ["command:/x"]` is "/x"); "" when none.
+func (m *Manifest) Command() string {
+	if m.Activation == nil {
+		return ""
+	}
+	for _, on := range m.Activation.On {
+		if cmd, ok := strings.CutPrefix(on, "command:"); ok {
+			return cmd
+		}
+	}
+	return ""
+}
+
+// peekRange reads the harnessly field of a manifest before the strict parse, whatever else the manifest holds; nil when
+// there is none or it is not a range.
+func peekRange(raw []byte) (Range, string) {
+	var head struct {
+		Harnessly string `json:"harnessly"`
+	}
+	if json.Unmarshal(raw, &head) != nil || head.Harnessly == "" {
+		return nil, ""
+	}
+	rng, err := ParseRange(head.Harnessly)
+	if err != nil {
+		return nil, ""
+	}
+	return rng, head.Harnessly
+}
+
+// HostAllows says whether the host version is in the range the manifest in raw asks for; true when the manifest names
+// none (the strict parse says what is wrong with it).
+func HostAllows(raw []byte, host string) (ok bool, wanted string) {
+	rng, text := peekRange(raw)
+	if rng == nil {
+		return true, ""
+	}
+	return rng.Allows(host), text
 }

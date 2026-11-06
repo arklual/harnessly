@@ -160,3 +160,30 @@ func CompareVersions(a, b string) int {
 	}
 	return compare(va, vb)
 }
+
+// lowest is the least version the range asks for ("1.2.0"), "" when no alternative bounds it from below.
+func (r Range) lowest() string {
+	var best [3]int
+	found := false
+	for _, set := range r {
+		var low [3]int
+		bounded := false
+		for _, c := range set {
+			if c.op == ">=" || c.op == ">" || c.op == "=" {
+				if !bounded || compare(c.v, low) > 0 {
+					low, bounded = c.v, true
+				}
+			}
+		}
+		if !bounded {
+			return ""
+		}
+		if !found || compare(low, best) < 0 {
+			best, found = low, true
+		}
+	}
+	if !found {
+		return ""
+	}
+	return fmt.Sprintf("%d.%d.%d", best[0], best[1], best[2])
+}

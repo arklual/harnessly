@@ -27,6 +27,7 @@ agent: harnessly secret run --env GITHUB_TOKEN=github-token -- gh pr create --fi
   `RUNTIME_SECRETS_KEY_FILE` moves it (for example onto a volume only the runtime mounts). The page's file viewer refuses
   `*.key` files like `.ssh`. A self-hosted runtime needs
   nothing else: no Vault, no network.
+- **Apps' secrets.** A secret an app asks for in its manifest is kept here too, under `app/<id>/<name>`. The slash keeps it out of the safe's list and out of `harnessly secret run` and `file`; the person puts it in from the app's «О приложении», and the runtime reveals it only to fill `${secret:<name>}` in the app's MCP server config at a launch (see [apps](apps.md#manifest)).
 - **Ways in.** Only the person's page puts a value: Settings → Safe (add, replace, remove) or the ask dialog. These
   routes take a page session and refuse a request from another site.
 - **Ways out.** Only two CLI routes return a value, both under the runtime's cli-token: `use` (for

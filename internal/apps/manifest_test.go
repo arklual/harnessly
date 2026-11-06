@@ -13,7 +13,7 @@ const cashback = `{
   "harnessly": ">=0.17",
   "trust": "sandboxed",
   "targets": ["chat", "pane", "sinopia.site"],
-  "activation": { "on": ["manual", "command:/cashback", "view"], "openView": "main" },
+  "activation": { "on": ["manual", "command:/cashback"], "openView": "main" },
   "permissions": ["chat.prompt", "chat.card", "pane.open", "storage", "secrets:bank-token", "sinopia.read", "sinopia.write"],
   "network": { "connect": ["cashback-api.bank.example"] },
   "secrets": [{ "name": "bank-token", "description": "Токен API кешбэков банка" }],
@@ -40,7 +40,7 @@ const review = `{
   "harnessly": "^0.17",
   "trust": "declarative",
   "targets": ["chat"],
-  "activation": { "on": ["command:/review"] },
+  "activation": { "on": ["command:/mr-review"] },
   "permissions": [],
   "agent": { "instructions": "instructions.md", "skills": ["review-checklist"], "tools": { "deny": ["Edit", "Write", "Bash(git push*)"] } }
 }`

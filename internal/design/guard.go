@@ -147,11 +147,55 @@ func GuardHook(raw []byte, cli string, env GuardEnv) []byte {
 			return denyAnswer(reason)
 		}
 	}
+	if reason := guardLocks(in, env); reason != "" {
+		return denyAnswer(reason)
+	}
 	deny, reason := GuardCanvas(in, cli)
 	if !deny {
 		return nil
 	}
 	return denyAnswer(reason)
+}
+
+// guardLocks refuses a write of the file of a board an app locked (or of its record in meta/pages): the lock is kept
+// by the server on every write it makes, and a file written by the agent is not looked at, so it is closed here. The
+// shell is read for the paths it names, as the canvas guard does: the honest border is the same.
+func guardLocks(in GuardInput, env GuardEnv) string {
+	var files []string
+	switch {
+	case writingTools[in.ToolName]:
+		files = append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath, in.ToolInput.Path}, patchTargets(in.ToolInput.Command)...)
+	case in.ToolName == "Bash" && shellWrites.MatchString(in.ToolInput.Command):
+		files = shellTokens.FindAllString(in.ToolInput.Command, -1)
+	default:
+		return ""
+	}
+	cwd := in.Cwd
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+	home, _ := os.UserHomeDir()
+	g := &guardCtx{home: home}
+	libs := map[string]*Library{}
+	for _, f := range files {
+		if f == "" || strings.HasPrefix(f, "-") {
+			continue
+		}
+		p := g.abs(f, cwd)
+		root, id, ok := projectTop(p)
+		if !ok {
+			continue
+		}
+		l := libs[root]
+		if l == nil {
+			l = New(Config{DataDir: env.DataDir, LibraryDir: root})
+			libs[root] = l
+		}
+		if reason := l.BoardLockReason(id, p); reason != "" {
+			return reason
+		}
+	}
+	return ""
 }
 
 // GuardCLI is the command name agents are told to run: RUNTIME_CLI_NAME when the deployment names one.

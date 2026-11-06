@@ -6,7 +6,7 @@
   "harnessly": ">=0.16.36",
   "trust": "declarative",
   "targets": ["chat"],
-  "activation": { "on": ["manual", "command:/review"] },
+  "activation": { "on": ["manual", "command:/mr-review"] },
   "permissions": [],
   "agent": {
     "instructions": "instructions.md",

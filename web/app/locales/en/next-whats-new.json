@@ -1,4 +1,10 @@
 {
+  "next.whatsNew.2026-11-06w.chatWidgets.title": "Widgets right in the chat",
+  "next.whatsNew.2026-11-06w.chatWidgets.text": "The agent can now draw a chart, a table or an app's card straight in the feed and update it in place while it works: the card under the step changes instead of a new message.",
+  "next.whatsNew.2026-11-06w.appsAlways.title": "Plugins that are always on",
+  "next.whatsNew.2026-11-06w.appsAlways.text": "A plugin can be on in every new chat, or turn on by its own command such as /tasks: no need to switch it on by hand each time.",
+  "next.whatsNew.2026-11-06w.appsSafer.title": "Keys and settings of apps",
+  "next.whatsNew.2026-11-06w.appsSafer.text": "An app asks for its keys and settings in «About the app»: a key goes into the machine's safe and reaches neither the agent nor the app's window. An app's prohibitions now hold in the agent itself.",
   "next.whatsNew.2026-11-06b.previewByPath.title": "The preview works on one address",
   "next.whatsNew.2026-11-06b.previewByPath.text": "When a company gives harnessly one address and no subdomains, the preview of local servers still opens in the pane. Nothing to set up.",
   "next.whatsNew.2026-11-06.docsLibrary.title": "Documentation of all of harnessly",

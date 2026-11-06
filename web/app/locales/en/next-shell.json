@@ -1302,5 +1302,6 @@
   "next.setup.action.start": "Start",
   "next.setup.hide": "Hide",
   "next.setup.more": "and {n} more",
-  "next.setup.askFailed": "The machine did not answer — try again"
+  "next.setup.askFailed": "The machine did not answer — try again",
+  "next.appview.widget": "Widget"
 }
