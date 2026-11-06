@@ -103,6 +103,28 @@ describe('liveEnv', () => {
     expect(item?.canToggle).toBe(true);
   });
 
+  it('changes the groups of a layer and a person’s own choice', async () => {
+    const g = { id: 'g1', name: 'Бэкенд', hint: '', required: false, defaultOn: false, position: 0 };
+    const seen = answer(200, { group: g });
+    expect(await liveEnv().envGroupAdd('acme', { layer: 'org', scopeId: 'o1', name: 'Бэкенд' })).toEqual(g);
+    await liveEnv().envGroupPatch('acme', 'g1', { required: true });
+    await liveEnv().envMineGroup('g1', true, 'product');
+    expect(seen.map((s) => `${s.method} ${s.url}`)).toEqual([
+      'POST /api/orgs/acme/env/groups',
+      'PATCH /api/orgs/acme/env/groups/g1',
+      'PUT /api/me/env/groups/g1',
+    ]);
+    expect(seen[2]?.body).toEqual({ on: true, space: 'product' });
+  });
+
+  it('applies a layer on its machines', async () => {
+    const seen = answer(200, { machines: 3, started: 2, waiting: 1 });
+    const out = await liveEnv().envApply('acme', { layer: 'tenant', scopeId: 't1', when: 'now' });
+    expect(out).toEqual({ machines: 3, started: 2, waiting: 1 });
+    expect(seen.map((s) => `${s.method} ${s.url}`)).toEqual(['POST /api/orgs/acme/env/apply']);
+    expect(seen[0]?.body).toEqual({ layer: 'tenant', scopeId: 't1', when: 'now' });
+  });
+
   it('turns the hub’s refusals into the codes the screen reads', async () => {
     const cases: [number, string, string][] = [
       [409, 'exists', 'Это уже есть в окружении.'],

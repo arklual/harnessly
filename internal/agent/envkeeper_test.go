@@ -18,7 +18,7 @@ func envItems() []hubproto.EnvItem {
 		{ItemID: "repo1", Kind: "repo", Name: "Монорепо", Layer: "team", Source: json.RawMessage(`{"url":"https://git.example.org/acme/mono.git"}`)},
 		{ItemID: "doc1", Kind: "doc", Name: "Регламент", Layer: "team", Source: json.RawMessage(`{"url":"https://docs.example.org/rules"}`)},
 		{ItemID: "../evil", Kind: "skill", Name: "Плохой", Layer: "team", Source: json.RawMessage(`{"body":"x"}`)},
-		{ItemID: "odd1", Kind: "plugin", Name: "Странный", Layer: "team", Source: json.RawMessage(`{}`)},
+		{ItemID: "odd1", Kind: "widget", Name: "Странный", Layer: "team", Source: json.RawMessage(`{}`)},
 	}
 	hubproto.SortEnvItems(items)
 	return items

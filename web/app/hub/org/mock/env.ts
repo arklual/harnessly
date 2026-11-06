@@ -6,12 +6,15 @@
 import type {
   AddCatalogRequest,
   AddEntryRequest,
+  AddGroupRequest,
+  ApplyRequest,
   CatalogItem,
   CatalogKind,
   CatalogOwner,
   CatalogSource,
   EnvCard,
   EnvEntryRow,
+  EnvGroup,
   EnvLayer,
   EnvLayerKind,
   EnvResponse,
@@ -52,12 +55,40 @@ interface Entry {
   scopeId: string;
   pinned: boolean;
   enabled: boolean;
+  groupId?: string;
 }
+
+interface Group extends EnvGroup {
+  layer: EnvLayerKind;
+  scopeId: string;
+}
+
+/** The platform's own group, as the hub puts it into every organization. */
+const RECOMMENDED = 'recommended';
 
 const team = (id: string): CatalogOwner => ({ layer: 'team', scopeId: id });
 const tenant: CatalogOwner = { layer: 'tenant', scopeId: TENANT_ID };
 
 const SEED_ITEMS: Item[] = [
+  {
+    id: 'builtin-superpowers',
+    kind: 'plugin',
+    name: 'Superpowers',
+    hint: 'процесс работы: план, тесты, проверка перед сдачей',
+    source: {
+      marketplace: 'anthropics/claude-plugins-official',
+      plugin: 'superpowers@claude-plugins-official',
+    },
+    owner: null,
+  },
+  {
+    id: 'builtin-claude-settings',
+    kind: 'claude-settings',
+    name: 'Экономные настройки Claude',
+    hint: 'сабагенты на Sonnet, разумные таймауты, правила экономии в CLAUDE.md',
+    source: {},
+    owner: null,
+  },
   {
     id: 'i-gitlab',
     kind: 'access',
@@ -257,6 +288,9 @@ const SEED_ENTRIES: [EnvLayerKind, string, string, boolean][] = [
 
 const items = new Map<string, Item>();
 let entries: Entry[] = [];
+let groups: Group[] = [];
+/** The member's own choices of optional groups. */
+const groupOn = new Map<string, boolean>();
 let runs: EnvRunRow[] = [];
 const logs = new Map<string, string>();
 let serial = 100;
@@ -279,6 +313,46 @@ const seed = () => {
     pinned,
     enabled: true,
   }));
+  groups = [
+    {
+      id: 'g-back',
+      layer: 'org',
+      scopeId: ORG_ID,
+      name: 'Бэкенд',
+      hint: 'Сервисы и их базы',
+      required: false,
+      defaultOn: false,
+      position: 0,
+      builtIn: false,
+    },
+    {
+      id: RECOMMENDED,
+      layer: 'org',
+      scopeId: ORG_ID,
+      name: 'Рекомендованное',
+      hint: 'плагины и настройки, с которыми агенту лучше; включает каждый у себя',
+      required: false,
+      defaultOn: false,
+      position: 1 << 20,
+      builtIn: true,
+    },
+  ];
+  groupOn.clear();
+  // One item of the organization sits in the optional group, so both views show a group.
+  const inGroup =
+    entries.find((e) => e.layer === 'org' && !e.pinned) ?? entries.find((e) => e.layer === 'org');
+  if (inGroup) inGroup.groupId = 'g-back';
+  for (const id of ['builtin-superpowers', 'builtin-claude-settings']) {
+    entries.push({
+      entryId: `builtin-entry-${id}`,
+      itemId: id,
+      layer: 'org',
+      scopeId: ORG_ID,
+      pinned: false,
+      enabled: true,
+      groupId: RECOMMENDED,
+    });
+  }
   machineCurrent = false;
   machineFailed = 1;
   logs.clear();
@@ -363,7 +437,8 @@ const guard = (role: Role, layer: EnvLayerKind, scopeId: string): void => {
 const rowOf = (role: Role, e: Entry): EnvEntryRow => {
   const it = items.get(e.itemId);
   const can = mayManage(role, e.layer, e.scopeId);
-  const reason: LockedReason | null = can ? null : e.layer === 'org' ? 'pinned_by_org' : 'no_rights';
+  let reason: LockedReason | null = can ? null : e.layer === 'org' ? 'pinned_by_org' : 'no_rights';
+  if (e.entryId.startsWith('builtin-entry-')) reason = 'built_in';
   return {
     entryId: e.entryId,
     itemId: e.itemId,
@@ -372,7 +447,7 @@ const rowOf = (role: Role, e: Entry): EnvEntryRow => {
     hint: it?.hint ?? '',
     audience: { mode: 'tenant', teams: [] },
     pinned: e.pinned,
-    locked: !can,
+    locked: reason !== null,
     lockedReason: reason,
     enabled: e.enabled,
     callsWeek: null,
@@ -380,7 +455,16 @@ const rowOf = (role: Role, e: Entry): EnvEntryRow => {
     lastUsedAt: null,
     unused: null,
     delivery: null,
+    groupId: e.groupId ?? '',
   };
+};
+
+const groupView = ({ layer: _l, scopeId: _s, ...g }: Group): EnvGroup => g;
+const isOn = (g: Group): boolean => g.required || (groupOn.get(g.id) ?? g.defaultOn);
+const findGroup = (id: string): Group => {
+  const g = groups.find((x) => x.id === id);
+  if (!g) throw new OrgApiError('not_found', 'group not found');
+  return g;
 };
 
 const view = (ctx: MockCtx): EnvResponse => {
@@ -403,6 +487,7 @@ const view = (ctx: MockCtx): EnvResponse => {
       items: entries
         .filter((e) => e.layer === o.layer && e.scopeId === o.scopeId)
         .map((e) => rowOf(ctx.role, e)),
+      groups: groups.filter((g) => g.layer === o.layer && g.scopeId === o.scopeId).map(groupView),
     }));
   const base: EnvResponse = {
     summary: {
@@ -626,6 +711,7 @@ const myMachine = (): MeMachine => ({
 
 const mineOf = (e: Entry): MeEnvItem => {
   const it = findItem(e.itemId);
+  const g = groups.find((x) => x.id === e.groupId);
   return {
     itemId: e.itemId,
     entryId: e.entryId,
@@ -635,9 +721,10 @@ const mineOf = (e: Entry): MeEnvItem => {
     layer: e.layer,
     scopeId: e.scopeId,
     layerTitle: layerTitle(e.layer, e.scopeId),
-    pinned: e.pinned,
-    off: false,
-    canToggle: !e.pinned,
+    pinned: e.pinned || (g?.required ?? false),
+    off: g ? !isOn(g) : false,
+    canToggle: !e.pinned && !g,
+    groupId: e.groupId ?? '',
   };
 };
 
@@ -754,6 +841,11 @@ export const envMock = (ctx: MockCtx): EnvApi => ({
     guard(ctx.role, e.layer, e.scopeId);
     if (req.enabled !== undefined) e.enabled = req.enabled;
     if (req.pinned !== undefined) e.pinned = req.pinned;
+    if (req.groupId !== undefined) {
+      if (req.groupId !== '' && findGroup(req.groupId).layer !== e.layer)
+        throw new OrgApiError('invalid_request', 'Группа другого уровня');
+      e.groupId = req.groupId;
+    }
     machineCurrent = false;
     return later(rowOf(ctx.role, e), 350);
   },
@@ -890,9 +982,100 @@ export const envMock = (ctx: MockCtx): EnvApi => ({
       space: { id: TENANT_ID, slug: 'product', name: tenantName() },
       org: { id: ORG_ID, name: 'Акме' },
       items: mine.map(mineOf),
+      groups: groups
+        .filter((g) => mine.some((e) => e.groupId === g.id))
+        .map((g) => ({
+          id: g.id,
+          name: g.name,
+          hint: g.hint,
+          layer: g.layer,
+          required: g.required,
+          on: isOn(g),
+          canToggle: !g.required,
+          items: mine.filter((e) => e.groupId === g.id).length,
+          builtIn: g.builtIn,
+        })),
       outdated: !m.current || m.failed > 0,
       machines: [m],
     });
+  },
+
+  envMineGroup: async (groupId, on) => {
+    const g = findGroup(groupId);
+    if (g.required) throw new OrgApiError('locked', 'Группа обязательная');
+    groupOn.set(g.id, on);
+    machineCurrent = false;
+    const n = entries.filter((e) => e.groupId === g.id).length;
+    return later(
+      {
+        id: g.id,
+        name: g.name,
+        hint: g.hint,
+        layer: g.layer,
+        required: false,
+        on,
+        canToggle: true,
+        items: n,
+        builtIn: g.builtIn,
+      },
+      300,
+    );
+  },
+
+  envGroupAdd: async (_org, req: AddGroupRequest) => {
+    guard(ctx.role, req.layer, req.scopeId);
+    const name = req.name.trim();
+    if (!name) throw new OrgApiError('invalid_request', 'Нужно название');
+    if (groups.some((g) => g.layer === req.layer && g.scopeId === req.scopeId && g.name === name))
+      throw new OrgApiError('name_taken', 'Такая группа уже есть');
+    serial += 1;
+    const g: Group = {
+      id: `g${serial}`,
+      layer: req.layer,
+      scopeId: req.scopeId,
+      name,
+      hint: req.hint ?? '',
+      required: !!req.required,
+      defaultOn: req.defaultOn ?? false,
+      position: groups.length,
+      builtIn: false,
+    };
+    groups = [...groups, g];
+    return later(groupView(g), 300);
+  },
+
+  envGroupPatch: async (_org, groupId, req) => {
+    const g = findGroup(groupId);
+    if (g.builtIn)
+      throw new OrgApiError('built_in', 'Группу платформы в хабе не меняют: каждый включает её у себя');
+    guard(ctx.role, g.layer, g.scopeId);
+    if (req.name !== undefined) g.name = req.name.trim() || g.name;
+    if (req.hint !== undefined) g.hint = req.hint;
+    if (req.required !== undefined) g.required = req.required;
+    if (req.defaultOn !== undefined) g.defaultOn = req.defaultOn;
+    if (req.position !== undefined) g.position = req.position;
+    machineCurrent = false;
+    return later(groupView(g), 300);
+  },
+
+  envGroupRemove: async (_org, groupId) => {
+    const g = findGroup(groupId);
+    if (g.builtIn)
+      throw new OrgApiError('built_in', 'Группу платформы в хабе не меняют: каждый включает её у себя');
+    guard(ctx.role, g.layer, g.scopeId);
+    groups = groups.filter((x) => x.id !== groupId);
+    for (const e of entries) if (e.groupId === groupId) e.groupId = '';
+    machineCurrent = false;
+    return later(undefined, 300);
+  },
+
+  envApply: async (_org, req: ApplyRequest) => {
+    guard(ctx.role, req.layer, req.scopeId);
+    // Three machines: two online, one asleep.
+    const machines = req.layer === 'team' ? 1 : 3;
+    const started = req.when === 'now' ? machines - 1 : 0;
+    if (started > 0) machineCurrent = true;
+    return later({ machines, started, waiting: machines - started }, 400);
   },
 
   envMineSet: async (itemId, off) => {

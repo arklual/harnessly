@@ -18,6 +18,16 @@ const (
 	EnvKindScript = "script"
 	// EnvKindAccess is the login of a forge's CLI (glab for GitLab, gh for GitHub) with the person's token from the safe.
 	EnvKindAccess = "access"
+	// EnvKindPlugin is a Claude Code plugin from a marketplace (its skills, hooks and MCP servers together), installed
+	// for the person with `claude plugin install`.
+	EnvKindPlugin = "plugin"
+	// EnvKindClaudeSettings are keys of the person's ~/.claude/settings.json (always, or only where the person set
+	// none) and a block of ~/.claude/CLAUDE.md between marks.
+	EnvKindClaudeSettings = "claude-settings"
+
+	// FeatureEnvClaude is in `hello` when the machine's runtime does the plugin and claude-settings kinds; the hub sends
+	// them only to such a machine.
+	FeatureEnvClaude = "environment.claude"
 
 	// FeatureEnvSetup is in `hello` when the agent hands the setup kinds to its runtime and serves env.run. The hub sends
 	// script and access items, and the order of the list, only to such a machine: an older agent would refuse a list
@@ -124,11 +134,22 @@ type EnvSetupState struct {
 	Items []EnvApplied      `json:"items"`
 	Once  map[string]string `json:"once"` // script item id → the hash of the source it ran once with, successfully
 	At    int64             `json:"at"`
+	// Heads: a script of a repository outside the list → the commit of its branch last seen (by a run or a look).
+	Heads map[string]string `json:"heads,omitempty"`
+	// HeadsAt is when the branches were last looked at.
+	HeadsAt int64 `json:"headsAt,omitempty"`
+	// Moved: a branch moved and the run for it has not finished yet (a restart in between must not lose it).
+	Moved bool `json:"moved,omitempty"`
 }
 
 // IsSetupKind says whether the machine (the runtime) does something with an item of this kind besides the chats.
 func IsSetupKind(kind string) bool {
-	return kind == EnvKindScript || kind == EnvKindAccess || kind == EnvKindRepo
+	return kind == EnvKindScript || kind == EnvKindAccess || kind == EnvKindRepo || IsClaudeKind(kind)
+}
+
+// IsClaudeKind says whether the kind changes the person's Claude Code (FeatureEnvClaude).
+func IsClaudeKind(kind string) bool {
+	return kind == EnvKindPlugin || kind == EnvKindClaudeSettings
 }
 
 // ValidRunMode is one of the four modes.

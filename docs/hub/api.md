@@ -876,6 +876,7 @@ Secrets (`*_SECRET`, `HUB_SMTP_URL`, `HUB_DATABASE_URL`, `HUB_SECRET_KEY`) may a
 | `AGENT_ENV_DIR` | `$AGENT_DATA_DIR/agent-env` | |
 | `AGENT_RUNTIME_PEERS` | `<runtime base>/api/peers` | the runtime's inbox and directory of messages between machines ([peers.md](peers.md)) |
 | `AGENT_HUB_PEERS` | | `on` lets an observe link take part in messages between machines |
+| `AGENT_HUB_DESIGN` | | `on` lets an observe link keep the designs' access and open tunnels to their guest read only ([design-access.md](design-access.md)) |
 
 All v1 variables keep their meaning. In Ed25519 mode `AGENT_CLUSTER_URL` and `AGENT_RUNTIME_ID` are ignored, and the
 agent starts even while the runtime has not written its secret yet (`runtime.session` answers `failed` until then).

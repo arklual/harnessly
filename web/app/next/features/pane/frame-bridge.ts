@@ -25,6 +25,8 @@ export type TFrameMessage =
   | { k: 'open'; url: string }
   /** The site redirected to another one: the offer page says so as it loads, before anyone presses anything. */
   | { k: 'redirect'; url: string }
+  /** The page asked for a security key or Touch ID, which the slot's origin can never give (WebAuthn). */
+  | { k: 'key-step' }
   /** The outcome of an agent's action (`tk:act`); rect is its element's box in the page's viewport. */
   | { k: 'acted'; acted: IFrameActed }
   /** The answer to `tk:probe-login`: whether the page asks for a password, and whether its form takes a fill. */
@@ -128,6 +130,8 @@ export const readFrameMessage = (data: unknown): TFrameMessage | null => {
       const url = httpUrl(data.url);
       return url ? { k: 'open', url } : null;
     }
+    case 'tk:key-step':
+      return { k: 'key-step' };
     case 'tk:redirect': {
       const url = httpUrl(data.url);
       return url ? { k: 'redirect', url } : null;

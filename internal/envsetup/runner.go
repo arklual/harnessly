@@ -85,7 +85,7 @@ func (r *Runner) Tick(ctx context.Context) {
 		return
 	}
 	st := r.readState()
-	if st.Hash == h.Hash && !r.secretArrived(h.Hash) && !r.retryDue(st) {
+	if st.Hash == h.Hash && !r.secretArrived(h.Hash) && !r.retryDue(st) && !st.Moved && !r.headsMoved(ctx, &st, h.Items) {
 		return
 	}
 	items := setupItems(h.Items)
@@ -171,13 +171,15 @@ func (r *Runner) readHeld() (held, bool) {
 // setupItems are the items the machine does something with, in the order of the steps: access, repositories, then the
 // scripts by their place in the list (those without one, in the order they came, last).
 func setupItems(all []hubproto.EnvItem) []hubproto.EnvItem {
-	var access, repos, scripts []hubproto.EnvItem
+	var access, repos, claude, scripts []hubproto.EnvItem
 	for _, it := range all {
 		switch it.Kind {
 		case hubproto.EnvKindAccess:
 			access = append(access, it)
 		case hubproto.EnvKindRepo:
 			repos = append(repos, it)
+		case hubproto.EnvKindClaudeSettings, hubproto.EnvKindPlugin:
+			claude = append(claude, it)
 		case hubproto.EnvKindScript:
 			scripts = append(scripts, it)
 		}
@@ -189,7 +191,7 @@ func setupItems(all []hubproto.EnvItem) []hubproto.EnvItem {
 		}
 		return a < b
 	})
-	return slices.Concat(access, repos, scripts)
+	return slices.Concat(access, repos, claude, scripts)
 }
 
 func (r *Runner) readState() hubproto.EnvSetupState {
@@ -353,6 +355,9 @@ func (r *Runner) nextRequest() (hubproto.EnvRunRequest, string, bool) {
 }
 
 func (r *Runner) runRequest(ctx context.Context, req hubproto.EnvRunRequest, path string) {
+	if req.Mode == hubproto.RunUpdate && r.OnUpdate != nil {
+		r.OnUpdate()
+	}
 	items, hash := []hubproto.EnvItem(nil), ""
 	if h, ok := r.readHeld(); ok {
 		items, hash = h.Items, h.Hash

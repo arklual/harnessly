@@ -2,6 +2,7 @@ package apps
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -423,11 +424,17 @@ func (s Snapshot) selfChange(call Call) string {
 		if strings.Contains(line, "harnessly") && (opaque || strings.ContainsAny(line, "$*?[{")) {
 			return "Bash(harnessly …)"
 		}
+		var forms []string
+		dirOf := map[string]string{}
 		for _, dir := range s.Protected {
 			for _, form := range protectedForms(dir) {
-				if strings.Contains(line, form) {
-					return "Bash(" + dir + ")"
-				}
+				forms = append(forms, form)
+				dirOf[form] = dir
+			}
+		}
+		for _, form := range forms {
+			if strings.Contains(line, form) && !readsProtected(line, forms) {
+				return "Bash(" + dirOf[form] + ")"
 			}
 		}
 	case "Edit", "Write", "MultiEdit", "NotebookEdit":
@@ -453,6 +460,130 @@ func (s Snapshot) selfChange(call Call) string {
 	}
 	return ""
 }
+
+// protectedReaders are the programs a command may name a protected folder to: they read files and write only to the
+// output the line redirects (judged on its own). Programs that can write or run more by a flag (sed -i, sort -o, tree
+// -o, find -exec, rg --pre) are not here.
+var protectedReaders = map[string]bool{"cat": true, "head": true, "tail": true, "ls": true, "wc": true, "grep": true,
+	"egrep": true, "fgrep": true, "file": true, "stat": true, "jq": true, "sha256sum": true, "md5sum": true, "diff": true,
+	"cmp": true, "du": true, "realpath": true, "readlink": true, "basename": true, "dirname": true, "echo": true,
+	"printf": true, "true": true, "test": true}
+
+// readsProtected says whether a shell line that names a protected folder only reads it: every command of the line is a
+// reader of protectedReaders (or sleep) or runs a script inside a protected folder with `python3 -I` / `python -I`
+// (alone or under `harnessly secret run --env V=name --`), and no output is redirected into one. It leans to no: a line
+// with an expansion, a substitution, an assignment, a program named by a path, or one the splitter cannot read, does
+// not only read.
+func readsProtected(line string, forms []string) bool {
+	if strings.ContainsAny(line, "$`") {
+		return false
+	}
+	// A descriptor's duplicate (2>&1, >&2, >&-) writes no file; out of the way, its & does not split the command.
+	// Twice: neighbours share the space between them, which one pass takes with the first.
+	line = fdDups.ReplaceAllString(fdDups.ReplaceAllString(line, " "), " ")
+	parts, opaque := commands(line)
+	if opaque {
+		return false
+	}
+	// commands() drops a part's leading assignments (VAR=x program) and the path of its program: here both are a no. An
+	// assignment can change what the program does (PYTHONSTARTUP, LD_PRELOAD); a program named by a path (./cat,
+	// <package>/cat) is a program of its own, not the reader of that name off the PATH.
+	for _, p := range strings.FieldsFunc(line, func(r rune) bool { return strings.ContainsRune(";&|\n(){}", r) }) {
+		if words := strings.Fields(p); len(words) > 0 && (isAssignment(words[0]) || strings.Contains(words[0], "/")) {
+			return false
+		}
+	}
+	names := func(w string) bool {
+		for _, f := range forms {
+			if strings.Contains(w, f) {
+				return true
+			}
+		}
+		return false
+	}
+	insideOne := func(w string) bool {
+		p := filepath.Clean(w)
+		for _, f := range forms {
+			if within(f, p) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, part := range parts {
+		words := strings.Fields(part)
+		// Redirections: any with a > in it (>, >>, >|, >&, &>, <>) writes, and its target is outside every protected
+		// folder, or it duplicates a descriptor (>&2, >&-); the words without them are the command.
+		var cmd []string
+		for i := 0; i < len(words); i++ {
+			w := words[i]
+			op := strings.TrimLeft(w, "0123456789&")
+			if !strings.HasPrefix(op, ">") && !strings.HasPrefix(op, "<") {
+				if strings.ContainsAny(w, "<>") {
+					// A redirection glued to a word (x>/path) is not read apart here: no.
+					return false
+				}
+				cmd = append(cmd, w)
+				continue
+			}
+			target := strings.TrimLeft(op, "<>|")
+			if target == "" && i+1 < len(words) {
+				i++
+				target = words[i]
+			}
+			if strings.Contains(op, ">") && !fdDup.MatchString(target) && (target == "" || names(target) || strings.HasPrefix(target, "&")) {
+				return false
+			}
+		}
+		if len(cmd) == 0 {
+			continue
+		}
+		// `harnessly secret run --env V=name ... -- <command>` runs the command with a secret in its environment.
+		if len(cmd) > 3 && cmd[0] == "harnessly" && cmd[1] == "secret" && cmd[2] == "run" {
+			rest, ok := cmd[3:], false
+			for len(rest) > 1 && rest[0] == "--env" {
+				rest = rest[2:]
+			}
+			if len(rest) > 1 && rest[0] == "--" {
+				rest, ok = rest[1:], true
+			}
+			if !ok {
+				return false
+			}
+			cmd = rest
+		}
+		// The program by its bare name, off the PATH: a path (./cat, <package>/cat) is a program of its own.
+		if strings.Contains(cmd[0], "/") {
+			return false
+		}
+		if protectedReaders[cmd[0]] || cmd[0] == "sleep" && !names(strings.Join(cmd, " ")) {
+			continue
+		}
+		if cmd[0] != "python3" && cmd[0] != "python" {
+			return false
+		}
+		i, isolated := 1, false
+		for i < len(cmd) && pythonFlags[cmd[i]] {
+			isolated = isolated || cmd[i] == "-I"
+			i++
+		}
+		if !isolated || i >= len(cmd) || strings.HasPrefix(cmd[i], "-") || !insideOne(strings.Trim(cmd[i], `"'`)) {
+			return false
+		}
+	}
+	return true
+}
+
+// fdDups are the descriptor duplications of a line, each a word of its own: 2>&1, >&2, <&0, >&-.
+// Only spaces and tabs around it are taken: a newline or a ; is a command's end and stays.
+var fdDups = regexp.MustCompile(`(?m)(^|[ \t])[0-9]*[<>]&([0-9]+-?|-)([ \t]|$)`)
+
+// fdDup is a redirection's target that duplicates or closes a descriptor (>&2, 2>&1, >&-), not a file.
+var fdDup = regexp.MustCompile(`^&([0-9]+-?|-)$`)
+
+// pythonFlags are the flags python may have before an app's script: -I (required: no PYTHON* variables, no user site,
+// no script folder on the path) and the harmless ones; never -c, -m or -X.
+var pythonFlags = map[string]bool{"-I": true, "-B": true, "-u": true, "-s": true, "-E": true, "-S": true, "-O": true}
 
 // protectedForms are the ways a protected folder is written in a path: as the launch named it and as it really is (the
 // data folder can be reached through a link, and a command or a tool may use either).

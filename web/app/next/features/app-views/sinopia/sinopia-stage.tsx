@@ -1,7 +1,8 @@
 // The editor of a document with the apps on in it: the document's own view in the middle, the apps' panels on its right
 // (only for the kinds they name), the menu of the selection, and the dialog that stops a share the checks forbid.
-// Nothing here when no app is on in the document: the wrapper is layout-neutral (`display: contents`) so the editor
-// is mounted once and never reloads when an app turns up.
+// Looking at the document (its mode «Макет»), only the share gate is left of them. Nothing here when no app is on in
+// the document: the wrapper is layout-neutral (`display: contents`) so the editor is mounted once and never reloads
+// when an app turns up.
 import { useState, type ReactNode } from 'react';
 import type { IAppView, IInstalledApp } from '@/next/features/app-views/api';
 import AppFrame from '@/next/features/app-views/app-frame';
@@ -44,11 +45,21 @@ export interface ISinopiaStageProps {
   id: string;
   conversation: ConvId | null;
   sinopia: ISinopia;
+  /** The document is looked at: the apps' panels and the selection's menu go, the share gate stays. */
+  viewing?: boolean;
   /** The document's own view. */
   children: ReactNode;
 }
 
-const SinopiaStage = ({ machine, kind, id, conversation, sinopia, children }: ISinopiaStageProps) => {
+const SinopiaStage = ({
+  machine,
+  kind,
+  id,
+  conversation,
+  sinopia,
+  viewing = false,
+  children,
+}: ISinopiaStageProps) => {
   const { active, focus, selection, viewPort } = sinopia;
   const panels = panelsOf(active);
   const actions = selectionActions(active);
@@ -62,7 +73,8 @@ const SinopiaStage = ({ machine, kind, id, conversation, sinopia, children }: IS
     const view = panel?.app.views.find((v) => v.id === panel.view);
     return panel !== null && view !== undefined ? { app: panel.app, view } : null;
   })();
-  const open = target !== null && kind !== null && viewPort !== null && (focus !== null || !hidden);
+  const open =
+    !viewing && target !== null && kind !== null && viewPort !== null && (focus !== null || !hidden);
   // The presence holds a value that stays the same object while it is the same view (a new one each render would swap
   // forever), and the last view while it leaves. State adjusted while rendering, as usePresence does.
   const [last, setLast] = useState<IShown | null>(null);
@@ -70,7 +82,7 @@ const SinopiaStage = ({ machine, kind, id, conversation, sinopia, children }: IS
     setLast(target);
   const presence = usePresence(open ? last : null, EXIT_MS);
   const aside = presence.value;
-  const bar = usePresence(selection.length > 0 && actions.length > 0 ? 'bar' : null, EXIT_MS);
+  const bar = usePresence(!viewing && selection.length > 0 && actions.length > 0 ? 'bar' : null, EXIT_MS);
 
   return (
     <div className="hx-sinopia" data-aside={aside !== null || undefined}>
@@ -125,7 +137,7 @@ const SinopiaStage = ({ machine, kind, id, conversation, sinopia, children }: IS
           </div>
         </aside>
       )}
-      {target !== null && hidden && focus === null && (
+      {!viewing && target !== null && hidden && focus === null && (
         <button type="button" className="hx-sinopia__reopen" onClick={() => setHidden(false)}>
           {t('next.sinopia.panelShow')}
         </button>

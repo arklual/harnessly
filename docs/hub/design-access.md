@@ -27,6 +27,22 @@ The share host is a separate origin so a guest page never runs next to the hub's
 (`hubproto.OpDesignPublicToken`) and fetches the project's public files with it; the hub never signs those tokens and a
 token opens only that project.
 
+## A machine of a closed cluster
+
+An observe link (`AGENT_HUB_OBSERVE_FILE`) changes nothing of its machine, so by default it refuses the design
+operations and opens no tunnel. The machine's operator hands the designs' access to the hub with `AGENT_HUB_DESIGN=on`
+in the agent's environment. The link then:
+
+- relays `design.access` and `design.public.token` to the runtime and passes its design events to the hub;
+- opens tunnels that end at a filter of their own, which lets through only `GET` and `HEAD` of
+  `/m/<id>/api/<name>/design-public/<project>[/<file>]` with no query and no cookie, and hands them to
+  `<AGENT_RUNTIME_PLATFORM_API>/design-public/...`; anything else is `403 machine_policy`;
+- keeps every other refusal: no runtime session, keys, logins, installs or limits, and the cluster's tunnels go where
+  they went.
+
+The snapshot the hub keeps replaces the one in `design-access.json`, so the cluster must stop writing it for that machine
+before the switch is turned on.
+
 ## Settings
 
 | Variable | Where | Meaning |

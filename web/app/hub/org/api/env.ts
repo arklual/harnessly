@@ -2,6 +2,12 @@
 // switches. The wire types are the hub's own (hub-api/env.ts); the screens use them as they are.
 import type {
   AddCatalogRequest,
+  AddGroupRequest,
+  ApplyRequest,
+  ApplyResponse,
+  EnvGroup,
+  MeEnvGroup,
+  PatchGroupRequest,
   AddEntryRequest,
   CatalogItem,
   CatalogKind,
@@ -43,6 +49,15 @@ export interface EnvApi {
   /** A person's own environment in a tenant (its slug; absent: the hub picks the one they are in). */
   envMine(space?: string): Promise<MeEnvResponse>;
   envMineSet(itemId: string, off: boolean, space?: string): Promise<MeEnvItem>;
+  /** The person turns an optional group on or off for themselves and their machines. */
+  envMineGroup(groupId: string, on: boolean, space?: string): Promise<MeEnvGroup>;
+  /** A group of a layer's entries: required pins its items, optional lets each person choose. */
+  envGroupAdd(org: string, req: AddGroupRequest): Promise<EnvGroup>;
+  envGroupPatch(org: string, groupId: string, req: PatchGroupRequest): Promise<EnvGroup>;
+  /** Removes a group; its entries stay in the layer without a group. */
+  envGroupRemove(org: string, groupId: string): Promise<void>;
+  /** «Применить на машинах»: an update run on the machines a layer reaches, now or at their next connection. */
+  envApply(org: string, req: ApplyRequest): Promise<ApplyResponse>;
 
   /** Changes an item of the catalog (its owner layer's managers, the organization's admins); the change shows in every layer that has it. */
   catalogPatch(org: string, itemId: string, req: PatchCatalogRequest): Promise<CatalogItem>;

@@ -565,6 +565,7 @@ runtime_env() {
 	printf 'RUNTIME_WORKSPACE_DIR=%s\n' "$WORK_DIR"
 	printf 'AGENT_DATA_DIR=%s\n' "$DATA_DIR"
 	printf 'AGENT_POLICY_FILE=%s\n' "$POLICY"
+	if [ "$PROFILE" = dir ]; then printf 'HARNESSLY_BASEPKG_STATE=%s\n' "$BASEPKG_STATE"; fi
 	if [ -n "${TMUX_DIR:-}" ]; then printf 'TMUX_TMPDIR=%s\n' "$TMUX_DIR"; fi
 }
 
@@ -759,6 +760,7 @@ layout_dir() {
 	BIN_DIR=/usr/local/bin
 	CONF_DIR=/etc/harnessly
 	UNIT_DIR=/etc/systemd/system
+	BASEPKG_STATE=/var/lib/harnessly-basepkg
 	MANIFEST=$CONF_DIR/install-manifest
 	MANIFEST_MODE=0644
 	POLICY=$CONF_DIR/policy.toml
@@ -778,6 +780,85 @@ ensure_service_user() {
 	# The user and its home are the installer's own from here on; a user that was there before is not.
 	track user "$SVC_USER"
 	track purge "$HOME_DIR"
+}
+
+# The base package (docs/hub/machine.md, «Base package»): a root service that installs only the system part of the list
+# built into harnessly-agent. It runs once at install, once a day, and when the runtime touches the request file.
+
+dir_unit_basepkg() {
+	cat <<EOF
+[Unit]
+Description=harnessly base package: the system tools harnessly needs on this machine
+Documentation=https://github.com/ly-solutions/harnessly/blob/main/docs/hub/machine.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$BIN_DIR/harnessly-agent basepkg install --state $BASEPKG_STATE --inbox $DATA_DIR/basepkg
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=2h
+EOF
+}
+
+dir_unit_basepkg_timer() {
+	cat <<EOF
+[Unit]
+Description=harnessly base package: the daily look
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1d
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+}
+
+dir_unit_basepkg_path() {
+	cat <<EOF
+[Unit]
+Description=harnessly base package: install when the runtime asks
+
+[Path]
+PathChanged=$DATA_DIR/basepkg/request
+Unit=harnessly-basepkg.service
+
+[Install]
+WantedBy=paths.target
+EOF
+}
+
+# write_basepkg puts the base package's service in place. A failure of it never fails the install: the machine works
+# without it and its card shows what is missing.
+write_basepkg() {
+	if [ "${HARNESSLY_BASEPKG:-1}" = 0 ]; then
+		say "The base package is off (HARNESSLY_BASEPKG=0)" "Базовый пакет выключен (HARNESSLY_BASEPKG=0)"
+		return 0
+	fi
+	mkd "$BASEPKG_STATE" 0755 root:root
+	track file "$BASEPKG_STATE/state.json"
+	track file "$BASEPKG_STATE/.lock"
+	mkd "$DATA_DIR/basepkg" 0700 "$SVC_USER:$SVC_USER"
+	purge_if_made "$DATA_DIR/basepkg"
+	dir_unit_basepkg | put "$UNIT_DIR/harnessly-basepkg.service" 0644
+	dir_unit_basepkg_timer | put "$UNIT_DIR/harnessly-basepkg.timer" 0644
+	dir_unit_basepkg_path | put "$UNIT_DIR/harnessly-basepkg.path" 0644
+	track unit harnessly-basepkg.service "$UNIT_DIR/harnessly-basepkg.service"
+	track unit harnessly-basepkg.timer "$UNIT_DIR/harnessly-basepkg.timer"
+	track unit harnessly-basepkg.path "$UNIT_DIR/harnessly-basepkg.path"
+}
+
+# start_basepkg starts the first install in the background: the machine is usable while it goes.
+start_basepkg() {
+	if [ "${HARNESSLY_BASEPKG:-1}" = 0 ]; then return 0; fi
+	X systemctl enable --now harnessly-basepkg.timer harnessly-basepkg.path ||
+		warn "the base package service did not start: the machine works, its card shows what is missing" \
+			"служба базового пакета не запустилась: машина работает, карточка покажет, чего не хватает"
+	X systemctl start --no-block harnessly-basepkg.service || true
 }
 
 dir_unit_runtime() {
@@ -888,12 +969,14 @@ install_dir() {
 	dir_unit_agent | put "$UNIT_DIR/harnessly-agent.service" 0644
 	track unit harnessly-runtime.service "$UNIT_DIR/harnessly-runtime.service"
 	track unit harnessly-agent.service "$UNIT_DIR/harnessly-agent.service"
+	write_basepkg
 	save_manifest
 	step "Starting the services" "Запускаем службы"
 	X systemctl daemon-reload
 	X systemctl enable harnessly-runtime.service harnessly-agent.service
 	X systemctl restart harnessly-runtime.service
 	X systemctl restart harnessly-agent.service
+	start_basepkg
 	wait_linked
 	done_message
 }

@@ -66,7 +66,7 @@ func TestMachineChecksSayWhatIsMissingAndHow(t *testing.T) {
 			t.Errorf("%s: %+v", id, c)
 		}
 	}
-	if got["tmux"].FixCommand != "sudo apt-get install -y tmux" || got["linger"].FixCommand != "sudo loginctl enable-linger someone" {
+	if got["tmux"].FixCommand != "sudo apt-get install -y -q --no-install-recommends tmux" || got["linger"].FixCommand != "sudo loginctl enable-linger someone" {
 		t.Errorf("commands: %q %q", got["tmux"].FixCommand, got["linger"].FixCommand)
 	}
 	if _, ok := got["git_identity"]; ok {
@@ -221,7 +221,7 @@ func TestMachineCheckAppsBoundary(t *testing.T) {
 		sysctl map[string]string
 		want   string
 	}{
-		{apps.ErrNoBwrap, nil, "sudo apt-get install -y bubblewrap"},
+		{apps.ErrNoBwrap, nil, "sudo apt-get install -y -q --no-install-recommends bubblewrap"},
 		{errors.New("bwrap: setting up uid map: Permission denied"), map[string]string{"/proc/sys/kernel/apparmor_restrict_unprivileged_userns": "1"}, "sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict"},
 		{errors.New("bwrap: No permissions to create new namespace"), map[string]string{"/proc/sys/user/max_user_namespaces": "0"}, "echo user.max_user_namespaces=15000 | sudo tee /etc/sysctl.d/60-harnessly-userns.conf && sudo sysctl --system"},
 		{errors.New("bwrap: something else"), nil, ""},

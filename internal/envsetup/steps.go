@@ -260,6 +260,8 @@ func (ex *execution) repo(i int) {
 		out, exit, err := ex.quiet(Cmd{Name: "git", Args: []string{"-c", "safe.directory=" + dir, "-C", dir, "remote", "get-url", "origin"}, Env: ex.baseEnv(), Timeout: loginTimeout})
 		got := strings.TrimSpace(out)
 		switch {
+		case (err != nil || exit != 0 || got == "") && ex.modifies && onlyMarkers(ex.hostPath(dir)):
+			ex.cloneInto(i, src, dir)
 		case err != nil || exit != 0 || got == "":
 			ex.fail(i, "папка "+dir+" уже есть, но это не клон репозитория")
 		case normRemote(got) != normRemote(src.URL):
@@ -297,7 +299,7 @@ func (ex *execution) script(i int) {
 			return
 		}
 	}
-	hash := hashOf(it.Source)
+	hash := ex.onceHash(i, ex.state.Heads[it.ItemID])
 	if !ex.modifies {
 		ex.scriptLook(i, hash)
 		return
@@ -377,6 +379,9 @@ func (ex *execution) script(i int) {
 		ex.scriptFail(i, fmt.Sprintf("завершился с кодом %d", exit))
 	default:
 		if src.Rerun == "once" {
+			if h, ok := ex.heads[it.ItemID]; ok {
+				hash = ex.onceHash(i, h) // the commit the script really ran from
+			}
 			ex.remember(it.ItemID, hash)
 		}
 		ex.done(i, hubproto.EnvOK, "выполнен")
@@ -582,6 +587,11 @@ func (ex *execution) locateCache(i int, w where, needFile bool, fileIn func(*whe
 		return w, fmt.Errorf("репозиторий скрипта не получен%s", exitNote(exit, err))
 	}
 	w.cwd = dir
+	if out, exit, err := ex.quiet(Cmd{Name: "git", Args: []string{"-C", dir, "rev-parse", "HEAD"}, Env: ex.baseEnv(), Timeout: loginTimeout}); err == nil && exit == 0 {
+		if h := strings.TrimSpace(out); h != "" {
+			ex.heads[ex.items[i].ItemID] = h
+		}
+	}
 	return w, fileIn(&w, dir)
 }
 

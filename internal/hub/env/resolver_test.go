@@ -137,3 +137,65 @@ func TestParseAudience(t *testing.T) {
 		}
 	}
 }
+
+func inGroup(id string) func(*Entry) { return func(e *Entry) { e.GroupID = id } }
+
+func TestResolveGroups(t *testing.T) {
+	groups := map[string]Group{
+		"core":  {ID: "core", Layer: "org", Name: "Основа", Required: true},
+		"back":  {ID: "back", Layer: "org", Name: "Бэкенд", DefaultOn: true},
+		"infra": {ID: "infra", Layer: "org", Name: "Инфра"},
+	}
+	entries := []Entry{
+		entry("org", "o1", "review", inGroup("core")),
+		entry("org", "o1", "tracker", inGroup("back")),
+		entry("org", "o1", "docs", inGroup("infra")),
+	}
+	by := func(eff []Effective) map[string]Effective {
+		m := map[string]Effective{}
+		for _, e := range eff {
+			m[e.ID] = e
+		}
+		return m
+	}
+	// Nobody chose: the required group is pinned, the optional ones follow their default.
+	p := Person{OrgID: "o1", SpaceID: "s1", Groups: groups, Off: map[string]bool{"review": true}}
+	got := by(Resolve(items(), entries, p))
+	if r := got["review"]; !r.Pinned || r.Off || r.LockedBy != "org" || r.GroupID != "core" {
+		t.Fatalf("required: %+v", r)
+	}
+	if tr := got["tracker"]; tr.Off || tr.GroupOff {
+		t.Fatalf("on by default: %+v", tr)
+	}
+	if d := got["docs"]; !d.Off || !d.GroupOff {
+		t.Fatalf("off by default: %+v", d)
+	}
+	// The person's choices win over the defaults.
+	p.GroupOn = map[string]bool{"back": false, "infra": true, "core": false}
+	got = by(Resolve(items(), entries, p))
+	if !got["tracker"].Off || got["docs"].Off || got["review"].Off {
+		t.Fatalf("choices: %+v", got)
+	}
+	// A group that is gone (unknown id) is no group.
+	p.Groups = nil
+	if d := by(Resolve(items(), entries, p))["docs"]; d.Off || d.GroupID != "" {
+		t.Fatalf("unknown group: %+v", d)
+	}
+}
+
+func TestARequiredGroupHoldsAgainstLowerLayers(t *testing.T) {
+	groups := map[string]Group{"core": {ID: "core", Layer: "org", Name: "Основа", Required: true}}
+	required := func(e *Entry) { e.GroupID, e.Required = "core", true }
+	entries := []Entry{
+		entry("org", "o1", "review", required),
+		entry("tenant", "s1", "review", disabled),
+	}
+	p := Person{OrgID: "o1", SpaceID: "s1", Groups: groups}
+	got := Resolve(items(), entries, p)
+	if len(got) != 1 || got[0].ID != "review" || !got[0].Pinned || got[0].LockedBy != "org" {
+		t.Fatalf("a lower layer switched a required item off: %+v", got)
+	}
+	if l := LockedAbove(entries, "tenant", "o1", "s1", "review"); l != "org" {
+		t.Fatalf("locked above: %q", l)
+	}
+}

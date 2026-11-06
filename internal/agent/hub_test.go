@@ -1173,6 +1173,7 @@ func TestHubModeReadsNoTranscripts(t *testing.T) {
 }
 
 func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
+	t.Setenv(designOptIn, "")
 	r := startHubAgent(t, rigOptions{observe: true})
 	if r.agent.hub == nil || !r.agent.hub.observe {
 		t.Fatal("the cluster's agent did not start an observe link")

@@ -38,6 +38,8 @@ A source holds the text or the address of the item and **nothing secret**. Whate
 | `mcp` | `transport` (`http`, `sse`, `stdio`), `url` (http or https, no login in it), `command`, `args` (≤ 32 strings), `secretRefs` (≤ 16 names of secrets, `[A-Za-z_][A-Za-z0-9_]*`; the machine looks them up by name) |
 | `repo` | `url` (https or ssh), `branch` |
 | `doc` | `url` (http or https), `text` (≤ 48 KiB) |
+| `plugin` | `marketplace` (GitHub `owner/repo` or an https git address), `plugin` (`name@marketplace`) — see «Recommended» |
+| `claude-settings` | `always`, `ifAbsent` (objects of Claude Code's settings), `claudeMd` (≤ 8 KiB) — see «Recommended» |
 
 The whole source is at most 64 KiB. Names are up to 80 characters, hints up to 200, without control characters.
 
@@ -146,6 +148,107 @@ pinned, off, canToggle}`. `canToggle` is false for a pinned item. Fixture: `fixt
 
 `{off: boolean}` (`space` may also be in the body) → 200 `MeItem`. 409 `locked` for a pinned item, 404 for an item the
 person does not have. Recorded in the audit trail only; it changes nothing of the organization.
+
+## Groups
+
+> **Important — read before you put a list together.** A list of more than about five repositories, or with anything
+> heavy or rarely used, goes into **groups**. Make **required** only what nobody of the team can work without; put the
+> rest into **optional** groups, and what most people do not need into optional groups that start **off**
+> (`defaultOn: false`). A machine gets an optional group only when its person has it on, so a team of thirty services
+> does not clone thirty repositories onto every laptop.
+
+- **Group** — a named group of one layer's entries: `id`, `name` (≤ 40 characters, unique in the layer), `hint`,
+  `required`, `defaultOn` (default true), `position`. An entry is in at most one group of its own layer (`groupId`;
+  `""` for none).
+- **Required**: the group's items are pinned — nobody below and no person can switch them off.
+- **Optional**: each person switches the group on or off for themselves in a tenant; with no choice it is `defaultOn`.
+  Items of a group that is off for the person are `off` in `GET /api/me/env` and are **not in the list of the machines
+  that are theirs** (`store.Machine.CreatedBy`), so nothing of them is cloned, run or loaded there. What a machine has
+  already set up stays (a folder may hold work); it is just no longer kept up.
+- An item put in by several layers takes the group of the highest layer that puts it in, as it takes the item.
+- Deleting a group leaves its entries in, without a group; the people's choices of it go.
+
+| Method and path | Who | Answer |
+| --- | --- | --- |
+| `POST /api/orgs/{org}/env/groups` `{layer, scopeId, name, hint?, required?, defaultOn?}` | managers of the layer | 201 `{group: GroupView}`; 409 `name_taken` |
+| `PATCH /api/orgs/{org}/env/groups/{groupId}` `{name?, hint?, required?, defaultOn?, position?}` | managers of the layer | 200 `{group}` |
+| `DELETE /api/orgs/{org}/env/groups/{groupId}` | managers of the layer | 204 |
+| `POST …/env/entries` and `PATCH …/env/entries/{entryId}` with `groupId` | managers of the layer | the group must be of the entry's layer (400 `invalid_request`, `details.field` `groupId`); `""` takes the entry out |
+| `PUT /api/me/env/groups/{groupId}?space=` `{on: boolean}` | the person | 200 `MeGroup`; 409 `locked` for a required group, 404 for a group none of their items is in |
+
+`GET /api/orgs/{org}/env` lists every layer's `groups: GroupView[]` and every row's `groupId`; `GET /api/me/env` has
+`groups: MeGroup[]` (`{id, name, hint, layer, required, on, canToggle, items}`, only groups the person has items in) and
+every item's `groupId`.
+
+Example — a team's code in groups, by the API:
+
+```sh
+curl -X POST $HUB/api/orgs/acme/env/groups -d '{"layer":"org","scopeId":"<org id>","name":"Основа","required":true}'
+curl -X POST $HUB/api/orgs/acme/env/groups -d '{"layer":"org","scopeId":"<org id>","name":"Бэкенд"}'
+curl -X POST $HUB/api/orgs/acme/env/groups -d '{"layer":"org","scopeId":"<org id>","name":"Аналитика","defaultOn":false}'
+curl -X PATCH $HUB/api/orgs/acme/env/entries/<entry id> -d '{"groupId":"<id of Бэкенд>"}'
+# a person switches «Аналитика» on for themselves
+curl -X PUT "$HUB/api/me/env/groups/<id of Аналитика>?space=product" -d '{"on":true}'
+```
+
+The same in an env-seed file (`hub env-seed --file`): `groups:` of an organization, and `group:` of an entry, by name.
+
+```yaml
+orgs:
+  - org: acme
+    groups:
+      - {layer: org, name: Основа, required: true}
+      - {layer: org, name: Бэкенд, hint: сервисы}
+      - {layer: org, name: Аналитика, defaultOn: false}
+    entries:
+      - {layer: org, item: Настройка машины, group: Основа}
+      - {layer: org, item: orders, group: Бэкенд}
+      - {layer: org, item: reports, group: Аналитика}
+```
+
+An entry without `group:` keeps the group it has; a group without `defaultOn:` keeps (or, new, gets) `true`.
+
+## Recommended
+
+«Рекомендованное» is a group of the platform itself, in every organization with no setting up: plugins and settings of
+Claude Code an agent works better with, none of which the platform needs. It is **optional and off**: each person turns
+it on for themselves (in «Окружение» of the hub, or on their machine's settings), and then their machines put it in in
+the background, with the same setup runner as the rest; one item failing does not stop the others. Turned off again,
+the group stops being updated and **nothing is undone**: the plugins and settings it put in stay.
+
+| Item | Kind | What it brings |
+| --- | --- | --- |
+| Superpowers | `plugin` | the way of working: plan, tests, a check before handing in |
+| Context7 | `plugin` | up-to-date documentation of libraries |
+| Playwright | `plugin` | the agent opens pages and checks them in a browser |
+| Chrome DevTools | `plugin` | the network, the console and the speed of a page |
+| Экономные настройки Claude | `claude-settings` | subagents on Sonnet, sane Bash timeouts, the rules of economy in CLAUDE.md |
+
+The items, the entries (`builtin-entry-…`) and the group (`id: "recommended"`, `builtIn: true`) live in the code
+(`internal/hub/env/recommended.go`), not in the database: nobody changes or removes them in the hub (an entry shows
+`lockedReason: "built_in"`; a change of the group answers 409 `built_in`). An organization's admin may put entries of
+the organization's own into the group (a plugin of the team with its hooks, say). `HUB_ENV_RECOMMENDED=off` leaves the
+group out of every organization of the hub.
+
+**The two kinds.** Both are done by the machine's setup runner (`internal/envsetup/claude.go`) and go only to a machine
+whose hello has `environment.claude`, so an older agent never sees them. Both change the person's Claude Code, so only an
+organization's admin writes them (a team's or a tenant's item of these kinds is refused).
+
+- `plugin` — when the marketplace is not known on the machine, `claude plugin marketplace add <marketplace>`; then
+  `claude plugin install <plugin>`. A plugin already in place is left to Claude Code, which updates its plugins itself.
+  No `claude` on the machine: the step fails with that, and the rest go on.
+- `claude-settings` — in `~/.claude/settings.json`, the keys of `always` are set every time and the keys of `ifAbsent`
+  only where the person has none (`env` variable by variable); nothing else in the file changes, and a file that is not
+  JSON is left alone (the step fails). Only these keys are written — `env`, `model`, `effortLevel`,
+  `includeCoAuthoredBy`, `cleanupPeriodDays`, `subagentPromptCacheTtl`, `alwaysThinkingEnabled`, `outputStyle`,
+  `spinnerTipsEnabled` — and in `env` only `CLAUDE_CODE_SUBAGENT_MODEL`, `BASH_DEFAULT_TIMEOUT_MS`,
+  `BASH_MAX_TIMEOUT_MS`, `CLAUDE_CODE_MAX_OUTPUT_TOKENS`, `MAX_THINKING_TOKENS`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`,
+  `DISABLE_ERROR_REPORTING`, `DISABLE_TELEMETRY`, `DISABLE_AUTOUPDATER` (`internal/hubproto/claude.go`): never hooks,
+  permissions, an API address or a key. `claudeMd` goes into `~/.claude/CLAUDE.md` between
+  `<!-- harnessly:<item id> -->` and `<!-- /harnessly:<item id> -->`: the block is rewritten in place, the rest of the
+  file is never touched. A file linked from elsewhere (dotfiles) is written where it really is.
+
+A check run says what would change and changes nothing; a sandbox run writes into the sandbox's own home.
 
 ## Calls of the tools
 
@@ -275,6 +378,7 @@ and a run of the modes `update`, `check` and `sandbox` only if the hub asked tha
 | `GET /api/me/env/machines?space=` | the person | `{machines: MeMachine[]}` |
 | `POST /api/me/env/run?space=` `{mode: 'update' \| 'check', machineId?}` | the person | 202 `{runs: {runId, machineId}[]}` — on every online machine of theirs in the tenant (or the one) |
 | `GET /api/me/env/runs?space=` | the person | `{runs: EnvRunRow[]}` of their machines |
+| `POST /api/orgs/{org}/env/apply` `{layer, scopeId, when: 'now' \| 'next'}` | managers of the layer | 200 `{machines, started, waiting}` — see «Apply on the machines» |
 
 ```ts
 type EnvRunRow = { id: string; machine: { id: string; name: string }; person: { id: string; name: string };
@@ -294,6 +398,20 @@ items in `error` and those `pending` with the ask «положите токен 
 (some machine of theirs in the tenant that serves the setup is not current or has a failed item; a machine with
 `setup: false` is not counted)
 and `machines: MeMachine[]`.
+
+### Apply on the machines
+
+«Применить на машинах» in the editor's head (managers of the layer only) asks every machine the layer reaches for an
+`update` run: the list and, with it, the base package (docs/hub/machine.md, «Base package»). Two choices:
+
+- **«Сейчас»** — a machine online with `environment.setup` runs at once (`started`); the others are marked and run when
+  they next connect (`waiting`).
+- **«При следующем запуске»** — nothing runs now: every machine is marked and runs when it next connects, so nobody's
+  work in progress is touched.
+
+The mark is one row per machine (`env_apply_pending`, the latest ask wins). When a marked machine connects, the hub
+sends its list first and asks for the run a few seconds later; the mark is taken off when the run is asked, and put
+back if the machine refused it. A disabled machine is not counted. The ask is in the layer's history as `env.apply`.
 
 ### Who writes the catalog
 
@@ -328,7 +446,7 @@ runs on the machines of wider layers.
   a password never is).
 - `hub env-seed --file env.yaml [--dry-run]` moves catalog items (`kind`, `name`, `hint`, `source`, `owner`) and entries
   (`layer`, `tenant`, `team`, `item`, `pinned`, `disabled`, `audience`, `position`) of organizations named by slug, matched
-  by (kind, name) and (layer, scope, item); in a script `source.repo` may be the repository item's name.
+  by (kind, name) and (layer, scope, item); in a script `source.repo` may be the repository item's name. An item without a `hint` in the file keeps the hint it has.
 
 ## Storage
 
@@ -342,6 +460,7 @@ status, the steps with their logs; removed after 14 days).
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
+| `HUB_ENV_RECOMMENDED` | `on` | `off` leaves the platform's group «Рекомендованное» out of every organization (see «Recommended») |
 | `HUB_ENV_FEATURES` | empty | comma list of `env` (the layers, `/me/env`, the machines' lists), `catalog` (the catalog endpoints) or `all`; empty: both off, the endpoints answer `404 not_enabled`, no machine is sent anything |
 
 The endpoints also follow `HUB_ORGS`. Per-organization switches are not in the base yet (there is no `org_features`), so
@@ -352,7 +471,7 @@ the flag is for the whole hub. `HUB_USAGE_INGEST=on` is needed for the numbers.
 - A member's own additions from the catalog (not only switching off) have no storage.
 - Personal switches are not applied to a machine's list; machines get the team's list.
 - Tool names of sessions already in an agent's facts cache appear after their transcript is parsed again.
-- Codex chats do not get the list.
+- Codex chats do not get the list, nor «Рекомендованное» (Codex's `~/.codex/config.toml` is not written).
 - Turning the flag off leaves the machines with their last list.
 - The applied status is shown summed over the screen's machines; there is no per-machine view.
 - The flag is not in `GET /api/config`.

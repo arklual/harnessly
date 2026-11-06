@@ -31,7 +31,18 @@ type File struct {
 type Org struct {
 	Org     string  `yaml:"org"`
 	Items   []Item  `yaml:"items"`
+	Groups  []Group `yaml:"groups"`
 	Entries []Entry `yaml:"entries"`
+}
+
+// Group is a group of a layer (docs/hub/environment.md, «Groups»): required, or optional and on (defaultOn: false starts
+// it off). Matched by (layer, scope, name).
+type Group struct {
+	Scope     `yaml:",inline"`
+	Name      string `yaml:"name"`
+	Hint      string `yaml:"hint"`
+	Required  bool   `yaml:"required"`
+	DefaultOn *bool  `yaml:"defaultOn"`
 }
 
 // Item is a catalog item. Owner narrows who may change it and where it may be used; none: the organization.
@@ -61,6 +72,8 @@ type Entry struct {
 	Audience string `yaml:"audience"`
 	// Position is the place of a script among the layer's scripts; none: after the others for a new entry, unchanged for an old one.
 	Position int `yaml:"position"`
+	// Group is the name of a group of the entry's layer; none: no group for a new entry, unchanged for an old one.
+	Group string `yaml:"group"`
 }
 
 // Parse reads the file.
@@ -113,6 +126,7 @@ type applier struct {
 	items   []store.CatalogItem
 	tenants map[string]store.Space // by slug
 	teams   map[string]store.Team  // by tenant slug + "/" + team name
+	groups  []store.EnvGroup
 }
 
 func (a *applier) note(format string, args ...any) {
@@ -148,6 +162,14 @@ func (a *applier) org(o Org) error {
 	for i, it := range o.Items {
 		if err := a.item(it); err != nil {
 			return fmt.Errorf("items[%d] %q: %w", i, it.Name, err)
+		}
+	}
+	if a.groups, err = a.st.EnvGroupsOfOrg(a.ctx, a.org_.ID); err != nil {
+		return err
+	}
+	for i, g := range o.Groups {
+		if err := a.group(g); err != nil {
+			return fmt.Errorf("groups[%d] %q: %w", i, g.Name, err)
 		}
 	}
 	for i, e := range o.Entries {
@@ -260,7 +282,7 @@ func (a *applier) item(in Item) error {
 	if c.Name != name {
 		what, c.Name = append(what, "name"), name
 	}
-	if c.Hint != hint {
+	if hint != "" && c.Hint != hint { // an empty hint in the file keeps the stored one
 		what, c.Hint = append(what, "hint"), hint
 	}
 	if string(env.CanonicalSource(c.Source)) != string(src) {
@@ -316,6 +338,14 @@ func (a *applier) entry(in Entry) error {
 	}
 	audience := env.AudienceJSON(aud)
 	enabled := !in.Disabled
+	groupID := ""
+	if in.Group != "" {
+		g, ok := a.groupOf(layer, scopeID, in.Group)
+		if !ok {
+			return fmt.Errorf("no group %q in this layer: add it to groups", in.Group)
+		}
+		groupID = g.ID
+	}
 	cur, err := a.st.EnvEntryByKey(a.ctx, layer, scopeID, item.ID)
 	if store.IsNotFound(err) {
 		position := 0
@@ -326,7 +356,7 @@ func (a *applier) entry(in Entry) error {
 			}
 		}
 		added, ok, err := a.st.AddEnvEntry(a.ctx, store.EnvEntry{OrgID: a.org_.ID, Layer: layer, ScopeID: scopeID, ItemID: item.ID, Enabled: enabled,
-			Audience: audience, Pinned: in.Pinned, Rev: 1, UpdatedAt: a.now, Position: position})
+			Audience: audience, Pinned: in.Pinned, Rev: 1, UpdatedAt: a.now, Position: position, GroupID: groupID})
 		if err != nil || !ok {
 			return errors.Join(err, errors.New("entry not added"))
 		}
@@ -349,6 +379,9 @@ func (a *applier) entry(in Entry) error {
 	}
 	if item.Kind == store.CatalogScript && in.Position != 0 && cur.Position != in.Position {
 		what, cur.Position = append(what, "position"), in.Position
+	}
+	if groupID != "" && cur.GroupID != groupID {
+		what, cur.GroupID = append(what, "group"), groupID
 	}
 	if len(what) == 0 {
 		return nil
@@ -418,4 +451,73 @@ func (a *applier) where(layer, scopeID string) string {
 		}
 	}
 	return layer + " " + scopeID
+}
+
+// groupOf finds a group of a layer by name.
+func (a *applier) groupOf(layer, scopeID, name string) (store.EnvGroup, bool) {
+	for _, g := range a.groups {
+		if g.Layer == layer && g.ScopeID == scopeID && strings.EqualFold(g.Name, name) {
+			return g, true
+		}
+	}
+	return store.EnvGroup{}, false
+}
+
+func (a *applier) group(in Group) error {
+	layer, scopeID, err := a.resolve(&in.Scope)
+	if err != nil {
+		return err
+	}
+	name, err := env.CleanText("name", in.Name, 40, true)
+	if err != nil {
+		return err
+	}
+	hint, err := env.CleanText("hint", in.Hint, 200, false)
+	if err != nil {
+		return err
+	}
+	cur, ok := a.groupOf(layer, scopeID, name)
+	if !ok {
+		g := store.EnvGroup{OrgID: a.org_.ID, Layer: layer, ScopeID: scopeID, Name: name, Hint: hint, Required: in.Required,
+			DefaultOn: in.DefaultOn == nil || *in.DefaultOn, UpdatedAt: a.now}
+		for _, o := range a.groups {
+			if o.Layer == layer && o.ScopeID == scopeID {
+				g.Position++
+			}
+		}
+		g.Position++
+		added, ok, err := a.st.AddEnvGroup(a.ctx, g)
+		if err != nil || !ok {
+			return errors.Join(err, errors.New("group not added"))
+		}
+		a.groups = append(a.groups, added)
+		a.note("+ group «%s» in %s", name, a.where(layer, scopeID))
+		return a.journal(layer, scopeID, "env.group.add", "env_group", added.ID, fmt.Sprintf("Окружение (из файла): группа «%s» добавлена в %s", name, a.where(layer, scopeID)),
+			map[string]any{"name": name, "required": g.Required, "defaultOn": g.DefaultOn})
+	}
+	var what []string
+	if hint != "" && cur.Hint != hint {
+		what, cur.Hint = append(what, "hint"), hint
+	}
+	if cur.Required != in.Required {
+		what, cur.Required = append(what, "required"), in.Required
+	}
+	if in.DefaultOn != nil && cur.DefaultOn != *in.DefaultOn {
+		what, cur.DefaultOn = append(what, "defaultOn"), *in.DefaultOn
+	}
+	if len(what) == 0 {
+		return nil
+	}
+	cur.UpdatedAt = a.now
+	if err := a.st.UpdateEnvGroup(a.ctx, cur); err != nil {
+		return err
+	}
+	for i := range a.groups {
+		if a.groups[i].ID == cur.ID {
+			a.groups[i] = cur
+		}
+	}
+	a.note("~ group «%s» in %s (%s)", name, a.where(layer, scopeID), strings.Join(what, ", "))
+	return a.journal(layer, scopeID, "env.group.update", "env_group", cur.ID, fmt.Sprintf("Окружение (из файла): группа «%s» в %s изменена (%s)", name, a.where(layer, scopeID), strings.Join(what, ", ")),
+		map[string]any{"name": name, "changed": what})
 }

@@ -54,6 +54,8 @@ export interface ISinopiaOptions {
   conversation: ConvId | null;
   /** The slot's origin the boards are shown at; null while there is none. */
   slotOrigin: string | null;
+  /** The document is looked at: the boards carry no marks and their bound elements answer no click. */
+  viewing?: boolean;
 }
 
 /** A block the presentation editor selected: the board's file, its number, the board's fingerprint and words. */
@@ -90,7 +92,14 @@ export interface ISinopia {
 
 const NONE: IActiveApp[] = [];
 
-export const useSinopia = ({ machine, id, kind, conversation, slotOrigin }: ISinopiaOptions): ISinopia => {
+export const useSinopia = ({
+  machine,
+  id,
+  kind,
+  conversation,
+  slotOrigin,
+  viewing = false,
+}: ISinopiaOptions): ISinopia => {
   const installed = useInstalledApps(machine, 0, kind !== null);
   const apps = installed.list?.apps ?? null;
   // The runtime is asked about the document only if some installed app works in this kind of document at all.
@@ -109,9 +118,9 @@ export const useSinopia = ({ machine, id, kind, conversation, slotOrigin }: ISin
   );
   // A focus whose app is no longer on in the document is not shown.
   const focus = picked !== null && active.some((a) => a.app.id === picked.app.id) ? picked : null;
-  const latest = useRef({ state, active, selection, conversation, noticeSeq: 0 });
+  const latest = useRef({ state, active, selection, conversation, viewing, noticeSeq: 0 });
   useEffect(() => {
-    latest.current = { ...latest.current, state, active, selection, conversation };
+    latest.current = { ...latest.current, state, active, selection, conversation, viewing };
   });
 
   const [hub] = useState(() => new HlHub(slotOrigin));
@@ -146,9 +155,13 @@ export const useSinopia = ({ machine, id, kind, conversation, slotOrigin }: ISin
     };
   }, [wants, machine, id, conversation]);
 
-  const bound = active.some((a) => a.bindings !== null);
+  // Looking at the document, the boards are as they are: no marks, no bound elements to click.
+  const bound = !viewing && active.some((a) => a.bindings !== null);
   useEffect(() => hub.setOn(bound), [hub, bound]);
-  useEffect(() => hub.setMarks(state?.marks ?? [], state?.boards ?? []), [hub, state]);
+  useEffect(
+    () => hub.setMarks(viewing ? [] : (state?.marks ?? []), state?.boards ?? []),
+    [hub, state, viewing],
+  );
 
   const pushSelection = useCallback(
     async (next: ISelectedNode[]) => {
@@ -189,8 +202,9 @@ export const useSinopia = ({ machine, id, kind, conversation, slotOrigin }: ISin
     const onMessage = (event: MessageEvent) => {
       const current = latest.current.state;
       const got = hub.onMessage(event, current?.boards ?? []);
-      if (got?.k === 'hello') hub.setMarks(current?.marks ?? [], current?.boards ?? []);
-      else if (got?.k === 'click') void onClick(got);
+      const looking = latest.current.viewing;
+      if (got?.k === 'hello') hub.setMarks(looking ? [] : (current?.marks ?? []), current?.boards ?? []);
+      else if (got?.k === 'click' && !looking) void onClick(got);
       else if (got === null && hub.knows(event)) {
         // A block picked on a board with the pick tool, when it is an element of the template.
         const message = readBridgeMessage(event.data);

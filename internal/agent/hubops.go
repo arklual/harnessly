@@ -427,14 +427,19 @@ func (h *hub) opSession(req map[string]json.RawMessage, pol hubproto.Policy) (an
 }
 
 func (h *hub) opTunnel(l *link, req map[string]json.RawMessage, pol hubproto.Policy) (any, func(), error) {
-	if err := h.allow(hubproto.OpTunnelOpen, pol.RuntimeSession, "opening the runtime through the hub"); err != nil {
+	// An observe link opens tunnels only to its guest filter, when it keeps the designs' access.
+	allowed, port := pol.RuntimeSession, 0
+	if h.observe {
+		allowed, port = h.guestPort != 0 && h.designServed(), h.guestPort
+	}
+	if err := h.allow(hubproto.OpTunnelOpen, allowed, "opening the runtime through the hub"); err != nil {
 		return nil, nil, err
 	}
 	spec, _ := field[TunnelOpen](req, "spec")
 	if spec.Target != "runtime" {
 		return nil, nil, invalid("a hub may open tunnels to the runtime only")
 	}
-	start, err := h.a.tunnels.Open(l, spec)
+	start, err := h.a.tunnels.OpenAt(l, spec, port)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -443,9 +448,9 @@ func (h *hub) opTunnel(l *link, req map[string]json.RawMessage, pol hubproto.Pol
 
 // opDesign is design.access (the hub's access snapshot for the runtime to enforce) and design.public.token (a short
 // read-only token over one project for a guest of a share link, signed by the runtime). An observe link changes nothing
-// of the machine, and its hub has no business opening the cluster's projects to guests.
+// of the machine unless its operator handed the designs' access to the hub (AGENT_HUB_DESIGN=on).
 func (h *hub) opDesign(op string, req map[string]json.RawMessage) (any, func(), error) {
-	if h.observe || h.a.cfg.RuntimePort == 0 {
+	if !h.designServed() {
 		return nil, nil, h.allow(op, false, "designs' access")
 	}
 	route := h.a.cfg.RuntimePlatformAPI + "/design/access"

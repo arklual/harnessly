@@ -2,12 +2,14 @@
 // (organization, tenant, team), the catalog the entries are picked from, and a person's own switches. Times are RFC 3339
 // UTC strings, days are YYYY-MM-DD (UTC). A number the hub has no facts for is null, never 0.
 
-export type CatalogKind = 'skill' | 'mcp' | 'repo' | 'doc' | 'script' | 'access';
+export type CatalogKind =
+  'skill' | 'mcp' | 'repo' | 'doc' | 'script' | 'access' | 'plugin' | 'claude-settings';
 export type EnvLayerKind = 'org' | 'tenant' | 'team';
 export type AudienceMode = 'tenant' | 'teams' | 'off';
 
 // Why a row cannot be changed by the person looking at it; null: it can.
-export type LockedReason = 'pinned_by_org' | 'pinned_by_tenant' | 'no_rights';
+// built_in: an item of the platform's own group «Рекомендованное».
+export type LockedReason = 'pinned_by_org' | 'pinned_by_tenant' | 'no_rights' | 'built_in';
 
 // The source of a catalog item. Only the keys of its kind are accepted (skill: body, ref; mcp: transport, command, args, url,
 // secretRefs; repo: url, branch, dir; doc: url, text; access: service, host, secret; script: from, body, fileName, repo,
@@ -49,6 +51,8 @@ export type KindCounts = {
   doc: number;
   script?: number;
   access?: number;
+  plugin?: number;
+  'claude-settings'?: number;
 };
 
 export type Audience = {
@@ -82,7 +86,44 @@ export type EnvEntryRow = {
   unused: boolean | null; // no calls for 30 days and the entry is older than that; null: unknown
   // What the machines holding the current list said about the item; null: none of them reported it.
   delivery: ItemDelivery | null;
+  groupId: string; // the group of the layer the entry is in; '' for none
 };
+
+// A group of a layer's entries (docs/hub/environment.md, «Groups»). Required: its items are pinned. Optional: each
+// person switches it on or off for themselves and their machines; defaultOn is how it starts.
+export type EnvGroup = {
+  id: string;
+  name: string;
+  hint: string;
+  required: boolean;
+  defaultOn: boolean;
+  position: number;
+  /** The platform's own group («Рекомендованное»): nobody changes it in the hub. */
+  builtIn: boolean;
+};
+// POST /api/orgs/{org}/env/groups → 201 { group }; PATCH …/env/groups/{groupId} → 200 { group }; DELETE → 204.
+export type AddGroupRequest = {
+  layer: EnvLayerKind;
+  scopeId: string;
+  name: string;
+  hint?: string;
+  required?: boolean;
+  defaultOn?: boolean;
+};
+export type PatchGroupRequest = {
+  name?: string;
+  hint?: string;
+  required?: boolean;
+  defaultOn?: boolean;
+  position?: number;
+};
+export type GroupResponse = { group: EnvGroup };
+
+// POST /api/orgs/{org}/env/apply → 200: «Применить на машинах». `now` runs an update on the machines online now, the
+// rest when they next connect; `next` waits for the next connection on every machine.
+export type ApplyWhen = 'now' | 'next';
+export type ApplyRequest = { layer: EnvLayerKind; scopeId: string; when: ApplyWhen };
+export type ApplyResponse = { machines: number; started: number; waiting: number };
 
 // How many machines put an item in, keep it without being able to load it yet, or failed it; `message` is the first
 // reason a machine gave (a missing secret, an unsupported source).
@@ -102,6 +143,7 @@ export type EnvLayer = {
   callsWeek: number | null;
   counts: KindCounts;
   items: EnvEntryRow[];
+  groups: EnvGroup[];
 };
 
 export type TeamRef = { id: string; name: string; tenantId: string };
@@ -158,12 +200,14 @@ export type AddEntryRequest = {
   audience?: { mode: AudienceMode; teams?: string[] };
   enabled?: boolean;
   pinned?: boolean;
+  groupId?: string;
 };
 // PATCH /api/orgs/{org}/env/entries/{entryId} → 200 EnvEntryRow
 export type PatchEntryRequest = {
   enabled?: boolean;
   audience?: { mode: AudienceMode; teams?: string[] };
   pinned?: boolean;
+  groupId?: string; // '' takes the entry out of its group
 };
 
 export type CatalogItem = {
@@ -210,12 +254,28 @@ export type MeEnvItem = {
   pinned: boolean;
   off: boolean; // the person's own switch
   canToggle: boolean; // false for a pinned item
+  groupId: string; // '' for none; an optional group switched off makes `off` true
 };
+// A group the person's items are in.
+export type MeEnvGroup = {
+  id: string;
+  name: string;
+  hint: string;
+  layer: EnvLayerKind;
+  required: boolean;
+  on: boolean;
+  canToggle: boolean;
+  items: number;
+  builtIn: boolean;
+};
+// PUT /api/me/env/groups/{groupId}?space= → 200 MeEnvGroup
+export type MeEnvGroupRequest = { on: boolean; space?: string };
 // GET /api/me/env?space=
 export type MeEnvResponse = {
   space: { id: string; slug: string; name: string };
   org: { id: string; name: string };
   items: MeEnvItem[];
+  groups: MeEnvGroup[];
   // Some machine of theirs in the tenant is not current or has a failed item.
   outdated: boolean;
   machines: MeMachine[];

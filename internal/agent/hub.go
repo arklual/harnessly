@@ -56,6 +56,10 @@ type hub struct {
 	check       *agentnet.Checker
 	shell       *preflight.Checker
 	filter      *routeFilter
+	// guests is an observe link's filter when it keeps the access to the machine's designs (AGENT_HUB_DESIGN=on): its
+	// tunnels reach the guest read of a shared design only; guestPort is where they go.
+	guests    *guestFilter
+	guestPort int
 	// observe: the hub only sees the machine. The agent runs its closed cluster's link as before, and the hub
 	// link answers what can be read (hello, preflight, agents, spend) under a policy that allows nothing: no tunnel to the
 	// runtime, no keys, env, logins or installs, no limits, and nothing of the cluster's tunnels is touched. The one
@@ -180,6 +184,16 @@ func (h *hub) start(ctx context.Context) error {
 		}
 		h.a.tunnels.runtimePort, h.a.tunnels.filesPort = port, 0
 	}
+	// An observe link that keeps the designs' access gets tunnels of its own, to the guest read only; the cluster's
+	// tunnels are not touched.
+	if cfg.RuntimePort != 0 && h.observe && os.Getenv(designOptIn) == "on" {
+		h.guests = newGuestFilter(cfg.RuntimePort, h.machine.RuntimeBasePath, cfg.RuntimePlatformAPI, h.audit)
+		port, err := h.guests.Start()
+		if err != nil {
+			return fmt.Errorf("guest filter: %w", err)
+		}
+		h.guestPort = port
+	}
 	h.installs = install.NewManager(ctx, install.Deps{
 		Shell: h.shell, EnvDir: cfg.EnvDir, Home: cfg.Home, JobsDir: filepath.Join(h.dir, "agent-install"),
 		Preflight: h.report,
@@ -229,6 +243,9 @@ func (h *hub) stop() {
 	_ = os.Remove(LinkStatePath(h.dir))
 	if h.filter != nil {
 		h.filter.Close()
+	}
+	if h.guests != nil {
+		h.guests.Close()
 	}
 	if h.proxies != nil {
 		h.proxies.Close()
@@ -419,7 +436,7 @@ func (h *hub) hello() hubproto.Hello {
 	// The runtime ships in the same release and does the setup; an own link takes it only under the policy's `setup`.
 	offered := h.setupOffered()
 	if offered {
-		features = append(features, hubproto.FeatureEnvSetup)
+		features = append(features, hubproto.FeatureEnvSetup, hubproto.FeatureEnvClaude)
 	}
 	h.mu.Lock()
 	h.setupSaid = offered
@@ -431,7 +448,10 @@ func (h *hub) hello() hubproto.Hello {
 		features = append(features, hubproto.FeatureMetrics)
 	}
 	if a.cfg.RuntimePort != 0 && !h.observe {
-		features = append(features, hubproto.FeatureDrain, hubproto.FeatureDesignAccess)
+		features = append(features, hubproto.FeatureDrain)
+	}
+	if h.designServed() {
+		features = append(features, hubproto.FeatureDesignAccess)
 	}
 	var hw *hubproto.Hardware
 	if h.metrics != nil {

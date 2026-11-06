@@ -487,6 +487,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(secretRoutes(d, ref.c)...)
 	setupRunners := envSetupRunners(d, os.Getenv("AGENT_HUB_OBSERVE_FILE"), cfg.Version)
 	f.Add(envSetupRoutes(d, setupRunners)...)
+	f.Add(basepkgRoutes(d)...)
 	f.Add(connectionRoutes(d)...)
 	f.Add(mcpRoutes(d)...)
 	f.Add(appRoutes(d, ref.c)...)
@@ -596,6 +597,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	f.startUpdateCheck(ctx)
 	f.startEnvSetup(ctx)
+	go watchBasepkg(ctx, cfg.DataDir)
 	// A GPT switch left on brings its proxy up again.
 	if a := f.core.c.agents; a != nil && a.gpt != nil {
 		a.gpt.Resume()

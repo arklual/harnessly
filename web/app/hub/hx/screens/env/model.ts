@@ -9,9 +9,18 @@ export const ADD_KINDS = ['access', 'repo', 'script', 'skill', 'mcp'] as const;
 export type AddKind = (typeof ADD_KINDS)[number];
 
 /** The order of the groups in a layer; a document (made elsewhere) is shown last. */
-export const GROUP_ORDER: readonly CatalogKind[] = ['access', 'repo', 'script', 'skill', 'mcp', 'doc'];
+export const GROUP_ORDER: readonly CatalogKind[] = [
+  'access',
+  'repo',
+  'script',
+  'skill',
+  'mcp',
+  'plugin',
+  'claude-settings',
+  'doc',
+];
 
-export const isAddKind = (k: CatalogKind): k is AddKind => k !== 'doc';
+export const isAddKind = (k: CatalogKind): k is AddKind => (ADD_KINDS as readonly CatalogKind[]).includes(k);
 
 interface KindMeta {
   icon: string;
@@ -55,6 +64,20 @@ export const KIND: Record<CatalogKind, KindMeta> = {
     many: 'MCP',
     about: 'Подключит к агенту сервис: по адресу, командой или конфигом',
     newT: 'Новый MCP',
+  },
+  plugin: {
+    icon: 'blocks',
+    one: 'Плагин',
+    many: 'Плагины',
+    about: 'Плагин Claude Code: скилы, хуки и MCP вместе',
+    newT: 'Новый плагин',
+  },
+  'claude-settings': {
+    icon: 'sliders-horizontal',
+    one: 'Настройки Claude',
+    many: 'Настройки Claude',
+    about: 'Ключи settings.json и правила в CLAUDE.md',
+    newT: 'Новые настройки',
   },
   doc: {
     icon: 'book-open',

@@ -3,7 +3,17 @@
 // hidden stays hidden until the list changes; a card goes away, fading, once everything is done.
 import { useEffect, useEffectEvent, useState } from 'react';
 import { pageClock } from '@/next/core/clock';
-import { askSetupRun, loadSetup, type ISetupView } from '@/next/features/setup/api';
+import {
+  askBaseProxy,
+  askBaseRun,
+  askBaseSkip,
+  askSetupRun,
+  loadBase,
+  loadSetup,
+  withBase,
+  type IBaseView,
+  type ISetupView,
+} from '@/next/features/setup/api';
 import { ACTION, cardOf, type TAction } from '@/next/features/setup/card-model';
 import SetupCard from '@/next/features/setup/setup-card';
 import type { MachineId } from '@/next/protocol/v2';
@@ -51,11 +61,18 @@ export const MachineSetup = ({
   const [picked, setPicked] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [doneGone, setDoneGone] = useState('');
+  const [proxy, setProxy] = useState('');
+  // A change the person made: look again now, not at the next tick.
+  const [nudge, setNudge] = useState(0);
 
   const look = useEffectEvent(async (m: MachineId) => {
-    const res = await loadSetup(m);
-    if (!('ok' in res)) return;
-    const view = res.value;
+    // The base package is read beside the hub's list: a runtime without it (older) answers 404 and is left out.
+    const [res, baseRes] = await Promise.all([loadSetup(m), loadBase(m)]);
+    const setup = 'ok' in res ? res.value : null;
+    const base: IBaseView | null = 'ok' in baseRes ? baseRes.value : null;
+    if (base) setProxy(base.proxy);
+    const view = withBase(setup, base);
+    if (!view) return;
     setSeen((now) => {
       const same = now?.machine === m && now.view.hash === view.hash;
       const wasOpen = same ? now.wasOpen || !view.done : !view.done;
@@ -82,7 +99,7 @@ export const MachineSetup = ({
     };
     again();
     return () => clock.clearTimeout(timer);
-  }, [machine]);
+  }, [machine, nudge]);
 
   const view = seen && seen.machine === machine ? seen.view : null;
   const doneKey = view?.done ? view.hash : '';
@@ -107,11 +124,47 @@ export const MachineSetup = ({
       onOpenSafe();
       return;
     }
-    if (!machine) return;
+    if (!machine || !card.value) return;
+    const line = card.value.line;
+    if (kind === ACTION.copy) {
+      try {
+        await navigator.clipboard.writeText(line.command);
+        toast(t('next.setup.copied'));
+      } catch {
+        toast(line.command);
+      }
+      return;
+    }
     setBusy(true);
-    const res = await askSetupRun(machine);
+    if (kind === ACTION.skip) {
+      const res = await askBaseSkip(machine, line.baseId, true);
+      setBusy(false);
+      if ('ok' in res) toast(t('next.setup.skipped', { name: line.baseName ?? line.baseId }));
+      else toast(t('next.setup.askFailed'), { tone: 'error' });
+      setNudge((n) => n + 1);
+      return;
+    }
+    // «Повторить» and «Запустить» go to both: the base package and the hub's list (where there is one).
+    const [base, list] = await Promise.all([
+      askBaseRun(machine),
+      view?.items.some((it) => !it.base) ? askSetupRun(machine) : null,
+    ]);
     setBusy(false);
-    if (!('ok' in res)) toast(t('next.setup.askFailed'), { tone: 'error' });
+    if (!('ok' in base) && (list === null || !('ok' in list)))
+      toast(t('next.setup.askFailed'), { tone: 'error' });
+    setNudge((n) => n + 1);
+  };
+  const sendProxy = async (url: string): Promise<boolean> => {
+    if (!machine) return false;
+    const res = await askBaseProxy(machine, url);
+    if ('ok' in res) {
+      setProxy(res.value.proxy);
+      toast(t('next.setup.proxy.saved'));
+      setNudge((n) => n + 1);
+      return true;
+    }
+    toast(t('next.setup.proxy.bad', { why: t('next.setup.proxy.hint') }), { tone: 'error' });
+    return false;
   };
   return (
     <SetupCard
@@ -120,6 +173,8 @@ export const MachineSetup = ({
       busy={busy}
       onPick={(i) => setPicked((p) => (p === i ? null : i))}
       onAction={(k) => void act(k)}
+      onProxy={sendProxy}
+      proxy={proxy}
       onHide={() => {
         if (!view) return;
         writeHidden(view.hash);

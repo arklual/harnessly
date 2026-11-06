@@ -132,6 +132,57 @@ func TestSnapshotKeepsTheAppsOn(t *testing.T) {
 	}
 }
 
+// A skill's own script runs from its package, and the package may be read; nothing writes into it.
+func TestSnapshotLetsThePackageBeReadAndRun(t *testing.T) {
+	pkg := "/data/apps/packages/a.b/1.0.0"
+	s := Snapshot{Apps: []SnapshotApp{{ID: "a.b", Name: "AB"}}, Protected: []string{"/data/apps", pkg}}
+	for _, c := range []struct {
+		line string
+		want Decision
+	}{
+		{"python3 -I " + pkg + "/skills/x/pulse.py --show HRN-1", DecideNone},
+		{"python3 -I " + pkg + "/skills/x/pulse.py HRN-1 > /tmp/pulse.json 2>&1", DecideNone},
+		{"harnessly secret run --env GITLAB_TOKEN=gitlab-token -- python3 -I " + pkg + "/pulse.py K || python3 -I " + pkg + "/pulse.py K", DecideNone},
+		{"cat " + pkg + "/SKILL.md | head -20; ls " + pkg, DecideNone},
+		{"grep -n x " + pkg + "/a.txt", DecideNone},
+		{"python3 -c 'open(\"" + pkg + "/x\",\"w\")'", DecideDeny},
+		{"python3 /tmp/mine.py " + pkg, DecideDeny},
+		{"python3 -I " + pkg + "/pulse.py K > " + pkg + "/out.json", DecideDeny},
+		{"echo x>" + pkg + "/f", DecideDeny},
+		{"echo x >> " + pkg + "/f", DecideDeny},
+		{"cat " + pkg + "/a | tee " + pkg + "/b", DecideDeny},
+		{"ls " + pkg + " && rm -rf " + pkg, DecideDeny},
+		{"S=" + pkg + "; python3 -I $S/pulse.py K", DecideDeny},
+		{"python3 -I " + pkg + "/pulse.py $(id)", DecideDeny},
+		{"sed -i s/a/b/ " + pkg + "/x", DecideDeny},
+		{"bash " + pkg + "/run.sh", DecideDeny},
+		{"nice python3 -I " + pkg + "/pulse.py K", DecideDeny},
+		{"harnessly secret run --env A=b -- cp /tmp/x " + pkg + "/y", DecideDeny},
+		{"harnessly secret run --env A=b -- harnessly app off a.b", DecideDeny},
+		{"cd " + pkg + " && cp /tmp/x y", DecideDeny},
+		{"python3 -I " + pkg + "/pulse.py K 2>&1 >&2", DecideNone},
+		{"python3 " + pkg + "/pulse.py K", DecideDeny},
+		{"node " + pkg + "/tool.mjs a", DecideDeny},
+		{"./cat " + pkg + "/a", DecideDeny},
+		{pkg + "/bin/cat " + pkg + "/a", DecideDeny},
+		{"echo x >&" + pkg + "/f", DecideDeny},
+		{"echo x >& " + pkg + "/f", DecideDeny},
+		{"echo x &> " + pkg + "/f", DecideDeny},
+		{"cat " + pkg + "/a 1<>" + pkg + "/f", DecideDeny},
+		{"cat " + pkg + "/a <> " + pkg + "/f", DecideDeny},
+		{"PYTHONSTARTUP=/tmp/x.py python3 -I " + pkg + "/pulse.py K", DecideDeny},
+		{"export LD_PRELOAD=/tmp/x.so; python3 -I " + pkg + "/pulse.py K", DecideDeny},
+		{"python3 -I " + pkg + "/pulse.py K; sleep 60", DecideNone},
+		{"echo x >&2\nrm " + pkg + "/f", DecideDeny},
+		{"echo x 2>&1;rm " + pkg + "/f", DecideDeny},
+		{"echo x >&2\ncat " + pkg + "/f", DecideNone},
+	} {
+		if v, _ := s.Decide(Call{Tool: "Bash", Input: map[string]any{"command": c.line}}); v.Decision != c.want {
+			t.Errorf("%s: %s", c.line, v.Decision)
+		}
+	}
+}
+
 // The agent's file tools and its shell reach the registry by the way it really leads, not by how it is written.
 func TestSnapshotProtectsByRealPath(t *testing.T) {
 	base := t.TempDir()

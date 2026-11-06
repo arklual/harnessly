@@ -30,7 +30,7 @@ func (a acme) url(path string) string { return "/api/orgs/" + a.org + path }
 
 func newAcme(t *testing.T, opts ...hubtest.Option) acme {
 	t.Helper()
-	s := hubtest.New(t, append([]hubtest.Option{hubtest.Env("HUB_ORGS", "on"), hubtest.Env("HUB_ENV_FEATURES", "all")}, opts...)...)
+	s := hubtest.New(t, append([]hubtest.Option{hubtest.Env("HUB_ORGS", "on"), hubtest.Env("HUB_ENV_FEATURES", "all"), hubtest.Env("HUB_ENV_RECOMMENDED", "off")}, opts...)...)
 	s.SignIn("root@example.com") // the first account administers the instance
 	a := acme{s: s, anna: s.SignIn("anna@example.com"), dina: s.SignIn("dina@example.com"), boris: s.SignIn("boris@example.com"),
 		vera: s.SignIn("vera@example.com"), carol: s.SignIn("carol@example.com"), gleb: s.SignIn("gleb@example.com"),

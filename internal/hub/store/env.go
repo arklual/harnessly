@@ -24,6 +24,9 @@ const (
 	// CatalogScript is a Linux script the machine runs; CatalogAccess the login of a forge's CLI.
 	CatalogScript = "script"
 	CatalogAccess = "access"
+	// CatalogPlugin and CatalogClaudeSettings change the person's Claude Code (docs/hub/environment.md, «Recommended»).
+	CatalogPlugin         = "plugin"
+	CatalogClaudeSettings = "claude-settings"
 )
 
 // CatalogItem is something an environment can hold: a skill, an MCP server, a repository or a document. OrgID is ""
@@ -122,9 +125,11 @@ type EnvEntry struct {
 	UpdatedBy string
 	// Position is the place among the layer's entries; scripts run in this order (1, 2, …; 0 until placed).
 	Position int
+	// GroupID is the group of the layer the entry is in ("" for none).
+	GroupID string
 }
 
-const envEntryCols = `id, org_id, layer, scope_id, item_id, enabled, audience, pinned, rev, updated_at, updated_by, position`
+const envEntryCols = `id, org_id, layer, scope_id, item_id, enabled, audience, pinned, rev, updated_at, updated_by, position, group_id`
 
 func scanEnvEntry(row interface{ Scan(...any) error }) (EnvEntry, error) {
 	var e EnvEntry
@@ -132,10 +137,11 @@ func scanEnvEntry(row interface{ Scan(...any) error }) (EnvEntry, error) {
 	var at int64
 	var by sql.NullString
 	var position sql.NullInt64
-	if err := row.Scan(&e.ID, &e.OrgID, &e.Layer, &e.ScopeID, &e.ItemID, &enabled, &e.Audience, &pinned, &e.Rev, &at, &by, &position); err != nil {
+	var group sql.NullString
+	if err := row.Scan(&e.ID, &e.OrgID, &e.Layer, &e.ScopeID, &e.ItemID, &enabled, &e.Audience, &pinned, &e.Rev, &at, &by, &position, &group); err != nil {
 		return EnvEntry{}, err
 	}
-	e.Position = int(position.Int64)
+	e.Position, e.GroupID = int(position.Int64), group.String
 	e.Enabled, e.Pinned, e.UpdatedAt, e.UpdatedBy = enabled != 0, pinned != 0, fromMs(at), by.String
 	return e, nil
 }
@@ -158,9 +164,9 @@ func (s Store) AddEnvEntry(ctx context.Context, e EnvEntry) (EnvEntry, bool, err
 	if e.Audience == "" {
 		e.Audience = `{"mode":"tenant","teams":[]}`
 	}
-	res, err := s.q.Exec(ctx, `INSERT INTO env_entries (`+envEntryCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	res, err := s.q.Exec(ctx, `INSERT INTO env_entries (`+envEntryCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (layer, scope_id, item_id) DO NOTHING`,
-		e.ID, e.OrgID, e.Layer, e.ScopeID, e.ItemID, envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy), e.Position)
+		e.ID, e.OrgID, e.Layer, e.ScopeID, e.ItemID, envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy), e.Position, nullStr(e.GroupID))
 	if err != nil {
 		return EnvEntry{}, false, err
 	}
@@ -197,10 +203,10 @@ func (s Store) EnvEntriesOfOrg(ctx context.Context, orgID string) ([]EnvEntry, e
 	return out, rows.Err()
 }
 
-// UpdateEnvEntry writes enabled, audience, pinned, position, rev, updated_at and updated_by of e.
+// UpdateEnvEntry writes enabled, audience, pinned, position, group, rev, updated_at and updated_by of e.
 func (s Store) UpdateEnvEntry(ctx context.Context, e EnvEntry) error {
-	_, err := s.q.Exec(ctx, `UPDATE env_entries SET enabled = ?, audience = ?, pinned = ?, position = ?, rev = ?, updated_at = ?, updated_by = ? WHERE id = ?`,
-		envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Position, e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy), e.ID)
+	_, err := s.q.Exec(ctx, `UPDATE env_entries SET enabled = ?, audience = ?, pinned = ?, position = ?, group_id = ?, rev = ?, updated_at = ?, updated_by = ? WHERE id = ?`,
+		envInt(e.Enabled), e.Audience, envInt(e.Pinned), e.Position, nullStr(e.GroupID), e.Rev, Ms(e.UpdatedAt), nullStr(e.UpdatedBy), e.ID)
 	return err
 }
 

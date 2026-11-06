@@ -53,6 +53,8 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
   const [picking, setPicking] = useState<boolean | null>(null);
   const [picked, setPicked] = useState<IFramePicked | null>(null);
   const [url, setUrl] = useState<string | null>(null);
+  // The document asked for a security key or Touch ID (WebAuthn), which the slot cannot give.
+  const [keyStep, setKeyStep] = useState(false);
   /** How many times a page's bridge said hello: each new document says it again. */
   const [hellos, setHellos] = useState(0);
   const opened = useEffectEvent((url: string) => onOpen(url));
@@ -100,6 +102,7 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
           origin,
         );
       } else if (message.k === 'open') opened(message.url);
+      else if (message.k === 'key-step') setKeyStep(true);
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
@@ -110,6 +113,8 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
   };
 
   return {
+    /** The page asked for a security key or Touch ID; false again with its next document. */
+    keyStep,
     picking,
     picked,
     /** The page's address in the slot, as its bridge last said; null before it did. */
@@ -130,6 +135,7 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
     },
     /** A new document in the frame: its bridge says hello again; what the old one was doing is lost with it. */
     onFrameLoad: () => {
+      setKeyStep(false);
       setPicking(null);
       setPicked(null);
       setNonceNow(null);

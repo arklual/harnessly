@@ -58,6 +58,11 @@ export interface IBrowserViewProps {
   signIn: TSignIn;
   onSignIn: () => void;
   onSignInRefresh: () => void;
+  /** The page asked for a security key or Touch ID, which the pane cannot give (asked), or the person takes that step
+   *  in an ordinary tab (waiting); none otherwise. */
+  keyStep: TSignIn;
+  onKeyStep: () => void;
+  onKeyStepRefresh: () => void;
   /** The app's theme: the page inside is told it (prefers-color-scheme). */
   theme: 'light' | 'dark';
   onGo: (address: IAddress) => void;
@@ -331,6 +336,22 @@ const BrowserView = (props: IBrowserViewProps) => {
               </button>
             ) : (
               <button type="button" className="hx-tbrowser__offer-btn" onClick={props.onSignInRefresh}>
+                {t('next.pane.signInRefresh')}
+              </button>
+            )}
+          </div>
+        )}
+        {props.keyStep !== SIGN_IN.none && (
+          <div className="hx-tbrowser__offer" role="group" aria-label={t('next.pane.keyStepLabel')}>
+            <span className="hx-tbrowser__offer-text">
+              {props.keyStep === SIGN_IN.asked ? t('next.pane.keyStepAsked') : t('next.pane.keyStepWaiting')}
+            </span>
+            {props.keyStep === SIGN_IN.asked ? (
+              <button type="button" className="hx-tbrowser__offer-btn" data-primary onClick={props.onKeyStep}>
+                {t('next.pane.keyStepOpen')}
+              </button>
+            ) : (
+              <button type="button" className="hx-tbrowser__offer-btn" onClick={props.onKeyStepRefresh}>
                 {t('next.pane.signInRefresh')}
               </button>
             )}

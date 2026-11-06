@@ -18,6 +18,9 @@ type KindCounts struct {
 	Doc    int `json:"doc"`
 	Script int `json:"script"`
 	Access int `json:"access"`
+	// Plugin and ClaudeSettings are left out while there are none (most organizations).
+	Plugin         int `json:"plugin,omitempty"`
+	ClaudeSettings int `json:"claude-settings,omitempty"`
 }
 
 func (c *KindCounts) add(kind string) {
@@ -34,6 +37,10 @@ func (c *KindCounts) add(kind string) {
 		c.Script++
 	case store.CatalogAccess:
 		c.Access++
+	case store.CatalogPlugin:
+		c.Plugin++
+	case store.CatalogClaudeSettings:
+		c.ClaudeSettings++
 	}
 }
 
@@ -77,6 +84,8 @@ type EntryItem struct {
 	Unused       *bool        `json:"unused"`
 	// Delivery is what the machines holding the current list said about the item; nil: none of them reported it.
 	Delivery *ItemDelivery `json:"delivery"`
+	// GroupID is the group of the layer the entry is in; "" for none.
+	GroupID string `json:"groupId"`
 }
 
 // LayerView is one layer with its rows.
@@ -90,6 +99,7 @@ type LayerView struct {
 	CallsWeek *int64      `json:"callsWeek"`
 	Counts    KindCounts  `json:"counts"`
 	Items     []EntryItem `json:"items"`
+	Groups    []GroupView `json:"groups"`
 }
 
 // TeamRef names a team an audience may list.
@@ -177,11 +187,14 @@ const (
 	reasonPinnedOrg    = "pinned_by_org"
 	reasonPinnedTenant = "pinned_by_tenant"
 	reasonNoRights     = "no_rights"
+	reasonBuiltIn      = "built_in"
 )
 
 // lockedReason is why a person cannot change an entry: a layer above pinned the item, or they do not manage its layer.
 func lockedReason(canEdit bool, above string, e store.EnvEntry) *string {
 	switch {
+	case isBuiltInEntry(e.ID):
+		return strp(reasonBuiltIn)
 	case above == store.EnvLayerOrg || (!canEdit && e.Layer == store.EnvLayerOrg && e.Pinned):
 		return strp(reasonPinnedOrg)
 	case above == store.EnvLayerTenant || (!canEdit && e.Layer == store.EnvLayerTenant && e.Pinned):

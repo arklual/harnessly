@@ -42,7 +42,20 @@ var sourceKeys = map[string][]string{
 	store.CatalogDoc:    {"url", "text"},
 	store.CatalogAccess: {"service", "host", "secret"},
 	store.CatalogScript: {"from", "body", "fileName", "repo", "repoUrl", "branch", "path", "url", "run", "rerun", "check", "secrets"},
+	// A plugin: the marketplace (owner/repo on GitHub or a git address) and plugin@marketplace.
+	store.CatalogPlugin: {"marketplace", "plugin"},
+	// Settings of Claude Code: keys set always, keys set only where the person has none, the CLAUDE.md block.
+	store.CatalogClaudeSettings: {"always", "ifAbsent", "claudeMd"},
 }
+
+// objectKeys are the keys whose value is an object of Claude Code's settings.
+var objectKeys = []string{"always", "ifAbsent"}
+
+// pluginRe is plugin@marketplace; marketRe a GitHub owner/repo.
+var (
+	pluginRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}@[a-z0-9][a-z0-9._-]{0,63}$`)
+	marketRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
+)
 
 // listKeys are the keys whose value is a list of strings.
 var listKeys = []string{"args", "secretRefs", "secrets"}
@@ -51,7 +64,7 @@ var listKeys = []string{"args", "secretRefs", "secrets"}
 func ValidKind(kind string) bool { _, ok := sourceKeys[kind]; return ok }
 
 // kindsRu lists the kinds for the message of a refused one.
-const kindsRu = "skill, mcp, repo, doc, script или access"
+const kindsRu = "skill, mcp, repo, doc, script, access, plugin или claude-settings"
 
 // CleanText trims a name or a hint and checks its length in characters.
 func CleanText(field, raw string, max int, required bool) (string, error) {
@@ -109,6 +122,11 @@ func cleanString(kind, k, s string) error {
 	field := "source." + k
 	limit := maxArgRunes
 	switch {
+	case k == "claudeMd":
+		if len(s) > hubproto.ClaudeMdMax {
+			return httpx.Invalid(field, "Слишком длинный текст для CLAUDE.md")
+		}
+		limit = hubproto.ClaudeMdMax
 	case k == "body" || k == "text":
 		if len(s) > maxTextBytes {
 			return httpx.Invalid(field, "Слишком длинный текст")
@@ -138,6 +156,13 @@ func cleanString(kind, k, s string) error {
 		return checkURL(field, s, "https", "ssh")
 	case k == "url", k == "ref":
 		return checkURL(field, s, "https", "http")
+	case k == "plugin" && !pluginRe.MatchString(s):
+		return httpx.Invalid(field, "Плагин пишут как имя@маркетплейс")
+	case k == "marketplace":
+		if marketRe.MatchString(s) {
+			return nil
+		}
+		return checkURL(field, s, "https")
 	case k == "transport" && s != "stdio" && s != "http" && s != "sse":
 		return httpx.Invalid(field, "stdio, http или sse")
 	case k == "dir":
@@ -219,6 +244,14 @@ func CleanSource(kind string, raw json.RawMessage) (json.RawMessage, error) {
 		if !slices.Contains(allowed, k) {
 			return nil, httpx.Invalid("source."+k, "Это поле здесь не используется")
 		}
+		if slices.Contains(objectKeys, k) {
+			obj, err := cleanClaudeSettings("source."+k, v)
+			if err != nil {
+				return nil, err
+			}
+			out[k] = obj
+			continue
+		}
 		if slices.Contains(listKeys, k) {
 			var list []string
 			if err := json.Unmarshal(v, &list); err != nil {
@@ -258,6 +291,17 @@ func CleanSource(kind string, raw json.RawMessage) (json.RawMessage, error) {
 	case store.CatalogAccess:
 		if s, _ := out["service"].(string); s == "" {
 			return nil, httpx.Invalid("source.service", "gitlab или github")
+		}
+	case store.CatalogPlugin:
+		if s, _ := out["plugin"].(string); s == "" {
+			return nil, httpx.Invalid("source.plugin", "Плагин пишут как имя@маркетплейс")
+		}
+		if s, _ := out["marketplace"].(string); s == "" {
+			return nil, httpx.Invalid("source.marketplace", "Нужен адрес маркетплейса")
+		}
+	case store.CatalogClaudeSettings:
+		if len(out) == 0 {
+			return nil, httpx.Invalid("source", "Нужны настройки или текст для CLAUDE.md")
 		}
 	}
 	b, err := json.Marshal(out)
@@ -314,4 +358,49 @@ func AudienceJSON(a Audience) string {
 	}
 	b, _ := json.Marshal(a)
 	return string(b)
+}
+
+// cleanClaudeSettings checks an object of Claude Code's settings: only the keys of hubproto.ClaudeSettingsKeys, an
+// "env" of hubproto.ClaudeEnvKeys with string values, and no value bigger than a line or two.
+func cleanClaudeSettings(field string, raw json.RawMessage) (map[string]any, error) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil || obj == nil {
+		return nil, httpx.Invalid(field, "Нужен объект настроек")
+	}
+	out := map[string]any{}
+	for k, v := range obj {
+		if !slices.Contains(hubproto.ClaudeSettingsKeys, k) {
+			return nil, httpx.Invalid(field+"."+k, "Эту настройку Claude Code окружение не ставит")
+		}
+		if k == "env" {
+			var env map[string]string
+			if err := json.Unmarshal(v, &env); err != nil {
+				return nil, httpx.Invalid(field+".env", "Переменные — строки")
+			}
+			for n, val := range env {
+				if !slices.Contains(hubproto.ClaudeEnvKeys, n) {
+					return nil, httpx.Invalid(field+".env."+n, "Эту переменную окружение не ставит")
+				}
+				if utf8.RuneCountInString(val) > maxArgRunes {
+					return nil, httpx.Invalid(field+".env."+n, "Слишком длинное значение")
+				}
+			}
+			out[k] = env
+			continue
+		}
+		var val any
+		if err := json.Unmarshal(v, &val); err != nil {
+			return nil, httpx.Invalid(field+"."+k, "Неверное значение")
+		}
+		switch val.(type) {
+		case string, float64, bool:
+		default:
+			return nil, httpx.Invalid(field+"."+k, "Значение — строка, число или да/нет")
+		}
+		if s, ok := val.(string); ok && utf8.RuneCountInString(s) > maxArgRunes {
+			return nil, httpx.Invalid(field+"."+k, "Слишком длинное значение")
+		}
+		out[k] = val
+	}
+	return out, nil
 }

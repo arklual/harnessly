@@ -4,7 +4,7 @@
 // One implementation for every width and every role: a member sees the same layers, only to read.
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { EnvEntryRow } from '../../../hub-api/env';
+import type { ApplyWhen, EnvEntryRow } from '../../../hub-api/env';
 import { useOrg } from '../../org/context';
 import { useClosing } from '../../org/ui/closing';
 import { Titles } from '../shell';
@@ -12,6 +12,7 @@ import { Btn, closingAttr, Icon } from '../ui';
 import '../styles/env.css';
 import { reposOf, useActions } from './env/actions';
 import { AddHome, AddKind, AddLink } from './env/add';
+import { ApplyMenu } from './env/apply';
 import { Empty, isNotEnabled, LoadFailed, Search, Skeleton } from './env/bits';
 import { type SheetCtx, type SheetMode } from './env/ctx';
 import { CopyBody } from './env/copy';
@@ -72,7 +73,8 @@ const SHEET_LABEL: Record<SheetMode['mode'], string> = {
 };
 
 const Screen = () => {
-  const { shell } = useOrg();
+  const { shell, scope } = useOrg();
+  const space = scope.kind === 'tenant' ? scope.tenant.slug : undefined;
   const role = shell.viewer.role;
   const member = role === 'member';
   const data = useEnvData();
@@ -188,6 +190,13 @@ const Screen = () => {
           openSheet({ mode: vm.edit && !row.locked ? 'edit' : 'view', entryId: row.entryId }),
     onPin: (row) => void actions.pin(row),
     onReorder: (ids) => actions.reorder({ layer: vm.layer.layer, scopeId: vm.layer.scopeId }, ids),
+    groups: {
+      onAdd: (name) => actions.addGroup({ layer: vm.layer.layer, scopeId: vm.layer.scopeId }, name),
+      onPatch: actions.patchGroup,
+      onRemove: actions.removeGroup,
+      onMove: actions.moveToGroup,
+      onMine: member ? (g, on) => actions.mineGroup(g.id, g.name, on, space) : null,
+    },
   });
 
   const text = introText(role);
@@ -201,6 +210,7 @@ const Screen = () => {
         }}
         onLogs={() => openSheet({ mode: 'logs' })}
         onTest={canEdit ? () => openSheet({ mode: 'test' }) : null}
+        onApply={canEdit ? (when) => actions.applyMachines(target, when) : null}
         onAdd={canEdit ? () => openSheet({ mode: 'add', step: 'home' }) : null}
       />
       {introAnim.mounted && (
@@ -291,12 +301,14 @@ const Header = ({
   onIntro,
   onLogs,
   onTest,
+  onApply,
   onAdd,
 }: {
   introHidden?: boolean;
   onIntro?: () => void;
   onLogs?: () => void;
   onTest?: (() => void) | null;
+  onApply?: ((when: ApplyWhen) => Promise<boolean>) | null;
   onAdd?: (() => void) | null;
 }) => (
   <div className="ad-head" data-block="Заголовок">
@@ -322,7 +334,7 @@ const Header = ({
         ) : undefined
       }
     />
-    <div className="ad-tools">
+    <div className="ad-tools ev-tools">
       {onLogs && (
         <Btn variant="ghost" size="sm" onClick={onLogs} aria-label="Логи">
           <Icon i="file-text" size="sm" />
@@ -335,6 +347,7 @@ const Header = ({
           <span className="ev-tl">Проверить</span>
         </Btn>
       )}
+      {onApply && <ApplyMenu onApply={onApply} />}
       {onAdd && (
         <Btn variant="primary" size="sm" icon="plus" onClick={onAdd}>
           Добавить

@@ -3,6 +3,7 @@
 // Pure: the card and its tests take it as it is.
 import { t } from '@/next/i18n';
 import {
+  BASE_STATUS,
   SETUP_KIND,
   SETUP_STATUS,
   type ISetupItem,
@@ -18,14 +19,20 @@ export type TMark = (typeof MARK)[keyof typeof MARK];
 export const INSIDE_MAX = 8;
 
 const STAGES: readonly { kind: TSetupKind; key: string }[] = [
+  { kind: SETUP_KIND.base, key: 'next.setup.stage.base' },
   { kind: SETUP_KIND.access, key: 'next.setup.stage.access' },
   { kind: SETUP_KIND.repo, key: 'next.setup.stage.code' },
+  { kind: SETUP_KIND.claude, key: 'next.setup.stage.claude' },
+  { kind: SETUP_KIND.plugin, key: 'next.setup.stage.plugins' },
   { kind: SETUP_KIND.script, key: 'next.setup.stage.scripts' },
 ];
 
 const RUN_KEY: Record<TSetupKind, string> = {
+  base: 'next.setup.run.base',
   access: 'next.setup.run.access',
   repo: 'next.setup.run.repo',
+  'claude-settings': 'next.setup.run.claude',
+  plugin: 'next.setup.run.plugin',
   script: 'next.setup.run.script',
 };
 
@@ -33,6 +40,8 @@ export const markOf = (it: ISetupItem): TMark => {
   if (it.status === SETUP_STATUS.ok) return MARK.done;
   if (it.status === SETUP_STATUS.error) return MARK.fail;
   if (it.status === SETUP_STATUS.running) return MARK.run;
+  // A tool the person installs by hand is wanted of them.
+  if (it.base?.command) return MARK.you;
   return it.secret ? MARK.you : MARK.wait;
 };
 
@@ -58,7 +67,14 @@ export interface ICardStep {
   mark: TMark;
 }
 
-export const ACTION = { retry: 'retry', safe: 'safe', start: 'start' } as const;
+export const ACTION = {
+  retry: 'retry',
+  safe: 'safe',
+  start: 'start',
+  proxy: 'proxy',
+  skip: 'skip',
+  copy: 'copy',
+} as const;
 export type TAction = (typeof ACTION)[keyof typeof ACTION];
 
 export interface ICardLine {
@@ -67,6 +83,14 @@ export interface ICardLine {
   rest: string;
   spin: boolean;
   action: { kind: TAction; label: string } | null;
+  /** The quieter actions beside the main one («Пропустить»). */
+  extra: readonly { kind: TAction; label: string }[];
+  /** The item of the base package the line is about (its id without «base:»), for «Пропустить». */
+  baseId: string;
+  /** The command «Скопировать команду» copies. */
+  command: string;
+  /** The name of that item, for the notice. */
+  baseName?: string;
 }
 
 export interface ICard {
@@ -123,7 +147,16 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
   const waiting = view.items.some((it) => it.status === SETUP_STATUS.pending);
   let line: ICardLine;
   if (view.done) {
-    line = { mark: MARK.done, title: '', rest: t('next.setup.line.done'), spin: false, action: null };
+    line = {
+      mark: MARK.done,
+      title: '',
+      rest: t('next.setup.line.done'),
+      spin: false,
+      action: null,
+      extra: [],
+      baseId: '',
+      command: '',
+    };
   } else if (failed) {
     line = {
       mark: MARK.fail,
@@ -131,6 +164,9 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       rest: failed.message,
       spin: false,
       action: running ? null : { kind: ACTION.retry, label: t('next.setup.action.retry') },
+      extra: [],
+      baseId: '',
+      command: '',
     };
   } else if (wanted) {
     line = {
@@ -139,6 +175,9 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       rest: wanted.name,
       spin: false,
       action: { kind: ACTION.safe, label: t('next.setup.action.safe') },
+      extra: [],
+      baseId: '',
+      command: '',
     };
   } else if (running) {
     line = {
@@ -147,6 +186,9 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       rest: t('next.setup.line.runningRest'),
       spin: true,
       action: null,
+      extra: [],
+      baseId: '',
+      command: '',
     };
   } else {
     line = {
@@ -155,6 +197,40 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       rest: waiting ? t('next.setup.line.waitingRest') : '',
       spin: false,
       action: { kind: ACTION.start, label: t('next.setup.action.start') },
+      extra: [],
+      baseId: '',
+      command: '',
+    };
+  }
+  // The base package first: a tool without network or one to install by hand, with what the person can do about it.
+  const noNet = view.items.find((it) => it.base?.status === BASE_STATUS.noAccess);
+  const byHand = view.items.find((it) => it.base?.command && it.status !== SETUP_STATUS.ok);
+  const skip = (it: { itemId: string; name: string }) => ({
+    extra: [{ kind: ACTION.skip, label: t('next.setup.action.skip') }],
+    baseId: it.itemId.replace(/^base:/, ''),
+    baseName: it.name,
+  });
+  if (!view.done && noNet && !(failed && failed.kind !== SETUP_KIND.base && failed !== noNet)) {
+    line = {
+      mark: MARK.you,
+      title: noNet.base?.host
+        ? t('next.setup.line.noAccessHost', { name: noNet.name, host: noNet.base.host })
+        : t('next.setup.line.noAccess', { name: noNet.name }),
+      rest: noNet.message,
+      spin: false,
+      action: { kind: ACTION.proxy, label: t('next.setup.action.proxy') },
+      command: '',
+      ...skip(noNet),
+    };
+  } else if (!view.done && byHand && !failed && !wanted) {
+    line = {
+      mark: MARK.you,
+      title: t('next.setup.line.byHand', { name: byHand.name }),
+      rest: view.baseCommand || (byHand.base?.command ?? ''),
+      spin: false,
+      action: { kind: ACTION.copy, label: t('next.setup.action.copy') },
+      command: view.baseCommand || (byHand.base?.command ?? ''),
+      ...skip(byHand),
     };
   }
   let titleKey = 'next.setup.title.first';

@@ -24,21 +24,28 @@ type Caller interface {
 // personal switches (a machine serves a team, not one person). Sorted as the hash is taken. setup says whether the
 // machine has the feature environment.setup: it gets the scripts, with their place in the run (Order), and the
 // accesses; a machine without it gets neither, so that the list and its hash are exactly what an older agent
-// computes from what it received.
-func MachineItems(w *world, spaceID, teamID string, setup bool) []hubproto.EnvItem {
-	person := Person{OrgID: w.org.ID, SpaceID: spaceID}
+// computes from what it received. owner is the person the machine is theirs (store.Machine.CreatedBy, "" for none): an
+// optional group they switched off (or that starts off and they did not switch on) is not on the machine.
+func MachineItems(w *world, spaceID, teamID, owner string, setup, claude bool) []hubproto.EnvItem {
+	person := Person{OrgID: w.org.ID, SpaceID: spaceID, Groups: w.resolverGroups(), GroupOn: w.choicesOf(spaceID, owner)}
 	if teamID != "" {
 		person.Teams = []string{teamID}
 	}
-	eff := Resolve(w.resolverItems(), resolverEntries(w.entries), person)
+	eff := Resolve(w.resolverItems(), w.resolverEntries(), person)
 	order := scriptOrder(eff)
 	out := []hubproto.EnvItem{}
 	for _, e := range eff {
+		if e.GroupOff {
+			continue
+		}
 		it := hubproto.EnvItem{ItemID: e.ID, Kind: e.Kind, Name: e.Name, Layer: e.Layer, Pinned: e.Pinned,
 			Source: hubproto.CanonicalJSON(json.RawMessage(e.Source))}
 		if setup {
 			it.Order = order[e.ID]
 		} else if e.Kind == hubproto.EnvKindScript || e.Kind == hubproto.EnvKindAccess {
+			continue
+		}
+		if !claude && hubproto.IsClaudeKind(e.Kind) {
 			continue
 		}
 		out = append(out, it)
@@ -78,18 +85,22 @@ type PushDeps struct {
 	Publisher Publisher
 	// Every is how often a machine that does not hold the list is told again; 0 means 60 s.
 	Every time.Duration
+	// Recommended: the platform's group is in every organization (Deps.Recommended).
+	Recommended bool
 }
 
 // Pusher keeps the environment lists of the machines current: it computes each machine's list, sends env.set when the
 // list changed, and sends it again every pass while the machine reports another hash.
 type Pusher struct {
-	db    *store.DB
-	reg   Caller
-	feat  FeatureGate
-	log   *slog.Logger
-	now   func() time.Time
-	every time.Duration
-	pub   Publisher
+	// afterHello is told of a machine that can do setup runs coming online («При следующем запуске»).
+	afterHello func(machineID string)
+	db         *store.DB
+	reg        Caller
+	feat       FeatureGate
+	log        *slog.Logger
+	now        func() time.Time
+	every      time.Duration
+	pub        Publisher
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -99,7 +110,10 @@ type Pusher struct {
 	mu   sync.Mutex
 	held map[string]string // machine with the environment feature → the hash it holds
 	// setup is whether a machine, at its last hello, had the feature environment.setup; a machine absent has not said yet.
-	setup map[string]bool
+	setup       map[string]bool
+	recommended bool
+	// claude: the machine has environment.claude too (the plugin and claude-settings kinds).
+	claude map[string]bool
 	// newRuns are the times a machine started runs of its own, for the hourly bound.
 	newRuns map[string][]time.Time
 	run     sync.Mutex // one pass at a time
@@ -107,7 +121,7 @@ type Pusher struct {
 
 // NewPusher starts the pusher.
 func NewPusher(d PushDeps) *Pusher {
-	p := &Pusher{db: d.DB, reg: d.Reg, feat: d.Features, log: d.Log, now: d.Now, every: d.Every, pub: d.Publisher, kick: make(chan struct{}, 1), held: map[string]string{}, setup: map[string]bool{}, newRuns: map[string][]time.Time{}}
+	p := &Pusher{recommended: d.Recommended, db: d.DB, reg: d.Reg, feat: d.Features, log: d.Log, now: d.Now, every: d.Every, pub: d.Publisher, kick: make(chan struct{}, 1), held: map[string]string{}, setup: map[string]bool{}, claude: map[string]bool{}, newRuns: map[string][]time.Time{}}
 	if p.log == nil {
 		p.log = slog.Default()
 	}
@@ -133,15 +147,21 @@ func (p *Pusher) Close() {
 func (p *Pusher) Connected(machineID string, hello hubproto.Hello) {
 	p.mu.Lock()
 	p.setup[machineID] = slices.Contains(hello.Features, hubproto.FeatureEnvSetup)
+	p.claude[machineID] = p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvClaude)
 	if slices.Contains(hello.Features, hubproto.FeatureEnvironment) {
 		p.held[machineID] = hello.EnvHash
 	} else {
 		delete(p.held, machineID)
 	}
 	_, ok := p.held[machineID]
+	setup := p.setup[machineID]
+	after := p.afterHello
 	p.mu.Unlock()
 	if ok {
 		p.Kick()
+	}
+	if setup && after != nil {
+		go after(machineID)
 	}
 }
 
@@ -242,7 +262,7 @@ func (p *Pusher) world(ctx context.Context, st store.Store, spaceOrg string, wor
 		if err != nil {
 			return nil, err
 		}
-		if w, err = loadWorld(ctx, st, o); err != nil {
+		if w, err = loadWorld(ctx, st, o, p.recommended); err != nil {
 			return nil, err
 		}
 	}
@@ -271,9 +291,9 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 	}
 	p.mu.Lock()
 	held, ok := p.held[machineID]
-	setup := p.setup[machineID]
+	setup, claude := p.setup[machineID], p.claude[machineID]
 	p.mu.Unlock()
-	items := MachineItems(w, sp.ID, m.TeamID, setup)
+	items := MachineItems(w, sp.ID, m.TeamID, m.CreatedBy, setup, claude)
 	hash := hubproto.EnvHash(items)
 	if !ok || held == hash {
 		return nil
@@ -302,6 +322,13 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 	}
 	p.mu.Unlock()
 	return p.save(machineID, res)
+}
+
+// ClaudeOf says whether a machine has the feature environment.claude.
+func (p *Pusher) ClaudeOf(machineID string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.claude[machineID]
 }
 
 // SetupOf says whether a machine has the feature environment.setup. known is false until the machine has said hello to

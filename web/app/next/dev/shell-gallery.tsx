@@ -267,6 +267,9 @@ const SiteTabSample = () => {
       signIn="none"
       onSignIn={() => {}}
       onSignInRefresh={() => {}}
+      keyStep="none"
+      onKeyStep={() => {}}
+      onKeyStepRefresh={() => {}}
       theme="light"
       title={null}
       pins={[]}
@@ -440,6 +443,9 @@ const GalleryPane = ({
           signIn="none"
           onSignIn={() => {}}
           onSignInRefresh={() => {}}
+          keyStep="none"
+          onKeyStep={() => {}}
+          onKeyStepRefresh={() => {}}
           theme="light"
           title={null}
           pins={[{ text: 'admin.example.com', name: 'Admin (test)' }]}

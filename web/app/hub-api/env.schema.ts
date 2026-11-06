@@ -1,9 +1,18 @@
 import { arr, bool, lit, nullable, num, obj, opt, str, time, day } from './schema';
 
-const catalogKind = lit('skill', 'mcp', 'repo', 'doc', 'script', 'access');
+const catalogKind = lit('skill', 'mcp', 'repo', 'doc', 'script', 'access', 'plugin', 'claude-settings');
 const layerKind = lit('org', 'tenant', 'team');
-const lockedReason = nullable(lit('pinned_by_org', 'pinned_by_tenant', 'no_rights'));
-const kindCounts = obj({ skill: num, mcp: num, repo: num, doc: num, script: opt(num), access: opt(num) });
+const lockedReason = nullable(lit('pinned_by_org', 'pinned_by_tenant', 'no_rights', 'built_in'));
+const kindCounts = obj({
+  skill: num,
+  mcp: num,
+  repo: num,
+  doc: num,
+  script: opt(num),
+  access: opt(num),
+  plugin: opt(num),
+  'claude-settings': opt(num),
+});
 const audience = obj({ mode: lit('tenant', 'teams', 'off'), teams: arr(str) });
 
 export const envSummary = obj({
@@ -30,6 +39,16 @@ export const envEntryRow = obj({
   lastUsedAt: nullable(time),
   unused: nullable(bool),
   delivery: nullable(obj({ ok: num, pending: num, error: num, message: nullable(str) })),
+  groupId: str,
+});
+export const envGroup = obj({
+  id: str,
+  name: str,
+  hint: str,
+  required: bool,
+  defaultOn: bool,
+  position: num,
+  builtIn: bool,
 });
 export const envLayer = obj({
   layer: layerKind,
@@ -41,6 +60,7 @@ export const envLayer = obj({
   callsWeek: nullable(num),
   counts: kindCounts,
   items: arr(envEntryRow),
+  groups: arr(envGroup),
 });
 export const teamRef = obj({ id: str, name: str, tenantId: str });
 export const observedTool = obj({
@@ -134,6 +154,18 @@ export const meEnvItem = obj({
   pinned: bool,
   off: bool,
   canToggle: bool,
+  groupId: str,
+});
+export const meEnvGroup = obj({
+  id: str,
+  name: str,
+  hint: str,
+  layer: layerKind,
+  required: bool,
+  on: bool,
+  canToggle: bool,
+  items: num,
+  builtIn: bool,
 });
 
 const runStatus = lit('running', 'ok', 'error', 'pending');
@@ -179,6 +211,7 @@ export const meEnvResponse = obj({
   space: obj({ id: str, slug: str, name: str }),
   org: obj({ id: str, name: str }),
   items: arr(meEnvItem),
+  groups: arr(meEnvGroup),
   outdated: bool,
   machines: arr(meMachine),
 });

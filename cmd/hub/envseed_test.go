@@ -100,6 +100,23 @@ func TestEnvSeedCommand(t *testing.T) {
 	if code, out, _ := do("env-seed", "--file", changed); code != 0 || !strings.Contains(out, "~ script «Установка» (hint)") || strings.Count(out, "\n") != 2 {
 		t.Errorf("update: %d %q", code, out)
 	}
+	// A file without the hint keeps the one stored: an empty hint means «do not touch».
+	noHint := write("env3.yaml", strings.Replace(envSeedFile, "        hint: ставит зависимости\n", "", 1))
+	if code, out, _ := do("env-seed", "--file", noHint); code != 0 || strings.TrimSpace(out) != "изменений нет" {
+		t.Errorf("no hint wiped the stored one: %d %q", code, out)
+	}
+	// Groups: made from the file, entries put into them by name; the same file again changes nothing.
+	grouped := write("env4.yaml", strings.Replace(envSeedFile, "    entries:\n      - {layer: org, item: GitLab, pinned: true}\n      - {layer: org, item: Монорепо}",
+		"    groups:\n      - {layer: org, name: Основа, required: true}\n      - {layer: org, name: Код, defaultOn: false}\n    entries:\n      - {layer: org, item: GitLab, pinned: true, group: Основа}\n      - {layer: org, item: Монорепо, group: Код}", 1))
+	if code, out, errOut := do("env-seed", "--file", grouped); code != 0 || !strings.Contains(out, "+ group «Основа» in org") || !strings.Contains(out, "~ entry repo «Монорепо» in org Альфа (group)") {
+		t.Errorf("groups: %d %q %q", code, out, errOut)
+	}
+	if code, out, _ := do("env-seed", "--file", grouped); code != 0 || strings.TrimSpace(out) != "изменений нет" {
+		t.Errorf("groups again: %d %q", code, out)
+	}
+	if code, _, errOut := do("env-seed", "--file", write("env5.yaml", strings.Replace(envSeedFile, "item: Монорепо}", "item: Монорепо, group: Нет}", 1))); code == 0 || !strings.Contains(errOut, "no group") {
+		t.Errorf("unknown group: %d %q", code, errOut)
+	}
 	// The same rules as the API: a bad source, a script of a team in the org layer, an unknown organization.
 	for name, body := range map[string]string{
 		"brew":    strings.Replace(envSeedFile, `"echo team"`, `"brew install jq"`, 1),

@@ -361,6 +361,20 @@
   min-height: 0;
   overflow: hidden;
 }
+/* The options reach 8px out to the left (.hx-ask__opts) and the clips around them cut their border and corners off: the
+   full half is 8px wider on each side and its clip pads it back, so the text keeps its place and the rows fit. */
+.hx-ask__full {
+  margin-inline: -8px;
+}
+.hx-ask__fullclip {
+  padding-inline: 8px;
+}
+/* The same for the body, a scroll box of its own on a narrow screen: it clipped the rows there too, and the content that
+   stuck out scrolled the clip sideways by 8px when an option took focus. */
+.hx-ask__body {
+  margin-inline: -8px;
+  padding-inline: 8px;
+}
 .hx-ask__fullclip {
   transition:
     opacity 320ms ease 120ms,

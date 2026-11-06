@@ -115,6 +115,13 @@ Everything in the system prompt is paid for on every turn, so it is counted:
 The agent of a chat with apps runs in a mount namespace. Writing a registry file, a package or a source folder fails in the kernel with
 «Read-only file system», whatever program does it.
 
+The app guard adds the same rule for the shell: a command that names a package or the registry is refused, unless it only
+reads it (`cat`, `ls`, `grep`, `head` and the like) or runs a skill's own script from its package
+(`python3 -I <skill folder>/pulse.py KEY`, alone or under
+`harnessly secret run --env V=name --`). Write that command with the path spelled out: a line with `$VAR`, `$(…)`, `VAR=x` before a program or a
+redirection into the package is refused. A skill that needs more (render a widget, fetch with a secret) does it inside
+its script.
+
 ```mermaid
 flowchart LR
   subgraph wall["Inside the wall"]

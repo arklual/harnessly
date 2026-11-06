@@ -519,3 +519,38 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* «Указать прокси»: one address under the line, opening and closing softly. */
+.hx-setup__proxy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0 2px;
+  border-top: 1px solid var(--hx-border);
+  font-size: var(--hx-text-sm);
+  animation: hx-setup-proxy-in 200ms var(--hx-ease-out);
+}
+.hx-setup__proxyl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--hx-fg-2);
+}
+.hx-setup__proxyl input {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 10px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+}
+.hx-setup__proxy .hx-setup__acts {
+  justify-content: flex-start;
+}
+@keyframes hx-setup-proxy-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

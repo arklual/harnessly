@@ -6,6 +6,7 @@ import type { EnvEntryRow, EnvLayer } from '../../../../hub-api/env';
 import { Icon } from '../../ui';
 import { Help } from './bits';
 import { type DragLock, keyMove, startDrag } from './drag';
+import { type GroupActions, GroupHead, MoveTo, NewGroup } from './groups';
 import { KIND } from './model';
 import { type Block, blocksOf, type LayerMeta } from './scope';
 
@@ -36,6 +37,7 @@ export interface LayerActions {
   onPin: (row: EnvEntryRow) => void;
   /** Asks the hub for a new order of the layer's scripts; true: kept. */
   onReorder: (entryIds: string[]) => Promise<boolean>;
+  groups: GroupActions;
 }
 
 const SCRIPT_TIP = (edit: boolean): string =>
@@ -110,6 +112,7 @@ const Row = ({
                 : 'Человек может пропустить. Включите — поставится всем'}
             </span>
           </span>
+          {vm.layer.groups.length > 0 && <MoveTo row={r} groups={vm.layer.groups} a={a.groups} />}
           <span className="ev-pen-w hx-tipped">
             <button
               type="button"
@@ -132,7 +135,7 @@ const Row = ({
         </>
       ) : (
         <>
-          <span className="ev-req__ro">{r.pinned ? 'обязательно' : 'по желанию'}</span>
+          <span className="ev-req__ro">{roLabel(r)}</span>
           {a.onOpen && (
             <span className="ev-go">
               <Icon i="chevron-right" size="sm" />
@@ -142,6 +145,12 @@ const Row = ({
       )}
     </div>
   );
+};
+
+/** What a row nobody here may change says: the platform's own, required, or optional. */
+const roLabel = (r: EnvEntryRow): string => {
+  if (r.lockedReason === 'built_in') return 'от платформы';
+  return r.pinned ? 'обязательно' : 'по желанию';
 };
 
 export const LayerCard = ({
@@ -160,7 +169,26 @@ export const LayerCard = ({
   const [drag] = useState<DragLock>(() => ({ busy: false }));
   const { layer, meta, edit } = vm;
   const scriptIds = layer.items.filter((r) => r.enabled && r.kind === 'script').map((r) => r.entryId);
+  const groupIds = new Set(layer.groups.map((g) => g.id));
+  const loose = rows
+    .map((b) => ({ ...b, rows: b.rows.filter((r) => !groupIds.has(r.groupId)) }))
+    .filter((b) => b.rows.length > 0);
+  const grouped = [...layer.groups]
+    .sort((x, y) => x.position - y.position)
+    .map((g) => ({ g, rows: rows.flatMap((b) => b.rows.filter((r) => r.groupId === g.id)) }))
+    .filter((x) => x.rows.length > 0 || (edit && q.trim() === ''));
   const empty = rows.length === 0 && q.trim() === '';
+  const row = (r: EnvEntryRow) => (
+    <Row
+      key={r.entryId}
+      r={r}
+      vm={vm}
+      a={a}
+      fresh={fresh.has(r.entryId)}
+      drag={drag}
+      scriptIds={q.trim() === '' ? scriptIds : []}
+    />
+  );
   return (
     <section className="ev-layer" aria-expanded={vm.open ? 'true' : 'false'} data-i={vm.index}>
       <div className="ev-layer__hd">
@@ -190,23 +218,19 @@ export const LayerCard = ({
       </div>
       <div className="ev-layer__body">
         <div>
-          {rows.map((b) => (
+          {grouped.map(({ g, rows: gr }) => (
+            <div key={g.id} className="ev-grp-w">
+              <GroupHead g={g} count={gr.length} edit={edit} a={a.groups} />
+              {gr.map(row)}
+            </div>
+          ))}
+          {loose.map((b) => (
             <div key={b.kind}>
               <div className="ev-kindh">
                 <span>{KIND[b.kind].many}</span>
                 {b.kind === 'script' && <Help text={SCRIPT_TIP(edit && q.trim() === '')} />}
               </div>
-              {b.rows.map((r) => (
-                <Row
-                  key={r.entryId}
-                  r={r}
-                  vm={vm}
-                  a={a}
-                  fresh={fresh.has(r.entryId)}
-                  drag={drag}
-                  scriptIds={q.trim() === '' ? scriptIds : []}
-                />
-              ))}
+              {b.rows.map(row)}
             </div>
           ))}
           {empty && (
@@ -220,6 +244,7 @@ export const LayerCard = ({
               {`Добавить в ${meta.acc}`}
             </button>
           )}
+          {edit && q.trim() === '' && <NewGroup onAdd={a.groups.onAdd} />}
         </div>
       </div>
     </section>

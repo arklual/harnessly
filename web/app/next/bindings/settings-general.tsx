@@ -7,6 +7,8 @@ import BetaSection from '@/next/features/settings/beta-section';
 import GeneralSection from '@/next/features/settings/general-section';
 import UpdateGroup from '@/next/features/settings/update-group';
 import ChecksGroup from '@/next/features/settings/checks-group';
+import BaseSkipped from '@/next/features/settings/base-skipped';
+import { askBaseSkip, loadBase, type IBaseItem } from '@/next/features/setup/api';
 import {
   browserChecks,
   fixMachineCheck,
@@ -176,6 +178,33 @@ const useMachineChecks = (machine: MachineId) => {
   return { checks, fixing, fix, copy };
 };
 
+/** The base package's skipped tools, read when the page opens. */
+const useBaseSkipped = (machine: MachineId) => {
+  const [read, setRead] = useState<{ machine: MachineId; items: readonly IBaseItem[] } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadBase(machine).then((res) => {
+      if (live && 'ok' in res) setRead({ machine, items: res.value.items });
+    });
+    return () => {
+      live = false;
+    };
+  }, [machine]);
+  const back = async (id: string) => {
+    setBusy(id);
+    const res = await askBaseSkip(machine, id, false);
+    setBusy(null);
+    if (!('ok' in res)) {
+      toast(t('next.settings.base.backFailed'), { tone: 'error' });
+      return;
+    }
+    setRead({ machine, items: res.value.items });
+    toast(t('next.settings.base.backed'));
+  };
+  return { items: read?.machine === machine ? read.items : [], busy, back };
+};
+
 /** «Оформление»: the theme and the palette are this browser's, the text size is the person's (pessimistic). */
 export const AppearancePage = ({ pending }: { pending: Pending }) => {
   const me = useMe();
@@ -216,6 +245,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
   const runtime = useRuntimeSettings(machine);
   const update = useUpdateInfo(machine);
   const machineChecks = useMachineChecks(machine);
+  const baseSkipped = useBaseSkipped(machine);
   const settings = me.k === 'ready' ? me.me.settings : DEFAULT_SETTINGS;
   const email = me.k === 'ready' ? me.me.email : null;
   const { run, pending: waiting } = pending;
@@ -278,12 +308,19 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
         ) : null
       }
       checks={
-        <ChecksGroup
-          checks={machineChecks.checks}
-          fixing={machineChecks.fixing}
-          onCopy={machineChecks.copy}
-          onFix={(id) => void machineChecks.fix(id)}
-        />
+        <>
+          <ChecksGroup
+            checks={machineChecks.checks}
+            fixing={machineChecks.fixing}
+            onCopy={machineChecks.copy}
+            onFix={(id) => void machineChecks.fix(id)}
+          />
+          <BaseSkipped
+            items={baseSkipped.items}
+            busy={baseSkipped.busy}
+            onBack={(id) => void baseSkipped.back(id)}
+          />
+        </>
       }
       onSignOut={() => {
         void signOut(machine).then((res) => {

@@ -97,3 +97,22 @@ describe('a page leaving the slot for another site by script', () => {
     expect(core.parseParentMessage({ type: 'tk:redirect-answer', url: auth, follow: 'yes' })).toBeNull();
   });
 });
+
+describe('a page that asks for a security key or Touch ID', () => {
+  it('tells the parent and still makes the call', async () => {
+    const posted: unknown[] = [];
+    const calls: unknown[] = [];
+    const credentials = {
+      get: (options: unknown) => {
+        calls.push(options);
+        return Promise.reject(new Error('NotAllowedError'));
+      },
+    };
+    core.installKeyStep({ navigator: { credentials } }, (m) => posted.push(m));
+    await credentials.get({ password: true }).catch(() => {});
+    expect(posted).toEqual([]);
+    await credentials.get({ publicKey: { challenge: 'x' } }).catch(() => {});
+    expect(posted).toEqual([{ type: 'tk:key-step' }]);
+    expect(calls).toHaveLength(2);
+  });
+});

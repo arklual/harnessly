@@ -376,6 +376,14 @@ const DesignlySiteBody = ({
   const src = mayShow ? (onFirstPage ? opened.enterUrl : plainSrc) : null;
   const slotOrigin = opened?.origin ?? null;
   const slotError = opened?.error ?? null;
+  const gated = gate.state.k === ACCESS.ready ? gate.state.access : null;
+  const mayEdit =
+    gate.state.k === ACCESS.absent ||
+    (gated !== null && (gated.role === ROLE.owner || gated.role === ROLE.manage || gated.role === ROLE.edit));
+  // A design is looked at unless the editing mode is asked for (and may be): the pane of a chat always edits, one
+  // opened from a chat edits as that chat last had it (design-mode).
+  const editing = pane !== undefined || (asked && mayEdit) || onMode === undefined;
+  const viewing = !editing;
   // The apps on in this document (their panels, selection menu, marks on the boards, the gate before a share). The
   // chat they send tasks to is the one the pane sits beside, or the one the person came from.
   // The design's own chat, when it has no pane or chat it was opened from, is the column's.
@@ -387,6 +395,7 @@ const DesignlySiteBody = ({
     kind: project?.design.kind ?? null,
     conversation: appsChat,
     slotOrigin,
+    viewing,
   });
 
   // The slot opens for the page on screen at the time; the pages after it reuse it (see the effect on the path).
@@ -486,7 +495,6 @@ const DesignlySiteBody = ({
     });
   }, [id]);
 
-  const gated = gate.state.k === ACCESS.ready ? gate.state.access : null;
   // The state of «Опубликовать как сайт» stays with the design while the share dialog opens and closes.
   const boards = project?.design.boards.map((b) => ({ path: b.path, title: b.title || b.path }));
   const sitePublish = usePublish({
@@ -563,10 +571,6 @@ const DesignlySiteBody = ({
   })();
 
   // Who may change pictures: where there is no gateway the design is as it was (its person edits); otherwise the owner and editors.
-  const mayEdit =
-    gate.state.k === ACCESS.absent ||
-    (gated !== null && (gated.role === ROLE.owner || gated.role === ROLE.manage || gated.role === ROLE.edit));
-
   const back = pane ? pane.onBack : () => goTo({ kind: ROUTE.designly });
   if (gated !== null && gated.role === null) {
     return (
@@ -584,10 +588,6 @@ const DesignlySiteBody = ({
     return <ProjectAway ownerName={gated?.ownerName ?? ''} onRetry={lookAgain} onBack={back} />;
   }
 
-  // A design is looked at unless the editing mode is asked for (and may be): the pane of a chat always edits, one
-  // opened from a chat edits as that chat last had it (design-mode).
-  const editing = pane !== undefined || (asked && mayEdit) || onMode === undefined;
-  const viewing = !editing;
   // «Опубликовать как сайт» lives in «Поделиться», where a manager edits a site design.
   const mayPublish =
     !viewing &&
@@ -741,6 +741,7 @@ const DesignlySiteBody = ({
         id={id}
         conversation={appsChat}
         sinopia={sinopia}
+        viewing={viewing}
       >
         {kindView()}
       </SinopiaStage>

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/basepkg"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -29,6 +30,7 @@ const cliUsage = `usage: harnessly-agent [command]
   off            switch the agent off on this machine: the hub link closes and stays closed
   on             switch it on again
   policy         print the local policy in force
+  basepkg install  (root) install the system part of the base package; run by the harnessly-basepkg service
   version
 `
 
@@ -104,6 +106,8 @@ func RunCLI(args []string, stdout, stderr io.Writer) (code int, handled bool) {
 	cmd, rest := args[0], args[1:]
 	switch cmd {
 	case "register", "unlink", "gitkey-remove", "status", "off", "on", "policy":
+	case "basepkg":
+		return basepkg.Service(rest, stdout, stderr), true
 	case "version", "--version", "-version":
 		fmt.Fprintln(stdout, BuildVersion)
 		return 0, true

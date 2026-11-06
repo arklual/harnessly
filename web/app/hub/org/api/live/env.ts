@@ -9,6 +9,9 @@ import type {
   EnvRunResponse,
   EnvRunsResponse,
   EnvTryResponse,
+  ApplyResponse,
+  GroupResponse,
+  MeEnvGroup,
   MeMachinesResponse,
   MeRunResponse,
   MeRunsResponse,
@@ -25,6 +28,8 @@ export const scopeQuery = (scope: string): Query => ({ scope: scope === ALL_SCOP
 
 const withSpace = (path: string, space?: string): string =>
   space ? `${path}?space=${encodeURIComponent(space)}` : path;
+
+const group = (org: string, id: string): string => orgPath(org, `/env/groups/${encodeURIComponent(id)}`);
 
 const entry = (org: string, id: string): string => orgPath(org, `/env/entries/${encodeURIComponent(id)}`);
 
@@ -52,6 +57,15 @@ export const liveEnv = (): EnvApi => ({
   envMine: (space) => http.get<MeEnvResponse>('/api/me/env', { space }),
   envMineSet: (itemId, off, space) =>
     http.put<MeEnvItem>(`/api/me/env/${encodeURIComponent(itemId)}`, { off, space }),
+  envMineGroup: (groupId, on, space) =>
+    http.put<MeEnvGroup>(`/api/me/env/groups/${encodeURIComponent(groupId)}`, { on, space }),
+  envGroupAdd: async (org, req) => (await http.post<GroupResponse>(orgPath(org, '/env/groups'), req)).group,
+  envGroupPatch: async (org, groupId, req) =>
+    (await http.patch<GroupResponse>(group(org, groupId), req)).group,
+  envGroupRemove: async (org, groupId) => {
+    await http.del(group(org, groupId));
+  },
+  envApply: (org, req) => http.post<ApplyResponse>(orgPath(org, '/env/apply'), req),
   catalogPatch: async (org, itemId, req) =>
     (await http.patch<CatalogItemResponse>(orgPath(org, `/catalog/${encodeURIComponent(itemId)}`), req)).item,
   catalogDelete: async (org, itemId) => {

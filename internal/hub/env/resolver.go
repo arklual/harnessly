@@ -71,6 +71,20 @@ type Entry struct {
 	Pinned   bool
 	Audience Audience
 	Position int // the place among the layer's entries (scripts run in this order)
+	GroupID  string
+	Required bool // the entry is in a required group: it pins its item as Pinned does
+}
+
+// pins says whether an entry stops the layers below and the person from switching its item off.
+func (e Entry) pins() bool { return e.Pinned || e.Required }
+
+// Group is a group of a layer's entries as the resolver needs it.
+type Group struct {
+	ID        string
+	Layer     string
+	Name      string
+	Required  bool // its items are pinned
+	DefaultOn bool // an optional group is on for a person who has not chosen
 }
 
 // Person is whom the environment is computed for: where they are and what they switched off.
@@ -79,6 +93,9 @@ type Person struct {
 	SpaceID string          // the tenant
 	Teams   []string        // the teams the person is in, in this tenant
 	Off     map[string]bool // item ids the person switched off in this tenant
+	// Groups are the organization's groups by id, GroupOn the person's choices of optional ones (no entry: DefaultOn).
+	Groups  map[string]Group
+	GroupOn map[string]bool
 }
 
 // Effective is one item in the environment of a person.
@@ -89,7 +106,9 @@ type Effective struct {
 	Pinned   bool   // some layer pinned it: the person cannot switch it off
 	Position int    // the place of that layer's entry among the layer's entries
 	LockedBy string // the highest layer that pinned it, "" when none
-	Off      bool   // the person switched it off (and could)
+	Off      bool   // the person switched it off (and could), or it is in an optional group that is off for them
+	GroupID  string // the group of the entry that put the item in ("" for none)
+	GroupOff bool   // off because its group is off for the person
 }
 
 // LayerRank orders the layers from the widest.
@@ -160,9 +179,9 @@ func Resolve(items map[string]Item, entries []Entry, p Person) []Effective {
 			case e.Enabled:
 				present = true
 				if eff.EntryID == "" {
-					eff.Layer, eff.EntryID, eff.Position = e.Layer, e.ID, e.Position
+					eff.Layer, eff.EntryID, eff.Position, eff.GroupID = e.Layer, e.ID, e.Position, e.GroupID
 				}
-				if e.Pinned && eff.LockedBy == "" {
+				if e.pins() && eff.LockedBy == "" {
 					eff.Pinned, eff.LockedBy = true, e.Layer
 				}
 			case eff.LockedBy == "":
@@ -173,7 +192,19 @@ func Resolve(items map[string]Item, entries []Entry, p Person) []Effective {
 			continue
 		}
 		eff.Item = items[id]
-		eff.Off = p.Off[id] && !eff.Pinned
+		if g, ok := p.Groups[eff.GroupID]; ok {
+			switch on, chose := p.GroupOn[g.ID]; {
+			case g.Required:
+				if !eff.Pinned {
+					eff.Pinned, eff.LockedBy = true, g.Layer
+				}
+			case chose && !on, !chose && !g.DefaultOn:
+				eff.GroupOff = !eff.Pinned
+			}
+		} else {
+			eff.GroupID = ""
+		}
+		eff.Off = (p.Off[id] || eff.GroupOff) && !eff.Pinned
 		out = append(out, eff)
 	}
 	slices.SortFunc(out, func(a, b Effective) int {
@@ -201,7 +232,7 @@ func LockedAbove(entries []Entry, layer, orgID, spaceID, itemID string) string {
 	best := ""
 	bestRank := 3
 	for _, e := range entries {
-		if e.ItemID != itemID || !e.Enabled || !e.Pinned || e.Audience.Mode != AudienceTenant {
+		if e.ItemID != itemID || !e.Enabled || !e.pins() || e.Audience.Mode != AudienceTenant {
 			continue
 		}
 		r := LayerRank(e.Layer)

@@ -162,7 +162,7 @@ func New(o Options) (*Hub, error) {
 	if envFeatures == nil {
 		envFeatures = anyGate{env.StaticFeatures(cfg.EnvFeatures), h.Features}
 	}
-	h.Env = env.New(env.Deps{DB: db, Gate: h.Orgs.Gate, Features: envFeatures, Publisher: orgEvents{db: db, broker: h.Events}, Reg: h.Registry, Log: log, Now: o.Now,
+	h.Env = env.New(env.Deps{DB: db, Gate: h.Orgs.Gate, Features: envFeatures, Recommended: cfg.EnvRecommended, Publisher: orgEvents{db: db, broker: h.Events}, Reg: h.Registry, Log: log, Now: o.Now,
 		Changed: func() {
 			if h.EnvPush != nil {
 				h.EnvPush.Kick()
@@ -197,7 +197,7 @@ func New(o Options) (*Hub, error) {
 	var envSink machines.EnvSink
 	// An organization may switch the environment on at any time, so the pusher is always there; it pushes nothing to the
 	// machines of an organization whose feature is off.
-	h.EnvPush = env.NewPusher(env.PushDeps{DB: db, Reg: h.Registry, Features: envFeatures, Publisher: orgEvents{db: db, broker: h.Events}, Log: log, Now: o.Now})
+	h.EnvPush = env.NewPusher(env.PushDeps{DB: db, Reg: h.Registry, Features: envFeatures, Recommended: cfg.EnvRecommended, Publisher: orgEvents{db: db, broker: h.Events}, Log: log, Now: o.Now})
 	h.Env.UsePusher(h.EnvPush)
 	envSink = h.EnvPush
 	machineFeatures := o.Features

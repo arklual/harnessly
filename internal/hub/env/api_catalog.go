@@ -125,12 +125,17 @@ func (q *req) requireOrgAdmin() error {
 // writes such an item can read every member's token, so only the organization's admins do.
 const consentMsg = "Токены из сейфа и доступы подключает админ организации"
 
+// claudeMsg: a plugin brings hooks that run with every tool call, settings change every chat of the person.
+const claudeMsg = "Плагины и настройки Claude подключает админ организации"
+
 // CheckConsent refuses the items only an organization admin may write: an access, and a script that takes secrets from
 // the safe. It is asked for every item a team or a tenant owns.
 func CheckConsent(kind string, src json.RawMessage) error {
 	switch kind {
 	case store.CatalogAccess:
 		return httpx.Invalid("kind", consentMsg)
+	case store.CatalogPlugin, store.CatalogClaudeSettings:
+		return httpx.Invalid("kind", claudeMsg)
 	case store.CatalogScript:
 		var s struct {
 			Secrets []string `json:"secrets"`

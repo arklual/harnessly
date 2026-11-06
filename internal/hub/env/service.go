@@ -50,24 +50,27 @@ type Deps struct {
 	Reg Caller
 	Log *slog.Logger
 	Now func() time.Time
+	// Recommended puts the platform's group «Рекомендованное» into every organization (HUB_ENV_RECOMMENDED).
+	Recommended bool
 }
 
 // Service is the environment and the catalog of the organizations.
 type Service struct {
-	db      *store.DB
-	gate    func(orgs.Handler) httpx.Handler
-	feat    FeatureGate
-	pub     Publisher
-	changed func()
-	reg     Caller
-	push    *Pusher
-	log     *slog.Logger
-	now     func() time.Time
+	recommended bool
+	db          *store.DB
+	gate        func(orgs.Handler) httpx.Handler
+	feat        FeatureGate
+	pub         Publisher
+	changed     func()
+	reg         Caller
+	push        *Pusher
+	log         *slog.Logger
+	now         func() time.Time
 }
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now}
+	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now, recommended: d.Recommended}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -97,10 +100,18 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/me/env/runs", s.gate(s.meRuns))
 	mux.Handle("GET /api/me/env", s.gate(s.meEnv))
 	mux.Handle("PUT /api/me/env/{itemId}", s.gate(s.putMeEnv))
+	mux.Handle("PUT /api/me/env/groups/{groupId}", s.gate(s.putMeGroup))
+	mux.Handle("POST /api/orgs/{org}/env/apply", s.gate(s.apply))
+	mux.Handle("POST /api/orgs/{org}/env/groups", s.gate(s.addGroup))
+	mux.Handle("PATCH /api/orgs/{org}/env/groups/{groupId}", s.gate(s.patchGroup))
+	mux.Handle("DELETE /api/orgs/{org}/env/groups/{groupId}", s.gate(s.deleteGroup))
 }
 
 // UsePusher gives the service the pusher that remembers what the machines can do (the pusher is made after the service).
-func (s *Service) UsePusher(p *Pusher) { s.push = p }
+func (s *Service) UsePusher(p *Pusher) {
+	s.push = p
+	p.afterHello = s.applyPending
+}
 
 // feature is nil when the feature is on for the organization, ErrNotEnabled otherwise.
 func (s *Service) feature(ctx context.Context, orgID, name string) error {
@@ -136,9 +147,12 @@ type world struct {
 	tenantBy map[string]store.Space
 	items    map[string]store.CatalogItem
 	entries  []store.EnvEntry
+	groups   []store.EnvGroup
+	// choices are the people's choices of optional groups: tenant id → user id → group id → on.
+	choices map[string]map[string]map[string]bool
 }
 
-func loadWorld(ctx context.Context, st store.Store, o store.Org) (*world, error) {
+func loadWorld(ctx context.Context, st store.Store, o store.Org, recommended bool) (*world, error) {
 	w := &world{org: o, teams: map[string][]store.Team{}, teamByID: map[string]store.Team{}, tenantBy: map[string]store.Space{},
 		items: map[string]store.CatalogItem{}}
 	var err error
@@ -166,7 +180,35 @@ func loadWorld(ctx context.Context, st store.Store, o store.Org) (*world, error)
 	if w.entries, err = st.EnvEntriesOfOrg(ctx, o.ID); err != nil {
 		return nil, err
 	}
+	if w.groups, err = st.EnvGroupsOfOrg(ctx, o.ID); err != nil {
+		return nil, err
+	}
+	if recommended {
+		w.addRecommended()
+	}
+	w.choices = map[string]map[string]map[string]bool{}
+	if len(w.groups) > 0 {
+		for _, sp := range w.tenants {
+			if w.choices[sp.ID], err = st.EnvPersonGroupsInScope(ctx, sp.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return w, nil
+}
+
+// resolverGroups are the organization's groups for the resolver, by id.
+func (w *world) resolverGroups() map[string]Group {
+	out := make(map[string]Group, len(w.groups))
+	for _, g := range w.groups {
+		out[g.ID] = Group{ID: g.ID, Layer: g.Layer, Name: g.Name, Required: g.Required, DefaultOn: g.DefaultOn}
+	}
+	return out
+}
+
+// choicesOf is a person's choices of groups in a tenant (nil when none).
+func (w *world) choicesOf(spaceID, userID string) map[string]bool {
+	return w.choices[spaceID][userID]
 }
 
 // tenant finds a tenant of the organization by id or slug.
@@ -226,11 +268,17 @@ func (w *world) resolverItems() map[string]Item {
 	return out
 }
 
-func resolverEntries(es []store.EnvEntry) []Entry {
-	out := make([]Entry, len(es))
-	for i, e := range es {
+// resolverEntries are the organization's entries for the resolver. An entry in a required group counts as pinned
+// (Required): a lower layer cannot switch its item off, as for an entry pinned by itself.
+func (w *world) resolverEntries() []Entry {
+	required := map[string]bool{}
+	for _, g := range w.groups {
+		required[g.ID] = g.Required
+	}
+	out := make([]Entry, len(w.entries))
+	for i, e := range w.entries {
 		out[i] = Entry{ID: e.ID, Layer: e.Layer, ScopeID: e.ScopeID, ItemID: e.ItemID, Enabled: e.Enabled, Pinned: e.Pinned,
-			Audience: ParseAudience(e.Audience), Position: e.Position}
+			Audience: ParseAudience(e.Audience), Position: e.Position, GroupID: e.GroupID, Required: e.GroupID != "" && required[e.GroupID]}
 	}
 	return out
 }
@@ -301,7 +349,7 @@ func (r *rights) visibleTenants(w *world) ([]store.Space, error) {
 }
 
 var kindRu = map[string]string{store.CatalogSkill: "скилл", store.CatalogMCP: "MCP", store.CatalogRepo: "репозиторий", store.CatalogDoc: "документ",
-	store.CatalogScript: "скрипт", store.CatalogAccess: "доступ"}
+	store.CatalogScript: "скрипт", store.CatalogAccess: "доступ", store.CatalogPlugin: "плагин", store.CatalogClaudeSettings: "настройки Claude"}
 
 // whereRu says where a layer is, for the title of a change.
 func (w *world) whereRu(layer, scopeID string) string {
@@ -316,23 +364,29 @@ func (w *world) whereRu(layer, scopeID string) string {
 
 // machinesIn counts the live machines a scope's environment reaches.
 func (w *world) machinesIn(ctx context.Context, st store.Store, layer, scopeID string) (int, error) {
-	n := 0
+	ms, err := w.machinesOf(ctx, st, layer, scopeID)
+	return len(ms), err
+}
+
+// machinesOf are the machines a scope's environment reaches.
+func (w *world) machinesOf(ctx context.Context, st store.Store, layer, scopeID string) ([]store.Machine, error) {
+	var out []store.Machine
 	for _, sp := range w.tenants {
 		if layer != store.EnvLayerOrg && w.tenantOf(layer, scopeID) != sp.ID {
 			continue
 		}
 		ms, err := st.MachinesBySpace(ctx, sp.ID)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 		for _, m := range ms {
 			if layer == store.EnvLayerTeam && m.TeamID != scopeID {
 				continue
 			}
-			n++
+			out = append(out, m)
 		}
 	}
-	return n, nil
+	return out, nil
 }
 
 // record writes the change and the audit entry of one edit, inside the edit's transaction.

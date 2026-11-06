@@ -329,6 +329,29 @@ export const installLeave = (win: any, post: (message: Record<string, unknown>) 
   };
 };
 
+/**
+ * A security key or Touch ID (WebAuthn) is bound to the site's own address: on the slot's origin the browser refuses it
+ * whatever the page does. A page that asks for one tells the parent, which offers to take this step in an ordinary tab;
+ * the call itself goes on and fails as it would.
+ */
+export const installKeyStep = (win: any, post: (message: Record<string, unknown>) => void) => {
+  const credentials = win.navigator?.credentials;
+  if (!credentials) return;
+  for (const name of ['get', 'create']) {
+    const original = credentials[name];
+    if (typeof original !== 'function') continue;
+    try {
+      credentials[name] = function (this: unknown, ...args: unknown[]) {
+        const options = args[0] as { publicKey?: unknown } | undefined;
+        if (options && typeof options === 'object' && options.publicKey) post({ type: 'tk:key-step' });
+        return original.apply(credentials, args);
+      };
+    } catch {
+      // A browser that keeps the container frozen: the parent is not told, the page works as before.
+    }
+  }
+};
+
 export const parseParentMessage = (data: unknown): TParentMessage | null => {
   if (!data || typeof data !== 'object') return null;
   const message = data as Record<string, unknown>;
@@ -1675,6 +1698,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   };
   const setAnchors = core.installAnchors(win, doc, post, findAnchor, core);
   const answerLeave = core.installLeave(win, post);
+  core.installKeyStep(win, post);
 
   const nav = () => {
     if (win.location.href === lastUrl) return;

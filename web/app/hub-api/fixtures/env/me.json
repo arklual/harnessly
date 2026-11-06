@@ -20,7 +20,8 @@
       "layerTitle": "Тенант Платформа",
       "pinned": false,
       "off": false,
-      "canToggle": true
+      "canToggle": true,
+      "groupId": ""
     },
     {
       "itemId": "item-review",
@@ -33,7 +34,8 @@
       "layerTitle": "Организация Acme",
       "pinned": true,
       "off": false,
-      "canToggle": false
+      "canToggle": false,
+      "groupId": ""
     }
   ],
   "outdated": true,
@@ -42,7 +44,10 @@
       "id": "m-andrey",
       "name": "vm-andrey",
       "online": true,
-      "team": { "id": "team-core", "name": "Ядро" },
+      "team": {
+        "id": "team-core",
+        "name": "Ядро"
+      },
       "setup": true,
       "current": false,
       "failed": 1,
@@ -101,5 +106,6 @@
         ]
       }
     }
-  ]
+  ],
+  "groups": []
 }

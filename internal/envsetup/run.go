@@ -48,7 +48,9 @@ type execution struct {
 	waits []string
 	// repoDirs are the folders of the list's repositories that are in place, by item id.
 	repoDirs map[string]string
-	seq      int
+	// heads are the commits the clones of repositories outside the list stand on after this run, by item id.
+	heads map[string]string
+	seq   int
 	// denied: the agent took the permission back during the run.
 	denied bool
 }
@@ -63,7 +65,7 @@ func (r *Runner) execute(ctx context.Context, req hubproto.EnvRunRequest, hash s
 		return
 	}
 	ex := &execution{r: r, ctx: ctx, items: items, modifies: req.Mode != hubproto.RunCheck, sandbox: req.Mode == hubproto.RunSandbox,
-		home: r.Home, state: r.readState(), values: map[string]string{}, repoDirs: map[string]string{}}
+		home: r.Home, state: r.readState(), values: map[string]string{}, repoDirs: map[string]string{}, heads: map[string]string{}}
 	ex.run = hubproto.EnvRun{RunID: req.RunID, Mode: req.Mode, Hash: hash, By: req.By, Status: hubproto.EnvRunning, StartedAt: r.now().UnixMilli()}
 	for _, it := range items {
 		var src source
@@ -147,6 +149,10 @@ func (ex *execution) step(i int) {
 		ex.repo(i)
 	case ex.items[i].Kind == hubproto.EnvKindScript:
 		ex.script(i)
+	case ex.items[i].Kind == hubproto.EnvKindPlugin:
+		ex.plugin(i)
+	case ex.items[i].Kind == hubproto.EnvKindClaudeSettings:
+		ex.claudeSettings(i)
 	}
 	st.Message = ex.mask(st.Message)
 	st.Ms = ex.r.now().Sub(start).Milliseconds()
@@ -205,6 +211,17 @@ func (ex *execution) saveState() {
 		st.Items = append(st.Items, hubproto.EnvApplied{ItemID: s.ItemID, Status: shown(s.Status), Message: s.Message})
 	}
 	ex.r.keepLedger(&st, ex.items)
+	if ex.modifies && !ex.sandbox {
+		st.Moved = false // the run for the moved branch is done
+	}
+	if len(ex.heads) > 0 && !ex.sandbox {
+		if st.Heads == nil {
+			st.Heads = map[string]string{}
+		}
+		for id, h := range ex.heads {
+			st.Heads[id] = h
+		}
+	}
 	if err := ex.r.writeState(st); err != nil {
 		ex.r.logf("warn", "envsetup: state not written", "error", err.Error())
 	}

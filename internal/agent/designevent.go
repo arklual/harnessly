@@ -45,8 +45,8 @@ func (a *Agent) designEventRoute(w http.ResponseWriter, r *http.Request) {
 		a.broadcast(evDesign{Event: kind, Project: *project})
 	}
 	// A hub hears it too, cluster link or not, with the person the owner file names (the hub checks they may open the
-	// machine). An observing link changes nothing, so it is not told.
-	if h := a.hub; h != nil && !h.observe {
+	// machine). An observing link is told only when it keeps the designs' access.
+	if h := a.hub; h != nil && (!h.observe || h.designServed()) {
 		person := ""
 		if p := str(obj, "person", 254); p != nil {
 			person = *p

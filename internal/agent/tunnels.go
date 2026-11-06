@@ -79,6 +79,11 @@ func newTunnels(runtimePort, filesPort int) *tunnels {
 // Open connects the tunnel. The returned start begins carrying the socket's bytes; it is called after the response
 // went out, so the cluster learns the tunnel is open before its first bytes arrive.
 func (t *tunnels) Open(l *link, spec TunnelOpen) (start func(), err error) {
+	return t.OpenAt(l, spec, 0)
+}
+
+// OpenAt is Open to the given loopback port instead of the target's (0: the target's).
+func (t *tunnels) OpenAt(l *link, spec TunnelOpen, at int) (start func(), err error) {
 	if !tunnelIDPattern.MatchString(spec.TunnelID) {
 		return nil, errors.New("bad tunnel id")
 	}
@@ -98,6 +103,9 @@ func (t *tunnels) Open(l *link, spec TunnelOpen) (start func(), err error) {
 	port := t.runtimePort
 	if spec.Target == "files" {
 		port = t.filesPort
+	}
+	if at != 0 {
+		port = at
 	}
 	if port == 0 {
 		return nil, fmt.Errorf("no %s here", spec.Target)

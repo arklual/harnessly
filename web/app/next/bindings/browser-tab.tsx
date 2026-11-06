@@ -5,7 +5,7 @@ import { fetchPorts, openPreview, slotNonce, type IListeningPort } from '@/next/
 import { neighboursOf } from '@/next/features/pane/neighbours';
 import { slotLeases } from '@/next/features/pane/slot-lease';
 import { useTheme } from '@/platform/theme';
-import { standSignInUrl, useStandSignIn } from '@/next/features/pane/stand-sign-in';
+import { SIGN_IN, standSignInUrl, useStandSignIn } from '@/next/features/pane/stand-sign-in';
 import { useBrowserPins } from '@/next/stores/browser-pins';
 import { worthRemembering } from '@/next/features/pane/pins';
 import { useMe, personKey, type MeState } from '@/next/stores/me';
@@ -265,6 +265,29 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
     },
   });
 
+  // A step that asks for a security key or Touch ID (WebAuthn) cannot happen on the slot's origin: the person takes it
+  // in an ordinary tab of their browser, and when they come back to this window the page loads again.
+  const [keyWait, setKeyWait] = useState(false);
+  const keyStep = keyWait ? SIGN_IN.waiting : bridge.keyStep ? SIGN_IN.asked : SIGN_IN.none;
+  const endKeyStep = () => {
+    setKeyWait(false);
+    setReloadKey((n) => n + 1);
+  };
+  const openKeyStep = () => {
+    if (at?.target.kind !== 'url') return;
+    const site = slot?.origin ? siteUrlOf(bridge.url ?? '', slot.origin, at.target.origin) : null;
+    openOutside(site ?? `${at.target.origin}${at.path}`);
+    setKeyWait(true);
+  };
+  useEffect(() => {
+    if (!keyWait) return;
+    const back = () => {
+      if (document.visibilityState === 'visible') endKeyStep();
+    };
+    window.addEventListener('focus', back);
+    return () => window.removeEventListener('focus', back);
+  });
+
   // The page's own address: the site's origin in place of the slot's, as far as the page has gone; a server of the
   // machine has none outside.
   const siteOrigin = at?.target.kind === 'url' ? at.target.origin : null;
@@ -393,6 +416,9 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
         bridge.onFrameLoad();
         stand.onFrameLoad();
       }}
+      keyStep={keyStep}
+      onKeyStep={openKeyStep}
+      onKeyStepRefresh={endKeyStep}
       signIn={stand.state}
       onSignIn={stand.start}
       onSignInRefresh={stand.refresh}

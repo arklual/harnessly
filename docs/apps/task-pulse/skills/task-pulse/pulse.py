@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """The data of a task's card: the task from the person's tracker (harnessly issue, through Connections) and, when
 GITLAB_TOKEN is in the environment (harnessly secret run), the merge requests that name the task and their pipelines.
-Prints one JSON object; never prints the token."""
+Prints one JSON object; never prints the token. With --show KEY it gathers the card itself (the token from the safe, when
+there is one) and puts it in the chat as a widget."""
 
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -95,13 +97,11 @@ def merge_requests(key):
     return mrs, "ok"
 
 
-def main():
-    key = (sys.argv[1] if len(sys.argv) > 1 else "").strip().upper()
+def card_of(key):
     card = {"key": key, "checkedAt": int(time.time() * 1000)}
     if not KEY.match(key):
         card["error"] = "not-a-key"
-        print(json.dumps(card, ensure_ascii=False))
-        return
+        return card
     code, out, err = run("harnessly", "issue", key, "--json")
     try:
         issue = json.loads(out)["issue"] if code == 0 else None
@@ -110,8 +110,7 @@ def main():
     if issue is None:
         card["error"] = "no-issue"
         card["reason"] = (err or out).splitlines()[0][:200] if (err or out) else ""
-        print(json.dumps(card, ensure_ascii=False))
-        return
+        return card
     status = issue.get("status") or {}
     card.update({
         "title": issue.get("title", ""), "url": issue.get("url", ""), "type": issue.get("type", ""),
@@ -122,7 +121,60 @@ def main():
         "dod": checklist(issue.get("description", "")),
     })
     card["mrs"], card["gitlab"] = merge_requests(key)
-    print(json.dumps(card, ensure_ascii=False))
+    return card
+
+
+def gathered(key):
+    """The card, with GitLab when the safe holds gitlab-token: this script again under `harnessly secret run`, so the
+    token lives only in that run's environment; without the token (or the safe) the card is the task alone."""
+    try:
+        code, out, _ = run("harnessly", "secret", "run", "--env", "GITLAB_TOKEN=gitlab-token", "--",
+                           sys.executable, "-I", os.path.abspath(__file__), key)
+        if code == 0:
+            return json.loads(out)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    return card_of(key)
+
+
+def summary(card):
+    if card.get("error"):
+        return "error: " + card["error"]
+    dod = card.get("dod") or {}
+    line = "%s · %s · DoD %d/%d" % (card["key"], card.get("status", ""), dod.get("done", 0), dod.get("total", 0))
+    mrs = card.get("mrs")
+    if mrs is None:
+        line += " · MR: " + ("no gitlab-token" if card.get("gitlab") == "no-token" else card.get("gitlab", ""))
+    else:
+        line += " · MR: " + (", ".join("!%s %s/%s" % (m.get("iid"), m.get("state"), (m.get("pipeline") or {}).get("status", "-"))
+                                     for m in mrs) or "none")
+    return line
+
+
+def show(key):
+    """Gather the card and put it in the chat as the widget task-<key>: shown the first time, changed in place after."""
+    card = gathered(key)
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "widget")
+    fd, data = tempfile.mkstemp(prefix="pulse-", suffix=".json")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(card, f, ensure_ascii=False)
+        code, out, err = run("harnessly", "widget", "render", "--title", key, "--id", "task-" + key.lower(),
+                             "--html", "@" + os.path.join(here, "card.html"), "--css", "@" + os.path.join(here, "card.css"),
+                             "--js", "@" + os.path.join(here, "card.js"), "--data", "@" + data)
+    finally:
+        os.unlink(data)
+    print((out or err).strip())
+    print(summary(card))
+    sys.exit(code)
+
+
+def main():
+    args = sys.argv[1:]
+    if args[:1] == ["--show"]:
+        show((args[1] if len(args) > 1 else "").strip().upper())
+        return
+    print(json.dumps(card_of((args[0] if args else "").strip().upper()), ensure_ascii=False))
 
 
 if __name__ == "__main__":

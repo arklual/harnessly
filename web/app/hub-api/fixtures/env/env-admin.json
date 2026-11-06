@@ -60,7 +60,8 @@
             "pending": 0,
             "error": 0,
             "message": null
-          }
+          },
+          "groupId": "grp-back"
         },
         {
           "entryId": "entry-org-gitlab",
@@ -85,7 +86,19 @@
             "pending": 0,
             "error": 0,
             "message": null
-          }
+          },
+          "groupId": ""
+        }
+      ],
+      "groups": [
+        {
+          "id": "grp-back",
+          "name": "Бэкенд",
+          "hint": "сервисы",
+          "required": false,
+          "defaultOn": true,
+          "position": 1,
+          "builtIn": false
         }
       ]
     },
@@ -105,7 +118,8 @@
         "script": 0,
         "access": 0
       },
-      "items": []
+      "items": [],
+      "groups": []
     },
     {
       "layer": "tenant",
@@ -142,9 +156,11 @@
           "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           "lastUsedAt": null,
           "unused": false,
-          "delivery": null
+          "delivery": null,
+          "groupId": ""
         }
-      ]
+      ],
+      "groups": []
     },
     {
       "layer": "team",
@@ -186,7 +202,8 @@
             "pending": 0,
             "error": 0,
             "message": null
-          }
+          },
+          "groupId": ""
         },
         {
           "entryId": "entry-core-repo",
@@ -211,7 +228,8 @@
             "pending": 0,
             "error": 0,
             "message": null
-          }
+          },
+          "groupId": ""
         },
         {
           "entryId": "entry-core-setup",
@@ -236,7 +254,8 @@
             "pending": 0,
             "error": 0,
             "message": null
-          }
+          },
+          "groupId": ""
         },
         {
           "entryId": "entry-core-node",
@@ -261,9 +280,11 @@
             "pending": 0,
             "error": 0,
             "message": null
-          }
+          },
+          "groupId": ""
         }
-      ]
+      ],
+      "groups": []
     },
     {
       "layer": "team",
@@ -281,7 +302,8 @@
         "script": 0,
         "access": 0
       },
-      "items": []
+      "items": [],
+      "groups": []
     }
   ],
   "teams": [

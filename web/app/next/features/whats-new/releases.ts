@@ -13,6 +13,28 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-06zb',
+    items: [{ key: 'basePackage', icon: 'layers' }],
+  },
+  {
+    id: '2026-11-06z',
+    items: [
+      { key: 'viewQuiet', icon: 'eye' },
+      { key: 'keyStep', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-06y',
+    items: [{ key: 'recommended', icon: 'sparkles' }],
+  },
+  {
+    id: '2026-11-06x',
+    items: [
+      { key: 'envGroups', icon: 'folder' },
+      { key: 'envApply', icon: 'rotate-cw' },
+    ],
+  },
+  {
     id: '2026-11-06w',
     items: [
       { key: 'chatWidgets', icon: 'layout-grid' },

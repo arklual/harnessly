@@ -2,6 +2,7 @@ package envsetup
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -63,6 +64,9 @@ type Runner struct {
 	Poll time.Duration
 	// Log is the runtime's log: level, message, key/value pairs.
 	Log func(level, msg string, kv ...string)
+	// OnUpdate is told when the hub asks for an update run («Применить на машинах»): the runtime asks the base package
+	// for a look of its own then. nil: nothing.
+	OnUpdate func()
 
 	// secretsWaited: the secrets a finished run waits for, and the list's hash it was for.
 	waited     []string
@@ -136,6 +140,13 @@ type source struct {
 	Rerun    string   `json:"rerun"`
 	Check    string   `json:"check"`
 	Secrets  []string `json:"secrets"`
+	// plugin
+	Marketplace string `json:"marketplace"`
+	Plugin      string `json:"plugin"`
+	// claude-settings
+	Always   map[string]json.RawMessage `json:"always"`
+	IfAbsent map[string]json.RawMessage `json:"ifAbsent"`
+	ClaudeMd string                     `json:"claudeMd"`
 }
 
 // shown maps a step's status to the one an item reports to the hub (ok, error, pending).

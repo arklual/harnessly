@@ -36,7 +36,7 @@ func (s *Service) open(r *http.Request, st store.Store, p *auth.Principal, featu
 	if err := s.feature(ctx, o.ID, feature); err != nil {
 		return nil, err
 	}
-	w, err := loadWorld(ctx, st, o)
+	w, err := loadWorld(ctx, st, o, s.recommended)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +191,9 @@ func (s *Service) getEnv(w http.ResponseWriter, r *http.Request, p *auth.Princip
 // layerView lists the rows of one layer. Calls count what the layer's cover (the tenants of the screen, the tenant, the
 // team) called; without any tool facts the organization has, they are unknown.
 func (q *req) layerView(layer, scopeID, tenantID, title, subtitle string, c cover, locked bool, use *usageIndex) LayerView {
-	lv := LayerView{Layer: layer, ScopeID: scopeID, TenantID: tenantID, Title: title, Subtitle: subtitle, Locked: locked, Items: []EntryItem{}}
-	rs := resolverEntries(q.w.entries)
+	lv := LayerView{Layer: layer, ScopeID: scopeID, TenantID: tenantID, Title: title, Subtitle: subtitle, Locked: locked, Items: []EntryItem{},
+		Groups: q.w.groupsOf(layer, scopeID)}
+	rs := q.w.resolverEntries()
 	var calls int64
 	for _, e := range q.w.entries {
 		if e.Layer != layer || e.ScopeID != scopeID {
@@ -228,7 +229,7 @@ func (q *req) row(e store.EnvEntry, edit bool, c cover, use *usageIndex, rs []En
 		above = LockedAbove(rs, e.Layer, q.w.org.ID, q.w.tenantOf(e.Layer, e.ScopeID), e.ItemID)
 	}
 	row := EntryItem{EntryID: e.ID, ItemID: it.ID, Kind: it.Kind, Name: it.Name, Hint: it.Hint, Audience: audienceView(e.Audience),
-		Pinned: e.Pinned, Enabled: e.Enabled}
+		Pinned: e.Pinned, Enabled: e.Enabled, GroupID: e.GroupID}
 	row.LockedReason = lockedReason(edit, above, e)
 	row.Locked = row.LockedReason != nil
 	if use.has {
@@ -372,7 +373,7 @@ func (s *Service) getCard(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	}
 	above := ""
 	if e.Layer != store.EnvLayerOrg {
-		above = LockedAbove(resolverEntries(q.w.entries), e.Layer, q.w.org.ID, tenantID, e.ItemID)
+		above = LockedAbove(q.w.resolverEntries(), e.Layer, q.w.org.ID, tenantID, e.ItemID)
 	}
 	card := Card{EntryID: e.ID, ItemID: it.ID, Kind: it.Kind, Name: it.Name, Hint: it.Hint, Layer: e.Layer, ScopeID: e.ScopeID,
 		Enabled: e.Enabled, Audience: audienceView(e.Audience), Pinned: e.Pinned, LockedReason: lockedReason(edit, above, e)}
@@ -406,6 +407,8 @@ type entryIn struct {
 	Audience *AudienceIn `json:"audience"`
 	Enabled  *bool       `json:"enabled"`
 	Pinned   *bool       `json:"pinned"`
+	// GroupID puts the entry into a group of its layer; "" takes it out.
+	GroupID *string `json:"groupId"`
 }
 
 // audienceTeams are the teams a layer's audience may name.
@@ -464,8 +467,15 @@ func (s *Service) addEntry(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		if it.Kind == store.CatalogScript {
 			e.Position = q.w.nextPosition(in.Layer, in.ScopeID)
 		}
+		if in.GroupID != nil && *in.GroupID != "" {
+			g, ok := q.w.group(*in.GroupID)
+			if !ok || g.Layer != in.Layer || g.ScopeID != in.ScopeID {
+				return httpx.Invalid("groupId", "Такой группы в этом слое нет")
+			}
+			e.GroupID = g.ID
+		}
 		if !e.Enabled && in.Layer != store.EnvLayerOrg {
-			if LockedAbove(resolverEntries(q.w.entries), in.Layer, q.w.org.ID, q.w.tenantOf(in.Layer, in.ScopeID), it.ID) != "" {
+			if LockedAbove(q.w.resolverEntries(), in.Layer, q.w.org.ID, q.w.tenantOf(in.Layer, in.ScopeID), it.ID) != "" {
 				return httpx.Conflict("locked", "Закреплено выше: выключить здесь нельзя")
 			}
 		}
@@ -504,6 +514,8 @@ type patchIn struct {
 	Enabled  *bool       `json:"enabled"`
 	Audience *AudienceIn `json:"audience"`
 	Pinned   *bool       `json:"pinned"`
+	// GroupID puts the entry into a group of its layer; "" takes it out.
+	GroupID *string `json:"groupId"`
 }
 
 func (s *Service) patchEntry(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -533,7 +545,7 @@ func (s *Service) patchEntry(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		var verbs []string
 		if in.Enabled != nil && *in.Enabled != e.Enabled {
 			if !*in.Enabled && e.Layer != store.EnvLayerOrg &&
-				LockedAbove(resolverEntries(q.w.entries), e.Layer, q.w.org.ID, q.w.tenantOf(e.Layer, e.ScopeID), e.ItemID) != "" {
+				LockedAbove(q.w.resolverEntries(), e.Layer, q.w.org.ID, q.w.tenantOf(e.Layer, e.ScopeID), e.ItemID) != "" {
 				return httpx.Conflict("locked", "Закреплено выше: выключить здесь нельзя")
 			}
 			e.Enabled = *in.Enabled
@@ -552,6 +564,18 @@ func (s *Service) patchEntry(w http.ResponseWriter, r *http.Request, p *auth.Pri
 				e.Audience = js
 				verbs = append(verbs, "изменён доступ")
 			}
+		}
+		if in.GroupID != nil && *in.GroupID != e.GroupID {
+			if *in.GroupID != "" {
+				g, ok := q.w.group(*in.GroupID)
+				if !ok || g.Layer != e.Layer || g.ScopeID != e.ScopeID {
+					return httpx.Invalid("groupId", "Такой группы в этом слое нет")
+				}
+				verbs = append(verbs, "перенесён в группу «"+g.Name+"»")
+			} else {
+				verbs = append(verbs, "убран из группы")
+			}
+			e.GroupID = *in.GroupID
 		}
 		if len(verbs) == 0 {
 			out = e
@@ -631,7 +655,7 @@ func (s *Service) answerRow(r *http.Request, p *auth.Principal, entryID string) 
 		if err != nil {
 			return EntryItem{}, err
 		}
-		row, _ := q.row(e, edit, q.coverOf(e), use, resolverEntries(q.w.entries))
+		row, _ := q.row(e, edit, q.coverOf(e), use, q.w.resolverEntries())
 		return row, nil
 	}
 	return EntryItem{}, httpx.ErrNotFound

@@ -49,12 +49,20 @@ const base = (over: Partial<ISinopia>): ISinopia => ({
   ...over,
 });
 
-const stage = (sinopia: ISinopia, kind: string | null = 'slides') =>
-  render(
-    <SinopiaStage machine={'m1' as never} kind={kind} id="proj1" conversation={null} sinopia={sinopia}>
-      <div data-testid="editor" />
-    </SinopiaStage>,
-  );
+const stageOf = (sinopia: ISinopia, kind: string | null, viewing: boolean) => (
+  <SinopiaStage
+    machine={'m1' as never}
+    kind={kind}
+    id="proj1"
+    conversation={null}
+    sinopia={sinopia}
+    viewing={viewing}
+  >
+    <div data-testid="editor" />
+  </SinopiaStage>
+);
+const stage = (sinopia: ISinopia, kind: string | null = 'slides', viewing = false) =>
+  render(stageOf(sinopia, kind, viewing));
 
 afterEach(cleanup);
 
@@ -103,6 +111,49 @@ describe('SinopiaStage', () => {
     fireEvent.click(screen.getByText('Объяснить'));
     expect(runAction).toHaveBeenCalledOnce();
     expect(runAction.mock.calls[0][0].item.id).toBe('explain');
+  });
+
+  it('looked at («Макет»), has no app panel, no selection menu and no way to reopen them', () => {
+    stage(
+      base({
+        active: activeApps([cashback], [cashback.id], 'site'),
+        selection: [{ id: 'p:4', tag: 'span' }],
+      }),
+      'site',
+      true,
+    );
+    expect(screen.getByTestId('editor')).toBeTruthy();
+    expect(screen.queryByTestId('frame')).toBeNull();
+    expect(screen.queryByText('Объяснить')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'App panel' })).toBeNull();
+  });
+
+  it('switched to looking, lets the panel leave with its animation and keeps the editor', () => {
+    const sinopia = base({ active: activeApps([lint], [lint.id], 'slides') });
+    const view = stage(sinopia);
+    const editor = screen.getByTestId('editor');
+    view.rerender(stageOf(sinopia, 'slides', true));
+    expect(screen.getByLabelText('App panel').getAttribute('data-state')).toBe('closing');
+    expect(screen.getByTestId('editor')).toBe(editor);
+  });
+
+  it('looked at, still tells why a share is blocked', () => {
+    stage(
+      base({
+        blocked: [
+          {
+            app: lint.id,
+            appName: lint.name,
+            check: 'rules',
+            findings: [{ node: 'p:1', level: 'error', message: 'Длинно' }],
+            blocks: true,
+          },
+        ],
+      }),
+      'slides',
+      true,
+    );
+    expect(screen.getByText('Длинно')).toBeTruthy();
   });
 
   it('tells why a share is blocked', () => {

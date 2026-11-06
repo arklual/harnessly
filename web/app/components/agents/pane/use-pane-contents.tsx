@@ -6,7 +6,6 @@ import { ExternalLink, Shapes } from 'lucide-react';
 import ChangesTab, { CommitView, isCommitTarget } from '@/components/agents/inspector/changes-tab';
 import { FileViewerContent } from '@/components/agents/inspector/file-viewer';
 import * as EconomicsIsland from '@/components/agents/inspector/economics-island';
-import { shownAddress } from '@/components/agents/pane/shown-address';
 import { closePaneShell } from '@/components/agents/pane/pane-shell';
 import type { IToolCount } from '@/components/agents/pane/tools-page';
 import type { IOverviewIsland } from '@/components/agents/pane/overview-tab';
@@ -25,7 +24,6 @@ import { paneRequestOf } from '@/lib/hl-pane-link';
 import { paneKeyOf, usePane } from '@/lib/hl-pane-store';
 
 import { closeTab, openTab, retitleTab, type IPaneTab, type TPaneTabKind } from '@/lib/hl-pane-tabs';
-import { usePreviewState } from '@/lib/hl-preview-store';
 import type { ITab } from '@/types/terminal';
 import { t } from '@/lib/i18n';
 
@@ -49,7 +47,6 @@ const DesignIsland = lazy(() =>
 );
 const SideChatView = lazy(() => import('@/components/agents/side-chat/side-chat-view'));
 const GalleryView = lazy(() => import('@/components/agents/gallery/gallery-view'));
-const BrowserTab = lazy(() => import('@/components/agents/pane/browser-tab'));
 const ShellTab = lazy(() => import('@/components/agents/pane/shell-tab'));
 const VaultTab = lazy(() => import('@/components/agents/vault/vault-tab'));
 
@@ -173,19 +170,12 @@ const BoardTab = ({ url, title, onTitle }: IBoardTabProps) => {
   );
 };
 
-const BrowserTitle = ({ previewKey }: { previewKey: string }) => {
-  const [{ state }] = usePreviewState(previewKey);
-  return <>{shownAddress(state) || PANE_KINDS.browser.title}</>;
-};
-
 interface ITabTitleProps {
   paneTab: IPaneTab;
-  tab: ITab | null;
   cwd: string | null;
 }
 
-export const TabTitle = ({ paneTab, tab, cwd }: ITabTitleProps) => {
-  if (paneTab.kind === 'browser' && tab) return <BrowserTitle previewKey={tab.id} />;
+export const TabTitle = ({ paneTab, cwd }: ITabTitleProps) => {
   if (paneTab.kind === 'terminal' && cwd) return <>{baseName(cwd)}</>;
   // A board's target is its address with the key in it: never a name to show.
   if (paneTab.kind === 'artifacts' && paneTab.target && boardFrameUrlOf(paneTab.target))
@@ -330,20 +320,6 @@ export const usePaneContents = ({ mode, tab, chatId, provider, launching = false
             onAddress={agent && tab ? (address) => open('browser', address, null, paneTab.id) : null}
             onOpen={(kind, beside) => open(kind, null, null, beside ? undefined : paneTab.id)}
           />
-        );
-      case 'browser':
-        return (
-          tab && (
-            <BrowserTab
-              tab={tab}
-              entries={entries}
-              workPaths={workPaths}
-              cwd={cwd}
-              target={paneTab.target}
-              request={paneTab.asked}
-              onTarget={(address) => open('browser', address)}
-            />
-          )
         );
       case 'terminal':
         return tabId && <ShellTab tabId={tabId} active={pane.activeId === paneTab.id} />;

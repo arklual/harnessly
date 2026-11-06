@@ -19,6 +19,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/basepkg"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/selfupdate"
@@ -87,20 +88,18 @@ type machineProbe struct {
 	ReadFile func(string) ([]byte, error)
 }
 
-// pkgInstall is the command that installs a system package here.
-func (p machineProbe) pkgInstall(pkg string) string {
-	if p.GOOS == "darwin" {
-		return "brew install " + pkg
+// pkgInstall is the command that installs an item of the base package here (internal/basepkg: one list for the checks,
+// the root service and the card).
+func (p machineProbe) pkgInstall(id string) string {
+	it, ok := basepkg.ByID(id)
+	if !ok {
+		return ""
 	}
-	for _, m := range []struct{ bin, cmd string }{
-		{"apt-get", "sudo apt-get install -y "}, {"dnf", "sudo dnf install -y "}, {"yum", "sudo yum install -y "},
-		{"pacman", "sudo pacman -S --needed "}, {"zypper", "sudo zypper install -y "}, {"apk", "sudo apk add "},
-	} {
-		if _, err := p.LookPath(m.bin); err == nil {
-			return m.cmd + pkg
-		}
+	m := basepkg.Detect(p.LookPath, p.GOOS)
+	if m == "" {
+		m = basepkg.Apt
 	}
-	return "sudo apt-get install -y " + pkg
+	return basepkg.Command(m, []basepkg.Item{it})
 }
 
 // localBin is ~/.local/bin, where install.sh puts the programs of an install of the person's own account and where

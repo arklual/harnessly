@@ -2,7 +2,17 @@
 // the notice says what was done with «Отменить» when it can be taken back (which is another change to the hub).
 import { useCallback, useState } from 'react';
 
-import type { CatalogItem, CatalogKind, CatalogOwner, EnvEntryRow, EnvLayer } from '../../../../hub-api/env';
+import type {
+  ApplyResponse,
+  ApplyWhen,
+  CatalogItem,
+  CatalogKind,
+  CatalogOwner,
+  EnvEntryRow,
+  EnvGroup,
+  EnvLayer,
+  PatchGroupRequest,
+} from '../../../../hub-api/env';
 import { OrgApiError, orgErrorText } from '../../../org/api/errors';
 import { useOrg } from '../../../org/context';
 import { plural } from './format';
@@ -224,6 +234,88 @@ export const useActions = (
     );
   };
 
+  /** A change of a group or of the place of an entry: the hub first, then the screen. */
+  const change = async (
+    fn: () => Promise<unknown>,
+    text: string,
+    undo?: () => Promise<unknown>,
+  ): Promise<boolean> => {
+    const ok = await run(async () => {
+      try {
+        await fn();
+      } finally {
+        await refresh();
+      }
+      return true;
+    });
+    if (!ok) return false;
+    notice.say(
+      text,
+      undo &&
+        (() =>
+          void run(async () => {
+            try {
+              await undo();
+            } finally {
+              await refresh();
+            }
+          })),
+    );
+    return true;
+  };
+
+  /** «Применить на машинах»: an update on every machine the layer reaches, now or at its next start. */
+  const applyMachines = async (t: Target, when: ApplyWhen): Promise<boolean> => {
+    const out = await run(() => api.envApply(org, { layer: t.layer, scopeId: t.scopeId, when }));
+    if (!out) return false;
+    notice.say(applyText(out, when));
+    return true;
+  };
+
+  const addGroup = (t: Target, name: string): Promise<boolean> =>
+    change(
+      () => api.envGroupAdd(org, { layer: t.layer, scopeId: t.scopeId, name }),
+      `Группа «${name}» — по желанию: каждый включит её у себя сам`,
+    );
+
+  const patchGroup = (g: EnvGroup, req: PatchGroupRequest): Promise<boolean> => {
+    const back: PatchGroupRequest = {};
+    if (req.required !== undefined) back.required = g.required;
+    if (req.defaultOn !== undefined) back.defaultOn = g.defaultOn;
+    if (req.name !== undefined) back.name = g.name;
+    let text = `Группа «${req.name ?? g.name}» сохранена`;
+    if (req.required === true) text = `Группа «${g.name}» обязательная — поставится всем`;
+    if (req.required === false) text = `Группа «${g.name}» по желанию — каждый выбирает у себя`;
+    if (req.defaultOn === true) text = `«${g.name}» включена сразу — кто не выбирал, получит её`;
+    if (req.defaultOn === false) text = `«${g.name}» выключена, пока человек сам не включит`;
+    return change(
+      () => api.envGroupPatch(org, g.id, req),
+      text,
+      () => api.envGroupPatch(org, g.id, back),
+    );
+  };
+
+  const removeGroup = (g: EnvGroup): Promise<boolean> =>
+    change(
+      () => api.envGroupRemove(org, g.id),
+      `Группы «${g.name}» больше нет — её пункты остались в уровне`,
+    );
+
+  const moveToGroup = (row: EnvEntryRow, g: EnvGroup | null): Promise<boolean> =>
+    change(
+      () => api.envPatch(org, row.entryId, { groupId: g?.id ?? '' }),
+      g ? `«${row.name}» теперь в группе «${g.name}»` : `«${row.name}» вне групп`,
+      () => api.envPatch(org, row.entryId, { groupId: row.groupId }),
+    );
+
+  /** A member's own switch of an optional group. */
+  const mineGroup = (groupId: string, name: string, on: boolean, space?: string): Promise<boolean> =>
+    change(
+      () => api.envMineGroup(groupId, on, space),
+      on ? `«${name}» включена — машина поставит её` : `«${name}» выключена — новое из неё не поставится`,
+      () => api.envMineGroup(groupId, !on, space),
+    );
+
   const reorder = async (t: Target, entryIds: string[], text?: string): Promise<boolean> => {
     const layer = layers.find((l) => keyOf(l) === keyOf(t));
     const before = layer?.items.filter((r) => r.kind === 'script').map((r) => r.entryId) ?? [];
@@ -315,7 +407,35 @@ export const useActions = (
     return true;
   };
 
-  return { busy, add, create, save, remove, pin, reorder, copy, run };
+  return {
+    busy,
+    add,
+    create,
+    save,
+    remove,
+    pin,
+    reorder,
+    copy,
+    run,
+    applyMachines,
+    addGroup,
+    patchGroup,
+    removeGroup,
+    moveToGroup,
+    mineGroup,
+  };
 };
 
 export type Actions = ReturnType<typeof useActions>;
+
+const machines = (n: number) => `${n} ${plural(n, 'машине', 'машинах', 'машинах')}`;
+
+/** What the toast says after «Применить на машинах». */
+export const applyText = (out: ApplyResponse, when: ApplyWhen): string => {
+  if (out.machines === 0) return 'Здесь пока нет машин — применится, когда они подключатся';
+  if (when === 'next') return `Применится на ${machines(out.machines)} при следующем запуске`;
+  if (out.waiting === 0) return `Применяем на ${machines(out.started)}`;
+  if (out.started === 0)
+    return `Машины не в сети — применится на ${machines(out.waiting)} при следующем запуске`;
+  return `Применяем на ${machines(out.started)}, ещё на ${machines(out.waiting)} — при следующем запуске`;
+};

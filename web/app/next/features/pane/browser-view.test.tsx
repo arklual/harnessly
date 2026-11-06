@@ -37,6 +37,9 @@ const props = (over: Partial<IBrowserViewProps> = {}): IBrowserViewProps => ({
   signIn: 'none',
   onSignIn: () => {},
   onSignInRefresh: () => {},
+  keyStep: 'none',
+  onKeyStep: () => {},
+  onKeyStepRefresh: () => {},
   theme: 'dark',
   onGo: () => {},
   onHistory: () => {},
@@ -233,5 +236,20 @@ describe('BrowserView: the tools of a page', () => {
       />,
     );
     expect(container.querySelector('.hx-tbrowser__stage')?.getAttribute('data-device')).toBe('phone');
+  });
+
+  it('offers to take a security-key step in an ordinary tab, and to load the page again after it', async () => {
+    const onKeyStep = vi.fn();
+    const onKeyStepRefresh = vi.fn();
+    const { rerender } = render(
+      <BrowserView {...props({ address: 'a.org', keyStep: 'asked', onKeyStep })} />,
+    );
+    expect(screen.getByText(/asks for a security key or Touch ID/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Open in an ordinary tab'));
+    expect(onKeyStep).toHaveBeenCalled();
+    rerender(<BrowserView {...props({ address: 'a.org', keyStep: 'waiting', onKeyStepRefresh })} />);
+    expect(screen.getByText(/Take the step in the tab that opened/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Refresh'));
+    expect(onKeyStepRefresh).toHaveBeenCalled();
   });
 });

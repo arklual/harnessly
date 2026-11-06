@@ -132,18 +132,23 @@ func (s *Service) machineList(w *world, spaceID string, m store.Machine) wantLis
 // machineListMemo is machineList that computes the list once per (team, features) in memo: the machines of a team hold
 // the same list.
 func (s *Service) machineListMemo(w *world, spaceID string, m store.Machine, memo map[string]wantList) wantList {
-	setup, known := false, true
+	setup, known, claude := false, true, false
 	if s.push != nil {
 		setup, known = s.push.SetupOf(m.ID)
+		claude = s.push.ClaudeOf(m.ID)
 	}
-	key := fmt.Sprintf("%s/%s/%t/%t", spaceID, m.TeamID, setup, known)
+	owner := ""
+	if len(w.groups) > 0 {
+		owner = m.CreatedBy // with groups the list depends on the owner's choices
+	}
+	key := fmt.Sprintf("%s/%s/%s/%t/%t/%t", spaceID, m.TeamID, owner, setup, known, claude)
 	if v, ok := memo[key]; ok {
 		return v
 	}
-	items := MachineItems(w, spaceID, m.TeamID, setup)
+	items := MachineItems(w, spaceID, m.TeamID, owner, setup, claude)
 	out := wantList{items: items, hashes: []string{hubproto.EnvHash(items)}}
 	if !known {
-		full := MachineItems(w, spaceID, m.TeamID, true)
+		full := MachineItems(w, spaceID, m.TeamID, owner, true, true)
 		out.hashes = append(out.hashes, hubproto.EnvHash(full))
 		if len(items) == 0 {
 			out.items = full

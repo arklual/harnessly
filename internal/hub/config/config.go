@@ -137,6 +137,9 @@ type Config struct {
 	// (the layers and the machines' lists), "catalog" (the catalog of skills, MCP servers, repositories and documents);
 	// empty: off, the endpoints answer 404 not_enabled (docs/hub/environment.md).
 	EnvFeatures []string
+	// EnvRecommended (HUB_ENV_RECOMMENDED, on by default) puts the platform's group «Рекомендованное» into every
+	// organization's environment (docs/hub/environment.md, «Recommended»); off leaves it out everywhere.
+	EnvRecommended bool
 	// Machines holds the settings of the machine resources and access (machines.go).
 	Machines MachinesConfig
 	// RatesURL (HUB_RATES_URL) is where the Central Bank's daily rates are read; "" is cbr.ru, "off" never fetches (money
@@ -403,6 +406,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		default:
 			bad("HUB_ENV_FEATURES takes env, catalog or all, got %q", f)
 		}
+	}
+	switch strings.ToLower(def("HUB_ENV_RECOMMENDED", "on")) {
+	case "on", "true", "1", "yes":
+		c.EnvRecommended = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_ENV_RECOMMENDED must be on or off")
 	}
 	switch strings.ToLower(def("HUB_USAGE_INGEST", "off")) {
 	case "on", "true", "1", "yes":

@@ -41,6 +41,7 @@ type MeItem struct {
 	Pinned     bool   `json:"pinned"`
 	Off        bool   `json:"off"`
 	CanToggle  bool   `json:"canToggle"`
+	GroupID    string `json:"groupId"` // the group the item is in ("" for none); a group switched off makes Off true
 }
 
 // MeResponse is GET /api/me/env.
@@ -48,6 +49,8 @@ type MeResponse struct {
 	Space MeSpace  `json:"space"`
 	Org   *MeOrg   `json:"org"`
 	Items []MeItem `json:"items"`
+	// Groups are the groups the person's items are in: required ones (always on) and optional ones (theirs to switch).
+	Groups []MeGroup `json:"groups"`
 	// Outdated: some machine of the person in the tenant does not hold the current list or has a setup item that failed.
 	Outdated bool        `json:"outdated"`
 	Machines []MeMachine `json:"machines"`
@@ -118,7 +121,7 @@ func (s *Service) openMe(r *http.Request, st store.Store, p *auth.Principal, ref
 	if err != nil {
 		return nil, err
 	}
-	w, err := loadWorld(ctx, st, o)
+	w, err := loadWorld(ctx, st, o, s.recommended)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +140,12 @@ func (s *Service) openMe(r *http.Request, st store.Store, p *auth.Principal, ref
 	if err != nil {
 		return nil, err
 	}
-	return &me{ctx: ctx, st: st, space: sp, org: o, w: w, person: Person{OrgID: o.ID, SpaceID: sp.ID, Teams: teams, Off: off}}, nil
+	return &me{ctx: ctx, st: st, space: sp, org: o, w: w, person: Person{OrgID: o.ID, SpaceID: sp.ID, Teams: teams, Off: off,
+		Groups: w.resolverGroups(), GroupOn: w.choicesOf(sp.ID, p.User.ID)}}, nil
 }
 
 func (m *me) effective() []Effective {
-	return Resolve(m.w.resolverItems(), resolverEntries(m.w.entries), m.person)
+	return Resolve(m.w.resolverItems(), m.w.resolverEntries(), m.person)
 }
 
 func (s *Service) meEnv(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -159,7 +163,9 @@ func (s *Service) meEnv(w http.ResponseWriter, r *http.Request, p *auth.Principa
 			out.Outdated = true
 		}
 	}
-	for _, e := range m.effective() {
+	eff := m.effective()
+	out.Groups = m.meGroups(eff)
+	for _, e := range eff {
 		scope := m.org.ID
 		switch e.Layer {
 		case store.EnvLayerTenant:
@@ -168,7 +174,7 @@ func (s *Service) meEnv(w http.ResponseWriter, r *http.Request, p *auth.Principa
 			scope = m.entryScope(e.EntryID)
 		}
 		out.Items = append(out.Items, MeItem{ItemID: e.ID, EntryID: e.EntryID, Kind: e.Kind, Name: e.Name, Hint: e.Hint, Layer: e.Layer, ScopeID: scope,
-			LayerTitle: m.w.layerTitle(e.Layer, scope), Pinned: e.Pinned, Off: e.Off, CanToggle: !e.Pinned})
+			LayerTitle: m.w.layerTitle(e.Layer, scope), Pinned: e.Pinned, Off: e.Off, CanToggle: !e.Pinned, GroupID: e.GroupID})
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil

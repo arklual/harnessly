@@ -2,7 +2,16 @@
 // counts and what the summary tiles add up to, from the rows alone.
 import type { CatalogKind, EnvLayer, EnvResponse, KindCounts } from '../../hub-api/env';
 
-export const KINDS: readonly CatalogKind[] = ['skill', 'mcp', 'repo', 'doc', 'script', 'access'];
+export const KINDS: readonly CatalogKind[] = [
+  'skill',
+  'mcp',
+  'repo',
+  'doc',
+  'script',
+  'access',
+  'plugin',
+  'claude-settings',
+];
 
 export const noCounts = (): KindCounts => ({ skill: 0, mcp: 0, repo: 0, doc: 0, script: 0, access: 0 });
 
@@ -15,7 +24,12 @@ export const countsOf = (rows: readonly { kind: CatalogKind; enabled: boolean }[
 
 const sumCounts = (layers: readonly EnvLayer[]): KindCounts => {
   const out = noCounts();
-  for (const l of layers) for (const k of KINDS) out[k] = (out[k] ?? 0) + (l.counts[k] ?? 0);
+  for (const l of layers)
+    for (const k of KINDS) {
+      const n = l.counts[k];
+      // plugin and claude-settings come only when there are some, as the hub writes them
+      if (n !== undefined || out[k] !== undefined) out[k] = (out[k] ?? 0) + (n ?? 0);
+    }
   return out;
 };
 

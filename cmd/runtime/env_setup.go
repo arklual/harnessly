@@ -38,7 +38,12 @@ func envSetupRunners(d deps, observeFile, version string) []*envsetup.Runner {
 	sec := safeSecrets{safeFor(d)}
 	var out []*envsetup.Runner
 	for _, dir := range hubLinkDirs(d.DataDir, observeFile) {
-		out = append(out, &envsetup.Runner{LinkDir: dir, Home: d.Home, Secrets: sec, Log: setupLog, Version: version})
+		out = append(out, &envsetup.Runner{LinkDir: dir, Home: d.Home, Secrets: sec, Log: setupLog, Version: version,
+			OnUpdate: func() {
+				if err := askBasepkg(d.DataDir); err != nil {
+					setupLog("warn", "base package not asked", "error", err.Error())
+				}
+			}})
 	}
 	return out
 }

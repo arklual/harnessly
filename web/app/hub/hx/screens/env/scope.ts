@@ -136,6 +136,18 @@ export const layersOfMe = (me: MeEnvResponse): EnvLayer[] => {
         callsWeek: null,
         counts: { skill: 0, mcp: 0, repo: 0, doc: 0 },
         items: [],
+        // The person sees their own choice: `defaultOn` is whether the group is on for them.
+        groups: me.groups
+          .filter((g) => g.layer === it.layer)
+          .map((g, position) => ({
+            id: g.id,
+            name: g.name,
+            hint: g.hint,
+            required: g.required,
+            defaultOn: g.on,
+            position,
+            builtIn: g.builtIn,
+          })),
       };
       out.push(l);
     }
@@ -155,6 +167,7 @@ export const layersOfMe = (me: MeEnvResponse): EnvLayer[] => {
       lastUsedAt: null,
       unused: null,
       delivery: null,
+      groupId: it.groupId,
     });
   }
   const rank: Record<EnvLayerKind, number> = { org: 0, tenant: 1, team: 2 };

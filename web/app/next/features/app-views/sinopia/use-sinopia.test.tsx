@@ -41,8 +41,15 @@ const fromBoard = (source: unknown, data: unknown, origin = SLOT) =>
   });
 
 let current: ISinopia | null = null;
-const Probe = ({ kind }: { kind: string | null }) => {
-  const value = useSinopia({ machine: MACHINE, id: 'proj1', kind, conversation: null, slotOrigin: SLOT });
+const Probe = ({ kind, viewing = false }: { kind: string | null; viewing?: boolean }) => {
+  const value = useSinopia({
+    machine: MACHINE,
+    id: 'proj1',
+    kind,
+    conversation: null,
+    slotOrigin: SLOT,
+    viewing,
+  });
   useEffect(() => {
     current = value;
   });
@@ -169,6 +176,56 @@ describe('a click on a bound element', () => {
     await flush();
     expect(sinopia().focus).toBeNull();
     expect(f.posted.find((p) => p.data.type === 'tk:hl')?.data.on).toBe(false);
+  });
+});
+
+describe('a document looked at («Макет»)', () => {
+  const marks: ISinopiaState['marks'] = [
+    {
+      node: `${boards[0].id}:3`,
+      level: 'error',
+      note: 'Слишком много слов',
+      source: 'app:harnessly.deck-lint',
+    },
+  ];
+  const click = (url: string) => ({
+    type: 'tk:hl-click',
+    field: 'amount',
+    hl: { field: 'amount' },
+    tpl: 4,
+    selector: '#amount',
+    tag: 'span',
+    rect: { x: 10, y: 20, width: 40, height: 16 },
+    url,
+  });
+
+  it('sends its boards no marks, and they come back when it is edited again', async () => {
+    api.syncSinopia.mockResolvedValue(stateOf({ kind: 'slides', apps: [lint.id], marks }));
+    const view = render(<Probe kind="slides" viewing />);
+    await flush();
+    const f = board();
+    fromBoard(f, { type: 'tk:hl-hello', url: `${SLOT}/a/proj1/p/index.dc.html` });
+    expect(f.posted.filter((p) => p.data.type === 'tk:hl-marks').at(-1)?.data.items).toEqual([]);
+
+    view.rerender(<Probe kind="slides" />);
+    await flush();
+    expect(f.posted.filter((p) => p.data.type === 'tk:hl-marks').at(-1)?.data.items).toEqual([
+      { tpl: 3, level: 'error', note: 'Слишком много слов' },
+    ]);
+  });
+
+  it('turns the bound elements off: a click opens no inspector and selects nothing', async () => {
+    api.syncSinopia.mockResolvedValue(stateOf({ apps: [cashback.id] }));
+    render(<Probe kind="site" viewing />);
+    await flush();
+    const f = board();
+    const url = `${SLOT}/a/proj1/p/cashback/card.dc.html`;
+    fromBoard(f, { type: 'tk:hl-hello', url });
+    expect(f.posted.filter((p) => p.data.type === 'tk:hl').at(-1)?.data.on).toBe(false);
+    fromBoard(f, click(url));
+    await flush();
+    expect(sinopia().focus).toBeNull();
+    expect(sinopia().selection).toEqual([]);
   });
 });
 

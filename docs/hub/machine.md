@@ -161,6 +161,59 @@ the runs are in [environment.md](environment.md#machine-setup); this is who does
   and clones only with 2 GiB free. A list that is not done (an error, a token missing) is tried again every 30 minutes.
   The runtime's heartbeat `environment-runner.json` (every 30 s) tells the agent a setup is there to offer the feature.
 
+## Base package
+
+Some parts of harnessly need tools on the machine: chats need tmux, voice input needs ffmpeg and a speech model,
+design checks and exports need Chromium, PPTX needs LibreOffice and unzip, apps need bubblewrap. The base package is
+the list of them, built into harnessly (`internal/basepkg`). The same list feeds the machine checks, the
+«Настройка машины» card on the start page (its first stage, «Основа») and the installer.
+
+| Item | Without it |
+| --- | --- |
+| tmux, git, bash | chats, tabs, the terminal and repositories do not work |
+| curl, ssh, python3 | part of the setup scripts fails |
+| Node.js and npm | agents cannot be installed or started |
+| ffmpeg | no voice input, recording or video |
+| bubblewrap | apps (plugins) do not start |
+| jq, ripgrep | agents are slower with service answers and code search |
+| Chromium | no design checks, no PNG, PDF or MP4 export |
+| LibreOffice, unzip | no PPTX import or export |
+| speech model (`huggingface.co`, `github.com`) | no voice input |
+
+**Who installs it.**
+
+- `dir`: the installer adds `harnessly-basepkg.service` (root, oneshot), a daily `.timer` and a `.path` unit. The
+  service runs right after the machine connects, so nothing waits for the person's first visit. It runs
+  `harnessly-agent basepkg install`, which installs only the system packages of the list built into that binary. It
+  takes no commands from the hub or the runtime. From its inbox (`<data dir>/basepkg`, written by the runtime) it reads
+  only the ids the person skipped and a proxy address, and it writes its state to `/var/lib/harnessly-basepkg`.
+  `HARNESSLY_BASEPKG=0` at install leaves the service out.
+- `full`: nothing is installed as root. The card shows one command for the machine's package manager
+  (`sudo apt-get install …`), with «Скопировать команду» and «Пропустить».
+- `container`: the image carries the system tools.
+- The speech model is the runtime's own. It is fetched in the background a few minutes after start, when there is
+  room and the machine is not busy.
+
+**Care for the machine.** The service runs with `Nice=19` and the idle I/O class, installs one item at a time and
+restarts no service. An item is installed only when 2 GiB stay free after it (`waiting_disk` otherwise). Heavy items
+(Chromium, LibreOffice, the speech model) wait while the load is above twice the cores (`deferred`). A failure of one
+item never stops the others.
+
+**No network.** An item whose install failed on the network is `no_access`, with the address when the package
+manager names one. The card offers «Указать прокси» (an `http`, `https` or `socks5` address; a login and password go
+in the safe, never in the address) and «Пропустить». The service goes direct first and uses the proxy only after
+the direct way failed on the network; the package manager checks the packages' signatures either way. A skipped item is not offered again until the person brings it
+back under Settings → General.
+
+Runtime endpoints, all under the page's session:
+
+| Request | What it does |
+| --- | --- |
+| `GET /api/platform/basepkg` | the items and their status: `ok`, `missing`, `installing`, `no_access`, `waiting_disk`, `deferred`, `skipped`, `error` |
+| `POST /api/platform/basepkg/run` | install now (the service's request file and the speech model) |
+| `POST /api/platform/basepkg/skip` `{"id": "chrome", "skip": true}` | skip an item, or bring it back with `false` |
+| `POST /api/platform/basepkg/proxy` `{"url": "http://proxy:3128"}` | the proxy for the install; `""` removes it |
+
 ## Files
 
 | Path | Mode | What |
