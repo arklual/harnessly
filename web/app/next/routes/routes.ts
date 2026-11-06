@@ -18,6 +18,7 @@ export const ROUTE = {
   apps: 'apps',
   app: 'app',
   help: 'help',
+  learn: 'learn',
   settings: 'settings',
 } as const;
 
@@ -87,6 +88,8 @@ export type TRoute =
    */
   | { kind: typeof ROUTE.help; section: string | null; page: string | null; anchor?: string }
   /** Settings: `/settings` (the list of sections; on a wide window the first one is open) and `/settings/:section`. */
+  /** «Обучение»: the lessons, each a film and a hands-on tour. */
+  | { kind: typeof ROUTE.learn }
   | { kind: typeof ROUTE.settings; section: SettingsSection | null };
 
 export const HOME: TRoute = { kind: ROUTE.home };
@@ -105,6 +108,7 @@ const TASKS_RE = /^\/tasks\/?$/;
 const APPS_RE = /^\/apps\/?$/;
 const APP_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/?$/;
 const HELP_RE = /^\/help(?:\/([a-z0-9][a-z0-9-]{0,62})(?:\/([a-z0-9][a-z0-9-]{0,62}))?)?\/?$/;
+const LEARN_RE = /^\/learn\/?$/;
 const SETTINGS_RE = /^\/settings(?:\/([a-z]+))?\/?$/;
 
 /** One parameter of an address's query, when it names one. */
@@ -140,6 +144,7 @@ export const parseRoute = (path: string): TRoute => {
   if (EFFICIENCY_RE.test(pathname)) return { kind: ROUTE.efficiency };
   if (TASKS_RE.test(pathname)) return { kind: ROUTE.tasks };
   if (APPS_RE.test(pathname)) return { kind: ROUTE.apps };
+  if (LEARN_RE.test(pathname)) return { kind: ROUTE.learn };
   const app = APP_RE.exec(pathname);
   if (app?.[1]) {
     const chat = queryParam(path, 'chat');
@@ -246,6 +251,8 @@ export const routePath = (route: TRoute): string => {
       if (route.section && route.page) base += `/${route.page}`;
       return route.anchor ? `${base}#${encodeURIComponent(route.anchor)}` : base;
     }
+    case ROUTE.learn:
+      return '/learn';
     case ROUTE.settings:
       return route.section ? `/settings/${route.section}` : '/settings';
     default:

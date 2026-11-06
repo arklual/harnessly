@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Попробуйте</title>
+<link rel="stylesheet" href="./deck-theme.css">
+<script src="./support.js"></script>
+<script src="/__lib/motion/gsap.min.js"></script>
+<script src="/__lib/motion/DrawSVGPlugin.min.js"></script>
+<script src="/__lib/motion/tk.js"></script>
+<script>
+tkVideo.motion(function (root) {
+  tk.tl.fromTo('.h1', { y: '4vh', opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: 'expo.out' }, 0.3);
+  tk.tl.fromTo('.sub', { opacity: 0 }, { opacity: 1, duration: 0.5 }, 1.0);
+  tk.tl.fromTo('.url', { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(1.7)' }, 1.8);
+});
+</script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>html,body{margin:0;background:var(--deck-bg)}
+.sc{--u:1cqw;position:relative;width:100vw;height:100vh;container-type:size;overflow:hidden;background:var(--deck-bg);color:var(--deck-ink);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.sc *{box-sizing:border-box}.sc p,.sc h1,.sc h2{margin:0}
+.c{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.h1{font-size:calc(var(--u)*7.2);line-height:1.02;letter-spacing:-.05em;font-weight:820}
+.h2{font-size:calc(var(--u)*4.4);line-height:1.1;letter-spacing:-.04em;font-weight:780}
+.sub{font-size:calc(var(--u)*2);color:var(--deck-mute);margin-top:calc(var(--u)*1.6)}
+.acc{color:var(--deck-acc)}
+.logo{display:inline-flex;align-items:center;gap:calc(var(--u)*1.4);font-weight:800;font-size:calc(var(--u)*4.6);letter-spacing:-.03em}
+.logo i{width:calc(var(--u)*5);height:calc(var(--u)*5);border-radius:calc(var(--u)*1.4);background:linear-gradient(135deg,#2f6bff,#7aa2ff);position:relative}
+.logo i::after{content:"";position:absolute;inset:32% 22% 32% 44%;border-radius:calc(var(--u)*.5);background:#fff}
+.panel{background:#fff;border:calc(var(--u)*.14) solid var(--deck-line);border-radius:calc(var(--u)*2);padding:calc(var(--u)*3);box-shadow:0 calc(var(--u)*3) calc(var(--u)*6) calc(var(--u)*-3) rgba(23,22,26,.25)}
+.tg{width:calc(var(--u)*8);height:calc(var(--u)*4.4);border-radius:calc(var(--u)*4);background:#d9d6ce;position:relative}
+.tg b{position:absolute;top:calc(var(--u)*.6);left:calc(var(--u)*.6);width:calc(var(--u)*3.2);height:calc(var(--u)*3.2);border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.tg .on{position:absolute;inset:0;border-radius:inherit;background:#16a36a;opacity:0}
+.track{height:calc(var(--u)*2.2);border-radius:calc(var(--u)*1);background:var(--deck-panel);overflow:hidden}
+.fill{height:100%;width:100%;border-radius:inherit;background:var(--deck-acc);transform-origin:0 50%}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}</style>
+</helmet>
+<main class="board sc">
+<div class="c"><div>
+  <h1 class="h1" data-block="Заголовок">14 дней бесплатно</h1>
+  <p class="sub" data-block="Подпись">без карты · 5 минут на подключение</p>
+  <p class="logo url" data-block="Адрес" data-tk-mark="2.0" style="margin-top:calc(var(--u)*4);font-size:calc(var(--u)*3.4)"><i></i><span class="acc">relay.dev</span></p>
+</div></div>
+</main>
+</x-dc>
+</body>
+</html>

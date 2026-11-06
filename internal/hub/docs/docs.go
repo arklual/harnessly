@@ -27,6 +27,8 @@ type Deps struct {
 	Auth   *auth.Service
 	Log    *slog.Logger
 	Now    func() time.Time
+	// Links hands comments to the machines' conversations; nil keeps them on the hub.
+	Links Linker
 	// HTTP reaches the documents and boards services; nil: a client with a 30 second timeout.
 	HTTP *http.Client
 }
@@ -41,10 +43,12 @@ type Service struct {
 	hc     *http.Client
 	art    *artifactsClient
 	prefix string
+	links  Linker
+	flight inflight
 }
 
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links}
 	if s.now == nil {
 		s.now = time.Now
 	}

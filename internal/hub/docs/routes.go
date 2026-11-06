@@ -348,10 +348,11 @@ func (s *Service) newThread(w http.ResponseWriter, r *http.Request, p *auth.Prin
 	if len(in.Anchor) == 0 || !bytes.HasPrefix(bytes.TrimSpace(in.Anchor), []byte("{")) {
 		in.Anchor = json.RawMessage(`{"quote":"","prefix":"","suffix":""}`)
 	}
-	id, err := s.addThread(r.Context(), doc.Slug, in.Anchor, personOf(p), body)
+	id, cid, err := s.addThread(r.Context(), doc.Slug, in.Anchor, personOf(p), body)
 	if err != nil {
 		return err
 	}
+	s.Deliver(cid)
 	return s.threadAnswer(w, r, doc.Slug, id, http.StatusCreated)
 }
 
@@ -388,9 +389,11 @@ func (s *Service) reply(w http.ResponseWriter, r *http.Request, p *auth.Principa
 	} else if t == nil {
 		return fail(http.StatusNotFound, "not_found", "Обсуждение не найдено")
 	}
-	if err := s.addComment(r.Context(), id, personOf(p), body); err != nil {
+	cid, err := s.addComment(r.Context(), id, personOf(p), body)
+	if err != nil {
 		return err
 	}
+	s.Deliver(cid)
 	return s.threadAnswer(w, r, doc.Slug, id, http.StatusOK)
 }
 

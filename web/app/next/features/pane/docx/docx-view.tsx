@@ -27,6 +27,7 @@ import {
   type IDocxBook,
 } from '@/next/features/pane/docx/docx-core';
 import { drawDocx, headingBefore, looksToCss } from '@/next/features/pane/docx/docx-draw';
+import { HeadTools } from '@/next/features/pane/pane-head';
 
 export interface IDocxViewProps {
   machine: MachineId;
@@ -150,10 +151,10 @@ const DocxView = ({ machine, path, src, name, onSelection, place, onPlaced }: ID
 
   return (
     <div className="hx-docx">
-      <div className="hx-docx__bar">
+      <HeadTools bar="hx-docx__bar">
         <SaveWord save={file.save} />
         <FileHistory machine={machine} path={path} current={file.revision} onRestored={file.reload} />
-      </div>
+      </HeadTools>
       {file.save === SAVE.conflict && <SaveConflict onReload={file.reload} onOverwrite={file.overwrite} />}
       <div className="hx-docx__scroll" ref={scroller}>
         <style ref={sheet} />

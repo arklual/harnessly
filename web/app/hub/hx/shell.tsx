@@ -9,7 +9,7 @@ import { useSession } from '../lib/session';
 import { useSignOut } from '../screens/home';
 import { useOrg } from '../org/context';
 import { ROLE_LABEL, type TenantRef } from '../org/types';
-import { liveOn } from './flag';
+import { fleetWorkspace, liveOn } from './flag';
 import { LiveCtx } from './live';
 import { navOf } from './nav';
 import { Btn, Icon, initial, LayerCtx, usePop } from './ui';
@@ -225,15 +225,16 @@ const GroupItems = ({ label, children }: { label: string; children: ReactNode })
 );
 
 /**
- * «Рабочее пространство»: back to where the person works with agents. Through the gateway that is its /agents/; a hub
- * of its own opens the person's machine when it has exactly one that is on, otherwise its machines to pick from.
+ * «Рабочее пространство»: back to where the person works with agents. Through the gateway that is its /agents/, and so
+ * it is on a hub of its own that serves the fleet (`runtime.fleet`): one workspace over every machine the person may
+ * open. Otherwise the person's machine when it has exactly one that is on, or its machines to pick from.
  */
 const Workspace = ({ onPick }: { onPick: () => void }) => {
   const { config } = useSession();
   const { api, base, scope, shell } = useOrg();
   const [busy, setBusy] = useState(false);
   const go = async () => {
-    if (config.proxied) {
+    if (config.proxied || fleetWorkspace(config.workspace, shell.features)) {
       onPick();
       window.location.assign(withBase('/agents/'));
       return;

@@ -150,13 +150,15 @@ step "Build the hub, the agent and the runtime (static, no cgo)"
 mkdir -p "$T/bin"
 cd "$ROOT"
 export CGO_ENABLED=0
-go build -o "$T/bin/hub" ./cmd/hub
 go build -o "$T/bin/harnessly-agent" ./cmd/agent
 if [ -f web/dist/index.html ]; then
+	# The hub carries the runtime's page too: the fleet's workspace at /agents/ (runtime.fleet, docs/hub/api.md).
+	go build -tags webui -o "$T/bin/hub" ./cmd/hub
 	go build -tags webui -o "$T/bin/harnessly-runtime" ./cmd/runtime
 	HAVE_PAGE=1
 	ok "built with the runtime's page"
 else
+	go build -o "$T/bin/hub" ./cmd/hub
 	go build -o "$T/bin/harnessly-runtime" ./cmd/runtime
 	HAVE_PAGE=0
 	say "  note  web/dist is missing: the runtime has no page, so the page of the machine is not checked (pnpm build)"
@@ -192,6 +194,7 @@ mkdir -p "$T/hub"
 	export HUB_ORGS="${E2E_HUB_ORGS:-shadow}"
 	if [ -n "$DB_URL" ]; then export HUB_DATABASE_URL="$DB_URL"; fi
 	if [ -n "$WEB_DIR" ]; then export HUB_WEB_DIR="$WEB_DIR"; fi
+	if [ "$HAVE_PAGE" = 1 ]; then export HUB_FEATURES_FORCE=runtime.fleet; fi
 	exec "$T/bin/hub" serve
 ) >"$T/hub.log" 2>&1 &
 PIDS+=($!)
@@ -436,6 +439,27 @@ if [ "$HAVE_PAGE" = 1 ]; then
 	PAGE=$(curl -sS -o "$T/page.html" -w '%{http_code}' -b "$OWNER" -H 'Accept: text/html' "$HUB$BASE/")
 	expect "the machine's page is served" "$PAGE" 200
 	check "…it knows the hub (hubUrl in its config)" grep -q "hubUrl" "$T/page.html"
+
+	step "The fleet's workspace: the runtime's page from the hub at /agents/"
+	call "$OWNER" GET "/api/config"
+	expect "the hub says it serves the workspace" "$(j .workspace)" true
+	WS=$(curl -sS -o "$T/ws.html" -D "$T/wsh.txt" -w '%{http_code}' -b "$OWNER" -H 'Accept: text/html' "$HUB/agents/chats")
+	expect "a deep link of the workspace is the page" "$WS" 200
+	check "…based at /agents/" grep -q '<base href="/agents/" />' "$T/ws.html"
+	check "…with its API under /agents" grep -q '<meta name="api-base" content="/agents" />' "$T/ws.html"
+	check "…and the hub's address in its config" grep -q "hubUrl&#34;:&#34;$HUB" "$T/ws.html"
+	WS_ASSET=$(grep -o 'assets/[^"]*\.js' "$T/ws.html" | head -n 1)
+	WS_JS=$(curl -sS -o /dev/null -w '%{http_code}' -b "$OWNER" "$HUB/agents/$WS_ASSET")
+	expect "its script is served by the hub" "$WS_JS" 200
+	WS_ANON=$(curl -sS -o /dev/null -D "$T/wsa.txt" -w '%{http_code}' -H 'Accept: text/html' -H 'Sec-Fetch-Mode: navigate' "$HUB/agents/")
+	expect "without a session the workspace sends to the sign-in" "$WS_ANON" 302
+	check "…with the way back" grep -qi "^location: /signin?next=%2Fagents%2F" "$T/wsa.txt"
+	call "$OWNER" GET "/agents/api/v2/machines"
+	expect "the workspace lists the machine" "$(j '.[0].id')" "$MID"
+	call "$OWNER" GET "/agents/api/platform/bootstrap"
+	expect "the bootstrap comes from the home machine" "$CODE" 200
+	call "$OWNER" GET "/agents/api/platform/bootstrap?machine=$MID"
+	expect "…and from the machine named" "$CODE" 200
 fi
 SET_COOKIES=$(curl -sS -o /dev/null -D - -b "$OWNER" "$HUB$BASE/api/auth/setup" | grep -ci '^set-cookie:' || true)
 expect "no cookie of the runtime reaches the browser" "$SET_COOKIES" 0

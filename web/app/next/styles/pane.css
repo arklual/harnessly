@@ -1307,63 +1307,96 @@ input.hx-tbrowser__url:focus {
   padding: 2px 4px 8px;
   color: var(--hx-fg-3);
 }
-/* The crumbs and, for a folder, what is done with all of it: pick entries, save the folder as a zip. */
-.hx-disk__head {
+/* The head row of a pane tab (pane-head.tsx): the crumbs on the left, shrinking with an ellipsis (the folders
+   in the middle first, then the first and the parent, the name last); on the right what is done with it, never wrapped:
+   the view's own controls (the switch of the view, the save state), then the place's (download, share, «…»,
+   «Сохранить»). */
+.hx-phead {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding-bottom: 6px;
 }
-.hx-disk__head > .hx-disk__crumbs {
+.hx-phead__lead {
   flex: 1 1 auto;
   min-width: 0;
+  container-type: inline-size;
 }
-.hx-disk__tools {
+.hx-phead__tools,
+.hx-phead__slot {
   display: flex;
   flex: none;
   align-items: center;
   gap: 2px;
 }
-/* An open file: one row — the crumbs on the left (the folders shrink first), the switch of the view, download, «…»
-   and «Сохранить» (only while there is something to save) on the right. */
-.hx-tv[data-file] .hx-disk__head {
-  align-items: center;
-  padding-bottom: 6px;
+.hx-phead__slot {
+  gap: 8px;
+  margin-right: 4px;
 }
-.hx-tv[data-file] .hx-disk__crumbs {
+.hx-phead__slot:empty {
+  display: none;
+}
+.hx-phead .hx-disk__crumbs {
   flex-wrap: nowrap;
   overflow: hidden;
   padding-bottom: 2px;
 }
-.hx-tv[data-file] .hx-disk__step {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-}
-.hx-tv[data-file] .hx-disk__step:last-child {
+.hx-phead .hx-disk__crumbs > .hx-icon {
   flex: none;
-  max-width: 60%;
 }
-.hx-tv[data-file] .hx-disk__crumb {
+.hx-phead .hx-disk__crumb {
+  flex: 0 1000 auto;
+  min-width: 2.5em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hx-disk__mode {
-  display: inline-flex;
+.hx-phead .hx-disk__crumb[data-step='first'],
+.hx-phead .hx-disk__crumb[data-step='parent'] {
+  flex-shrink: 50;
+}
+/* A factor under 1 would take only that share of what is missing: the name keeps 1 and the others far more. */
+.hx-phead .hx-disk__crumb[data-step='last'] {
+  flex-shrink: 1;
+  min-width: 4em;
+  cursor: default;
+}
+.hx-phead .hx-disk__crumb[data-step='last']:hover {
+  background: transparent;
+}
+/* A narrow row keeps the first folder, the parent and the name: the folders between are one «…». */
+@container (max-width: 320px) {
+  .hx-phead .hx-disk__crumb[data-step='middle'] {
+    flex: none;
+    min-width: 0;
+    font-size: 0;
+  }
+  .hx-phead .hx-disk__crumb[data-step='middle']::before {
+    content: '…';
+    font-size: 12px;
+  }
+  .hx-phead .hx-disk__crumb[data-step='middle'] ~ .hx-disk__crumb[data-step='middle'],
+  .hx-phead .hx-disk__crumb[data-step='middle'] ~ .hx-disk__crumb[data-step='middle'] + .hx-icon {
+    display: none;
+  }
+}
+/* Narrower still: the parent and the name only. */
+@container (max-width: 200px) {
+  .hx-phead .hx-disk__crumb:is([data-step='first'], [data-step='middle']),
+  .hx-phead .hx-disk__crumb:is([data-step='first'], [data-step='middle']) + .hx-icon {
+    display: none;
+  }
+}
+/* «Проект / Машина» of a folder, before its buttons. */
+.hx-phead__tools > .hx-segmented {
   margin-right: 4px;
 }
-.hx-disk__mode:empty {
-  display: none;
-}
-.hx-disk__mode .hx-segmented > button,
-.hx-disk__tools > .hx-segmented > button {
+.hx-phead .hx-segmented > button {
   height: 24px;
   padding: 0 8px;
   font-size: var(--hx-text-sm);
-}
-/* «Проект / Машина» of a folder, before its buttons. */
-.hx-disk__tools > .hx-segmented {
-  margin-right: 4px;
 }
 /* A new folder's name, typed in a row over the list. */
 .hx-disk__new {
@@ -1775,11 +1808,6 @@ input.hx-tbrowser__url:focus {
 .hx-plan__blocked {
   color: var(--hx-danger);
 }
-.hx-disk__step {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
 .hx-plan__row[data-i='1'] {
   --i: 1;
 }
@@ -2078,13 +2106,8 @@ input.hx-tbrowser__url:focus {
   animation: none;
 }
 
-/* A file that is not text, in the pane: its name biggest, the way to save it beside, the contents under. */
-.hx-deliv__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* A file that is not text, in the pane: the head row over it (pane-head.tsx), the contents under; a file of a zip has
+   the way to save it beside its name. */
 .hx-deliv__save {
   flex: none;
   display: grid;

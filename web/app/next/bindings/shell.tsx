@@ -109,6 +109,9 @@ import { useAppUpdate } from '@/next/bindings/use-app-update';
 import { useRelease } from '@/next/bindings/use-release';
 import ReleaseNotice from '@/next/features/update/release-notice';
 import UpdateBanner from '@/next/features/update/update-banner';
+import LearnPage from '@/next/features/learn/learn-page';
+import LearnWelcome from '@/next/features/learn/learn-welcome';
+import TourOverlay from '@/next/features/tour/tour-overlay';
 import WhatsNew from '@/next/features/whats-new/whats-new';
 import { REFS_MAX, type Conversation, type ConvId } from '@/next/protocol/v2';
 import { chatRef } from '@/next/features/composer/chat-sources';
@@ -534,6 +537,13 @@ const Shell = ({ owner }: IShellProps) => {
       onSelect: () => openScreen({ kind: ROUTE.manage }),
     },
     {
+      id: 'learn',
+      icon: 'graduation-cap',
+      label: t('next.learn.title'),
+      current: route.kind === ROUTE.learn,
+      onSelect: () => openScreen({ kind: ROUTE.learn }),
+    },
+    {
       id: 'help',
       icon: 'book-open',
       label: t('next.sidebar.help'),
@@ -853,6 +863,8 @@ const Shell = ({ owner }: IShellProps) => {
       <UpdateBanner available={update.available} onReload={update.reload} onDismiss={update.dismiss} />
       <ReleaseNotice release={update.available ? null : release.release} onDismiss={release.dismiss} />
       <WhatsNew ready={boot.k === 'ready'} updating={update.available} />
+      <LearnWelcome fresh={boot.k === 'ready' && model.chats !== null && model.chats.length === 0} />
+      <TourOverlay />
       {keysHelp}
     </>
   );
@@ -892,6 +904,7 @@ const Shell = ({ owner }: IShellProps) => {
         route.kind !== ROUTE.tasks &&
         route.kind !== ROUTE.apps &&
         route.kind !== ROUTE.help &&
+        route.kind !== ROUTE.learn &&
         route.kind !== ROUTE.app &&
         route.kind !== ROUTE.appDoc &&
         route.kind !== ROUTE.settings && (
@@ -1015,6 +1028,7 @@ const Shell = ({ owner }: IShellProps) => {
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
+      {route.kind === ROUTE.learn && <LearnPage onOpenDrawer={() => setDrawerOpen(true)} />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
         <AppMainPage
           key={`${route.id}/${route.chat ?? ''}/${tabs.activeId}`}

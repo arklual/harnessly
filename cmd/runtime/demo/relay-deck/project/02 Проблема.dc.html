@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проблема</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./deck-theme.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>html,body{margin:0;background:var(--deck-bg)}
+.slide{position:relative;width:100%;aspect-ratio:16/9;box-sizing:border-box;overflow:hidden;background:var(--deck-bg);color:var(--deck-ink);font-family:var(--deck-font);container-type:inline-size;-webkit-font-smoothing:antialiased}
+.slide *{box-sizing:border-box}.slide p,.slide h1,.slide h2,.slide h3,.slide ul{margin:0}.slide ul{padding:0;list-style:none}
+.kicker{position:absolute;left:6cqw;top:4.6cqw;display:flex;align-items:center;gap:1cqw;font-size:1.1cqw;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--deck-mute)}
+.kicker i{display:block;width:2.4cqw;height:.32cqw;border-radius:1cqw;background:var(--deck-acc)}
+.title{position:absolute;left:6cqw;top:7.8cqw;width:84cqw;font-size:3.6cqw;line-height:1.08;font-weight:750;letter-spacing:-.03em}
+.foot{position:absolute;left:6cqw;right:6cqw;bottom:3.2cqw;display:flex;justify-content:space-between;font-size:1cqw;color:var(--deck-mute)}
+.card{background:#fff;border:.12cqw solid var(--deck-line);border-radius:1.4cqw;padding:2.2cqw}
+.lbl{font-size:1cqw;font-weight:650;letter-spacing:.12em;text-transform:uppercase;color:var(--deck-mute)}
+.big{font-size:5.6cqw;line-height:.95;font-weight:780;letter-spacing:-.045em}
+.txt{font-size:1.35cqw;line-height:1.45;color:var(--deck-mute)}
+.lead{font-size:1.7cqw;line-height:1.3;font-weight:650;letter-spacing:-.01em}
+.n{width:3cqw;height:3cqw;border-radius:50%;background:var(--deck-acc);color:var(--deck-on-acc);display:grid;place-items:center;font-size:1.3cqw;font-weight:750}
+.tg{display:inline-block;width:3.6cqw;height:2cqw;border-radius:2cqw;background:#d9d6ce;position:relative;vertical-align:middle}
+.tg::after{content:"";position:absolute;top:.3cqw;left:.3cqw;width:1.4cqw;height:1.4cqw;border-radius:50%;background:#fff}
+.tg.on{background:#16a36a}.tg.on::after{left:1.9cqw}
+.code{background:#14131a;color:#d8d6e0;border-radius:1.4cqw;padding:2.2cqw 2.4cqw;font:1.25cqw/1.8 'JetBrains Mono',ui-monospace,monospace}
+.code .k{color:#8fb0ff}.code .s{color:#9be3b9}.code .c{color:#6e6b78}
+.bar{height:1.4cqw;border-radius:.4cqw;background:var(--deck-acc)}.track{height:1.4cqw;border-radius:.4cqw;background:var(--deck-panel);flex:1;overflow:hidden}</style>
+</helmet>
+<main class="board">
+<section class="slide" data-block="Слайд">
+<div class="kicker" data-block="Рубрика"><i></i><span>Проблема</span></div>
+<h1 class="title" data-block="Заголовок">Каждый релиз — немного лотерея</h1>
+<div data-block="Цифры" style="position:absolute;left:6cqw;right:6cqw;top:20cqw;display:grid;grid-template-columns:repeat(3,1fr);gap:2cqw">
+<div class="card"><div class="big">1 из 4</div><p class="txt" style="margin-top:1.2cqw">релизов откатывают целиком из-за одной фичи</p></div>
+<div class="card"><div class="big">40 мин</div><p class="txt" style="margin-top:1.2cqw">в среднем занимает откат с новым деплоем</p></div>
+<div class="card"><div class="big">пт, 19:00</div><p class="txt" style="margin-top:1.2cqw">самое популярное время для «срочного фикса»</p></div>
+</div>
+<div class="foot" data-block="Подвал"><span>Relay · релизы без страха</span><span>2 / 6</span></div>
+</section>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

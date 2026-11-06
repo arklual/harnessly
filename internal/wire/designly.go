@@ -333,6 +333,13 @@ type DesignlyPin struct {
 
 func (p DesignlyPin) Validate() error { return need("id", p.ID) }
 
+// DesignlyDemo is the answer of POST /api/v2/designly/demo: the demo projects copied back into the library.
+type DesignlyDemo struct {
+	Restored []string `json:"restored"`
+}
+
+func (d DesignlyDemo) Validate() error { return nil }
+
 // DesignlyChat is the body and the answer of POST /api/v2/designly/chat: the person started conversation Conv from the
 // column of design ID, so it is one of the design's chats.
 type DesignlyChat struct {
@@ -378,19 +385,21 @@ type DesignlySource interface {
 	Pin(ctx context.Context, id string, pinned bool) error
 	// Chat records that conversation conv was started from the column of design id.
 	Chat(ctx context.Context, id, conv string) error
+	// Demo copies back the demo projects the library no longer has; the ones it has are left as they are.
+	Demo(ctx context.Context) (DesignlyDemo, error)
 }
 
 // designlyBudget is how long a project may take to be made and its conversation to be opened.
 const designlyBudget = 30 * time.Second
 
-// designly serves /api/v2/designly/{create,library,systems,pin,chat}.
+// designly serves /api/v2/designly/{create,library,systems,pin,chat,demo}.
 func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 	if s.Designly == nil {
 		refuse(w, RefuseNotFound)
 		return
 	}
 	want := http.MethodGet
-	if what == "create" || what == "pin" || what == "chat" {
+	if what == "create" || what == "pin" || what == "chat" || what == "demo" {
 		want = http.MethodPost
 	}
 	if r.Method != want {
@@ -460,6 +469,16 @@ func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 			return
 		}
 		s.writeChecked(w, r, body)
+	case "demo":
+		out, err := s.Designly.Demo(ctx)
+		if err != nil {
+			s.designlyRefusal(w, r, err)
+			return
+		}
+		if out.Restored == nil {
+			out.Restored = []string{}
+		}
+		s.writeChecked(w, r, out)
 	default:
 		refuse(w, RefuseNotFound)
 	}

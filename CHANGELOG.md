@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The fleet's workspace on a standalone hub (`runtime.fleet`): the hub carries the runtime's page and serves it at
+  `/agents/` with the home machine's settings; `/agents/api/v2/…` is the fleet, every other API call goes to
+  `?machine=<id>` or the home machine, so Sinopia and the platform API work across machines too. The hub page's
+  «Рабочее пространство» opens it. Only machines the hub trusts are in it, in either mode. See `docs/hub/api.md`.
 - `harnessly upgrade plan|apply|rollback`: a signed release manifest (`/dl/release.json`, Ed25519 against a pinned key)
   ties the hub, runtime, agent, command line and web page to one version and lists the extension protocol ranges. `plan`
   shows what changes and which registered extensions the new core cannot speak to; `apply` replaces the programs

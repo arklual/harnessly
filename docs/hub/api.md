@@ -324,6 +324,30 @@ the access list of the machine lets them in (`HUB_ACCESS_ENFORCE`), and in path 
 else is not in the list and the proxy refuses it with 403/404. The answers are believed for 5 seconds, so a revoked
 access takes effect within that time. The `machine` parameter is not passed on to the runtime.
 
+#### The workspace at `/agents/` (flag `runtime.fleet`)
+
+A hub built with the runtime's page (`make hub`, the image: tags `hubui webui`) serves it at `/agents/` on its own origin,
+so a standalone hub gives one workspace for every machine of the fleet, the way a gateway does. The page loads from the
+hub even when every machine is off; `GET /api/config` says `workspace: true`, and the hub page's «Рабочее пространство»
+opens `/agents/` when the organization has the flag (otherwise the person's machine or the list of machines, as before).
+
+| Path | Answer |
+| --- | --- |
+| `GET /agents/…` | the runtime's page: `<base href>` `/agents/`, `api-base` `/agents`, the home machine's `platform-api` and settings (`hl-config`, believed for a minute) with `hubUrl`/`hubLink` of this hub; `assets/` immutable, the rest `no-cache`; a path with no file is the page (deep links), a missing file 404 |
+| `ANY /agents/api/v2/…` | the Fleet routes above, with the workspace's rule for machines (below) |
+| `ANY /agents/api/…?machine=<id>` | the runtime's own `/agents/api/…` on that machine (Sinopia, the platform API, files, sockets); no `machine` or `machine=local`: the home machine, the person's first machine that is on |
+| `POST /agents/api/auth/logout` | signs out of the hub |
+
+Not signed in: a page asks for `/signin?next=…`, an API call is 401; a request from another site is 403 `cross_site`.
+No machine of the person's: 404. The design access routes (`/api/<platform>/design/access…`) are answered by the hub,
+as on `/m/<id>/`.
+
+What a machine answers in the workspace runs on the hub's origin, so in either mode only a machine the hub trusts is in
+it (made by an instance admin, or trusted with `HUB_MACHINE_TRUST`); any other is not listed and is refused with 403
+`machine_untrusted`. In subdomain mode `/api/v2/machines` still lists it: there it opens on an origin of its own. The
+preview slots of a machine (`/m/<id>/__pv/…`) are the path mode's: in subdomain mode a preview opens on the machine's
+origin.
+
 #### Moving a chat between machines (flag `runtime.fleet`)
 
 The runtime's chat move (`/api/v2/move/*`, one machine's chat to another) driven by the hub, so the two machines need no

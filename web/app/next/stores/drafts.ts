@@ -23,6 +23,8 @@ export const NEW_CHAT = 'new' as const;
 /** The draft of a design that has no chat yet: its first message (bindings/design-conv.ts). */
 export type DesignDraftKey = `design:${string}`;
 export type DraftKey = ConvId | typeof NEW_CHAT | DesignDraftKey;
+/** The brief of a new design, typed on Sinopia's start page. */
+export const DESIGN_START_DRAFT: DesignDraftKey = 'design:new-start';
 
 export const draftsStore = createKeyedStore<DraftKey, Draft>();
 

@@ -179,6 +179,8 @@ export type Config = {
   sites?: { enabled: boolean; scheme?: 'subdomain' | 'path'; domain?: string };
   /** The page came through a gateway that signs its people in; their workspace is its /agents/. */
   proxied?: boolean;
+  /** This hub serves the runtime's page at /agents/: the fleet's one workspace for every machine (`runtime.fleet`). */
+  workspace?: boolean;
   /** What the instance itself switches on for every organization (HUB_FEATURES_DEFAULT); `ui.hx` is one of them. */
   features?: string[];
 };

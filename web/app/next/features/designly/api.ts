@@ -74,6 +74,10 @@ export const fetchEngine = (m: MachineId, signal?: AbortSignal) =>
 export const pinDesign = (m: MachineId, id: string, pinned: boolean) =>
   page(m, '/designly/pin', parsePage.designlyPin, { method: 'POST', body: { id, pinned } });
 
+/** Copies back the demo projects (Relay) the library no longer has; edited ones stay as they are. */
+export const restoreDemoDesigns = (m: MachineId) =>
+  page(m, '/designly/demo', parsePage.designlyDemo, { method: 'POST', body: {} });
+
 /** The chat conv was started from the design's own column: the machine lists it among the design's chats. */
 export const recordDesignChat = (m: MachineId, id: string, conv: string) =>
   page(m, '/designly/chat', parsePage.designlyChat, { method: 'POST', body: { id, conv } });

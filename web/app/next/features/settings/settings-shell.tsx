@@ -100,6 +100,7 @@ const SettingsShell = ({
                     key={id}
                     type="button"
                     className="hx-set__nav-item"
+                    data-id={id}
                     aria-current={id === section ? true : undefined}
                     ref={(element) =>
                       element?.style.setProperty('--i', String(SETTINGS_SECTIONS.indexOf(id)))

@@ -469,6 +469,13 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 	if err != nil {
 		return wire.DesignLibrary{}, err
 	}
+	if !lib.DemoSeeded() {
+		if _, err := d.seedDemo(lib, false); err != nil {
+			if log := lib.Config().Log; log != nil {
+				log("warn", "design: the demo projects were not copied", err)
+			}
+		}
+	}
 	st := d.state()
 	person := d.personOf(ctx)
 	arts := lib.VisibleToFor(lib.ListArtifacts(), person)

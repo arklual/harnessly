@@ -105,7 +105,7 @@ func (a *Agent) docRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Nothing is stored here: without a cluster link the call would silently vanish.
-	if !a.connected() {
+	if !a.docsConnected() {
 		reply(w, 503, map[string]string{"error": "the platform is not connected, try again later"})
 		return
 	}
@@ -118,7 +118,7 @@ func (a *Agent) docRoute(w http.ResponseWriter, r *http.Request) {
 			reply(w, 400, map[string]string{"error": "threadId and text (or resolve) are required"})
 			return
 		}
-		a.broadcast(evDocReply{Event: "docs.reply", ThreadID: *threadID, Body: text, Resolve: resolve})
+		a.sendDoc(evDocReply{Event: "docs.reply", ThreadID: *threadID, Body: text, Resolve: resolve})
 		reply(w, 202, map[string]bool{"ok": true})
 		return
 	}
@@ -167,7 +167,12 @@ func (a *Agent) docRoute(w http.ResponseWriter, r *http.Request) {
 		TabID: resolved.TabID, SessionName: resolved.SessionName, AgentSessionID: resolved.AgentSessionID,
 		Provider: provider, SourcePath: str(obj, "sourcePath", 1024), Cwd: cwd,
 	}
-	a.broadcast(evDocBound{Event: "docs.bound", Binding: binding})
+	// Boards stay with the cluster's board service: only documents move to the hub.
+	if kind == "board" {
+		a.broadcast(evDocBound{Event: "docs.bound", Binding: binding})
+	} else {
+		a.sendDoc(evDocBound{Event: "docs.bound", Binding: binding})
+	}
 	reply(w, 202, map[string]bool{"ok": true, "boundToTab": binding.TabID != nil})
 }
 

@@ -142,6 +142,10 @@ func (s designly) Pin(_ context.Context, id string, pinned bool) error {
 	return &wire.DesignlyError{Code: wire.RefuseNotFound, Message: "Макета больше нет"}
 }
 
+func (s designly) Demo(context.Context) (wire.DesignlyDemo, error) {
+	return wire.DesignlyDemo{Restored: []string{}}, nil
+}
+
 func (s designly) Chat(_ context.Context, id, conv string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

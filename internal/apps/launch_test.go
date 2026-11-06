@@ -124,6 +124,13 @@ func TestLauncherAgentToken(t *testing.T) {
 	if !strings.HasPrefix(rest, `HARNESSLY_SESSION="$(tmux display-message`) {
 		t.Fatalf("the launch names the tab's session before the wall: %q", got.Env)
 	}
+	// The guard runs the CLI by its path, past the pane's wrapper: the launch tells it the runtime's header.
+	l.CLIHeader = "x-rt-token"
+	if h, err := l.Claude([]string{"acme.review"}, base); err != nil || !strings.Contains(h.Env, " HARNESSLY_CLI_HEADER='x-rt-token' ") {
+		t.Fatalf("the header: %q %v", h.Env, err)
+	}
+	l.CLIHeader = ""
+	sessions = sessions[:1]
 	file := strings.Trim(strings.TrimPrefix(first, "HARNESSLY_CLI_TOKEN_FILE="), "'")
 	raw, err := os.ReadFile(file)
 	info, _ := os.Stat(file)

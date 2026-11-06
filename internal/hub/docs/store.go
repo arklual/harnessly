@@ -28,13 +28,14 @@ type author struct {
 }
 
 type comment struct {
-	ID          string  `json:"id"`
-	ThreadID    string  `json:"threadId"`
-	Author      author  `json:"author"`
-	Body        string  `json:"body"`
-	CreatedAt   string  `json:"createdAt"`
-	DeliveredAt *string `json:"deliveredAt"`
-	// DeliveryError is always null: this hub has no conversation to hand a comment to.
+	ID        string `json:"id"`
+	ThreadID  string `json:"threadId"`
+	Author    author `json:"author"`
+	Body      string `json:"body"`
+	CreatedAt string `json:"createdAt"`
+	// DeliveredAt is when a person's comment reached the conversation the document was published from; DeliveryError
+	// why it never will.
+	DeliveredAt   *string `json:"deliveredAt"`
 	DeliveryError *string `json:"deliveryError"`
 }
 
@@ -171,7 +172,7 @@ func (s *Service) threads(ctx context.Context, slug string) ([]thread, error) {
 	if len(out) == 0 {
 		return out, nil
 	}
-	cr, err := q.Query(ctx, `SELECT c.id, c.thread_id, c.author_kind, c.author_email, c.author_name, c.body, c.created_at
+	cr, err := q.Query(ctx, `SELECT c.id, c.thread_id, c.author_kind, c.author_email, c.author_name, c.body, c.created_at, c.delivered_at, c.delivery_error
 		FROM doc_comments c JOIN doc_threads t ON t.id = c.thread_id WHERE t.slug = ? ORDER BY c.created_at, c.id`, slug)
 	if err != nil {
 		return nil, err
@@ -180,10 +181,15 @@ func (s *Service) threads(ctx context.Context, slug string) ([]thread, error) {
 	for cr.Next() {
 		var c comment
 		var created int64
-		if err := cr.Scan(&c.ID, &c.ThreadID, &c.Author.Kind, &c.Author.Email, &c.Author.Name, &c.Body, &created); err != nil {
+		var delivered sql.NullInt64
+		var deliveryErr sql.NullString
+		if err := cr.Scan(&c.ID, &c.ThreadID, &c.Author.Kind, &c.Author.Email, &c.Author.Name, &c.Body, &created, &delivered, &deliveryErr); err != nil {
 			return nil, err
 		}
-		c.CreatedAt = ts(created)
+		c.CreatedAt, c.DeliveredAt = ts(created), tsPtr(delivered)
+		if deliveryErr.Valid {
+			c.DeliveryError = &deliveryErr.String
+		}
 		if i, ok := byID[c.ThreadID]; ok {
 			out[i].Comments = append(out[i].Comments, c)
 		}
@@ -204,20 +210,23 @@ func (s *Service) thread(ctx context.Context, slug, id string) (*thread, error) 
 	return nil, nil
 }
 
-func (s *Service) addThread(ctx context.Context, slug string, anchor json.RawMessage, a author, body string) (string, error) {
+// addThread opens a thread with its first comment and returns the ids of both.
+func (s *Service) addThread(ctx context.Context, slug string, anchor json.RawMessage, a author, body string) (string, string, error) {
 	id := store.NewID()
 	now := s.now().UnixMilli()
 	if _, err := s.db.S().Q().Exec(ctx, `INSERT INTO doc_threads (id, slug, anchor, status, author_kind, author_email, author_name, created_at)
 		VALUES (?, ?, ?, 'open', ?, ?, ?, ?)`, id, slug, string(anchor), a.Kind, a.Email, a.Name, now); err != nil {
-		return "", err
+		return "", "", err
 	}
-	return id, s.addComment(ctx, id, a, body)
+	cid, err := s.addComment(ctx, id, a, body)
+	return id, cid, err
 }
 
-func (s *Service) addComment(ctx context.Context, threadID string, a author, body string) error {
+func (s *Service) addComment(ctx context.Context, threadID string, a author, body string) (string, error) {
+	id := store.NewID()
 	_, err := s.db.S().Q().Exec(ctx, `INSERT INTO doc_comments (id, thread_id, author_kind, author_email, author_name, body, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, store.NewID(), threadID, a.Kind, a.Email, a.Name, body, s.now().UnixMilli())
-	return err
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, id, threadID, a.Kind, a.Email, a.Name, body, s.now().UnixMilli())
+	return id, err
 }
 
 func (s *Service) setStatus(ctx context.Context, threadID, status string) error {

@@ -194,3 +194,84 @@ func TestDocsAgentToldWhenNotConfigured(t *testing.T) {
 		return false
 	})
 }
+
+// A document bound to a conversation: a person's comment reaches that conversation through the machine, the agent's
+// answer lands in the thread, and a board's binding is not the hub's.
+func TestDocsCommentsReachTheConversation(t *testing.T) {
+	_, srv := newFakeArtifacts(t)
+	s := docsStack(t, hubtest.Env("HUB_DOCS", "on"), hubtest.Env("HUB_ARTIFACTS_URL", srv.URL), hubtest.Env("HUB_ARTIFACTS_TOKEN", "secret-token"))
+	owner := s.SignIn("owner@example.com")
+	id, _ := owner.NewSpace("Acme")
+	a := owner.Machine(id, nil)
+	a.Handle("doc.result", func(hubtest.Call) (any, error) { return map[string]bool{"settled": true}, nil })
+	a.Handle("docs.deliver", func(hubtest.Call) (any, error) { return map[string]string{"mode": "typed"}, nil })
+
+	a.Emit(map[string]any{"event": "doc.publish", "requestId": "r1", "title": "Plan", "format": "md", "content": "# Plan", "slug": "plan", "visibility": "private"})
+	s.Eventually("doc.result for publish", func() bool { return len(a.Calls("doc.result")) > 0 })
+
+	// A board's binding is not the hub's; the document's binding comes through the event the agent sends after publish.
+	a.Emit(map[string]any{"event": "docs.bound", "binding": map[string]any{"slug": "b1", "kind": "board", "title": "Board", "tabId": "tab-9"}})
+	a.Emit(map[string]any{"event": "docs.bound", "binding": map[string]any{"slug": "plan", "kind": "artifact", "title": "Plan", "tabId": "tab-1", "cwd": "/work"}})
+	// The binding is stored in the background: comment until one reaches the conversation.
+	var got hubtest.Call
+	s.Eventually("comment delivered", func() bool {
+		if r := owner.Do("POST", "/api/platform/docs/plan/threads", map[string]any{"anchor": map[string]string{"quote": "Plan"}, "body": "Why?"}); r.Code != http.StatusCreated {
+			t.Fatalf("new thread: %s", r)
+		}
+		time.Sleep(50 * time.Millisecond)
+		for _, c := range a.Calls("docs.deliver") {
+			got = c
+			return true
+		}
+		return false
+	})
+	for _, c := range a.Calls("docs.deliver") {
+		if c.Str("tabId") == "tab-9" {
+			t.Fatalf("a board's binding reached the hub: %v", c.Params)
+		}
+	}
+	if got.Str("tabId") != "tab-1" || got.Str("cwd") != "/work" || !strings.Contains(got.Str("message"), "Комментарий к твоему документу") ||
+		!strings.Contains(got.Str("message"), "/docs/plan") || !strings.Contains(got.Str("message"), "Why?") {
+		t.Fatalf("deliver: %s", got.Params["message"])
+	}
+	var doc struct {
+		Threads []struct {
+			ID       string
+			Comments []struct {
+				Body        string
+				DeliveredAt *string `json:"deliveredAt"`
+			}
+		}
+	}
+	s.Eventually("delivered mark", func() bool {
+		owner.Do("GET", "/api/platform/docs/plan", nil).JSON(&doc)
+		for _, th := range doc.Threads {
+			for _, c := range th.Comments {
+				if c.Body == "Why?" && c.DeliveredAt != nil {
+					return true
+				}
+			}
+		}
+		return false
+	})
+
+	// The agent answers in the thread and resolves it.
+	thread := ""
+	for _, th := range doc.Threads {
+		if len(th.Comments) > 0 && th.Comments[0].Body == "Why?" {
+			thread = th.ID
+		}
+	}
+	a.Emit(map[string]any{"event": "docs.reply", "threadId": thread, "body": "Fixed it", "resolve": true})
+	s.Eventually("agent reply", func() bool {
+		r := owner.Do("GET", "/api/platform/docs/plan", nil)
+		return strings.Contains(r.String(), "Fixed it") && strings.Contains(r.String(), "resolved")
+	})
+	// The agent's own answer is not handed back to the conversation.
+	time.Sleep(100 * time.Millisecond)
+	for _, c := range a.Calls("docs.deliver") {
+		if strings.Contains(c.Str("message"), "Fixed it") && !strings.Contains(c.Str("message"), "Раньше") {
+			t.Fatalf("the agent's reply went back to it: %v", c.Params)
+		}
+	}
+}

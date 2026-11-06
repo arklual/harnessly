@@ -255,7 +255,7 @@ func (s *Service) moveTargets(w http.ResponseWriter, r *http.Request, u store.Us
 	case !d.HasHistory:
 		source["ok"], source["code"] = false, "no_history"
 	}
-	list, err := s.fleet(ctx, u.ID)
+	list, err := s.fleet(ctx, u.ID, false)
 	if err != nil {
 		if errors.Is(err, errFleetOff) {
 			writeMoveFail(w, failOff)

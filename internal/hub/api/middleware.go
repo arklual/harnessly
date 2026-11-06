@@ -99,7 +99,9 @@ func recoverer(log *slog.Logger, next http.Handler) http.Handler {
 // securityHeaders are set on everything the hub answers itself. What a machine's runtime answers keeps its own.
 func securityHeaders(secure bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/m/") && !strings.HasPrefix(r.URL.Path, "/sites/") {
+		// The workspace (/agents/) frames its own previews and sets its frame rules itself, like a machine's pages.
+		if !strings.HasPrefix(r.URL.Path, "/m/") && !strings.HasPrefix(r.URL.Path, "/sites/") && r.URL.Path != "/agents" &&
+			!strings.HasPrefix(r.URL.Path, "/agents/") {
 			h := w.Header()
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("Referrer-Policy", "same-origin")

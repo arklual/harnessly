@@ -304,7 +304,7 @@
       ]
     },
     "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
-    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyDemo", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
     "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
     "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
     "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
@@ -676,6 +676,12 @@
       "required": ["id", "pinned"],
       "additionalProperties": false,
       "properties": {"id": {"type": "string", "minLength": 1}, "pinned": {"type": "boolean"}}
+    },
+    "DesignlyDemo": {
+      "type": "object",
+      "required": ["restored"],
+      "additionalProperties": false,
+      "properties": {"restored": {"type": "array", "items": {"type": "string", "minLength": 1}}}
     },
     "DesignlyChat": {
       "type": "object",
@@ -3884,6 +3890,15 @@
           "properties": {
             "http": {"const": "designlyPin"},
             "response": {"oneOf": [{"$ref": "#/$defs/DesignlyPin"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "designlyDemo"},
+            "response": {"oneOf": [{"$ref": "#/$defs/DesignlyDemo"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
           }
         },
         {

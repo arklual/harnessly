@@ -221,36 +221,43 @@ func patchPaths(input map[string]any, cwd string) ([]string, bool) {
 // CodexAnswer is what the guard writes to Codex for one PreToolUse input: nil lets the call go on to Codex's own
 // permissions, anything else is a refusal.
 func (s Snapshot) CodexAnswer(raw []byte) []byte {
+	out, _, _ := s.CodexJudge(raw)
+	return out
+}
+
+// CodexJudge is CodexAnswer with the rule that refused the call and the call's tool, for the journal; the verdict is
+// empty when no app's rule decided (a call that goes on, or one the guard cannot read).
+func (s Snapshot) CodexJudge(raw []byte) ([]byte, Verdict, string) {
 	calls, skip, problem := CodexCalls(raw)
 	if problem == problemStdin {
 		if !s.judgesShell() {
-			return nil
+			return nil, Verdict{}, ""
 		}
-		return CodexDeny("Interactive input into a shell is not checked by the rules of the apps of this chat (it can be a command typed a character at a time): run the command whole.")
+		return CodexDeny("Interactive input into a shell is not checked by the rules of the apps of this chat (it can be a command typed a character at a time): run the command whole."), Verdict{}, ""
 	}
 	if problem != "" {
-		return CodexDeny("The app guard cannot let this call through: " + problem + ", and the apps of this chat ask for their rules to hold.")
+		return CodexDeny("The app guard cannot let this call through: " + problem + ", and the apps of this chat ask for their rules to hold."), Verdict{}, ""
 	}
 	if skip {
-		return nil
+		return nil, Verdict{}, ""
 	}
 	if reason := s.unknownPlugin(calls); reason != "" {
-		return CodexDeny(reason)
+		return CodexDeny(reason), Verdict{}, ""
 	}
-	best, reason := Verdict{}, ""
+	best, reason, tool := Verdict{}, "", ""
 	for _, call := range calls {
 		v, r := s.Decide(call)
 		if v.Decision.rank() > best.Decision.rank() {
-			best, reason = v, r
+			best, reason, tool = v, r, call.Tool
 		}
 	}
 	switch best.Decision {
 	case DecideDeny:
-		return CodexDeny(reason)
+		return CodexDeny(reason), best, tool
 	case DecideConfirm:
-		return CodexDeny(reason + " Codex has no step where the person confirms a call, so it is refused: do it another way, or ask the person.")
+		return CodexDeny(reason + " Codex has no step where the person confirms a call, so it is refused: do it another way, or ask the person."), best, tool
 	}
-	return nil
+	return nil, Verdict{}, ""
 }
 
 // judgesShell says whether the snapshot has anything to say about shell commands: a Bash rule of any app (or the rule *),

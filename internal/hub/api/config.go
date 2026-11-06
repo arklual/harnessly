@@ -61,6 +61,9 @@ func (h *Hub) config(w http.ResponseWriter, r *http.Request) error {
 		// proxied: the page came through a gateway that signs its people in (config.ProxyJWT); it shows no sign-in or
 		// sign-out of its own.
 		"proxied": h.Auth.ProxiedHost(r),
+		// workspace: this hub serves the runtime's page at /agents/, one workspace for every machine of the fleet
+		// (runtime.fleet, internal/hub/proxy/workspace.go).
+		"workspace": h.Proxy != nil && h.Proxy.Workspace(),
 		// What the instance itself switches on for every organization; an organization's own flags are in its view.
 		"features": h.Features.Instance(),
 	})

@@ -26,6 +26,8 @@ import FindInFiles, {
 } from '@/next/features/pane/find-in-files';
 import { toast } from '@/next/ui/toast';
 import Icon from '@/next/ui/icon';
+import PaneHead, { Crumbs } from '@/next/features/pane/pane-head';
+import { crumbsOf, MACHINE, trimmed } from '@/next/features/pane/crumbs';
 import type { DirListing, FileContent } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import LoadFailed from '@/next/ui/load-failed';
@@ -54,10 +56,9 @@ export interface IFilesViewProps {
   onDownload: (paths: readonly string[]) => void;
   /** Two picked files, one against the other. */
   onCompare?: (a: string, b: string) => void;
-  /** The open file's own controls (download, «…», «Сохранить»): on the right of the crumbs, one row. */
+  /** The open file's own controls (download, «…», «Сохранить»): on the right of the crumbs, one row, after what the
+   *  editor puts there (the switch of the view). */
   tools?: ReactNode;
-  /** The place for the editor's switch of the view (page and code, tree and code), before `tools`. */
-  onModeSlot?: (el: HTMLElement | null) => void;
   /** «…» of an entry, around the button that opens it; `acts` rename it or move it to the trash, where it can be. */
   menuOf?: (
     path: string,
@@ -180,8 +181,6 @@ const GIT_LABEL = {
   directory: { new: 'next.files.gitNewFolder', changed: 'next.files.gitChangedFolder' },
 } as const;
 
-/** The list of the workspace's places: the top of «Машина». */
-export const MACHINE = '/';
 const SCOPE = { project: 'project', machine: 'machine' } as const;
 type TScope = (typeof SCOPE)[keyof typeof SCOPE];
 const FOLDER_INPUT = { webkitdirectory: '', directory: '' } as Record<string, string>;
@@ -191,29 +190,6 @@ const EXIT_MS = 180;
 const HOLD_MS = 450;
 /** A finger that moved this far is scrolling, not holding. */
 const HOLD_SLOP = 8;
-
-const nameOf = (path: string) => path.split('/').filter(Boolean).pop() ?? path;
-const trimmed = (dir: string) => dir.replace(/\/+$/, '') || MACHINE;
-
-/** The steps under a base: `a/b` of `base` is base/a, base/a/b. */
-const stepsOf = (rel: string, join: (sub: string) => string) => {
-  const parts = rel.split('/').filter(Boolean);
-  return parts.map((name, i) => ({ name, path: join(parts.slice(0, i + 1).join('/')) }));
-};
-
-/** A path of the machine: «Машина», the place it lies in, the folders under that place. A file opened by itself shows
- *  its folder and its name, a folder still loading its whole path in one step. */
-const machineCrumbs = (path: string, top: string | undefined, file: boolean) => {
-  const head = { name: t('next.files.machine'), path: MACHINE };
-  if (path === MACHINE) return [head];
-  if (top && (path === top || path.startsWith(`${top}/`)))
-    return [head, { name: top, path: top }, ...stepsOf(path.slice(top.length), (sub) => `${top}/${sub}`)];
-  if (file) {
-    const dir = path.slice(0, path.lastIndexOf('/')) || MACHINE;
-    return [head, { name: dir, path: dir }, { name: nameOf(path), path }];
-  }
-  return [head, { name: path, path }];
-};
 
 const FilesView = ({
   root,
@@ -229,7 +205,6 @@ const FilesView = ({
   onDownload,
   onCompare,
   tools,
-  onModeSlot,
   menuOf,
   take = null,
   entryOps = null,
@@ -289,10 +264,7 @@ const FilesView = ({
   );
   const home = trimmed(root);
   const scope: TScope = path.startsWith('/') ? SCOPE.machine : SCOPE.project;
-  const crumbs =
-    scope === SCOPE.machine
-      ? machineCrumbs(path, listing?.root, opening === 'file')
-      : [{ name: nameOf(home), path: '' }, ...stepsOf(path, (sub) => sub)];
+  const crumbs = crumbsOf(root, path, listing?.root, opening === 'file');
   // The same folder in the other scope: the chat's folder seen from the machine, or back to it.
   const rescope = (to: TScope) => {
     if (to === scope) return;
@@ -417,377 +389,374 @@ const FilesView = ({
   return (
     <div className="hx-tv" data-tool="disk" data-file={file !== null || undefined}>
       <div className="hx-disk">
-        <div className="hx-disk__head">
-          <div className="hx-disk__crumbs">
-            {crumbs.map((c, i) => (
-              <span key={c.path} className="hx-disk__step">
-                <button
-                  type="button"
-                  className="hx-disk__crumb"
-                  aria-current={i === crumbs.length - 1}
-                  onClick={() => onOpen(c.path, 'directory')}
-                >
-                  {c.name}
-                </button>
-                {i < crumbs.length - 1 && <Icon name="chevron-right" size="sm" />}
-              </span>
-            ))}
-          </div>
-          {error === null && file !== null && (
-            <div className="hx-disk__tools">
-              <span className="hx-disk__mode" ref={onModeSlot} />
-              {quickButton}
-              {findButton}
-              {tools}
-            </div>
-          )}
-          {folder && (
-            <div className="hx-disk__tools">
-              <Segmented
-                label={t('next.files.scope')}
-                value={scope}
-                options={[
-                  { value: SCOPE.project, label: t('next.files.project') },
-                  { value: SCOPE.machine, label: t('next.files.machine') },
-                ]}
-                onChange={rescope}
-              />
-              {quickButton}
-              {findButton}
-              {entryOps && (
-                <button
-                  type="button"
-                  className="hx-head-btn hx-tipped"
-                  aria-label={t('next.files.newFile')}
-                  onClick={() => startEdit({ kind: 'newFile', name: '' })}
-                >
-                  <Icon name="file-plus" size="sm" />
-                  <span className="hx-tip" data-pos="below" data-align="end">
-                    {t('next.files.newFile')}
-                  </span>
-                </button>
-              )}
-              {take && (
+        <PaneHead
+          lead={<Crumbs items={crumbs} onPick={(at) => onOpen(at, 'directory')} />}
+          tools={
+            <>
+              {error === null && file !== null && (
                 <>
-                  <button
-                    type="button"
-                    className="hx-head-btn hx-tipped"
-                    aria-label={t('next.files.newFolder')}
-                    onClick={() => startEdit({ kind: 'newFolder', name: '' })}
-                  >
-                    <Icon name="folder-plus" size="sm" />
-                    <span className="hx-tip" data-pos="below" data-align="end">
-                      {t('next.files.newFolder')}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="hx-head-btn hx-tipped"
-                    aria-label={t('next.files.upload')}
-                    onClick={() => filesInput.current?.click()}
-                  >
-                    <Icon name="upload" size="sm" />
-                    <span className="hx-tip" data-pos="below" data-align="end">
-                      {t('next.files.uploadHint')}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="hx-head-btn hx-tipped"
-                    aria-label={t('next.files.uploadFolder')}
-                    onClick={() => folderInput.current?.click()}
-                  >
-                    <Icon name="folder-input" size="sm" />
-                    <span className="hx-tip" data-pos="below" data-align="end">
-                      {t('next.files.uploadFolder')}
-                    </span>
-                  </button>
-                  <input ref={filesInput} type="file" multiple hidden onChange={sendPicked} />
-                  <input
-                    ref={folderInput}
-                    type="file"
-                    multiple
-                    hidden
-                    {...FOLDER_INPUT}
-                    onChange={sendPicked}
+                  {quickButton}
+                  {findButton}
+                  {tools}
+                </>
+              )}
+              {folder && (
+                <>
+                  <Segmented
+                    label={t('next.files.scope')}
+                    value={scope}
+                    options={[
+                      { value: SCOPE.project, label: t('next.files.project') },
+                      { value: SCOPE.machine, label: t('next.files.machine') },
+                    ]}
+                    onChange={rescope}
                   />
-                </>
-              )}
-            </div>
-          )}
-          {folder && path !== MACHINE && listing !== null && listing.entries.length > 0 && (
-            <div className="hx-disk__tools">
-              <button
-                type="button"
-                className="hx-head-btn hx-tipped"
-                aria-label={t('next.files.pick')}
-                aria-pressed={picking !== null}
-                onClick={() => setPicked(picking ? null : { at: path, paths: new Set() })}
-              >
-                <Icon name="list-checks" size="sm" />
-                <span className="hx-tip" data-pos="below" data-align="end">
-                  {t('next.files.pick')}
-                </span>
-              </button>
-              <button
-                type="button"
-                className="hx-head-btn hx-tipped"
-                aria-label={t('next.files.downloadFolder')}
-                onClick={() => onDownload([path])}
-              >
-                <Icon name="download" size="sm" />
-                <span className="hx-tip" data-pos="below" data-align="end">
-                  {t('next.files.downloadFolder')}
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-        {finding && findText && onOpenAt && (
-          <FindInFiles
-            find={findText}
-            state={findState}
-            onState={setFindState}
-            onClose={() => setFinding(false)}
-            onOpen={(hit, size) => {
-              setFinding(false);
-              onOpenAt(hit, size);
-            }}
-          />
-        )}
-        {quick && find && (
-          <QuickOpen
-            find={find}
-            onClose={() => setQuick(false)}
-            onOpen={(found) => {
-              setQuick(false);
-              onOpen(found, 'file');
-            }}
-          />
-        )}
-        {error !== null && (
-          <LoadFailed
-            title={t(opening === 'file' ? 'next.load.file' : 'next.load.files')}
-            reason={error}
-            onRetry={onRetry}
-          />
-        )}
-        {error === null && file !== null && editor}
-        {error === null && file === null && (
-          <div
-            className="hx-disk__list"
-            data-picking={picking !== null || undefined}
-            data-drop={dropping || undefined}
-            {...dropTo}
-            role={listing === null ? 'status' : undefined}
-            aria-label={listing === null ? t('next.files.loading') : undefined}
-          >
-            <Swap
-              ready={listing !== null}
-              skeleton={
-                <>
-                  <span className="hx-sk hx-plan__sk" />
-                  <span className="hx-sk hx-plan__sk" />
-                </>
-              }
-            >
-              {editing && (editing.kind === 'newFolder' || editing.kind === 'newFile') && (
-                <NameRow
-                  icon={editing.kind === 'newFolder' ? 'folder' : 'file-text'}
-                  label={t(
-                    editing.kind === 'newFolder' ? 'next.files.newFolderName' : 'next.files.newFileName',
+                  {quickButton}
+                  {findButton}
+                  {entryOps && (
+                    <button
+                      type="button"
+                      className="hx-head-btn hx-tipped"
+                      aria-label={t('next.files.newFile')}
+                      onClick={() => startEdit({ kind: 'newFile', name: '' })}
+                    >
+                      <Icon name="file-plus" size="sm" />
+                      <span className="hx-tip" data-pos="below" data-align="end">
+                        {t('next.files.newFile')}
+                      </span>
+                    </button>
                   )}
-                  done={t('next.files.newFolderMake')}
-                  value={editing.name}
-                  busy={editing.busy}
-                  failure={editing.failure}
-                  onChange={typeName}
-                  onSubmit={() => void commit()}
-                  onCancel={() => setEdit(null)}
-                />
-              )}
-              {listing?.entries.map((entry) => {
-                const on = picking?.has(entry.path) ?? false;
-                const mine = editing && 'path' in editing && editing.path === entry.path ? editing : null;
-                if (mine?.kind === 'rename')
-                  return (
-                    <NameRow
-                      key={entry.path}
-                      icon={entry.kind === 'directory' ? 'folder' : 'file-text'}
-                      label={t('next.files.renameName')}
-                      done={t('next.files.renameDo')}
-                      value={mine.name}
-                      busy={mine.busy}
-                      failure={mine.failure}
-                      pickStem={entry.kind === 'file'}
-                      onChange={typeName}
-                      onSubmit={() => void commit()}
-                      onCancel={() => setEdit(null)}
-                    />
-                  );
-                return (
-                  <Fragment key={entry.path}>
-                    <div className="hx-disk__item">
+                  {take && (
+                    <>
                       <button
                         type="button"
-                        className="hx-tv__row"
-                        role={picking ? 'checkbox' : undefined}
-                        aria-checked={picking ? on : undefined}
-                        onPointerDown={press(entry.path)}
-                        onPointerMove={drift}
-                        onPointerUp={release}
-                        onPointerCancel={release}
-                        onContextMenu={(event) => {
-                          if (held.current || hold.current) event.preventDefault();
-                        }}
-                        onClick={(event) => {
-                          if (held.current) {
-                            held.current = false;
-                            return;
-                          }
-                          if (picking) toggle(entry.path);
-                          else if (onOpenBeside && (event.metaKey || event.ctrlKey))
-                            onOpenBeside(entry.path, entry.kind);
-                          else onOpen(entry.path, entry.kind);
-                        }}
-                        onAuxClick={(event) => {
-                          if (event.button !== 1 || picking || !onOpenBeside) return;
-                          event.preventDefault();
-                          onOpenBeside(entry.path, entry.kind);
-                        }}
+                        className="hx-head-btn hx-tipped"
+                        aria-label={t('next.files.newFolder')}
+                        onClick={() => startEdit({ kind: 'newFolder', name: '' })}
                       >
-                        {picking && (
-                          <span className="hx-disk__check" data-on={on || undefined} aria-hidden="true">
-                            <Icon name="check" size="sm" />
-                          </span>
-                        )}
-                        <Icon name={entry.kind === 'directory' ? 'folder' : 'file-text'} size="sm" />
-                        <span className="hx-tv__main">
-                          <span className="hx-tv__name" data-git={entry.git}>
-                            {entry.name}
-                          </span>
+                        <Icon name="folder-plus" size="sm" />
+                        <span className="hx-tip" data-pos="below" data-align="end">
+                          {t('next.files.newFolder')}
                         </span>
-                        {entry.git && (
-                          <span
-                            className="hx-disk__git"
-                            data-git={entry.git}
-                            role="img"
-                            aria-label={t(GIT_LABEL[entry.kind][entry.git])}
-                            title={t(GIT_LABEL[entry.kind][entry.git])}
-                          />
-                        )}
                       </button>
-                      {!picking && (
-                        <span className="hx-disk__acts">
-                          <button
-                            type="button"
-                            className="hx-head-btn"
-                            aria-label={t(
-                              entry.kind === 'directory' ? 'next.files.downloadZip' : 'next.files.download',
-                              { name: entry.name },
-                            )}
-                            title={t(
-                              entry.kind === 'directory'
-                                ? 'next.files.downloadZipHint'
-                                : 'next.files.downloadHint',
-                            )}
-                            onClick={() => onDownload([entry.path])}
-                          >
-                            <Icon name="download" size="sm" />
-                          </button>
-                          {menuOf?.(
-                            entry.path,
-                            entry.kind,
+                      <button
+                        type="button"
+                        className="hx-head-btn hx-tipped"
+                        aria-label={t('next.files.upload')}
+                        onClick={() => filesInput.current?.click()}
+                      >
+                        <Icon name="upload" size="sm" />
+                        <span className="hx-tip" data-pos="below" data-align="end">
+                          {t('next.files.uploadHint')}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="hx-head-btn hx-tipped"
+                        aria-label={t('next.files.uploadFolder')}
+                        onClick={() => folderInput.current?.click()}
+                      >
+                        <Icon name="folder-input" size="sm" />
+                        <span className="hx-tip" data-pos="below" data-align="end">
+                          {t('next.files.uploadFolder')}
+                        </span>
+                      </button>
+                      <input ref={filesInput} type="file" multiple hidden onChange={sendPicked} />
+                      <input
+                        ref={folderInput}
+                        type="file"
+                        multiple
+                        hidden
+                        {...FOLDER_INPUT}
+                        onChange={sendPicked}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+              {folder && path !== MACHINE && listing !== null && listing.entries.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="hx-head-btn hx-tipped"
+                    aria-label={t('next.files.pick')}
+                    aria-pressed={picking !== null}
+                    onClick={() => setPicked(picking ? null : { at: path, paths: new Set() })}
+                  >
+                    <Icon name="list-checks" size="sm" />
+                    <span className="hx-tip" data-pos="below" data-align="end">
+                      {t('next.files.pick')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="hx-head-btn hx-tipped"
+                    aria-label={t('next.files.downloadFolder')}
+                    onClick={() => onDownload([path])}
+                  >
+                    <Icon name="download" size="sm" />
+                    <span className="hx-tip" data-pos="below" data-align="end">
+                      {t('next.files.downloadFolder')}
+                    </span>
+                  </button>
+                </>
+              )}
+            </>
+          }
+        >
+          {finding && findText && onOpenAt && (
+            <FindInFiles
+              find={findText}
+              state={findState}
+              onState={setFindState}
+              onClose={() => setFinding(false)}
+              onOpen={(hit, size) => {
+                setFinding(false);
+                onOpenAt(hit, size);
+              }}
+            />
+          )}
+          {quick && find && (
+            <QuickOpen
+              find={find}
+              onClose={() => setQuick(false)}
+              onOpen={(found) => {
+                setQuick(false);
+                onOpen(found, 'file');
+              }}
+            />
+          )}
+          {error !== null && (
+            <LoadFailed
+              title={t(opening === 'file' ? 'next.load.file' : 'next.load.files')}
+              reason={error}
+              onRetry={onRetry}
+            />
+          )}
+          {error === null && file !== null && editor}
+          {error === null && file === null && (
+            <div
+              className="hx-disk__list"
+              data-picking={picking !== null || undefined}
+              data-drop={dropping || undefined}
+              {...dropTo}
+              role={listing === null ? 'status' : undefined}
+              aria-label={listing === null ? t('next.files.loading') : undefined}
+            >
+              <Swap
+                ready={listing !== null}
+                skeleton={
+                  <>
+                    <span className="hx-sk hx-plan__sk" />
+                    <span className="hx-sk hx-plan__sk" />
+                  </>
+                }
+              >
+                {editing && (editing.kind === 'newFolder' || editing.kind === 'newFile') && (
+                  <NameRow
+                    icon={editing.kind === 'newFolder' ? 'folder' : 'file-text'}
+                    label={t(
+                      editing.kind === 'newFolder' ? 'next.files.newFolderName' : 'next.files.newFileName',
+                    )}
+                    done={t('next.files.newFolderMake')}
+                    value={editing.name}
+                    busy={editing.busy}
+                    failure={editing.failure}
+                    onChange={typeName}
+                    onSubmit={() => void commit()}
+                    onCancel={() => setEdit(null)}
+                  />
+                )}
+                {listing?.entries.map((entry) => {
+                  const on = picking?.has(entry.path) ?? false;
+                  const mine = editing && 'path' in editing && editing.path === entry.path ? editing : null;
+                  if (mine?.kind === 'rename')
+                    return (
+                      <NameRow
+                        key={entry.path}
+                        icon={entry.kind === 'directory' ? 'folder' : 'file-text'}
+                        label={t('next.files.renameName')}
+                        done={t('next.files.renameDo')}
+                        value={mine.name}
+                        busy={mine.busy}
+                        failure={mine.failure}
+                        pickStem={entry.kind === 'file'}
+                        onChange={typeName}
+                        onSubmit={() => void commit()}
+                        onCancel={() => setEdit(null)}
+                      />
+                    );
+                  return (
+                    <Fragment key={entry.path}>
+                      <div className="hx-disk__item">
+                        <button
+                          type="button"
+                          className="hx-tv__row"
+                          role={picking ? 'checkbox' : undefined}
+                          aria-checked={picking ? on : undefined}
+                          onPointerDown={press(entry.path)}
+                          onPointerMove={drift}
+                          onPointerUp={release}
+                          onPointerCancel={release}
+                          onContextMenu={(event) => {
+                            if (held.current || hold.current) event.preventDefault();
+                          }}
+                          onClick={(event) => {
+                            if (held.current) {
+                              held.current = false;
+                              return;
+                            }
+                            if (picking) toggle(entry.path);
+                            else if (onOpenBeside && (event.metaKey || event.ctrlKey))
+                              onOpenBeside(entry.path, entry.kind);
+                            else onOpen(entry.path, entry.kind);
+                          }}
+                          onAuxClick={(event) => {
+                            if (event.button !== 1 || picking || !onOpenBeside) return;
+                            event.preventDefault();
+                            onOpenBeside(entry.path, entry.kind);
+                          }}
+                        >
+                          {picking && (
+                            <span className="hx-disk__check" data-on={on || undefined} aria-hidden="true">
+                              <Icon name="check" size="sm" />
+                            </span>
+                          )}
+                          <Icon name={entry.kind === 'directory' ? 'folder' : 'file-text'} size="sm" />
+                          <span className="hx-tv__main">
+                            <span className="hx-tv__name" data-git={entry.git}>
+                              {entry.name}
+                            </span>
+                          </span>
+                          {entry.git && (
+                            <span
+                              className="hx-disk__git"
+                              data-git={entry.git}
+                              role="img"
+                              aria-label={t(GIT_LABEL[entry.kind][entry.git])}
+                              title={t(GIT_LABEL[entry.kind][entry.git])}
+                            />
+                          )}
+                        </button>
+                        {!picking && (
+                          <span className="hx-disk__acts">
                             <button
                               type="button"
                               className="hx-head-btn"
-                              aria-label={t('next.fileMenu.of', { name: entry.name })}
+                              aria-label={t(
+                                entry.kind === 'directory' ? 'next.files.downloadZip' : 'next.files.download',
+                                { name: entry.name },
+                              )}
+                              title={t(
+                                entry.kind === 'directory'
+                                  ? 'next.files.downloadZipHint'
+                                  : 'next.files.downloadHint',
+                              )}
+                              onClick={() => onDownload([entry.path])}
                             >
-                              <Icon name="ellipsis" size="sm" />
-                            </button>,
-                            actsOf(entry),
-                          )}
-                        </span>
-                      )}
-                    </div>
-                    {mine?.kind === 'trash' && (
-                      <form
-                        className="hx-disk__new"
-                        role="alertdialog"
-                        aria-label={t('next.files.trashAsk', { name: entry.name })}
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          void commit();
-                        }}
-                      >
-                        <Icon name="trash-2" size="sm" />
-                        <span className="hx-disk__ask">{t('next.files.trashAsk', { name: entry.name })}</span>
-                        <Button size="sm" variant="ghost" autoFocus onClick={() => setEdit(null)}>
-                          {t('next.files.pickCancel')}
-                        </Button>
-                        <Button size="sm" variant="danger" disabled={mine.busy} onClick={() => void commit()}>
-                          {t('next.files.trashDo')}
-                        </Button>
-                        {mine.failure && (
-                          <span className="hx-disk__fail" role="alert">
-                            {mine.failure}
+                              <Icon name="download" size="sm" />
+                            </button>
+                            {menuOf?.(
+                              entry.path,
+                              entry.kind,
+                              <button
+                                type="button"
+                                className="hx-head-btn"
+                                aria-label={t('next.fileMenu.of', { name: entry.name })}
+                              >
+                                <Icon name="ellipsis" size="sm" />
+                              </button>,
+                              actsOf(entry),
+                            )}
                           </span>
                         )}
-                      </form>
-                    )}
-                  </Fragment>
-                );
-              })}
-              {listing?.entries.length === 0 && (
-                <div className="hx-tv__empty">{t(take ? 'next.files.emptyDrop' : 'next.files.empty')}</div>
+                      </div>
+                      {mine?.kind === 'trash' && (
+                        <form
+                          className="hx-disk__new"
+                          role="alertdialog"
+                          aria-label={t('next.files.trashAsk', { name: entry.name })}
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void commit();
+                          }}
+                        >
+                          <Icon name="trash-2" size="sm" />
+                          <span className="hx-disk__ask">
+                            {t('next.files.trashAsk', { name: entry.name })}
+                          </span>
+                          <Button size="sm" variant="ghost" autoFocus onClick={() => setEdit(null)}>
+                            {t('next.files.pickCancel')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={mine.busy}
+                            onClick={() => void commit()}
+                          >
+                            {t('next.files.trashDo')}
+                          </Button>
+                          {mine.failure && (
+                            <span className="hx-disk__fail" role="alert">
+                              {mine.failure}
+                            </span>
+                          )}
+                        </form>
+                      )}
+                    </Fragment>
+                  );
+                })}
+                {listing?.entries.length === 0 && (
+                  <div className="hx-tv__empty">{t(take ? 'next.files.emptyDrop' : 'next.files.empty')}</div>
+                )}
+                {listing?.truncated && <div className="hx-tv__note">{t('next.files.truncated')}</div>}
+              </Swap>
+            </div>
+          )}
+          {below}
+          {bar.value && (
+            <div
+              className="hx-disk__bar"
+              data-state={bar.state}
+              role="toolbar"
+              aria-label={t('next.files.pick')}
+            >
+              <span className="hx-disk__count">
+                {bar.value.size === 0
+                  ? t('next.files.pickHint')
+                  : t('next.files.picked', { n: bar.value.size })}
+              </span>
+              <span className="hx-spacer" />
+              <Button size="sm" variant="ghost" onClick={() => setPicked(null)}>
+                {t('next.files.pickCancel')}
+              </Button>
+              {onCompare && pair && (
+                <Button
+                  size="sm"
+                  icon="git-compare"
+                  onClick={() => {
+                    onCompare(pair[0], pair[1]);
+                    setPicked(null);
+                  }}
+                >
+                  {t('next.files.compare')}
+                </Button>
               )}
-              {listing?.truncated && <div className="hx-tv__note">{t('next.files.truncated')}</div>}
-            </Swap>
-          </div>
-        )}
-        {below}
-        {bar.value && (
-          <div
-            className="hx-disk__bar"
-            data-state={bar.state}
-            role="toolbar"
-            aria-label={t('next.files.pick')}
-          >
-            <span className="hx-disk__count">
-              {bar.value.size === 0
-                ? t('next.files.pickHint')
-                : t('next.files.picked', { n: bar.value.size })}
-            </span>
-            <span className="hx-spacer" />
-            <Button size="sm" variant="ghost" onClick={() => setPicked(null)}>
-              {t('next.files.pickCancel')}
-            </Button>
-            {onCompare && pair && (
               <Button
                 size="sm"
-                icon="git-compare"
+                variant="primary"
+                icon="download"
+                disabled={pickedList.length === 0}
                 onClick={() => {
-                  onCompare(pair[0], pair[1]);
+                  onDownload(pickedList);
                   setPicked(null);
                 }}
               >
-                {t('next.files.compare')}
+                {t('next.files.downloadPicked')}
               </Button>
-            )}
-            <Button
-              size="sm"
-              variant="primary"
-              icon="download"
-              disabled={pickedList.length === 0}
-              onClick={() => {
-                onDownload(pickedList);
-                setPicked(null);
-              }}
-            >
-              {t('next.files.downloadPicked')}
-            </Button>
-          </div>
-        )}
+            </div>
+          )}
+        </PaneHead>
       </div>
     </div>
   );

@@ -162,6 +162,12 @@ func (s *Service) RequireTrustedMachine(ctx context.Context, m store.Machine) er
 	if s.cfg.SubdomainMode() {
 		return nil
 	}
+	return s.RequireTrustedOnHub(ctx, m)
+}
+
+// RequireTrustedOnHub is the same rule whatever the mode: for what a machine answers on the hub's own origin even when
+// it has an origin of its own (the hub's workspace, /agents/, internal/hub/proxy/workspace.go).
+func (s *Service) RequireTrustedOnHub(ctx context.Context, m store.Machine) error {
 	admin, err := s.IsInstanceAdmin(ctx, m.CreatedBy)
 	if err != nil {
 		return err

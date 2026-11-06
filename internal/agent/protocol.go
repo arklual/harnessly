@@ -1,6 +1,10 @@
 package agent
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/ly-solutions/harnessly/internal/hubproto"
+)
 
 // Wire protocol between the cluster and the machine agent, version 1. One WebSocket per person × machine, JSON text
 // frames. A request carries an id and gets exactly one response with the same id; an event has no id. Tunnel bytes
@@ -87,18 +91,8 @@ type evAutomationResult struct {
 	MrURL       string `json:"mrUrl,omitempty"`
 }
 
-type DocBinding struct {
-	Slug           string  `json:"slug"`
-	Kind           string  `json:"kind"`
-	Key            *string `json:"key"`
-	Title          string  `json:"title"`
-	TabID          *string `json:"tabId"`
-	SessionName    *string `json:"sessionName"`
-	AgentSessionID *string `json:"agentSessionId"`
-	Provider       string  `json:"provider"`
-	SourcePath     *string `json:"sourcePath"`
-	Cwd            *string `json:"cwd"`
-}
+// DocBinding is the conversation a document was published from (docs.bound).
+type DocBinding = hubproto.DocBinding
 
 type evDocBound struct {
 	Event   string     `json:"event"`

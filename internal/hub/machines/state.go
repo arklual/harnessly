@@ -231,7 +231,7 @@ func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 		if s.design != nil && json.Unmarshal(ev.Raw, &e) == nil {
 			go s.design.Event(m, e.Design)
 		}
-	case "doc.publish", "doc.acl":
+	case hubproto.EventDocPublish, hubproto.EventDocACL, hubproto.EventDocBound, hubproto.EventDocReply:
 		if s.docs != nil {
 			s.docs.Event(l, m, ev)
 		}

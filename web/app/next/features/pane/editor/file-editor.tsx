@@ -5,7 +5,6 @@ import { usePhone } from '@/next/ui/use-media';
 import { EditorState, type Text } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { openSearchPanel } from '@codemirror/search';
-import { createPortal } from 'react-dom';
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { WordedError } from '@/next/core/net/worded';
 import { extensions, language } from '@/next/features/pane/editor/setup';
@@ -25,6 +24,7 @@ import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresence, usePresentFlag } from '@/next/ui/presence';
 import Segmented from '@/next/ui/segmented';
+import { HeadTools } from '@/next/features/pane/pane-head';
 
 const MdPreview = lazy(() => import('@/next/features/pane/editor/md-preview'));
 
@@ -119,8 +119,6 @@ export interface IFileEditorProps {
   at?: { line: number; col: number; size: number } | null;
   /** Hands the selection to the chat's field as a quote: the path with the lines, the code, the person's ask. */
   onAsk?: (quote: string, note: string | null) => void;
-  /** Where the switch of the view goes (the folder's head row, beside the crumbs); without it, a bar of its own. */
-  modeSlot?: HTMLElement | null;
 }
 
 /** What the editor's text is shown against: its name over the diff, its text, or why there is none. */
@@ -175,7 +173,6 @@ const FileEditor = ({
   compare = null,
   onCloseCompare,
   onAsk,
-  modeSlot = null,
   at = null,
 }: IFileEditorProps) => {
   const host = useRef<HTMLDivElement>(null);
@@ -369,8 +366,8 @@ const FileEditor = ({
   );
   return (
     <div className="hx-fed" data-kind={shown ?? 'code'}>
-      {modes && modeSlot && createPortal(modeSwitch, modeSlot)}
-      {modes && !modeSlot && <div className="hx-fed__bar">{modeSwitch}</div>}
+      {/* The switch of the view goes into the head row over the editor (beside the crumbs); alone, a bar of its own. */}
+      {modes && <HeadTools bar="hx-fed__bar">{modeSwitch}</HeadTools>}
       {shownNotice.value && (
         <div
           className="hx-fed__notice"

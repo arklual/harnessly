@@ -1,0 +1,2 @@
+/* Written by the runtime from meta/deck.json: change the deck's theme and font in its settings. */
+:root{--deck-bg:#fbfaf7;--deck-ink:#17161a;--deck-mute:#56545e;--deck-acc:#2f6bff;--deck-on-acc:#ffffff;--deck-acc-soft:#e9efff;--deck-acc-ink:#2f6bff;--deck-panel:#f1efea;--deck-line:#e2dfd7;--deck-font:Inter, system-ui, sans-serif;}

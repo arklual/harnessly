@@ -453,6 +453,9 @@ func (h *hub) hello() hubproto.Hello {
 	if h.designServed() {
 		features = append(features, hubproto.FeatureDesignAccess)
 	}
+	if h.docsServed() {
+		features = append(features, hubproto.FeatureDocs)
+	}
 	var hw *hubproto.Hardware
 	if h.metrics != nil {
 		hw = h.metrics.hardware(runtime.GOOS, runtime.GOARCH)

@@ -48,8 +48,9 @@ func (s *Service) fleetOn(ctx context.Context, sp store.Space) bool {
 	return s.gate != nil && s.gate.On(ctx, store.OrgKey(sp), features.RuntimeFleet)
 }
 
-// fleet is every machine the person may open now, across the organizations, oldest first within a tenant.
-func (s *Service) fleet(ctx context.Context, userID string) ([]FleetMachine, error) {
+// fleet is every machine the person may open now, across the organizations, oldest first within a tenant. onHub keeps
+// only the machines that may answer on the hub's own origin (the workspace, workspace.go), in either mode.
+func (s *Service) fleet(ctx context.Context, userID string, onHub bool) ([]FleetMachine, error) {
 	st := s.db.S()
 	byID := map[string]store.Space{}
 	mine, err := st.SpacesByUser(ctx, userID)
@@ -108,6 +109,9 @@ func (s *Service) fleet(ctx context.Context, userID string) ([]FleetMachine, err
 			if _, err := s.admit(ctx, userID, m.ID); err != nil {
 				continue // no access, an untrusted machine: it is not there for this person
 			}
+			if onHub && s.trustedOnHub(ctx, m) != nil {
+				continue
+			}
 			f := FleetMachine{
 				ID: m.ID, Name: m.Name, Host: m.Hostname, OrgID: sp.OrgID, OrgName: orgName[sp.OrgID],
 				TenantID: sp.ID, Tenant: sp.Name,
@@ -137,7 +141,7 @@ func (s *Service) fleet(ctx context.Context, userID string) ([]FleetMachine, err
 }
 
 func (s *Service) meMachines(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	list, err := s.fleet(r.Context(), p.User.ID)
+	list, err := s.fleet(r.Context(), p.User.ID, false)
 	if err != nil {
 		return err
 	}
@@ -160,8 +164,8 @@ type v2Machine struct {
 	Tenant     string   `json:"tenant"`
 }
 
-func (s *Service) v2List(w http.ResponseWriter, r *http.Request, userID string) {
-	list, err := s.fleet(r.Context(), userID)
+func (s *Service) v2List(w http.ResponseWriter, r *http.Request, userID string, onHub bool) {
+	list, err := s.fleet(r.Context(), userID, onHub)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -193,8 +197,8 @@ func clusterPath(p string) bool {
 }
 
 // home is the machine the cluster's paths go to: the first one of the fleet that is on, else the first.
-func (s *Service) home(ctx context.Context, userID string) string {
-	list, err := s.fleet(ctx, userID)
+func (s *Service) home(ctx context.Context, userID string, onHub bool) string {
+	list, err := s.fleet(ctx, userID, onHub)
 	if err != nil || len(list) == 0 {
 		return ""
 	}
@@ -224,8 +228,14 @@ func (s *Service) serveFleet(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.ErrUnauthenticated)
 		return
 	}
+	s.fleetCall(w, r, p.User, false)
+}
+
+// fleetCall answers /api/v2/… for a signed-in person; onHub is the workspace's way in (workspace.go), where only the
+// machines that may answer on the hub's own origin are there.
+func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User, onHub bool) {
 	if r.URL.Path == "/api/v2/chat-move" || strings.HasPrefix(r.URL.Path, "/api/v2/chat-move/") {
-		s.serveMove(w, r, p.User)
+		s.serveMove(w, r, u)
 		return
 	}
 	q := r.URL.Query()
@@ -235,13 +245,13 @@ func (s *Service) serveFleet(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
 		}
-		s.v2List(w, r, p.User.ID)
+		s.v2List(w, r, u.ID, onHub)
 		return
 	}
 	if id == "" && clusterPath(r.URL.Path) {
 		// The cluster's own paths (the person, search, the vault) have no machine in the address: the runtime of the
 		// person's first machine that is on answers them, the one a standalone runtime would.
-		if id = s.home(r.Context(), p.User.ID); id == "" {
+		if id = s.home(r.Context(), u.ID, onHub); id == "" {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
 		}
@@ -250,7 +260,10 @@ func (s *Service) serveFleet(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 		return
 	}
-	m, err := s.admit(r.Context(), p.User.ID, id)
+	m, err := s.admit(r.Context(), u.ID, id)
+	if err == nil && onHub {
+		err = s.trustedOnHub(r.Context(), m)
+	}
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -262,10 +275,10 @@ func (s *Service) serveFleet(w http.ResponseWriter, r *http.Request) {
 	}
 	// The machine's runtime knows nothing of which machine it is asked for: the address is its own.
 	clone := r.Clone(r.Context())
-	u := url.URL{Path: strings.TrimSuffix(r.URL.Path, "/"), RawPath: ""}
+	target := url.URL{Path: strings.TrimSuffix(r.URL.Path, "/"), RawPath: ""}
 	q.Del("machine")
-	u.RawQuery = q.Encode()
-	clone.URL = &u
+	target.RawQuery = q.Encode()
+	clone.URL = &target
 	clone.RequestURI = ""
-	s.forward(w, clone, p.User, m)
+	s.forward(w, clone, u, m)
 }

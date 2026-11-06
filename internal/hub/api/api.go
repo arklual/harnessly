@@ -62,6 +62,9 @@ type Options struct {
 	Endpoints  auth.Endpoints
 	// UI is the built hub page (index.html and assets/); nil serves a note instead. Config.WebDir, when set, wins.
 	UI fs.FS
+	// Workspace is the runtime's built page (web/dist): the fleet's workspace at /agents/ (internal/hub/proxy/workspace.go).
+	// nil leaves /agents/ to the hub's page.
+	Workspace fs.FS
 	// SSHDial opens the connections of the SSH install way; nil uses the network. Tests move it.
 	SSHDial sshinstall.Dialer
 	// SSHOnlineWait shortens the last step of an SSH install (tests).
@@ -277,7 +280,7 @@ func New(o Options) (*Hub, error) {
 		PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
 		LinkKey: linkKey, Notice: notice,
 	})
-	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now})
+	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry})
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
@@ -287,7 +290,7 @@ func New(o Options) (*Hub, error) {
 	h.Analytics.UseEvents(h.OrgEvents)
 	h.Analytics.UseFeatures(h.Features)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
-	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features})
+	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features, Workspace: o.Workspace})
 	h.Proxy = px
 	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
 	if cfg.SSH {
@@ -435,6 +438,7 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 	go h.Analytics.RunLive(ctx, h.OrgEvents.Active)
 	go h.Design.Run(ctx)
+	go h.Docs.Run(ctx) // comments not yet handed to their conversations
 	if h.Ext != nil {
 		go h.Ext.Run(ctx, ext.CheckEvery)
 	}

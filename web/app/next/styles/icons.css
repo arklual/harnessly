@@ -146,6 +146,9 @@
 .hx-icon[data-i='globe'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22 /%3E%3Cpath d=%22M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20%22 /%3E%3Cpath d=%22M2 12h20%22 /%3E%3C/svg%3E');
 }
+.hx-icon[data-i='graduation-cap'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z%22 /%3E%3Cpath d=%22M22 10v6%22 /%3E%3Cpath d=%22M6 12.5V16a6 3 0 0 0 12 0v-3.5%22 /%3E%3C/svg%3E');
+}
 .hx-icon[data-i='grip-horizontal'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Ccircle cx=%2212%22 cy=%229%22 r=%221%22 /%3E%3Ccircle cx=%2219%22 cy=%229%22 r=%221%22 /%3E%3Ccircle cx=%225%22 cy=%229%22 r=%221%22 /%3E%3Ccircle cx=%2212%22 cy=%2215%22 r=%221%22 /%3E%3Ccircle cx=%2219%22 cy=%2215%22 r=%221%22 /%3E%3Ccircle cx=%225%22 cy=%2215%22 r=%221%22 /%3E%3C/svg%3E');
 }

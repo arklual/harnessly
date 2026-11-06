@@ -643,6 +643,8 @@
   "next.designly.deleteCancel": "Отмена",
   "next.designly.deleteConfirm": "Удалить",
   "next.designly.deleteFailed": "Не удалось удалить проект",
+  "next.designly.restoreDemo": "Вернуть демо-проекты",
+  "next.designly.restoreDemoFailed": "Не удалось вернуть демо-проекты",
   "next.pane.chatGroup": "Этот чат",
   "next.pane.side": "Боковой чат",
   "next.pane.sideHint": "Вопрос про этот чат, агент не отвлечётся",

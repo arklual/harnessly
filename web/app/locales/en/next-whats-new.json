@@ -1,4 +1,10 @@
 {
+  "next.whatsNew.2026-11-06zg.learn.title": "Learn",
+  "next.whatsNew.2026-11-06zg.learn.text": "«More» → «Learn»: ten short lessons with films — the chat, the right pane, Sinopia, the safe and several agents. A lesson leads through the real interface and counts a step once you've done it.",
+  "next.whatsNew.2026-11-06zg.demo.title": "Demo projects in Sinopia",
+  "next.whatsNew.2026-11-06zg.demo.text": "Relay's site, deck, film and design system are already in the library — try and break them, they can be brought back.",
+  "next.whatsNew.2026-11-06zg.fileHead.title": "The file head in one row",
+  "next.whatsNew.2026-11-06zg.fileHead.text": "Over a file open in the right pane there is now one row: the path on the left, «Edit | Preview», «Share» and «Save» on the right. PDFs, pictures, spreadsheets and Word documents have the same. On a narrow pane a long path shrinks with an ellipsis.",
   "next.whatsNew.2026-11-06zf.codexApps.title": "Apps in Codex too",
   "next.whatsNew.2026-11-06zf.codexApps.text": "Apps now work in Codex chats as well: the same rules, instructions and servers as in Claude Code. What an app's rule forbids, the agent does not do.",
   "next.whatsNew.2026-11-06zf.appConnection.title": "An app through your connection",

@@ -151,14 +151,15 @@ USER agent
 # four systems a machine can be, and the installer. /dl/manifest.json is made by the hub from the files it finds.
 FROM build AS build-hub
 ARG VERSION=dev
-# `pnpm build` of the web stage builds the hub page too (web/dist-hub): one install and one type check for both.
+# `pnpm build` of the web stage builds the hub page too (web/dist-hub): one install and one type check for both. The hub
+# carries the runtime's page as well (web/dist, the webui tag): the fleet's workspace at /agents/.
 COPY --from=web /src/web/dist-hub ./web/dist-hub
 # The hub and the four systems a machine can be build side by side: one after another they took four minutes.
 RUN set -e; \
     hubflags="-s -w -X github.com/ly-solutions/harnessly/internal/hub/buildinfo.Version=${VERSION}"; \
     ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION}"; \
     mkdir -p /out/dist; \
-    go build -trimpath -tags hubui -ldflags "$hubflags" -o /out/hub ./cmd/hub & pids="$!"; \
+    go build -trimpath -tags "hubui webui" -ldflags "$hubflags" -o /out/hub ./cmd/hub & pids="$!"; \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
       os=${target%/*}; arch=${target#*/}; \
       ( GOOS=$os GOARCH=$arch go build -trimpath -tags webui -ldflags "$ldflags" -o /out/dist/runtime-$os-$arch ./cmd/runtime \

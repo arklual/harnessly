@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "minutes": 1,
+  "slides": null,
+  "tone": "talk",
+  "script": false,
+  "style": null,
+  "theme": "relay",
+  "font": "inter",
+  "themes": [
+    {
+      "id": "relay",
+      "name": "Relay",
+      "vars": {
+        "--deck-bg": "#fbfaf7",
+        "--deck-ink": "#17161a",
+        "--deck-mute": "#56545e",
+        "--deck-acc": "#2f6bff",
+        "--deck-on-acc": "#ffffff",
+        "--deck-acc-soft": "#e9efff",
+        "--deck-acc-ink": "#2f6bff",
+        "--deck-panel": "#f1efea",
+        "--deck-line": "#e2dfd7"
+      }
+    }
+  ]
+}

@@ -38,6 +38,20 @@ get the level the owner gave the team: none, view, comment or edit. A document t
 everyone signed in. Agent visibility maps to levels: `private` none, `team` or `view` view, `comment`, `edit`, and
 `public` view with a public link.
 
+## Comments reach the conversation
+
+A document published from a conversation is bound to it: after the publish the agent sends `docs.bound` with the tab,
+session and working directory (a board's binding stays with the cluster). When a person comments, the hub hands the
+comment to that conversation through the machine with `docs.deliver`, with the quoted place, the last comments of the
+thread and how to answer. The agent answers with the `reply` and `resolve` commands of its document tool, which reach the hub as `docs.reply`
+and show in the thread as "Агент".
+
+A comment the machine could not take (offline, timed out) is tried again every minute; after a day it is marked
+undelivered and the thread shows why (`deliveryError`). A delivered comment carries `deliveredAt`.
+
+On a machine linked to the hub as an observer the cluster keeps its documents unless the operator sets
+`AGENT_HUB_DOCS=on` there.
+
 ## What it does not do yet
 
 - Editing a block in place (`/source/block`) answers 501 `not_supported`; save the whole source instead.

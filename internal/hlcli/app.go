@@ -469,12 +469,35 @@ func (c *cli) appGuardCodex(in io.Reader, policyPath string) error {
 		out = apps.CodexDeny("The app guard could not read the rules of this chat's apps, so it cannot let this call through. " +
 			"Ask the person to turn the apps off and on again.")
 	default:
-		out = snap.CodexAnswer(raw)
+		var v apps.Verdict
+		var tool string
+		out, v, tool = snap.CodexJudge(raw)
+		if v.App != "" {
+			// The answer is out first: the journal is a courtesy and must not hold the call.
+			_, _ = c.env.Stdout.Write(out)
+			var head struct {
+				Session string `json:"session_id"`
+			}
+			_ = json.Unmarshal(raw, &head)
+			c.journalDecision(head.Session, tool, v, "deny", codexReason(out))
+			return nil
+		}
 	}
 	if len(out) > 0 {
 		_, _ = c.env.Stdout.Write(out)
 	}
 	return nil
+}
+
+// codexReason is the reason of a Codex refusal, for the journal.
+func codexReason(answer []byte) string {
+	var a struct {
+		H struct {
+			R string `json:"permissionDecisionReason"`
+		} `json:"hookSpecificOutput"`
+	}
+	_ = json.Unmarshal(answer, &a)
+	return a.H.R
 }
 
 // appContext is the SessionStart and UserPromptSubmit hook that hands the agent the context of the chat's apps

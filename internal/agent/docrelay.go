@@ -65,8 +65,17 @@ func (a *Agent) settleDoc(requestID string, res DocResult) {
 	}
 }
 
-// askCluster sends the event and waits up to wait for its doc.result (or notify.result).
+// askCluster sends the event to the cluster and waits up to wait for its notify.result.
 func (a *Agent) askCluster(id string, ev any, wait time.Duration) DocResult {
+	return a.ask(id, wait, func() bool { a.broadcast(ev); return true })
+}
+
+// askDocs sends a document event to whoever keeps the documents (hubdocs.go) and waits up to wait for its doc.result.
+func (a *Agent) askDocs(id string, ev any, wait time.Duration) DocResult {
+	return a.ask(id, wait, func() bool { return a.sendDoc(ev) })
+}
+
+func (a *Agent) ask(id string, wait time.Duration, send func() bool) DocResult {
 	ch := make(chan DocResult, 1)
 	a.mu.Lock()
 	a.pendingDocs[id] = ch
@@ -76,7 +85,9 @@ func (a *Agent) askCluster(id string, ev any, wait time.Duration) DocResult {
 		delete(a.pendingDocs, id)
 		a.mu.Unlock()
 	}()
-	a.broadcast(ev)
+	if !send() {
+		return DocResult{Status: http.StatusServiceUnavailable, Body: json.RawMessage(`{"error":"the hub is not connected, try again later"}`)}
+	}
 	select {
 	case res := <-ch:
 		return res
@@ -101,7 +112,7 @@ func (a *Agent) docRelayRoute(w http.ResponseWriter, r *http.Request) {
 		reply(w, 400, map[string]string{"error": "bad json"})
 		return
 	}
-	if !a.connected() {
+	if !a.docsConnected() {
 		reply(w, 503, map[string]string{"error": "the platform is not connected, try again later"})
 		return
 	}
@@ -114,7 +125,7 @@ func (a *Agent) docRelayRoute(w http.ResponseWriter, r *http.Request) {
 			reply(w, 400, map[string]string{"error": "slug, method and route are required"})
 			return
 		}
-		reply(w, 200, a.askCluster(id, evDocAcl{Event: "doc.acl", RequestID: id, Slug: *slug, Method: strings.ToUpper(method), Route: route, Body: obj["body"]}, docRelayTO))
+		reply(w, 200, a.askDocs(id, evDocAcl{Event: "doc.acl", RequestID: id, Slug: *slug, Method: strings.ToUpper(method), Route: route, Body: obj["body"]}, docRelayTO))
 		return
 	}
 	title := str(obj, "title", 300)
@@ -137,5 +148,5 @@ func (a *Agent) docRelayRoute(w http.ResponseWriter, r *http.Request) {
 		visibility = "private"
 	}
 	ev := evDocPublish{Event: "doc.publish", RequestID: id, Title: *title, Format: format, Content: content, Slug: str(obj, "slug", 128), Visibility: visibility, Note: str(obj, "note", 200), Source: obj["source"]}
-	reply(w, 200, a.askCluster(id, ev, docRelayTO))
+	reply(w, 200, a.askDocs(id, ev, docRelayTO))
 }

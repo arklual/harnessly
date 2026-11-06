@@ -4,6 +4,7 @@
 // screen, the panel's mode and tab, the selected and hovered block, the open popover or sheet — and talks to the board
 // on screen through the deck bridge: it turns the board's deck mode on, writes hand edits (text, style, move) into the
 // board's source through the patch route, and shows the frame, grip and guides of the blocks.
+import { tourSignal } from '@/next/stores/tour';
 import { placeOf } from '@/next/features/keys/chord';
 import { runChord } from '@/next/features/keys/use-keys';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -252,6 +253,9 @@ const DeckView = (props: IDeckViewProps) => {
   const [subsOn, setSubsOn] = useState(true);
   const [lmode, setLmode] = useState<TDeckOpens>(DECK_OPENS.slides);
   const [lfull, setLfull] = useState(false);
+  useEffect(() => {
+    if (lfull) tourSignal('deck:full');
+  }, [lfull]);
   // The mode asked for from outside (the address) puts the deck on the screen that is its own.
   const [wasViewing, setWasViewing] = useState(viewing);
   if (wasViewing !== viewing) {
@@ -286,6 +290,9 @@ const DeckView = (props: IDeckViewProps) => {
 
   const index = deckIndexOf(boards, path);
   const total = boards.length;
+  // The hands-on tour waits for these (stores/tour.ts): a slide turned to, the show started.
+  useEffect(() => tourSignal(`deck:slide:${index}`), [index]);
+  useEffect(() => tourSignal(`deck:screen:${screen}`), [screen]);
   const current = boards[index] ?? null;
   const slide = deck?.slides.find((s) => s.path === current?.path) ?? deck?.slides[index] ?? null;
   const n = index + 1;

@@ -1,6 +1,7 @@
 // Designly over the machine's library: loads it with the design systems, asks again while a card is drawing (a
 // conversation in its folder works), starts a new project from a brief and waits for the runtime before the field
 // clears — the card comes from the library itself. A pin waits for the machine too.
+import { useTourFill } from '@/next/features/tour/use-tour-fill';
 import { uploadSrc } from '@/next/commands/uploads';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +17,7 @@ import {
   fetchLibrary,
   fetchSystems,
   pinDesign,
+  restoreDemoDesigns,
   thumbPath,
   type IDesign,
   type IDesignSystem,
@@ -32,7 +34,7 @@ import { rememberChoice } from '@/next/features/composer/start-choice';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import { useVoice } from '@/next/bindings/use-voice';
 import { useUploads } from '@/next/bindings/use-uploads';
-import { clearDraft, setDraftText, useDraft, type DesignDraftKey } from '@/next/stores/drafts';
+import { clearDraft, DESIGN_START_DRAFT, setDraftText, useDraft } from '@/next/stores/drafts';
 import {
   createKindDocument,
   loadKindDocs,
@@ -170,6 +172,16 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     setDesigns((list) => list?.filter((d) => d.id !== id) ?? null);
   };
 
+  const onRestoreDemo = async () => {
+    try {
+      await restoreDemoDesigns(machine);
+    } catch (failure) {
+      toast(t('next.designly.restoreDemoFailed'), { tone: 'error', description: (failure as Error).message });
+      throw failure;
+    }
+    await load();
+  };
+
   const onRetry = () => {
     loaded.current = false;
     setDesigns(null);
@@ -177,7 +189,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     setAttempt((n) => n + 1);
   };
 
-  return { cards, error, now, load, onPin, onDelete, onRetry, appDocIds };
+  return { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds };
 };
 
 interface IDesignlyLibraryProps {
@@ -188,7 +200,7 @@ interface IDesignlyLibraryProps {
 /** The library alone, for the right pane: its chat is the field that starts a design, so there is none here. */
 export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
   // The documents of the types apps add are listed here as in the whole library; opening one is the pane's to tell.
-  const { cards, error, now, onPin, onDelete, onRetry } = useDesignLibrary(machine, true);
+  const { cards, error, now, onPin, onDelete, onRestoreDemo, onRetry } = useDesignLibrary(machine, true);
   return (
     <DesignlyHome
       cards={cards}
@@ -196,6 +208,7 @@ export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
       now={now}
       onPin={onPin}
       onDelete={onDelete}
+      onRestoreDemo={onRestoreDemo}
       onOpen={onOpen}
       onRetry={onRetry}
       compose={null}
@@ -212,11 +225,14 @@ interface IDesignlyViewProps {
 }
 
 /** The draft of the start's field, one for every kind: the brief and its uploaded files survive a reload. */
-const START_DRAFT: DesignDraftKey = 'design:new-start';
+const START_DRAFT = DESIGN_START_DRAFT;
 const setBrief = (value: string) => setDraftText(START_DRAFT, value);
 
 const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewProps) => {
-  const { cards, error, now, load, onPin, onDelete, onRetry, appDocIds } = useDesignLibrary(machine, true);
+  const { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds } = useDesignLibrary(
+    machine,
+    true,
+  );
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
   const restored = useLinkRestored(machine);
 
@@ -238,6 +254,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
   const brief = draft?.text ?? '';
   const uploads = useUploads(machine, START_DRAFT, draft?.attachments ?? []);
   const voice = useVoice(machine, brief, setBrief);
+  useTourFill(brief, setBrief);
 
   // The document types installed apps add are only an offer: an older runtime, or none installed, shows no tile.
   const [appKinds, setAppKinds] = useState<IAppKind[] | null>(null);
@@ -310,6 +327,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
         now={now}
         onPin={onPin}
         onDelete={onDelete}
+        onRestoreDemo={onRestoreDemo}
         onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
         onRetry={onRetry}
         compose={{

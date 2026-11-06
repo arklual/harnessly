@@ -123,6 +123,8 @@ turn() {
   held=(); heldat=(); inject_now=0
   # A message asking for a long task runs a tool for a while: its call stands in the transcript without a result.
   case "$1" in *long*) long=1 ;; *) long=0 ;; esac
+  # The lesson videos ask for a long turn without the word in the message: a flag file beside the reply.
+  [ -f "$HOME/.fake-long" ] && long=1
   if [ $long = 0 ]; then wait_for 1000; fi
   case "$1" in *askquestions*) ask_turn "$n"; return ;; esac
   # Asked for a widget, it draws one with the real CLI: «widget N» shows the number N in the widget «sales», so the
@@ -131,6 +133,8 @@ turn() {
   case "$1" in *widget*) widget=$(printf '%s' "$1" | grep -o '[0-9][0-9]*' | head -1); widget=${widget:-1}
     command="harnessly widget render --title Sales --html @w.html --js @w.js --data @d.json --id sales" ;;
   esac
+  if [ -f "$HOME/.fake-widget" ]; then widget=$(cat "$HOME/.fake-widget"); widget=${widget:-1}
+    command="harnessly widget render --title Sales --html @w.html --js @w.js --data @d.json --id sales"; fi
   printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_%s","name":"Bash","input":{"command":"%s","description":"List files"}}]},"uuid":"t-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$command" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
   if [ $long = 1 ]; then wait_for 20000; else wait_for 500; fi
   out='total 0'

@@ -137,7 +137,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	// The person's MCP servers (Settings → Connections) go to every agent that starts, through the runtime's proxy.
 	mcpEnabled := mcpEnabledOf(c.DataDir)
 	// One launcher gives the apps to both agents: the same registry, wall and rules.
-	appLauncher := &apps.Launcher{Registry: apps.Open(c.DataDir), GuardCommand: appGuardCommand(), GuardProbe: probeAppGuard, MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
+	appLauncher := &apps.Launcher{Registry: apps.Open(c.DataDir), CLIHeader: firstOf(c.TokenHeaders), GuardCommand: appGuardCommand(), GuardProbe: probeAppGuard, MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
 		Boundary: appBoundary(), RequireWall: os.Getenv("RUNTIME_APPS_REQUIRE_WALL") == "1", AgentToken: (&gate.CLIToken{DataDir: c.DataDir}).IssueAgent,
 		Secrets: storeFor(c.DataDir, c.Home), Connections: appConnections{ms: mcpconn.New(c.DataDir, nil, nil)}}
 	return &coreAgents{
@@ -634,4 +634,14 @@ func budgetScript(dataDir string) string {
 		return ""
 	}
 	return filepath.Join(dataDir, hooksetup.BudgetHookFile)
+}
+
+// firstOf is the first of the names, "" for none.
+func firstOf(names []string) string {
+	for _, n := range names {
+		if n != "" {
+			return n
+		}
+	}
+	return ""
 }

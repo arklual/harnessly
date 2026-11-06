@@ -3,6 +3,7 @@
 // site (a window or an edge) it is the usual chat — the same feed, field, picker, queue and states as anywhere; folded
 // over the site it is the island: the field, and over it the agent's last line with what it does now and «Стоп». A
 // design without a chat gets one with its first message, which is in the column from the moment it is sent.
+import { useTourFill } from '@/next/features/tour/use-tour-fill';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { interrupt, sendMessage } from '@/next/commands';
 import { uploadSrc } from '@/next/commands/uploads';
@@ -230,6 +231,7 @@ const NewDesignChat = ({ machine, draftKey, creating, start, extra, onFirst }: I
     [draftKey, files],
   );
   const voice = useVoice(machine, text, onChange);
+  useTourFill(text, onChange);
   const limits = useAgentLimits(machine, limitsProviderOf(start.choice));
   const first = useMessage(creating?.clientId ?? null);
   const items = useMemo(() => (first ? [outgoingItem(first)] : []), [first]);
@@ -453,6 +455,7 @@ export const useSiteStage = ({
   const text = draft?.text ?? '';
   const setText = (value: string) =>
     setDraft(draftKey, { text: value, attachments: draft?.attachments ?? [] });
+  useTourFill(text, setText);
   const voice = useVoice(machine, text, setText);
 
   const [notes, setNotes] = useState<INote[]>([]);

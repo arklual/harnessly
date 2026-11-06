@@ -93,8 +93,7 @@ func (l *Launcher) Codex(conversation string, ids []string) (agents.CodexApps, e
 			return out, fmt.Errorf("the apps' grant: %w", err)
 		}
 		out.TokenFile = file
-		out.Env = "HARNESSLY_CLI_TOKEN_FILE=" + agents.ShellQuote(file) +
-			` HARNESSLY_SESSION="$(tmux display-message -p '#{session_name}' 2>/dev/null)"`
+		out.Env = l.agentEnv(file)
 	}
 	if token != "" || l.Secrets != nil {
 		l.sweepLaunches()

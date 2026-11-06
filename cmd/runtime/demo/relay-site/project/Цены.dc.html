@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Цены</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./relay.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+</helmet>
+<div class="wrap"><header class="nav" data-block="Шапка"><a class="logo" href="Главная.dc.html"><i></i>Relay</a><nav><a href="Главная.dc.html">Продукт</a><a>Документация</a><a href="Цены.dc.html" aria-current="page">Цены</a><a>Блог</a></nav><span class="sp"></span><a class="btn">Войти</a><a class="btn btn--p">Начать бесплатно</a></header></div>
+<main class="wrap sec">
+<input type="radio" name="per" id="mo" checked><input type="radio" name="per" id="yr">
+<div class="center" data-block="Заголовок"><h2>Простые цены</h2><p class="sub" style="margin:0 auto 28px">Платите за команду, а не за запросы. Флаги и SDK — без лимитов.</p>
+<div class="seg"><label for="mo">Помесячно</label><label for="yr">За год −20%</label></div></div>
+<div class="plans" data-block="Тарифы">
+<div class="plan"><h3>Старт</h3><div class="price">0 ₽ <small>навсегда</small></div><ul><li>До 3 участников</li><li>10 флагов</li><li>История за 7 дней</li></ul><a class="btn">Начать</a></div>
+<div class="plan plan--hot"><h3>Команда <small>Популярный</small></h3><div class="price"><span class="m">2 400 ₽</span><span class="y">1 920 ₽</span> <small>за участника</small></div><ul><li>Без лимита флагов</li><li>Постепенный выкат</li><li>A/B-эксперименты</li><li>История за год</li></ul><a class="btn btn--p">Попробовать 14 дней</a></div>
+<div class="plan"><h3>Компания</h3><div class="price">По запросу</div><ul><li>SSO и роли</li><li>Свой сервер</li><li>SLA 99,99%</li></ul><a class="btn">Связаться</a></div>
+</div>
+<div class="faq sec" data-block="Вопросы"><h2 class="center">Частые вопросы</h2>
+<details open><summary>Замедлит ли Relay приложение?</summary><p>Нет: SDK держит флаги в памяти и обновляет их в фоне, проверка занимает меньше миллисекунды.</p></details>
+<details><summary>Можно ли поставить на свой сервер?</summary><p>Да, в тарифе «Компания» — Docker-образ или Helm-чарт.</p></details>
+<details><summary>Что будет, если Relay недоступен?</summary><p>SDK продолжит работать на последних известных значениях флагов.</p></details>
+</div>
+</main>
+<div class="wrap"><footer class="foot"><span>© 2026 Relay</span><span>Статус · Безопасность · Changelog</span></footer></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

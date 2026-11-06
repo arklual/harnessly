@@ -3,6 +3,7 @@
 // and what a comment is about — and hands it to the player (video-player.tsx), the timeline (video-timeline.tsx) and the
 // comments (video-comments.tsx). The deck's own parts serve a video too: «Стиль» is DeckStyle on /design/deck/settings,
 // «Поделиться» is the one dialog of every kind; DeckShare in its video variant only where the gateway has none. A phone gets the player and a list of scenes instead of the timeline.
+import { tourSignal } from '@/next/stores/tour';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ISiteAccess, ISiteMode, ISiteStage } from '@/next/features/designly/site-view';
 import type { MachineId } from '@/next/protocol/v2';
@@ -220,6 +221,14 @@ const VideoView = (props: IVideoViewProps) => {
     );
     return () => abort.abort();
   }, [sharing, machine, id]);
+
+  // The hands-on tour waits for these (stores/tour.ts): the clip playing, a scene turned to.
+  const tourScene = video ? sceneAt(video.scenes, time) : null;
+  const sceneNo = video && tourScene ? video.scenes.indexOf(tourScene) : -1;
+  useEffect(() => tourSignal(`video:scene:${sceneNo}`), [sceneNo]);
+  useEffect(() => {
+    if (playing) tourSignal('video:play');
+  }, [playing]);
 
   if (video === undefined) {
     // Never an empty screen: the video is on its way (a bar stands in) or its read failed (the words and a way on).

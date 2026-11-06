@@ -531,7 +531,7 @@ func TestHubObserveLinkHasNoDrain(t *testing.T) {
 func TestHubV1OperationsAreDeniedAndUnknownOnesUnsupported(t *testing.T) {
 	r := startHubAgent(t, rigOptions{})
 	c := r.connect()
-	for _, op := range []string{"state.list", "transcripts.list", "transcripts.read", "conversations.start", "docs.deliver", "eval.start", "status.send", "design.notify"} {
+	for _, op := range []string{"state.list", "transcripts.list", "transcripts.read", "conversations.start", "docs.notify", "eval.start", "status.send", "design.notify"} {
 		if _, e := c.call(op, nil); !strings.HasPrefix(e, "policy_denied: ") {
 			t.Errorf("%s: %q", op, e)
 		}

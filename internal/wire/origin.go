@@ -13,7 +13,7 @@ func crossSite(r *http.Request) bool { return sameorigin.CrossSite(r) }
 // guarded: the requests that must not come from another origin.
 func guarded(p string, r *http.Request) bool {
 	switch {
-	case p == "socket", p == "replica", p == "terminal", p == "voice", p == "designly/create", p == "designly/pin", p == "designly/chat":
+	case p == "socket", p == "replica", p == "terminal", p == "voice", p == "designly/create", p == "designly/pin", p == "designly/chat", p == "designly/demo":
 		return true
 	case p == "machine/processes/stop", p == "search", p == "file-bytes", p == "pane-selection", p == "pane-act", strings.HasPrefix(p, "move/"):
 		return true

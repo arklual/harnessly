@@ -24,7 +24,7 @@ var (
 	// closedClusterOps are protocol 1's operations. A hub does not use them, and a hub link may not.
 	closedClusterOps = map[string]bool{
 		"transcripts.list": true, "transcripts.read": true, "state.list": true, "state.put": true, "state.mode": true,
-		"state.result": true, "conversations.start": true, "docs.deliver": true, "docs.notify": true,
+		"state.result": true, "conversations.start": true, "docs.notify": true,
 		"design.notify": true, "apps.team": true, "apps.team.snapshot": true, "apps.public": true, "apps.public.snapshot": true, "eval.start": true, "eval.poll": true, "eval.stop": true, "status.send": true,
 	}
 
@@ -144,6 +144,9 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	case hubproto.OpPeersDeliver, hubproto.OpPeersDirectory:
 		// Served on an observe link only when the operator opted in with AGENT_HUB_PEERS=on.
 		return h.opPeers(op, req)
+	case hubproto.OpDocResult, hubproto.OpDocsDeliver:
+		// Served on an observe link only when the operator opted in with AGENT_HUB_DOCS=on (hubdocs.go).
+		return h.opDocs(op, req)
 	}
 	if closedClusterOps[op] {
 		return nil, nil, hubproto.Errf(hubproto.CodePolicyDenied, "%s is not served on a hub link", op)

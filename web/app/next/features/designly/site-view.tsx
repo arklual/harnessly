@@ -1,6 +1,7 @@
 // An open design as the design draws it (.hx-site): a browser with the design's pages in tabs, its bar — history,
 // the address with the pages, the device and size, more — and the page itself in the chosen viewport, in a case when
 // the device has one. The page is the board on the machine's library server, opened in a preview slot of its own.
+import { tourSignal } from '@/next/stores/tour';
 import { ChatTerminalSlotContext } from '@/next/features/terminal/chat-terminal';
 import {
   pageDownloads,
@@ -440,6 +441,14 @@ const SiteView = ({
   const current = tabs.find((x) => x.id === tab) ?? tabs[0];
   const pagePath = current?.hist[current.hi] ?? null;
   const page = pages.find((p) => p.path === pagePath) ?? null;
+  // The hands-on tour waits for these (stores/tour.ts): the page, the device and the mode the person turned to.
+  useEffect(() => {
+    if (pagePath) tourSignal(`site:page:${pagePath}`);
+  }, [pagePath]);
+  useEffect(() => tourSignal(`site:device:${deviceId}`), [deviceId]);
+  useEffect(() => {
+    if (mode?.editing) tourSignal('site:edit');
+  }, [mode?.editing]);
   // The address reads the page and where it is; a site named by its own address shows it once.
   const addrName = page?.name ?? title;
   const addrPath = pagePath ? `${title}/${pagePath}` : title;

@@ -13,6 +13,14 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-06zg',
+    items: [
+      { key: 'learn', icon: 'graduation-cap' },
+      { key: 'demo', icon: 'palette' },
+      { key: 'fileHead', icon: 'file-text' },
+    ],
+  },
+  {
     id: '2026-11-06zf',
     items: [
       { key: 'codexApps', icon: 'blocks' },

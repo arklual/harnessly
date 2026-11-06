@@ -601,6 +601,8 @@
   "next.designly.deleteCancel": "Cancel",
   "next.designly.deleteConfirm": "Delete",
   "next.designly.deleteFailed": "Could not delete the project",
+  "next.designly.restoreDemo": "Bring back the demo projects",
+  "next.designly.restoreDemoFailed": "Could not bring back the demo projects",
   "next.pane.chatGroup": "This chat",
   "next.pane.side": "Side chat",
   "next.pane.sideHint": "A question about this chat that does not distract the agent",

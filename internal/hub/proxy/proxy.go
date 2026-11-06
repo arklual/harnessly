@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -64,6 +65,9 @@ type Deps struct {
 	Design Interceptor
 	// Features says whether runtime.fleet is on for an organization (fleet.go); nil: off, the routes answer not found.
 	Features FeatureGate
+	// Workspace is the runtime's built page (web/dist): the hub serves it at /agents/ for the fleet (workspace.go). nil
+	// leaves /agents/ to the hub's page.
+	Workspace fs.FS
 }
 
 // Interceptor answers some requests of a signed-in person to a machine itself; false lets them through to it.
@@ -84,6 +88,7 @@ type Service struct {
 	acc     *machaccess.Checker
 	design  Interceptor
 	gate    FeatureGate
+	web     fs.FS
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
@@ -92,6 +97,7 @@ type Service struct {
 	authz      map[string]time.Time
 	access     map[string]time.Time
 	trust      map[string]time.Time
+	pages      map[string]workspaceConfig
 	tracked    map[string]map[uint64]context.CancelFunc
 	nextTrack  uint64
 }
@@ -110,9 +116,9 @@ type grantCall struct {
 // New makes the proxy.
 func New(d Deps) *Service {
 	s := &Service{
-		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features,
+		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace,
 		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
-		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
+		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -130,6 +136,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("/m/", s)
 	mux.Handle("GET /api/machines/{machineId}/browser/ws", s.auth.Require(s.browserWS))
 	s.mountFleet(mux)
+	s.mountWorkspace(mux)
 }
 
 func (s *Service) browserWS(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -264,6 +271,12 @@ func (s *Service) trusted(ctx context.Context, m store.Machine) error {
 	if s.cfg.SubdomainMode() {
 		return nil
 	}
+	return s.trustedOnHub(ctx, m)
+}
+
+// trustedOnHub is the rule of path mode in either mode: what the machine answers runs on the hub's origin (the
+// workspace, workspace.go), so only a machine as trusted as the hub may answer.
+func (s *Service) trustedOnHub(ctx context.Context, m store.Machine) error {
 	key := m.ID + "/" + m.CreatedBy
 	s.mu.Lock()
 	until, ok := s.trust[key]
@@ -271,7 +284,7 @@ func (s *Service) trusted(ctx context.Context, m store.Machine) error {
 	if ok && s.now().Before(until) {
 		return nil
 	}
-	if err := s.auth.RequireTrustedMachine(ctx, m); err != nil {
+	if err := s.auth.RequireTrustedOnHub(ctx, m); err != nil {
 		return err
 	}
 	s.mu.Lock()

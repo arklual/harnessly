@@ -337,6 +337,56 @@
   color: var(--hx-fg-3);
   text-align: center;
 }
+.hx-dl__lessons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-2);
+  margin: var(--hx-space-8) auto 0;
+}
+.hx-dl__lessons-hint {
+  margin-right: var(--hx-space-1);
+  color: var(--hx-fg-3);
+}
+.hx-dl__lesson {
+  padding: var(--hx-space-1) var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out;
+}
+.hx-dl__lesson:hover {
+  border-color: var(--hx-border-strong);
+  background: var(--hx-bg-hover);
+}
+.hx-dl__demo {
+  display: block;
+  margin: var(--hx-space-8) auto 0;
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-out,
+    color 0.15s ease-out;
+}
+.hx-dl__demo:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-dl__demo:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
 @media (max-width: 900px) {
   .hx-dl {
     padding: 0 var(--hx-space-4) var(--hx-space-8);

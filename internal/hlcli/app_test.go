@@ -153,3 +153,42 @@ func TestAppGuardJournalsRefusal(t *testing.T) {
 		t.Errorf("the call's input went out: %v", got[0])
 	}
 }
+
+// A Codex refusal goes to the journal too, without the call's input.
+func TestAppGuardCodexJournalsRefusal(t *testing.T) {
+	dir := t.TempDir()
+	snap := apps.Snapshot{Apps: []apps.SnapshotApp{{ID: "acme.review", Name: "Ревью", Tools: &apps.ToolPolicy{Deny: []string{"Bash(git push*)"}}}}}
+	raw, _ := json.Marshal(snap)
+	sum := sha256.Sum256(raw)
+	policy := filepath.Join(dir, "policy-"+hex.EncodeToString(sum[:8])+".json")
+	if err := os.WriteFile(policy, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var got []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var b map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		if r.URL.Path == "/api/cli/apps/decision" {
+			got = append(got, b)
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+	env := map[string]string{"HARNESSLY_URL": srv.URL, "HARNESSLY_CLI_TOKEN": "t", "HARNESSLY_SESSION": "hs-1"}
+	run := func(stdin string) string {
+		var out bytes.Buffer
+		Run([]string{"hook", "app-guard", "--policy", policy, "--agent", "codex"}, Env{Getenv: func(k string) string { return env[k] }, Stdin: strings.NewReader(stdin), Stdout: &out})
+		return out.String()
+	}
+	if out := run(`{"session_id":"s1","cwd":"/w","tool_name":"Bash","tool_input":{"command":"git push origin"}}`); !strings.Contains(out, `"deny"`) {
+		t.Fatalf("not refused: %s", out)
+	}
+	run(`{"session_id":"s1","cwd":"/w","tool_name":"Bash","tool_input":{"command":"git status"}}`)
+	if len(got) != 1 || got[0]["decision"] != "deny" || got[0]["rule"] != "Bash(git push*)" || got[0]["app"] != "acme.review" ||
+		got[0]["session"] != "hs-1" || got[0]["agentSession"] != "s1" || got[0]["tool"] != "Bash" {
+		t.Fatalf("journaled %v", got)
+	}
+	if strings.Contains(fmt.Sprint(got[0]), "git push origin") {
+		t.Errorf("the call's input went out: %v", got[0])
+	}
+}

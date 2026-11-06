@@ -53,6 +53,7 @@ flowchart LR
 | --- | --- | --- |
 | hub | `cmd/hub`, `internal/hub/...` | accounts and sign-in, spaces and invites, machine registry, agent links, the runtime proxy, the installer and binaries, the hub UI's files |
 | hub UI | `web/app/hub`, built into `web/dist-hub`, embedded into the hub with the `hubui` tag | sign-in, the onboarding of the mockup «Инициализация», a space's home and settings |
+| workspace | the runtime's page (`web/dist`, the `webui` tag) served by the hub at `/agents/`, `internal/hub/proxy/workspace.go` | with `runtime.fleet`: one workspace for every machine the person may open; its API goes to `?machine=` or the home machine |
 | agent | `cmd/agent`, `internal/agent` | unchanged link protocol v1, plus protocol 2: registration, signed dial, preflight with disk and RAM, agent install, logins, provider checks, proxy, sealed keys, runtime sessions, local policy and kill switch |
 | runtime | `cmd/runtime` | unchanged; started by the installer under the base path `/m/<machine id>` with `RUNTIME_HUB_URL` set |
 | installer | `deploy/install/install.sh`, served by the hub at `/install` | downloads the binaries from the hub, sets up the profile, registers the machine, starts the services |

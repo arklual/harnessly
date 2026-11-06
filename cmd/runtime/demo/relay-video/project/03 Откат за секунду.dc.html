@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Откат за секунду</title>
+<link rel="stylesheet" href="./deck-theme.css">
+<script src="./support.js"></script>
+<script src="/__lib/motion/gsap.min.js"></script>
+<script src="/__lib/motion/DrawSVGPlugin.min.js"></script>
+<script src="/__lib/motion/tk.js"></script>
+<script>
+tkVideo.motion(function (root) {
+  tk.tl.fromTo('.panel', { opacity: 0, y: '5vh' }, { opacity: 1, y: 0, duration: 0.6, ease: 'expo.out' }, 0.2);
+  tk.draw('.ln', { at: 0.8, dur: 2.6 });
+  tk.tl.to('.badge .on', { opacity: 0, duration: 0.25, ease: 'power2.in' }, 2.9);
+  tk.tl.to('.badge b', { x: 0, duration: 0.3, ease: 'back.out(2)' }, 2.9);
+  tk.tl.fromTo('.done', { opacity: 0, y: '2vh' }, { opacity: 1, y: 0, duration: 0.5, ease: 'expo.out' }, 3.8);
+});
+</script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>html,body{margin:0;background:var(--deck-bg)}
+.sc{--u:1cqw;position:relative;width:100vw;height:100vh;container-type:size;overflow:hidden;background:var(--deck-bg);color:var(--deck-ink);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.sc *{box-sizing:border-box}.sc p,.sc h1,.sc h2{margin:0}
+.c{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.h1{font-size:calc(var(--u)*7.2);line-height:1.02;letter-spacing:-.05em;font-weight:820}
+.h2{font-size:calc(var(--u)*4.4);line-height:1.1;letter-spacing:-.04em;font-weight:780}
+.sub{font-size:calc(var(--u)*2);color:var(--deck-mute);margin-top:calc(var(--u)*1.6)}
+.acc{color:var(--deck-acc)}
+.logo{display:inline-flex;align-items:center;gap:calc(var(--u)*1.4);font-weight:800;font-size:calc(var(--u)*4.6);letter-spacing:-.03em}
+.logo i{width:calc(var(--u)*5);height:calc(var(--u)*5);border-radius:calc(var(--u)*1.4);background:linear-gradient(135deg,#2f6bff,#7aa2ff);position:relative}
+.logo i::after{content:"";position:absolute;inset:32% 22% 32% 44%;border-radius:calc(var(--u)*.5);background:#fff}
+.panel{background:#fff;border:calc(var(--u)*.14) solid var(--deck-line);border-radius:calc(var(--u)*2);padding:calc(var(--u)*3);box-shadow:0 calc(var(--u)*3) calc(var(--u)*6) calc(var(--u)*-3) rgba(23,22,26,.25)}
+.tg{width:calc(var(--u)*8);height:calc(var(--u)*4.4);border-radius:calc(var(--u)*4);background:#d9d6ce;position:relative}
+.tg b{position:absolute;top:calc(var(--u)*.6);left:calc(var(--u)*.6);width:calc(var(--u)*3.2);height:calc(var(--u)*3.2);border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.tg .on{position:absolute;inset:0;border-radius:inherit;background:#16a36a;opacity:0}
+.track{height:calc(var(--u)*2.2);border-radius:calc(var(--u)*1);background:var(--deck-panel);overflow:hidden}
+.fill{height:100%;width:100%;border-radius:inherit;background:var(--deck-acc);transform-origin:0 50%}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}</style>
+</helmet>
+<main class="board sc">
+<p class="h2" data-block="Заголовок" style="position:absolute;left:8vw;top:12vh">Ошибки растут? <span class="acc">Выключите флаг</span></p>
+<div class="panel" data-block="График" data-tk-mark="3.0" style="position:absolute;left:8vw;right:8vw;top:34vh;height:48vh">
+  <svg viewBox="0 0 1000 300" preserveAspectRatio="none" style="width:100%;height:100%">
+    <path class="ln" d="M0 250 L200 245 L320 240 L420 120 L480 40 L540 230 L700 248 L1000 246" fill="none" stroke="#e5484d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div class="badge" style="position:absolute;right:calc(var(--u)*3);top:calc(var(--u)*3);display:flex;align-items:center;gap:calc(var(--u)*1.4);font-size:calc(var(--u)*2.2);font-weight:700"><div class="tg"><i class="on" style="opacity:1"></i><b style="transform:translateX(3.6cqw)"></b></div><span class="mono">new-checkout</span></div>
+</div>
+<p class="sub done" data-block="Итог" style="position:absolute;left:8vw;bottom:8vh">Откат — за 1 секунду, без нового деплоя</p>
+</main>
+</x-dc>
+</body>
+</html>

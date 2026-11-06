@@ -22,6 +22,7 @@ import { heldTools, quietTools, toolOfRequest } from '@/next/features/pane/tools
 import { useChatMade } from '@/next/bindings/chat-made';
 import BrowserTab from '@/next/bindings/browser-tab';
 import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
+import { crumbsOf } from '@/next/features/pane/crumbs';
 import { downloadHref, saveFrom } from '@/next/features/pane/download';
 import { useFolderUploads } from '@/next/legacy/folder-uploads';
 import FileMenu from '@/next/features/pane/file-menu';
@@ -308,8 +309,6 @@ const FilesTab = ({
   tools: ReactNode;
 }) => {
   const [shown, setShown] = useState<IShownFile | null>(null);
-  // The editor's switch of the view goes into the head row too.
-  const [modeSlot, setModeSlot] = useState<HTMLElement | null>(null);
   // A zip, a picture, a PDF or a file to be saved is not read as text: the pane shows it its own way.
   const delivered = tab.file ? deliveredViewOf(tab.path) : null;
   // A new epoch is the disk's text read again over the editor's.
@@ -452,7 +451,6 @@ const FilesTab = ({
         readAsset={readAsset}
         compare={shownCompare}
         onCloseCompare={() => onChange({ ...tab, against: undefined })}
-        modeSlot={modeSlot}
         at={tab.at ?? null}
         onAsk={(quote, note) => {
           addQuote(conv.id, quote, note);
@@ -467,6 +465,11 @@ const FilesTab = ({
         machine={conv.machineId}
         path={tab.path.startsWith('/') ? tab.path : `${conv.cwd.replace(/\/+$/, '')}/${tab.path}`}
         view={delivered}
+        crumbs={crumbsOf(conv.cwd, tab.path, undefined, true)}
+        onCrumb={(path) =>
+          guard([tab.id], () => onChange({ ...tab, path, file: false, against: undefined, at: undefined }))
+        }
+        tools={tools}
       />
     );
   return (
@@ -477,7 +480,6 @@ const FilesTab = ({
       file={now?.file ?? null}
       editor={editor}
       tools={tools}
-      onModeSlot={setModeSlot}
       error={now?.error ?? null}
       opening={tab.file ? 'file' : 'folder'}
       onRetry={() => setEpoch((n) => n + 1)}
@@ -847,15 +849,8 @@ const PaneBody = (props: IPaneBodyProps) => {
         </button>
       );
     }
-    // A file shown its own way (a picture, a PDF) keeps its controls on the bar over it; a text file has them in the
-    // folder's head row, beside the crumbs (fileTools).
-    if (tab?.kind !== 'files' || !tab.file || deliveredViewOf(tab.path) === null) return null;
-    return (
-      <>
-        {fileShare()}
-        {fileMenu(false)}
-      </>
-    );
+    // A file has its controls in its head row, beside the crumbs (fileTools).
+    return null;
   };
   /** «…» of the open file; `compare`: «Сравнить с git» (a text file). */
   const fileMenu = (compare: boolean) =>
@@ -888,9 +883,11 @@ const PaneBody = (props: IPaneBodyProps) => {
     isShareable(tab.path) && (
       <FileShareButton key={tab.path} machine={conv.machineId} conv={conv.id} path={tab.path} />
     );
-  /** The open text file's controls: download, share, «…», and «Сохранить» while there is something to save. */
+  /** The open file's controls: download, share, «…», and «Сохранить» while a text file has something to save. A file
+   *  shown its own way (a picture, a PDF) saves itself: its «…» has no «Сравнить с git». */
   const fileTools = () => {
-    if (!tab || tab.kind !== 'files' || !tab.file || deliveredViewOf(tab.path) !== null) return null;
+    if (!tab || tab.kind !== 'files' || !tab.file) return null;
+    const text = deliveredViewOf(tab.path) === null;
     const unsaved = edits.unsaved.has(tab.id) || (saveButton && edits.live?.saving === true);
     return (
       <>
@@ -906,8 +903,8 @@ const PaneBody = (props: IPaneBodyProps) => {
           </span>
         </a>
         {fileShare()}
-        {fileMenu(true)}
-        {saveButton && unsaved && (
+        {fileMenu(text)}
+        {text && saveButton && unsaved && (
           <Button variant="primary" size="sm" busy={edits.live?.saving} onClick={() => void edits.save()}>
             {t('next.editor.save')}
           </Button>

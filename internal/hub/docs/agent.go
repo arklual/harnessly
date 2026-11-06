@@ -9,6 +9,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // Reply is what the hub answers an agent's doc.publish or doc.acl: the agent turns it into the tool result.
@@ -177,10 +178,36 @@ func (s *Service) acl(ctx context.Context, who Who, e aclEvent) Reply {
 	return reply(http.StatusNotFound, "not_supported", "Эта настройка прав здесь не поддерживается")
 }
 
+// machineEvent records a document's conversation (docs.bound) or the agent's answer in a thread (docs.reply).
+func (s *Service) machineEvent(m store.Machine, ev link.Event) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	var err error
+	if ev.Name == hubproto.EventDocBound {
+		var e struct{ Binding hubproto.DocBinding }
+		if err = json.Unmarshal(ev.Raw, &e); err == nil {
+			err = s.bind(ctx, m.ID, e.Binding)
+		}
+	} else {
+		var e hubproto.DocReply
+		if err = json.Unmarshal(ev.Raw, &e); err == nil {
+			err = s.agentReply(ctx, m.ID, e)
+		}
+	}
+	if err != nil {
+		s.log.Warn("document event not taken", "machine", m.ID, "event", ev.Name, "error", err)
+	}
+}
+
 // Event takes the doc.publish and doc.acl events of a machine's link and answers each with the op doc.result. It
 // returns at once; the answer is sent from a goroutine.
 func (s *Service) Event(l *link.Link, m store.Machine, ev link.Event) {
-	if ev.Name != "doc.publish" && ev.Name != "doc.acl" {
+	switch ev.Name {
+	case hubproto.EventDocBound, hubproto.EventDocReply:
+		go s.machineEvent(m, ev)
+		return
+	case hubproto.EventDocPublish, hubproto.EventDocACL:
+	default:
 		return
 	}
 	go func() {

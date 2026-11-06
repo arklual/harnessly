@@ -94,7 +94,7 @@ func roundTrip(b []byte) ([]byte, error) {
 }
 
 // httpKinds is the answers of the v2 HTTP pages a fixture can hold.
-var httpKinds = []string{"hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"}
+var httpKinds = []string{"hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyDemo", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"}
 
 func decodePage(kind string, b []byte) (interface{ Validate() error }, error) {
 	var v interface{ Validate() error }
@@ -149,6 +149,8 @@ func decodePage(kind string, b []byte) (interface{ Validate() error }, error) {
 		v = &DesignSystems{}
 	case "designlyPin":
 		v = &DesignlyPin{}
+	case "designlyDemo":
+		v = &DesignlyDemo{}
 	case "designlyChat":
 		v = &DesignlyChat{}
 	case "tasks":

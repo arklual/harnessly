@@ -43,6 +43,9 @@ func snapHasContext(snap Snapshot) bool {
 // Launcher is agents.AppLauncher over a registry.
 type Launcher struct {
 	Registry *Registry
+	// CLIHeader is the request header the runtime takes the CLI's token in; the agent's CLI and the hooks get it, since
+	// the guard runs the CLI by its path, past the pane's wrapper that names it. "" leaves the CLI's default.
+	CLIHeader string
 	// GuardCommand is the hook command line; "" is `harnessly hook app-guard` off the agents' PATH.
 	GuardCommand string
 	// GuardProbe runs the hook command line once at a launch and returns an error when the guard does not answer; nil skips
@@ -190,8 +193,7 @@ func (l *Launcher) ClaudeFor(conversation string, ids []string, settingsPath str
 		}
 		// The pane's shell names the tab's tmux session before the wall: inside it the tmux server is out of reach
 		// (a window it opened would run outside the wall), and the hooks and the CLI take the session from here.
-		out.Env = "HARNESSLY_CLI_TOKEN_FILE=" + agents.ShellQuote(file) +
-			` HARNESSLY_SESSION="$(tmux display-message -p '#{session_name}' 2>/dev/null)"`
+		out.Env = l.agentEnv(file)
 		// Other MCP configs of the runtime (the person's MCP servers, reached through it) go in with this token too:
 		// the person's would read as nothing behind the wall.
 		out.Retoken = func(src string) (string, error) { return retokenMCP(sealDir, "xmcp", src, tok) }
@@ -490,4 +492,14 @@ func writeByContent(dir, prefix, ext string, body []byte) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// agentEnv are the shell words the agent of a chat with apps starts with: its launch's token file, the header the
+// runtime takes it in, and the tab's tmux session, named before the wall.
+func (l *Launcher) agentEnv(tokenFile string) string {
+	env := "HARNESSLY_CLI_TOKEN_FILE=" + agents.ShellQuote(tokenFile)
+	if l.CLIHeader != "" {
+		env += " HARNESSLY_CLI_HEADER=" + agents.ShellQuote(l.CLIHeader)
+	}
+	return env + ` HARNESSLY_SESSION="$(tmux display-message -p '#{session_name}' 2>/dev/null)"`
 }

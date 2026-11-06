@@ -795,6 +795,10 @@ export interface DesignlyPin {
   id: string;
   pinned: boolean;
 }
+/** POST /api/v2/designly/demo: the demo projects copied back into the library. */
+export interface DesignlyDemo {
+  restored: string[];
+}
 /** POST /api/v2/designly/chat: conv was started from the design's own column. */
 export interface DesignlyChat {
   id: string;
@@ -3420,6 +3424,7 @@ export const parsePage = {
     object({ port: int, root: id, artifacts: array(designArtifact) })(v, '$'),
   designlySystems: (v: unknown): DesignSystemInfo[] => array(designSystemInfo)(v, '$'),
   designlyPin: (v: unknown): DesignlyPin => designlyPin(v, '$'),
+  designlyDemo: (v: unknown): DesignlyDemo => object({ restored: array(id) })(v, '$'),
   designlyChat: (v: unknown): DesignlyChat => designlyChat(v, '$'),
   files: (v: unknown): DirListing =>
     object({ path: str, entries: array(fileEntry), truncated: bool }, { root: str })(v, '$'),

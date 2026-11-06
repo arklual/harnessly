@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дизайн-система Relay</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./relay.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+.ds{max-width:1160px;margin:0 auto;padding:56px 32px 80px}
+.ds h1{font-size:44px;letter-spacing:-.03em;margin:0 0 8px}.ds h2{font-size:22px;margin:56px 0 18px}
+.ds .sub{color:var(--ink2);margin:0}
+.sws{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.sw{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:4px}
+.sw i{display:block;height:72px;border-radius:10px;margin-bottom:8px;border:1px solid rgba(0,0,0,.06)}
+.sw span,.sw small{color:var(--mute);font-size:12px}.mono{font-family:var(--mono)}
+.type>div{display:flex;align-items:baseline;gap:24px;padding:14px 0;border-bottom:1px solid var(--line)}
+.type small{width:140px;color:var(--mute);font-size:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+</style>
+</helmet>
+<main class="ds" data-block="Дизайн-система">
+<h1 data-block="Заголовок">Дизайн-система Relay</h1>
+<p class="sub">Цвета, шрифты и компоненты, на которых собраны сайт, презентация и ролик Relay.</p>
+<h2>Цвета</h2>
+<div class="sws" data-block="Цвета"><div class="sw"><i style="background:#FBFAF7"></i><b>Фон</b><span class="mono">#FBFAF7</span><small>страница</small></div><div class="sw"><i style="background:#17161A"></i><b>Текст</b><span class="mono">#17161A</span><small>заголовки и текст</small></div><div class="sw"><i style="background:#2F6BFF"></i><b>Акцент</b><span class="mono">#2F6BFF</span><small>кнопки, ссылки</small></div><div class="sw"><i style="background:#16A36A"></i><b>Успех</b><span class="mono">#16A36A</span><small>включённый флаг</small></div><div class="sw"><i style="background:#FFFFFF"></i><b>Поверхность</b><span class="mono">#FFFFFF</span><small>карточки</small></div><div class="sw"><i style="background:#E7E4DC"></i><b>Линия</b><span class="mono">#E7E4DC</span><small>границы</small></div><div class="sw"><i style="background:#56545E"></i><b>Второстепенный</b><span class="mono">#56545E</span><small>подписи</small></div><div class="sw"><i style="background:#14131A"></i><b>Код</b><span class="mono">#14131A</span><small>блоки кода</small></div></div>
+<h2>Шрифты</h2>
+<div class="type" data-block="Шрифты">
+<div><small>Заголовок · 58/750</small><span style="font-size:58px;font-weight:750;letter-spacing:-.035em">Выкатывайте</span></div>
+<div><small>Раздел · 38/700</small><span style="font-size:38px;font-weight:700;letter-spacing:-.03em">Всё для спокойного релиза</span></div>
+<div><small>Текст · 17/400</small><span style="font-size:17px;color:var(--ink2)">Relay включает функции флагами — для 1% пользователей, для команды или для всех.</span></div>
+<div><small>Код · JetBrains Mono</small><span class="mono" style="font-size:15px">relay.isOn('new-checkout')</span></div>
+</div>
+<h2>Компоненты</h2>
+<div class="row" data-block="Кнопки"><a class="btn btn--p">Начать бесплатно</a><a class="btn">Смотреть демо</a><span class="pill"><b></b>Новое</span></div>
+<div class="term" data-block="Флаги" style="margin-top:20px;max-width:460px"><div class="flags" style="margin-top:0;border-top:0;padding-top:0">
+<label class="flag"><input type="checkbox" checked><span class="tg"></span><span>new-checkout</span><span class="pct">25%</span></label>
+<label class="flag"><input type="checkbox"><span class="tg"></span><span>dark-mode</span><span class="pct">команда</span></label>
+</div></div>
+<div class="grid3" data-block="Карточки" style="margin-top:20px"><div class="card"><div class="ico">%</div><h3>Карточка</h3><p>Иконка, заголовок и пара строк текста.</p></div></div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

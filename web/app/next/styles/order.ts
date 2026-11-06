@@ -81,5 +81,7 @@ import '@/next/styles/project-access.css';
 import '@/next/styles/connections.css';
 import '@/next/styles/notices.css';
 import '@/next/styles/whats-new.css';
+import '@/next/styles/learn.css';
+import '@/next/styles/tour.css';
 import '@/next/styles/motion.css';
 import '@/next/styles/header.css';

@@ -1,6 +1,6 @@
 // A file that is not text, in the pane: a zip's contents with each file to save, a picture or a PDF as it is, a video or
 // a sound in the player, any other file with its name and the way to save it. Used for what the agent handed over and for any such file the pane opens.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import Icon from '@/next/ui/icon';
 import Swap from '@/next/ui/swap';
 import LoadFailed from '@/next/ui/load-failed';
@@ -19,6 +19,7 @@ import { SHEET_FILE } from '@/next/features/pane/sheet/sheet-api';
 import { MEDIA_KIND } from '@/next/features/pane/media/media-model';
 import { listZip, previewUrl, zipEntryUrl, type IZipList } from '@/next/features/pane/delivered';
 import { downloadHref } from '@/next/features/pane/download';
+import PaneHead, { Crumbs, type ICrumb } from '@/next/features/pane/pane-head';
 
 export interface IDeliveredViewProps {
   /** The chat the pane is beside: it hears what is selected in the file. */
@@ -27,6 +28,11 @@ export interface IDeliveredViewProps {
   /** Absolute path of the file. */
   path: string;
   view: DeliveredView;
+  /** The way to the file, for its head row; a crumb opens its folder. */
+  crumbs: readonly ICrumb[];
+  onCrumb: (path: string) => void;
+  /** The file's controls (save, share, «…»), on the right of the crumbs. */
+  tools: ReactNode;
 }
 
 const loadPdfView = () => import('@/next/features/pane/pdf/pdf-view');
@@ -106,7 +112,7 @@ const ZipContents = ({ machine, path }: { machine: MachineId; path: string }) =>
   );
 };
 
-const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
+const DeliveredView = ({ conv, machine, path, view, crumbs, onCrumb, tools }: IDeliveredViewProps) => {
   const name = nameOf(path);
   const onSelection = useCallback(
     (selection: IFileSelection | null) => reportFileSelection(machine, conv, path, selection),
@@ -129,85 +135,83 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
   const src = changes === 0 ? previewUrl(machine, path) : `${previewUrl(machine, path)}&v=${changes}`;
   return (
     <div className="hx-tv hx-deliv" data-tool="disk" data-view={view}>
-      <div className="hx-tv__sum">
-        <span className="hx-tv__big hx-deliv__name">{name}</span>
-        <Save href={saveHref} />
-      </div>
-      {view === DELIVERED_VIEW.zip && <ZipContents machine={machine} path={path} />}
-      {view === DELIVERED_VIEW.image && (
-        <ImageStage key={path} src={src} name={name} onSelection={onSelection} />
-      )}
-      {view === DELIVERED_VIEW.pdf && (
-        <LazyView
-          load={loadPdfView}
-          props={{ src, name, saveHref, ...toFile }}
-          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
-          title={t('next.pdf.broken')}
-        />
-      )}
-      {view === DELIVERED_VIEW.video && (
-        <MediaPlayer
-          key={path}
-          src={src}
-          kind={MEDIA_KIND.video}
-          name={name}
-          path={path}
-          saveHref={saveHref}
-          {...toFile}
-        />
-      )}
-      {view === DELIVERED_VIEW.audio && (
-        <MediaPlayer
-          key={path}
-          src={src}
-          kind={MEDIA_KIND.audio}
-          name={name}
-          path={path}
-          saveHref={saveHref}
-          {...toFile}
-        />
-      )}
-      {view === DELIVERED_VIEW.sheet && (
-        <LazyView
-          load={loadSheetView}
-          props={{
-            machine,
-            path,
-            src: previewUrl(machine, path),
-            name,
-            kind: /\.(?:csv|tsv)$/i.test(path) ? SHEET_FILE.csv : SHEET_FILE.xlsx,
-            saveHref,
-            ...toFile,
-          }}
-          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
-          title={t('next.sheet.failed')}
-        />
-      )}
-      {view === DELIVERED_VIEW.docx && (
-        <LazyView
-          load={loadDocxView}
-          props={{ machine, path, src: previewUrl(machine, path), name, ...toFile }}
-          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
-          title={t('next.docx.failed')}
-        />
-      )}
-      {view === DELIVERED_VIEW.pptx && (
-        <LazyView
-          load={loadPptxView}
-          props={{ machine, path, src: previewUrl(machine, path), name, ...toFile }}
-          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
-          title={t('next.pptx.failed')}
-        />
-      )}
-      {view === DELIVERED_VIEW.font && (
-        <LazyView
-          load={loadFontView}
-          props={{ href: saveHref, name }}
-          fallback={<span className="hx-sk hx-plan__sk" />}
-          title={t('next.font.failed')}
-        />
-      )}
-      {view === DELIVERED_VIEW.save && <div className="hx-tv__note">{t('next.delivered.saveOnly')}</div>}
+      <PaneHead lead={<Crumbs items={crumbs} onPick={onCrumb} />} tools={tools}>
+        {view === DELIVERED_VIEW.zip && <ZipContents machine={machine} path={path} />}
+        {view === DELIVERED_VIEW.image && (
+          <ImageStage key={path} src={src} name={name} onSelection={onSelection} />
+        )}
+        {view === DELIVERED_VIEW.pdf && (
+          <LazyView
+            load={loadPdfView}
+            props={{ src, name, saveHref, ...toFile }}
+            fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+            title={t('next.pdf.broken')}
+          />
+        )}
+        {view === DELIVERED_VIEW.video && (
+          <MediaPlayer
+            key={path}
+            src={src}
+            kind={MEDIA_KIND.video}
+            name={name}
+            path={path}
+            saveHref={saveHref}
+            {...toFile}
+          />
+        )}
+        {view === DELIVERED_VIEW.audio && (
+          <MediaPlayer
+            key={path}
+            src={src}
+            kind={MEDIA_KIND.audio}
+            name={name}
+            path={path}
+            saveHref={saveHref}
+            {...toFile}
+          />
+        )}
+        {view === DELIVERED_VIEW.sheet && (
+          <LazyView
+            load={loadSheetView}
+            props={{
+              machine,
+              path,
+              src: previewUrl(machine, path),
+              name,
+              kind: /\.(?:csv|tsv)$/i.test(path) ? SHEET_FILE.csv : SHEET_FILE.xlsx,
+              saveHref,
+              ...toFile,
+            }}
+            fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+            title={t('next.sheet.failed')}
+          />
+        )}
+        {view === DELIVERED_VIEW.docx && (
+          <LazyView
+            load={loadDocxView}
+            props={{ machine, path, src: previewUrl(machine, path), name, ...toFile }}
+            fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+            title={t('next.docx.failed')}
+          />
+        )}
+        {view === DELIVERED_VIEW.pptx && (
+          <LazyView
+            load={loadPptxView}
+            props={{ machine, path, src: previewUrl(machine, path), name, ...toFile }}
+            fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+            title={t('next.pptx.failed')}
+          />
+        )}
+        {view === DELIVERED_VIEW.font && (
+          <LazyView
+            load={loadFontView}
+            props={{ href: saveHref, name }}
+            fallback={<span className="hx-sk hx-plan__sk" />}
+            title={t('next.font.failed')}
+          />
+        )}
+        {view === DELIVERED_VIEW.save && <div className="hx-tv__note">{t('next.delivered.saveOnly')}</div>}
+      </PaneHead>
     </div>
   );
 };

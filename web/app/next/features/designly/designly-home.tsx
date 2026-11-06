@@ -2,6 +2,8 @@
 // library below — the machine's designs as cards with their pictures. A tile switches the kind in place: the field,
 // its text and its files stay, «Настройки» offers what the kind has. Scrolled, the field goes up and the library's row
 // sticks. A card opens the design; a brief sent starts a project and its agent, and its card draws while it works.
+import { TOUR_ORDER } from '@/next/features/tour/tracks';
+import { startTour } from '@/next/stores/tour';
 import {
   memo,
   useEffect,
@@ -128,6 +130,8 @@ export interface IDesignlyHomeProps {
   onPin: (id: string, pinned: boolean) => Promise<void>;
   /** Moves a project to the trash; resolves once the machine did, rejects (the caller says why) when it did not. */
   onDelete?: (id: string) => Promise<void>;
+  /** Copies back the demo projects the library no longer has; resolves once the list has them. */
+  onRestoreDemo?: () => Promise<void>;
   onOpen: (id: string) => void;
   onRetry: () => void;
   /** Where a project is started; null is the library alone (the right pane's: its chat is the field). */
@@ -234,6 +238,10 @@ const CardShot = ({ image }: { image: string | null }) => {
     </>
   );
 };
+
+/** The demo projects every library starts with. */
+const DEMO_IDS = ['relay-site', 'relay-deck', 'relay-video', 'relay-ds'] as const;
+const demoMissing = (cards: readonly IDesignCard[]) => DEMO_IDS.some((id) => !cards.some((c) => c.id === id));
 
 /** What an empty list says: nothing matched the search, else nothing is in the tab. */
 const emptyKey = (scope: TDesignScope, searching: boolean) => {
@@ -722,11 +730,13 @@ const DesignlyHome = ({
   now,
   onPin,
   onDelete,
+  onRestoreDemo,
   onOpen,
   onRetry,
   compose,
 }: IDesignlyHomeProps) => {
   const [pinning, setPinning] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const [deleting, setDeleting] = useState<IDesignCard | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [query, setQuery] = useState('');
@@ -912,6 +922,31 @@ const DesignlyHome = ({
           </Swap>
         )}
         {shown && shown.length === 0 && <div className="hx-dl__empty">{t(emptyKey(scope, q !== ''))}</div>}
+        {compose && cards !== null && q === '' && scope === DESIGN_SCOPE.all && (
+          <nav className="hx-dl__lessons" aria-label={t('next.tour.lessons')}>
+            <span className="hx-dl__lessons-hint">{t('next.tour.lessonsHint')}</span>
+            {TOUR_ORDER.map((k) => (
+              <button key={k} type="button" className="hx-dl__lesson" onClick={() => startTour(k)}>
+                {t(`next.tour.${k}.lesson`)}
+              </button>
+            ))}
+          </nav>
+        )}
+        {onRestoreDemo && cards !== null && q === '' && scope === DESIGN_SCOPE.all && demoMissing(cards) && (
+          <button
+            type="button"
+            className="hx-dl__demo"
+            disabled={restoring}
+            onClick={() => {
+              setRestoring(true);
+              onRestoreDemo()
+                .catch(() => undefined)
+                .finally(() => setRestoring(false));
+            }}
+          >
+            {t('next.designly.restoreDemo')}
+          </button>
+        )}
       </div>
       <DeleteConfirm
         card={deleting}

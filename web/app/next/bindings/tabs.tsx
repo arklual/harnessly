@@ -46,6 +46,7 @@ const FIXED: Record<
   [ROUTE.tasks]: { icon: 'list-checks', title: () => t('next.sidebar.tasks') },
   [ROUTE.apps]: { icon: 'layout-grid', title: () => t('next.sidebar.apps') },
   [ROUTE.help]: { icon: 'book-open', title: () => t('next.sidebar.help') },
+  [ROUTE.learn]: { icon: 'graduation-cap', title: () => t('next.learn.title') },
   [ROUTE.settings]: { icon: 'settings', title: () => t('next.shell.settings') },
   [ROUTE.manage]: { icon: 'sliders-horizontal', title: () => t('next.sidebar.manage') },
   [ROUTE.stats]: { icon: 'chart-column', title: () => t('next.sidebar.stats') },

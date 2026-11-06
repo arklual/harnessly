@@ -40,7 +40,11 @@ html[data-theme='dark'] {
   min-height: 0;
 }
 .hx-tv[data-file='true'] .hx-disk__crumbs {
-  padding: 2px 16px 8px;
+  padding: 2px 16px;
+}
+/* The head row of an open text file runs edge to edge: its last button keeps off the edge. */
+.hx-tv[data-file='true'] .hx-phead {
+  padding-right: 8px;
 }
 .hx-fed {
   display: flex;

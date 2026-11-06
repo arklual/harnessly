@@ -353,6 +353,9 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
       (`project/_ds/*`, named by the folder without its uuid, labelled by its README's heading), the projects of kind
       `ds`, and the UI kits installed on the machine (`kit:<id>`). `designSystem` of a create is one of these ids.
     - `POST /api/v2/designly/pin` takes and answers `{id, pinned}`; a project that is not in the library is 404.
+    - `POST /api/v2/designly/demo` copies back the demo projects (a Relay site, deck, video and design system) the
+      library no longer has and answers `{restored}`, their ids. The library gets them once by itself, on its first
+      listing; an edited demo project is never overwritten.
     The kind of a project and the pins are kept by the runtime in its data folder (`v2/designly.json`), not in the
     project: a project made elsewhere is a `site`, unpinned. Create and pin are refused to other origins (item 41).
 43. **Side chat.** `POST /api/v2/conversations/{id}/side-chat` takes `{question, excerpts?, history?, model?}` (the

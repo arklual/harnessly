@@ -1,6 +1,7 @@
 // Comments on the slides: the «Комментарии» tab (the list and «Решено»), the layer over the slide (pins, the capture while
 // a place is being picked, the ring of a held finger), the bar «Нажмите на место» and the popover (a bottom sheet on a
 // phone) where the comment is written. The state of picking is in ./comment-ui.ts; the list in ./use-deck-comments.ts.
+import { tourSignal } from '@/next/stores/tour';
 import {
   useEffect,
   useLayoutEffect,
@@ -307,6 +308,7 @@ export const DeckCommentLayer = ({
     const ok = submit ? await submit(slideIndex, made) : await comments.add(slideIndex, made);
     if (!ok) return false;
     toast(t('next.deck.comments.added'), { tone: 'success' });
+    tourSignal('deck:comment');
     closeDeckDraft(artifact);
     onAdded();
     return true;

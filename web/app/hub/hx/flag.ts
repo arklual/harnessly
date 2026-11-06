@@ -37,3 +37,12 @@ export const HX_LIVE_FEATURE = 'ui.hx.live';
 
 export const liveOn = (features: readonly string[] | undefined): boolean =>
   (features ?? []).includes(HX_LIVE_FEATURE);
+
+/** The fleet: one runtime for every machine a person may open (the hub's /agents/, internal/hub/proxy/workspace.go). */
+export const FLEET_FEATURE = 'runtime.fleet';
+
+/** Whether «Рабочее пространство» is the hub's own /agents/: the hub serves it and the organization has the fleet. */
+export const fleetWorkspace = (
+  served: boolean | undefined,
+  features: readonly string[] | undefined,
+): boolean => served === true && (features ?? []).includes(FLEET_FEATURE);

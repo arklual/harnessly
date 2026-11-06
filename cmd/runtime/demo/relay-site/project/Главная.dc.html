@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Главная</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./relay.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+</helmet>
+<div class="wrap"><header class="nav" data-block="Шапка"><a class="logo" href="Главная.dc.html"><i></i>Relay</a><nav><a href="Главная.dc.html" aria-current="page">Продукт</a><a>Документация</a><a href="Цены.dc.html">Цены</a><a>Блог</a></nav><span class="sp"></span><a class="btn">Войти</a><a class="btn btn--p">Начать бесплатно</a></header></div>
+<main class="wrap">
+<section class="hero" data-block="Первый экран">
+<div><span class="pill"><b></b>Новое: постепенный выкат по регионам</span>
+<h1>Выкатывайте фичи <em>без страха</em> релиза</h1>
+<p class="lead">Relay включает функции флагами — для 1% пользователей, для команды или для всех. Откат за секунду, без нового деплоя.</p>
+<div class="cta"><a class="btn btn--p">Начать бесплатно</a><a class="btn">Смотреть демо</a><small>Без карты · 5 минут на подключение</small></div></div>
+<div class="term" data-block="Пример кода"><div class="dots"><i></i><i></i><i></i></div>
+<div><span class="c">// checkout.ts</span></div>
+<div><span class="k">import</span> { relay } <span class="k">from</span> <span class="s">'@relay/sdk'</span></div>
+<div><span class="k">if</span> (<span class="k">await</span> relay.isOn(<span class="s">'new-checkout'</span>, user)) {</div>
+<div>&nbsp;&nbsp;<span class="k">return</span> renderNewCheckout()</div>
+<div>}</div>
+<div class="flags">
+<label class="flag"><input type="checkbox" checked><span class="tg"></span><span>new-checkout</span><span class="pct">25%</span></label>
+<label class="flag"><input type="checkbox"><span class="tg"></span><span>dark-mode</span><span class="pct">команда</span></label>
+<label class="flag"><input type="checkbox" checked><span class="tg"></span><span>search-v2</span><span class="pct">100%</span></label>
+</div></div>
+</section>
+<div class="logos" data-block="Клиенты"><p>Нам доверяют</p><span>Northwind</span><span>Acme</span><span>Globex</span><span>Initech</span><span>Umbrella</span></div>
+<section class="sec" data-block="Возможности"><h2>Всё для спокойного релиза</h2><p class="sub">Флаги, эксперименты и откат — в одном месте, с историей каждого изменения.</p>
+<div class="grid3">
+<div class="card"><div class="ico">%</div><h3>Постепенный выкат</h3><p>1%, 10%, 50% — увеличивайте долю, пока метрики в норме.</p></div>
+<div class="card"><div class="ico">↺</div><h3>Откат за секунду</h3><p>Выключите флаг — и фича пропала у всех, без деплоя и ревью.</p></div>
+<div class="card"><div class="ico">A/B</div><h3>Эксперименты</h3><p>Сравните варианты на живом трафике, Relay посчитает значимость.</p></div>
+</div></section>
+<section data-block="Отзыв"><div class="quote"><div><p>«Раньше релиз был событием на весь вечер. С Relay мы выкатываем по пять раз в день и спим спокойно».</p><small>Анна Ли, техлид платёжной команды Northwind</small></div><div class="stat"><b>5×</b><small>чаще релизы</small></div></div></section>
+</main>
+<div class="wrap"><footer class="foot"><span>© 2026 Relay</span><span>Статус · Безопасность · Changelog</span></footer></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

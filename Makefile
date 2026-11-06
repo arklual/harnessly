@@ -93,8 +93,8 @@ MACHINE_IMAGE ?= ghcr.io/ly-solutions/harnessly-machine:latest
 hub-web: web/node_modules ## Build the hub page into web/dist-hub
 	cd web && $(PNPM) build:hub
 
-hub: hub-web ## Build bin/hub with the hub page compiled in (the hubui tag)
-	CGO_ENABLED=0 $(GO) build -trimpath -tags hubui -ldflags "$(LDFLAGS)" -o $(BIN)/hub ./cmd/hub
+hub: hub-web web ## Build bin/hub with the hub page and the runtime's page (the fleet's workspace) compiled in
+	CGO_ENABLED=0 $(GO) build -trimpath -tags "hubui webui" -ldflags "$(LDFLAGS)" -o $(BIN)/hub ./cmd/hub
 
 hub-schema: ## Regenerate the expected database schema (internal/hub/store/schema/*.json); HUB_TEST_POSTGRES_URL for the Postgres one
 	$(GO) run ./cmd/hub schema snapshot $(if $(HUB_TEST_POSTGRES_URL),--postgres '$(HUB_TEST_POSTGRES_URL)')

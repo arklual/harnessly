@@ -3,6 +3,7 @@
 // `<annotation>` blocks the agent reads). The chat on the left is where the edits are asked for, so the notes live
 // under its id, not the design's. Kept for the page only.
 
+import { tourSignal } from '@/next/stores/tour';
 import { createKeyedStore, flush, useKey } from '@/next/core/store';
 import type { INote } from '@/next/features/designly/site-notes';
 import type { ConvId } from '@/next/protocol/v2';
@@ -24,11 +25,15 @@ export function patchDesignNotes(
   conv: ConvId,
   change: (have: readonly IDesignNote[]) => readonly IDesignNote[],
 ): void {
+  let grew = false;
   designNotesStore.patch(conv, (have) => {
     const next = change(have ?? NONE);
+    grew = next.length > (have ?? NONE).length;
     return next.length > 0 ? next : undefined;
   });
   flush();
+  // The hands-on tour waits for a block picked on the page (stores/tour.ts).
+  if (grew) tourSignal('site:note');
 }
 
 export const clearDesignNotes = (conv: ConvId): void => {

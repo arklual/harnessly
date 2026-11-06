@@ -157,7 +157,7 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 		}
 		mailer = mail.Log{Logger: log}
 	}
-	hub, err := api.New(api.Options{Config: cfg, DB: db, Mailer: mailer, Log: log, UI: web.HubDist()})
+	hub, err := api.New(api.Options{Config: cfg, DB: db, Mailer: mailer, Log: log, UI: web.HubDist(), Workspace: web.Dist()})
 	if err != nil {
 		return err
 	}

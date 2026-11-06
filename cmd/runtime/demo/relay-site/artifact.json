@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "title": "Relay — лендинг",
+  "importedAt": "2026-11-06T10:00:00.000Z",
+  "boards": [
+    {
+      "id": "01M6S0Q7Y4K2N8H3D5F6G7J8KA",
+      "title": "Главная",
+      "path": "Главная.dc.html",
+      "w": null,
+      "h": null
+    },
+    {
+      "id": "01M6S0Q7Y4K2N8H3D5F6G7J8KB",
+      "title": "Цены",
+      "path": "Цены.dc.html",
+      "w": null,
+      "h": null
+    }
+  ]
+}
