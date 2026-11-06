@@ -89,7 +89,7 @@ func TestLangOfTheRuntimeWins(t *testing.T) {
 		{"auto", "en", "auto"}, {"ru", "en", "ru"}, {"", "en", "en"}, {"de", "en", "en"},
 	} {
 		s := New(Config{Socket: svc.path, FFmpeg: real, Lang: c.runtime})
-		text, err := s.Transcribe(ctx, bytes.NewReader(audio), c.page)
+		text, err := s.Transcribe(ctx, bytes.NewReader(audio), c.page, "")
 		if err != nil || !strings.Contains(text, " "+c.want+" ") {
 			t.Errorf("runtime %q, page %q: heard %q, %v", c.runtime, c.page, text, err)
 		}
