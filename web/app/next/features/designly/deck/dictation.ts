@@ -16,7 +16,7 @@ import type { IDeckTidied } from '@/next/features/designly/deck/types';
 import { locale, t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { changeDeck } from '@/next/stores/deck';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 /** The tidied notes laid over the deck the page holds. */
 export const putTidied = (artifact: string, tidied: readonly IDeckTidied[]): void =>

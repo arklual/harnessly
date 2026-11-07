@@ -11,7 +11,7 @@ import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { putDeckSlide, useDeck } from '@/next/stores/deck';
 import Icon from '@/next/ui/icon';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 /** The four bars beside the words while the machine listens. */
 export const DeckWave = () => (

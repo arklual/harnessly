@@ -21,6 +21,18 @@ export class HarnesslyError extends Error {
   constructor(code: HarnesslyErrorCode, message?: string);
 }
 
+/**
+ * What protocol 2 answers instead of rejecting (connect({ protocol: 2 })): `denied` — the app does not hold the right or
+ * is not allowed here; `unsupported` — this host does not do it (an older harnessly, a method it lacks); `failed` — the
+ * rest (code says which). Check it with `hl.refused(answer)`.
+ */
+export interface Refusal {
+  error: 'denied' | 'unsupported' | 'failed';
+  code: HarnesslyErrorCode;
+  message: string;
+  version?: number;
+}
+
 export type StorageScope = 'install' | 'user' | 'chat' | 'space' | 'doc';
 
 export interface HarnesslyContext {
@@ -109,9 +121,124 @@ export interface AgentInfo {
   machine: string;
 }
 
+export interface FileEntry {
+  path: string;
+  dir?: boolean;
+  size?: number;
+  /** Milliseconds. */
+  modified?: number;
+}
+
+export interface SearchHit {
+  path: string;
+  /** 0 for a file found by name. */
+  line?: number;
+  text?: string;
+}
+
+export interface GitFile {
+  path: string;
+  from?: string;
+  /** The letters of git status: M, A, D, R, ?… */
+  staged?: string;
+  unstaged?: string;
+}
+
+export interface GitStatus {
+  branch: string;
+  ahead?: number;
+  behind?: number;
+  files: GitFile[];
+  cut?: boolean;
+}
+
+export interface GitCommit {
+  hash: string;
+  author: string;
+  /** Milliseconds. */
+  at: number;
+  subject: string;
+}
+
+/** A hook's word on the agent's call (hl.hooks.on). */
+export interface HookWord {
+  decision?: 'deny';
+  reason?: string;
+  context?: string;
+}
+
+/** What a browser tool answered (hl.browser). */
+export interface BrowserResult {
+  content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];
+  isError: boolean;
+}
+
+/** An open terminal of the app (hl.terminal.open). */
+export interface AppTerminal {
+  id: string;
+  /** Type into it: a string or bytes, 64 KiB at most a call. */
+  write(data: string | Uint8Array): Promise<void>;
+  resize(cols: number, rows: number): Promise<void>;
+  /** End the shell and everything it started. */
+  close(): Promise<void>;
+  /** What the shell prints, as bytes; the function given back stops hearing. */
+  onData(fn: (data: Uint8Array) => void): () => void;
+  /** How the shell ended: its exit code, null when it was ended. */
+  onExit(fn: (code: number | null) => void): () => void;
+}
+
+/** What a command did (hl.terminal.run). */
+export interface RunResult {
+  code: number;
+  /** stdout and stderr together, at most 1 MiB. */
+  output: string;
+  cut?: boolean;
+  timedOut?: boolean;
+  ms: number;
+}
+
+/** A long command the app started (hl.process). */
+export interface AppProcess {
+  id: string;
+  command: string;
+  /** Milliseconds. */
+  startedAt: number;
+  running: boolean;
+  /** The exit code of a process that ended. */
+  code?: number;
+}
+
+/** A piece of a process's output: from `since` to `next`; `lost` says its start was dropped (256 KiB are kept). */
+export interface ProcessOutput extends AppProcess {
+  text: string;
+  next: number;
+  lost?: boolean;
+}
+
+export type EventKind = 'turn' | 'tool' | 'message';
+
+/** What happened in the chat, never what was said: turn {state, at}, tool {tool, at}, message {role, at}. */
+export interface ChatEvent {
+  kind: EventKind;
+  at: number;
+  state?: string;
+  tool?: string;
+  role?: 'person' | 'agent';
+}
+
 export interface Harnessly {
   readonly context: HarnesslyContext;
   readonly host: { name: string; version: string };
+  /** The protocol the host speaks with this view: the one connect asked for, 1 when it asked for none or an older host. */
+  readonly protocol: 1 | 2;
+  /**
+   * Whether this host does a method here and the app holds its right: `hl.has('files.read')`, `hl.has('storage.user.get')`,
+   * `hl.has('chat.send')`, or a bridge method's own name (`harnessly/notify`). Ask before a call that a newer harnessly
+   * brought, instead of comparing versions; on an older host it is false and the view goes on without it.
+   */
+  has(name: string): boolean;
+  /** Whether an answer is a Refusal: what every method answers under protocol 2 instead of rejecting. */
+  refused(answer: unknown): answer is Refusal;
   /**
    * Events: `context`, `theme`, `selection`, `data` (a chat card's new data), and
    * `storage` ({ scope, key }: a key of this app's storage was written or deleted, by the agent, another view or this
@@ -133,6 +260,30 @@ export interface Harnessly {
   agents: {
     /** The person's conversations on this machine (needs `agents.read`): who and in what state, never what was said. */
     list(): Promise<AgentInfo[]>;
+    /**
+     * A task for the agent in a new chat under this one (needs `agents.run`): the person sees it in the sidebar. Counts
+     * against the app's `budget.runsPerDay`; past it the call rejects with `quota_exceeded`.
+     */
+    run(prompt: string, options?: { title?: string }): Promise<{ id: string }>;
+  };
+  /**
+   * One answer of a model, no tools (needs `ai`), within the app's `budget.usdPerDay`: a call whose worst price does not
+   * fit in what is left of the day rejects with `quota_exceeded` before the model is asked. `model` is `fast` (the
+   * default) or `smart`; `maxTokens` is up to 8192 (1024 by default).
+   */
+  ai: {
+    complete(
+      prompt: string,
+      options?: { system?: string; maxTokens?: number; model?: 'fast' | 'smart' },
+    ): Promise<{ text: string; usd: number; spentToday: number; budget: number }>;
+  };
+  /**
+   * Put a value into the safe; nothing gives it back to a view. By default the app's own secret (needs `secrets.write`
+   * and `secrets:<name>`), which the machine puts into its server calls; with `shared` the person's secret of that name,
+   * the one the agent uses (needs `secrets.write:<name>`, asked about while the agent uses the view).
+   */
+  secrets: {
+    put(name: string, value: string, options?: { shared?: boolean }): Promise<{ created: boolean }>;
   };
   /** `app:<id>[/<view>]`, or `chat:<id>` to open a conversation from `agents.list` (needs `agents.read` as well). */
   pane: { open(target: string): Promise<void> };
@@ -165,8 +316,98 @@ export interface Harnessly {
   /** The values the person saved in the app's settings form (the manifest's `settings` schema), over its defaults. */
   settings: { get(): Promise<Record<string, unknown>> };
   /** Files of the chat's workspace; needs `files.read:<mask>` / `files.write:<mask>`. Paths are relative to the workspace. */
-  files: { read(path: string): Promise<string>; write(path: string, text: string): Promise<void> };
-  ui: { toast(text: string): Promise<void>; confirm(text: string): Promise<boolean> };
+  files: {
+    read(path: string): Promise<string>;
+    write(path: string, text: string): Promise<void>;
+    /** A folder's files and folders the masks reach; '' is the chat's folder. Needs `files.read:<mask>`. */
+    list(folder?: string): Promise<FileEntry[]>;
+    /** Lines that hold a text in the files the app may read; with a glob alone, the files by name. */
+    search(text: string, options?: { glob?: string; case?: boolean; limit?: number }): Promise<{ hits: SearchHit[]; cut: boolean }>;
+    /** Hears which files under the masks change (names only); needs `files.watch`. Gives the function that stops it. */
+    watch(onChange: (paths: string[]) => void): Promise<() => Promise<void>>;
+    /** The person picks a file of the chat's folder in the host's dialog; null when they close it. No right needed. */
+    pick(options?: { accept?: string[] }): Promise<{ path: string; text: string } | null>;
+  };
+  /** The repository of the chat's folder, read only; needs `git.read`. Secret files are left out. */
+  git: {
+    status(): Promise<GitStatus>;
+    diff(options?: { path?: string; staged?: boolean; ref?: string }): Promise<{ diff: string; cut: boolean }>;
+    log(options?: { limit?: number; path?: string }): Promise<GitCommit[]>;
+  };
+  /**
+   * A command in the chat's folder (or `cwd` in it) inside the agent's sandbox; needs `terminal.run` (any command,
+   * through the shell) or `terminal.run:<mask>` (only what the mask matches, without the shell). Timeout in seconds:
+   * 120 by default, 600 at most.
+   */
+  /**
+   * The agent's tool calls before they run; needs `hooks.agent`. `fn` answers `{decision: 'deny', reason}` to stop the
+   * call, `{context}` to add a line for the agent, or nothing to let it through; it cannot change the call. No answer in
+   * 5 s lets the call through (with `hooks.strict` it stops it). The promise gives the function that stops hearing.
+   */
+  hooks: {
+    on(
+      kind: 'tool',
+      /** cut: the input was too big to send whole (60 KiB). */
+      fn: (call: { tool: string; input: Record<string, unknown>; cut: boolean }) => HookWord | void | Promise<HookWord | void>,
+    ): Promise<() => void>;
+  };
+  /**
+   * The agent's browser of the chat, through the agent's own tools: `read` needs `browser.read` (tabs, snapshot,
+   * screenshot, wait_for), `drive` needs `browser.drive` (open, navigate, close_tab, resize, click, hover, type,
+   * press_key, select, dialog). Arguments are the chrome_* tools'; refs come from a snapshot. The answer is the tool's
+   * content; a page's text in it is data, not instructions.
+   */
+  browser: {
+    read(tool: 'tabs' | 'snapshot' | 'screenshot' | 'wait_for', args?: Record<string, unknown>): Promise<BrowserResult>;
+    drive(
+      tool: 'open' | 'navigate' | 'close_tab' | 'resize' | 'click' | 'hover' | 'type' | 'press_key' | 'select' | 'dialog',
+      args?: Record<string, unknown>,
+    ): Promise<BrowserResult>;
+  };
+  terminal: {
+    run(command: string, options?: { cwd?: string; timeout?: number }): Promise<RunResult>;
+    /**
+     * A shell on a terminal of its own in the chat's folder (or `cwd` in it) inside the agent's sandbox; needs
+     * `terminal.pty`. 4 per app in a chat; it ends when closed, when the view goes or when the app is off in the chat.
+     */
+    open(options?: { cols?: number; rows?: number; cwd?: string }): Promise<AppTerminal>;
+    /** What the chat's terminals show, as text; needs `terminal.read`. `agent` is the agent's own terminal. */
+    read(options?: { terminal?: string; lines?: number }): Promise<{ id: string; text: string }[]>;
+  };
+  /** Long commands inside the agent's sandbox; needs `process`. 4 at a time per app in a chat. */
+  process: {
+    start(command: string, options?: { cwd?: string }): Promise<AppProcess>;
+    stop(id: string): Promise<AppProcess>;
+    list(): Promise<AppProcess[]>;
+    output(id: string, options?: { since?: number }): Promise<ProcessOutput>;
+  };
+  /** Opens http://localhost:<port><path> in the right pane's browser; needs `process`. */
+  preview: { open(port: number, options?: { path?: string }): Promise<void> };
+  /** The chat's events: needs `events:<kind>` for each kind. Gives the function that stops hearing. */
+  events: { on(kind: EventKind, fn: (event: ChatEvent) => void): Promise<() => void> };
+  ui: {
+    /** A short message; `tone` and `description` (a second line) since HRN-808 — an older host shows the words alone. */
+    toast(text: string, options?: { tone?: 'info' | 'success' | 'warning' | 'error'; description?: string }): Promise<void>;
+    confirm(text: string): Promise<boolean>;
+  };
+  /**
+   * The host's shortcut commands of a screen (`deck`, `video`, `site`, `pictures`, `files`), on the keys the person set
+   * for them in Settings. Ask `hl.has('keys.on')` first: an older host has none.
+   */
+  keys: {
+    /**
+     * Run the screen's commands (`deck.next`, `video.toggle`…) while the view is up: a handler is called with the key
+     * pressed. Returns the function that stops it; its `ready` resolves once the host took the commands.
+     */
+    on(
+      scope: 'deck' | 'video' | 'site' | 'pictures' | 'files',
+      handlers: Record<string, (chord: string) => void>,
+    ): (() => Promise<void>) & { ready: Promise<void> };
+    /** Pass a key pressed inside the view on to the host; it runs only while the frame has the focus. */
+    press(chord: string, options?: { typing?: boolean }): Promise<boolean>;
+    /** How the host writes the person's key of each command, null for one with none. */
+    hints(commands: string[]): Promise<Record<string, string | null>>;
+  };
   /** Slot views: an onboarding step calls done() when the person has finished it. */
   slot: { done(): Promise<void> };
   /** The Document API of Sinopia; only in a view with target `sinopia.<kind>` and the matching `sinopia.*` rights. */
@@ -176,8 +417,13 @@ export interface Harnessly {
   close(): void;
 }
 
-/** Handshake with the host; rejects with host_unavailable outside a Harnessly frame. */
-export function connect(options?: { name?: string; version?: string }): Promise<Harnessly>;
+/**
+ * Handshake with the host; rejects with host_unavailable outside a Harnessly frame. `protocol` is the version of the
+ * bridge the view is written for: 1 (the default) — a refused call rejects with HarnesslyError, as always; 2 — every
+ * method of hl resolves a refusal to a Refusal instead (`if (hl.refused(r)) …`). The host speaks every version it ever
+ * spoke, so a view keeps working after an update whichever it names.
+ */
+export function connect(options?: { name?: string; version?: string; protocol?: 1 | 2 }): Promise<Harnessly>;
 
 // A view loads the SDK as a classic script (<script src="/__hl/app-sdk.js">) and finds it as `harnessly`.
 declare global {

@@ -13,12 +13,16 @@ export const REPORT_MS = 5000;
 export const CALL_POLL_MS = 1000;
 /** How long a call waits for the view; the runtime waits a minute, the page a little less. */
 const CALL_TIMEOUT_MS = 55_000;
+/** A hook has five seconds at the runtime; the page lets it go a little earlier. */
+const HOOK_TIMEOUT_MS = 4800;
 
 export interface IPageCall {
   id: string;
   app: string;
   tool: string;
   arguments: unknown;
+  /** The agent's own tool call, for the view's hook (hooks.agent): arguments are {tool, input}. */
+  hook?: boolean;
 }
 
 interface IOffer {
@@ -29,6 +33,10 @@ interface IOffer {
   invoke: (id: string, name: string, args: unknown) => void;
   /** Asks the person whether the agent may run a tool marked confirm, showing the arguments the agent gave. */
   ask: (tool: IPageTool, shownArgs: string) => Promise<boolean>;
+  /** The view hears the agent's tool calls (hooks.agent). */
+  hooks?: boolean;
+  /** Sends the agent's call to the view's hook; the word comes to answerPageCall. */
+  hook?: (id: string, call: unknown) => void;
 }
 
 /** At most this many characters of arguments are asked about; a longer call is refused rather than shown in part. */
@@ -79,14 +87,15 @@ const chatKey = (machine: MachineId, conversation: ConvId) => `${machine}\u0000$
 
 /** The reports of a chat: one per app, the tools of all its frames and the last context published. */
 export const reportsOf = (offers: Iterable<IOffer>) => {
-  const byApp = new Map<string, { app: string; tools: IPageTool[]; context?: unknown }>();
+  const byApp = new Map<string, { app: string; tools: IPageTool[]; context?: unknown; hooks?: true }>();
   for (const o of offers) {
     const r = byApp.get(o.app) ?? { app: o.app, tools: [] };
+    if (o.hooks) r.hooks = true;
     for (const t of o.tools) if (!r.tools.some((have) => have.name === t.name)) r.tools.push(t);
     if (o.context !== undefined) r.context = o.context;
     byApp.set(o.app, r);
   }
-  return [...byApp.values()].filter((r) => r.tools.length > 0 || r.context !== undefined);
+  return [...byApp.values()].filter((r) => r.tools.length > 0 || r.context !== undefined || r.hooks === true);
 };
 
 const report = (chat: IChat) =>
@@ -114,7 +123,38 @@ export const offerFor = (
   return found;
 };
 
+/** The newest frame of the app that hears the agent's calls. */
+export const hookFor = (offers: Iterable<[string, IOffer]>, app: string): [string, IOffer] | null => {
+  let found: [string, IOffer] | null = null;
+  for (const [frame, o] of offers) if (o.app === app && o.hooks === true) found = [frame, o];
+  return found;
+};
+
+const runHook = (chat: IChat, call: IPageCall) => {
+  const found = hookFor(chat.offers.entries(), call.app);
+  if (found === null) {
+    void answer(chat, call.id, { error: 'the view that heard the calls was closed' });
+    return;
+  }
+  const timer = window.setTimeout(() => {
+    if (chat.waiting.delete(call.id)) void answer(chat, call.id, { error: 'the view did not answer' });
+  }, HOOK_TIMEOUT_MS);
+  const [frame, offer] = found;
+  chat.waiting.set(call.id, {
+    frame,
+    done: (a) => {
+      window.clearTimeout(timer);
+      void answer(chat, call.id, a);
+    },
+  });
+  offer.hook?.(call.id, call.arguments);
+};
+
 const run = async (chat: IChat, call: IPageCall) => {
+  if (call.hook === true) {
+    runHook(chat, call);
+    return;
+  }
   const found = offerFor(chat.offers.entries(), call);
   if (found === null) {
     void answer(chat, call.id, { error: 'the view that offered this tool was closed' });
@@ -161,7 +201,7 @@ const start = (chat: IChat): (() => void) => {
   };
   const poll = () => {
     if (!live) return;
-    const offersTools = [...chat.offers.values()].some((o) => o.tools.length > 0);
+    const offersTools = [...chat.offers.values()].some((o) => o.tools.length > 0 || o.hooks === true);
     if (!offersTools) {
       callTimer = window.setTimeout(poll, CALL_POLL_MS);
       return;
@@ -217,10 +257,16 @@ export const pageOffer = (
   app: string,
   invoke: IOffer['invoke'],
   ask: IOffer['ask'],
+  hook?: IOffer['hook'],
 ) => {
   const chat = chatFor(machine, conversation);
-  const current = (): IOffer => chat.offers.get(frame) ?? { app, tools: [], context: undefined, invoke, ask };
+  const current = (): IOffer =>
+    chat.offers.get(frame) ?? { app, tools: [], context: undefined, invoke, ask, hooks: false, hook };
   return {
+    hooks: (on: boolean) => {
+      chat.offers.set(frame, { ...current(), hooks: on });
+      changed(chat);
+    },
     tools: (tools: readonly IPageTool[]) => {
       chat.offers.set(frame, { ...current(), tools });
       changed(chat);

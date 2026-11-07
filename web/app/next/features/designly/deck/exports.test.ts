@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/next/features/designly/deck/api', () => api);
 vi.mock('@/next/ui/toast', () => ({ toast }));
+vi.mock('@/next/features/designly/sdk/toast', () => ({ toast }));
 vi.mock('@/next/i18n', () => ({ t: (key: string) => key }));
 
 import { DECK_EXPORT_POLL_MS, followDeckExport, runDeckExport } from '@/next/features/designly/deck/exports';

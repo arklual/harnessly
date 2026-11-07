@@ -1,7 +1,14 @@
 // «Приложения»: the installed apps of the machine. Opening one takes it to the chat it was last on in, so the app
 // opens with its chat beside it; an app on in no chat opens alone.
 import { useState } from 'react';
-import { setSafeMode, useInstalledApps, type IInstalledApp } from '@/next/features/app-views/api';
+import {
+  consentApp,
+  declineApp,
+  setSafeMode,
+  switchApp,
+  useInstalledApps,
+  type IInstalledApp,
+} from '@/next/features/app-views/api';
 import AppsCatalog from '@/next/features/app-catalog/apps-catalog';
 import PublicCatalog from '@/next/features/app-catalog/public-catalog';
 import { useTeam } from '@/next/features/app-catalog/use-team';
@@ -29,6 +36,19 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
     await setSafeMode(machine, on);
     onChanged();
   };
+  // The person's word on what an app reaches, and its switch: the list is read again from the machine after each.
+  const consent = async (app: IInstalledApp, version: string, access: readonly string[]) => {
+    await consentApp(machine, app.id, version, access);
+    onChanged();
+  };
+  const decline = async (app: IInstalledApp) => {
+    await declineApp(machine, app.id);
+    onChanged();
+  };
+  const onSwitch = async (app: IInstalledApp, on: boolean) => {
+    await switchApp(machine, app.id, on);
+    onChanged();
+  };
   const open = (app: IInstalledApp) => {
     const chat = activeApps(chats ?? [], [app])[0]?.chat;
     goTo({ kind: ROUTE.app, id: app.id, ...(chat ? { chat } : {}) });
@@ -42,6 +62,9 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
       onHelp={() => goTo({ kind: ROUTE.help, section: 'build-apps', page: 'overview' })}
       team={team}
       onEnvMute={muteEnv}
+      onConsent={consent}
+      onDecline={decline}
+      onSwitch={onSwitch}
       safeMode={list?.safeMode}
       onSafeMode={safe}
       footer={

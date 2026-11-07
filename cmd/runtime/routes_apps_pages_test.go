@@ -33,6 +33,7 @@ func TestAppPageRoutes(t *testing.T) {
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkg+`"}`, cli); code != http.StatusOK {
 		t.Fatalf("install: %d %s", code, body)
 	}
+	agreeRig(t)
 	report := `{"conversation":"tab-2","apps":[{"app":"acme.demo","tools":[{"name":"fill","description":"Fill it"}],"context":{"step":1}},{"app":"acme.other","tools":[{"name":"x"}]}]}`
 	if code, _ := call("POST", platformAPI+"/apps/page-tools", report, nil); code != http.StatusUnauthorized {
 		t.Fatalf("no session: %d", code)
@@ -78,6 +79,20 @@ func TestAppPageRoutes(t *testing.T) {
 	if code, _ := call("POST", platformAPI+"/apps/page-tools", `{"conversation":"tab-9","apps":[]}`, page); code != http.StatusNotFound {
 		t.Fatalf("unknown chat: %d", code)
 	}
+	// Sinopia is the host's own: its page offers tools and its screen in a chat it is on in no list of.
+	builtin := `{"conversation":"tab-2","apps":[{"app":"harnessly.sinopia","tools":[{"name":"show_board","description":"Show"}],"context":{"board":{"number":2}}}]}`
+	if code, body := call("POST", platformAPI+"/apps/page-tools", builtin, page); code != http.StatusOK || !strings.Contains(body, `"kept":1`) {
+		t.Fatalf("builtin report: %d %s", code, body)
+	}
+	var sinopia *apps.PageReport
+	for _, r := range appPages.Offered("tab-2") {
+		if r.App == "harnessly.sinopia" {
+			sinopia = &r
+		}
+	}
+	if sinopia == nil || len(sinopia.Tools) != 1 || string(sinopia.Context) != `{"board":{"number":2}}` {
+		t.Fatalf("builtin offered: %+v", sinopia)
+	}
 }
 
 // A view the app's own server hosts gets a session and its address, not a path on the view server (delivery mode remote).
@@ -100,6 +115,7 @@ func TestRemoteViewSession(t *testing.T) {
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkg+`"}`, cli); code != http.StatusOK {
 		t.Fatalf("install: %d %s", code, body)
 	}
+	agreeRig(t)
 	code, body := call("POST", platformAPI+"/apps/session", `{"app":"acme.demo","view":"remote","target":"pane","conversation":""}`, page)
 	var got struct{ Session, Nonce, URL, Path string }
 	_ = json.Unmarshal([]byte(body), &got)

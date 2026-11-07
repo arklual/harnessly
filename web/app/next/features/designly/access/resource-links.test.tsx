@@ -10,6 +10,7 @@ import type { IAccessLink, IResourceView } from '@/next/features/designly/access
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/next/ui/toast', () => ({ toast }));
+vi.mock('@/next/features/designly/sdk/toast', () => ({ toast }));
 
 const written = vi.fn();
 

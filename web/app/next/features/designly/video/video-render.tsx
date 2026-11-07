@@ -12,7 +12,7 @@ import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import { putVideoJob } from '@/next/stores/video';
 import { PRESENCE, type TPresenceState } from '@/next/ui/presence';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import Icon from '@/next/ui/icon';
 
 const POLL_MS = 1000;

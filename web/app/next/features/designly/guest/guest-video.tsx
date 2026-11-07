@@ -21,7 +21,7 @@ import { useComments } from '@/next/features/designly/guest/use-guest-comments';
 import { autoplayOn, startFormat, timelineCommentsOn } from '@/next/features/designly/video/share-view';
 import { VIDEO_FORMATS, type TVideoFormat } from '@/next/features/designly/video/types';
 import { Button } from '@/next/ui/button';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { t } from '@/next/i18n';
 
 export interface IGuestVideoProps {

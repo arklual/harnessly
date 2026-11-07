@@ -7,7 +7,7 @@ import type { IDeckEdit, IDeckRecording } from '@/next/features/designly/deck/ty
 import { WordedError } from '@/next/core/net/worded';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 /** The transcript is built after the recording ends; look again this often, this many times. */
 const POLL_MS = 2000;

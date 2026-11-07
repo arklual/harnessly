@@ -18,7 +18,7 @@ import {
 import GuestNameDialog from '@/next/features/designly/guest/guest-name-dialog';
 import { useComments } from '@/next/features/designly/guest/use-guest-comments';
 import { useGuestPdf } from '@/next/features/designly/guest/use-guest-pdf';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { t } from '@/next/i18n';
 
 const clock = (): number => Date.now();

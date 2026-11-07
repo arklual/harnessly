@@ -49,7 +49,7 @@ import {
 import Icon from '@/next/ui/icon';
 import Switch from '@/next/ui/switch';
 import { Button } from '@/next/ui/button';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { t } from '@/next/i18n';
 import { formatAgoFull } from '@/next/i18n/format';
 import type { MachineId } from '@/next/protocol/v2';

@@ -4,7 +4,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import SiteView, { type ISiteStage, type ISiteTab } from '@/next/features/designly/site-view';
 import { PortalContext } from '@/next/ui/portal';
-import { ToastHost, toast } from '@/next/ui/toast';
+import { ToastHost } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
 import { NO_EDIT } from '@/next/features/designly/element-style';
 import { anchorItems } from '@/next/features/designly/note-anchor';

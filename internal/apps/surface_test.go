@@ -45,7 +45,7 @@ func TestSurfaceIsConsistent(t *testing.T) {
 			t.Errorf("%s is not taken", p)
 		}
 	}
-	if !paramPermissions["files.read"] || permissions["files.read"] || !unsupportedPermissions["ai"] {
+	if !paramPermissions["files.read"] || permissions["files.read"] || !unsupportedPermissions["users.read"] || unsupportedPermissions["ai"] {
 		t.Error("parameterised or unsupported rights are read wrong")
 	}
 	// Every tool the host serves is in the catalog.

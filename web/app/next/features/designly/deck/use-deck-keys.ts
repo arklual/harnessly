@@ -3,11 +3,11 @@
 // link), F goes full screen (link), P shows and R records (R from the show too), Esc steps back; ⌥← and ⌥→ turn the
 // slides even from the chat's field. Keys typed into a field are the field's. The same keys come from inside the board
 // as `tk:key` while it has the focus (use-deck-bridge.ts).
-import { KEY_SCOPE } from '@/next/features/keys/commands';
-import { useKeys, type TKeyHandlers } from '@/next/features/keys/use-keys';
+import { KEY_SCOPE } from '@/next/features/designly/sdk/keys';
+import { useKeys, type TKeyHandlers } from '@/next/features/designly/sdk/keys';
 import { DECK_SCREEN, type TDeckScreen } from '@/next/features/designly/deck/types';
 
-export { isTypingTarget } from '@/next/features/keys/use-keys';
+export { isTypingTarget } from '@/next/features/designly/sdk/keys';
 
 export const DECK_KEY = {
   next: 'next',

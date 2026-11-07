@@ -4,6 +4,11 @@ allowBuilds:
   protobufjs: false
   sharp: false
 
+minimumReleaseAgeExclude:
+  - vizloom@0.1.0
+
 # @tailwindcss/typography 0.5.20 pins postcss-selector-parser 6.0.10 (quadratic parsing, GHSA fixed in 6.1.5).
 overrides:
   postcss-selector-parser@<6.1.5: ^6.1.5
+  # eslint 10.13 / typescript-eslint 8.72 pin minimatch 10.2.6 (globparts DoS, GHSA-g3hv-75wg-m249, fixed in 11.0.1).
+  minimatch@>=7 <11.0.1: ^11.0.1

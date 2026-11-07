@@ -101,6 +101,60 @@ export const deleteDesign = async (m: MachineId, id: string): Promise<void> => {
   await runtimeJson<unknown>(m, platformPath('/design/library/delete'), postJson({ project: id }));
 };
 
+export interface IFolder {
+  id: string;
+  name: string;
+  /** '' for a top folder; a folder holds folders one level deep. */
+  parent: string;
+}
+
+export interface IDesignSystemRef {
+  id: string;
+  label: string;
+}
+
+/** The person's own shelf: folders, where each project lies, the design system each was built on. */
+export interface ILibraryLayout {
+  folders: IFolder[];
+  placed: Record<string, string>;
+  systems: Record<string, IDesignSystemRef>;
+}
+
+export interface ITrashItem {
+  id: string;
+  title: string;
+  deletedAt: number;
+  kind: 'site' | 'slides' | 'video';
+}
+
+const layoutPost = <T>(m: MachineId, path: `/${string}`, body: object, signal?: AbortSignal) =>
+  runtimeJson<T>(m, platformPath(path), { ...postJson(body), signal });
+
+/** A runtime without folders answers nothing usable: the library then has none (an addition, not the library). */
+export const fetchLayout = async (m: MachineId, signal?: AbortSignal): Promise<ILibraryLayout> => {
+  const raw = await layoutPost<Partial<ILibraryLayout>>(m, '/design/library/layout', {}, signal);
+  return { folders: raw.folders ?? [], placed: raw.placed ?? {}, systems: raw.systems ?? {} };
+};
+
+export const saveFolder = (m: MachineId, input: { id?: string; name: string; parent?: string }) =>
+  layoutPost<IFolder>(m, '/design/library/folder', input);
+
+export const deleteFolder = (m: MachineId, id: string, projects: 'keep' | 'trash') =>
+  layoutPost<{ ok: boolean; trashed: string[] }>(m, '/design/library/folder/delete', { id, projects });
+
+/** Lays projects in a folder; '' is the top. */
+export const moveToFolder = (m: MachineId, projects: string[], folder: string) =>
+  layoutPost<unknown>(m, '/design/library/folder/move', { projects, folder });
+
+export const fetchTrash = async (m: MachineId): Promise<ITrashItem[]> =>
+  (await layoutPost<{ items: ITrashItem[] }>(m, '/design/library/trash', {})).items;
+
+export const restoreDesign = (m: MachineId, id: string) =>
+  layoutPost<unknown>(m, '/design/library/trash/restore', { project: id });
+
+export const purgeDesign = (m: MachineId, id: string) =>
+  layoutPost<unknown>(m, '/design/library/trash/purge', { project: id });
+
 /** The picture of a board for a card; `version` is the cache key (the project's last change). */
 /**
  * The picture of a board. `fresh` waits for the picture of the board as it is now instead of an earlier one: for an

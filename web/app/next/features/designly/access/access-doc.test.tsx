@@ -16,6 +16,7 @@ import {
 } from '@/next/features/designly/access/api';
 
 vi.mock('@/next/ui/toast', () => ({ toast: vi.fn() }));
+vi.mock('@/next/features/designly/sdk/toast', () => ({ toast: vi.fn() }));
 
 beforeEach(() => {
   window.matchMedia = ((query: string) => ({

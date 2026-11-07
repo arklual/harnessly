@@ -9,9 +9,9 @@ import {
   ProjectDownloadMenu,
   type IProjectDownloadsOf,
 } from '@/next/features/designly/project-downloads';
-import { KEY_SCOPE } from '@/next/features/keys/commands';
-import { useKeyHint } from '@/next/features/keys/keys-help';
-import { useKeys } from '@/next/features/keys/use-keys';
+import { KEY_SCOPE } from '@/next/features/designly/sdk/keys';
+import { useKeyHint } from '@/next/features/designly/sdk/keys';
+import { useKeys } from '@/next/features/designly/sdk/keys';
 import {
   Fragment,
   useCallback,

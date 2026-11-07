@@ -1,0 +1,13 @@
+{
+  "id": "harnessly.runner",
+  "name": "Запуск",
+  "description": "Тесты и dev-сервер папки чата по кнопке: вывод команды здесь, сайт — во встроенном браузере справа",
+  "version": "0.1.0",
+  "harnessly": ">=0.16.177",
+  "trust": "sandboxed",
+  "targets": ["chat", "pane", "app"],
+  "activation": { "on": ["manual"], "openView": "main" },
+  "permissions": ["terminal.run", "process", "storage", "tools.page"],
+  "agent": { "instructions": "instructions.md" },
+  "views": [{ "id": "main", "title": "Запуск", "entry": "ui/index.html", "targets": ["pane", "app"] }]
+}

@@ -776,3 +776,61 @@
   flex-direction: column;
   align-items: flex-end;
 }
+
+/* hl.files.pick: the host's dialog where the person picks a file for an app. */
+.hx-filepick__field {
+  width: 100%;
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-window);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+.hx-filepick__field:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--hx-focus);
+}
+.hx-filepick__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  margin: var(--hx-space-2) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.hx-filepick__item {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  width: 100%;
+  padding: var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-filepick__item span {
+  overflow-wrap: anywhere;
+}
+.hx-filepick__item:hover,
+.hx-filepick__item:focus-visible {
+  background: var(--hx-bg-hover);
+  outline: none;
+}
+.hx-filepick__none,
+.hx-filepick__fail {
+  margin: 0;
+  padding: var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-filepick__fail {
+  color: var(--hx-danger);
+}

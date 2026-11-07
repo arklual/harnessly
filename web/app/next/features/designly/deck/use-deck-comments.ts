@@ -17,7 +17,7 @@ import { useGuestComments } from '@/next/features/designly/deck/guest-comments';
 import { useDeck, putDeckComment, putGuestResolved } from '@/next/stores/deck';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 export interface IDeckComments {
   /** null while the deck has not been read. */

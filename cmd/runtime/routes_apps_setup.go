@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -226,6 +227,7 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 					deny(w, http.StatusConflict, "waiting-connection")
 					return
 				}
+				_ = reg.Journal(id, apps.JournalEntry{What: "connection.call", Class: apps.ClassHigh, OK: true, Detail: srv.Connection})
 				connProxy.serve(w, r, conn.ID+strings.TrimSuffix("/"+sub, "/"))
 				return
 			}
@@ -243,6 +245,8 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 					values[n] = v[n]
 				}
 			}
+			names := slices.Sorted(maps.Keys(values))
+			_ = reg.Journal(id, apps.JournalEntry{What: "secret.call", Class: apps.ClassHigh, OK: true, Detail: server + ": " + strings.Join(names, ", ")})
 			apps.ProxyMCP(w, r, srv, values)
 		}),
 	}

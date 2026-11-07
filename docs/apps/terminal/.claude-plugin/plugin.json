@@ -1,0 +1,5 @@
+{
+  "description": "Свой терминал в папке чата, собранный на SDK: оболочка в песочнице агента, xterm в окне",
+  "name": "harnessly-terminal",
+  "version": "0.1.0"
+}

@@ -1,0 +1,52 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--hx-bg-window, Canvas);
+  color: var(--hx-fg-1, CanvasText);
+}
+.tm {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  gap: 8px;
+}
+.tm__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tm__sub {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--hx-fg-2, GrayText);
+}
+.tm__btn {
+  border: 1px solid var(--hx-border, GrayText);
+  border-radius: 6px;
+  padding: 4px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+.tm__btn:hover:not(:disabled) {
+  background: var(--hx-bg-hover, ButtonFace);
+}
+.tm__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tm__term {
+  flex: 1;
+  min-height: 0;
+}

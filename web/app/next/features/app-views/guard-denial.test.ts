@@ -16,6 +16,15 @@ describe('parseGuardDenial', () => {
     expect(parseGuardDenial(text)).toMatchObject({ app: 'A "b"', rule: 'Bash(echo ])' });
   });
 
+  it('reads the app id of a hook stop', () => {
+    expect(parseGuardDenial('[app-guard "Сторож" "hook" "acme.watch"] no pushes')).toEqual({
+      app: 'Сторож',
+      rule: 'hook',
+      appId: 'acme.watch',
+      reason: 'no pushes',
+    });
+  });
+
   it('leaves any other output alone', () => {
     expect(parseGuardDenial(undefined)).toBeNull();
     expect(parseGuardDenial('permission denied')).toBeNull();

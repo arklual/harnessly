@@ -192,3 +192,59 @@ func TestAppGuardCodexJournalsRefusal(t *testing.T) {
 		t.Errorf("the call's input went out: %v", got[0])
 	}
 }
+
+// after the rules, the guard asks the runtime for the word of the apps' hooks: a stop goes out marked as the
+// app's, a context goes to the agent, and a runtime that cannot be asked stops the call only for a strict app.
+func TestAppGuardAsksHooks(t *testing.T) {
+	write := func(snap apps.Snapshot) string {
+		raw, _ := json.Marshal(snap)
+		sum := sha256.Sum256(raw)
+		p := filepath.Join(t.TempDir(), "policy-"+hex.EncodeToString(sum[:8])+".json")
+		if err := os.WriteFile(p, raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	hooked := write(apps.Snapshot{Apps: []apps.SnapshotApp{{ID: "acme.watch", Name: "Сторож", Hooks: true}}})
+	strict := write(apps.Snapshot{Apps: []apps.SnapshotApp{{ID: "acme.watch", Name: "Сторож", Hooks: true, Strict: true}}})
+	plain := write(apps.Snapshot{Apps: []apps.SnapshotApp{{ID: "acme.other", Name: "Другое"}}})
+	var asked []map[string]any
+	answer := `{"deny":true,"app":"acme.watch","name":"Сторож","reason":"no pushes on Friday"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var b map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		if r.URL.Path == "/api/cli/apps/hook" {
+			asked = append(asked, b)
+		}
+		_, _ = w.Write([]byte(answer))
+	}))
+	defer srv.Close()
+	env := map[string]string{"HARNESSLY_URL": srv.URL, "HARNESSLY_CLI_TOKEN": "t", "HARNESSLY_SESSION": "hs-1"}
+	run := func(policy string, env map[string]string) string {
+		var out bytes.Buffer
+		Run([]string{"hook", "app-guard", "--policy", policy}, Env{Getenv: func(k string) string { return env[k] },
+			Stdin: strings.NewReader(`{"session_id":"s1","tool_name":"Bash","tool_input":{"command":"git push"}}`), Stdout: &out})
+		return out.String()
+	}
+	out := run(hooked, env)
+	if !strings.Contains(out, `"permissionDecision":"deny"`) || !strings.Contains(out, `\"hook\" \"acme.watch\"]`) || !strings.Contains(out, "no pushes on Friday") {
+		t.Fatalf("a hook's stop: %s", out)
+	}
+	if len(asked) != 1 || asked[0]["tool"] != "Bash" || asked[0]["session"] != "hs-1" {
+		t.Fatalf("asked %v", asked)
+	}
+	answer = `{"context":"[Сторож] main is protected"}`
+	if out := run(hooked, env); !strings.Contains(out, `"additionalContext":"[Сторож] main is protected"`) || strings.Contains(out, "permissionDecision") {
+		t.Fatalf("a hook's context: %s", out)
+	}
+	if run(plain, env) != "" || len(asked) != 2 {
+		t.Fatalf("an app with no hook is not asked: %v", asked)
+	}
+	away := map[string]string{"HARNESSLY_URL": "http://127.0.0.1:1", "HARNESSLY_CLI_TOKEN": "t", "HARNESSLY_SESSION": "hs-1"}
+	if out := run(hooked, away); out != "" {
+		t.Fatalf("no runtime, not strict: the call goes on: %s", out)
+	}
+	if out := run(strict, away); !strings.Contains(out, `"permissionDecision":"deny"`) || !strings.Contains(out, "strict") {
+		t.Fatalf("no runtime, strict: stopped: %s", out)
+	}
+}

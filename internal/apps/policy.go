@@ -417,6 +417,10 @@ type SnapshotApp struct {
 	// Dir and Validators are the package folder and the checks of the turn the validate hook runs (validate.go).
 	Dir        string      `json:"dir,omitempty"`
 	Validators []Validator `json:"validators,omitempty"`
+	// Hooks: a view of the app hears the agent's calls (hooks.agent): the guard asks the runtime after the rules. Strict:
+	// a call the app does not answer is stopped (hooks.strict).
+	Hooks  bool `json:"hooks,omitempty"`
+	Strict bool `json:"strict,omitempty"`
 }
 
 // The subcommands of `harnessly app` (with their aliases, internal/hlcli app.go) that change what is on: the agent of a

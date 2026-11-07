@@ -49,6 +49,10 @@ import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { useNotices } from '@/next/bindings/notices';
 import { useNotify } from '@/next/stores/notices';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
+import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
+import { useInstalledApps } from '@/next/features/app-views/api';
+import { openAppTab } from '@/next/features/app-views/open';
+import { setDraftText } from '@/next/stores/drafts';
 import { useMessageSearch } from '@/next/bindings/use-message-search';
 import {
   hasTestChats,
@@ -85,6 +89,7 @@ import AppDocPage from '@/next/bindings/app-doc';
 import AppsListPage from '@/next/bindings/apps-list';
 import HelpPage from '@/next/bindings/help';
 import { AppConfirmHost } from '@/next/features/app-views/confirm';
+import { AppFilePickHost } from '@/next/features/app-views/file-pick';
 import LegacyScreen, { LEGACY_SCREEN, ManageScreen } from '@/next/legacy/screens';
 import {
   SIDEBAR_VIEW,
@@ -486,13 +491,28 @@ const Shell = ({ owner }: IShellProps) => {
   const [machineReveal, setMachineReveal] = useState(0);
   const unread = notificationItems?.some((item) => item.unread) ?? false;
   const messages = useMessageSearch(model.active, query, searchOpen);
+  // The apps of the search: read once the dialog is open, so a page that never searches does not ask.
+  const searchApps = useInstalledApps(model.active ?? 'local', 0, searchOpen && model.active !== null).list;
+  const searchChat = useConversation(currentId !== null && isConvId(currentId) ? currentId : null);
+  const appsGroup = useMemo(
+    () =>
+      appSearchGroup(
+        searchApps?.apps ?? [],
+        searchChat && currentId ? { id: currentId, apps: searchChat.apps ?? [] } : null,
+        query,
+      ),
+    [searchApps, searchChat, currentId, query],
+  );
   const searchResults = useMemo(() => {
     if (shownChats === null) return null;
-    const titles = searchChats(shownChats, model.projects ?? [], query);
+    const titles = [
+      ...(appsGroup ? [appsGroup] : []),
+      ...searchChats(shownChats, model.projects ?? [], query),
+    ];
     // The messages are still being asked and no title answers yet: the dialog keeps its «searching» rather than «nothing».
     if (messages.asked && messages.hits === null && titles.length === 0) return null;
     return messages.hits ? [...titles, ...messageGroups(messages.hits, shownChats, now)] : titles;
-  }, [shownChats, model.projects, query, messages.asked, messages.hits, now]);
+  }, [shownChats, model.projects, query, messages.asked, messages.hits, now, appsGroup]);
   const recent = useMemo(
     () => (shownChats === null ? [] : recentChats(shownChats, model.projects ?? [])),
     [shownChats, model.projects],
@@ -630,9 +650,15 @@ const Shell = ({ owner }: IShellProps) => {
   useUiRequest(UI_REQUEST.resume, resumeDialog.show);
   const newChatProject = useNewChatProject();
   // the machine the next chat starts on, the default one unless another was picked for it; a
-  // pick of a machine that cannot take a chat now is no pick.
+  // pick of a machine that cannot take a chat now is no pick. HRN-870: with the default one down too, the first
+  // machine that answers, so the pill (and in it the machines) stays to pick from.
   const newChatMachine = useNewChatMachine();
-  const startOn = model.startMachines.find((m) => m.id === newChatMachine && !m.off)?.id ?? model.active;
+  const startOn =
+    model.startMachines.find((m) => m.id === newChatMachine && !m.off)?.id ??
+    model.startMachines.find((m) => !m.off)?.id ??
+    model.active;
+  // Not one machine can take a new chat: the field says so instead of a pill with nothing in it.
+  const allMachinesOff = model.startMachines.length > 0 && model.startMachines.every((m) => m.off);
   // Picked in the model's popover, for a person with several machines; the default one is no pick.
   const startPick = useMemo(
     () =>
@@ -804,6 +830,7 @@ const Shell = ({ owner }: IShellProps) => {
       {projectDialog.dialog}
       {projectSettings.dialog}
       <AppConfirmHost />
+      <AppFilePickHost />
       {resumeDialog.dialog}
       <NotificationCenter
         open={notifications !== null}
@@ -853,7 +880,17 @@ const Shell = ({ owner }: IShellProps) => {
             onPick: (row: ISearchRow) => {
               setSearchOpen(false);
               setQuery('');
-              if (row.target && isConvId(row.target.chatId)) {
+              if (row.id.startsWith(APP_ROW.command)) {
+                const [chatId, ...words] = row.id.slice(APP_ROW.command.length).split('|');
+                if (chatId && isConvId(chatId)) {
+                  setDraftText(chatId, words.join('|'));
+                  openChat(chatId);
+                }
+              } else if (row.id.startsWith(APP_ROW.open)) {
+                const id = row.id.slice(APP_ROW.open.length);
+                navigate({ kind: ROUTE.app, id, ...(currentId ? { chat: currentId } : {}) });
+              } else if (row.id.startsWith(APP_ROW.pane)) openAppTab(row.id.slice(APP_ROW.pane.length));
+              else if (row.target && isConvId(row.target.chatId)) {
                 // The chat opens at the message: the feed of that chat takes the ask when it is on screen.
                 revealMessage({
                   conv: row.target.chatId,
@@ -978,6 +1015,7 @@ const Shell = ({ owner }: IShellProps) => {
               projectId={newChatInto?.id ?? null}
               resolveProject={model.personSidebar ? machineProjectOf : undefined}
               machines={startPick}
+              allMachinesOff={allMachinesOff}
               below={<HomeTools tools={homeTools} />}
               onCreated={(id) => {
                 newChatProjectStore.set(null);

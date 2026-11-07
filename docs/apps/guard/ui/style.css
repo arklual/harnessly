@@ -1,0 +1,34 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  background: var(--hx-bg-window, Canvas);
+  color: var(--hx-fg-1, CanvasText);
+}
+.gd {
+  padding: 16px;
+}
+.gd__sub {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--hx-fg-2, GrayText);
+}
+.gd__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gd__item {
+  font-size: 13px;
+}
+.gd__cmd {
+  display: block;
+  margin-top: 2px;
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}

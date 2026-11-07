@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { usePortalContainer } from '@/next/ui/portal';
 import ImageEditView from '@/next/features/image-edit/image-editor';
 import {

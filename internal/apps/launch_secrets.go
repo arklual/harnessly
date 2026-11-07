@@ -134,6 +134,8 @@ func (l *Launcher) pluginDir(a Installed, session, token string) (dir string, er
 				delete(servers, name)
 				continue
 			}
+			_ = l.Registry.Journal(a.ID, JournalEntry{What: "secret.launch", Class: ClassHigh, OK: true,
+				Detail: name + ": " + strings.Join(names, ", ")})
 			env, _ := srv["env"].(map[string]any)
 			for k, val := range env {
 				if s, ok := val.(string); ok {

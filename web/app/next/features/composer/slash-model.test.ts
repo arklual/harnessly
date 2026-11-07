@@ -400,3 +400,23 @@ describe('buildRows: commands of apps', () => {
     );
   });
 });
+
+describe('what the apps find for «@»', () => {
+  it('lists each app under its title and puts its text into the field', async () => {
+    const { mentionRows, GROUP } = await import('@/next/features/composer/slash-model');
+    const rows = mentionRows([
+      {
+        app: 'acme.tracker',
+        title: 'Задачи',
+        items: [{ label: 'ABC-1 Оплата', detail: 'в работе', insert: 'ABC-1' }],
+      },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      group: GROUP.mention,
+      heading: 'Задачи',
+      description: 'в работе',
+      action: { k: 'insert', text: 'ABC-1 ' },
+    });
+  });
+});

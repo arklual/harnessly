@@ -109,7 +109,7 @@ func packageStamp(dir string) string {
 			b.WriteString("-;")
 			continue
 		}
-		fmt.Fprintf(&b, "%d:%d;", info.Size(), info.ModTime().UnixNano())
+		fmt.Fprintf(&b, "%d:%d:%d;", info.Size(), info.ModTime().UnixNano(), changedAt(info))
 	}
 	return b.String()
 }
@@ -304,6 +304,11 @@ func (p *Package) checkFiles() Problems {
 	if c := m.Chat; c != nil {
 		for i, cmd := range c.Commands {
 			_, _ = p.stat(fmt.Sprintf("chat.commands[%d]", i), "commands/"+strings.TrimPrefix(cmd, "/")+".md", &ps)
+		}
+		if c.Mentions != nil && c.Mentions.Tool != "" {
+			if _, _, err := p.CanCallTool(c.Mentions.Tool); err != nil {
+				ps = append(ps, Problem{Path: "chat.mentions.tool", Message: err.Error()})
+			}
 		}
 	}
 

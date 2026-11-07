@@ -90,6 +90,12 @@ type Manifest struct {
 	Sinopia     json.RawMessage `json:"sinopia,omitempty"`
 	Storage     json.RawMessage `json:"storage,omitempty"`
 	Backend     *Backend        `json:"backend,omitempty"`
+	// Budget is what the app may spend a day through `ai` and `agents.run` (spend.go).
+	Budget *Budget `json:"budget,omitempty"`
+	// Delivery, Points and Aliases are the host's own apps' (builtin.go): an installed app is a package and has none.
+	Delivery string      `json:"delivery,omitempty"`
+	Points   []PointDecl `json:"points,omitempty"`
+	Aliases  []AliasDecl `json:"aliases,omitempty"`
 }
 
 // Activation is how the app turns on and what it opens when it does.
@@ -178,11 +184,67 @@ type Branding struct {
 type Chat struct {
 	Commands []string `json:"commands,omitempty"`
 	Cards    []string `json:"cards,omitempty"`
+	// Starters are lines an empty chat offers under its field; a click puts the text into the field, it sends nothing.
+	Starters []Starter `json:"starters,omitempty"`
+	// Buttons stand at the chat's field: each runs one of the app's commands or opens one of its views in the pane.
+	Buttons []ChatButton `json:"buttons,omitempty"`
+	// Links are the addresses the app shows a card for: a message with such a link gets the card under it.
+	Links []LinkCard `json:"links,omitempty"`
+	// Mentions is what «@» in the chat's field finds in the app: a tool of its own MCP server, asked with what is typed.
+	Mentions *ChatMentions `json:"mentions,omitempty"`
 }
+
+// ChatMentions is the app's part of «@»: Tool (<server>.<tool> of its .mcp.json) is called with {"query": "<typed>"}
+// and answers {"items": [{"label", "detail", "insert"}]}; the palette lists them under Title.
+type ChatMentions struct {
+	Title string `json:"title"`
+	Tool  string `json:"tool"`
+}
+
+const maxMentionTitle = 40
+
+var mentionToolRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}\.[A-Za-z0-9_.-]{1,64}$`)
+
+// Starter is a line an empty chat offers.
+type Starter struct {
+	Text string `json:"text"`
+}
+
+// ChatButton is a button of the app at the chat's field: Command (one of chat.commands) or View (a view with the pane
+// target), one of the two.
+type ChatButton struct {
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Icon    string `json:"icon,omitempty"`
+	Command string `json:"command,omitempty"`
+	View    string `json:"view,omitempty"`
+}
+
+// LinkCard is a kind of address the app shows a card for. Match is https://<host>/<path> where the host may start with
+// "*." and the path may end with "*"; Card is one of chat.cards, given the link as its data ({url}).
+type LinkCard struct {
+	Match string `json:"match"`
+	Card  string `json:"card"`
+}
+
+// Starters, buttons and link kinds an app may give: more would crowd the field and the empty chat.
+const (
+	maxStarters  = 4
+	maxButtons   = 3
+	maxLinkCards = 8
+	maxStarter   = 140
+)
+
+// linkMatchRe is the form of a link kind: https, a host (a leading "*." for its subdomains), a path that may end with *.
+var linkMatchRe = regexp.MustCompile(`^https://(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(/[^\s*?#]*\*?)?$`)
 
 // Backend is the app's own server.
 type Backend struct {
-	URL string `json:"url"`
+	URL string `json:"url,omitempty"`
+	// Tools are a builtin app's (builtin.go): its backend runs in the runtime's process. Instructions is what the host's
+	// tools server says of them to the agent.
+	Tools        []BackendTool `json:"tools,omitempty"`
+	Instructions string        `json:"instructions,omitempty"`
 }
 
 // Problem is one thing wrong with a package: the field it is about and what is wrong, in words.
@@ -305,6 +367,17 @@ func (m *Manifest) Check() Problems {
 	case m.ID == WidgetsApp:
 		// The agents' own widgets are served and bridged under this id; a package with it would lend them its rights.
 		add("id", "%q is reserved for the agents' own widgets", m.ID)
+	case IsBuiltin(m.ID):
+		add("id", "%q is an app of the host's own", m.ID)
+	}
+	if m.Delivery != "" {
+		add("delivery", "an installed app is a package: only the host's own apps are delivered otherwise")
+	}
+	if len(m.Points) > 0 {
+		add("points", "only the host's own apps declare points for now: contribute to theirs (`sinopia`) instead")
+	}
+	if len(m.Aliases) > 0 {
+		add("aliases", "only the host's own apps declare aliases")
 	}
 	if strings.TrimSpace(m.Name) == "" {
 		add("name", "is required: the name people see")
@@ -414,6 +487,17 @@ func (m *Manifest) Check() Problems {
 		}
 		if name == "secrets" && !m.hasSecret(value) {
 			add(path, "the secret %q is not in secrets", value)
+		}
+		if name == "secrets.write" && !secretRe.MatchString(value) {
+			add(path, "secrets.write:%s: a secret name is letters, digits, '.', '_' and '-'", value)
+		}
+		if name == "events" && !slices.Contains(EventKinds, value) {
+			add(path, "events:%s: the kinds are %s", value, strings.Join(EventKinds, ", "))
+		}
+		if name == "terminal.run" || name == "process" {
+			if why := CheckCommandMask(value); why != "" {
+				add(path, "the mask %q %s", value, why)
+			}
 		}
 		if name == "files.read" || name == "files.write" {
 			if why := CheckMask(value); why != "" {
@@ -565,7 +649,7 @@ func (m *Manifest) Check() Problems {
 			add(path+".targets", "is required: where the view shows")
 		}
 		for j, t := range v.Targets {
-			if !targets[t] && !(wildcardCovers(t) && targets["sinopia.*"]) {
+			if w := wildcardOf(t); !targets[t] && (w == "" || !targets[w]) {
 				add(fmt.Sprintf("%s.targets[%d]", path, j), "%q is not in the app's targets", t)
 			}
 		}
@@ -588,6 +672,7 @@ func (m *Manifest) Check() Problems {
 	}
 
 	m.checkBranding(targets, add)
+	m.checkBudget(add)
 
 	// A target with nothing in it is a mistake: the app would show up where it does nothing.
 	for _, t := range sortedKeys(targets) {
@@ -607,7 +692,8 @@ func (m *Manifest) Check() Problems {
 				add(fmt.Sprintf("chat.cards[%d]", i), "%q is not a view with the chat target", card)
 			}
 		}
-		if (len(c.Commands) > 0 || len(c.Cards) > 0) && !targets[TargetChat] {
+		m.checkChatHost(c, add)
+		if (len(c.Commands) > 0 || len(c.Cards) > 0 || len(c.Starters) > 0 || len(c.Buttons) > 0 || len(c.Links) > 0 || c.Mentions != nil) && !targets[TargetChat] {
 			add("chat", "chat contributions need the chat target")
 		}
 	}
@@ -638,7 +724,7 @@ func (m *Manifest) contributes(target string) bool {
 		return m.Agent != nil || m.Chat != nil
 	case target == TargetBranding:
 		return m.Branding != nil
-	case strings.HasPrefix(target, "sinopia."):
+	case IsSinopiaTarget(target):
 		return len(m.Sinopia) > 0 || m.Agent != nil
 	}
 	return false
@@ -667,25 +753,45 @@ func (m *Manifest) HasTarget(target string) bool {
 	if contains(m.Targets, target) {
 		return true
 	}
-	return wildcardCovers(target) && contains(m.Targets, "sinopia.*")
+	w := wildcardOf(target)
+	return w != "" && contains(m.Targets, w)
 }
 
-// wildcardCovers says whether sinopia.* names the target: the host's own document types, not those an app adds, which an
-// app has to name to be in.
-func wildcardCovers(target string) bool {
-	kind, ok := strings.CutPrefix(target, "sinopia.")
-	return ok && !strings.Contains(kind, ".")
+// wildcardOf is the wildcard alias that names the target (sinopia.* for sinopia.slides), "" for none. It covers the
+// host's own document types, not those an app adds, which an app has to name to be in.
+func wildcardOf(target string) string {
+	_, scope, ok := aliasOwner(target)
+	if !ok || scope == "*" || strings.Contains(scope, ".") {
+		return ""
+	}
+	return target[:len(target)-len(scope)] + "*"
 }
 
+// TargetCovers says whether a listed target (of an app or a view) covers the target asked for: the same one, or a
+// wildcard alias of a builtin app's screen over it (sinopia.* over sinopia.slides).
+func TargetCovers(listed, target string) bool {
+	if listed == target {
+		return true
+	}
+	owner, scope, ok := aliasOwner(listed)
+	if !ok || scope != "*" {
+		return false
+	}
+	to, _, ok := aliasOwner(target)
+	return ok && to == owner
+}
+
+// validTarget: a place of the host's own, or an alias of a builtin app's screen (builtin.go) with a document type
+// after it (sinopia.slides, sinopia.acme.board) or its wildcard.
 func validTarget(t string) bool {
 	switch t {
-	case TargetChat, TargetPane, TargetApp, "sinopia.*":
+	case TargetChat, TargetPane, TargetApp:
 		return true
 	case TargetSettings, TargetOnboarding, TargetObjectAction, TargetHubSettings, TargetBranding:
 		return true
 	}
-	kind, ok := strings.CutPrefix(t, "sinopia.")
-	return ok && (kindRe.MatchString(kind) || appKindRe.MatchString(kind))
+	_, scope, ok := aliasOwner(t)
+	return ok && (scope == "*" || kindRe.MatchString(scope) || appKindRe.MatchString(scope))
 }
 
 func hasViewTarget(targets map[string]bool) bool {
@@ -693,13 +799,20 @@ func hasViewTarget(targets map[string]bool) bool {
 		targets[TargetObjectAction] || targets[TargetHubSettings]
 }
 
+// hasSinopia says whether a target names Sinopia's screen through one of its aliases.
 func hasSinopia(targets map[string]bool) bool {
 	for t := range targets {
-		if strings.HasPrefix(t, "sinopia.") {
+		if IsSinopiaTarget(t) {
 			return true
 		}
 	}
 	return false
+}
+
+// IsSinopiaTarget says whether a target is an alias of Sinopia's screen.
+func IsSinopiaTarget(t string) bool {
+	owner, _, ok := aliasOwner(t)
+	return ok && owner == SinopiaApp
 }
 
 // checkToolPattern is "" for a good tool name or mask: a built-in tool (Bash, Read, Bash(git push*)), a server's tool
@@ -854,4 +967,74 @@ func (m *Manifest) checkBranding(targets map[string]bool, add func(path, format 
 	if utf8.RuneCountInString(b.Tagline) > 120 {
 		add("branding.tagline", "is up to 120 characters")
 	}
+}
+
+// checkChatHost checks what the app puts into the host's own chat: the starters, the buttons at the field and the
+// kinds of link it shows a card for.
+func (m *Manifest) checkChatHost(c *Chat, add func(field, format string, args ...any)) {
+	if len(c.Starters) > maxStarters {
+		add("chat.starters", "at most %d starters", maxStarters)
+	}
+	for i, st := range c.Starters {
+		if text := strings.TrimSpace(st.Text); text == "" || utf8.RuneCountInString(text) > maxStarter {
+			add(fmt.Sprintf("chat.starters[%d].text", i), "a starter is a line of 1 to %d characters", maxStarter)
+		}
+	}
+	if len(c.Buttons) > maxButtons {
+		add("chat.buttons", "at most %d buttons", maxButtons)
+	}
+	ids := map[string]bool{}
+	for i, b := range c.Buttons {
+		field := fmt.Sprintf("chat.buttons[%d]", i)
+		if !viewIDRe.MatchString(b.ID) || ids[b.ID] {
+			add(field+".id", "%q: a button needs an id of its own (a-z, 0-9, -)", b.ID)
+		}
+		ids[b.ID] = true
+		if strings.TrimSpace(b.Title) == "" {
+			add(field+".title", "a button needs a title: it is what people read on hover")
+		}
+		switch {
+		case (b.Command == "") == (b.View == ""):
+			add(field, "a button runs a command or opens a view: one of the two")
+		case b.Command != "" && !slices.Contains(c.Commands, b.Command):
+			add(field+".command", "%q is not one of chat.commands", b.Command)
+		case b.View != "":
+			if v := m.view(b.View); v == nil || !contains(v.Targets, TargetPane) {
+				add(field+".view", "%q is not a view with the pane target", b.View)
+			}
+		}
+	}
+	if mn := c.Mentions; mn != nil {
+		if title := strings.TrimSpace(mn.Title); title == "" || utf8.RuneCountInString(title) > maxMentionTitle {
+			add("chat.mentions.title", "a title of 1 to %d characters: the palette lists the app's finds under it", maxMentionTitle)
+		}
+		if !mentionToolRe.MatchString(mn.Tool) {
+			add("chat.mentions.tool", "%q: a tool of the app's MCP server, <server>.<tool>", mn.Tool)
+		}
+	}
+	if len(c.Links) > maxLinkCards {
+		add("chat.links", "at most %d kinds of link", maxLinkCards)
+	}
+	for i, l := range c.Links {
+		field := fmt.Sprintf("chat.links[%d]", i)
+		if strings.HasPrefix(l.Match, "https://*.") && !wideEnough(l.Match) {
+			add(field+".match", "%q: a wildcard needs a host of at least three parts (*.bank.example), or it takes the links of a whole zone", l.Match)
+		}
+		if !linkMatchRe.MatchString(l.Match) {
+			add(field+".match", "%q: a link kind is https://<host>/<path>, the host may start with *. and the path end with *", l.Match)
+		}
+		if !slices.Contains(c.Cards, l.Card) {
+			add(field+".card", "%q is not one of chat.cards", l.Card)
+		}
+	}
+}
+
+// wideEnough says whether the host under a link kind's wildcard has two labels below its zone at least: *.bank.example
+// and *.co.uk.example are, *.co.uk is not (it would take every link of a country's zone).
+func wideEnough(match string) bool {
+	host := strings.TrimPrefix(match, "https://*.")
+	if i := strings.IndexByte(host, '/'); i >= 0 {
+		host = host[:i]
+	}
+	return strings.Count(host, ".") >= 1 && !(strings.Count(host, ".") == 1 && len(strings.Split(host, ".")[0]) <= 3)
 }

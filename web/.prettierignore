@@ -5,6 +5,7 @@ test-results
 playwright-report
 dist-hub
 app/next/features/app-views/fixtures/ext-apps
+app/next/features/app-views/fixtures/compat
 
 # The design board's stylesheets, copied as they are: keep them diffable against the design
 app/hub/hx/styles/tokens.css

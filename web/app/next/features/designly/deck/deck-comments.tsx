@@ -26,7 +26,7 @@ import { useVars } from '@/next/features/designly/deck/use-vars';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresence, PRESENCE } from '@/next/ui/presence';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 /** The popover leaves in 160 ms on a wide window, the phone's sheet in 240 ms. */
 const POP_OUT_MS = 160;

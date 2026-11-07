@@ -80,7 +80,7 @@ func TestFieldsTheHostDoesNotRunAreRefused(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, ps)
 		}
 	}
-	for _, perm := range []string{"ai", "users.read", "sinopia.export"} {
+	for _, perm := range []string{"users.read", "sinopia.export"} {
 		_, ps := ParseManifest([]byte(strings.Replace(base(""), `"permissions":[]`, `"permissions":["`+perm+`"]`, 1)))
 		if p := problemAt(ps, "permissions[0]"); p == nil || !strings.Contains(p.Message, "not supported yet") {
 			t.Errorf("%s: %v", perm, ps)

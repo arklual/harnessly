@@ -44,8 +44,65 @@ func (HostTools) Instructions() string {
 		"app_data_get and app_data_set keep the app's data of this chat; app_ask puts a choice to the person in the app and waits for it. " +
 		"widget_show draws an app's chat view in the feed with the data you give; widget_render draws a widget you write yourself " +
 		"(HTML, CSS and a classic script, no network; window.echarts and window.widgetData are there). The same id changes a widget where it stands. " +
-		"The sinopia_* tools read and change the Sinopia document the editor shows beside this chat, for the apps that work in it. " +
+		builtinInstructions() +
 		"catalog lists what an app can use (targets, contributions, rights, bridge methods): ask it when you write or fix an app."
+}
+
+// builtinInstructions are the lines the host's own apps add about their backend tools (backend.instructions).
+func builtinInstructions() string {
+	var b strings.Builder
+	for _, m := range Builtins() {
+		if m.Backend != nil && m.Backend.Instructions != "" {
+			b.WriteString(m.Backend.Instructions + " ")
+		}
+	}
+	return b.String()
+}
+
+// builtinToolList are the backend tools of the host's own apps, as their manifests write them.
+func builtinToolList() []any {
+	var out []any
+	for _, m := range Builtins() {
+		if m.Backend == nil {
+			continue
+		}
+		for _, tool := range m.Backend.Tools {
+			schema, err := jsvalue.Parse(tool.InputSchema)
+			if err != nil {
+				continue
+			}
+			out = append(out, jsvalue.NewObject("name", tool.Name, "description", tool.Description, "inputSchema", schema))
+		}
+	}
+	return out
+}
+
+// builtin runs a backend tool of a host's own app: its code answers it in this process (builtinCalls).
+func (t HostTools) builtin(app *Manifest, tool BackendTool, args *jsvalue.Object) *jsvalue.Object {
+	run := builtinCalls[app.ID]
+	if run == nil {
+		return refuse(app.Name + " does not answer its tools here")
+	}
+	params := map[string]any{}
+	if args != nil {
+		for _, k := range args.Keys() {
+			v, _ := args.Get(k)
+			params[k] = plain(v)
+		}
+	}
+	res, err := run(t, tool, params)
+	if err != nil {
+		var be *BridgeError
+		if errors.As(err, &be) {
+			return refuse(be.Message)
+		}
+		return refuse(err.Error())
+	}
+	out, err := json.Marshal(res)
+	if err != nil {
+		return refuse("the answer could not be written")
+	}
+	return mcpserver.TextResult(string(out), false)
 }
 
 func str(desc string) *jsvalue.Object {
@@ -102,18 +159,20 @@ func (HostTools) Tools() []any {
 		tool("catalog", "What an app can use, from the table the manifest check reads: targets, contribution kinds, rights, "+
 			"the bridge methods each right opens and these tools. Ask it instead of guessing names when you write or fix an app.",
 			jsvalue.NewObject("section", str("targets, contributions, permissions, methods or tools; omit for all."))),
-	}, sinopiaToolList()...)
+	}, builtinToolList()...)
 }
 
 func (HostTools) Has(name string) bool {
-	return slices.Contains([]string{"open", "data_get", "data_set", "settings_get", "ask", "widget_show", "widget_render", "catalog", "page_tools", "page_call"}, name) || isSinopiaTool(name)
+	return slices.Contains([]string{"open", "data_get", "data_set", "settings_get", "ask", "widget_show", "widget_render", "catalog", "page_tools", "page_call"}, name) || isBuiltinTool(name)
 }
+
+func isBuiltinTool(name string) bool { _, _, ok := builtinTool(name); return ok }
 
 func refuse(msg string) *jsvalue.Object { return mcpserver.TextResult("refused: "+msg, true) }
 
 func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsvalue.Object {
-	if isSinopiaTool(name) {
-		return t.sinopia(name, args)
+	if app, tool, ok := builtinTool(name); ok {
+		return t.builtin(app, tool, args)
 	}
 	if name == "widget_render" {
 		return t.widgetRender(args)
@@ -123,6 +182,14 @@ func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) 
 	}
 	if name == "page_tools" {
 		return t.pageTools(args)
+	}
+	// A builtin app (Sinopia) is on wherever its page is open: its page tools need no install in the chat.
+	if name == "page_call" {
+		if v, _ := args.Get("app"); v != nil {
+			if id, _ := v.(string); IsBuiltin(id) {
+				return t.pageCall(ctx, Installed{ID: id, Manifest: builtinOf(id)}, args)
+			}
+		}
 	}
 	enabled := t.Enabled()
 	if len(enabled) == 0 {
@@ -351,14 +418,14 @@ func (t HostTools) pageTools(args *jsvalue.Object) *jsvalue.Object {
 	enabled := t.Enabled()
 	out := []PageReport{}
 	for _, r := range t.Pages.Offered(t.Conv) {
-		if !slices.Contains(enabled, r.App) || (only != "" && r.App != only) {
+		if only != "" && r.App != only {
 			continue
 		}
-		in, err := t.Registry.Get(r.App)
-		if err != nil || in.Manifest == nil {
+		m := PageApp(r.App, enabled, t.Registry)
+		if m == nil {
 			continue
 		}
-		if r = PageReportAllowed(in.Manifest, r); len(r.Tools) == 0 && len(r.Context) == 0 {
+		if r = PageReportAllowed(m, r); len(r.Tools) == 0 && len(r.Context) == 0 {
 			continue
 		}
 		if r.Tools == nil {

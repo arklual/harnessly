@@ -323,6 +323,10 @@ type PublicInstallOptions struct {
 	HostVersion string
 	// Sum is the archive of the entry the person was shown. An entry that has another is not installed.
 	Sum string
+	// Consent is whose word the install carries (consent.go); with ConsentGiven, Granted are the keys the install screen
+	// listed (nil: all the package reaches).
+	Consent ConsentFrom
+	Granted []string
 }
 
 // InstallFromPublic installs a listed app for the person, from the archive the catalog names. The install is the
@@ -375,7 +379,7 @@ func (r *Registry) InstallFromPublic(id string, opt PublicInstallOptions) (Insta
 	if pkg.Manifest.Trust != e.Trust || !sameSet(pkg.Manifest.Permissions, e.Permissions) {
 		return Installed{}, nil, fmt.Errorf("%w: %s asks for other rights than were shown", ErrPublicChanged, id)
 	}
-	return r.Install(pkg.Dir, InstallOptions{HostVersion: opt.HostVersion, Source: r.publicPackageDir(id, e.Version)})
+	return r.Install(pkg.Dir, InstallOptions{HostVersion: opt.HostVersion, Source: r.publicPackageDir(id, e.Version), Consent: opt.Consent, Granted: opt.Granted})
 }
 
 // PublicSnapshot is what the platform sends a machine: the reviewed list with the archives, or what a machine sends the

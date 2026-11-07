@@ -2,7 +2,6 @@
 // bound elements, the selection the apps are told about, the marks drawn on the boards, and the gate before sharing.
 // The runtime holds the rules (which app is on in which document, what blocks a share); this holds what the page shows.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { sendMessage } from '@/next/commands/messages';
 import {
   callTool,
   createViewSession,
@@ -24,6 +23,7 @@ import {
 } from '@/next/features/app-views/sinopia/contributions';
 import { gateShare } from '@/next/features/app-views/sinopia/share-gate';
 import { HlHub, type THlEvent } from '@/next/features/app-views/sinopia/hub';
+import { connectSinopia } from '@/next/features/app-views/sinopia/host';
 import type {
   ISelectedNode,
   ISinopiaCheckResult,
@@ -32,7 +32,7 @@ import type {
 import { readBridgeMessage } from '@/next/features/designly/page-bridge';
 import { t } from '@/next/i18n';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 /** How often the runtime is asked what it keeps of the document (the marks of the save checks, the apps on in it). */
 export const POLL_MS = 3000;
@@ -56,6 +56,8 @@ export interface ISinopiaOptions {
   slotOrigin: string | null;
   /** The document is looked at: the boards carry no marks and their bound elements answer no click. */
   viewing?: boolean;
+  /** A view of an app changed the document's boards (setFields, patch, a new board): the open board is out of date. */
+  onBoardsChanged?: () => void;
 }
 
 /** A block the presentation editor selected: the board's file, its number, the board's fingerprint and words. */
@@ -91,6 +93,8 @@ export interface ISinopia {
 }
 
 const NONE: IActiveApp[] = [];
+/** The Document API calls that write the boards' files. */
+const BOARD_WRITES: ReadonlySet<string> = new Set(['setFields', 'patch', 'boards.add']);
 
 export const useSinopia = ({
   machine,
@@ -99,6 +103,7 @@ export const useSinopia = ({
   conversation,
   slotOrigin,
   viewing = false,
+  onBoardsChanged,
 }: ISinopiaOptions): ISinopia => {
   const installed = useInstalledApps(machine, 0, kind !== null);
   const apps = installed.list?.apps ?? null;
@@ -118,9 +123,9 @@ export const useSinopia = ({
   );
   // A focus whose app is no longer on in the document is not shown.
   const focus = picked !== null && active.some((a) => a.app.id === picked.app.id) ? picked : null;
-  const latest = useRef({ state, active, selection, conversation, viewing, noticeSeq: 0 });
+  const latest = useRef({ state, active, selection, conversation, viewing, onBoardsChanged, noticeSeq: 0 });
   useEffect(() => {
-    latest.current = { ...latest.current, state, active, selection, conversation, viewing };
+    latest.current = { ...latest.current, state, active, selection, conversation, viewing, onBoardsChanged };
   });
 
   const [hub] = useState(() => new HlHub(slotOrigin));
@@ -268,10 +273,11 @@ export const useSinopia = ({
           toast(app.name, { description: t('next.sinopia.noChat') });
           return;
         }
-        sendMessage(machine, {
-          conversationId: chat,
-          text: selectionMessage({ document: id, app: app.name, task: item.agent, nodes: picked }),
-        });
+        await connectSinopia({ machine, conversation: chat })
+          .chat.send(selectionMessage({ document: id, app: app.name, task: item.agent, nodes: picked }))
+          .catch((e: unknown) =>
+            toast(app.name, { description: e instanceof Error ? e.message : undefined, tone: 'error' }),
+          );
         return;
       }
       if (item.tool === undefined || kind === null) return;
@@ -329,11 +335,12 @@ export const useSinopia = ({
         typeof params.text === 'string'
       ) {
         const node = latest.current.selection.find((n) => n.id === params.node) ?? null;
-        sendMessage(machine, {
-          conversationId: latest.current.conversation,
-          text: commentMessage(id, app.name, node, params.node, params.text),
-        });
+        void connectSinopia({ machine, conversation: latest.current.conversation })
+          .chat.send(commentMessage(id, app.name, node, params.node, params.text))
+          .catch(() => undefined);
       }
+      // The runtime wrote the boards' files; the board on screen shows them once it is loaded again.
+      if (BOARD_WRITES.has(method)) latest.current.onBoardsChanged?.();
       void syncSinopia(machine, id, latest.current.conversation).then(setState, () => undefined);
     },
     [machine, id],

@@ -159,8 +159,26 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 | `hl.storage.<scope>.get/getVersioned/set/delete/keys` | `storage` | Scopes below; `get` of a missing key is `null`. `getVersioned(key)` answers `{value, version}`; `set(key, value, {ifVersion})` answers the new version. See [Versions](#versions) |
 | `hl.flow.*`, `hl.data.*` | none | **Removed.** They were never connected. A call rejects with `invalid_params` and says to use `hl.storage` |
 | `hl.files.read(path)`, `hl.files.write(path, text)` | `files.read:<mask>`, `files.write:<mask>` | Files of the chat's folder, as text |
+| `hl.files.list(folder)`, `hl.files.search(text, {glob})` | `files.read:<mask>` | A folder's entries and the lines that hold a text, within the masks |
+| `hl.files.watch(fn)` | `files.watch` | Which files under the masks changed (names only); gives the function that stops it |
+| `hl.files.pick({accept})` | none | The person picks a file in the host's dialog: `{path, text}` once, or `null` |
+| `hl.git.status()`, `hl.git.diff({path, staged, ref})`, `hl.git.log({limit})` | `git.read` | git of the chat's folder, read only, secrets left out |
+| `hl.events.on(kind, fn)` | `events:<kind>` | `turn`, `tool`, `message` of the chat |
+| `hl.terminal.run(command, {cwd, timeout})` | `terminal.run`, `terminal.run:<mask>` | A command in the agent's sandbox: `{code, output, cut, timedOut, ms}`. See [Commands and processes](#commands-and-processes) |
+| `hl.process.start/stop/list/output` | `process`, `process:<mask>` | Long commands: a dev server, a watcher |
+| `hl.preview.open(port, {path})` | `process` | `localhost:<port>` in the right pane's browser |
+| `hl.terminal.open({cols, rows, cwd})` | `terminal.pty` | A shell on a pty in the agent's sandbox: `{id, write, resize, close, onData, onExit}`. See [Terminal, browser and hooks](#terminal-browser-and-hooks) |
+| `hl.terminal.read({lines})` | `terminal.read` | The latest lines of the chat's agent terminal and of the app's own shells |
+| `hl.browser.read(tool, args)`, `hl.browser.drive(tool, args)` | `browser.read`, `browser.drive` | The chat's agent browser: look (`tabs`, `snapshot`, `screenshot`, `wait_for`) or act (`open`, `navigate`, `click`, `type`…). Answers `{content, isError}` |
+| `hl.hooks.on('tool', fn)` | `hooks.agent` | Hears each tool call of the agent before it runs: `fn({tool, input, cut})` answers `{decision: 'deny', reason}` or `{context}` |
+| `hl.ai.complete(prompt, {system, maxTokens, model})` | `ai` | One answer of a model, no tools: `{text, usd, spentToday, budget}`. See [The model and the agent](#the-model-and-the-agent) |
+| `hl.agents.run(prompt, {title})` | `agents.run` | A task in a new chat under this one: `{id}` |
+| `hl.secrets.put(name, value, {shared})` | `secrets.write[:<name>]` | Put a value into the safe, never read back: `{created}`. See [The safe](#the-safe) |
 | `hl.ui.confirm(text)` | none | A dialog titled with the app's real name. **Resolves a boolean.** Up to 500 characters; never times out |
-| `hl.ui.toast(text)` | none | A notice, up to 500 characters |
+| `hl.ui.toast(text, {tone, description})` | none | A notice, up to 500 characters; tone `info`, `success`, `warning` or `error` and a second line are optional |
+| `hl.keys.on(scope, handlers)` | none | Run the host's shortcut commands of a screen (`deck`, `video`, `site`, `pictures`, `files`) on the person's own keys while the view is up; returns the function that stops it |
+| `hl.keys.press(chord)` | none | Pass a key pressed in the view on to the host; it runs only while the frame has the focus |
+| `hl.keys.hints(commands)` | none | How the host writes the person's key of each command |
 | `hl.notify(text)` | `notify` | The same notice, up to 2000 characters |
 | `hl.resize(height)` | none | The height of a card (sent by itself for cards) |
 | `hl.sinopia.*` | `sinopia.*` | See [Sinopia](04-sinopia.md) |
@@ -213,6 +231,104 @@ symlinks followed, and has to lie in the chat's folder and match a mask. Secrets
 a mask says. Writes also refuse `.claude`, `.mcp.json`, `.vscode`, `.harnessly`, `.github`, `CLAUDE.md`, `AGENTS.md`, and any dot-file no mask
 names with a dot of its own. This needs a chat with the app on: a view in no chat has no workspace.
 
+## Commands and processes
+
+```json
+"permissions": ["terminal.run:npm test*", "process"]
+```
+
+`terminal.run` alone runs any command through the shell; `terminal.run:<mask>` runs only the commands the mask matches
+(`*` is any run of characters), as a program and its words: no `;`, `&&`, `|`, `$`, quotes. A `*` never stands
+for an option: `npm test*` runs `npm test:unit`, not `npm test --registry=…`; write the options the app needs in the
+mask (`npm test -- --grep *`). Both are high: the install
+screen says what they can do, and every run goes into the app's journal.
+
+A command runs in the same sandbox as the agent of the chat: in the chat's folder (or `cwd` inside it), with the
+registry and the packages read-only, `~/.ssh`, `~/.config`, the safe and the tools' logins out of sight, an environment
+with no secret (PATH, HOME, the locale, `CI=1`), 1800 s of processor time, 120 s by default and 600 s at most of wall
+time, and 1 MiB of output. What it leaves behind dies with it. A machine that cannot make the sandbox (no bubblewrap,
+no user namespaces) runs nothing and answers `host_unavailable`.
+
+`process` alone starts any command, `process:<mask>` only what its masks match, as above. `hl.process.start` keeps a command running until `hl.process.stop`, until the app is turned off in the chat or loses
+`process`, or until the runtime stops: 4 per app in a chat. `hl.process.output(id, {since})` gives what it printed from
+an offset and the next one; the machine keeps the last 256 KiB. `hl.preview.open(5173)` shows the port in the pane.
+
+While the agent calls one of the view's tools (and 30 s after the view answers), a call of a high or critical right asks
+the person in the host's own dialog, which the view cannot draw or answer: the agent gets no more through an app than
+the person allowed. The dialog shows the whole command; one longer than 1500 characters is refused. The runtime
+checks it too: in that time it runs only what the person said yes to. A no is the refusal `permission_denied`. [`docs/apps/runner`](../apps/runner) is the example.
+
+## Terminal, browser and hooks
+
+```json
+"permissions": ["terminal.pty", "hooks.agent", "background"]
+```
+
+`terminal.pty` (critical) gives a full shell on a pty in the same sandbox as `terminal.run`: bytes in with `write`,
+bytes out through `onData`, `resize(cols, rows)`, `onExit(code)`. 4 shells per app in a chat, 16 on the machine; the
+journal keeps when a shell opened and closed, never what was typed. While the agent uses the view, each `write` asks the
+person with its whole text. [`docs/apps/terminal`](../apps/terminal) is the example: an xterm.js terminal as fast as
+the built-in one.
+
+`terminal.read` (high) reads what the chat's agent terminal and the app's own shells show, 200 lines by default and 2000
+at most. `browser.read` and `browser.drive` (high) go through the agent's own browser tools for the chat: a tab the
+person holds stays theirs, and passwords, files, network logs and page scripts are not given to an app.
+
+`hooks.agent` (critical) lets a view hear each tool call of the chat's agent before it runs. A hook stops the call or
+adds context for the agent; it never changes the call's arguments. Every app that hears is asked at once; any stop
+wins, contexts add up. A view that does not answer in 5 s lets the call through, and the app's journal says so. With
+`hooks.strict` (critical, its own line on the install screen) silence stops the call instead, and so does a call too
+big to show the view (`cut: true`). A stop shows in the feed as «Остановлено приложением X» with a button that turns
+that app's hook off on the machine. [`docs/apps/guard`](../apps/guard) is the example: it stops `rm -rf` and `git push --force`.
+
+A hook needs a live view. `background` (critical) keeps the app's first pane view running hidden while a chat it is on
+in is open, so its hooks and events work without the person opening it; the view gets `visibility` `{visible: false}`.
+
+## The model and the agent
+
+```json
+"permissions": ["ai", "agents.run"],
+"budget": { "usdPerDay": 1, "runsPerDay": 5 }
+```
+
+Both rights are high and spend the person's model, so each has a budget of the day, declared in the manifest and shown
+on the install screen in the right's line («до $1 в день», «до 5 раз в день»). Without `budget` an app gets $0.50 and 3
+chats a day; the host caps them at $5 and 20. A version that spends more asks the person again. The day ends at 00:00
+UTC.
+
+`hl.ai.complete` asks the person's own Claude once, with no tools, no settings and no session: `model` is `fast` (the
+default) or `smart`, the prompt is up to 20 000 characters, the answer up to `maxTokens` (1024 by default, 8192 at
+most). The call is made only when its worst price fits in what is left of the day; the model is capped to that, and the
+day is charged what it reports. Past the budget the call rejects with `quota_exceeded` and the model is not asked. Two
+calls of an app run at once.
+
+`hl.agents.run` starts the chat's agent in a new chat nested under this one, in the same folder, with the prompt as its
+first message and the app's name in its title. The person sees it in the sidebar and can stop it. Each run counts
+against `runsPerDay`.
+
+While the agent uses the view, both ask the person in the host's dialog with the whole prompt. Every call goes into the
+app's journal with what it cost and what is left.
+
+## The safe
+
+```json
+"permissions": ["secrets:token", "secrets.write", "secrets.write:GITHUB_TOKEN"],
+"secrets": [{ "name": "token", "description": "The service's key", "optional": true }]
+```
+
+`hl.secrets.put(name, value)` puts a value into the person's safe; nothing gives it back to a view. With `secrets.write`
+(medium) an app keeps its own secrets, those it declares in `secrets` and holds `secrets:<name>` for: say the key a
+service gave it after the person signed in. They live apart from the person's, under the app's id, and the machine puts
+them into the app's server calls as if the person had typed them in «О приложении».
+
+`hl.secrets.put(name, value, {shared: true})` replaces the person's secret of that name, the one the agent uses with
+`harnessly secret run`. It needs `secrets.write:<name>` for that very name (high: the install screen says the app can
+swap the agent's key); while the agent uses the view, the host asks the person and names the secret, not its value.
+The secret keeps its limits: one that only other projects may use is not replaced from this chat, and a new one is
+for the chat's project only.
+
+The answer is `{created}`; the journal records the name and whose it is, never the value.
+
 ## Cards in the chat
 
 A view with the `chat` target draws a tool result:
@@ -229,6 +345,41 @@ A tool of your own server (a local one too) answers with JSON in its `text`, up 
 ```
 
 The feed draws the view under that step, with `data` in `hl.context.data`. Only a tool of the app's own server may name its view.
+
+## The chat's own interface
+
+An app on in a chat can put three things into the chat itself, in `chat` of `app.json`:
+
+```json
+"chat": {
+  "commands": ["/check"],
+  "cards": ["card"],
+  "starters": [{ "text": "Check the cashback in the mockup" }],
+  "buttons": [
+    { "id": "check", "title": "Check", "icon": "scan-search", "command": "/check" },
+    { "id": "open", "title": "Cashbacks", "view": "main" }
+  ],
+  "links": [{ "match": "https://*.bank.example/cashback/*", "card": "card" }]
+}
+```
+
+| Field | Where it shows | Rules |
+| --- | --- | --- |
+| `starters[]` | Lines under the field of an empty chat; a click puts the text into the field, nothing is sent | up to 4, 1–140 characters each |
+| `buttons[]` | Icons at the field; more than three of all apps go into one «⋯» menu | up to 3; `id` a-z0-9-; a `title`; `command` (one of `chat.commands`, it goes into the field) or `view` (a view with the `pane` target), one of the two |
+| `links[]` | A link alone in its paragraph of a message: the app's card stands under it, with `{"url": "<the link without its query and fragment>"}` in `hl.context.data` | up to 8; `match` is `https://<host>/<path>`, the host may start with `*.` (the host and its subdomains; not a whole zone like `*.co.uk`), the path may end with `*`, no path takes every path; `card` is one of `chat.cards` |
+
+### «@» in the field
+
+`"mentions": { "title": "Tasks", "tool": "tracker.find" }` in `chat` makes «@» ask the app as the person types: the
+machine calls that tool of the app's MCP server (from `.mcp.json`, with its secrets filled in by the machine) with
+`{"query": "<what is typed>"}` and lists the answer under `title`, beside the chat's files and chats. The tool answers
+`{"items": [{"label": "ABC-1 Payment form", "detail": "in progress", "insert": "ABC-1"}]}` — as `structuredContent` or
+as JSON in its first text content. Up to 8 items; `insert` goes into the field. The call has 2 s: a slower app, one that
+is off or waits for the person's consent is left out. The tool has to be quick and must not change anything.
+
+Search (⌘K) lists the commands of the apps on in the chat on screen and opens any installed app by its name: nothing to declare.
+An app's `icon` is a Lucide name the host draws; one it does not have shows nothing, so check it in the app's window first.
 
 ## The agent's host tools
 

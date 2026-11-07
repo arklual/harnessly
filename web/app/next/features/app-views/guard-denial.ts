@@ -5,11 +5,13 @@ export interface IGuardDenial {
   /** The name of the app that refused; empty for a refusal no single app made (the apps' own files and commands). */
   app: string;
   rule: string;
+  /** The app's id, for a hook's stop (rule "hook"): the feed turns that hook off by it. */
+  appId?: string;
   /** The words for the agent, without the mark. */
   reason: string;
 }
 
-const MARK = /^\s*\[app-guard ("(?:[^"\\]|\\.)*") ("(?:[^"\\]|\\.)*")\] ?/;
+const MARK = /^\s*\[app-guard ("(?:[^"\\]|\\.)*") ("(?:[^"\\]|\\.)*")(?: ("(?:[^"\\]|\\.)*"))?\] ?/;
 
 export const parseGuardDenial = (text: string | undefined): IGuardDenial | null => {
   const found = text ? MARK.exec(text) : null;
@@ -17,8 +19,10 @@ export const parseGuardDenial = (text: string | undefined): IGuardDenial | null 
   try {
     const app: unknown = JSON.parse(found[1]);
     const rule: unknown = JSON.parse(found[2]);
+    const appId: unknown = found[3] === undefined ? undefined : JSON.parse(found[3]);
     if (typeof app !== 'string' || typeof rule !== 'string') return null;
-    return { app, rule, reason: text!.slice(found[0].length) };
+    const reason = text!.slice(found[0].length);
+    return typeof appId === 'string' ? { app, rule, appId, reason } : { app, rule, reason };
   } catch {
     return null;
   }

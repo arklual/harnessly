@@ -1,0 +1,13 @@
+{
+  "id": "harnessly.changes",
+  "name": "Изменения",
+  "description": "Что поменялось в папке чата: файлы и дифф по git, обновляется само, когда агент правит файлы или заканчивает ход",
+  "version": "0.1.0",
+  "harnessly": ">=0.16.175",
+  "trust": "sandboxed",
+  "targets": ["chat", "pane", "app"],
+  "activation": { "on": ["manual"], "openView": "main" },
+  "permissions": ["git.read", "files.read:**", "files.watch", "events:turn"],
+  "agent": { "instructions": "instructions.md" },
+  "views": [{ "id": "main", "title": "Изменения", "entry": "ui/index.html", "targets": ["pane", "app"] }]
+}

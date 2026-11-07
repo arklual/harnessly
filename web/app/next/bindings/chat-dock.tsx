@@ -30,6 +30,7 @@ import { HOME, ROUTE, goTo } from '@/next/routes/routes';
 import { UI_REQUEST, requestContinue, requestUi } from '@/next/stores/ui-requests';
 import { useSlashSource } from '@/next/bindings/slash-source';
 import { appCommandsOf } from '@/next/features/composer/app-commands';
+import { AppButtons, AppStarters, appButtonsOf, appStartersOf } from '@/next/features/composer/app-parts';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
 import { failureText, settled } from '@/next/bindings/outcome';
 import { isHanded } from '@/next/bindings/feed-items';
@@ -278,6 +279,28 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     () => appCommandsOf(installedApps?.apps ?? [], chatApps.on),
     [installedApps, chatApps.on],
   );
+  // What the apps on in the chat put at its field: their buttons, and the lines an empty chat offers.
+  const appButtons = useMemo(
+    () => appButtonsOf(installedApps?.apps ?? [], chatApps.on),
+    [installedApps, chatApps.on],
+  );
+  const empty = record !== undefined && record.lastTurn === null && record.queue.count === 0;
+  const starters = useMemo(
+    () => (empty ? appStartersOf(installedApps?.apps ?? [], chatApps.on) : []),
+    [empty, installedApps, chatApps.on],
+  );
+  const intoField = useCallback(
+    (words: string) => {
+      onChange(words);
+      requestAnimationFrame(() => {
+        const el = field.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(words.length, words.length);
+      });
+    },
+    [onChange, field],
+  );
   const slash = useSlashSource({
     machine,
     conv,
@@ -286,6 +309,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     actions: slashActions,
     appCommands,
     onChat,
+    appMentions: (installedApps?.apps ?? []).some((a) => a.mentions && chatApps.on.includes(a.id)),
   });
   const cardSend = useRef<(() => boolean) | null>(null);
   // The marks sent from the pane's browser: chips in the field, in words after the text once the message goes.
@@ -490,6 +514,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onResume={() => settled(resumeQueue(machine, conv))}
         onRetry={(id) => settled(retryMessage(id))}
       />
+      {text === '' && <AppStarters lines={starters} onPick={intoField} />}
       <Composer
         enterSends={enterSends}
         value={text}
@@ -563,7 +588,14 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
             patchDesignNotes(conv, (have) => have.filter((n) => n.id !== id));
           } else removeQuote(conv, id);
         }}
-        tools={extra?.tools}
+        tools={
+          extra?.tools || appButtons.length > 0 ? (
+            <>
+              {extra?.tools}
+              <AppButtons buttons={appButtons} onField={intoField} />
+            </>
+          ) : undefined
+        }
         {...voice}
         limits={limits}
         contextRing={

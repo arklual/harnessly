@@ -7,7 +7,7 @@ import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { patchDeck } from '@/next/features/designly/deck/api';
 import type { IPickedDraw } from '@/next/features/designly/page-bridge';
 import ImageGenPanel, { imageTargetOf } from '@/next/features/designly/image-gen/gen-panel';

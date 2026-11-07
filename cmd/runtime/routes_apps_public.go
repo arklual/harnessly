@@ -105,16 +105,18 @@ func appPublicRoutes(d deps, reg *apps.Registry, version string) []gate.Route {
 		reg.Precheck(entries, version)
 		secretJSON(w, http.StatusOK, map[string]any{"apps": list})
 	}
-	install := func(w http.ResponseWriter, r *http.Request) {
+	install := func(w http.ResponseWriter, r *http.Request, from apps.ConsentFrom) {
 		var b struct {
 			ID  string `json:"id"`
 			Sum string `json:"sum"`
+			// Access are the keys the install screen listed.
+			Access []string `json:"access"`
 		}
 		if !readSecretBody(r, &b) || b.ID == "" {
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
-		got, problems, err := reg.InstallFromPublic(b.ID, apps.PublicInstallOptions{HostVersion: version, Sum: b.Sum})
+		got, problems, err := reg.InstallFromPublic(b.ID, apps.PublicInstallOptions{HostVersion: version, Sum: b.Sum, Consent: from, Granted: b.Access})
 		if problems == nil {
 			problems = apps.Problems{}
 		}
@@ -146,7 +148,7 @@ func appPublicRoutes(d deps, reg *apps.Registry, version string) []gate.Route {
 		})},
 		{Match: is("/api/cli/apps/public/install"), Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if cli(w, r, http.MethodPost) {
-				install(w, r)
+				install(w, r, apps.ConsentAsk)
 			}
 		})},
 		{Match: is("/api/cli/apps/public/publish"), Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -181,12 +183,14 @@ func appPublicRoutes(d deps, reg *apps.Registry, version string) []gate.Route {
 		})},
 		{Match: is(platformAPI + "/apps/public/install"), Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if page(w, r, http.MethodPost) {
-				install(w, r)
+				// The page installs after its install screen listed everything the app reaches: the click is the consent.
+				install(w, r, apps.ConsentGiven)
 			}
 		})},
 		{Match: is("/agents" + platformAPI + "/apps/public/install"), Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if page(w, r, http.MethodPost) {
-				install(w, r)
+				// The page installs after its install screen listed everything the app reaches: the click is the consent.
+				install(w, r, apps.ConsentGiven)
 			}
 		})},
 		{Match: is(platformAPI + "/apps/public/sync"), Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@
 // what the person may do with it. An owner installs an app for the team; a member turns a team app off for themselves.
 import { platformPath } from '@/next/core/net/machine';
 import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
+import type { IAccess } from '@/next/features/app-views/api';
 import type { MachineId } from '@/next/protocol/v2';
 
 export const CHANNELS = ['dev', 'beta', 'stable'] as const;
@@ -23,6 +24,8 @@ export type TRefusal = (typeof REFUSAL)[keyof typeof REFUSAL];
 export interface IPrecheck {
   refusals: { code: TRefusal; detail?: string }[];
   secrets: string[];
+  /** What the entry says the app reaches, in words, for the install screen; absent from an older machine. */
+  access?: IAccess[];
 }
 
 export interface ICatalogEntry {
@@ -82,8 +85,17 @@ export const searchPublic = async (m: MachineId, query: string): Promise<IPublic
   return (await runtimeJson<{ apps: IPublicEntry[] }>(m, platformPath(`/apps/public${q}`))).apps;
 };
 
+/** The install after the install screen: `access` are the keys it listed, all the person agreed to. */
 export const installPublic = (m: MachineId, entry: IPublicEntry): Promise<unknown> =>
-  runtimeJson(m, platformPath('/apps/public/install'), postJson({ id: entry.id, sum: entry.sum }));
+  runtimeJson(
+    m,
+    platformPath('/apps/public/install'),
+    postJson(
+      entry.check?.access
+        ? { id: entry.id, sum: entry.sum, access: entry.check.access.map((a) => a.key) }
+        : { id: entry.id, sum: entry.sum },
+    ),
+  );
 
 /** A document type an installed app adds to Sinopia (GET <platform>/apps/kinds). */
 export interface IAppKind {

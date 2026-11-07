@@ -25,7 +25,7 @@ import {
   type IDeckTextToolsProps,
 } from '@/next/features/designly/deck/deck-toolbar';
 import ImageGenPanel, { imageTargetOf } from '@/next/features/designly/image-gen/gen-panel';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 /** The sheet's exit, ms (the board's 240 ms slide down). */
 export const DECK_SHEET_EXIT_MS = 240;

@@ -15,7 +15,7 @@ import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import { usePresence } from '@/next/ui/presence';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 export interface IVideoCommentsProps {
   machine: MachineId;

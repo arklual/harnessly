@@ -43,6 +43,7 @@ func TestKindRoutes(t *testing.T) {
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+abs+`"}`, cli); code != http.StatusOK {
 		t.Fatalf("install: %d %s", code, body)
 	}
+	agreeRig(t)
 	code, body = call("GET", platformAPI+"/apps/kinds", "", page)
 	var listed struct {
 		Kinds []struct {

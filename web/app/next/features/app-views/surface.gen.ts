@@ -4,6 +4,7 @@
 export const METHOD_PERMISSION = {
   'ui/initialize': '',
   'ui/notifications/initialized': '',
+  'harnessly/protocol': '',
   'harnessly/debug.log': '',
   'ui/notifications/size-changed': '',
   'ui/open-link': '',
@@ -13,6 +14,9 @@ export const METHOD_PERMISSION = {
   'harnessly/chat.card': 'chat.card',
   'harnessly/pane.open': 'pane.open',
   'harnessly/agents.list': 'agents.read',
+  'harnessly/agents.run': 'agents.run',
+  'harnessly/ai.complete': 'ai',
+  'harnessly/secrets.put': 'secrets.write',
   'harnessly/storage.get': 'storage',
   'harnessly/storage.set': 'storage',
   'harnessly/storage.delete': 'storage',
@@ -21,11 +25,39 @@ export const METHOD_PERMISSION = {
   'harnessly/notify': 'notify',
   'harnessly/files.read': 'files.read',
   'harnessly/files.write': 'files.write',
+  'harnessly/files.list': 'files.read',
+  'harnessly/files.search': 'files.read',
+  'harnessly/files.watch': 'files.watch',
+  'harnessly/files.unwatch': 'files.watch',
+  'harnessly/files.pick': '',
+  'harnessly/git.status': 'git.read',
+  'harnessly/git.diff': 'git.read',
+  'harnessly/git.log': 'git.read',
+  'harnessly/terminal.run': 'terminal.run',
+  'harnessly/process.start': 'process',
+  'harnessly/process.stop': 'process',
+  'harnessly/process.list': 'process',
+  'harnessly/process.output': 'process',
+  'harnessly/preview.open': 'process',
+  'harnessly/hooks.subscribe': 'hooks.agent',
+  'harnessly/hooks.result': 'hooks.agent',
+  'harnessly/browser.read': 'browser.read',
+  'harnessly/browser.drive': 'browser.drive',
+  'harnessly/terminal.open': 'terminal.pty',
+  'harnessly/terminal.write': 'terminal.pty',
+  'harnessly/terminal.resize': 'terminal.pty',
+  'harnessly/terminal.close': 'terminal.pty',
+  'harnessly/terminal.read': 'terminal.read',
+  'harnessly/events.subscribe': 'events',
   'harnessly/tools.register': 'tools.page',
   'harnessly/tools.result': 'tools.page',
   'harnessly/context.publish': 'context.publish',
   'harnessly/ui.toast': '',
   'harnessly/ui.confirm': '',
+  'harnessly/keys.on': '',
+  'harnessly/keys.off': '',
+  'harnessly/keys.press': '',
+  'harnessly/keys.hints': '',
   'harnessly/slot.done': '',
   'harnessly/sinopia.document': 'sinopia.read',
   'harnessly/sinopia.selection': 'sinopia.read',
@@ -51,7 +83,20 @@ export const APP_PERMISSIONS = [
   'storage.space.write',
   'files.read',
   'files.write',
+  'files.watch',
+  'git.read',
+  'events',
   'secrets',
+  'secrets.write',
+  'terminal.run',
+  'process',
+  'terminal.pty',
+  'terminal.read',
+  'browser.read',
+  'browser.drive',
+  'hooks.agent',
+  'hooks.strict',
+  'background',
   'notify',
   'tools.page',
   'context.publish',
@@ -61,10 +106,59 @@ export const APP_PERMISSIONS = [
   'sinopia.kind',
   'sinopia.export',
   'ai',
+  'agents.run',
   'users.read',
 ] as const;
 
-/** The places an app works in. */
+/** The class of risk of every right: it orders the install screen, it forbids nothing. */
+export const PERMISSION_CLASS = {
+  'chat.prompt': 'medium',
+  'chat.read': 'medium',
+  'chat.card': 'medium',
+  'agents.read': 'medium',
+  'pane.open': 'low',
+  'storage': 'low',
+  'storage.space.write': 'medium',
+  'files.read': 'medium',
+  'files.write': 'medium',
+  'files.watch': 'medium',
+  'git.read': 'medium',
+  'events': 'medium',
+  'secrets': 'high',
+  'secrets.write': 'medium',
+  'terminal.run': 'high',
+  'process': 'high',
+  'terminal.pty': 'critical',
+  'terminal.read': 'high',
+  'browser.read': 'high',
+  'browser.drive': 'high',
+  'hooks.agent': 'critical',
+  'hooks.strict': 'critical',
+  'background': 'critical',
+  'notify': 'low',
+  'tools.page': 'medium',
+  'context.publish': 'medium',
+  'sinopia.read': 'medium',
+  'sinopia.write': 'medium',
+  'sinopia.comment': 'low',
+  'sinopia.kind': 'low',
+  'sinopia.export': 'low',
+  'ai': 'high',
+  'agents.run': 'high',
+  'users.read': 'medium',
+} as const satisfies Record<string, 'critical' | 'high' | 'medium' | 'low'>;
+
+/** The methods that still work but are deprecated, with what to call instead. */
+export const DEPRECATED_METHODS: Readonly<Record<string, string>> = {
+};
+
+/** The rights written with a value (files.read:<mask>, events:<kind>): held when any value is listed. */
+export const PARAM_PERMISSIONS: ReadonlySet<string> = new Set(['files.read', 'files.write', 'events', 'secrets', 'secrets.write', 'terminal.run', 'process']);
+
+/** The versions of the bridge's protocol the host speaks; a view names its own in ui/initialize. */
+export const SDK_PROTOCOLS = [1, 2] as const;
+
+/** The places an app works in; the last ones are aliases of the builtin apps' screens (sinopia.<kind>). */
 export const APP_TARGETS = [
   'chat',
   'pane',
@@ -93,11 +187,15 @@ export const SINOPIA_METHODS = [
   'comment',
 ] as const;
 
-/** The kinds of contribution an app puts into the host. */
+/** The kinds of contribution an app puts into the host: the host's own, then the builtin apps' points. */
 export const CONTRIBUTION_KINDS = [
   'view',
   'chat.command',
   'chat.card',
+  'chat.starter',
+  'chat.button',
+  'chat.link',
+  'chat.mention',
   'agent',
   'branding',
   'sinopia.kind',
@@ -109,3 +207,16 @@ export const CONTRIBUTION_KINDS = [
 ] as const;
 
 export type TContributionKind = (typeof CONTRIBUTION_KINDS)[number];
+
+/** The host's own apps (internal/apps/builtin): they run in the page, through the same bridge and rights. */
+export const BUILTIN_APPS = [
+  {
+    id: 'harnessly.sinopia',
+    name: 'Sinopia',
+    version: '1.0.0',
+    targets: ['app'],
+    permissions: ['chat.prompt', 'tools.page', 'context.publish'],
+    points: ['sinopia.kind', 'sinopia.panel', 'sinopia.selection', 'sinopia.check', 'sinopia.export', 'sinopia.import'],
+    aliases: ['sinopia.<kind>', 'sinopia.*'],
+  },
+] as const;

@@ -49,9 +49,18 @@ import { onOpenNotePage, takeNoteBoard } from '@/next/features/designly/open-not
 import DesignlyDeck from '@/next/bindings/designly-deck';
 import DesignlyVideo from '@/next/bindings/designly-video';
 import SinopiaStage from '@/next/features/app-views/sinopia/sinopia-stage';
-import { useSinopia } from '@/next/features/app-views/sinopia/use-sinopia';
+import { useSinopia, type IPickedBlock } from '@/next/features/app-views/sinopia/use-sinopia';
+import type { ISelectedNode } from '@/next/features/app-views/sinopia/types';
+import {
+  useSinopiaPage,
+  type ISinopiaActions,
+  type ISinopiaBoard,
+} from '@/next/features/app-views/sinopia/page-tools';
 
 /** The slot the open design's page lives in; «open outside» takes the next one so the two do not fight. */
+
+const NO_BOARDS: readonly ISinopiaBoard[] = [];
+const NO_NODES: readonly ISelectedNode[] = [];
 const PAGE_SLOT = 1;
 const OUTSIDE_SLOT = 2;
 /** In the pane the chat's own browser tabs take the first slots of ports (3 is theirs): the pane's design takes these. */
@@ -396,7 +405,52 @@ const DesignlySiteBody = ({
     conversation: appsChat,
     slotOrigin,
     viewing,
+    // A site's board is the page itself: an app's write shows once the page loads again. A deck and a video follow
+    // their own files.
+    onBoardsChanged: project?.design.kind === 'site' ? () => setReloadKey((n) => n + 1) : undefined,
   });
+
+  // The block picked on a slide is what the agent reads as selected, with an app of the document on or not.
+  const [picked, setPicked] = useState<IPickedBlock | null>(null);
+  const { pickBlock } = sinopia;
+  const onPick = useCallback(
+    (block: IPickedBlock | null) => {
+      setPicked(block);
+      pickBlock(block);
+    },
+    [pickBlock],
+  );
+  const pickedNodes = useMemo(
+    () =>
+      picked === null
+        ? NO_NODES
+        : [{ page: picked.path, tpl: picked.tpl, tag: picked.tag || 'div', text: picked.text }],
+    [picked],
+  );
+  const designBoards = project?.design.boards;
+  const sinopiaBoards = useMemo(
+    () => designBoards?.map((b) => ({ path: b.path, title: b.title || b.path })),
+    [designBoards],
+  );
+  const sinopiaActions = useRef<ISinopiaActions>({
+    onGo: () => undefined,
+    onReload: () => undefined,
+  });
+  // The editor's tools of the page and its screen, for the agent of the chat beside it (page_tools, page_call).
+  useSinopiaPage(
+    {
+      machine,
+      conversation: appsChat,
+      id,
+      kind: project?.design.kind ?? null,
+      title: project?.design.title ?? '',
+      boards: sinopiaBoards ?? NO_BOARDS,
+      path,
+      selection: sinopia.selection.length > 0 ? sinopia.selection : pickedNodes,
+      viewing,
+    },
+    sinopiaActions,
+  );
 
   // The slot opens for the page on screen at the time; the pages after it reuse it (see the effect on the path).
   const pathRef = useRef(path);
@@ -469,6 +523,21 @@ const DesignlySiteBody = ({
       setTabs((list) => list.map((x) => (x.id === (current?.id ?? '') ? change(x) : x))),
     [current?.id, setTabs],
   );
+
+  const navigate = (page: string) => {
+    refreshSlot(page);
+    updateTab((x) =>
+      x.hist[x.hi] === page ? x : { ...x, hist: [...x.hist.slice(0, x.hi + 1), page], hi: x.hi + 1 },
+    );
+  };
+
+  // What the editor's tools of the page do (useSinopiaPage reads it when a tool runs).
+  useEffect(() => {
+    sinopiaActions.current = {
+      onGo: (page) => navigate(page),
+      onReload: () => setReloadKey((n) => n + 1),
+    };
+  });
 
   // A sent note's chip asked for one of this design's pages (open-note.ts): the open tab turns to it, or the first tab
   // is that page.
@@ -631,13 +700,6 @@ const DesignlySiteBody = ({
     );
   }
 
-  const navigate = (page: string) => {
-    refreshSlot(page);
-    updateTab((x) =>
-      x.hist[x.hi] === page ? x : { ...x, hist: [...x.hist.slice(0, x.hi + 1), page], hi: x.hi + 1 },
-    );
-  };
-
   const site = (
     <SiteView
       key={id}
@@ -729,7 +791,7 @@ const DesignlySiteBody = ({
     };
     if (project.design.kind === 'video') return <DesignlyVideo {...host} />;
     if (project.design.kind === 'slides')
-      return <DesignlyDeck {...host} onPick={sinopia.pickBlock} onStale={() => setAttempt((n) => n + 1)} />;
+      return <DesignlyDeck {...host} onPick={onPick} onStale={() => setAttempt((n) => n + 1)} />;
     return site;
   };
 

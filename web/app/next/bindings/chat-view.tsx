@@ -44,6 +44,7 @@ import type { FeedItem } from '@/next/features/chat/types';
 import GateCard from '@/next/features/questions/gate-card';
 import type { PermissionScope } from '@/next/features/questions/types';
 import { useConversationChannel } from '@/next/core/realtime/hub';
+import AppBackground from '@/next/features/app-views/background';
 import type { ConvId, MachineId, TurnOutput } from '@/next/protocol/v2';
 import { useFeedKinds } from '@/next/stores/feed-kinds';
 import { downloadUrl } from '@/next/features/pane/delivered';
@@ -482,6 +483,7 @@ const ChatView = ({
         />
       )}
       <SelBar onAdd={(text, note) => addQuote(conv, text, note)} />
+      <AppBackground machine={machine} conversation={conv} apps={record?.apps} />
     </AttachmentSrc.Provider>
   );
 };

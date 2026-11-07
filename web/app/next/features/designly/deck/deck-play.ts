@@ -1,7 +1,7 @@
 // Moving through the talk in the show and the recording: the keys and the rule «a step of the slide first, then the next
 // slide». The shell owns the slide frames, so it passes in where the talk stands and how to move it (IDeckPlayHost).
-import { KEY_SCOPE } from '@/next/features/keys/commands';
-import { useKeys } from '@/next/features/keys/use-keys';
+import { KEY_SCOPE } from '@/next/features/designly/sdk/keys';
+import { useKeys } from '@/next/features/designly/sdk/keys';
 import type { IDeckSlide } from '@/next/features/designly/deck/types';
 
 /** A pointer position over the slide, in the board's pixels. */

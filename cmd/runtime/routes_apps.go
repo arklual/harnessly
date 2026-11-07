@@ -61,6 +61,11 @@ type appView struct {
 	Dev     bool          `json:"dev,omitempty"`
 	// Commands are the app's chat.commands for the «/» palette of the page, each with its description.
 	Commands []apps.ChatCommand `json:"commands"`
+	// The app's own parts of the chat's interface: lines of an empty chat, buttons at the field, links it shows a card for.
+	Starters []apps.Starter     `json:"starters,omitempty"`
+	Buttons  []apps.ChatButton  `json:"buttons,omitempty"`
+	Links    []apps.LinkCard    `json:"links,omitempty"`
+	Mentions *apps.ChatMentions `json:"mentions,omitempty"`
 	// Setup: the app has settings or secrets, so «О приложении» draws their form. Waiting are the required secrets that
 	// have no value yet: the app is «ждёт секрет».
 	Setup   bool     `json:"setup"`
@@ -82,6 +87,22 @@ type appView struct {
 	Dir         string `json:"dir,omitempty"`
 	InstalledAt int64  `json:"installedAt"`
 	UpdatedAt   int64  `json:"updatedAt"`
+	// Access is everything the app reaches, from the most dangerous, in the person's words.
+	Access []apps.Access `json:"access"`
+	// Consent: the install waits for the person to agree to all of Access (a first install nobody clicked through).
+	Consent bool `json:"consent,omitempty"`
+	// Pending is a newer version that reaches more and waits for the person's word; its Access is only what it adds.
+	Pending *pendingView `json:"pending,omitempty"`
+	// Off: the person turned the app off with its switch.
+	Off bool `json:"off,omitempty"`
+	// Source is where it was installed from: a folder, an address, a catalog.
+	Source string `json:"source,omitempty"`
+}
+
+// pendingView is a version waiting for consent as the install screen shows it.
+type pendingView struct {
+	Version string        `json:"version"`
+	Access  []apps.Access `json:"access"`
 }
 
 // appViewEntry is a view of an app as the page opens it: Path is its entry on the view server (/<app>/<file>), URL the
@@ -151,6 +172,9 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 		v.PluginParts = append(v.PluginParts, pkg.PluginParts...)
 	}
 	v.Commands = a.Manifest.ChatCommands(a.Dir)
+	if m := a.Manifest; m != nil && m.Chat != nil {
+		v.Starters, v.Buttons, v.Links, v.Mentions = m.Chat.Starters, m.Chat.Buttons, m.Chat.Links, m.Chat.Mentions
+	}
 	v.Views = []appViewEntry{}
 	if m := a.Manifest; m != nil {
 		v.Branding = m.Branding
@@ -168,6 +192,17 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 		}
 	}
 	v.InstructionsBytes = apps.InstructionsBytes(a)
+	pkg, _ := apps.CachedPackage(a.Dir)
+	v.Access = apps.AccessOf(a.Manifest, pkg)
+	v.Consent, v.Off, v.Source = a.NeedsConsent(), a.Off, a.Source
+	if p := a.Pending; p != nil {
+		next, _ := apps.CachedPackage(p.Dir)
+		granted := apps.AccessKeys(v.Access)
+		if a.Grant != nil {
+			granted = a.Grant.Keys
+		}
+		v.Pending = &pendingView{Version: p.Version, Access: apps.NewAccess(apps.AccessOf(p.Manifest, next), granted)}
+	}
 	if withDir {
 		v.Dir = a.Dir
 	}
@@ -351,7 +386,8 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
-		got, problems, err := reg.Install(b.Dir, apps.InstallOptions{Dev: b.Dev, HostVersion: version})
+		// The CLI is the person's shell and every agent's: what the app reaches waits for a click in the page.
+		got, problems, err := reg.Install(b.Dir, apps.InstallOptions{Dev: b.Dev, HostVersion: version, Consent: apps.ConsentAsk})
 		if problems == nil {
 			problems = apps.Problems{}
 		}
@@ -365,6 +401,9 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		case errors.Is(err, apps.ErrCommandTaken):
 			secretJSON(w, http.StatusConflict, map[string]any{"error": "command-taken", "message": err.Error()})
 			return
+		case errors.Is(err, apps.ErrSameVersionGrew):
+			secretJSON(w, http.StatusConflict, map[string]any{"error": "same-version-grew", "message": err.Error()})
+			return
 		case errors.Is(err, apps.ErrHostVersion), errors.Is(err, apps.ErrPluginName):
 			secretJSON(w, http.StatusConflict, map[string]any{"error": "host-version", "message": err.Error()})
 			return
@@ -373,7 +412,14 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			return
 		}
 		agent.Log("info", "apps: installed", agent.F{K: "id", V: got.ID}, agent.F{K: "version", V: got.Version}, agent.F{K: "dev", V: got.Dev})
-		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, true), "problems": problems})
+		if got.WaitsConsent() {
+			detail := got.Version
+			if got.Pending != nil {
+				detail = got.Pending.Version
+			}
+			_ = reg.Journal(got.ID, apps.JournalEntry{What: "consent.waits", Class: apps.ClassHigh, OK: true, Detail: detail})
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, true), "problems": problems, "waitsConsent": got.WaitsConsent()})
 	}
 
 	remove := func(w http.ResponseWriter, r *http.Request) {
@@ -687,6 +733,9 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	routes = append(routes, helpRoutes(d)...)
 	routes = append(routes, appPublicRoutes(d, reg, version)...)
 	routes = append(routes, appShareRoutes(d, reg, guests, version)...)
+	routes = append(routes, appConsentRoutes(d, reg)...)
+	routes = append(routes, appMentionRoutes(d, reg, chats)...)
+	routes = append(routes, appHookRoutes(d, reg, chats)...)
 	routes = append(routes, []gate.Route{
 		{Match: is(platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
 		{Match: is("/agents" + platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},

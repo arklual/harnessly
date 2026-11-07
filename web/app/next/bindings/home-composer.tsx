@@ -42,12 +42,15 @@ import { refKey } from '@/next/features/chat/attached';
 import { designThumb } from '@/next/features/composer/attach-sources';
 import type { IPlusAttach } from '@/next/features/composer/plus-menu';
 import type { IPlusApps } from '@/next/features/composer/apps-pane';
+import type { DockNotice } from '@/next/features/composer/types';
 import { withApp } from '@/next/features/app-main/chat-apps';
 import { ROUTE, goTo } from '@/next/routes/routes';
 import { REFS_MAX } from '@/next/protocol/v2';
 import { settled } from '@/next/bindings/outcome';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
+
+const NO_MACHINES = { kind: 'noMachines' } as const satisfies DockNotice;
 
 /** The folder a new conversation starts in: where the machine's latest one works, else the machine's default one. */
 export const startFolder = (
@@ -72,6 +75,8 @@ interface IHomeComposerProps {
   onCreated: (id: ConvId) => void;
   /** The machine the chat starts on, picked in the model's popover; its agents are this machine's. */
   machines?: IModelPickerProps['machine'];
+  /** Not one of the person's machines answers: a warning over the field. */
+  allMachinesOff?: boolean;
   /** Over the field, inside the dock: the greeting, which stays over the field's top edge however the dock moves. */
   above?: ReactNode;
   /** Under the field, inside the dock: what stays below the field however far it grows (the places to open). */
@@ -87,6 +92,7 @@ const HomeComposer = ({
   resolveProject,
   onCreated,
   machines = null,
+  allMachinesOff = false,
   above = null,
   below = null,
 }: IHomeComposerProps) => {
@@ -342,7 +348,7 @@ const HomeComposer = ({
       <div className="hx-dock" data-creating={creating || undefined}>
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
-          <DockBar notice={voiceNotice} />
+          <DockBar notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : null)} />
           <Composer
             enterSends={enterSends}
             value={text}

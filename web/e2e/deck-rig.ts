@@ -3,7 +3,9 @@
 // project's files and the published media) and a stand-in of the gateway's access routes the owner's page calls (the
 // project's access, its share links), answered in the page.
 import { createHmac, hkdfSync, randomBytes } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer, request, type Server } from 'node:http';
+import { join } from 'node:path';
 
 import type { Page } from '@playwright/test';
 
@@ -36,6 +38,29 @@ html,body{margin:0}
 </x-dc>
 </body></html>
 `;
+
+/**
+ * The slides of a deck made as the agent's CLI makes them: each page through the runtime's page command (which writes
+ * meta/ and the listing the editor reads its boards from), then the board's file over the blank one. Writing the
+ * files under a fresh project by hand races the library's file watcher, and the strip may stay empty.
+ */
+export const makeSlides = async (
+  rt: Runtime,
+  project: string,
+  slides: readonly { title: string; head: string; body: string }[],
+): Promise<void> => {
+  const token = readFileSync(join(rt.home, '.harnessly', 'cli-token'), 'utf8').trim();
+  for (const [i, s] of slides.entries()) {
+    const file = `slide-${i + 1}.dc.html`;
+    const res = await fetch(`${rt.url}/api/cli/design/pages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cli-token': token },
+      body: JSON.stringify({ action: 'create', project, title: s.title, file, w: 1920, h: 1080 }),
+    });
+    if (!res.ok) throw new Error(`page ${file}: ${res.status} ${await res.text()}`);
+    writeFileSync(join(rt.home, 'project', 'design-artifacts', project, 'project', file), slideFile(s));
+  }
+};
 
 const ULID = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 export const pageId = (i: number) => `01JDECK0000000000000000${ULID[i + 1]}${ULID[i + 1]}Z`.slice(0, 26);
@@ -270,4 +295,26 @@ export const deckGateway = (runtime: () => Runtime, project: () => string): IDec
     stop: () => new Promise<void>((ok) => (gateway ? gateway.close(() => ok()) : ok())),
     stubAccess,
   };
+};
+
+/**
+ * The person's word on an app installed with the CLI (such an install waits for it): what the install screen
+ * does on «Установить», from the page's session — the access the machine lists, granted as shown.
+ */
+export const agreeApp = async (p: Page, id: string): Promise<void> => {
+  const got = await p.evaluate(async (id) => {
+    const list = (await (await fetch('/api/platform/installed-apps')).json()) as {
+      apps: { id: string; version: string; consent?: boolean; access?: { key: string }[] }[];
+    };
+    const app = list.apps.find((a) => a.id === id);
+    if (!app) return `no app ${id}`;
+    if (!app.consent) return 'ok';
+    const res = await fetch('/api/platform/apps/consent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, version: app.version, access: (app.access ?? []).map((a) => a.key) }),
+    });
+    return res.ok ? 'ok' : `${res.status} ${await res.text()}`;
+  }, id);
+  if (got !== 'ok') throw new Error(`consent to ${id}: ${got}`);
 };

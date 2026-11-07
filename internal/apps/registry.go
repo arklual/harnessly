@@ -44,6 +44,15 @@ type Installed struct {
 	UpdatedAt   int64 `json:"updatedAt"`
 	// Manifest is the manifest as installed, so the list needs no read of every package.
 	Manifest *Manifest `json:"manifest"`
+	// Wants are the keys of what the install reaches (AccessOf), fixed at install so the list reads no package.
+	Wants []string `json:"wants,omitempty"`
+	// Grant is what the person agreed to (consent.go); nil is an install made before consent was asked, which keeps
+	// what it had.
+	Grant *Grant `json:"grant,omitempty"`
+	// Pending is a newer version that reaches more and waits for the person's word; the install runs as it was.
+	Pending *Installed `json:"pending,omitempty"`
+	// Off: the person turned the app off (the switch of its card); it starts nowhere until it is turned on.
+	Off bool `json:"off,omitempty"`
 }
 
 type registryBody struct {
@@ -151,17 +160,18 @@ func (r *Registry) userInstalls() ([]Installed, error) {
 	return r.read()
 }
 
-// List is every installed app that is on for the person, by id: their own installs, and the team's that they did not
-// turn off or install themselves (their own install of the same app wins).
+// List is every installed app that is on for the person, by id: their own installs that are not turned off and do not
+// wait for their consent, and the team's that they did not turn off or install themselves (their own install of the
+// same app wins).
 func (r *Registry) List() ([]Installed, error) {
 	all, err := r.ListAll()
 	if err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(all, func(a Installed) bool { return a.Muted }), nil
+	return slices.DeleteFunc(all, func(a Installed) bool { return a.Muted || a.Off || a.NeedsConsent() }), nil
 }
 
-// ListAll is List with the team's apps the person turned off, which have Muted set.
+// ListAll is List with the apps the person turned off (Muted, Off) and those that wait for their consent.
 func (r *Registry) ListAll() ([]Installed, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -202,6 +212,11 @@ type InstallOptions struct {
 	// that is removed afterwards ("" records the folder installed from).
 	Source string
 	Now    func() time.Time
+	// Consent is whose word the install carries (consent.go): the host's own (ConsentHost, the zero value), the person's
+	// click in the page (ConsentGiven) or none (ConsentAsk: a CLI or a channel, which an agent can drive).
+	Consent ConsentFrom
+	// Granted are the keys the install screen listed, with ConsentGiven; nil grants all the package reaches.
+	Granted []string
 }
 
 // Install checks the package in dir and installs it, replacing an installed version of the same app. The problems are
@@ -265,6 +280,20 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 		return Installed{}, ps, fmt.Errorf("%w: %s is added by %s", ErrKindTaken, kind, other)
 	}
 
+	var old *Installed
+	for i := range list {
+		if list[i].ID == m.ID {
+			old = &list[i]
+		}
+	}
+	wants := AccessKeys(AccessOf(m, pkg))
+	// An update that reaches more than the person agreed to waits beside the running version (consent.go).
+	// A dev install is the author's folder, live: it is not staged, it waits as a whole (NeedsConsent reads the folder).
+	stage := opt.Consent == ConsentAsk && !opt.Dev && old != nil && !old.NeedsConsent() && !covered(wants, old.granted())
+	if stage && old.Version == m.Version {
+		return Installed{}, ps, fmt.Errorf("%w: %s %s", ErrSameVersionGrew, m.ID, m.Version)
+	}
+
 	target := pkg.Dir
 	if !opt.Dev {
 		target = filepath.Join(r.Root, "packages", m.ID, m.Version)
@@ -281,14 +310,27 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 	if opt.Source != "" {
 		source = opt.Source
 	}
-	entry := Installed{ID: m.ID, Version: m.Version, Dir: target, Source: source, Dev: opt.Dev, Channel: opt.Channel, InstalledAt: at, UpdatedAt: at, Manifest: m}
-	var old *Installed
-	for i := range list {
-		if list[i].ID == m.ID {
-			old = &list[i]
+	entry := Installed{ID: m.ID, Version: m.Version, Dir: target, Source: source, Dev: opt.Dev, Channel: opt.Channel, InstalledAt: at, UpdatedAt: at, Manifest: m, Wants: wants}
+	entry.Grant = grantFor(opt.Consent, old, wants, at)
+	if opt.Consent == ConsentGiven && opt.Granted != nil {
+		entry.Grant.Keys = slices.Clone(opt.Granted)
+	}
+	if stage {
+		if old.Pending != nil && old.Pending.Dir != old.Dir && old.Pending.Dir != target {
+			_ = os.RemoveAll(old.Pending.Dir)
 		}
+		entry.Grant = nil
+		old.Pending = &entry
+		if err := r.write(list); err != nil {
+			return Installed{}, ps, err
+		}
+		return *old, ps, nil
 	}
 	if old != nil {
+		entry.Off = old.Off
+		if old.Pending != nil && old.Pending.Dir != target && old.Pending.Dir != old.Dir {
+			_ = os.RemoveAll(old.Pending.Dir)
+		}
 		entry.InstalledAt = old.InstalledAt
 		if old.Version != m.Version {
 			entry.Previous = old.Version

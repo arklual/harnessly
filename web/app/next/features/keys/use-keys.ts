@@ -50,10 +50,13 @@ export const pauseKeys = (): (() => void) => {
 };
 
 /** Runs a press as the latest screen's action; true when one ran. Exported for the keys a board forwards. */
-export const runChord = (chord: string, typing: boolean): boolean => {
+export const runChord = (chord: string, typing: boolean, scopes?: readonly TKeyScope[]): boolean => {
   if (paused > 0) return false;
   if (typing && !isCommandChord(chord) && !chord.endsWith('Escape')) return false;
-  const ids = commandsOfChord(chord, keyOverrides()).map((c) => c.id);
+  // `scopes`: only the actions of these screens (a key a frame of an app passes on never runs the host's global ones).
+  const ids = commandsOfChord(chord, keyOverrides())
+    .filter((c) => scopes === undefined || scopes.includes(c.scope))
+    .map((c) => c.id);
   if (ids.length === 0) return false;
   for (let i = stack.length - 1; i >= 0; i -= 1) {
     const handlers = stack[i].handlers();
@@ -87,6 +90,10 @@ const register = (entry: IKeyEntry): (() => void) => {
     publish();
   };
 };
+
+/** The same as useKeys outside React: a view of an app runs a screen's actions until the returned function is called. */
+export const listenKeys = (scope: TKeyScope, handlers: () => TKeyHandlers): (() => void) =>
+  register({ scope, handlers });
 
 /** While `on`, the screen runs these actions (by id) on their shortcuts. */
 export const useKeys = (scope: TKeyScope, handlers: TKeyHandlers, on = true) => {

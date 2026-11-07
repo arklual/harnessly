@@ -9,6 +9,7 @@ import type { IGuestLink, IInvite, IProjectAccess } from '@/next/features/design
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/next/ui/toast', () => ({ toast }));
+vi.mock('@/next/features/designly/sdk/toast', () => ({ toast }));
 
 const written = vi.fn();
 

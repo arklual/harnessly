@@ -14,6 +14,7 @@ import type { IQuickPrompt } from '@/next/features/composer/prompts';
 import type { ICatalogItem } from '@/next/features/settings/api';
 import { t } from '@/next/i18n';
 import type { IChatPick } from '@/next/features/composer/chat-sources';
+import type { IAppMentionGroup } from '@/next/features/app-views/api';
 import { EFFORTS, type FileEntry, type MessageRef, type Provider } from '@/next/protocol/v2';
 
 export const GROUP = {
@@ -24,6 +25,7 @@ export const GROUP = {
   mcp: 'mcp',
   quick: 'quick',
   file: 'file',
+  mention: 'mention',
   chat: 'chat',
 } as const;
 export type TGroup = (typeof GROUP)[keyof typeof GROUP];
@@ -37,6 +39,7 @@ export const GROUP_ORDER: readonly TGroup[] = [
   GROUP.mcp,
   GROUP.quick,
   GROUP.file,
+  GROUP.mention,
   GROUP.chat,
 ];
 
@@ -154,6 +157,7 @@ const ICON: Record<TGroup, string> = {
   mcp: 'plug',
   quick: 'zap',
   file: 'file-text',
+  mention: 'layout-grid',
   chat: 'message-square',
 };
 
@@ -516,6 +520,26 @@ export const fileRows = (entries: readonly FileEntry[], name: string): IRowList 
   const ordered = name ? [...rows].sort((a, b) => b.score - a.score) : rows;
   return { rows: ordered.slice(0, FILES_SHOWN), more: Math.max(0, ordered.length - FILES_SHOWN) };
 };
+
+/** What the apps on in the chat find for «@», each app's finds under its title, in the order it answered them. */
+export const mentionRows = (groups: readonly IAppMentionGroup[]): ISlashRow[] =>
+  groups.flatMap((g) =>
+    g.items.map((item, index) => ({
+      id: `mention:${g.app}:${index}`,
+      group: GROUP.mention,
+      name: item.label,
+      prefix: '',
+      ranges: [],
+      description: item.detail ?? '',
+      heading: g.title,
+      hint: null,
+      source: g.title,
+      icon: ICON.mention,
+      current: false,
+      action: { k: 'insert', text: `${item.insert} ` },
+      score: -index,
+    })),
+  );
 
 /** The chats «@» offers beside the files, in the order they were found. */
 export const chatRows = (picks: readonly IChatPick[], name: string): ISlashRow[] =>

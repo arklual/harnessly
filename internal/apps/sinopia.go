@@ -373,3 +373,77 @@ func hasSinopiaView(targets []string) bool {
 	}
 	return false
 }
+
+// SinopiaApp is Sinopia, the builtin app (builtin/sinopia/harnessly/app.json) whose points the manifest's `sinopia`
+// contributes to: sinopia.kind, sinopia.panel, sinopia.check and the rest. The targets sinopia.<kind> and sinopia.*
+// are its aliases.
+const SinopiaApp = "harnessly.sinopia"
+
+// The readers of Sinopia's points: each reads one list of a manifest's `sinopia`.
+func init() {
+	pointReaders["sinopia.kind"] = func(m *Manifest) []Contribution {
+		s, err := m.SinopiaOf()
+		if err != nil {
+			return nil
+		}
+		var out []Contribution
+		for _, k := range s.Kinds {
+			out = append(out, Contribution{Kind: "sinopia.kind", ID: k.ID, Target: "sinopia." + k.ID, Spec: k})
+		}
+		return out
+	}
+	pointReaders["sinopia.panel"] = sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
+		for _, p := range s.Panels {
+			add(p.ID, p.Kinds, p)
+		}
+	}, "sinopia.panel")
+	pointReaders["sinopia.selection"] = sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
+		for _, p := range s.Selection {
+			add(p.ID, p.Kinds, p)
+		}
+	}, "sinopia.selection")
+	pointReaders["sinopia.check"] = sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
+		for _, p := range s.Checks {
+			add(p.ID, p.Kinds, p)
+		}
+	}, "sinopia.check")
+	pointReaders["sinopia.export"] = sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
+		for _, p := range s.Export {
+			add(p.ID, p.Kinds, p)
+		}
+	}, "sinopia.export")
+	pointReaders["sinopia.import"] = sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
+		for _, p := range s.Import {
+			add(p.ID, nil, p)
+		}
+	}, "sinopia.import")
+}
+
+// sinopiaPart reads one list of the manifest's `sinopia`: an item for listed kinds shows in each, one for all of the
+// app's kinds shows in the app's sinopia targets.
+func sinopiaPart(each func(s Sinopia, add func(id string, kinds []string, spec any)), kind string) func(m *Manifest) []Contribution {
+	return func(m *Manifest) []Contribution {
+		s, err := m.SinopiaOf()
+		if err != nil {
+			return nil
+		}
+		var out []Contribution
+		each(s, func(id string, kinds []string, spec any) {
+			targets := []string{}
+			for _, k := range kinds {
+				targets = append(targets, "sinopia."+k)
+			}
+			if len(kinds) == 0 {
+				for _, t := range m.Targets {
+					if IsSinopiaTarget(t) {
+						targets = append(targets, t)
+					}
+				}
+			}
+			for _, t := range targets {
+				out = append(out, Contribution{Kind: kind, ID: id, Target: t, Spec: spec})
+			}
+		})
+		return out
+	}
+}

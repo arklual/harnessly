@@ -21,6 +21,7 @@ vi.mock('@/next/features/app-views/api', () => ({
 }));
 vi.mock('@/next/commands/messages', () => ({ sendMessage: vi.fn() }));
 vi.mock('@/next/ui/toast', () => ({ toast: vi.fn() }));
+vi.mock('@/next/features/designly/sdk/toast', () => ({ toast: vi.fn() }));
 
 const MACHINE = 'm1' as never;
 

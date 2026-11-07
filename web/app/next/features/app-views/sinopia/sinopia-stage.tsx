@@ -9,7 +9,7 @@ import AppFrame from '@/next/features/app-views/app-frame';
 import { panelsOf, selectionActions, type IPanelRef } from '@/next/features/app-views/sinopia/contributions';
 import type { ISinopia } from '@/next/features/app-views/sinopia/use-sinopia';
 import type { ISinopiaCheckResult } from '@/next/features/app-views/sinopia/types';
-import Modal from '@/next/features/shell/modal';
+import { Modal } from '@/next/features/designly/sdk/ui';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';

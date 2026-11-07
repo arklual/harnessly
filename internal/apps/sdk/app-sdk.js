@@ -10,6 +10,55 @@
 // so this file (like any standard MCP Apps view) just posts to window.parent and listens to `message`.
 
 const PROTOCOL = '2025-11-21';
+// The versions of Harnessly's own protocol this SDK speaks (internal/apps/surface.go SDKProtocols). A view asks for one
+// with connect({ protocol }); 1, the default, behaves as it always did.
+const HL_PROTOCOLS = [1, 2];
+
+// What a refusal is called in protocol 2: the app may not (denied), the host cannot here (unsupported), or it failed.
+const DENIED = ['permission_denied', 'not_in_target', 'policy_blocked', 'network_denied', 'host_not_allowed'];
+const refusalOf = (e) => {
+  const code = e?.code || 'host_unavailable';
+  let kind = 'failed';
+  if (DENIED.includes(code)) kind = 'denied';
+  else if (code === 'host_unavailable' || /removed from the SDK|method not found|no method/.test(e?.message || '')) kind = 'unsupported';
+  const out = { error: kind, code, message: e?.message || code };
+  if (typeof e?.version === 'number') out.version = e.version;
+  return out;
+};
+const isRefusal = (v) => v !== null && typeof v === 'object' && typeof v.error === 'string' && typeof v.code === 'string';
+
+// Protocol 2: every method of hl answers a refusal as a value ({ error, code, message }) instead of rejecting, so a view
+// that does not catch keeps working. hl.on, hl.has, hl.refused, hl.resize and hl.close are left as they are.
+const KEEP = new Set(['on', 'has', 'refused', 'resize', 'close', 'context', 'host']);
+const answerRefusals = (obj, top) => {
+  for (const [key, v] of Object.entries(obj)) {
+    if (top && KEEP.has(key)) continue;
+    if (typeof v === 'function') {
+      obj[key] = (...args) => {
+        try {
+          const out = v.apply(obj, args);
+          if (!out || typeof out.then !== 'function') return out;
+          const answered = out.catch(refusalOf);
+          // hl.tools.register's promise carries unregister.
+          if (typeof out.unregister === 'function') answered.unregister = out.unregister;
+          return answered;
+        } catch (e) {
+          return Promise.resolve(refusalOf(e));
+        }
+      };
+    } else if (v && typeof v === 'object' && !Array.isArray(v)) answerRefusals(v, false);
+  }
+};
+
+// What hl.has accepts besides a bridge method's own name: the SDK's names of the MCP Apps methods.
+const HAS_ALIAS = {
+  'chat.send': 'ui/message',
+  'tools.call': 'tools/call',
+  'resize': 'ui/notifications/size-changed',
+  'openLink': 'ui/open-link',
+  'publish': 'harnessly/context.publish',
+  'events.on': 'harnessly/events.subscribe',
+};
 const TIMEOUT_MS = 30_000;
 
 /** The error every failed call throws; `code` says why (see HarnesslyErrorCode in app-sdk.d.ts). */
@@ -98,6 +147,26 @@ export async function connect(options = {}) {
     }
     request('harnessly/tools.result', body).catch(() => {});
   };
+  // The agent's tool calls a view hears before they run (hooks.agent): every fn has its word; the first stop wins and the
+  // contexts add up. A fn that throws or says nothing lets the call through.
+  const hookFns = new Set();
+  const runHook = async (p) => {
+    const id = p?.id;
+    if (typeof id !== 'string') return;
+    let deny = null;
+    const contexts = [];
+    for (const fn of [...hookFns]) {
+      try {
+        const word = await fn({ tool: p.tool, input: p.input ?? {}, cut: p.cut === true });
+        if (word?.decision === 'deny' && deny === null) deny = { decision: 'deny', reason: String(word.reason ?? '') };
+        else if (typeof word?.context === 'string' && word.context !== '') contexts.push(word.context);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    const body = deny ? { id, ...deny } : { id, context: contexts.join('\n') };
+    request('harnessly/hooks.result', body).catch(() => {});
+  };
   let seq = 0;
 
   const send = (message) => parent.postMessage({ jsonrpc: '2.0', ...message }, hostOrigin ?? '*');
@@ -174,10 +243,18 @@ export async function connect(options = {}) {
       case 'harnessly/notifications/storage':
       case 'harnessly/notifications/visibility':
       case 'harnessly/notifications/agents':
+      case 'harnessly/notifications/event':
+      case 'harnessly/notifications/files-changed':
+      case 'harnessly/notifications/terminal-output':
+      case 'harnessly/notifications/terminal-exit':
+      case 'harnessly/notifications/key':
         emit(m.method.slice('harnessly/notifications/'.length), m.params);
         break;
       case 'harnessly/notifications/tool-call':
         void runPageTool(m.params);
+        break;
+      case 'harnessly/notifications/hook':
+        void runHook(m.params);
         break;
       default:
         // A request the view does not know gets the standard answer, so the host does not wait.
@@ -186,6 +263,7 @@ export async function connect(options = {}) {
   };
   window.addEventListener('message', onMessage);
 
+  const protocol = HL_PROTOCOLS.includes(options.protocol) ? options.protocol : 1;
   const init = await request('ui/initialize', {
     protocolVersion: PROTOCOL,
     appInfo: { name: options.name ?? document.title ?? 'view', version: options.version ?? '0' },
@@ -196,8 +274,23 @@ export async function connect(options = {}) {
   });
   hl.context = ctxOf(init.hostContext);
   hl.host = init.hostInfo;
+  // What this view may call here, as the host said in the handshake; a host that did not say knows nothing new.
+  const callable = new Set(init.hostCapabilities?.harnessly?.methods ?? []);
+  hl.protocol = 1;
+  /** Whether the host does a method here and the app holds its right: 'files.read', 'storage.user.get', 'harnessly/notify'. */
+  hl.has = (name) => {
+    if (typeof name !== 'string' || name === '') return false;
+    const plain = name.replace(/^storage\.(install|user|chat|space|doc)\./, 'storage.');
+    return callable.has(name) || callable.has(HAS_ALIAS[plain] ?? '') || callable.has(`harnessly/${plain}`);
+  };
+  /** Whether an answer is a refusal ({ error, code, message }): what protocol 2 answers instead of rejecting. */
+  hl.refused = isRefusal;
   applyTheme(hl.context);
   notify('ui/notifications/initialized', {});
+  // A view written for a newer protocol says so; the host answers the one it speaks with it (an older host, none: 1).
+  if (protocol > 1 && callable.has('harnessly/protocol')) {
+    hl.protocol = await request('harnessly/protocol', { protocol }).then((r) => (HL_PROTOCOLS.includes(r?.protocol) ? r.protocol : 1), () => 1);
+  }
   debugSend = (line) => notify('harnessly/debug.log', line);
   for (const line of debugQueue.splice(0)) debugSend(line);
 
@@ -213,7 +306,20 @@ export async function connect(options = {}) {
     read: ({ last = 20 } = {}) => request('harnessly/chat.read', { last }).then((r) => r.messages),
     card: (view, data) => request('harnessly/chat.card', { view, data }),
   };
-  hl.agents = { list: () => request('harnessly/agents.list', {}).then((r) => r.agents) };
+  hl.agents = {
+    list: () => request('harnessly/agents.list', {}).then((r) => r.agents),
+    // A task in a new chat under this one (agents.run), within the app's budget of the day.
+    run: (prompt, { title = '' } = {}) => request('harnessly/agents.run', { prompt, title }),
+  };
+  // One answer of a model, no tools (ai), within the app's budget of the day: { text, usd, spentToday, budget }.
+  hl.ai = {
+    complete: (prompt, { system = '', maxTokens = 0, model = '' } = {}) =>
+      request('harnessly/ai.complete', { prompt, system, maxTokens, model }),
+  };
+  // A value into the safe, never read back (secrets.write): the app's own secret, or with shared the person's.
+  hl.secrets = {
+    put: (name, value, { shared = false } = {}) => request('harnessly/secrets.put', { name, value, shared }),
+  };
   hl.pane = { open: (target) => request('harnessly/pane.open', { target }) };
   hl.tools = { call: (name, args = {}) => request('tools/call', { name, arguments: args }) };
   // Tools of the page (right tools.page): the agent of the chat lists them with page_tools and calls one with page_call;
@@ -311,14 +417,143 @@ export async function connect(options = {}) {
   };
   // Files of the chat's workspace, inside the masks of files.read:<mask> and files.write:<mask>. A path is relative to
   // the workspace; a text moves, up to 4 MB.
+  let watchers = 0;
   hl.files = {
     read: (path) => request('harnessly/files.read', { path }).then((r) => r.text),
     write: (path, text) => request('harnessly/files.write', { path, text }).then(() => undefined),
+    // A folder's files and folders that the masks reach ('' is the chat's folder).
+    list: (folder = '') => request('harnessly/files.list', { path: folder }).then((r) => r.entries),
+    // Lines holding a text, or with a glob alone the files by name: { hits: [{ path, line, text }], cut }.
+    search: (text, { glob = '', case: matchCase = false, limit = 0 } = {}) =>
+      request('harnessly/files.search', { text, glob, case: matchCase, limit }),
+    // onChange(paths) hears which files under the masks changed; the promise gives the function that stops it.
+    watch: async (onChange) => {
+      if (watchers === 0) await request('harnessly/files.watch', {});
+      watchers++;
+      const off = hl.on('files-changed', (p) => onChange(p?.paths ?? []));
+      let stopped = false;
+      return () => {
+        if (stopped) return Promise.resolve();
+        stopped = true;
+        off();
+        watchers--;
+        return watchers === 0 ? request('harnessly/files.unwatch', {}).then(() => undefined) : Promise.resolve();
+      };
+    },
+    // The person picks a file in the host's dialog: { path, text }, or null when they close it.
+    pick: ({ accept = [] } = {}) => request('harnessly/files.pick', { accept }).then((r) => r.file ?? null),
+  };
+  // The repository of the chat's folder, read only (git.read).
+  hl.git = {
+    status: () => request('harnessly/git.status', {}),
+    diff: ({ path = '', staged = false, ref = '' } = {}) => request('harnessly/git.diff', { path, staged, ref }),
+    log: ({ limit = 0, path = '' } = {}) => request('harnessly/git.log', { limit, path }).then((r) => r.commits),
+  };
+  // Commands in the chat's folder, inside the agent's sandbox (terminal.run): { code, output, cut, timedOut, ms }. The
+  // timeout is in seconds.
+  hl.terminal = {
+    run: (command, { cwd = '', timeout = 0 } = {}) => request('harnessly/terminal.run', { command, cwd, timeout }),
+    // A shell on a terminal of its own in the chat's folder (terminal.pty): write what is typed, hear what it prints
+    // (bytes, for a terminal emulator such as xterm) and how it ends.
+    open: async ({ cols = 80, rows = 24, cwd = '' } = {}) => {
+      const { id } = await request('harnessly/terminal.open', { cols, rows, cwd });
+      const data = new Set();
+      const exits = new Set();
+      const offData = hl.on('terminal-output', (p) => {
+        if (p?.id === id) for (const fn of data) fn(p.data);
+      });
+      const offExit = hl.on('terminal-exit', (p) => {
+        if (p?.id !== id) return;
+        offData();
+        offExit();
+        for (const fn of exits) fn(p.code ?? null);
+      });
+      const hear = (set) => (fn) => {
+        set.add(fn);
+        return () => set.delete(fn);
+      };
+      const term = {
+        id,
+        write: (text) => request('harnessly/terminal.write', { id, data: text }).then(() => undefined),
+        resize: (c, r) => request('harnessly/terminal.resize', { id, cols: c, rows: r }).then(() => undefined),
+        close: () => request('harnessly/terminal.close', { id }).then(() => undefined),
+        onData: hear(data),
+        onExit: hear(exits),
+      };
+      // The terminal's methods answer refusals as the rest of hl does in protocol 2.
+      if (hl.protocol >= 2) answerRefusals(term, false);
+      return term;
+    },
+    // What the chat's terminals show, as text (terminal.read): [{ id, text }]; "agent" is the agent's own.
+    read: ({ terminal = '', lines = 0 } = {}) =>
+      request('harnessly/terminal.read', { terminal, lines }).then((r) => r.terminals),
+  };
+  // The agent's tool calls before they run (hooks.agent): fn({ tool, input }) answers { decision: 'deny', reason } to stop
+  // the call, { context } to add a line for the agent, or nothing. The promise gives the function that stops hearing.
+  hl.hooks = {
+    on: async (kind, fn) => {
+      if (kind !== 'tool') throw Object.assign(new Error(`no hook ${kind}: only 'tool'`), { code: 'invalid_params' });
+      hookFns.add(fn);
+      if (hookFns.size === 1) await request('harnessly/hooks.subscribe', {});
+      return () => hookFns.delete(fn);
+    },
+  };
+  // The agent's browser of the chat: look (browser.read: tabs, snapshot, screenshot, wait_for) and act (browser.drive:
+  // open, navigate, close_tab, resize, click, hover, type, press_key, select, dialog), with the chrome_* tools' arguments.
+  hl.browser = {
+    read: (tool, args = {}) => request('harnessly/browser.read', { tool, args }),
+    drive: (tool, args = {}) => request('harnessly/browser.drive', { tool, args }),
+  };
+  // Long commands (process): a dev server, a watcher. They run until stopped or until the app is off in the chat.
+  hl.process = {
+    start: (command, { cwd = '' } = {}) => request('harnessly/process.start', { command, cwd }),
+    stop: (id) => request('harnessly/process.stop', { id }),
+    list: () => request('harnessly/process.list', {}).then((r) => r.processes),
+    output: (id, { since = 0 } = {}) => request('harnessly/process.output', { id, since }),
+  };
+  // A local port in the right pane's browser (process).
+  hl.preview = {
+    open: (port, { path = '/' } = {}) => request('harnessly/preview.open', { port, path }).then(() => undefined),
+  };
+  // The chat's events, by kind (turn, tool, message), for the kinds the app holds events:<kind> for. The promise gives
+  // the function that stops hearing.
+  hl.events = {
+    on: async (kind, fn) => {
+      await request('harnessly/events.subscribe', { kinds: [kind] });
+      return hl.on('event', (e) => {
+        if (e?.kind === kind) fn(e);
+      });
+    },
   };
   hl.ui = {
-    toast: (text) => request('harnessly/ui.toast', { text }).then(() => undefined),
+    // A tone (info, success, warning, error) and a second line are optional; an older host shows the words alone.
+    toast: (text, { tone, description } = {}) =>
+      request('harnessly/ui.toast', { text, ...(tone ? { tone } : {}), ...(description ? { description } : {}) }).then(() => undefined),
     // A person decides in their own time.
     confirm: (text) => request('harnessly/ui.confirm', { text }, { timeout: 0 }).then((r) => r.ok),
+  };
+  // The host's shortcut commands of a screen (deck, video, site, pictures, files), on the keys the person set for them:
+  // the view runs them while it is up. A press inside the view's own frame is the view's; hl.keys.press passes
+  // one on to the host, which runs it only while the frame has the focus.
+  const keyScopes = new Map();
+  hl.keys = {
+    on: (scope, handlers) => {
+      keyScopes.get(scope)?.();
+      const off = hl.on('key', (p) => {
+        if (typeof p?.command === 'string' && p.command.startsWith(`${scope}.`)) handlers[p.command]?.(p.chord);
+      });
+      const stop = () => {
+        if (keyScopes.get(scope) !== stop) return Promise.resolve();
+        keyScopes.delete(scope);
+        off();
+        return request('harnessly/keys.off', { scope }).then(() => undefined);
+      };
+      keyScopes.set(scope, stop);
+      const ready = request('harnessly/keys.on', { scope, commands: Object.keys(handlers) });
+      return Object.assign(stop, { ready: ready.then(() => undefined) });
+    },
+    press: (chord, { typing = false } = {}) => request('harnessly/keys.press', { chord, typing }).then((r) => r.ran === true),
+    hints: (commands) => request('harnessly/keys.hints', { commands }).then((r) => r.hints),
   };
   // An onboarding step tells the host it is finished; other slots ignore it.
   hl.slot = { done: () => request('harnessly/slot.done', {}).then(() => undefined) };
@@ -347,5 +582,6 @@ export async function connect(options = {}) {
   if (['chat', 'settings', 'onboarding', 'object-action'].includes(hl.context?.target) && typeof ResizeObserver === 'function') {
     new ResizeObserver(() => hl.resize(document.documentElement.scrollHeight)).observe(document.documentElement);
   }
+  if (hl.protocol >= 2) answerRefusals(hl, true);
   return hl;
 }

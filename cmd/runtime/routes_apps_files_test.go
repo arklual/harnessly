@@ -54,6 +54,7 @@ func TestAppFilesRoute(t *testing.T) {
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkg+`"}`, cli); code != http.StatusOK {
 		t.Fatalf("install: %d %s", code, body)
 	}
+	agreeRig(t)
 
 	code, body := call("POST", platformAPI+"/apps/session", `{"app":"acme.demo","view":"main","target":"pane","conversation":"tab-1"}`, page)
 	var sess struct{ Session string }
@@ -104,6 +105,21 @@ func TestAppFilesRoute(t *testing.T) {
 		t.Errorf("an unknown op: %d", code)
 	}
 
+	// a folder and a search, inside the masks; a watch and git need their own rights.
+	if code, body := files(`"op":"list","path":""`); code != http.StatusOK || !strings.Contains(body, `"path":"docs"`) ||
+		strings.Contains(body, "other") || strings.Contains(body, ".env") {
+		t.Errorf("list: %d %s", code, body)
+	}
+	if code, body := files(`"op":"search","query":"ALPHA"`); code != http.StatusOK || !strings.Contains(body, `"path":"docs/a.md"`) || strings.Contains(body, "SECRET") {
+		t.Errorf("search: %d %s", code, body)
+	}
+	if code, body := files(`"op":"watch"`); code != http.StatusForbidden || !strings.Contains(body, "files.watch") {
+		t.Errorf("a watch without files.watch: %d %s", code, body)
+	}
+	if code, body := call("POST", platformAPI+"/apps/git", `{"session":"`+sess.Session+`","op":"status"}`, page); code != http.StatusForbidden || !strings.Contains(body, "git.read") {
+		t.Errorf("git without git.read: %d %s", code, body)
+	}
+
 	// The chat turned the app off: its view's session no longer reaches the workspace.
 	conv.Apps = nil
 	if code, body := files(`"op":"read","path":"docs/a.md"`); code != http.StatusForbidden || !strings.Contains(body, "not-on") {
@@ -143,9 +159,11 @@ func TestAppFilesRouteKeepsPackagesOut(t *testing.T) {
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+other+`","dev":true}`, cli); code != http.StatusOK {
 		t.Fatalf("install other: %d %s", code, body)
 	}
+	agreeRig(t)
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+demo+`"}`, cli); code != http.StatusOK {
 		t.Fatalf("install demo: %d %s", code, body)
 	}
+	agreeRig(t)
 	_ = os.WriteFile(filepath.Join(ws, "ok.md"), []byte("fine"), 0o644)
 
 	code, body := call("POST", platformAPI+"/apps/session", `{"app":"acme.demo","view":"main","target":"pane","conversation":"tab-1"}`, page)

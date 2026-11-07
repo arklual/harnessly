@@ -2,6 +2,7 @@ package apps
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,8 @@ type Contribution struct {
 	Target string `json:"target"`
 	// Spec is the part of the manifest it was read from.
 	Spec any `json:"spec,omitempty"`
+	// Owner is the app whose point the record goes into (harnessly.sinopia for sinopia.panel); "" for the host's own.
+	Owner string `json:"owner,omitempty"`
 }
 
 // ContributionKind is a kind of contribution as the catalog gives it.
@@ -32,6 +35,8 @@ type ContributionKind struct {
 	Field string `json:"field"`
 	// Targets are the targets it can show in.
 	Targets []string `json:"targets"`
+	// Owner is the app that declares the point (builtin.go); "" for a kind of the host's own.
+	Owner string `json:"owner,omitempty"`
 }
 
 type contributionReader struct {
@@ -39,8 +44,9 @@ type contributionReader struct {
 	read func(m *Manifest) []Contribution
 }
 
-// contributionTable is the one place a kind of contribution is added; the reader and the implementor on the page are
-// the rest of it.
+// contributionTable is the one place a kind of contribution of the host's own is added; the reader and the implementor
+// on the page are the rest of it. The points of a builtin app are in its manifest, and their readers are its code
+// (pointReaders, builtin.go).
 var contributionTable = []contributionReader{
 	{ContributionKind{Name: "view", Field: "views[]", Doc: "A page of the app in a frame.",
 		Targets: []string{TargetPane, TargetApp, TargetChat, TargetSettings, TargetOnboarding, TargetObjectAction, TargetHubSettings, "sinopia.<kind>"}},
@@ -75,6 +81,46 @@ var contributionTable = []contributionReader{
 			}
 			return out
 		}},
+	{ContributionKind{Name: "chat.starter", Field: "chat.starters[]", Doc: "A line an empty chat offers under its field; a click puts it into the field.", Targets: []string{TargetChat}},
+		func(m *Manifest) []Contribution {
+			if m.Chat == nil {
+				return nil
+			}
+			var out []Contribution
+			for i, st := range m.Chat.Starters {
+				out = append(out, Contribution{Kind: "chat.starter", ID: strconv.Itoa(i), Target: TargetChat, Spec: st})
+			}
+			return out
+		}},
+	{ContributionKind{Name: "chat.button", Field: "chat.buttons[]", Doc: "A button at the chat's field: runs one of the app's commands or opens its view in the pane.", Targets: []string{TargetChat}},
+		func(m *Manifest) []Contribution {
+			if m.Chat == nil {
+				return nil
+			}
+			var out []Contribution
+			for _, b := range m.Chat.Buttons {
+				out = append(out, Contribution{Kind: "chat.button", ID: b.ID, Target: TargetChat, Spec: b})
+			}
+			return out
+		}},
+	{ContributionKind{Name: "chat.link", Field: "chat.links[]", Doc: "A kind of address the app shows a card for under a message that has such a link.", Targets: []string{TargetChat}},
+		func(m *Manifest) []Contribution {
+			if m.Chat == nil {
+				return nil
+			}
+			var out []Contribution
+			for _, l := range m.Chat.Links {
+				out = append(out, Contribution{Kind: "chat.link", ID: l.Match, Target: TargetChat, Spec: l})
+			}
+			return out
+		}},
+	{ContributionKind{Name: "chat.mention", Field: "chat.mentions", Doc: "What «@» in the chat's field finds in the app: a tool of its MCP server, asked with what is typed.", Targets: []string{TargetChat}},
+		func(m *Manifest) []Contribution {
+			if m.Chat == nil || m.Chat.Mentions == nil {
+				return nil
+			}
+			return []Contribution{{Kind: "chat.mention", ID: m.Chat.Mentions.Tool, Target: TargetChat, Spec: *m.Chat.Mentions}}
+		}},
 	{ContributionKind{Name: "agent", Field: "agent", Doc: "The agent profile: instructions, skills, MCP servers, tool rules, validators.",
 		Targets: []string{TargetChat, TargetPane, "sinopia.<kind>"}},
 		func(m *Manifest) []Contribution {
@@ -83,7 +129,7 @@ var contributionTable = []contributionReader{
 			}
 			var out []Contribution
 			for _, t := range m.Targets {
-				if t == TargetChat || t == TargetPane || strings.HasPrefix(t, "sinopia.") {
+				if t == TargetChat || t == TargetPane || IsSinopiaTarget(t) {
 					out = append(out, Contribution{Kind: "agent", ID: "agent", Target: t, Spec: m.Agent})
 				}
 			}
@@ -96,83 +142,32 @@ var contributionTable = []contributionReader{
 			}
 			return []Contribution{{Kind: "branding", ID: "branding", Target: TargetBranding, Spec: m.Branding}}
 		}},
-	{ContributionKind{Name: "sinopia.kind", Field: "sinopia.kinds[]", Doc: "A Sinopia document type of the app's own.", Targets: []string{"sinopia.<kind>"}},
-		func(m *Manifest) []Contribution {
-			s, err := m.SinopiaOf()
-			if err != nil {
-				return nil
-			}
-			var out []Contribution
-			for _, k := range s.Kinds {
-				out = append(out, Contribution{Kind: "sinopia.kind", ID: k.ID, Target: "sinopia." + k.ID, Spec: k})
-			}
-			return out
-		}},
-	{ContributionKind{Name: "sinopia.panel", Field: "sinopia.panels[]", Doc: "A view to the right of the editor.", Targets: []string{"sinopia.<kind>"}},
-		sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
-			for _, p := range s.Panels {
-				add(p.ID, p.Kinds, p)
-			}
-		}, "sinopia.panel")},
-	{ContributionKind{Name: "sinopia.selection", Field: "sinopia.selection[]", Doc: "An item of the selection menu.", Targets: []string{"sinopia.<kind>"}},
-		sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
-			for _, p := range s.Selection {
-				add(p.ID, p.Kinds, p)
-			}
-		}, "sinopia.selection")},
-	{ContributionKind{Name: "sinopia.check", Field: "sinopia.checks[]", Doc: "A check of the document.", Targets: []string{"sinopia.<kind>"}},
-		sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
-			for _, p := range s.Checks {
-				add(p.ID, p.Kinds, p)
-			}
-		}, "sinopia.check")},
-	{ContributionKind{Name: "sinopia.export", Field: "sinopia.export[]", Doc: "An export entry of the document.", Targets: []string{"sinopia.<kind>"}},
-		sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
-			for _, p := range s.Export {
-				add(p.ID, p.Kinds, p)
-			}
-		}, "sinopia.export")},
-	{ContributionKind{Name: "sinopia.import", Field: "sinopia.import[]", Doc: "An import entry of the document.", Targets: []string{"sinopia.<kind>"}},
-		sinopiaPart(func(s Sinopia, add func(id string, kinds []string, spec any)) {
-			for _, p := range s.Import {
-				add(p.ID, nil, p)
-			}
-		}, "sinopia.import")},
 }
 
-// sinopiaPart reads one list of the manifest's `sinopia`: an item for listed kinds shows in each, one for all of the
-// app's kinds shows in the app's sinopia targets.
-func sinopiaPart(each func(s Sinopia, add func(id string, kinds []string, spec any)), kind string) func(m *Manifest) []Contribution {
-	return func(m *Manifest) []Contribution {
-		s, err := m.SinopiaOf()
-		if err != nil {
-			return nil
-		}
-		var out []Contribution
-		each(s, func(id string, kinds []string, spec any) {
-			targets := []string{}
-			for _, k := range kinds {
-				targets = append(targets, "sinopia."+k)
-			}
-			if len(kinds) == 0 {
-				for _, t := range m.Targets {
-					if strings.HasPrefix(t, "sinopia.") {
-						targets = append(targets, t)
-					}
-				}
-			}
-			for _, t := range targets {
-				out = append(out, Contribution{Kind: kind, ID: id, Target: t, Spec: spec})
-			}
-		})
-		return out
-	}
-}
-
+// contributionKinds are the host's kinds and then the points the builtin apps declare (builtin.go), each shown in the
+// families of its owner's aliases.
 func contributionKinds() []ContributionKind {
-	out := make([]ContributionKind, len(contributionTable))
-	for i, k := range contributionTable {
-		out[i] = k.ContributionKind
+	out := make([]ContributionKind, 0, len(contributionTable))
+	for _, k := range contributionTable {
+		out = append(out, k.ContributionKind)
+	}
+	for _, p := range AppPoints() {
+		out = append(out, ContributionKind{Name: p.Name, Doc: p.Doc, Field: p.Field, Targets: familiesOf(p.Owner), Owner: p.Owner})
+	}
+	return out
+}
+
+// familiesOf are the aliases of an app's screen that name one scope (sinopia.<kind>), not its wildcard.
+func familiesOf(app string) []string {
+	m := builtinOf(app)
+	if m == nil {
+		return nil
+	}
+	var out []string
+	for _, a := range m.Aliases {
+		if !strings.HasSuffix(a.Name, ".*") {
+			out = append(out, a.Name)
+		}
 	}
 	return out
 }
@@ -186,6 +181,17 @@ func ContributionsOf(m *Manifest) []Contribution {
 	for _, k := range contributionTable {
 		for _, c := range k.read(m) {
 			c.App = m.ID
+			out = append(out, c)
+		}
+	}
+	// The contributions to the builtin apps' points, read by their owners' code.
+	for _, p := range AppPoints() {
+		read := pointReaders[p.Name]
+		if read == nil {
+			continue
+		}
+		for _, c := range read(m) {
+			c.App, c.Kind, c.Owner = m.ID, p.Name, p.Owner
 			out = append(out, c)
 		}
 	}
@@ -223,7 +229,7 @@ func (c *Contributions) All() []Contribution { return append([]Contribution(nil)
 func (c *Contributions) In(target string) []Contribution {
 	var out []Contribution
 	for _, r := range c.list {
-		if r.Target == target || (r.Target == "sinopia.*" && wildcardCovers(target)) {
+		if r.Target == target || (r.Target != "" && r.Target == wildcardOf(target)) {
 			out = append(out, r)
 		}
 	}

@@ -8,7 +8,7 @@ import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import Segmented from '@/next/ui/segmented';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import {
   GEN_VARIANTS,
   readGenVariants,

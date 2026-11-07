@@ -67,6 +67,7 @@ import '@/next/styles/apps.css';
 import '@/next/styles/app-main.css';
 import '@/next/styles/app-catalog.css';
 import '@/next/styles/app-doc.css';
+import '@/next/styles/app-consent.css';
 import '@/next/styles/help.css';
 import '@/next/styles/sidebar.css';
 import '@/next/styles/tabs.css';

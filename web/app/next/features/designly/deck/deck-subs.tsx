@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import type { IDeckSlide } from '@/next/features/designly/deck/types';
 
 /** A dictation into one slide's notes (WP4's dictation.ts drives it). */

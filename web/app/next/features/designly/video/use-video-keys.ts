@@ -3,8 +3,8 @@
 // PageUp/PageDown or ↑/↓ change the scene; Home/End go to the ends; 0–9 go to a tenth of the video; I and O mark the
 // range; C comments; F goes full screen; ⌥← and ⌥→ change the scene even from the chat's field. The keys are places on
 // the keyboard, so the Russian layout has the same. Keys typed into a field are the field's.
-import { KEY_SCOPE } from '@/next/features/keys/commands';
-import { useKeys, type TKeyHandlers } from '@/next/features/keys/use-keys';
+import { KEY_SCOPE } from '@/next/features/designly/sdk/keys';
+import { useKeys, type TKeyHandlers } from '@/next/features/designly/sdk/keys';
 
 export const VIDEO_KEY = {
   toggle: 'toggle',

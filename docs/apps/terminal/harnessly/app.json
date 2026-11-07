@@ -1,0 +1,36 @@
+{
+  "id": "harnessly.terminal",
+  "name": "Терминал",
+  "description": "Свой терминал в папке чата, собранный на SDK: оболочка в песочнице агента, xterm в окне",
+  "version": "0.1.0",
+  "harnessly": ">=0.16.177",
+  "trust": "sandboxed",
+  "targets": [
+    "chat",
+    "pane",
+    "app"
+  ],
+  "activation": {
+    "on": [
+      "manual"
+    ],
+    "openView": "main"
+  },
+  "permissions": [
+    "terminal.pty"
+  ],
+  "agent": {
+    "instructions": "instructions.md"
+  },
+  "views": [
+    {
+      "id": "main",
+      "title": "Терминал",
+      "entry": "ui/index.html",
+      "targets": [
+        "pane",
+        "app"
+      ]
+    }
+  ]
+}

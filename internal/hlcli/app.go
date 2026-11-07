@@ -220,6 +220,8 @@ func (c *cli) appInstall(args []string, dev bool) error {
 		Message  string        `json:"message"`
 		Problems apps.Problems `json:"problems"`
 		App      cliApp        `json:"app"`
+		// WaitsConsent: what the app reaches waits for the person's click on the install screen.
+		WaitsConsent bool `json:"waitsConsent"`
 	}
 	_ = json.Unmarshal(raw, &out)
 	if c.json {
@@ -241,6 +243,11 @@ func (c *cli) appInstall(args []string, dev bool) error {
 		how := "installed"
 		if out.App.Dev {
 			how = "installed for development (the folder itself: a chat started after an edit gets it)"
+		}
+		if out.WaitsConsent {
+			// The CLI is every agent's too: what an app may do is agreed to only by a click in the page.
+			c.out("%s %s: it waits for the person's consent. Ask them to open «Приложения» in harnessly and look through what it gets (the app is off, or keeps its previous version, until they agree)\n", how, out.App.ID)
+			return nil
 		}
 		c.out("%s %s %s\nturn it on in this chat: harnessly app enable %s\n", how, out.App.ID, out.App.Version, out.App.ID)
 	}
@@ -422,8 +429,65 @@ func (c *cli) appGuard(policyPath string, codexInput bool) error {
 		c.journalDecision(call.Session, call.Tool, v, "ask", reason)
 		return answer("ask", reason)
 	}
-	// No rule of the apps, or one that allows: the chat's own permissions decide.
+	// No rule of the apps, or one that allows: the views that hear the agent's calls have their word (hooks.agent), then
+	// the chat's own permissions decide.
+	if hv, asked := c.askHooks(snap, call.Session, call.Tool, call.Input); asked {
+		if hv.Deny {
+			return answer("deny", hookMark(hv.Name, hv.App)+hv.Reason)
+		}
+		if hv.Context != "" {
+			out, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
+				"hookEventName": "PreToolUse", "additionalContext": hv.Context,
+			}})
+			_, _ = c.env.Stdout.Write(append(out, '\n'))
+		}
+	}
 	return nil
+}
+
+// askHooks asks the runtime for the word of the views that hear the agent's calls, when an app of the snapshot has a
+// hook. A runtime that does not answer lets the call through, unless an app is strict: then it is stopped by that app.
+func (c *cli) askHooks(snap apps.Snapshot, agentSession, tool string, input map[string]any) (apps.HookVerdict, bool) {
+	var hooked, strict []apps.SnapshotApp
+	for _, a := range snap.Apps {
+		if a.Hooks {
+			hooked = append(hooked, a)
+			if a.Strict {
+				strict = append(strict, a)
+			}
+		}
+	}
+	if len(hooked) == 0 {
+		return apps.HookVerdict{}, false
+	}
+	unanswered := func() (apps.HookVerdict, bool) {
+		if len(strict) == 0 {
+			return apps.HookVerdict{}, false
+		}
+		a := strict[0]
+		return apps.HookVerdict{Deny: true, App: a.ID, Name: a.Name,
+			Reason: "The app " + a.Name + " checks every tool call in strict mode and could not be asked; ask the person to turn its hook off or open its view."}, true
+	}
+	session := c.session()
+	if session == "" {
+		return unanswered()
+	}
+	cc := *c
+	cc.env.Client = &http.Client{Timeout: apps.HookTimeout + 2*time.Second}
+	status, raw, err := cc.call("POST", "/api/cli/apps/hook", nil, map[string]any{"session": session, "agentSession": agentSession, "tool": tool, "input": input})
+	var v apps.HookVerdict
+	if err != nil || status != http.StatusOK || json.Unmarshal(raw, &v) != nil {
+		return unanswered()
+	}
+	return v, true
+}
+
+// hookMark is the head of a hook's stop that the feed knows it by: the app's name, the rule "hook" and the app's id,
+// which the feed's «Выключить хук» turns off.
+func hookMark(name, id string) string {
+	n, _ := json.Marshal(name)
+	i, _ := json.Marshal(id)
+	return "[app-guard " + string(n) + ` "hook" ` + string(i) + "] "
 }
 
 // guardMark is the head of a refusal's reason that the feed knows it by (web: app-views/guard-denial.ts): the app's

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -23,6 +24,16 @@ func ForegroundExec(argv []string) error {
 	path, err := exec.LookPath(argv[0])
 	if err != nil {
 		return err
+	}
+	// An app's command (run.go) names its processor time: set here, inside the wall, where the command cannot raise it.
+	if v, ok := os.LookupEnv(SandboxCPUEnv); ok {
+		_ = os.Unsetenv(SandboxCPUEnv)
+		if secs, err := strconv.ParseUint(v, 10, 64); err == nil && secs > 0 {
+			lim := unix.Rlimit{Cur: secs, Max: secs + 5}
+			if err := unix.Setrlimit(unix.RLIMIT_CPU, &lim); err != nil {
+				return fmt.Errorf("sandbox-exec: the processor limit: %w", err)
+			}
+		}
 	}
 	// A kernel without one of these says so at the machine check (Boundary.Gaps); the chat starts, as it does without the wall.
 	if err := harden(); err != nil {

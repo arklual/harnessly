@@ -53,3 +53,12 @@ regexes = [
   '''^e06Qm75//kTEZaIgA31gjuNYl9Me\+XLwf3SJLLD3PxM=$''',
   '''^HPV5q6RaELodHvBtkfyiqp7QoRUFFWUxVUBdCxjLmmc=$''',
 ]
+
+# The minified xterm.js bundle of the terminal example app (MIT, vendored): generic-api-key reads two of its exports
+# as keys. Only that file, only that rule, only those two exact strings.
+[[allowlists]]
+description = "Exports of the vendored xterm.js bundle"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^docs/apps/terminal/ui/vendor/xterm\.js$''']
+regexes = ['''^t\.TwoKeyMap=void$''', '''^t\.Sequencer=t\.Throttler=void$''']

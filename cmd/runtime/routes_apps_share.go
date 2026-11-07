@@ -304,7 +304,7 @@ func appShareRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version str
 		if !ok {
 			return
 		}
-		got, problems, err := reg.InstallChannel(b.ID, ch, apps.InstallOptions{HostVersion: version})
+		got, problems, err := reg.InstallChannel(b.ID, ch, apps.InstallOptions{HostVersion: version, Consent: apps.ConsentAsk})
 		if problems == nil {
 			problems = apps.Problems{}
 		}

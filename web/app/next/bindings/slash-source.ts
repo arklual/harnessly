@@ -1,6 +1,7 @@
 // What «/» lists over a field, read from the machine: the agent's commands and skills for the chat's folder (the
 // catalog the Settings screen shows the skills of), the MCP servers set up for the agent, and the chat's folder for
 // «@». Nothing is asked until the palette first opens.
+import { findAppMentions } from '@/next/features/app-views/api';
 import { useCallback, useMemo, useState } from 'react';
 import { useAgentSettings, useCatalog, type SkillCatalog } from '@/next/bindings/settings-data';
 import type { ICatalogItem } from '@/next/features/settings/api';
@@ -22,6 +23,8 @@ interface IOptions {
   appCommands?: readonly IAppCommands[];
   /** A chat picked after «@»: the message points at it. */
   onChat: (ref: MessageRef) => void;
+  /** Some app on in the chat answers «@» (chat.mentions). */
+  appMentions?: boolean;
 }
 
 /** The folders that are not the person's files to point at. */
@@ -41,6 +44,7 @@ export const useSlashSource = ({
   actions,
   appCommands,
   onChat,
+  appMentions = false,
 }: IOptions): ISlashSource | null => {
   const [woken, setWoken] = useState(false);
   const wake = useCallback(() => setWoken(true), []);
@@ -75,6 +79,15 @@ export const useSlashSource = ({
     [machine, conv],
   );
 
+  // The apps' finds for «@»: asked only where an app of the chat answers it.
+  const mentions = useMemo(
+    () =>
+      machine !== null && conv !== null && appMentions
+        ? (query: string, signal: AbortSignal) => findAppMentions(machine, conv, query, signal)
+        : null,
+    [machine, conv, appMentions],
+  );
+
   return useMemo(
     () =>
       machine !== null && provider !== null
@@ -90,8 +103,9 @@ export const useSlashSource = ({
             listFolder: lister,
             findChats: chats,
             onChat,
+            findMentions: mentions,
           }
         : null,
-    [machine, provider, wake, list, mcp, appCommands, actions, conv, lister, chats, onChat],
+    [machine, provider, wake, list, mcp, appCommands, actions, conv, lister, chats, onChat, mentions],
   );
 };

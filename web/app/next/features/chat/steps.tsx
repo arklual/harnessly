@@ -1,5 +1,6 @@
 // The agent's work inside a turn, compact (not a log): a thought, one line per tool with its output
 // on a click, a run of tools folded into «K actions», subagents, dynamic workflows, a compaction divider and notices.
+import type { MachineId } from '@/next/protocol/v2';
 import { memo, useContext, useState, type ReactNode } from 'react';
 import Md from '@/next/features/chat/md';
 import type {
@@ -24,7 +25,8 @@ import AppCard from '@/next/features/app-views/app-card';
 import { parseAppCard } from '@/next/features/app-views/card';
 import ChatWidget from '@/next/features/app-views/chat-widget';
 import CardOutput, { cardOutputPending } from '@/next/features/app-views/card-output';
-import { parseGuardDenial } from '@/next/features/app-views/guard-denial';
+import { setHookOff, useInstalledApps } from '@/next/features/app-views/api';
+import { type IGuardDenial, parseGuardDenial } from '@/next/features/app-views/guard-denial';
 import { parseWidgetRef } from '@/next/features/app-views/widgets';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { useSeen } from '@/next/ui/presence';
@@ -57,12 +59,60 @@ export const toolView = (tool: string): { icon: TIconName; label: string } => {
   return { icon: 'square-terminal', label: tool.replace(/^mcp__(\w+)__/, '$1 · ') };
 };
 
+/** The line of a refused call: an app's hook stopped it, or a rule of an app (or of the chat's apps) did. */
+const guardLabel = (denial: IGuardDenial, label: string): string => {
+  if (denial.rule === 'hook') return t('next.tool.hookStopped', { app: denial.app });
+  return t(denial.app ? 'next.tool.guarded' : 'next.tool.guardedChat', {
+    app: denial.app,
+    tool: label.toLowerCase(),
+    rule: denial.rule,
+  });
+};
+
+type THookOff = 'idle' | 'busy' | 'done' | 'failed';
+
+/**
+ * «Выключить хук» under an app's stop: the person turns the app's hook off on the machine of the chat. The mark comes in
+ * a tool's text, which a command can print too, so the button shows only for an installed app that holds hooks.agent,
+ * under that app's own name from the machine's list.
+ */
+const HookOff = ({ machine, app }: { machine: MachineId; app: string }) => {
+  const { list } = useInstalledApps(machine);
+  const [state, setState] = useState<THookOff>('idle');
+  const known = list?.apps.find((a) => a.id === app && a.permissions.includes('hooks.agent'));
+  if (!known) return null;
+  if (state === 'done') return <span className="hx-tool__act-note">{t('next.tool.hookOffDone')}</span>;
+  return (
+    <button
+      type="button"
+      className="hx-tool__act"
+      disabled={state === 'busy'}
+      onClick={() => {
+        setState('busy');
+        setHookOff(machine, app, true).then(
+          () => setState('done'),
+          () => setState('failed'),
+        );
+      }}
+    >
+      {t(state === 'failed' ? 'next.tool.hookOffFailed' : 'next.tool.hookOff', { app: known.name })}
+    </button>
+  );
+};
+
+/** The hook's switch on the machine the feed shows; a feed of no machine has none. */
+const HookOffHere = ({ app }: { app: string }) => {
+  const host = useContext(ImageHost);
+  return host === null ? null : <HookOff machine={host.machine} app={app} />;
+};
+
 const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
   const [open, setOpen] = useState(false);
   const seen = useSeen(open);
   const { icon, label } = toolView(entry.tool);
   const denial = entry.ok === false ? parseGuardDenial(entry.output?.text) : null;
   const text = denial ? denial.reason : entry.output?.text;
+  const guardText = denial === null ? null : guardLabel(denial, label);
   const has = Boolean(text);
   let meta = '';
   if (entry.ok === null) meta = t('next.tool.running');
@@ -86,14 +136,8 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
         ) : (
           <Icon name={icon} size="sm" className="hx-tool__ico" />
         )}
-        {denial ? (
-          <span className="hx-tool__label">
-            {t(denial.app ? 'next.tool.guarded' : 'next.tool.guardedChat', {
-              app: denial.app,
-              tool: label.toLowerCase(),
-              rule: denial.rule,
-            })}
-          </span>
+        {guardText !== null ? (
+          <span className="hx-tool__label">{guardText}</span>
         ) : (
           <>
             <span className="hx-tool__label">{label}</span>
@@ -103,6 +147,7 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
         <span className="hx-spacer" />
         {meta && <span className="hx-tool__meta">{meta}</span>}
       </button>
+      {denial?.rule === 'hook' && denial.appId && <HookOffHere app={denial.appId} />}
       {has && (
         <div className="hx-tool__body">
           <div>

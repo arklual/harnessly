@@ -25,7 +25,7 @@ import type { IScopePage } from '@/next/features/designly/access/link-scope';
 import RequestForm from '@/next/features/designly/access/request-form';
 import ShareMenu, { SUB_VIEW, type TSubView } from '@/next/features/designly/access/share-menu';
 import { useAction, type IAction } from '@/next/features/designly/access/use-action';
-import Modal from '@/next/features/shell/modal';
+import { Modal } from '@/next/features/designly/sdk/ui';
 import { useMe } from '@/next/stores/me';
 import Icon from '@/next/ui/icon';
 import { usePresence, type TPresenceState } from '@/next/ui/presence';

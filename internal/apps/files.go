@@ -34,11 +34,18 @@ func refuseFile(format string, a ...any) error {
 // the tools' own credentials. A name with a * is matched by path.Match against each segment of the path.
 var secretNames = []string{".env", ".env.*", ".npmrc", ".netrc", ".pypirc", ".git-credentials", ".htpasswd",
 	"id_rsa", "id_rsa.*", "id_dsa", "id_ecdsa", "id_ed25519", "id_ed25519.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.keystore",
-	"cli-token", ".envrc"}
+	"cli-token", ".envrc",
+	// The agents' own credentials and account: a chat in the home folder has them in its workspace.
+	".credentials.json", ".claude.json",
+	// What the person typed into shells and interpreters.
+	".*_history", ".histfile", ".lesshst", ".viminfo"}
+
+// secretPairs are a folder and a file in it that no app reaches: a file name too common to refuse everywhere.
+var secretPairs = [][2]string{{".codex", "auth.json"}}
 
 // secretDirs are folders of a workspace that are never reached: the repository's own files (config holds remotes with
 // credentials, hooks run code), the shell's keys and the cloud tools' credentials.
-var secretDirs = []string{".git", ".ssh", ".aws", ".gnupg", ".kube", ".docker"}
+var secretDirs = []string{".git", ".ssh", ".aws", ".gnupg", ".kube", ".docker", ".config", ".azure", ".password-store"}
 
 // Tool and agent configuration is code or instructions in disguise (a hook, an MCP server, a setting, a prompt the agent
 // reads): an app may read it but never write it. Dot-folders and dot-files in general are written only when a mask names
@@ -141,7 +148,13 @@ func anyMask(masks []string, rel string) bool {
 // secret says whether a clean relative path is, or lies in, one of the files and folders no app reaches.
 func secret(rel string) bool {
 	// Case-insensitive: on a case-insensitive volume .GIT/config is .git/config.
-	for _, seg := range strings.Split(strings.ToLower(rel), "/") {
+	segs := strings.Split(strings.ToLower(rel), "/")
+	for i, seg := range segs {
+		for _, pair := range secretPairs {
+			if seg == pair[0] && i+1 < len(segs) && segs[i+1] == pair[1] {
+				return true
+			}
+		}
 		for _, d := range secretDirs {
 			if seg == d {
 				return true

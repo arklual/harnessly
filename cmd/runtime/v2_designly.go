@@ -186,6 +186,9 @@ func (d *v2Designly) Create(ctx context.Context, c wire.DesignlyCreate) (wire.De
 	// The owner file (personal, v2) is a note for the library's other runtimes and the gateway hears of the project:
 	// the project is made without them, nothing stops for it.
 	lib.AnnounceNewBy(project.ID, d.api.PersonOf(wire.RequestOf(ctx)))
+	if c.DesignSystem != nil {
+		d.recordSystem(project.ID, *c.DesignSystem, d.personOf(ctx))
+	}
 	if err := d.change(func(st *designlyState) { st.Kinds[project.ID] = c.Kind }); err != nil {
 		return wire.DesignlyCreated{}, notStarted(err.Error())
 	}
@@ -385,6 +388,22 @@ func (d *v2Designly) systemLine(sys, person string) (string, bool) {
 			"Строй на дизайн-системе проекта «"+s.info.Label+"» из библиотеки."), true
 	}
 	return "", false
+}
+
+// recordSystem notes on the project the design system or kit it is built on, for the library's filter; a failed write
+// only costs the project its place in that filter.
+func (d *v2Designly) recordSystem(project, sys, person string) {
+	for _, s := range d.systems(person) {
+		if s.info.ID != sys {
+			continue
+		}
+		if err := d.api.L.SetSystem(project, design.System{ID: s.info.ID, Label: s.info.Label}); err != nil {
+			if log := d.api.L.Config().Log; log != nil {
+				log("warn", "design: the design system of a project was not recorded", err)
+			}
+		}
+		return
+	}
 }
 
 // recordCreated keeps that conv was started from design; a failed write only costs the chat its place in the list.

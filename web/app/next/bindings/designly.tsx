@@ -13,7 +13,6 @@ import DesignlyHome, {
 } from '@/next/features/designly/designly-home';
 import {
   createDesign,
-  deleteDesign,
   fetchLibrary,
   fetchSystems,
   pinDesign,
@@ -22,6 +21,8 @@ import {
   type IDesign,
   type IDesignSystem,
 } from '@/next/features/designly/api';
+import { useLibraryOrganizer } from '@/next/bindings/use-library-organizer';
+import type { ILibraryLayout } from '@/next/features/designly/api';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
 import { bindDesignConv } from '@/next/bindings/design-conv';
@@ -60,7 +61,12 @@ const DELETERS: ReadonlySet<string> = new Set(['owner']);
 
 const titleOf = (brief: string) => (brief.length > TITLE_MAX ? `${brief.slice(0, TITLE_MAX)}…` : brief);
 
-const cardOf = (m: MachineId, design: IDesign, working: ReadonlySet<string>): IDesignCard => {
+const cardOf = (
+  m: MachineId,
+  design: IDesign,
+  working: ReadonlySet<string>,
+  layout: ILibraryLayout,
+): IDesignCard => {
   const board = design.boards[0];
   return {
     id: design.id,
@@ -73,6 +79,8 @@ const cardOf = (m: MachineId, design: IDesign, working: ReadonlySet<string>): ID
     drawing: isDrawing(design, working),
     owner: design.owner ?? null,
     canDelete: design.role === undefined ? design.owner?.me === true : DELETERS.has(design.role),
+    folder: layout.placed[design.id] ?? null,
+    system: layout.systems[design.id] ?? null,
   };
 };
 
@@ -146,10 +154,17 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     return () => clearInterval(timer);
   }, [drawing, load]);
 
+  const forget = useCallback((ids: string[]) => {
+    const gone = new Set(ids);
+    setDesigns((list) => list?.filter((d) => !gone.has(d.id)) ?? null);
+  }, []);
+  const reload = useCallback(() => load(), [load]);
+  const { layout, organizer } = useLibraryOrganizer(machine, reload, forget);
+
   const cards = useMemo(() => {
     if (designs === null) return null;
-    return [...designs.map((design) => cardOf(machine, design, working)), ...appDocs.map(appDocCard)];
-  }, [designs, appDocs, machine, working]);
+    return [...designs.map((design) => cardOf(machine, design, working, layout)), ...appDocs.map(appDocCard)];
+  }, [designs, appDocs, machine, working, layout]);
   const appDocIds = useMemo(() => new Set(appDocs.map((d) => d.document)), [appDocs]);
 
   const onPin = async (id: string, pinned: boolean) => {
@@ -162,15 +177,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     setDesigns((list) => list?.map((d) => (d.id === id ? { ...d, pinned } : d)) ?? null);
   };
 
-  const onDelete = async (id: string) => {
-    try {
-      await deleteDesign(machine, id);
-    } catch (failure) {
-      toast(t('next.designly.deleteFailed'), { tone: 'error', description: (failure as Error).message });
-      throw failure;
-    }
-    setDesigns((list) => list?.filter((d) => d.id !== id) ?? null);
-  };
+  const onDelete = (id: string) => organizer.onDeleteMany([id]);
 
   const onRestoreDemo = async () => {
     try {
@@ -189,7 +196,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     setAttempt((n) => n + 1);
   };
 
-  return { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds };
+  return { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds, organizer };
 };
 
 interface IDesignlyLibraryProps {
@@ -200,7 +207,10 @@ interface IDesignlyLibraryProps {
 /** The library alone, for the right pane: its chat is the field that starts a design, so there is none here. */
 export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
   // The documents of the types apps add are listed here as in the whole library; opening one is the pane's to tell.
-  const { cards, error, now, onPin, onDelete, onRestoreDemo, onRetry } = useDesignLibrary(machine, true);
+  const { cards, error, now, onPin, onDelete, onRestoreDemo, onRetry, organizer } = useDesignLibrary(
+    machine,
+    true,
+  );
   return (
     <DesignlyHome
       cards={cards}
@@ -208,6 +218,7 @@ export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
       now={now}
       onPin={onPin}
       onDelete={onDelete}
+      organizer={organizer}
       onRestoreDemo={onRestoreDemo}
       onOpen={onOpen}
       onRetry={onRetry}
@@ -229,10 +240,8 @@ const START_DRAFT = DESIGN_START_DRAFT;
 const setBrief = (value: string) => setDraftText(START_DRAFT, value);
 
 const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewProps) => {
-  const { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds } = useDesignLibrary(
-    machine,
-    true,
-  );
+  const { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds, organizer } =
+    useDesignLibrary(machine, true);
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
   const [kitsAdded, setKitsAdded] = useState(0);
   const restored = useLinkRestored(machine);
@@ -328,6 +337,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
         now={now}
         onPin={onPin}
         onDelete={onDelete}
+        organizer={organizer}
         onRestoreDemo={onRestoreDemo}
         onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
         onRetry={onRetry}

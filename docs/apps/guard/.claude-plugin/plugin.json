@@ -1,0 +1,5 @@
+{
+  "description": "Останавливает опасные команды агента до запуска: rm -rf и git push --force",
+  "name": "harnessly-guard",
+  "version": "0.1.0"
+}

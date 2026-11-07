@@ -528,7 +528,7 @@ func (r *Registry) followOne(a Installed, ch Channel, opt SyncOptions) (SyncResu
 			return res, nil
 		}
 	}
-	if _, _, err := r.Install(dir, InstallOptions{HostVersion: opt.HostVersion, Channel: string(ch)}); err != nil {
+	if _, _, err := r.Install(dir, InstallOptions{HostVersion: opt.HostVersion, Channel: string(ch), Consent: ConsentAsk}); err != nil {
 		return res, err
 	}
 	res.Applied = true

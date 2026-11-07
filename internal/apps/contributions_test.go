@@ -55,10 +55,11 @@ func TestContributionsRemovedWithTheirApp(t *testing.T) {
 	}
 }
 
-// Every kind of the table reads from its manifest field and is listed in the catalog: one place adds a kind.
+// Every kind of the table and every point of a builtin app reads from its manifest field and is listed in the catalog:
+// one place adds a kind.
 func TestContributionKindsAreInTheCatalog(t *testing.T) {
 	cat := SurfaceCatalog()
-	if len(cat.Contributions) != len(contributionTable) {
+	if len(cat.Contributions) != len(contributionTable)+len(AppPoints()) {
 		t.Fatal("catalog and table differ")
 	}
 	seen := map[string]bool{}
@@ -67,5 +68,11 @@ func TestContributionKindsAreInTheCatalog(t *testing.T) {
 			t.Errorf("kind %+v", k.ContributionKind)
 		}
 		seen[k.Name] = true
+	}
+	for _, p := range AppPoints() {
+		if seen[p.Name] || pointReaders[p.Name] == nil || len(familiesOf(p.Owner)) == 0 {
+			t.Errorf("point %+v: no reader or nowhere to show", p)
+		}
+		seen[p.Name] = true
 	}
 }

@@ -259,6 +259,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A new Sinopia project takes a brief of up to 20,000 characters, not 4,000: a dictated brief ran past the old bound
+  and the person saw a bare «brief: too long». A longer one is refused in their words, with a hint to attach the text as
+  a file.
+
 - A message with several pictures no longer goes to the agent cut in two: no Enter is pressed while Claude still reads a
   paste («Pasting…»), nor while its box stops short of the message's end; the paths of a paste Claude reads late are
   not pasted a second time. A message of only «…/up_….pn» went in, the other paths left in the box.

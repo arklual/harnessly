@@ -46,7 +46,8 @@ func (l *Launcher) Codex(conversation string, ids []string) (agents.CodexApps, e
 			return out, fmt.Errorf("app %s does not work in a chat", id)
 		}
 		installed = append(installed, a)
-		snap.Apps = append(snap.Apps, SnapshotApp{ID: a.ID, Name: a.Manifest.Name, Tools: toolsOf(a.Manifest), Context: ContextItems(a.Manifest)})
+		snap.Apps = append(snap.Apps, SnapshotApp{ID: a.ID, Name: a.Manifest.Name, Tools: toolsOf(a.Manifest), Context: ContextItems(a.Manifest),
+			Hooks: a.Manifest.Allows("hooks.agent"), Strict: a.Manifest.Allows("hooks.agent") && a.Manifest.Allows("hooks.strict")})
 		text, err := instructions(a)
 		if err != nil {
 			return out, fmt.Errorf("app %s: %w", id, err)

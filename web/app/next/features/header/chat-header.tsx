@@ -244,8 +244,8 @@ const ChatHeader = ({
         )}
       </div>
 
-      {/* As in the design, the machine shows only when something is wrong with it */}
-      {chat && machine && machine.health !== MACHINE_HEALTH.ok && (
+      {/* The machine always shows (HRN-870): a green dot when it is fine, its state and trouble on hover */}
+      {machine && (
         <span
           className="hx-headmach hx-tipped"
           data-health={machine.health}

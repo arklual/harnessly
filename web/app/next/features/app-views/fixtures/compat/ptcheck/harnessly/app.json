@@ -1,0 +1,31 @@
+{
+  "id": "acme.ptcheck",
+  "name": "Проверка тулов страницы",
+  "description": "Временное приложение для проверки page_tools и page_call",
+  "version": "0.1.3",
+  "harnessly": ">=0.16",
+  "trust": "sandboxed",
+  "targets": [
+    "pane",
+    "chat",
+    "app"
+  ],
+  "permissions": [
+    "tools.page",
+    "context.publish"
+  ],
+  "views": [
+    {
+      "id": "main",
+      "title": "Проверка",
+      "entry": "ui/index.html",
+      "targets": [
+        "pane",
+        "app"
+      ]
+    }
+  ],
+  "agent": {
+    "instructions": "AGENT.md"
+  }
+}

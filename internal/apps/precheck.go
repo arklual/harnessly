@@ -28,6 +28,9 @@ type Refusal struct {
 type Precheck struct {
 	Refusals []Refusal `json:"refusals"`
 	Secrets  []string  `json:"secrets"`
+	// Access is what the entry says the app reaches, for the install screen. The package may reach more (its
+	// network, servers, plugin parts): the install grants only these keys and the rest waits for consent.
+	Access []Access `json:"access"`
 }
 
 // describe keeps in the entry what a machine checks before it downloads the app.
@@ -92,6 +95,11 @@ func (r *Registry) Precheck(entries []*CatalogEntry, host string) {
 	}
 	for _, e := range entries {
 		c := PrecheckEntry(*e, host, installed)
+		secrets := make([]Secret, 0, len(e.Secrets))
+		for _, n := range e.Secrets {
+			secrets = append(secrets, Secret{Name: n})
+		}
+		c.Access = AccessOf(&Manifest{Permissions: e.Permissions, Secrets: secrets}, nil)
 		e.Check = &c
 	}
 }

@@ -5,6 +5,14 @@ import { slotLeases } from '@/next/features/pane/slot-lease';
 import { openPreview } from '@/next/core/net/preview';
 import {
   callFiles,
+  callFilesMore,
+  callGit,
+  callRun,
+  callTerminalRead,
+  callAgentsRun,
+  callAI,
+  callSecretsPut,
+  callBrowser,
   callSettings,
   callSinopia,
   callStorage,
@@ -14,6 +22,9 @@ import {
   type IAppView,
   type IInstalledApp,
 } from '@/next/features/app-views/api';
+import { watchChatEvents } from '@/next/features/app-views/chat-events';
+import { subscribeFileChanges } from '@/next/features/app-views/file-events';
+import { askFile } from '@/next/features/app-views/file-pick';
 import {
   AppBridge,
   BridgeError,
@@ -25,10 +36,12 @@ import {
 import { logCall, logKey } from '@/next/features/app-views/bridge-log';
 import { pageOffer } from '@/next/features/app-views/page-tools';
 import { askConfirm } from '@/next/features/app-views/confirm';
+import { hostKeys } from '@/next/features/app-views/host-keys';
 import { watchLoads } from '@/next/features/app-views/frame-loads';
 import { chatOf, useHostHandlers } from '@/next/features/app-views/host-handlers';
 import { conversationsStore, useConversation } from '@/next/stores/conversations';
-import { openAppTab } from '@/next/features/app-views/open';
+import { openAppTerminal } from '@/next/features/app-views/app-terminal';
+import { openAddressTab, openAppTab } from '@/next/features/app-views/open';
 import { agentRows, chatTarget, openConversation, watchAgents } from '@/next/features/app-views/agents';
 import { reaches, subscribeStorageChanges } from '@/next/features/app-views/storage-events';
 import { viewTheme } from '@/next/features/app-views/theme';
@@ -46,6 +59,22 @@ import type { ConvId, MachineId } from '@/next/protocol/v2';
 /** How long a view has to make its handshake before the debug section says it did not. */
 const HANDSHAKE_WAIT_MS = 8000;
 
+/** The action an elevation dialog names, in the person's words. */
+const elevationAction = (method: string): string => {
+  if (method === 'harnessly/terminal.run') return t('next.appview.elevate.run');
+  if (method === 'harnessly/process.start') return t('next.appview.elevate.start');
+  if (method === 'harnessly/process.stop') return t('next.appview.elevate.stop');
+  if (method === 'harnessly/preview.open') return t('next.appview.elevate.preview');
+  if (method === 'harnessly/terminal.open') return t('next.appview.elevate.terminalOpen');
+  if (method === 'harnessly/terminal.write') return t('next.appview.elevate.terminalWrite');
+  if (method === 'harnessly/terminal.read') return t('next.appview.elevate.terminalRead');
+  if (method === 'harnessly/browser.read') return t('next.appview.elevate.browserRead');
+  if (method === 'harnessly/browser.drive') return t('next.appview.elevate.browserDrive');
+  if (method === 'harnessly/ai.complete') return t('next.appview.elevate.ai');
+  if (method === 'harnessly/agents.run') return t('next.appview.elevate.agentsRun');
+  if (method === 'harnessly/secrets.put') return t('next.appview.elevate.secretsPut');
+  return t('next.appview.elevate.other');
+};
 export const APP_FRAME_SANDBOX = 'allow-scripts allow-forms allow-popups';
 /**
  * A view the app's own server hosts runs on that server's origin (its own sign-in and storage work), which is never the
@@ -159,6 +188,8 @@ const AppFrame = ({
   const [opened, setOpened] = useState<IOpened | null>(null);
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
   const [reload, setReload] = useState(0);
+  // The address the frame finished loading: until it is the one shown, the frame shows the loader (.hx-appview[data-loading]).
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const bridge = useRef<AppBridge | null>(null);
   // This frame among the views of the chat that offer page tools.
   const frameId = useId();
@@ -300,8 +331,10 @@ const AppFrame = ({
             chat,
             frameId,
             app.id,
-            (id, name, args) =>
-              bridge.current?.notify('harnessly/notifications/tool-call', { id, name, arguments: args }),
+            (id, name, args) => {
+              bridge.current?.agentCall(id);
+              bridge.current?.notify('harnessly/notifications/tool-call', { id, name, arguments: args });
+            },
             (tool, shown) =>
               askConfirm(
                 app.name,
@@ -311,13 +344,23 @@ const AppFrame = ({
                   args: shown,
                 }),
               ),
+            (id, call) => {
+              // The view decides in the agent's turn: its loud calls meanwhile are asked about, as a tool's are.
+              bridge.current?.agentCall(id);
+              bridge.current?.notify('harnessly/notifications/hook', {
+                id,
+                ...(typeof call === 'object' && call !== null ? call : {}),
+              });
+            },
           );
+    let offFiles: (() => void) | null = null;
     const noChat = () => {
       throw new BridgeError('host_unavailable', 'page tools work in a chat the app is on in');
     };
     const host: IBridgeHandlers = {
       pageTools: (tools) => (offer ? offer.tools(tools) : noChat()),
       pageToolResult: (id, answer) => offer?.result(id, answer),
+      hooks: (on) => (offer ? offer.hooks(on) : noChat()),
       publish: (data) => (offer ? offer.publish(data) : noChat()),
       // The runtime reads the app, the target and the chat from the session; none of them is sent again.
       tool: (name, args) => {
@@ -343,6 +386,61 @@ const AppFrame = ({
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
         return callFiles(machine, session, op, path, text);
       },
+      filesMore: async (op, params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        const out = await callFilesMore(machine, session, op, params);
+        // The names of the changed files come by the machine's stream, to this view's session only.
+        if (op === 'watch' && offFiles === null)
+          offFiles = subscribeFileChanges(machine, session, (paths) => bridge.current?.filesChanged(paths));
+        if (op === 'unwatch') {
+          offFiles?.();
+          offFiles = null;
+        }
+        return out;
+      },
+      git: (op, params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callGit(machine, session, op, params);
+      },
+      run: (op, params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callRun(machine, session, op, params);
+      },
+      terminal: (params, events) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return openAppTerminal(machine, session, params, events);
+      },
+      browser: (params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callBrowser(machine, session, params);
+      },
+      ai: (params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callAI(machine, session, params);
+      },
+      secretsPut: (params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callSecretsPut(machine, session, params);
+      },
+      agentsRun: (params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callAgentsRun(machine, session, params);
+      },
+      terminalRead: (params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callTerminalRead(machine, session, params);
+      },
+      previewOpen: async (port, path) => {
+        if (!openAddressTab(`localhost:${port}${path === '/' ? '' : path}`))
+          throw new BridgeError('host_unavailable', 'the right pane is not on this page');
+      },
+      elevate: (method, detail) =>
+        askConfirm(app.name, t('next.appview.agentElevate', { action: elevationAction(method), detail })),
+      pick: (accept) => {
+        if (chat === null)
+          throw new BridgeError('host_unavailable', 'a file is picked in a chat the app is on in');
+        return askFile(app.name, machine, chat, accept);
+      },
       chatSend: async (text) => {
         sendMessage(machine, { conversationId: chatOf(conversation, on), text: fromApp(app.name, text) });
       },
@@ -365,7 +463,10 @@ const AppFrame = ({
         latest.current.onSinopiaCall?.(method, params);
         return result;
       },
-      toast: (text) => void toast(app.name, { description: text }),
+      // A frame's toast is signed with the app's name: its words are the second line, never the host's own title.
+      toast: (text, { tone, description }) =>
+        void toast(app.name, { tone, description: description ? `${text} — ${description}` : text }),
+      ...hostKeys(() => document.activeElement === frame),
       resize: (h) => setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, h))),
       ...work,
       // The host's own come last: the chat binding may read the chat or run a flow where a default has no way to.
@@ -391,6 +492,8 @@ const AppFrame = ({
       },
     });
     bridge.current = b;
+    // The chat's events reach the view only for the kinds it subscribed to and holds events:<kind> for.
+    const offChat = chat === null ? null : watchChatEvents(chat, (kind, params) => b.event(kind, params));
     const onMessage = (event: MessageEvent) => void b.onMessage(event);
     window.addEventListener('message', onMessage);
     // A view that never connects shows nothing of why: the debug section says so.
@@ -408,6 +511,11 @@ const AppFrame = ({
     return () => {
       window.clearTimeout(watchdog);
       window.removeEventListener('message', onMessage);
+      offChat?.();
+      if (offFiles !== null && session !== null) {
+        offFiles();
+        void callFilesMore(machine, session, 'unwatch', {}).catch(() => undefined);
+      }
       b.dispose();
       bridge.current = null;
       offer?.drop();
@@ -495,8 +603,11 @@ const AppFrame = ({
   }, [context]);
 
   if (shown?.error) return <p className="hx-appview__error">{shown.error}</p>;
+  const loading = shown?.src == null || loadedSrc !== shown.src;
   return (
     <iframe
+      onLoad={() => setLoadedSrc(shown?.src ?? null)}
+      data-loading={loading || undefined}
       ref={setFrame}
       className="hx-appview"
       title={view.title ?? app.name}

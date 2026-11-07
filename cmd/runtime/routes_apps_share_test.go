@@ -131,6 +131,7 @@ func TestChannelsOverTheCLI(t *testing.T) {
 	if code, out := post("/api/cli/apps/follow", `{"id":"acme.demo","channel":"stable"}`); code != 200 {
 		t.Fatalf("follow: %d %v", code, out)
 	}
+	agreeAll(t, r.reg)
 	if code, out := post("/api/cli/apps/publish", `{"dir":"`+v2+`","channel":"stable"}`); code != 200 || out["version"] != "1.1.0" {
 		t.Fatalf("publish stable: %d %v", code, out)
 	}

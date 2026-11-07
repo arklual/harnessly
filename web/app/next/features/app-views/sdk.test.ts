@@ -23,9 +23,23 @@ interface IHl {
   storage: { install: { get: (k: string) => Promise<unknown> } };
   chat: { send: (t: string) => Promise<void>; read: (o: { last: number }) => Promise<unknown> };
   on: (event: string, fn: (v: unknown) => void) => void;
+  protocol: number;
+  has: (name: string) => boolean;
+  refused: (v: unknown) => boolean;
+  ui: { toast: (t: string, o?: { tone?: string }) => Promise<void> };
+  keys: {
+    on: (
+      scope: string,
+      h: Record<string, (chord: string) => void>,
+    ) => (() => Promise<void>) & { ready: Promise<void> };
+  };
 }
 
-const view = async (permissions: string[], handlers: IBridgeHandlers) => {
+const view = async (
+  permissions: string[],
+  handlers: IBridgeHandlers,
+  options: { protocol?: number } = {},
+) => {
   const r = new FrameRig();
   r.bridge = new AppBridge({
     frame: () => r.proxy,
@@ -37,8 +51,9 @@ const view = async (permissions: string[], handlers: IBridgeHandlers) => {
     nonce: NONCE,
   });
   const dom = r.load('<html><head></head><body></body></html>', NONCE, [classicSdk()]);
-  const harnessly = (dom.window as unknown as { harnessly: { connect: () => Promise<IHl> } }).harnessly;
-  const hl = await harnessly.connect();
+  const harnessly = (dom.window as unknown as { harnessly: { connect: (o?: object) => Promise<IHl> } })
+    .harnessly;
+  const hl = await harnessly.connect(options);
   return { r, dom, hl };
 };
 
@@ -61,6 +76,46 @@ describe('@harnessly/app-sdk against the bridge, through the shim', () => {
     const { hl } = await view([], { chatRead: async () => [] });
     const failure = await hl.chat.read({ last: 3 }).catch((e: unknown) => e);
     expect(failure).toMatchObject({ name: 'HarnesslyError', code: 'permission_denied' });
+  });
+
+  it('says what this host does for the app with has, and keeps protocol 1 for a view that names none', async () => {
+    const { hl } = await view(['storage'], {});
+    expect(hl.protocol).toBe(1);
+    expect(hl.has('storage.user.get')).toBe(true);
+    expect(hl.has('harnessly/storage.set')).toBe(true);
+    expect(hl.has('chat.send')).toBe(false);
+    expect(hl.has('files.watch')).toBe(false);
+    expect(hl.has('ui.toast')).toBe(true);
+  });
+
+  it('answers a refusal as a value under protocol 2, without an exception', async () => {
+    const { hl } = await view([], { chatRead: async () => [] }, { protocol: 2 });
+    expect(hl.protocol).toBe(2);
+    const answer = await hl.chat.read({ last: 3 });
+    expect(answer).toMatchObject({ error: 'denied', code: 'permission_denied' });
+    expect(hl.refused(answer)).toBe(true);
+    expect(hl.refused([])).toBe(false);
+  });
+
+  it('runs the host’s shortcut commands of a screen and toasts with a tone (HRN-808)', async () => {
+    let handlers: (() => Record<string, ((chord: string) => void | false) | undefined>) | null = null;
+    const toast = vi.fn();
+    const { hl } = await view([], {
+      toast,
+      keys: (_scope, h) => {
+        handlers = h;
+        return () => undefined;
+      },
+    });
+    expect(hl.has('keys.on')).toBe(true);
+    await hl.ui.toast('Готово', { tone: 'success' });
+    expect(toast).toHaveBeenCalledWith('Готово', { tone: 'success' });
+    const heard: string[] = [];
+    const stop = hl.keys.on('deck', { 'deck.next': (chord: string) => heard.push(chord) });
+    await stop.ready;
+    handlers!()['deck.next']?.('ArrowRight');
+    await vi.waitFor(() => expect(heard).toEqual(['ArrowRight']));
+    await stop();
   });
 
   it('is told of a changed context', async () => {

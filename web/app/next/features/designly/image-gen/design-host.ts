@@ -4,7 +4,7 @@
 // remembers (data-gen-job, data-gen-from in the board's source) is what makes the versions outlive a reload.
 import { RuntimeError } from '@/next/core/net/runtime-json';
 import { t } from '@/next/i18n';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import type { MachineId } from '@/next/protocol/v2';
 import {
   EDIT_MODE,

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Запуск</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="rn">
+  <header class="rn__head">
+    <h1 class="rn__title">Запуск</h1>
+    <p class="rn__sub" id="sub" role="status"></p>
+  </header>
+  <section class="rn__block" aria-labelledby="tests-title">
+    <h2 class="rn__h" id="tests-title">Тесты</h2>
+    <div class="rn__row">
+      <input class="rn__input" id="test-cmd" aria-label="Команда тестов" spellcheck="false">
+      <button class="rn__btn" id="test-run" type="button">Запустить</button>
+    </div>
+    <p class="rn__result" id="test-result" role="status"></p>
+    <pre class="rn__out" id="test-out" hidden></pre>
+  </section>
+  <section class="rn__block" aria-labelledby="dev-title">
+    <h2 class="rn__h" id="dev-title">Dev-сервер</h2>
+    <div class="rn__row">
+      <input class="rn__input" id="dev-cmd" aria-label="Команда dev-сервера" spellcheck="false">
+      <input class="rn__input rn__input--port" id="dev-port" aria-label="Порт" inputmode="numeric">
+    </div>
+    <div class="rn__row">
+      <button class="rn__btn" id="dev-start" type="button">Запустить</button>
+      <button class="rn__btn rn__btn--quiet" id="dev-stop" type="button" hidden>Остановить</button>
+      <button class="rn__btn rn__btn--quiet" id="dev-open" type="button" hidden>Открыть в панели</button>
+    </div>
+    <p class="rn__result" id="dev-result" role="status"></p>
+    <pre class="rn__out" id="dev-out" hidden></pre>
+  </section>
+</main>
+<!-- Classic scripts only: the view runs in an opaque-origin frame (see docs/apps/cashback). -->
+<script src="/__hl/app-sdk.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

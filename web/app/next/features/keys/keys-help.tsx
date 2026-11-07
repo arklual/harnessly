@@ -4,7 +4,7 @@ import Modal from '@/next/features/shell/modal';
 import { chordLabel, isMac } from '@/next/features/keys/chord';
 import { KEY_COMMANDS, KEY_SCOPE, type TKeyScope } from '@/next/features/keys/commands';
 import { keysOf, type TKeyOverrides } from '@/next/features/keys/keymap';
-import { useKeyOverrides } from '@/next/features/keys/use-keys';
+import { keyOverrides, useKeyOverrides } from '@/next/features/keys/use-keys';
 import { t } from '@/next/i18n';
 import '@/next/styles/keys.css';
 
@@ -14,10 +14,13 @@ export const KeyCaps = ({ chord }: { chord: string }) => (
 );
 
 /** An action's first shortcut as this keyboard writes it, for a hint beside its button; null when it has none. */
-export const useKeyHint = (id: string): string | null => {
-  const chord = keysOf(id, useKeyOverrides())[0];
+/** The first key of an action as the host writes it, with the person's own keys; null when it has none. */
+export const keyHintOf = (id: string, overrides: TKeyOverrides = keyOverrides()): string | null => {
+  const chord = keysOf(id, overrides)[0];
   return chord === undefined ? null : chordLabel(chord, t('next.keys.space'), isMac());
 };
+
+export const useKeyHint = (id: string): string | null => keyHintOf(id, useKeyOverrides());
 
 /** The screens whose actions the sheet lists: the open ones, the latest first, then the global ones. */
 export const helpScopes = (open: readonly TKeyScope[]): readonly TKeyScope[] => {

@@ -14,6 +14,9 @@ import type {
 import {
   BridgeError,
   isBridgeCode,
+  type TFilesOp,
+  type TGitOp,
+  type TRunOp,
   type TStorageScope,
   type TTarget,
 } from '@/next/features/app-views/bridge';
@@ -52,6 +55,15 @@ export interface IAppCommand {
   kind: 'prompt';
 }
 
+/** A chat.buttons entry: `command` (one of chat.commands, with its slash) or `view` (a view with the pane target). */
+export interface IAppChatButton {
+  id: string;
+  title: string;
+  icon?: string;
+  command?: string;
+  view?: string;
+}
+
 export interface IInstalledApp {
   id: string;
   name: string;
@@ -70,6 +82,14 @@ export interface IInstalledApp {
   command?: string;
   /** The app's chat.commands, for the «/» palette of a chat it is on in. */
   commands?: IAppCommand[];
+  /** Lines an empty chat it is on in offers under the field (chat.starters). */
+  starters?: { text: string }[];
+  /** Buttons at the field of a chat it is on in (chat.buttons): a command of the app or a view in the pane. */
+  buttons?: IAppChatButton[];
+  /** Addresses it shows a card for under a message (chat.links): https://<host>/<path>, `*.` and a trailing `*`. */
+  links?: { match: string; card: string }[];
+  /** What «@» in the field finds in the app (chat.mentions): its tool answers what is typed. */
+  mentions?: { title: string; tool: string };
   /** On in every new Claude chat of the machine (`activation.on: ["always"]`, an app the person installed). */
   always?: boolean;
   /** What the app puts into the document editor; absent for an app that puts nothing. */
@@ -92,7 +112,78 @@ export interface IInstalledApp {
   detail?: string;
   /** The branding slot: the name, accent and support address the app brings. */
   branding?: IBranding;
+  /** Everything the app reaches, from the most dangerous, in words; absent from an older machine. */
+  access?: IAccess[];
+  /** The install waits for the person to agree to all of `access`. */
+  consent?: boolean;
+  /** A newer version that reaches more waits for the person's word; its `access` is only what it adds. */
+  pending?: { version: string; access: IAccess[] };
+  /** The person turned the app off with its switch. */
+  off?: boolean;
+  /** Where it was installed from: a folder, an address, a catalog. */
+  source?: string;
 }
+
+/** The classes of risk, from the most dangerous (internal/apps surface.go). */
+export const ACCESS_CLASS = {
+  critical: 'critical',
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+export type TAccessClass = (typeof ACCESS_CLASS)[keyof typeof ACCESS_CLASS];
+
+/** A line in both languages of the page. */
+export interface IText {
+  ru: string;
+  en: string;
+}
+
+/** One thing an app reaches (internal/apps access.go): a right, a secret, a host, a server, a part of a plugin. */
+export interface IAccess {
+  key: string;
+  /** How the manifest writes it; shown small, on hover. */
+  code: string;
+  class: TAccessClass;
+  label: IText;
+  /** What a high or critical one can do to the person. */
+  threat?: IText;
+}
+
+/** One line of the app's journal (internal/apps journal.go): what it did of a high or critical class, never a value. */
+export interface IJournalEntry {
+  at: number;
+  what: string;
+  class: TAccessClass;
+  detail?: string;
+  chat?: string;
+  ok: boolean;
+}
+
+/** «Установить» / «Обновить» on the install screen, for the version it showed. */
+/** «Установить» on the install screen: access are the keys the screen showed, and only those are granted. */
+export const consentApp = (
+  m: MachineId,
+  id: string,
+  version: string,
+  access: readonly string[],
+): Promise<unknown> => runtimeJson(m, platformPath('/apps/consent'), postJson({ id, version, access }));
+
+/** «Отмена»: a waiting update is dropped (the running version stays); a first install that waited is removed. */
+export const declineApp = (m: MachineId, id: string): Promise<{ removed: boolean }> =>
+  runtimeJson<{ removed: boolean }>(m, platformPath('/apps/decline'), postJson({ id }));
+
+/** The switch of an app: off, it starts nowhere and its views' calls are refused at once. */
+export const switchApp = (m: MachineId, id: string, on: boolean): Promise<unknown> =>
+  runtimeJson(m, platformPath('/apps/switch'), postJson({ id, on }));
+
+export const loadAppJournal = async (m: MachineId, id: string): Promise<IJournalEntry[]> => {
+  const r = await runtimeJson<{ journal: IJournalEntry[] }>(
+    m,
+    platformPath(`/apps/journal?id=${encodeURIComponent(id)}`),
+  );
+  return r.journal;
+};
 
 export const APP_STATE = {
   ready: 'ready',
@@ -108,6 +199,7 @@ export const APP_REASON = {
   host: 'host',
   package: 'package',
   safe: 'safe',
+  consent: 'consent',
 } as const;
 export type TAppReason = (typeof APP_REASON)[keyof typeof APP_REASON];
 
@@ -158,17 +250,16 @@ export interface IViewSession {
 }
 
 /** Starts the session of a view the page mounts; the runtime refuses a view that is not the app's for the target. */
-export const createViewSession = async (
-  m: MachineId,
-  view: {
-    app: string;
-    view: string;
-    target: TTarget;
-    conversation: string | null;
-    /** The Sinopia document a view of target `sinopia.<kind>` is shown in. */
-    document?: string;
-  },
-): Promise<IViewSession> => {
+interface IViewAsk {
+  app: string;
+  view: string;
+  target: TTarget;
+  conversation: string | null;
+  /** The Sinopia document a view of target `sinopia.<kind>` is shown in. */
+  document?: string;
+}
+
+const askSession = async (m: MachineId, view: IViewAsk): Promise<IViewSession> => {
   try {
     return await runtimeJson<IViewSession>(
       m,
@@ -178,6 +269,32 @@ export const createViewSession = async (
   } catch (e) {
     throw asBridgeError(e);
   }
+};
+
+// A session asked for before the click (the pointer is on the app in the sidebar): the window that mounts next takes
+// it instead of asking again, and saves a round trip to the machine. One mount takes it once; an old one is dropped.
+const READY_MS = 20_000;
+const ready = new Map<string, { at: number; made: Promise<IViewSession> }>();
+const readyKey = (m: MachineId, v: IViewAsk) =>
+  [m, v.app, v.view, v.target, v.conversation ?? '', v.document ?? ''].join('|');
+
+export const prepareViewSession = (m: MachineId, view: IViewAsk): void => {
+  const key = readyKey(m, view);
+  const held = ready.get(key);
+  if (held && Date.now() - held.at < READY_MS) return;
+  const made = askSession(m, view);
+  ready.set(key, { at: Date.now(), made });
+  made.catch(() => {
+    if (ready.get(key)?.made === made) ready.delete(key);
+  });
+};
+
+export const createViewSession = (m: MachineId, view: IViewAsk): Promise<IViewSession> => {
+  const key = readyKey(m, view);
+  const held = ready.get(key);
+  ready.delete(key);
+  if (held && Date.now() - held.at < READY_MS) return held.made.catch(() => askSession(m, view));
+  return askSession(m, view);
 };
 
 /** Keeps a mounted view's session alive while nobody uses it; the runtime refuses a session that is gone. */
@@ -303,6 +420,121 @@ export const callFiles = async (
       postJson({ session, op, path, text }),
     );
     return r.text;
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** The workspace beyond one file: the runtime judges each against the app's masks. */
+export const callFilesMore = async (
+  m: MachineId,
+  session: string,
+  op: TFilesOp,
+  params: Record<string, unknown>,
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/files'), postJson({ ...params, session, op }));
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** The repository of the chat's folder, read only (git.read). */
+export const callGit = async (
+  m: MachineId,
+  session: string,
+  op: TGitOp,
+  params: Record<string, unknown>,
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/git'), postJson({ ...params, session, op }));
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** A command or a process of the app in the chat's folder; the runtime runs it inside the agent's wall. */
+/** The person turns an app's hook off (or on) on the machine: from the feed's line of its stop. */
+export const setHookOff = (m: MachineId, id: string, off: boolean): Promise<unknown> =>
+  runtimeJson(m, platformPath('/apps/hooks-off'), postJson({ id, off }));
+
+/** The agent's browser of the chat through an app (browser.read, browser.drive). */
+export const callBrowser = async (
+  m: MachineId,
+  session: string,
+  params: { right: string; tool: string; args: Record<string, unknown>; confirmed?: boolean },
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/browser'), postJson({ ...params, session }));
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** One answer of a model within the app's budget of the day (ai). */
+export const callAI = async (
+  m: MachineId,
+  session: string,
+  params: { prompt: string; system: string; maxTokens: number; model: string; confirmed?: boolean },
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/ai'), postJson({ ...params, session }));
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** A value into the safe, never read back (secrets.write): {created}. */
+export const callSecretsPut = async (
+  m: MachineId,
+  session: string,
+  params: { name: string; value: string; shared: boolean; confirmed?: boolean },
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/secrets'), postJson({ ...params, session }));
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** A task in a new chat under the app's chat, within the app's budget of the day (agents.run). */
+export const callAgentsRun = async (
+  m: MachineId,
+  session: string,
+  params: { prompt: string; title: string; confirmed?: boolean },
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/agents/run'), postJson({ ...params, session }));
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** What the chat's terminals show (terminal.read). */
+export const callTerminalRead = async (
+  m: MachineId,
+  session: string,
+  params: { terminal: string; lines: number },
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(
+      m,
+      platformPath('/apps/terminal/read'),
+      postJson({ ...params, session }),
+    );
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+export const callRun = async (
+  m: MachineId,
+  session: string,
+  op: TRunOp,
+  params: Record<string, unknown>,
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/run'), postJson({ ...params, session, op }));
   } catch (e) {
     throw asBridgeError(e);
   }
@@ -473,3 +705,30 @@ export const setAppConnection = (m: MachineId, id: string, name: string, on: boo
 
 export const removeAppSecret = (m: MachineId, id: string, name: string): Promise<IAppSetup> =>
   runtimeJson<IAppSetup>(m, platformPath('/apps/setup/secret'), postJson({ id, name, remove: true }));
+
+/** One find of an app for «@»: what the palette shows and what goes into the field. */
+export interface IAppMention {
+  label: string;
+  detail?: string;
+  insert: string;
+}
+
+export interface IAppMentionGroup {
+  app: string;
+  title: string;
+  items: IAppMention[];
+}
+
+/** What the apps on in the chat find for the words after «@»; an app that is slow or fails is simply not there. */
+export const findAppMentions = async (
+  m: MachineId,
+  conversation: string,
+  query: string,
+  signal: AbortSignal,
+): Promise<IAppMentionGroup[]> =>
+  (
+    await runtimeJson<{ groups: IAppMentionGroup[] }>(m, platformPath('/apps/mentions'), {
+      ...postJson({ conversation, query }),
+      signal,
+    })
+  ).groups;

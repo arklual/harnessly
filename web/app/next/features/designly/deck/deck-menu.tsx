@@ -4,7 +4,7 @@
 // build (no Chrome, no ffmpeg, nothing recorded yet) is shown disabled with the reason in place of its hint.
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { PRESENCE, type TPresenceState } from '@/next/ui/presence';
 import { deckExportHref, startDeckExport } from '@/next/features/designly/deck/api';
 import { downloadDeckFile, followDeckExport } from '@/next/features/designly/deck/exports';

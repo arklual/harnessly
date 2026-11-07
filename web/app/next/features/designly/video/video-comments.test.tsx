@@ -20,6 +20,7 @@ vi.mock('@/next/stores/video', () => ({
 }));
 vi.mock('@/next/features/designly/deck/guest-comments', () => ({ useGuestComments: () => null }));
 vi.mock('@/next/ui/toast', () => ({ toast: vi.fn() }));
+vi.mock('@/next/features/designly/sdk/toast', () => ({ toast: vi.fn() }));
 
 const { default: VideoComments } = await import('@/next/features/designly/video/video-comments');
 

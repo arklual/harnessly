@@ -54,7 +54,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@kit': fileURLToPath(new URL('./kit', import.meta.url)),
-      '@viz': fileURLToPath(new URL('./viz', import.meta.url)),
     },
   },
   build: {

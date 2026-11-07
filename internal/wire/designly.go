@@ -34,9 +34,9 @@ var DesignKinds = []DesignKind{DesignSite, DesignSlides, DesignDS, DesignVideo}
 // The bounds of what a person writes for a new project.
 const (
 	DesignTitleMax  = 200
-	DesignBriefMax  = 4000
+	DesignBriefMax  = 20000
 	DesignSystemMax = 200
-	DesignlyBodyMax = 64 << 10
+	DesignlyBodyMax = 256 << 10
 	DesignBoardsMax = 200
 )
 
@@ -180,9 +180,8 @@ func (c DesignlyCreate) Validate() error {
 	if utf8.RuneCountInString(c.Title) > DesignTitleMax {
 		errs = append(errs, errors.New("title: too long"))
 	}
-	if utf8.RuneCountInString(c.Brief) > DesignBriefMax {
-		errs = append(errs, errors.New("brief: too long"))
-	}
+	// The brief's length is not checked here: the library refuses a long one in the person's words (design.CleanBrief),
+	// where this check would answer them "brief: too long".
 	if c.DesignSystem != nil && utf8.RuneCountInString(*c.DesignSystem) > DesignSystemMax {
 		errs = append(errs, errors.New("designSystem: too long"))
 	}

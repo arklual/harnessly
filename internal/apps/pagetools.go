@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -62,6 +63,8 @@ type PageReport struct {
 	App     string          `json:"app"`
 	Tools   []PageTool      `json:"tools"`
 	Context json.RawMessage `json:"context,omitempty"`
+	// Hooks: a view of the app hears the agent's tool calls before they run (hooks.agent).
+	Hooks bool `json:"hooks,omitempty"`
 }
 
 // PageCall is a call the page takes to the view.
@@ -70,6 +73,8 @@ type PageCall struct {
 	App       string          `json:"app"`
 	Tool      string          `json:"tool"`
 	Arguments json.RawMessage `json:"arguments"`
+	// Hook: not a tool of the view but the agent's tool call, for the view's hook to stop or let through.
+	Hook bool `json:"hook,omitempty"`
 }
 
 // PageAnswer is the view's answer: a result, or an error in words.
@@ -95,13 +100,19 @@ type PageTools struct {
 	mu    sync.Mutex
 	chats map[string]map[string]pageEntry
 	calls map[string]*openPageCall
+	// answered is when the last call of an app's view in a chat was answered, by chat and app.
+	answered map[string]time.Time
 	// Now and CallTTL are for tests.
 	Now     func() time.Time
 	CallTTL time.Duration
 }
 
+// AgentAfter is how long after a view answers the agent's call of its tool the view's loud calls still count as the
+// agent's: the page asks the person about them, and the runtime runs them only with the person's yes.
+const AgentAfter = 30 * time.Second
+
 func NewPageTools() *PageTools {
-	return &PageTools{chats: map[string]map[string]pageEntry{}, calls: map[string]*openPageCall{}}
+	return &PageTools{chats: map[string]map[string]pageEntry{}, calls: map[string]*openPageCall{}, answered: map[string]time.Time{}}
 }
 
 func (p *PageTools) now() time.Time {
@@ -168,6 +179,16 @@ func (p *PageTools) Offered(conv string) []PageReport {
 	return out
 }
 
+// Hooked says whether a view of the app in the chat hears the agent's tool calls now.
+func (p *PageTools) Hooked(conv, app string) bool {
+	for _, r := range p.Offered(conv) {
+		if r.App == app && r.Hooks {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *PageTools) offers(conv, app, tool string) bool {
 	for _, r := range p.Offered(conv) {
 		if r.App != app {
@@ -184,18 +205,38 @@ func (p *PageTools) offers(conv, app, tool string) bool {
 
 // Call puts a call to a view's tool and waits for its answer, the context's end or PageCallTTL.
 func (p *PageTools) Call(ctx context.Context, conv, app, tool string, args json.RawMessage) (PageAnswer, error) {
+	if !p.offers(conv, app, tool) {
+		return PageAnswer{}, ErrPageToolGone
+	}
+	ttl := p.CallTTL
+	if ttl == 0 {
+		ttl = PageCallTTL
+	}
+	return p.put(ctx, PageCall{App: app, Tool: tool, Arguments: args}, conv, ttl)
+}
+
+// Hook hands the agent's tool call to the view of the app that hears them and waits for its word, at most ttl. The
+// view acts in the agent's turn while it decides, so its loud calls count as the agent's, as a tool call's do.
+func (p *PageTools) Hook(ctx context.Context, conv, app string, call json.RawMessage, ttl time.Duration) (PageAnswer, error) {
+	if !p.Hooked(conv, app) {
+		return PageAnswer{}, ErrPageToolGone
+	}
+	return p.put(ctx, PageCall{App: app, Arguments: call, Hook: true}, conv, ttl)
+}
+
+// put puts a call for the chat's page and waits for its answer, the context's end or ttl.
+func (p *PageTools) put(ctx context.Context, pc PageCall, conv string, ttl time.Duration) (PageAnswer, error) {
+	app, args := pc.App, pc.Arguments
 	if len(args) == 0 {
 		args = json.RawMessage("{}")
 	}
 	if len(args) > MaxPageToolArgs || !json.Valid(args) {
 		return PageAnswer{}, ErrPageToolArgs
 	}
-	if !p.offers(conv, app, tool) {
-		return PageAnswer{}, ErrPageToolGone
-	}
 	raw := make([]byte, 12)
 	_, _ = rand.Read(raw)
-	c := &openPageCall{PageCall: PageCall{ID: hex.EncodeToString(raw), App: app, Tool: tool, Arguments: args}, conv: conv, result: make(chan PageAnswer, 1)}
+	pc.ID, pc.Arguments = hex.EncodeToString(raw), args
+	c := &openPageCall{PageCall: pc, conv: conv, result: make(chan PageAnswer, 1)}
 	p.mu.Lock()
 	n := 0
 	for _, o := range p.calls {
@@ -212,12 +253,10 @@ func (p *PageTools) Call(ctx context.Context, conv, app, tool string, args json.
 	defer func() {
 		p.mu.Lock()
 		delete(p.calls, c.ID)
+		// However the call ends (an answer, a timeout, the agent gone), the view may still act on it a while.
+		p.answered[conv+"\x00"+app] = p.now()
 		p.mu.Unlock()
 	}()
-	ttl := p.CallTTL
-	if ttl == 0 {
-		ttl = PageCallTTL
-	}
 	timer := time.NewTimer(ttl)
 	defer timer.Stop()
 	select {
@@ -228,6 +267,24 @@ func (p *PageTools) Call(ctx context.Context, conv, app, tool string, args json.
 	case <-timer.C:
 		return PageAnswer{}, ErrPageCallTimeout
 	}
+}
+
+// Driving says whether the agent of a chat is using an app's view: a call of the view's tool waits, or was answered
+// less than AgentAfter ago.
+func (p *PageTools) Driving(conv, app string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, c := range p.calls {
+		if c.conv == conv && c.App == app {
+			return true
+		}
+	}
+	at, ok := p.answered[conv+"\x00"+app]
+	if ok && p.now().Sub(at) >= AgentAfter {
+		delete(p.answered, conv+"\x00"+app)
+		return false
+	}
+	return ok
 }
 
 // Take hands the page the calls of a chat nobody took yet; each goes out once.
@@ -263,6 +320,23 @@ func (p *PageTools) Answer(conv, id string, a PageAnswer) error {
 	return nil
 }
 
+// PageApp is the manifest of an app whose page may offer tools and context in a chat: a builtin app's (Sinopia runs in
+// the host's page wherever a document is open, and is on in no chat's list), or an installed app on in the chat. nil
+// for any other.
+func PageApp(id string, enabled []string, reg *Registry) *Manifest {
+	if m := builtinOf(id); m != nil {
+		return m
+	}
+	if reg == nil || !slices.Contains(enabled, id) {
+		return nil
+	}
+	in, err := reg.Get(id)
+	if err != nil {
+		return nil
+	}
+	return in.Manifest
+}
+
 // PageReportAllowed keeps of a report what the app may offer: tools need tools.page, the context context.publish.
 func PageReportAllowed(m *Manifest, r PageReport) PageReport {
 	if !m.Allows("tools.page") {
@@ -270,6 +344,9 @@ func PageReportAllowed(m *Manifest, r PageReport) PageReport {
 	}
 	if !m.Allows("context.publish") {
 		r.Context = nil
+	}
+	if !m.Allows("hooks.agent") {
+		r.Hooks = false
 	}
 	return r
 }

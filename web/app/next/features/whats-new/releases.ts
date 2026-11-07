@@ -13,6 +13,99 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-07zz',
+    items: [{ key: 'appMentions', icon: 'layout-grid' }],
+  },
+  {
+    id: '2026-11-07za',
+    items: [
+      { key: 'machinePick', icon: 'server' },
+      { key: 'machineStatus', icon: 'activity' },
+    ],
+  },
+  {
+    id: '2026-11-07z',
+    items: [
+      { key: 'designFolders', icon: 'folders' },
+      { key: 'designExamples', icon: 'folder-open' },
+    ],
+  },
+  {
+    id: '2026-11-07w',
+    items: [
+      { key: 'appSecrets', icon: 'key-round' },
+      { key: 'appSecretsShared', icon: 'lock' },
+    ],
+  },
+  {
+    id: '2026-11-07v',
+    items: [
+      { key: 'appAI', icon: 'sparkles' },
+      { key: 'appAgentsRun', icon: 'messages-square' },
+      { key: 'appBudget', icon: 'gauge' },
+    ],
+  },
+  {
+    id: '2026-11-07u',
+    items: [
+      { key: 'appTerminal', icon: 'square-terminal' },
+      { key: 'appBrowser', icon: 'globe' },
+      { key: 'appHooks', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-07t',
+    items: [
+      { key: 'sinopiaSees', icon: 'eye' },
+      { key: 'sinopiaHands', icon: 'presentation' },
+      { key: 'appKeys', icon: 'keyboard' },
+    ],
+  },
+  {
+    id: '2026-11-07s',
+    items: [
+      { key: 'appRun', icon: 'terminal' },
+      { key: 'appDevServer', icon: 'monitor' },
+      { key: 'appAgentAsks', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-07r',
+    items: [
+      { key: 'appButtons', icon: 'layout-grid' },
+      { key: 'appSearch', icon: 'search' },
+      { key: 'appLinks', icon: 'link' },
+    ],
+  },
+  {
+    id: '2026-11-07q',
+    items: [{ key: 'appFast', icon: 'layout-grid' }],
+  },
+  {
+    id: '2026-11-07n',
+    items: [
+      { key: 'libFolders', icon: 'folder' },
+      { key: 'libFilters', icon: 'list-filter' },
+      { key: 'libTrash', icon: 'trash-2' },
+    ],
+  },
+  {
+    id: '2026-11-07m',
+    items: [
+      { key: 'appFiles', icon: 'folder' },
+      { key: 'appGit', icon: 'git-branch' },
+      { key: 'appEvents', icon: 'bell' },
+    ],
+  },
+  {
+    id: '2026-11-07l',
+    items: [
+      { key: 'appConsent', icon: 'shield-check' },
+      { key: 'appSwitch', icon: 'shield-off' },
+      { key: 'appCompat', icon: 'refresh-cw' },
+    ],
+  },
+  {
     id: '2026-11-07k',
     items: [{ key: 'sinopiaChatLeft', icon: 'panel-left' }],
   },

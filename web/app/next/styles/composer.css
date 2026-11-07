@@ -216,6 +216,37 @@
   margin-top: auto;
 }
 
+/* The lines an empty chat offers from its apps (chat.starters): quiet chips over the field, one line that scrolls. */
+.hx-starters {
+  display: flex;
+  gap: var(--hx-space-2);
+  margin-bottom: var(--hx-space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hx-starters__item {
+  flex: none;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm) var(--hx-ease-out),
+    color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-starters__item:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+
 /* «+»: a menu over the field; on a phone a sheet with tiles. */
 .hx-plus-btn__ic {
   transition: transform 200ms var(--hx-ease-out);

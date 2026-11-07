@@ -1,0 +1,359 @@
+{
+  "id": "harnessly.sinopia",
+  "name": "Sinopia",
+  "description": "The editor of designs, slides, videos and sites. Built into the host: its page runs in the host's own page and talks to the host through the SDK in the same process.",
+  "version": "1.0.0",
+  "harnessly": ">=0.16.0",
+  "trust": "trusted",
+  "delivery": "builtin",
+  "targets": [
+    "app"
+  ],
+  "permissions": [
+    "chat.prompt",
+    "tools.page",
+    "context.publish"
+  ],
+  "aliases": [
+    {
+      "name": "sinopia.<kind>",
+      "doc": "The editor of one Sinopia document type: panels, selection items, checks, bindings."
+    },
+    {
+      "name": "sinopia.*",
+      "doc": "The editor of every Sinopia document type."
+    }
+  ],
+  "points": [
+    {
+      "name": "sinopia.kind",
+      "field": "sinopia.kinds[]",
+      "doc": "A Sinopia document type of the app's own."
+    },
+    {
+      "name": "sinopia.panel",
+      "field": "sinopia.panels[]",
+      "doc": "A view to the right of the editor."
+    },
+    {
+      "name": "sinopia.selection",
+      "field": "sinopia.selection[]",
+      "doc": "An item of the selection menu."
+    },
+    {
+      "name": "sinopia.check",
+      "field": "sinopia.checks[]",
+      "doc": "A check of the document."
+    },
+    {
+      "name": "sinopia.export",
+      "field": "sinopia.export[]",
+      "doc": "An export entry of the document."
+    },
+    {
+      "name": "sinopia.import",
+      "field": "sinopia.import[]",
+      "doc": "An import entry of the document."
+    }
+  ],
+  "backend": {
+    "instructions": "The sinopia_* tools read and change the Sinopia document the editor shows beside this chat, for the apps that work in it. While the person has the document open, page_tools (app harnessly.sinopia) says what the editor shows — the document, the board or slide on screen, the selection — and lists the editor's own tools (go to a slide, select, show a node); call them with page_call.",
+    "tools": [
+      {
+        "name": "sinopia_document",
+        "call": "document",
+        "description": "The Sinopia document: its kind, title, boards and revision.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "sinopia_selection",
+        "call": "selection",
+        "description": "The elements the person picked in the editor now.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "sinopia_node",
+        "call": "node",
+        "description": "One element of a board by its id (<page id>:<number>).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The node id."
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "sinopia_query",
+        "call": "query",
+        "description": "Elements that match a selector (type, #id, .class, [attr], space, >), in one board or all.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "selector": {
+              "type": "string",
+              "description": "The selector."
+            },
+            "page": {
+              "type": "string",
+              "description": "A page id, file or title; omit for all."
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "selector"
+          ]
+        }
+      },
+      {
+        "name": "sinopia_fields",
+        "call": "fields",
+        "description": "The data fields the app binds to the board's elements, with their values.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": []
+        }
+      },
+      {
+        "name": "sinopia_set_fields",
+        "call": "setFields",
+        "description": "Set the values of bound fields; the board is rewritten, as one history entry. A value outside the app's schema is refused.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "patch": {
+              "type": "object",
+              "description": "Field name to value."
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "patch"
+          ]
+        }
+      },
+      {
+        "name": "sinopia_patch",
+        "call": "patch",
+        "description": "Change the board: ops setText, setStyle, setAttr, insert, remove, setField, all or none, as one history entry. A board another chat holds is refused.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "ops": {
+              "type": "array",
+              "description": "Each op is {op, node, …}: setText {value}, setStyle {style}, setAttr {name, value}, insert {position, html}, remove, setField {field, value}.",
+              "items": {
+                "type": "object"
+              }
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "ops"
+          ]
+        }
+      },
+      {
+        "name": "sinopia_mark",
+        "call": "mark",
+        "description": "Put a note on elements of the board, which the person sees on it.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "note": {
+              "type": "string",
+              "description": "The note."
+            },
+            "level": {
+              "type": "string",
+              "description": "error, warning or info."
+            },
+            "replace": {
+              "type": "boolean",
+              "description": "Take this app's earlier marks away first; with no nodes it clears them."
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "nodes"
+          ]
+        }
+      },
+      {
+        "name": "sinopia_comment",
+        "call": "comment",
+        "description": "Comment an element: the comment shows on the board as a mark.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "node": {
+              "type": "string",
+              "description": "The node id."
+            },
+            "text": {
+              "type": "string",
+              "description": "The comment."
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "node",
+            "text"
+          ]
+        }
+      },
+      {
+        "name": "sinopia_render",
+        "call": "render",
+        "description": "Render a board as PNG, PDF or HTML. Not available yet.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "board": {
+              "type": "string",
+              "description": "The page."
+            },
+            "format": {
+              "type": "string",
+              "description": "png, pdf or html."
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "board"
+          ]
+        }
+      },
+      {
+        "name": "sinopia_boards_add",
+        "call": "boards.add",
+        "description": "Add a board from one of the app's templates, with data for its bound fields.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "template": {
+              "type": "string",
+              "description": "The template's name."
+            },
+            "data": {
+              "type": "object",
+              "description": "Field name to value."
+            },
+            "title": {
+              "type": "string",
+              "description": "The board's title."
+            },
+            "app": {
+              "type": "string",
+              "description": "The app's id; omit when only one app works in this document."
+            },
+            "document": {
+              "type": "string",
+              "description": "The Sinopia document (project) id; omit for the one the editor shows beside this chat."
+            }
+          },
+          "required": [
+            "template"
+          ]
+        }
+      }
+    ]
+  }
+}

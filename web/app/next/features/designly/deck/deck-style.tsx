@@ -6,7 +6,7 @@ import { fetchKitFonts, type IKitFont } from '@/next/features/designly/deck/api'
 import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { PRESENCE, type TPresenceState } from '@/next/ui/presence';
 import {
   DECK_FONT,

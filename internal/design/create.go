@@ -13,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // A new project of the library: the library's .template/ folder copied to <library>/<id>/ with the title and the
@@ -308,15 +309,17 @@ func (l *Library) CreateProject(title string) (CreatedProject, error) {
 	}
 }
 
-// CleanBrief is the person's brief for a new project: controls gone, trimmed, at most 4000 characters.
+// CleanBrief is the person's brief for a new project: controls gone, trimmed, at most wire.DesignBriefMax characters.
+// A dictated or pasted brief runs long, so the bound is wide; a longer text goes with the brief as a file.
 func CleanBrief(v any) (string, error) {
 	s, _ := v.(string)
 	b := jscompat.Trim(briefControls.ReplaceAllString(s, " "))
 	if b == "" {
 		return "", createErr(locale.Pick("Describe what to draw", "Опишите, что нарисовать"))
 	}
-	if jscompat.Len(b) > 4000 {
-		return "", createErr(locale.Pick("The description is longer than 4000 characters", "Описание длиннее 4000 знаков"))
+	if jscompat.Len(b) > wire.DesignBriefMax {
+		return "", createErr(locale.Pick("The description is longer than 20,000 characters: shorten it or attach the text as a file",
+			"Описание длиннее 20 000 знаков: сократите его или приложите текст файлом"))
 	}
 	return b, nil
 }

@@ -7,6 +7,7 @@
     "agent": {},
     "backend": {},
     "branding": {},
+    "budget": {},
     "chat": {},
     "description": {},
     "harnessly": {},
@@ -58,8 +59,72 @@
             "pattern": "^files\\.write:.+$"
           },
           {
+            "const": "files.watch",
+            "description": "Hear which files under the files.read masks change (hl.files.watch); the names, not the contents."
+          },
+          {
+            "const": "git.read",
+            "description": "See git status, diffs and history of the chat's folder (secret files left out)."
+          },
+          {
+            "description": "Hear what happens in the chat: turn (the agent's turn ended), tool (the agent called a tool), message (a message came).",
+            "pattern": "^events:.+$"
+          },
+          {
             "description": "Have the machine put a secret the person typed into the app's server calls.",
             "pattern": "^secrets:.+$"
+          },
+          {
+            "description": "Put a value into the safe, never read it back (hl.secrets.put). Alone: the app's own secrets, those it holds secrets:\u003cname\u003e for; with a name (secrets.write:GITHUB_TOKEN): that secret of the person's safe, the one the agent uses.",
+            "pattern": "^secrets\\.write:.+$"
+          },
+          {
+            "const": "secrets.write",
+            "description": "Put a value into the safe, never read it back (hl.secrets.put). Alone: the app's own secrets, those it holds secrets:\u003cname\u003e for; with a name (secrets.write:GITHUB_TOKEN): that secret of the person's safe, the one the agent uses."
+          },
+          {
+            "description": "Run a command in the chat's folder inside the agent's sandbox and get its exit code and output (hl.terminal.run). Alone: any command, through the shell; with a mask (terminal.run:npm test*, * is any run of characters but an option): only the commands it matches, without the shell; an option (a word starting with -) is matched only where the mask writes it.",
+            "pattern": "^terminal\\.run:.+$"
+          },
+          {
+            "const": "terminal.run",
+            "description": "Run a command in the chat's folder inside the agent's sandbox and get its exit code and output (hl.terminal.run). Alone: any command, through the shell; with a mask (terminal.run:npm test*, * is any run of characters but an option): only the commands it matches, without the shell; an option (a word starting with -) is matched only where the mask writes it."
+          },
+          {
+            "description": "Start and stop long commands in the chat's folder inside the agent's sandbox (a dev server, a watcher), read their output, and open a local port in the right pane's browser (hl.process, hl.preview.open). Alone: any command, through the shell; with a mask (process:npm run dev*): only the commands it matches, as terminal.run's masks.",
+            "pattern": "^process:.+$"
+          },
+          {
+            "const": "process",
+            "description": "Start and stop long commands in the chat's folder inside the agent's sandbox (a dev server, a watcher), read their output, and open a local port in the right pane's browser (hl.process, hl.preview.open). Alone: any command, through the shell; with a mask (process:npm run dev*): only the commands it matches, as terminal.run's masks."
+          },
+          {
+            "const": "terminal.pty",
+            "description": "Open a shell on a terminal of its own in the chat's folder inside the agent's sandbox, type into it and get what it prints (hl.terminal.open): a whole terminal, as the right pane's own. 4 per app in a chat."
+          },
+          {
+            "const": "terminal.read",
+            "description": "Read what the chat's terminals show: the agent's and the chat's own shells, as text (hl.terminal.read)."
+          },
+          {
+            "const": "browser.read",
+            "description": "See the agent's browser of the chat: its tabs, a page's text and elements, a picture of it (hl.browser.read)."
+          },
+          {
+            "const": "browser.drive",
+            "description": "Act in the agent's browser of the chat: open and close tabs, go to an address, click, type, press keys, pick options (hl.browser.drive). Passwords, files and scripts stay out."
+          },
+          {
+            "const": "hooks.agent",
+            "description": "Hear each tool call of the chat's agent before it runs, and stop it or add context for the agent (hl.hooks.on). The call is never changed. A view that does not answer in 5 s lets it through, and the journal says so."
+          },
+          {
+            "const": "hooks.strict",
+            "description": "Strict mode of hooks.agent: a call the app's view did not answer in time, or with no view open, is stopped instead of let through."
+          },
+          {
+            "const": "background",
+            "description": "Run a view of the app hidden in the page while the app is on in a chat, without the person opening it: its hooks and events work in every such chat."
           },
           {
             "const": "notify",
@@ -88,6 +153,14 @@
           {
             "const": "sinopia.kind",
             "description": "Add Sinopia document types of the app's own."
+          },
+          {
+            "const": "ai",
+            "description": "Call a model on the person's behalf, within the app's budget of the day (manifest `budget.usdPerDay`, $0.50 by default, $5 at most)."
+          },
+          {
+            "const": "agents.run",
+            "description": "Start a task in a new chat under the app's chat, within the app's budget of the day (manifest `budget.runsPerDay`, 3 by default, 20 at most)."
           }
         ]
       },
@@ -134,12 +207,12 @@
             "description": "The product's name and accent; declared values, no view."
           },
           {
-            "const": "sinopia.*",
-            "description": "The editor of every Sinopia document type."
+            "description": "The editor of one Sinopia document type: panels, selection items, checks, bindings.",
+            "pattern": "^sinopia\\.[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"
           },
           {
-            "description": "The editor of one Sinopia document type.",
-            "pattern": "^sinopia\\.[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"
+            "const": "sinopia.*",
+            "description": "The editor of every Sinopia document type."
           }
         ]
       },

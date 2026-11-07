@@ -1,0 +1,75 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  background: var(--hx-bg-window, Canvas);
+  color: var(--hx-fg-1, CanvasText);
+}
+.ch {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.ch__title {
+  margin: 0;
+  font-size: 20px;
+}
+.ch__sub {
+  margin: 4px 0 0;
+  color: var(--hx-fg-3, GrayText);
+  font-size: 13px;
+}
+.ch__files {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ch__file {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.ch__file:hover,
+.ch__file[aria-pressed='true'] {
+  background: var(--hx-bg-hover, rgba(127, 127, 127, 0.12));
+}
+.ch__path {
+  overflow-wrap: anywhere;
+}
+.ch__state {
+  flex: none;
+  color: var(--hx-fg-3, GrayText);
+}
+.ch__diff {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--hx-bg-raised, rgba(127, 127, 127, 0.08));
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ch__add {
+  color: #1a7f37;
+}
+.ch__del {
+  color: #cf222e;
+}
+.ch__hunk {
+  color: var(--hx-fg-3, GrayText);
+}

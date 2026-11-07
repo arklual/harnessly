@@ -13,7 +13,7 @@ import { canLabel, untilLabel } from '@/next/features/designly/access/labels';
 import { dayLabel, ttlLabel } from '@/next/features/designly/access/ttl-picker';
 import Icon from '@/next/ui/icon';
 import Popover from '@/next/ui/popover';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { t } from '@/next/i18n';
 
 export const EXTEND = '7d';

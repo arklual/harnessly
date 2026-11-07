@@ -58,18 +58,29 @@ func RequiredPermission(method string) (string, bool) {
 	return p, ok
 }
 
-// Allows says whether the app holds a permission. files.read and files.write are held in the manifest with a mask
-// (files.read:docs/*): the app holds the right when it lists any; which paths it reaches is FileScope's to judge.
+// Allows says whether the app holds a permission. A right with a value (files.read:docs/*, events:turn) is held when
+// the app lists any value of it; which paths or kinds it reaches is for the call's own check.
 func (m *Manifest) Allows(permission string) bool {
 	if permission == "" {
 		return true
 	}
 	for _, p := range m.Permissions {
-		if p == permission || ((permission == "files.read" || permission == "files.write") && strings.HasPrefix(p, permission+":")) {
+		if p == permission || (paramPermissions[permission] && strings.HasPrefix(p, permission+":")) {
 			return true
 		}
 	}
 	return false
+}
+
+// EventKindsOf are the kinds of events:<kind> the app holds.
+func (m *Manifest) EventKindsOf() []string {
+	var out []string
+	for _, p := range m.Permissions {
+		if kind, ok := strings.CutPrefix(p, "events:"); ok {
+			out = append(out, kind)
+		}
+	}
+	return out
 }
 
 // Authorize checks a bridge call of an app's view: the method exists, the app holds its permission and the view is

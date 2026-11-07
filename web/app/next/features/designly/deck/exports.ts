@@ -10,7 +10,7 @@ import {
 import { RuntimeError } from '@/next/core/net/runtime-json';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 export const DECK_EXPORT_POLL_MS = 800;
 /** A job that has not finished in this long is given up on here (the runtime stops it at 40 minutes). */

@@ -14,7 +14,7 @@ import {
 import type { IDeckPptxStyle } from '@/next/features/designly/deck/types';
 import type { DesignlyDeck, MachineId } from '@/next/protocol/v2';
 import Popover from '@/next/ui/popover';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { plural, t } from '@/next/i18n';
 
 export type TStyleRead =

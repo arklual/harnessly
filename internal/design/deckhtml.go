@@ -98,6 +98,14 @@ const deckSnapshotJS = `(async () => {
     if (abs) el.setAttribute(name, await dataOf(abs));
   };
   const jobs = [];
+  // A video cannot live in a static page: its poster stands in for it, so a video background keeps its first frame.
+  root.querySelectorAll('video[poster]').forEach((v) => {
+    const img = document.createElement('img');
+    img.setAttribute('src', v.getAttribute('poster'));
+    img.setAttribute('alt', '');
+    img.className = v.className;
+    v.replaceWith(img);
+  });
   root.querySelectorAll('img[src],video[poster],image[href],image[*|href],use[href]').forEach((el) => {
     if (el.tagName === 'use') { const h = el.getAttribute('href'); if (h && !h.startsWith('#') && !h.startsWith('data:')) jobs.push(attr(el, 'href')); return; }
     jobs.push(attr(el, el.tagName === 'VIDEO' ? 'poster' : el.hasAttribute('src') ? 'src' : 'href'));

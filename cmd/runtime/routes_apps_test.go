@@ -21,6 +21,15 @@ import (
 // The rig's data folder and registry root, for the tests that issue agent tokens against it.
 var decRigDir, decRigRoot string
 
+// rigDeps are the deps of the last appRig, for a test that reads the safe behind the routes.
+var rigDeps deps
+
+// rigRoutes are the routes of the last appRig, for a test that needs a real server (a socket).
+var rigRoutes []gate.Route
+
+// rigCreated are the chats the rig was asked to start (agents.run).
+var rigCreated []wire.ConversationCreateCmd
+
 func appRig(t *testing.T) (func(method, path, body string, h map[string]string) (int, string), *wire.Conversation) {
 	t.Helper()
 	dir := t.TempDir()
@@ -30,7 +39,7 @@ func appRig(t *testing.T) (func(method, path, body string, h map[string]string) 
 	d := deps{DataDir: dir, Home: t.TempDir(), CLI: &gate.CLIToken{DataDir: dir, Headers: []string{"x-cli-token"}},
 		SessionOK: func(r *http.Request) bool { return r.Header.Get("X-Test-Session") == "yes" }}
 	reg := apps.Open(dir)
-	decRigDir, decRigRoot = dir, reg.Root
+	decRigDir, decRigRoot, rigDeps = dir, reg.Root, d
 	conv := &wire.Conversation{ID: "tab-1"}
 	chats := appChats{
 		ofSession: func(session string) string {
@@ -49,6 +58,11 @@ func appRig(t *testing.T) (func(method, path, body string, h map[string]string) 
 			return *conv, id == conv.ID
 		},
 		do: func(_ context.Context, cmd wire.Command) wire.CmdResult {
+			if c, ok := cmd.(wire.ConversationCreateCmd); ok {
+				rigCreated = append(rigCreated, c)
+				id := "tab-new"
+				return wire.CmdResult{R: wire.ResultAccepted, ID: &id}
+			}
 			m := cmd.(wire.ConversationAppsCmd)
 			if bad := appsOK(reg)(m.Apps); len(m.Apps) > 0 && bad != "" {
 				return wire.Refused(wire.RefuseNotFound)
@@ -57,7 +71,9 @@ func appRig(t *testing.T) (func(method, path, body string, h map[string]string) 
 			return wire.Accepted(wire.ChannelConvs, 1)
 		},
 	}
+	rigCreated = nil
 	routes := appRouteList(d, reg, "0.17.0", chats)
+	rigRoutes = routes
 	return func(method, path, body string, h map[string]string) (int, string) {
 		req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
 		for k, v := range h {
@@ -93,6 +109,7 @@ func TestAppRoutes(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `"id":"acme.demo"`) {
 		t.Fatalf("install: %d %s", code, body)
 	}
+	agreeRig(t)
 
 	// The page lists it without the folder.
 	code, body = call("GET", platformAPI+"/installed-apps", "", map[string]string{"X-Test-Session": "yes"})
@@ -148,6 +165,7 @@ func TestAppRoutes(t *testing.T) {
 	if code != http.StatusUnprocessableEntity || !strings.Contains(body, `"path":"name"`) {
 		t.Fatalf("broken package: %d %s", code, body)
 	}
+	agreeRig(t)
 
 	if code, _ := call("POST", "/api/cli/apps/remove", `{"id":"acme.demo"}`, cli); code != http.StatusOK {
 		t.Fatalf("remove: %d", code)
@@ -169,6 +187,7 @@ func TestAppViewsAndBridgeRoutes(t *testing.T) {
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkg+`"}`, cli); code != http.StatusOK {
 		t.Fatalf("install: %d %s", code, body)
 	}
+	agreeRig(t)
 
 	// The page's list names each view's entry on the view server, and the server's port.
 	code, body := call("GET", platformAPI+"/installed-apps", "", page)
@@ -379,6 +398,7 @@ func TestAppEnableWarnsOverTheInstructionsBudget(t *testing.T) {
 		if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkg+`"}`, cli); code != http.StatusOK {
 			t.Fatalf("install: %d %s", code, body)
 		}
+		agreeRig(t)
 		code, body := call("POST", "/api/cli/apps/enable", `{"session":"hs-agent","id":"`+id+`","on":true}`, cli)
 		if code != http.StatusOK {
 			t.Fatalf("enable %s: %d %s", id, code, body)

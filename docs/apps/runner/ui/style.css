@@ -1,0 +1,91 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  background: var(--hx-bg-window, Canvas);
+  color: var(--hx-fg-1, CanvasText);
+}
+.rn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.rn__title {
+  margin: 0;
+  font-size: 20px;
+}
+.rn__sub {
+  margin: 4px 0 0;
+  color: var(--hx-fg-3, GrayText);
+  font-size: 13px;
+}
+.rn__block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rn__h {
+  margin: 0;
+  font-size: 15px;
+}
+.rn__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rn__input {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--hx-border, rgba(127, 127, 127, 0.3));
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: 13px ui-monospace, monospace;
+}
+.rn__input--port {
+  flex: 0 0 80px;
+}
+.rn__btn {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--hx-accent, #2563eb);
+  color: var(--hx-bg-pane, Canvas);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.rn__btn--quiet {
+  background: var(--hx-bg-hover, rgba(127, 127, 127, 0.12));
+  color: inherit;
+}
+.rn__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.rn__result {
+  margin: 0;
+  font-size: 13px;
+}
+.rn__ok {
+  color: var(--hx-success, #1a7f37);
+}
+.rn__fail {
+  color: var(--hx-danger, #cf222e);
+}
+.rn__out {
+  max-height: 320px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--hx-bg-raised, rgba(127, 127, 127, 0.08));
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

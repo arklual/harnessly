@@ -127,7 +127,8 @@ func (l *Launcher) ClaudeFor(conversation string, ids []string, settingsPath str
 		}
 		out.PluginDirs = append(out.PluginDirs, a.Dir)
 		installed = append(installed, a)
-		sa := SnapshotApp{ID: a.ID, Name: a.Manifest.Name, Tools: toolsOf(a.Manifest), Context: ContextItems(a.Manifest)}
+		sa := SnapshotApp{ID: a.ID, Name: a.Manifest.Name, Tools: toolsOf(a.Manifest), Context: ContextItems(a.Manifest),
+			Hooks: a.Manifest.Allows("hooks.agent"), Strict: a.Manifest.Allows("hooks.agent") && a.Manifest.Allows("hooks.strict")}
 		// Scripts run only for a trusted app: an install made before this rule, or edited since, does not get round it.
 		if vs := ValidatorsOf(a.Manifest); len(vs) > 0 && a.Manifest.Trust == TrustTrusted {
 			sa.Dir, sa.Validators = a.Dir, vs

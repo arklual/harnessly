@@ -60,6 +60,7 @@ func TestSinopiaRoutes(t *testing.T) {
 	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+app+`","dev":true}`, cli); code != http.StatusOK {
 		t.Fatalf("install: %d %s", code, body)
 	}
+	agreeRig(t)
 	dir := filepath.Join(lib, sinProject)
 	writeAll(t, map[string]string{
 		filepath.Join(dir, "meta", "deck.json"):              `{"v":1}`,

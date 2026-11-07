@@ -44,6 +44,9 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
     title = t('next.dockBar.off', { machine: value.machine });
     sub = t('next.dockBar.offSub');
     quiet = true;
+  } else if (value.kind === 'noMachines') {
+    title = t('next.dockBar.noMachines');
+    sub = t('next.dockBar.noMachinesSub');
   } else if (value.kind === 'machine') {
     title = t('next.dockBar.machine', { machine: value.machine });
     sub = t('next.dockBar.machineSub');

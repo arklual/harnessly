@@ -15,7 +15,7 @@ import type { IVideoCommentDraft, IVideoState } from '@/next/features/designly/v
 import { putVideoComment, putVideoGuestResolved } from '@/next/stores/video';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 export interface IVideoComments {
   /** The merged list: the team's show at once, the guests' join when read. */

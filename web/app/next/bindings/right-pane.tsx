@@ -31,7 +31,7 @@ import { SideFloat } from '@/next/features/pane/side-float';
 import { onOpenSubagent, openSubagent } from '@/next/features/subagents/open';
 import AppTab from '@/next/features/app-views/app-tab';
 import { useInstalledApps } from '@/next/features/app-views/api';
-import { onOpenAppTab } from '@/next/features/app-views/open';
+import { onOpenAddressTab, onOpenAppTab, openAppTab } from '@/next/features/app-views/open';
 import { workflowsOf } from '@/next/features/workflows/run';
 import { onOpenNotePage } from '@/next/features/designly/open-note';
 import { onOpenAttached } from '@/next/features/pane/open-attached';
@@ -165,6 +165,9 @@ const LEGACY_HINTS: Record<string, string> = {
 };
 
 /** «Открыто: N» for the tools that can have several tabs; nothing while there are none. */
+/** The id of an app's tile in the tools: the prefix, then the app's id. */
+const APP_TOOL = 'app:';
+
 const openCount = (tabs: readonly TTab[], kind: TTab['kind']): string | undefined => {
   const n = tabs.filter((x) => x.kind === kind).length;
   return n > 0 ? t('next.pane.liveOpen', { n }) : undefined;
@@ -578,8 +581,13 @@ const PaneBody = (props: IPaneBodyProps) => {
   const groups: IToolGroup[] = [
     { id: 'chat', label: t('next.pane.chatGroup') },
     { id: 'vm', label: t('next.pane.machineGroup', { name: machineName }) },
+    { id: 'apps', label: t('next.pane.appsGroup') },
     { id: 'links', label: t('next.pane.linksGroup') },
   ];
+  // The apps on in this chat that have a view for the pane: a tile each, which opens (or brings forward) its tab.
+  const paneApps = (installed.list?.apps ?? []).filter(
+    (a) => conv.apps?.includes(a.id) && a.views.some((v) => v.targets.includes('pane')),
+  );
   const tools: ITool[] = [
     // The side chat forks the conversation's Claude session: Codex has none to fork.
     ...(conv.provider === 'claude'
@@ -664,6 +672,17 @@ const PaneBody = (props: IPaneBodyProps) => {
       hint: t('next.subs.paneHint'),
       live: running > 0 ? plural(running, 'next.bg.agentsRun') : undefined,
     },
+    ...paneApps.map((a) => ({
+      id: `${APP_TOOL}${a.id}`,
+      group: 'apps',
+      icon: a.icon || 'layout-grid',
+      name: a.name,
+      hint: a.description,
+      live: openCount(
+        tabs.filter((x) => x.kind === 'app' && x.app === a.id),
+        'app',
+      ),
+    })),
     ...legacy.tools.map((x) => ({ ...x, hint: LEGACY_HINTS[x.id] ? t(LEGACY_HINTS[x.id]) : '' })),
     ...(props.besideDesign
       ? []
@@ -689,7 +708,10 @@ const PaneBody = (props: IPaneBodyProps) => {
     designs: made.holds?.designs ?? false,
   });
   const quiet = quietTools(tools, new Set([...held, ...Object.keys(props.used)]));
-  const marked = tools.map((x) => (quiet.has(x.id) ? { ...x, quiet: true } : x));
+  // An app on in the chat is never quiet: the person turned it on to use it.
+  const marked = tools.map((x) =>
+    quiet.has(x.id) && !x.id.startsWith(APP_TOOL) ? { ...x, quiet: true } : x,
+  );
 
   /** What was picked in the tools opens as a tab beside them, which the tools stay. */
   const add = (next: TTab) => {
@@ -699,6 +721,10 @@ const PaneBody = (props: IPaneBodyProps) => {
 
   const openTool = (id: string) => {
     props.onUsed([id]);
+    if (id.startsWith(APP_TOOL)) {
+      openAppTab(id.slice(APP_TOOL.length));
+      return;
+    }
     if (isLegacyTab(id)) {
       setActive(legacy.open(id));
       return;
@@ -1316,9 +1342,10 @@ export const useRightPane = (
   // the pane comes out for it with its motion. On the phone the pane is a sheet over the chat: it is not thrown over
   // what the person reads, the tabs wait under its button.
   const phone = usePhone();
-  const applyRequests = (requests: readonly IPaneRequest[]) => {
+  /** `asked`: the person asked for it themselves (a view's button), so it comes in front whatever tab they are in. */
+  const applyRequests = (requests: readonly IPaneRequest[], asked = false) => {
     if (!conv) return;
-    const busy = open && state.active !== '' && state.active !== TOOLS_TAB;
+    const busy = !asked && open && state.active !== '' && state.active !== TOOLS_TAB;
     let tabs: IPaneTabs = state;
     let front: string | null = null;
     let show = false;
@@ -1392,6 +1419,12 @@ export const useRightPane = (
   // A view's hl.pane.open and a card's «Открыть в панели» ask for an app's tab like the agent's `open app` does.
   const showApp = useEffectEvent((target: string) => applyRequests([{ k: 'app', target, reload: false }]));
   useEffect(() => onOpenAppTab(showApp), []);
+  // A view's hl.preview.open: its dev server in the pane's browser, as `open <port>` of the agent, in front: the
+  // person pressed the view's button for it.
+  const showAddress = useEffectEvent((address: string) =>
+    applyRequests([{ k: 'browser', target: address, reload: false }], true),
+  );
+  useEffect(() => onOpenAddressTab(showAddress), []);
 
   // A sent note's chip opens its design in the pane's Designly tab; the viewer turns to the note's page itself.
   const showNotePage = useEffectEvent((design: string) => {

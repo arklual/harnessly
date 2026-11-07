@@ -34,7 +34,7 @@ import { locale, t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { hasFeature } from '@/next/stores/machines';
 import Icon from '@/next/ui/icon';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 
 /** The hint stays this long (its animation is 4.2 s). */
 const HINT_MS = 4300;

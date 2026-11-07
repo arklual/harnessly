@@ -43,13 +43,32 @@ afterEach(() => {
 const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS + 10)));
 
 describe('PublicCatalog', () => {
-  it('lists the apps and asks for the rights before anything is installed', async () => {
-    asked.mockResolvedValue({ apps: [entry()] });
+  it('lists the apps and opens the install screen with the warning and the access before anything is installed', async () => {
+    const access = [
+      {
+        key: 'perm:chat.prompt',
+        code: 'chat.prompt',
+        class: 'medium',
+        label: { ru: 'Писать агенту', en: 'Message the agent' },
+      },
+      {
+        key: 'secret:TOKEN',
+        code: 'secrets:TOKEN',
+        class: 'high',
+        label: { ru: 'Использовать секрет TOKEN', en: 'Use the secret TOKEN' },
+        threat: { ru: 'Сможет действовать от вашего имени.', en: 'It can act on your behalf.' },
+      },
+    ];
+    asked.mockResolvedValue({ apps: [entry({ check: { refusals: [], secrets: [], access } as never })] });
     render(<Page />);
     await settle();
     expect(screen.getByText('Демо')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /^(Install|Установить)$/ }));
-    expect(screen.getByText(/storage, chat\.prompt/)).toBeTruthy();
+    expect(screen.getByText(/(We do not check apps|Мы не проверяем приложения)/)).toBeTruthy();
+    expect(screen.getByText(/^(Use the secret TOKEN|Использовать секрет TOKEN)$/)).toBeTruthy();
+    // The dangerous line comes first.
+    const items = [...document.querySelectorAll('.hx-access__item')].map((li) => li.textContent ?? '');
+    expect(items[0]).toMatch(/TOKEN/);
     // Nothing was sent to install yet: only the list was read.
     expect(asked.mock.calls.every(([, , init]) => init?.method !== 'POST')).toBe(true);
   });

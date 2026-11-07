@@ -2,14 +2,14 @@
 // slide, a block selected on the slide brings the app's bar over the field, and the bar's item sends the task and the
 // block's words to the deck's chat. The agent is the stand-in CLI, so what is checked is that the message gets there.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { expect, type Frame, type Page, test } from '@playwright/test';
 
-import { pageId, slideFile } from './deck-rig';
+import { agreeApp, makeSlides } from './deck-rig';
 import { type Runtime, startRuntime } from './runtime';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -70,6 +70,7 @@ test('1. a slide with a long text gets a mark on the block and the panel counts 
   await setup.locator('input[name=confirm]').fill(PASSWORD);
   await setup.locator('button[type=submit]').click();
   await expect(page.locator('.hx-app')).toBeVisible();
+  await agreeApp(page, 'harnessly.deck-lint');
 
   const made = await page.evaluate(async () => {
     const res = await fetch('/api/v2/designly/create', {
@@ -93,18 +94,10 @@ test('1. a slide with a long text gets a mark on the block and the panel counts 
   expect(project).not.toBe('');
   expect(conv).toMatch(/^tab-/);
 
-  const lib = join(rt.home, 'project', 'design-artifacts', project);
-  [
+  await makeSlides(rt, project, [
     { title: 'Short', head: 'A short slide', body: 'Few words here' },
     { title: 'Wordy', head: 'A wordy slide', body: WORDY },
-  ].forEach((s, i) => {
-    const file = `slide-${i + 1}.dc.html`;
-    writeFileSync(join(lib, 'project', file), slideFile(s));
-    writeFileSync(
-      join(lib, 'meta', 'pages', `${pageId(i)}.json`),
-      JSON.stringify({ id: pageId(i), title: s.title, file, w: 1920, h: 1080, order: i + 1 }),
-    );
-  });
+  ]);
 
   // The deck is opened from its chat (`?chat=`), as the person comes to it.
   await page.goto(`${rt.url}/agents/designly/${project}?chat=${conv}`);

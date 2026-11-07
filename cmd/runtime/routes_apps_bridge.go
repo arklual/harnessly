@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,7 +25,9 @@ import (
 //
 //	POST <platform>/apps/storage   hl.storage.<scope>.get|set|delete|keys
 //	POST <platform>/apps/tool      hl.tools.call: a tool of the app's own remote MCP server
-//	POST <platform>/apps/files     hl.files.read|write: a file of the chat's workspace, inside the app's masks
+//	POST <platform>/apps/files     hl.files.read|write|list|search|watch|unwatch: the chat's workspace, inside the app's masks
+//	POST <platform>/apps/git       hl.git.status|diff|log: the repository of the chat's folder, read only
+//	GET  <platform>/apps/file-events  the files that changed for the views that watch (hl.files.watch), by session
 //	GET  <platform>/apps/events    a stream of the keys the app storage changed (no values), for the page's views
 //
 // Both are the person's page session only; a view never reaches them itself (it has no cookie of the page's origin).
@@ -44,6 +47,24 @@ type bridgeBody struct {
 	// Path and Text are a file of the chat's workspace (hl.files): a path relative to it, and what to write.
 	Path string  `json:"path"`
 	Text *string `json:"text"`
+	// Query, Glob, Case and Limit are a search of the workspace (hl.files.search); Limit is git log's length too.
+	Query string `json:"query"`
+	Glob  string `json:"glob"`
+	Case  bool   `json:"case"`
+	Limit int    `json:"limit"`
+	// Staged and Ref narrow a diff (hl.git.diff).
+	Staged bool   `json:"staged"`
+	Ref    string `json:"ref"`
+	// Command, Cwd and Timeout (seconds) are a command of hl.terminal.run or hl.process.start; ID and Since a process
+	// and an offset of its output; Port a local port for hl.preview.open.
+	Command string `json:"command"`
+	Cwd     string `json:"cwd"`
+	Timeout int    `json:"timeout"`
+	ID      string `json:"id"`
+	Since   int64  `json:"since"`
+	Port    int    `json:"port"`
+	// Confirmed: the person said yes in the page's own dialog to a loud call made while the agent uses the view.
+	Confirmed bool `json:"confirmed"`
 	// The session's issue (POST .../apps/session) names these.
 	App          string `json:"app"`
 	View         string `json:"view"`
@@ -163,7 +184,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		for _, v := range m.Views {
 			if v.ID == b.View {
 				for _, t := range v.Targets {
-					inTarget = inTarget || t == b.Target || (t == "sinopia.*" && strings.HasPrefix(b.Target, "sinopia."))
+					inTarget = inTarget || apps.TargetCovers(t, b.Target)
 				}
 			}
 		}
@@ -187,7 +208,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 			}
 		}
 		// A view of a Sinopia target is shown in a document of that kind, and no other view is shown in any.
-		if strings.HasPrefix(b.Target, "sinopia.") {
+		if apps.IsSinopiaTarget(b.Target) {
 			if err := viewDocumentKind(d, b.Target, b.Document); err != nil {
 				return refused(err)
 			}
@@ -285,28 +306,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		if err := app.Manifest.Authorize("tools/call", sess.Target, nil); err != nil {
 			return refused(err)
 		}
-		pkg, err := reg.Package(sess.App)
-		if err != nil {
-			return refused(err)
-		}
-		server, name, err := pkg.CanCallTool(b.Name)
-		if err != nil {
-			return refused(err)
-		}
-		if decl := pkg.MCP[server]; decl.Connection != "" {
-			result, err := callConnectionTool(ctx, mcpFor(d), reg.ConnectionGranted(sess.App, decl.Connection), decl, name, b.Args)
-			if err != nil {
-				return refused(err)
-			}
-			return http.StatusOK, map[string]any{"result": result}
-		}
-		// The machine fills the app's secrets into the server's headers; the view never holds one. A server whose secret
-		// has no value is not called: the app waits for it.
-		srv, missing := pkg.MCP[server].Filled(revealApp(safeFor(d).store.Local, sess.App, pkg.MCP[server].Secrets()))
-		if len(missing) > 0 {
-			return refused(&apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a secret"})
-		}
-		result, err := apps.CallTool(ctx, srv, name, b.Args)
+		result, err := callAppTool(ctx, d, reg, sess.App, b.Name, b.Args)
 		if err != nil {
 			return refused(err)
 		}
@@ -329,6 +329,27 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		return http.StatusOK, map[string]any{"value": values}
 	})
 
+	watches := apps.NewFileWatches()
+	// workspaceOf is the reach of a view's app into the workspace of its chat: the chat's own folder, read from the
+	// machine's record of the chat, never from the call. A status other than 0 is the refusal to answer.
+	workspaceOf := func(sess apps.Session, app apps.Installed) (apps.FileScope, int, any) {
+		if sess.Conversation == "" {
+			st, out := refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: "this view is in no chat, so it has no workspace"})
+			return apps.FileScope{}, st, out
+		}
+		rec, ok := chats.record(sess.Conversation)
+		if !ok || !slices.Contains(rec.Apps, sess.App) {
+			return apps.FileScope{}, http.StatusForbidden, map[string]string{"error": "not-on", "message": "the app is not turned on in this chat"}
+		}
+		protected, err := reg.ProtectedDirs()
+		if err != nil {
+			st, out := refused(err)
+			return apps.FileScope{}, st, out
+		}
+		// The host's data folder, the registry and every installed package (any app's) are out of reach.
+		return app.Manifest.FileScope(rec.Cwd, append(protected, filepath.Dir(reg.Root))...), 0, nil
+	}
+
 	// files: a file of the workspace of the chat the view is in. The workspace is the chat's own folder, read from the
 	// machine's record of the chat, never from the call; the host's data folder (the registry, the cli-token) is out of
 	// reach whatever the masks say.
@@ -337,26 +358,23 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		if err != nil {
 			return refused(err)
 		}
-		if b.Op != "read" && b.Op != "write" {
+		method := "harnessly/files." + b.Op
+		if !slices.Contains([]string{"read", "write", "list", "search", "watch", "unwatch"}, b.Op) {
 			return refused(apps.ErrUnknownMethod)
 		}
-		if err := app.Manifest.Authorize("harnessly/files."+b.Op, sess.Target, nil); err != nil {
+		if err := app.Manifest.Authorize(method, sess.Target, nil); err != nil {
 			return refused(err)
 		}
-		if sess.Conversation == "" {
-			return refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: "this view is in no chat, so it has no workspace"})
+		if b.Op == "unwatch" {
+			watches.Stop(b.Session)
+			return http.StatusOK, map[string]any{"ok": true}
 		}
-		rec, ok := chats.record(sess.Conversation)
-		if !ok || !slices.Contains(rec.Apps, sess.App) {
-			return http.StatusForbidden, map[string]string{"error": "not-on", "message": "the app is not turned on in this chat"}
+		scope, status, out := workspaceOf(sess, app)
+		if status != 0 {
+			return status, out
 		}
-		protected, err := reg.ProtectedDirs()
-		if err != nil {
-			return refused(err)
-		}
-		// The host's data folder, the registry and every installed package (any app's) are out of reach.
-		scope := app.Manifest.FileScope(rec.Cwd, append(protected, filepath.Dir(reg.Root))...)
-		if b.Op == "read" {
+		switch b.Op {
+		case "read":
 			raw, err := scope.Read(b.Path)
 			if err != nil {
 				return refused(err)
@@ -365,6 +383,36 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 				return refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: "the file is not text"})
 			}
 			return http.StatusOK, map[string]any{"text": string(raw)}
+		case "list":
+			list, err := scope.List(b.Path)
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"entries": list}
+		case "search":
+			hits, cut, err := scope.Search(b.Query, apps.SearchOptions{Glob: b.Glob, Case: b.Case, Limit: b.Limit})
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"hits": hits, "cut": cut}
+		case "watch":
+			token, appID, chat := b.Session, sess.App, sess.Conversation
+			// The watch lives while its session does, the app stays on in the chat and keeps files.watch: turned off in
+			// the chat, switched off or updated without the right, it stops at the next check.
+			alive := func() bool {
+				if _, ok := views.Sessions.Get(token); !ok {
+					return false
+				}
+				if rec, ok := chats.record(chat); !ok || !slices.Contains(rec.Apps, appID) {
+					return false
+				}
+				now, err := reg.Get(appID)
+				return err == nil && now.Manifest != nil && now.Manifest.Allows("files.watch")
+			}
+			if err := watches.Start(token, scope, alive); err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"ok": true}
 		}
 		if b.Text == nil {
 			return refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: "text is what to write"})
@@ -374,6 +422,195 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		}
 		return http.StatusOK, map[string]any{"ok": true}
 	})
+
+	// git: the repository of the chat's folder, read only (internal/apps gitread.go).
+	git := session(func(ctx context.Context, b bridgeBody) (int, any) {
+		sess, app, err := live(b)
+		if err != nil {
+			return refused(err)
+		}
+		if !slices.Contains([]string{"status", "diff", "log"}, b.Op) {
+			return refused(apps.ErrUnknownMethod)
+		}
+		if err := app.Manifest.Authorize("harnessly/git."+b.Op, sess.Target, nil); err != nil {
+			return refused(err)
+		}
+		scope, status, out := workspaceOf(sess, app)
+		if status != 0 {
+			return status, out
+		}
+		repo := apps.GitScope{Workspace: scope.Workspace, Forbidden: scope.Forbidden}
+		switch b.Op {
+		case "status":
+			st, err := repo.Status(ctx)
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, st
+		case "diff":
+			diff, cut, err := repo.Diff(ctx, apps.GitDiffOptions{Path: b.Path, Staged: b.Staged, Ref: b.Ref})
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"diff": diff, "cut": cut}
+		}
+		log, err := repo.Log(ctx, b.Limit, b.Path)
+		if err != nil {
+			return refused(err)
+		}
+		return http.StatusOK, map[string]any{"commits": log}
+	})
+
+	// run: the commands and the processes of an app in the chat's folder, inside the agent's wall (internal/apps run.go).
+	// Every one is journaled: what ran, where, how it ended.
+	procs := apps.NewProcesses()
+	procs.OnEnd = func(app, chat string, p apps.Process) {
+		code := -1
+		if p.Code != nil {
+			code = *p.Code
+		}
+		_ = reg.Journal(app, apps.JournalEntry{What: "process.end", Class: apps.ClassHigh, Chat: chat, OK: code == 0,
+			Detail: p.ID + " " + strconv.Itoa(code) + ": " + p.Command})
+	}
+	run := session(func(ctx context.Context, b bridgeBody) (int, any) {
+		sess, app, err := live(b)
+		if err != nil {
+			return refused(err)
+		}
+		method := map[string]string{"run": "harnessly/terminal.run", "start": "harnessly/process.start", "stop": "harnessly/process.stop",
+			"list": "harnessly/process.list", "output": "harnessly/process.output", "preview": "harnessly/preview.open"}[b.Op]
+		if method == "" {
+			return refused(apps.ErrUnknownMethod)
+		}
+		if err := app.Manifest.Authorize(method, sess.Target, nil); err != nil {
+			return refused(err)
+		}
+		scope, status, out := workspaceOf(sess, app)
+		if status != 0 {
+			return status, out
+		}
+		appID, chat := sess.App, sess.Conversation
+		journal := func(what, detail string, ok bool) {
+			_ = reg.Journal(appID, apps.JournalEntry{What: what, Class: apps.ClassHigh, Chat: chat, OK: ok, Detail: detail})
+		}
+		// The agent gets no more through an app than the person allowed: while it uses the app's view, what changes
+		// something runs only with the person's yes, which the page asks in a dialog of its own.
+		if b.Op != "list" && b.Op != "output" && !b.Confirmed && appPages.Driving(chat, appID) {
+			journal(strings.TrimPrefix(method, "harnessly/"), "the agent: "+b.Command, false)
+			return refused(&apps.BridgeError{Code: apps.CodePermissionDenied, Message: "the agent is using the app: this needs the person's yes"})
+		}
+		switch b.Op {
+		case "list":
+			return http.StatusOK, map[string]any{"processes": procs.List(appID, chat)}
+		case "output":
+			got, err := procs.Output(appID, chat, b.ID, b.Since)
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, got
+		case "stop":
+			got, err := procs.Stop(appID, chat, b.ID)
+			if err != nil {
+				return refused(err)
+			}
+			journal("process.stop", got.ID+": "+got.Command, true)
+			return http.StatusOK, got
+		case "preview":
+			if b.Port < 1024 || b.Port > 65535 {
+				return refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: "port is a local port from 1024 to 65535"})
+			}
+			journal("preview.open", "localhost:"+strconv.Itoa(b.Port), true)
+			return http.StatusOK, map[string]any{"ok": true}
+		}
+		// A command and a process are each held to their own right: alone any command, with masks only theirs.
+		right := "terminal.run"
+		if b.Op == "start" {
+			right = "process"
+		}
+		argv, err := app.Manifest.RunRightsOf(right).Argv(b.Command)
+		if err != nil {
+			journal(strings.TrimPrefix(method, "harnessly/"), b.Command, false)
+			return refused(err)
+		}
+		dir, err := apps.RunDir(scope.Workspace, b.Cwd)
+		if err != nil {
+			return refused(err)
+		}
+		box, err := reg.Sandbox(appBoundary())
+		if err != nil {
+			return refused(err)
+		}
+		if b.Op == "start" {
+			alive := func() bool {
+				if rec, ok := chats.record(chat); !ok || !slices.Contains(rec.Apps, appID) {
+					return false
+				}
+				now, err := reg.Get(appID)
+				return err == nil && now.Manifest != nil && now.Manifest.Allows("process")
+			}
+			got, err := procs.Start(box, appID, chat, dir, b.Command, argv, alive)
+			journal("process.start", b.Command, err == nil)
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, got
+		}
+		res, err := box.Run(ctx, dir, argv, time.Duration(b.Timeout)*time.Second)
+		if err != nil {
+			journal("terminal.run", b.Command, false)
+			return refused(err)
+		}
+		journal("terminal.run", strconv.Itoa(res.Code)+": "+b.Command, res.Code == 0)
+		return http.StatusOK, res
+	})
+
+	// fileEvents: which files changed for the views that watch, for the person's page to hand to each view by its
+	// session (app-views/file-events.ts). Names only, never what is in the files.
+	fileEvents := func(w http.ResponseWriter, r *http.Request) {
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		if r.Method != http.MethodGet {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			secretJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed"})
+			return
+		}
+		changes := make(chan apps.FileChange, 64)
+		stop := watches.OnChange(func(c apps.FileChange) {
+			select {
+			case changes <- c:
+			default:
+			}
+		})
+		defer stop()
+		h := w.Header()
+		h.Set("Content-Type", "text/event-stream; charset=utf-8")
+		h.Set("Cache-Control", "no-store, no-transform")
+		h.Set("X-Accel-Buffering", "no")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(": ok\n\n"))
+		flusher.Flush()
+		beat := time.NewTicker(15 * time.Second)
+		defer beat.Stop()
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case c := <-changes:
+				raw, _ := json.Marshal(c)
+				_, _ = w.Write(append(append([]byte("data: "), raw...), '\n', '\n'))
+				flusher.Flush()
+			case <-beat.C:
+				_, _ = w.Write([]byte(": ping\n\n"))
+				flusher.Flush()
+			}
+		}
+	}
 
 	// events: the changes of the app storage as they happen, for the person's page to tell the views that are open. A
 	// change carries where it happened (app, scope, the chat or document of the area, key) and never the value; the
@@ -427,9 +664,18 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 	}
 
 	is := func(p string) func(*http.Request) bool { return func(r *http.Request) bool { return pathIs(r, p) } }
-	return []gate.Route{
+	routes := append(appTerminalRoutes(d, reg, chats, live, workspaceOf), appBrowserRoutes(d, reg, live, workspaceOf)...)
+	routes = append(routes, appAIRoutes(d, reg, chats, live)...)
+	routes = append(routes, appSecretRoutes(d, reg, chats, live)...)
+	return append(routes, []gate.Route{
 		{Match: is(platformAPI + "/apps/files"), Handler: files},
 		{Match: is("/agents" + platformAPI + "/apps/files"), Handler: files},
+		{Match: is(platformAPI + "/apps/git"), Handler: git},
+		{Match: is("/agents" + platformAPI + "/apps/git"), Handler: git},
+		{Match: is(platformAPI + "/apps/run"), Handler: run},
+		{Match: is("/agents" + platformAPI + "/apps/run"), Handler: run},
+		{Match: is(platformAPI + "/apps/file-events"), Handler: http.HandlerFunc(fileEvents)},
+		{Match: is("/agents" + platformAPI + "/apps/file-events"), Handler: http.HandlerFunc(fileEvents)},
 		{Match: is(platformAPI + "/apps/session"), Handler: open},
 		{Match: is("/agents" + platformAPI + "/apps/session"), Handler: open},
 		{Match: is(platformAPI + "/apps/session/renew"), Handler: renew},
@@ -441,7 +687,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		{Match: is(platformAPI + "/apps/tool"), Handler: tool},
 		{Match: is("/agents" + platformAPI + "/apps/storage"), Handler: store},
 		{Match: is("/agents" + platformAPI + "/apps/tool"), Handler: tool},
-	}
+	}...)
 }
 
 // revealApp is the values of an app's secrets by their names; one with no value is left out.
@@ -453,4 +699,26 @@ func revealApp(store *secrets.Store, app string, names []string) map[string]stri
 		}
 	}
 	return out
+}
+
+// callAppTool runs a tool (<server>.<tool>) of an app's own MCP server from the machine: a server through the person's
+// connection with that connection's grant, any other with the app's secrets the machine fills into its headers (the
+// page never holds one). A server whose secret has no value is not called: the app waits for it.
+func callAppTool(ctx context.Context, d deps, reg *apps.Registry, appID, tool string, args map[string]any) (json.RawMessage, error) {
+	pkg, err := reg.Package(appID)
+	if err != nil {
+		return nil, err
+	}
+	server, name, err := pkg.CanCallTool(tool)
+	if err != nil {
+		return nil, err
+	}
+	if decl := pkg.MCP[server]; decl.Connection != "" {
+		return callConnectionTool(ctx, mcpFor(d), reg.ConnectionGranted(appID, decl.Connection), decl, name, args)
+	}
+	srv, missing := pkg.MCP[server].Filled(revealApp(safeFor(d).store.Local, appID, pkg.MCP[server].Secrets()))
+	if len(missing) > 0 {
+		return nil, &apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a secret"}
+	}
+	return apps.CallTool(ctx, srv, name, args)
 }

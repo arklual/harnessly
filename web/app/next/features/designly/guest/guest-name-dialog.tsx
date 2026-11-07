@@ -1,7 +1,7 @@
 // «Как вас зовут?»: asked once when a guest first comments (and again from the menu to change it). The dialog is the
 // shell's own Modal, the same box as «Новый проект».
 import { useRef, useState, type FormEvent } from 'react';
-import Modal from '@/next/features/shell/modal';
+import { Modal } from '@/next/features/designly/sdk/ui';
 import { t } from '@/next/i18n';
 
 export const NAME_MAX = 60;

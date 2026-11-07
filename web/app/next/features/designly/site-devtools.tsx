@@ -3,7 +3,7 @@
 // keeps the record (the slot's proxy and the bridge in the page write it; the pane and the agents read it), the panel
 // polls it while it is open, filters it by type and by words, and sends any line to the chat. The throttling and the cache
 // are the slot's own settings, changed through the runtime.
-import { useKeyHint } from '@/next/features/keys/keys-help';
+import { useKeyHint } from '@/next/features/designly/sdk/keys';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   fetchDevtools,
@@ -34,7 +34,7 @@ import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import type { TPresenceState } from '@/next/ui/presence';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { t } from '@/next/i18n';
 
 /** An open panel reads the record about once a second, as a log should feel live. */

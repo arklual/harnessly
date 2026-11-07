@@ -173,6 +173,8 @@ export interface ISidebarApps {
   /** The list of every installed app is on screen. */
   allCurrent: boolean;
   onOpen: (id: string, chat: string) => void;
+  /** The pointer or the focus is on an app: its window can start getting ready before the click. */
+  onPrepare?: (id: string, chat: string) => void;
   onAll: () => void;
 }
 
@@ -308,6 +310,8 @@ const AppRows = ({ apps }: { apps: ISidebarApps }) => (
         className="hx-nav__kid"
         aria-current={a.id === apps.current ? 'page' : undefined}
         onClick={() => apps.onOpen(a.id, a.chat)}
+        onPointerEnter={() => apps.onPrepare?.(a.id, a.chat)}
+        onFocus={() => apps.onPrepare?.(a.id, a.chat)}
       >
         <Icon name="layout-grid" size="sm" className="hx-nav__kid-icon" />
         <span className="hx-item__title">{a.name}</span>
@@ -1093,6 +1097,7 @@ const Sidebar = ({
         <button
           type="button"
           className="hx-btn hx-tipped hx-user__bell"
+          data-variant="ghost"
           data-size="sm"
           data-shape="icon"
           data-tip={t('next.sidebar.notifications')}

@@ -6,7 +6,9 @@ import {
   callStorage,
   createViewSession,
   loadAppDecisions,
+  loadAppJournal,
   type IAppDecision,
+  type IJournalEntry,
   type IAppView,
   type IInstalledApp,
 } from '@/next/features/app-views/api';
@@ -17,6 +19,7 @@ import { clock } from '@/next/i18n/format';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { Button } from '@/next/ui/button';
 import { t } from '@/next/i18n';
+import AccessList from '@/next/features/app-consent/access-list';
 import '@/next/styles/app-main.css';
 
 /** The scopes the inspector lists keys of: `doc` belongs to a Sinopia document and is refused until a view is bound to one. */
@@ -154,6 +157,51 @@ const Decisions = ({
   );
 };
 
+/** What a journal line says in words; a line this page does not know says its code. */
+export const journalText = (e: Pick<IJournalEntry, 'what' | 'detail'>): string => {
+  const key = `next.journal.what.${e.what}`;
+  const words = t(key);
+  const said = words === key ? e.what : words;
+  return e.detail ? `${said}: ${e.detail}` : said;
+};
+
+/** The deprecated methods the view called, each once, with what replaces them (the bridge logs them as it runs them). */
+export const deprecatedOf = (calls: readonly IBridgeLogEntry[]): string[] => [
+  ...new Set(
+    calls.filter((c) => c.message?.startsWith('deprecated:')).map((c) => `${c.method} — ${c.message}`),
+  ),
+];
+
+type TJournal = { k: 'loading' } | { k: 'ready'; list: IJournalEntry[] } | { k: 'failed'; text: string };
+
+/** The app's journal: what it did of a high or critical class and every change of what it may do. */
+const Journal = ({ machine, app }: { machine: MachineId; app: string }) => {
+  const [state, setState] = useState<TJournal>({ k: 'loading' });
+  useEffect(() => {
+    let live = true;
+    loadAppJournal(machine, app).then(
+      (list) => live && setState({ k: 'ready', list }),
+      (e: Error) => live && setState({ k: 'failed', text: e.message }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [machine, app]);
+  if (state.k === 'loading') return <p className="hx-insp__none">{t('next.inspector.loading')}</p>;
+  if (state.k === 'failed') return <p className="hx-insp__none">{state.text}</p>;
+  if (state.list.length === 0) return <p className="hx-insp__none">{t('next.journal.none')}</p>;
+  return (
+    <ul className="hx-journal">
+      {state.list.map((e, i) => (
+        <li key={`${e.at}-${i}`} data-ok={e.ok}>
+          <time dateTime={new Date(e.at).toISOString()}>{clock(e.at)}</time>
+          <span>{journalText(e)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 export interface IAppInspectorProps {
   machine: MachineId;
   app: IInstalledApp;
@@ -188,6 +236,7 @@ const AppInspector = ({
     onReload();
   }, [key, onReload]);
   const shown = [...calls].reverse().slice(0, 100);
+  const deprecated = deprecatedOf(calls);
   return (
     <section className="hx-insp" aria-label={t('next.inspector.title')}>
       <div className="hx-insp__sec">
@@ -214,9 +263,25 @@ const AppInspector = ({
           <Decisions machine={machine} app={app.id} conversation={conversation} />
         </div>
       )}
+      {deprecated.length > 0 && (
+        <div className="hx-insp__sec">
+          <h3 className="hx-insp__h">{t('next.inspector.deprecated')}</h3>
+          {deprecated.map((line) => (
+            <p key={line} className="hx-insp__warn">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
       <div className="hx-insp__sec">
-        <h3 className="hx-insp__h">{t('next.inspector.rights')}</h3>
-        {app.permissions.length === 0 ? (
+        <h3 className="hx-insp__h">{t('next.journal.title')}</h3>
+        <Journal machine={machine} app={app.id} />
+      </div>
+      <div className="hx-insp__sec">
+        <h3 className="hx-insp__h">{t('next.consent.access')}</h3>
+        {app.access ? (
+          <AccessList access={app.access} />
+        ) : app.permissions.length === 0 ? (
           <p className="hx-insp__none">{t('next.inspector.noRights')}</p>
         ) : (
           <ul className="hx-insp__chips">

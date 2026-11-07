@@ -517,6 +517,52 @@ describe('AppBridge: what the manifest grants', () => {
   });
 });
 
+describe('AppBridge: toasts and keys (HRN-808)', () => {
+  it('passes a tone and a second line with a toast, and drops a tone it does not know', async () => {
+    const toast = vi.fn();
+    const r = rig([], { toast });
+    await r.start();
+    await r.call('harnessly/ui.toast', { text: 'Готово', tone: 'success', description: 'всё' }, 20);
+    expect(toast).toHaveBeenLastCalledWith('Готово', { tone: 'success', description: 'всё' });
+    await r.call('harnessly/ui.toast', { text: 'x', tone: 'loud' }, 21);
+    expect(toast).toHaveBeenLastCalledWith('x', {});
+  });
+
+  it('runs the commands of the screen it names and tells the view each press', async () => {
+    let handlers: (() => Record<string, ((chord: string) => void | false) | undefined>) | null = null;
+    const stop = vi.fn();
+    const r = rig([], {
+      keys: (_scope, h) => {
+        handlers = h;
+        return stop;
+      },
+    });
+    await r.start();
+    await r.call('harnessly/keys.on', { scope: 'deck', commands: ['deck.next'] }, 30);
+    expect(r.last()?.result).toEqual({});
+    handlers!()['deck.next']?.('ArrowRight');
+    expect(r.last()).toMatchObject({
+      method: 'harnessly/notifications/key',
+      params: { command: 'deck.next', chord: 'ArrowRight' },
+    });
+    await r.call('harnessly/keys.on', { scope: 'deck', commands: ['global.newChat'] }, 31);
+    expect(r.last()?.error.data.code).toBe('invalid_params');
+    await r.call('harnessly/keys.on', { scope: 'global', commands: ['global.help'] }, 32);
+    expect(r.last()?.error.data.code).toBe('invalid_params');
+    await r.call('harnessly/keys.off', { scope: 'deck' }, 33);
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers whether a press ran, and how the host writes a key', async () => {
+    const r = rig([], { keyPress: (chord) => chord === 'ArrowRight', keyHints: (c) => ({ [c[0]]: '→' }) });
+    await r.start();
+    await r.call('harnessly/keys.press', { chord: 'ArrowRight' }, 40);
+    expect(r.last()?.result).toEqual({ ran: true });
+    await r.call('harnessly/keys.hints', { commands: ['deck.next'] }, 41);
+    expect(r.last()?.result).toEqual({ hints: { 'deck.next': '→' } });
+  });
+});
+
 describe('AppBridge: notifications', () => {
   it('tells the view when its context changes, once it is up', async () => {
     const r = rig([]);

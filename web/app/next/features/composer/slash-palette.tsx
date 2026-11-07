@@ -14,6 +14,7 @@ import {
   type RefObject,
 } from 'react';
 import { modelOf, type IPickerAgent } from '@/next/features/composer/agents';
+import type { IAppMentionGroup } from '@/next/features/app-views/api';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import type { IQuickPrompt } from '@/next/features/composer/prompts';
 import type { IChatPick } from '@/next/features/composer/chat-sources';
@@ -21,6 +22,7 @@ import { highlighted } from '@/next/features/composer/slash-match';
 import {
   buildRows,
   chatRows,
+  mentionRows,
   clampSelection,
   detectSub,
   detectTrigger,
@@ -75,6 +77,8 @@ export interface ISlashSource {
   findChats?: ((query: string, signal: AbortSignal) => Promise<readonly IChatPick[]>) | null;
   /** A chat is picked: the message points at it from now on. */
   onChat?: (ref: MessageRef) => void;
+  /** What the apps on in the chat find for «@»; null where no app of the chat answers «@». */
+  findMentions?: ((query: string, signal: AbortSignal) => Promise<readonly IAppMentionGroup[]>) | null;
 }
 
 interface ISlashOptions {
@@ -161,6 +165,11 @@ export const useSlashPalette = ({
   const [picked, setPicked] = useState({ key: '', index: 0 });
   const [folders, setFolders] = useState<IFolders>(NO_FOLDERS);
   const [chats, setChats] = useState<IChatsFound | null>(null);
+  const [mentions, setMentions] = useState<{
+    scope: string;
+    query: string;
+    groups: readonly IAppMentionGroup[];
+  } | null>(null);
   const [kept, setKept] = useState<{ sig: string; view: IView } | null>(null);
   const pendingCaret = useRef<{ text: string; caret: number } | null>(null);
 
@@ -224,6 +233,27 @@ export const useSlashPalette = ({
   const chatPicks =
     chatQuery !== null && chats?.scope === scope && chats.query === chatQuery ? chats.picks : null;
 
+  // What the apps of the chat find: asked for the same word as the chats, each answer kept for its word.
+  const findMentions = slash?.findMentions ?? null;
+  useEffect(() => {
+    if (chatQuery === null || !findMentions) return;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => {
+      findMentions(chatQuery, ctl.signal).then(
+        (groups) => setMentions({ scope, query: chatQuery, groups }),
+        () => {
+          if (!ctl.signal.aborted) setMentions({ scope, query: chatQuery, groups: [] });
+        },
+      );
+    }, CHATS_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [chatQuery, findMentions, scope]);
+  const mentionGroups =
+    chatQuery !== null && mentions?.scope === scope && mentions.query === chatQuery ? mentions.groups : null;
+
   const wanted = sub !== null || trigger !== null;
   const wake = slash?.wake;
   useEffect(() => {
@@ -254,6 +284,7 @@ export const useSlashPalette = ({
       const entries = dir !== null ? known[dir] : undefined;
       failed = entries === null;
       list = entries ? fileRows(entries, splitMention(trigger.query).name) : { rows: [], more: 0 };
+      if (mentionGroups) list = { ...list, rows: [...list.rows, ...mentionRows(mentionGroups)] };
       if (chatPicks) list = { ...list, rows: [...list.rows, ...chatRows(chatPicks, trigger.query)] };
     } else {
       list = buildRows({
@@ -387,6 +418,7 @@ const GROUP_KEY: Record<TGroup, string> = {
   [GROUP.mcp]: 'next.slash.group.mcp',
   [GROUP.quick]: 'next.slash.group.quick',
   [GROUP.file]: 'next.slash.group.file',
+  [GROUP.mention]: 'next.slash.group.mention',
   [GROUP.chat]: 'next.slash.group.chat',
 };
 

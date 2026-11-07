@@ -508,6 +508,7 @@ html,body{margin:0;width:100%%;height:100%%;background:#fff;font-family:Georgia,
 <div class="t">%s</div><p class="s">Первая строка и <b>жирная</b> вторая строка достаточно длинная, чтобы перенестись</p>
 <div class="b" onclick="evil()"></div><a href="javascript:evil()" onmouseover="evil()">x</a>
 <svg width="10" height="10"><rect width="10" height="10"><animate attributeName="x" to="5"/></rect></svg><img src="pic.png" width="40" height="40" style="position:absolute;left:10px;top:10px">
+<video src="clip.mp4" poster="pic.png" autoplay loop muted playsinline class="bgv" width="40" height="40" style="position:absolute;left:60px;top:10px"></video>
 </body></html>`
 
 func TestExportersInChrome(t *testing.T) {
@@ -632,6 +633,9 @@ func TestExportersInChrome(t *testing.T) {
 		}
 		if !strings.Contains(page, "data:image/png;base64") || strings.Contains(page, "<script src") {
 			t.Error("the picture was not written in, or a script stayed")
+		}
+		if strings.Contains(page, "&lt;video") || strings.Contains(page, "clip.mp4") || !strings.Contains(page, "bgv") {
+			t.Error("a video stayed in the static page, or its poster did not stand in for it")
 		}
 	})
 }

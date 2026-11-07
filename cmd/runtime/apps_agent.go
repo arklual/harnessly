@@ -20,6 +20,8 @@ import (
 
 // agentRefusedAppRoutes are the CLI routes that change what is installed, on, shared or published.
 var agentRefusedAppRoutes = [...]string{
+	platformAPI + "/apps/hooks-off",
+	"/agents" + platformAPI + "/apps/hooks-off",
 	"/api/cli/apps/install",
 	"/api/cli/apps/remove",
 	"/api/cli/apps/enable",

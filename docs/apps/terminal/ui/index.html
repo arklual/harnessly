@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Терминал</title>
+<link rel="stylesheet" href="vendor/xterm.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="tm">
+  <header class="tm__head">
+    <p class="tm__sub" id="sub" role="status"></p>
+    <button class="tm__btn" id="again" type="button" hidden>Открыть заново</button>
+    <button class="tm__btn" id="measure" type="button" disabled>Замер</button>
+  </header>
+  <div class="tm__term" id="term"></div>
+</main>
+<!-- Classic scripts only: the view runs in an opaque-origin frame (see docs/apps/cashback). -->
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script src="/__hl/app-sdk.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

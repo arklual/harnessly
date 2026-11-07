@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"slices"
 
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -65,14 +64,11 @@ func appPageRoutes(d deps, reg *apps.Registry, pages *apps.PageTools, chats appC
 		}
 		var kept []apps.PageReport
 		for _, a := range b.Apps {
-			if !slices.Contains(rec.Apps, a.App) {
+			m := apps.PageApp(a.App, rec.Apps, reg)
+			if m == nil {
 				continue
 			}
-			in, err := reg.Get(a.App)
-			if err != nil || in.Manifest == nil {
-				continue
-			}
-			kept = append(kept, apps.PageReportAllowed(in.Manifest, a))
+			kept = append(kept, apps.PageReportAllowed(m, a))
 		}
 		if err := pages.Report(b.Conversation, kept); err != nil {
 			bad(w)

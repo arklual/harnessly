@@ -7,6 +7,12 @@
   color-scheme: normal;
   transition: height var(--hx-dur-md) var(--hx-ease-out);
 }
+/* While the frame loads: a quiet spinner on its own background, gone once its page paints over it. */
+.hx-appview[data-loading] {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' fill='none' stroke='rgba(128,128,128,0.25)' stroke-width='3'/%3E%3Cpath d='M14 3a11 11 0 0 1 11 11' fill='none' stroke='rgba(128,128,128,0.8)' stroke-width='3' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 14 14' to='360 14 14' dur='0.8s' repeatCount='indefinite'/%3E%3C/path%3E%3C/svg%3E")
+    center / 28px 28px no-repeat;
+  min-height: 120px;
+}
 .hx-appview:not([data-fit]) {
   flex: 1;
   height: 100%;
@@ -100,4 +106,13 @@
   flex-wrap: wrap;
   gap: var(--hx-space-2);
   padding: var(--hx-space-2) var(--hx-space-4);
+}
+
+/* The hidden views of the chat's background apps (features/app-views/background.tsx): running, never drawn. */
+.hx-appbg {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }

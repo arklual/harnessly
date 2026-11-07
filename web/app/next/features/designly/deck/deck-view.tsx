@@ -6,12 +6,12 @@
 // board's source through the patch route, and shows the frame, grip and guides of the blocks.
 import { tourSignal } from '@/next/stores/tour';
 import { placeOf } from '@/next/features/keys/chord';
-import { runChord } from '@/next/features/keys/use-keys';
+import { pressKey } from '@/next/features/designly/sdk/keys';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { ISiteAccess, ISiteMode, ISiteStage } from '@/next/features/designly/site-view';
 import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
-import { toast } from '@/next/ui/toast';
+import { toast } from '@/next/features/designly/sdk/toast';
 import { useMedia } from '@/next/ui/use-media';
 import { usePresence, PRESENCE } from '@/next/ui/presence';
 import { goTo, ROUTE } from '@/next/routes/routes';
@@ -763,7 +763,7 @@ const DeckView = (props: IDeckViewProps) => {
     if (!imagesOn || !at || !slide) return;
     setImageOpen({ act: said, box: screenBoxOf(at, said) });
   };
-  useDeckBridge(frameRef, src, onBoard, (key) => runChord(placeOf(key, ''), false), onImage);
+  useDeckBridge(frameRef, src, onBoard, (key) => pressKey(placeOf(key, '')), onImage);
   useDeckKeys(!playing, screen, onKey);
 
   // The board on screen is in the deck's mode of the screen; a board loaded later is told when it loads.

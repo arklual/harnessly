@@ -59,6 +59,7 @@
     "sonner": "^2.0.8",
     "swr": "^2.5.1",
     "use-stick-to-bottom": "^1.1.6",
+    "vizloom": "0.1.0",
     "web-vitals": "^6.2.3",
     "zustand": "^5.0.16"
   },

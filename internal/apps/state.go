@@ -19,6 +19,7 @@ const (
 	ReasonConnection = "connection" // a connection its servers need is not made or not signed in; Detail names them
 	ReasonHost       = "host"       // this harnessly is outside the range the app wants; Detail is the range
 	ReasonPackage    = "package"    // its installed copy cannot be read; Detail says why
+	ReasonConsent    = "consent"    // it waits for the person to agree to what it reaches (consent.go)
 )
 
 // AppState is an app's state as the page shows it.
@@ -36,8 +37,10 @@ func StateOf(a Installed, host string, packageErr error, secrets, connections []
 // StateIn is StateOf with safe mode: on, every app but a pinned one is disabled.
 func StateIn(a Installed, safe bool, host string, packageErr error, secrets, connections []string) AppState {
 	switch {
-	case a.Muted:
+	case a.Muted || a.Off:
 		return AppState{State: StateDisabled, Reason: ReasonOff}
+	case a.NeedsConsent():
+		return AppState{State: StateWaiting, Reason: ReasonConsent}
 	case safe && !SafeAllows(a):
 		return AppState{State: StateDisabled, Reason: ReasonSafe}
 	case a.Manifest == nil:

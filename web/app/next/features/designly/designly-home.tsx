@@ -16,8 +16,32 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react';
-import Modal from '@/next/features/shell/modal';
-import { Button } from '@/next/ui/button';
+import { Menu } from '@base-ui/react/menu';
+import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import LibraryBar from '@/next/features/designly/library-bar';
+import {
+  Crumbs,
+  FolderDeleteDialog,
+  FolderNameDialog,
+  FolderTiles,
+  MoveDialog,
+  type IFolderForm,
+} from '@/next/features/designly/library-folders';
+import TrashView from '@/next/features/designly/library-trash';
+import type { ILibraryOrganizer } from '@/next/features/designly/library-organizer';
+import {
+  NO_FILTERS,
+  childrenOf,
+  isNarrowed,
+  matchesFilters,
+  projectsIn,
+  sortCards,
+  systemsOf,
+  type ILibraryFilters,
+} from '@/next/features/designly/library-model';
+import { useCardDrag } from '@/next/features/designly/use-card-drag';
+import type { IFolder } from '@/next/features/designly/api';
+import { usePresence, usePresentFlag } from '@/next/ui/presence';
 import AttachmentThumb from '@/next/ui/attachment-thumb';
 import { useFileDrop } from '@/next/features/composer/use-file-drop';
 import Icon from '@/next/ui/icon';
@@ -40,7 +64,6 @@ import { useFieldEdges, useFitField } from '@/next/ui/use-fit-field';
 import { useStableFn } from '@/next/ui/use-stable-fn';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import Swap from '@/next/ui/swap';
-import { usePresence } from '@/next/ui/presence';
 import { HSCROLL_DIR, useHScroll } from '@/next/ui/use-h-scroll';
 import type { IDesignSystem } from '@/next/features/designly/api';
 import {
@@ -82,6 +105,10 @@ export interface IDesignCard {
   owner: DesignOwner | null;
   /** The person may edit it, so may delete it. */
   canDelete?: boolean;
+  /** The person's folder it lies in; null or absent at the top. */
+  folder?: string | null;
+  /** The design system or kit it was built on, when the project recorded one. */
+  system?: { id: string; label: string } | null;
   /** For a document of a type an installed app adds: the type's name, shown where a design shows its kind. */
   appKind?: string;
 }
@@ -132,6 +159,8 @@ export interface IDesignlyHomeProps {
   onPin: (id: string, pinned: boolean) => Promise<void>;
   /** Moves a project to the trash; resolves once the machine did, rejects (the caller says why) when it did not. */
   onDelete?: (id: string) => Promise<void>;
+  /** Folders, moving and the trash; absent where the machine cannot lay the library out. */
+  organizer?: ILibraryOrganizer;
   /** Copies back the demo projects the library no longer has; resolves once the list has them. */
   onRestoreDemo?: () => Promise<void>;
   onOpen: (id: string) => void;
@@ -147,41 +176,6 @@ export interface IDesignlyVoice {
   onCancel: () => void;
   onFinish: () => void;
 }
-
-/** The confirmation leaves this long (shell.css, .hx-modal). */
-const DELETE_EXIT_MS = 240;
-
-interface IDeleteConfirmProps {
-  card: IDesignCard | null;
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}
-
-/** «Удалить проект?»: names the project, asks once; Esc and «Отмена» close it, nothing is done before the machine answers. */
-const DeleteConfirm = ({ card, busy, onCancel, onConfirm }: IDeleteConfirmProps) => {
-  const shown = usePresence(card, DELETE_EXIT_MS).value;
-  return (
-    <Modal
-      open={card !== null}
-      onClose={() => {
-        if (!busy) onCancel();
-      }}
-      title={t('next.designly.deleteTitle', { title: shown?.title ?? '' })}
-      lead={t('next.designly.deleteLead')}
-      boxClass="hx-leave"
-    >
-      <div className="hx-modal__foot">
-        <Button variant="ghost" disabled={busy} onClick={onCancel}>
-          {t('next.designly.deleteCancel')}
-        </Button>
-        <Button variant="danger" busy={busy} onClick={onConfirm}>
-          {t('next.designly.deleteConfirm')}
-        </Button>
-      </div>
-    </Modal>
-  );
-};
 
 /** The recording bar's exit, as long as hx-recbar-out in composer.css. */
 const REC_EXIT_MS = 180;
@@ -640,26 +634,104 @@ interface IDesignCardProps {
   now: number;
   pinning: boolean;
   deletable: boolean;
+  /** Folders exist: the menu offers «Переместить в…». */
+  movable: boolean;
+  selecting: boolean;
+  selected: boolean;
   onOpen: (id: string) => void;
   onPin: (card: IDesignCard) => void;
   onDelete: (card: IDesignCard) => void;
+  onMove: (card: IDesignCard) => void;
+  onSelect: (card: IDesignCard) => void;
 }
+
+/** «…» of a card: move it, select it, delete it (the owner's). */
+const CardMenu = ({
+  card,
+  deletable,
+  movable,
+  onDelete,
+  onMove,
+  onSelect,
+}: Pick<IDesignCardProps, 'card' | 'deletable' | 'movable' | 'onDelete' | 'onMove' | 'onSelect'>) => {
+  const actions = useMenuActions();
+  return (
+    <Menu.Root actionsRef={actions}>
+      <Menu.Trigger
+        className="hx-dl-card__del"
+        aria-label={t('next.designly.cardMenu', { title: card.title })}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Icon name="ellipsis" size="sm" />
+      </Menu.Trigger>
+      <MenuPanel
+        actions={actions}
+        className="hx-cmenu"
+        label={card.title}
+        side="bottom"
+        align="start"
+        sideOffset={6}
+      >
+        {movable && (
+          <Menu.Item className="hx-cmenu__item" onClick={() => onMove(card)}>
+            <Icon name="folder-input" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.designly.moveTo')}</span>
+          </Menu.Item>
+        )}
+        <Menu.Item className="hx-cmenu__item" onClick={() => onSelect(card)}>
+          <Icon name="list-checks" size="sm" />
+          <span className="hx-cmenu__txt">{t('next.designly.select')}</span>
+        </Menu.Item>
+        {deletable && (
+          <>
+            <Menu.Separator className="hx-cmenu__sep" />
+            <Menu.Item className="hx-cmenu__item" data-danger="true" onClick={() => onDelete(card)}>
+              <Icon name="trash-2" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.designly.delete')}</span>
+            </Menu.Item>
+          </>
+        )}
+      </MenuPanel>
+    </Menu.Root>
+  );
+};
 
 /** One card of the library. Memoized: a keystroke in the field above does not draw the library again. */
 const DesignCard = memo(
-  ({ card, index, now, pinning, deletable, onOpen, onPin, onDelete }: IDesignCardProps) => (
+  ({
+    card,
+    index,
+    now,
+    pinning,
+    deletable,
+    movable,
+    selecting,
+    selected,
+    onOpen,
+    onPin,
+    onDelete,
+    onMove,
+    onSelect,
+  }: IDesignCardProps) => (
     <div
       data-id={card.id}
       className="hx-dl-card"
       data-state={card.drawing ? 'gen' : 'ready'}
       data-pinned={card.pinned}
+      data-selecting={selecting || undefined}
+      data-selected={selected || undefined}
       data-i={Math.min(index, 8)}
       tabIndex={0}
       role="button"
       aria-label={card.title}
-      onClick={() => onOpen(card.id)}
+      onClick={(event) =>
+        selecting || event.shiftKey || event.metaKey || event.ctrlKey ? onSelect(card) : onOpen(card.id)
+      }
       onKeyDown={(event) => {
-        if (event.key === 'Enter' && event.target === event.currentTarget) onOpen(card.id);
+        if (event.key === 'Enter' && event.target === event.currentTarget) {
+          if (selecting) onSelect(card);
+          else onOpen(card.id);
+        }
       }}
     >
       <div className="hx-dl-card__shot">
@@ -684,21 +756,20 @@ const DesignCard = memo(
             </span>
           </button>
         )}
-        {deletable && (
-          <button
-            type="button"
-            className="hx-dl-card__del hx-tipped"
-            aria-label={t('next.designly.delete')}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(card);
-            }}
-          >
-            <Icon name="trash-2" size="sm" />
-            <span className="hx-tip" data-pos="below" data-align="start">
-              {t('next.designly.delete')}
-            </span>
-          </button>
+        {!selecting && !card.appKind && (movable || deletable) && (
+          <CardMenu
+            card={card}
+            deletable={deletable}
+            movable={movable}
+            onDelete={onDelete}
+            onMove={onMove}
+            onSelect={onSelect}
+          />
+        )}
+        {selecting && (
+          <span className="hx-dl-card__check" aria-hidden="true">
+            <Icon name="check" size="sm" />
+          </span>
         )}
         <span className="hx-dl-card__gen">
           <Icon name="loader-circle" size="sm" />
@@ -735,6 +806,7 @@ const DesignlyHome = ({
   now,
   onPin,
   onDelete,
+  organizer,
   onRestoreDemo,
   onOpen,
   onRetry,
@@ -742,9 +814,18 @@ const DesignlyHome = ({
 }: IDesignlyHomeProps) => {
   const [pinning, setPinning] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
-  const [deleting, setDeleting] = useState<IDesignCard | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
   const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<ILibraryFilters>(NO_FILTERS);
+  // The folder open ('' is the library itself), the trash, the selection and the dialogs.
+  const [folder, setFolder] = useState('');
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [moving, setMoving] = useState<string[] | null>(null);
+  const [folderForm, setFolderForm] = useState<IFolderForm | null>(null);
+  const [folderDelete, setFolderDelete] = useState<IFolder | null>(null);
+  const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
+  const selbar = usePresentFlag(selecting, 200);
   const [scope, setScope] = useState<TDesignScope>(DESIGN_SCOPE.all);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -790,13 +871,26 @@ const DesignlyHome = ({
   };
 
   const q = query.trim().toLowerCase();
-  // Pinned first, then the latest change.
-  const shown = useMemo(
-    () =>
-      cards
-        ?.filter((c) => inScope(scope, c.owner) && (!q || c.title.toLowerCase().includes(q)))
-        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt) ?? null,
-    [cards, scope, q],
+  const folders = organizer?.folders ?? [];
+  // A search or a filter looks through every folder; with none, the library shows the folder that is open.
+  const searching = q !== '' || isNarrowed(filters);
+  const here = folders.some((f) => f.id === folder) ? folder : '';
+  const shown = useMemo(() => {
+    if (cards === null) return null;
+    const list = cards.filter(
+      (c) =>
+        inScope(scope, c.owner) &&
+        (!q || c.title.toLowerCase().includes(q)) &&
+        matchesFilters(c, filters, now) &&
+        (searching || !organizer || (c.folder ?? '') === here),
+    );
+    return sortCards(list, filters.sort);
+  }, [cards, scope, q, filters, now, searching, organizer, here]);
+  const systems = useMemo(() => systemsOf(cards ?? []), [cards]);
+  const subfolders = !searching && !trashOpen ? childrenOf(folders, here) : [];
+  const projectIds = useMemo(
+    () => new Set((cards ?? []).filter((c) => !c.appKind).map((c) => c.id)),
+    [cards],
   );
 
   // Pinning: the cards were measured before the machine kept the pin; when the new order is on screen, each one
@@ -845,16 +939,49 @@ const DesignlyHome = ({
       });
   });
 
-  const confirmDelete = () => {
-    if (!deleting || !onDelete || deleteBusy) return;
-    setDeleteBusy(true);
-    void onDelete(deleting.id)
-      // A refusal is said by the caller; the question stays so the person can try again or cancel.
-      .then(
-        () => setDeleting(null),
-        () => undefined,
-      )
-      .finally(() => setDeleteBusy(false));
+  const deletableIds = (ids: readonly string[]) =>
+    ids.filter((id) => cards?.find((c) => c.id === id)?.canDelete === true);
+  const deleteIds = (ids: string[]): Promise<void> => {
+    if (organizer) return organizer.onDeleteMany(ids);
+    return ids.reduce<Promise<void>>((chain, id) => chain.then(() => onDelete?.(id)), Promise.resolve());
+  };
+  const canDeleteHere = organizer !== undefined || onDelete !== undefined;
+
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+  const toggle = useStableFn((card: IDesignCard) => {
+    if (card.appKind) return;
+    setSelecting(true);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(card.id)) next.add(card.id);
+      return next;
+    });
+  });
+  const moveOne = useStableFn((card: IDesignCard) => setMoving([card.id]));
+  const deleteOne = useStableFn((card: IDesignCard) => void deleteIds([card.id]).catch(() => undefined));
+  const dropped = (ids: string[], target: string) => {
+    if (!organizer) return;
+    organizer.onMove(ids, target).then(stopSelecting, () => undefined);
+  };
+  useCardDrag(gridEl, {
+    enabled: organizer !== undefined && !trashOpen,
+    carry: (id) => (selected.has(id) ? [...selected] : [id]),
+    onDrop: dropped,
+  });
+  const openFolder = (id: string) => {
+    setFolder(id);
+    stopSelecting();
+  };
+  const newFolder = () => {
+    const current = folders.find((f) => f.id === here);
+    setFolderForm({ parent: current ? (current.parent === '' ? current.id : current.parent) : '' });
+  };
+  const movingFrom = (ids: string[] | null): string | null => {
+    const places = new Set((ids ?? []).map((id) => cards?.find((c) => c.id === id)?.folder ?? ''));
+    return places.size === 1 ? ([...places][0] ?? null) : null;
   };
 
   return (
@@ -897,7 +1024,49 @@ const DesignlyHome = ({
           )}
         </div>
 
-        {cards === null && error !== null && (
+        {organizer && !trashOpen && (
+          <LibraryBar
+            filters={filters}
+            onFilters={setFilters}
+            systems={systems}
+            tools={{
+              selecting,
+              trashOpen,
+              onNewFolder: newFolder,
+              onSelect: () => (selecting ? stopSelecting() : setSelecting(true)),
+              onTrash: () => {
+                stopSelecting();
+                setTrashOpen(true);
+              },
+            }}
+          />
+        )}
+        {!organizer && <LibraryBar filters={filters} onFilters={setFilters} systems={systems} tools={null} />}
+
+        {trashOpen && organizer && (
+          <TrashView
+            items={organizer.trash}
+            now={now}
+            load={organizer.loadTrash}
+            onBack={() => setTrashOpen(false)}
+            onRestore={organizer.onRestore}
+            onPurge={organizer.onPurge}
+          />
+        )}
+
+        {!trashOpen && organizer && !searching && here !== '' && (
+          <Crumbs folders={folders} current={here} onOpen={openFolder} />
+        )}
+        {!trashOpen && organizer && subfolders.length > 0 && (
+          <FolderTiles
+            folders={subfolders}
+            onOpen={openFolder}
+            onRename={(f) => setFolderForm({ folder: f, parent: f.parent })}
+            onDelete={setFolderDelete}
+          />
+        )}
+
+        {!trashOpen && cards === null && error !== null && (
           <LoadFailed
             size={LOAD_FAILED_SIZE.page}
             title={t('next.designly.failed')}
@@ -905,10 +1074,16 @@ const DesignlyHome = ({
             onRetry={onRetry}
           />
         )}
-        {(cards !== null || error === null) && (
+        {!trashOpen && (cards !== null || error === null) && (
           <Swap ready={shown !== null} skeleton={<LibrarySkeleton />}>
             {shown && shown.length > 0 && (
-              <div className="hx-dl__grid" ref={gridRef}>
+              <div
+                className="hx-dl__grid"
+                ref={(el) => {
+                  gridRef.current = el;
+                  setGridEl(el);
+                }}
+              >
                 {shown.map((card, i) => (
                   <DesignCard
                     key={card.id}
@@ -916,49 +1091,132 @@ const DesignlyHome = ({
                     index={i}
                     now={now}
                     pinning={pinning === card.id}
-                    deletable={onDelete !== undefined && card.canDelete === true}
+                    deletable={canDeleteHere && card.canDelete === true}
+                    movable={organizer !== undefined}
+                    selecting={selecting}
+                    selected={selected.has(card.id)}
                     onOpen={open}
                     onPin={pin}
-                    onDelete={setDeleting}
+                    onDelete={deleteOne}
+                    onMove={moveOne}
+                    onSelect={toggle}
                   />
                 ))}
               </div>
             )}
           </Swap>
         )}
-        {shown && shown.length === 0 && <div className="hx-dl__empty">{t(emptyKey(scope, q !== ''))}</div>}
-        {compose && cards !== null && q === '' && scope === DESIGN_SCOPE.all && (
-          <nav className="hx-dl__lessons" aria-label={t('next.tour.lessons')}>
-            <span className="hx-dl__lessons-hint">{t('next.tour.lessonsHint')}</span>
-            {TOUR_ORDER.map((k) => (
-              <button key={k} type="button" className="hx-dl__lesson" onClick={() => startTour(k)}>
-                {t(`next.tour.${k}.lesson`)}
-              </button>
-            ))}
-          </nav>
+        {!trashOpen && shown && shown.length === 0 && (
+          <div className="hx-dl__empty">
+            {t(
+              here !== '' && !searching
+                ? 'next.designly.emptyFolder'
+                : emptyKey(scope, q !== '' || isNarrowed(filters)),
+            )}
+          </div>
         )}
-        {onRestoreDemo && cards !== null && q === '' && scope === DESIGN_SCOPE.all && demoMissing(cards) && (
+        {compose &&
+          cards !== null &&
+          !trashOpen &&
+          !searching &&
+          here === '' &&
+          scope === DESIGN_SCOPE.all && (
+            <nav className="hx-dl__lessons" aria-label={t('next.tour.lessons')}>
+              <span className="hx-dl__lessons-hint">{t('next.tour.lessonsHint')}</span>
+              {TOUR_ORDER.map((k) => (
+                <button key={k} type="button" className="hx-dl__lesson" onClick={() => startTour(k)}>
+                  {t(`next.tour.${k}.lesson`)}
+                </button>
+              ))}
+            </nav>
+          )}
+        {onRestoreDemo &&
+          cards !== null &&
+          !trashOpen &&
+          !searching &&
+          here === '' &&
+          scope === DESIGN_SCOPE.all &&
+          demoMissing(cards) && (
+            <button
+              type="button"
+              className="hx-dl__demo"
+              disabled={restoring}
+              onClick={() => {
+                setRestoring(true);
+                onRestoreDemo()
+                  .catch(() => undefined)
+                  .finally(() => setRestoring(false));
+              }}
+            >
+              {t('next.designly.restoreDemo')}
+            </button>
+          )}
+      </div>
+      {organizer && selbar.mounted && (
+        <div
+          className="hx-dl__selbar"
+          data-state={selbar.state}
+          role="toolbar"
+          aria-label={t('next.designly.selection')}
+        >
+          <span className="hx-dl__selbar-n">{plural(selected.size, 'next.designly.selected')}</span>
           <button
             type="button"
-            className="hx-dl__demo"
-            disabled={restoring}
+            className="hx-dl__chip"
+            disabled={selected.size === 0}
+            onClick={() => setMoving([...selected])}
+          >
+            <Icon name="folder-input" size="sm" />
+            {t('next.designly.moveTo')}
+          </button>
+          <button
+            type="button"
+            className="hx-dl__chip"
+            data-danger="true"
+            disabled={deletableIds([...selected]).length === 0}
             onClick={() => {
-              setRestoring(true);
-              onRestoreDemo()
-                .catch(() => undefined)
-                .finally(() => setRestoring(false));
+              void deleteIds(deletableIds([...selected])).then(stopSelecting, () => undefined);
             }}
           >
-            {t('next.designly.restoreDemo')}
+            <Icon name="trash-2" size="sm" />
+            {t('next.designly.delete')}
           </button>
-        )}
-      </div>
-      <DeleteConfirm
-        card={deleting}
-        busy={deleteBusy}
-        onCancel={() => setDeleting(null)}
-        onConfirm={confirmDelete}
-      />
+          <button type="button" className="hx-dl__chip" onClick={stopSelecting}>
+            {t('next.designly.done')}
+          </button>
+        </div>
+      )}
+      {organizer && (
+        <>
+          <FolderNameDialog
+            form={folderForm}
+            onClose={() => setFolderForm(null)}
+            onSave={organizer.onFolderSave}
+          />
+          <FolderDeleteDialog
+            folder={folderDelete}
+            projects={folderDelete ? projectsIn(cards ?? [], folders, folderDelete.id) : 0}
+            onClose={() => setFolderDelete(null)}
+            onDelete={async (id, mode) => {
+              await organizer.onFolderDelete(id, mode);
+              if (id === here) setFolder('');
+            }}
+          />
+          <MoveDialog
+            ids={moving}
+            folders={folders}
+            from={movingFrom(moving)}
+            onClose={() => setMoving(null)}
+            onMove={async (ids, target) => {
+              await organizer.onMove(
+                ids.filter((id) => projectIds.has(id)),
+                target,
+              );
+              stopSelecting();
+            }}
+          />
+        </>
+      )}
     </section>
   );
 };
