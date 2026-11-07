@@ -30,6 +30,9 @@ type Claim struct {
 	// ParentOrigin is the platform's page origin the in-page bridge talks to; "" when the gateway sent none, and then
 	// there is no bridge.
 	ParentOrigin string
+	// Carried: the gateway took the slot's session from the address, not a cookie (an app's view frame sends none). Such
+	// a session is a bearer link, so the proxy opens only the apps' view server with it (Config.CarriedPort).
+	Carried bool
 	// PathPrefix is the slot's path on the page's own origin when the slot goes by path (<appBase>/__pv/<n>, a
 	// standalone runtime's preview without origins of its own); "" for a slot origin of its own. SlotOrigin ends with it.
 	PathPrefix string
@@ -168,6 +171,12 @@ func parseClaim(payload *jsvalue.Object, local bool) (*Claim, bool) {
 			return nil, false
 		}
 		c.ParentOrigin = parent
+	}
+	if raw, present := payload.Get("carry"); present {
+		if v, isString := raw.(string); !isString || v != "path" {
+			return nil, false
+		}
+		c.Carried = true
 	}
 	return c, true
 }

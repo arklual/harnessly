@@ -27,6 +27,11 @@ export const openPreview = (
   slot: number,
   path = '/',
   neighbours: readonly number[] = [],
+  /**
+   * `path`: the slot's session rides in the address instead of a cookie. An app's view runs in an opaque-origin frame,
+   * whose loads the browser files under another cookie partition than the enter navigation, so a cookie never comes along.
+   */
+  carry?: 'path',
 ) =>
   runtimeJson<IPreviewSlot>(
     m,
@@ -36,6 +41,7 @@ export const openPreview = (
       slot,
       path,
       ...(target.kind === 'port' && neighbours.length > 0 ? { neighbours: [...neighbours] } : {}),
+      ...(carry ? { carry } : {}),
     }),
   ).then((opened) => ({
     ...opened,

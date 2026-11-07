@@ -220,7 +220,7 @@ const AppFrame = ({
       })
         .then(async (made) => {
           if (made.path === undefined) throw new Error(t('next.appview.noEntry'));
-          const o = await openPreview(machine, { kind: 'port', port: viewPort }, slot, made.path);
+          const o = await openPreview(machine, { kind: 'port', port: viewPort }, slot, made.path, [], 'path');
           if (live)
             setOpened({ key, src: o.enterUrl, session: made.session, nonce: made.nonce, error: null });
         })

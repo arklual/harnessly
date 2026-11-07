@@ -272,6 +272,16 @@ func (s *ViewServer) Handler() http.Handler {
 		}
 		token, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 		sess, live := s.Sessions.Get(token)
+		// The SDK's files under the session's own path too: a view's page reaches them by a relative path (relativeSDK),
+		// so a gateway that carries the slot's session in the address (an opaque frame sends no cookie) keeps it on them.
+		if name, isSDK := strings.CutPrefix(rest, "__hl/"); isSDK && live {
+			if body, typ, found := sdkFile(name); found {
+				serveBytes(w, r, typ, body)
+				return
+			}
+			http.NotFound(w, r)
+			return
+		}
 		id, rel, ok := strings.Cut(rest, "/")
 		if !live || !ok || id != sess.App || !idRe.MatchString(id) {
 			http.NotFound(w, r)
@@ -305,14 +315,18 @@ func (s *ViewServer) Handler() http.Handler {
 		}
 		size := info.Size()
 		var page []byte
-		if strings.HasPrefix(contentType(full), "text/html") {
-			// A page of the view carries the session's nonce, for the bridge to check (see injectNonce).
+		ct := contentType(full)
+		if isHTML, isJS := strings.HasPrefix(ct, "text/html"), strings.HasPrefix(ct, "text/javascript"); isHTML || isJS {
 			raw, err := io.ReadAll(io.LimitReader(f, maxViewBytes+1))
 			if err != nil || len(raw) > maxViewBytes {
 				http.NotFound(w, r)
 				return
 			}
-			page = injectNonce(raw, sess.Nonce)
+			// The SDK by a path relative to the file, and a page with the session's nonce for the bridge to check.
+			page = relativeSDK(raw, rel, isJS)
+			if isHTML {
+				page = injectNonceShim(page, sess.Nonce, strings.Repeat("../", strings.Count(rel, "/")+1)+"__hl/bridge-shim.js")
+			}
 			size = int64(len(page))
 		}
 		h := w.Header()
@@ -394,6 +408,26 @@ func splice(page []byte, at int, insert string) []byte {
 	out = append(out, page[:at]...)
 	out = append(out, insert...)
 	return append(out, page[at:]...)
+}
+
+// sdkFile is one of the SDK's own files by its name under /__hl/.
+func sdkFile(name string) ([]byte, string, bool) {
+	const js, css = "text/javascript; charset=utf-8", "text/css; charset=utf-8"
+	switch "/__hl/" + name {
+	case SDKPath:
+		return classicSDK(), js, true
+	case SDKModulePath:
+		return sdkJS, js, true
+	case ShimPath:
+		return shimJS, js, true
+	case WidgetBaseCSSPath:
+		return widgetCSS, css, true
+	case UICSSPath:
+		return hlUICSS, css, true
+	case EChartsPath:
+		return echartsJS, js, true
+	}
+	return nil, "", false
 }
 
 func serveBytes(w http.ResponseWriter, r *http.Request, typ string, body []byte) {

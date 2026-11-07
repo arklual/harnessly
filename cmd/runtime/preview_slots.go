@@ -657,7 +657,9 @@ func (s *previewSlots) enter(w http.ResponseWriter, r *http.Request, slot int, s
 	h := w.Header()
 	// Storage, IndexedDB and a service worker of whatever the slot showed before stay with the slot's origin: wiped
 	// unless the slot already showed this target after a wipe. Not "cookies": those are the app's host's too.
-	if previous == nil || previous.target != ticket.target || !previous.cleared {
+	// An app's view keeps nothing there to wipe or to be wiped for: its frame's origin is opaque and service workers are
+	// refused, while the wipe holds the answer back, longer the more the browser keeps, on every open of a view.
+	if !ticket.showsAppViews() && (previous == nil || previous.target != ticket.target || !previous.cleared) {
 		h.Set("Clear-Site-Data", `"cache", "storage"`)
 	}
 	ticket.cleared = true
@@ -703,7 +705,9 @@ func (s *previewSlots) forward(w http.ResponseWriter, r *http.Request, set *prev
 	if prefix != "" {
 		claim["pathPrefix"] = prefix
 	}
-	if cfg.Bridge != nil {
+	// An app's view talks to the page through its own shim: the page bridge would be one more script that holds the
+	// view's page back, and its frame's opaque origin sends the bridge's load no cookie anyway.
+	if cfg.Bridge != nil && !sess.showsAppViews() {
 		if _, ok := cfg.Bridge(); ok {
 			claim["parentOrigin"] = sess.app
 		}

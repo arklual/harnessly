@@ -54,6 +54,8 @@ type Config struct {
 	// LocalOrigins: the claims come from this runtime's own slot listeners (a standalone runtime), whose slot and page
 	// origins may be plain http and carry a port, like http://localhost:8023. The fleet gateway's are always https.
 	LocalOrigins bool
+	// CarriedPort is the only port a session carried in the address may open (the apps' view server); 0 or nil: none.
+	CarriedPort func() int
 
 	// Tests: where names point, the address of a port, the CA of an https target, shorter timeouts.
 	Resolve      func(host string) Resolved
@@ -420,6 +422,9 @@ func (p *Proxy) admit(r *http.Request) admission {
 	if c == nil {
 		return admission{status: 401, text: locale.Pick("The preview session has expired: press \"Reload\" in the preview window", "Сессия превью устарела — нажмите «Перезагрузить» в окне превью")}
 	}
+	if c.Carried && (p.cfg.CarriedPort == nil || c.Target.Kind != "port" || c.Target.Port == 0 || c.Target.Port != p.cfg.CarriedPort()) {
+		return admission{status: 403, text: locale.Pick("This link opens only an app's view", "По такой ссылке открывается только окно приложения")}
+	}
 	path := p.upstreamPath(r)
 	if c.Target.Kind == "url" {
 		u, _ := weburl.Parse(c.Target.Origin)
@@ -440,6 +445,10 @@ func (p *Proxy) admit(r *http.Request) admission {
 	rt := routeOf(c, c.Target.Port, path)
 	if rt == nil {
 		return admission{status: 404, text: locale.Pick("This port is not open in the preview", "Этот порт не открыт в превью")}
+	}
+	// A neighbour's path would lead a carried session to another port than the view server.
+	if c.Carried && (rt.kind != "port" || rt.port != c.Target.Port || rt.basePath != "") {
+		return admission{status: 403, text: locale.Pick("This link opens only an app's view", "По такой ссылке открывается только окно приложения")}
 	}
 	forbidden := map[int]bool{}
 	if p.cfg.Forbidden != nil {

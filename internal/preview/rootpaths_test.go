@@ -2,8 +2,11 @@ package preview
 
 import (
 	"bytes"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
@@ -102,5 +105,42 @@ func TestClaimPathPrefix(t *testing.T) {
 	}
 	if _, ok := parseClaim(claim("https://h.example/agents/__pv/1"+k, "/agents/__pv/1"+k), false); ok {
 		t.Error("only a standalone runtime's own claim goes by path")
+	}
+}
+
+func TestCarriedClaimOpensOnlyTheViewServer(t *testing.T) {
+	secret := []byte("0123456789abcdef0123456789abcdef")
+	claim := func(port int, carry string) string {
+		raw := `{"sub":"u","target":{"kind":"port","port":` + strconv.Itoa(port) + `},"slotOrigin":"https://s.example",` +
+			`"portSlots":{"` + strconv.Itoa(port) + `":"https://s.example"}` + carry + `}`
+		return signClaim(secret, []byte(raw))
+	}
+	p := &Proxy{cfg: Config{ClaimHeader: "x-claim", Audience: "acme-preview-proxy", Secret: secret, CarriedPort: func() int { return 4300 }}}
+	admit := func(token string) admission {
+		r := httptest.NewRequest("GET", "https://s.example/x.js", nil)
+		r.Header.Set("x-claim", token)
+		return p.admit(r)
+	}
+	for name, token := range map[string]string{
+		"a dev server by a link": claim(5173, `,"carry":"path"`),
+		"an unknown carry":       claim(4300, `,"carry":"cookie"`),
+	} {
+		if a := admit(token); a.claim != nil || a.status == 0 {
+			t.Errorf("%s: admitted", name)
+		}
+	}
+	if c := verifyClaim(claim(4300, `,"carry":"path"`), secret, "acme-preview-proxy", time.Now(), false); c == nil || !c.Carried {
+		t.Fatalf("the view server's link: %+v", c)
+	}
+	neighbour := signClaim(secret, []byte(`{"sub":"u","target":{"kind":"port","port":4300},"slotOrigin":"https://s.example",`+
+		`"portSlots":{"4300":"https://s.example","5173":"https://s.example/__tk/p/5173"},"carry":"path"}`))
+	r := httptest.NewRequest("GET", "/__tk/p/5173/x.js", nil)
+	r.Header.Set("x-claim", neighbour)
+	if a := p.admit(r); a.status != 403 {
+		t.Errorf("a carried session to a neighbour port: %d", a.status)
+	}
+	p.cfg.CarriedPort = nil
+	if a := admit(claim(4300, `,"carry":"path"`)); a.status != 403 {
+		t.Errorf("no view server: %d", a.status)
 	}
 }

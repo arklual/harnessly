@@ -152,9 +152,21 @@ func TestViewPagesCarryTheSessionNonce(t *testing.T) {
 		}
 		return rec.Body.String()
 	}
-	// The nonce's meta is followed at once by the shim's script tag, before any other script of the page.
+	// The nonce's meta is followed at once by the shim's script tag, before any other script of the page; the shim and
+	// the SDK go by a path relative to the page (ui/index.html), under the session's own path.
 	meta := func(n string) string {
-		return `<meta name="` + NonceMeta + `" content="` + n + `"><script src="` + ShimPath + `"></script>`
+		return `<meta name="` + NonceMeta + `" content="` + n + `"><script src="../../__hl/bridge-shim.js"></script>`
+	}
+	if body := page(one); !strings.Contains(body, `<script src="../../__hl/app-sdk.js">`) || strings.Contains(body, `"/__hl/`) {
+		t.Errorf("the SDK is not relative to the page: %s", body)
+	}
+	for _, name := range []string{"app-sdk.js", "bridge-shim.js", "app-sdk.mjs", "hl-ui.css", "lib/echarts.js"} {
+		if rec := get(t, s.Handler(), "/"+one.Token+"/__hl/"+name); rec.Code != 200 {
+			t.Errorf("the SDK's %s under the session: %d", name, rec.Code)
+		}
+	}
+	if rec := get(t, s.Handler(), "/not-a-session/__hl/app-sdk.js"); rec.Code != 404 {
+		t.Errorf("the SDK under a dead session: %d", rec.Code)
 	}
 	if body := page(one); !strings.Contains(body, meta(one.Nonce)) || strings.Contains(body, two.Nonce) {
 		t.Errorf("the page does not carry its own session's nonce: %s", body)
@@ -165,6 +177,9 @@ func TestViewPagesCarryTheSessionNonce(t *testing.T) {
 	// Scripts and other files are served as they are.
 	if rec := get(t, s.Handler(), "/"+one.Token+"/acme.demo/ui/app.js"); strings.Contains(rec.Body.String(), "hl-nonce") {
 		t.Error("a script got the nonce")
+	}
+	meta = func(n string) string {
+		return `<meta name="` + NonceMeta + `" content="` + n + `"><script src="` + ShimPath + `"></script>`
 	}
 	for in, want := range map[string]string{
 		"<!doctype html><html><head><title>x</title></head></html>": "<head>" + meta("N") + "<title>",

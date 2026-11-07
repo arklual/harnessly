@@ -164,6 +164,7 @@ func previewOf(d deps) *previewSet {
 		Store:        store,
 		Cache:        preview.NewAssetCache(filepath.Join(d.DataDir, "preview-cache"), preview.DefaultMaxTotalBytes, preview.DefaultMaxFileBytes),
 		Bridge:       previewBridgeScript(os.Getenv("RUNTIME_PREVIEW_BRIDGE_FILE")),
+		CarriedPort:  func() int { return int(appViewPort.Load()) },
 	}
 	if d.Upstream != "" {
 		cfg.Fallback = previewOldRuntime(d.Upstream)

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
@@ -119,5 +120,31 @@ func TestAppViewAssetGoesWithoutTheSlotCookie(t *testing.T) {
 	appViewPort.Store(42213)
 	if sess := appViewSession("https://slot.example"); !sess.showsAppViews() || sess.origin != "https://slot.example" {
 		t.Errorf("the session goes to the view server under the slot's origin: %+v", sess)
+	}
+}
+
+func TestAppViewEnterKeepsTheSlot(t *testing.T) {
+	t.Cleanup(func() { appViewPort.Store(0) })
+	secret := []byte("0123456789abcdef0123456789abcdef")
+	s := &previewSlots{ports: []int{18734}, spent: map[string]int64{}}
+	enter := func(port int, jti string) http.Header {
+		t.Helper()
+		ticket := agent.SignPayload(secret, previewTicketAudience, map[string]any{"sub": "user", "slot": 1,
+			"origin": "http://127.0.0.1:18734", "app": "http://127.0.0.1:18733", "jti": jti, "path": "/",
+			"target": map[string]any{"kind": "port", "port": port}}, time.Minute)
+		w := httptest.NewRecorder()
+		s.enter(w, httptest.NewRequest("GET", "http://127.0.0.1:18734/__tk/enter?t="+ticket, nil), 1, secret, "")
+		if w.Code != http.StatusFound {
+			t.Fatalf("enter %d: %d %s", port, w.Code, w.Body)
+		}
+		return w.Header()
+	}
+	appViewPort.Store(42213)
+	// A dev server's first open wipes what the slot showed before; an app's view has nothing there to wipe.
+	if enter(3000, "a").Get("Clear-Site-Data") == "" {
+		t.Fatal("a dev server's enter without the wipe")
+	}
+	if h := enter(42213, "b"); h.Get("Clear-Site-Data") != "" {
+		t.Fatalf("an app view's enter wipes the slot: %v", h)
 	}
 }
