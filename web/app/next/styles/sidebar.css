@@ -1013,7 +1013,24 @@ a.hx-brand__name {
   border-radius: 50%;
   background: var(--hx-accent);
   box-shadow: 0 0 0 2px var(--hx-bg-side, var(--hx-bg-app));
-  animation: hx-plus-in 200ms var(--hx-ease-out) backwards;
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 160ms cubic-bezier(0.4, 0, 1, 1),
+    transform 160ms cubic-bezier(0.4, 0, 1, 1);
+}
+/* The dot stays mounted so it can leave as smoothly as it came: it grows in and shrinks away. */
+.hx-user__dot[data-on='true'] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 220ms var(--hx-ease-out),
+    transform 260ms var(--hx-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-user__dot {
+    transform: none;
+  }
 }
 .hx-user:hover {
   background: none;
@@ -1907,9 +1924,22 @@ button.hx-project__add {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.hx-user__theme {
+.hx-user__bell {
+  position: relative;
   flex: none;
-  transition: opacity 260ms ease 120ms;
+  margin-left: auto;
+}
+/* Something in the notification centre is unread: one accent dot on the bell. */
+.hx-user__dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  box-shadow: 0 0 0 2px var(--hx-bg-side, var(--hx-bg-app));
+  animation: hx-plus-in 200ms var(--hx-ease-out) backwards;
 }
 
 /* Chats started by one prompt on several models: the prompt names the group, each chat below it is a model. */

@@ -12,7 +12,8 @@
         "prompt": {"type": "string", "description": "The task, complete: goal, context, files, what to answer with."},
         "cwd": {"type": "string", "description": "Absolute folder to work in, inside this chat's folder or one of the machine's projects; omit for this chat's folder."},
         "title": {"type": "string", "description": "A short name for the chat, as the person sees it in the sidebar."},
-        "notify": {"type": "boolean", "description": "Wake this chat with the result when the other agent finishes a turn (it arrives as a message from that agent). Default false."}
+        "notify": {"type": "boolean", "description": "Wake this chat with the result when the other agent finishes a turn (it arrives as a message from that agent). Default false."},
+        "test": {"type": "boolean", "description": "Mark the chat as a test chat: the person's sidebar leaves it out (they can show test chats). Set it for a chat you start only to check something. Default false."}
       },
       "required": ["provider", "prompt"],
       "additionalProperties": false

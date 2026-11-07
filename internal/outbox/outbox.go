@@ -54,6 +54,10 @@ const (
 
 	// A message carried by the launch of the agent (its first prompt) is waited for this long: a start can be slow.
 	CarryDeadline = 90 * time.Second
+	// GatherMaxText is the longest message the line's gathering makes (UTF-16 units): a long paste is refused by Claude
+	// Code without a word, so messages that would make more are typed one after another, each whole.
+	GatherMaxText = 8_000
+
 	// MaxCarriedText is the longest text a launch carries (the agent launcher caps a first prompt there).
 	MaxCarriedText = 20_000
 
@@ -491,7 +495,7 @@ func (b *Box) gather(ch *Change, into *Record, now time.Time) {
 	for _, r := range order {
 		if r != into {
 			add := jscompat.Len(r.Message.Text) + 2
-			if size+add > b.limits.MaxText || count+len(r.Message.Attachments) > b.limits.MaxAttachments {
+			if size+add > min(b.limits.MaxText, GatherMaxText) || count+len(r.Message.Attachments) > b.limits.MaxAttachments {
 				continue
 			}
 			size, count = size+add, count+len(r.Message.Attachments)

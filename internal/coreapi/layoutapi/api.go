@@ -126,6 +126,7 @@ type DelegateRequest struct {
 	Prompt   string
 	Title    string
 	Notify   bool
+	Test     bool
 }
 
 // DelegateResult is the nested chat that was started.

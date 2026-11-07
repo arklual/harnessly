@@ -41,7 +41,7 @@ const q = (params: Record<string, string | number>) =>
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join('&');
 
-const jsonInit = (method: 'PUT' | 'PATCH', body: unknown): RequestInit => ({
+const jsonInit = (method: 'PUT' | 'PATCH' | 'POST', body: unknown): RequestInit => ({
   method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
@@ -295,3 +295,82 @@ export const putDeckPdfAuto = async (
 /** Where a finished export downloads from (an attachment named after the deck). */
 export const deckExportHref = (m: MachineId, artifact: string, job: string) =>
   runtimePath(deck(`/export/file?${q({ artifact, job })}`), m);
+
+// ---- the fonts the installed kits offer a deck
+
+export interface IKitFont {
+  /** kit:<kit>:<version>:<font> */
+  id: `kit:${string}`;
+  family: string;
+  kit: string;
+  restricted: boolean;
+}
+
+/** The fonts of the machine's kits; empty when there are none or the list cannot be read. */
+export const fetchKitFonts = async (m: MachineId, signal?: AbortSignal): Promise<IKitFont[]> => {
+  const res = await fetch(runtimePath(platformPath('/design/kit/fonts' as TPath), m), {
+    credentials: 'same-origin',
+    signal,
+  });
+  if (!res.ok) return [];
+  const body: unknown = await res.json().catch(() => null);
+  const list = typeof body === 'object' && body !== null ? (body as { fonts?: unknown }).fonts : null;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((x): IKitFont[] => {
+    const r = typeof x === 'object' && x !== null ? (x as Record<string, unknown>) : {};
+    return typeof r.id === 'string' && r.id.startsWith('kit:') && typeof r.family === 'string'
+      ? [
+          {
+            id: r.id as IKitFont['id'],
+            family: r.family,
+            kit: typeof r.kit === 'string' ? r.kit : '',
+            restricted: r.restricted === true,
+          },
+        ]
+      : [];
+  });
+};
+
+// ---- slide layouts of the installed kits
+
+export interface IKitLayout {
+  /** <kit>@<version>/<theme>/<layout>: what the runtime takes to make the slide. */
+  address: string;
+  theme: string;
+  name: string;
+  mode: string;
+  purpose: string;
+}
+
+/** The layouts of the machine's kits; empty when there are none or the list cannot be read. */
+export const fetchKitLayouts = async (m: MachineId, signal?: AbortSignal): Promise<IKitLayout[]> => {
+  const res = await fetch(runtimePath(platformPath('/design/kit/layouts' as TPath), m), {
+    credentials: 'same-origin',
+    signal,
+  });
+  if (!res.ok) return [];
+  const body: unknown = await res.json().catch(() => null);
+  const list = typeof body === 'object' && body !== null ? (body as { layouts?: unknown }).layouts : null;
+  if (!Array.isArray(list)) return [];
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  return list.flatMap((x): IKitLayout[] => {
+    const r = typeof x === 'object' && x !== null ? (x as Record<string, unknown>) : {};
+    const [kit, version, theme, id] = [str(r.kit), str(r.version), str(r.theme), str(r.id)];
+    return kit && version && theme && id
+      ? [
+          {
+            address: `${kit}@${version}/${theme}/${id}`,
+            theme,
+            name: str(r.name) || id,
+            mode: str(r.mode),
+            purpose: str(r.purpose),
+          },
+        ]
+      : [];
+  });
+};
+
+/** A new slide that starts as a kit's layout; the deck shows it once the library has it. Throws with the runtime's reason. */
+export const addDeckSlide = async (m: MachineId, artifact: string, layout: string): Promise<void> => {
+  await runtimeJson(m, deck('/slide'), jsonInit('POST', { artifact, layout }));
+};

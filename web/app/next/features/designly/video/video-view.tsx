@@ -474,6 +474,7 @@ const VideoView = (props: IVideoViewProps) => {
 
       {shownPop.value === POP.style && (
         <DeckStyle
+          machine={machine}
           state={shownPop.state}
           settings={video.deck}
           onSettings={saveSettings}

@@ -108,6 +108,9 @@ export const renameConversation = (m: MachineId, id: ConvId, title: string) =>
   runCommand(m, 'conversation.rename', { id, title });
 export const pinConversation = (m: MachineId, id: ConvId, pinned: boolean) =>
   runCommand(m, 'conversation.pin', { id, pinned });
+/** Marks a chat as a test chat (the sidebar leaves it out), or takes the mark off. */
+export const setConversationTest = (m: MachineId, id: ConvId, test: boolean) =>
+  runCommand(m, 'conversation.test', { id, test });
 /** The installed apps turned on in a chat, the whole list: the runtime keeps exactly these (and stops a resting agent). */
 export const setConversationApps = (m: MachineId, id: ConvId, apps: string[]) =>
   runCommand(m, 'conversation.apps', { id, apps });

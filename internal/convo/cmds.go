@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agentstate"
 	"github.com/ly-solutions/harnessly/internal/attach"
 	"github.com/ly-solutions/harnessly/internal/chatguard"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/screen"
@@ -87,6 +88,9 @@ func (c *conv) do(device string, cmd wire.Command, now time.Time) wire.CmdResult
 		return c.recResult(now)
 	case wire.ConversationPinCmd:
 		c.rec.Pinned = m.Pinned
+		return c.recResult(now)
+	case wire.ConversationTestCmd:
+		c.rec.Test = m.Test
 		return c.recResult(now)
 	case wire.ConversationAppsCmd:
 		return c.setApps(m.Apps, now)
@@ -214,6 +218,9 @@ func (c *conv) seen(upTo wire.Ms, now time.Time) wire.CmdResult {
 // terminalOff: the machine's policy keeps the terminal off for the hub.
 func (c *conv) terminalOff() bool { return c.d.TerminalOff != nil && c.d.TerminalOff() }
 
+// longTextName is the name of the file a long message is kept in.
+var longTextName = locale.Pick("whole-message.md", "сообщение-целиком.md")
+
 func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 	if c.terminalOff() && chatguard.BashMode(m.Text) {
 		// A bash-mode line is a shell command to the agent, run without asking: the terminal's work, not the chat's.
@@ -246,8 +253,18 @@ func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 		}
 		items, d.Refs = append(items, places...), slices.Clone(m.Refs)
 	}
+	text := m.Text
+	if keeper, ok := c.d.Uploads.(TextKeeper); ok && m.Kind != wire.KindCommand && attach.IsLongText(m.Text) &&
+		jscompat.Len(m.Text) <= c.d.Limits.MaxText {
+		// Claude Code refuses some long pastes without a word: the agent gets the start and the file with all of it.
+		if ref, path, kept := keeper.Keep(longTextName, []byte(m.Text)); kept {
+			d.Attachments = append(d.Attachments, ref)
+			items = append([]attach.Item{attach.LongTextItem(ref, path, len([]rune(m.Text)))}, items...)
+			text = attach.Head(m.Text)
+		}
+	}
 	if len(items) > 0 {
-		d.Text = attach.With(m.Text, attach.Block(items))
+		d.Text = attach.With(text, attach.Block(items))
 	}
 	ch, code := c.box.Send(d, c.rec.State, now)
 	r := c.result(ch, code, wire.ResultQueued, now)
@@ -369,7 +386,7 @@ func (c *conv) keys(g *gate, work func(p typist.Pane) error, ok func(now time.Ti
 				// call now, this gate is stale and the look that follows opens the screen's own; when it is the same
 				// call, the gate opens again for the page to decide anew.
 				c.read(now)
-				if e, ok := c.fd.PendingTool(); ok && wire.PermissionID(e.ToolUseID) != g.p.ID {
+				if e, ok := c.fd.PendingTool(); ok && wire.PermissionID(e.ToolUseID) != g.p.ID && !c.foreignGate(g) {
 					c.closeGate(g.id(), wire.ClosedAgentMovedOn, now)
 					c.input(agentstate.Input{K: agentstate.GateResolved}, now)
 					c.observe(now)

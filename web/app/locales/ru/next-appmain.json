@@ -107,7 +107,7 @@
   "next.inspector.noHandshake": "окно не подключилось за {s} с: его скрипты не загрузились или не вызвали connect()",
   "next.appmain.share": "Поделиться",
   "next.appmain.shared": "Ссылка скопирована",
-  "next.appmain.sharedHint": "Откроется у коллег, у которых стоит это приложение",
+  "next.appmain.sharedHint": "Ссылка ведёт на это приложение на вашей машине",
   "next.appmain.shareFailed": "Не удалось скопировать ссылку",
   "next.appmain.settings": "Настройки приложения",
   "next.appmain.chats": "Чаты с этим приложением",

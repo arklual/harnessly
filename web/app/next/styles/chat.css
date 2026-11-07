@@ -890,9 +890,10 @@
   text-overflow: ellipsis;
   color: var(--hx-fg-2);
 }
-/* The word stays whole; a long part after it (a machine's address) gives way first. */
+/* Both give way by their length: a short word stays near whole beside a long address, a long word (a reply off
+   the screen) gives way too, with an ellipsis, and never runs past the column (HRN-841). */
 .hx-now__word {
-  flex: none;
+  flex: 0 1 auto;
 }
 .hx-now__time {
   flex: 0 1 auto;

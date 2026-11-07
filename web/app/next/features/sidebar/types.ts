@@ -26,6 +26,8 @@ export interface ISidebarChat {
   /** For `background`: what the agent waits for, in words («Ждёт: 2 сабагента, команда npm test»); for `limited`: «Ждёт сброса лимита до 18:00»; else absent. */
   waitsFor?: string;
   pinned: boolean;
+  /** An agent made the chat to check something: the sidebar and the search leave it out unless the person shows test chats. */
+  test?: boolean;
   projectId: string | null;
   /** The chat whose agent delegated this one: it is drawn under that chat. Absent for a chat the person started. */
   parentId?: string;

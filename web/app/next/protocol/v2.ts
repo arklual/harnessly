@@ -325,6 +325,7 @@ export const OPS = [
   'conversation.rename',
   'conversation.pin',
   'conversation.apps',
+  'conversation.test',
   'conversation.move',
   'conversation.delete',
   'conversation.restore',
@@ -1317,6 +1318,7 @@ export interface Conversation {
   limited?: LimitHold; // the last turn ended on the usage limit and the chat waits for its reset; absent otherwise
   autoContinues?: AutoContinue[]; // the times the runtime went on by itself, oldest first (the last 20); absent when none
   parentId?: ConvId; // the chat whose agent delegated this one; absent for a chat the person started
+  test?: boolean; // a chat an agent made to check something: the sidebar leaves it out unless the person shows test chats
   rev: number;
 }
 /**
@@ -1897,6 +1899,7 @@ export interface CommandBodies {
   'conversation.retitle': OpBody & { id: ConvId };
   'conversation.pin': OpBody & { id: ConvId; pinned: boolean };
   'conversation.apps': OpBody & { id: ConvId; apps: string[] };
+  'conversation.test': OpBody & { id: ConvId; test: boolean };
   'conversation.move': OpBody & { id: ConvId; projectId: string | null };
   'conversation.delete': OpBody & { id: ConvId; force?: boolean };
   'conversation.restore': OpBody & { id: ConvId };
@@ -2800,6 +2803,7 @@ const conversation: Decoder<Conversation> = object(
     limited: limitHold,
     autoContinues: array(autoContinue),
     parentId: convId,
+    test: bool,
   },
 );
 
@@ -3250,6 +3254,7 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   'conversation.retitle': object({ opId: id, id: convId }),
   'conversation.pin': object({ opId: id, id: convId, pinned: bool }),
   'conversation.apps': object({ opId: id, id: convId, apps: array(id) }),
+  'conversation.test': object({ opId: id, id: convId, test: bool }),
   'conversation.move': object({ opId: id, id: convId, projectId: nullable(id) }),
   'conversation.delete': object({ opId: id, id: convId }, { force: bool }),
   'conversation.restore': object({ opId: id, id: convId }),

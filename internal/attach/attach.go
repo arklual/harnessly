@@ -7,7 +7,9 @@ package attach
 import (
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -150,4 +152,48 @@ var blockAtEnd = regexp.MustCompile(`(?:^|\n\n)<attached>\n(?s:.*?)\n</attached>
 // Strip is the person's words without the block: what a title or a summary is made of.
 func Strip(text string) string {
 	return strings.TrimRight(blockAtEnd.ReplaceAllString(text, ""), " \t\r\n")
+}
+
+// LongText: a message this long (UTF-16 units, as the page counts) or of this many lines is not pasted into the
+// agent's box — Claude Code refuses some long pastes without a word, its Enter does nothing — but kept in a file: the
+// box gets its start and the file's path.
+const (
+	LongTextUnits = 12_000
+	LongTextLines = 200
+	// headRunes is how much of a long message the box gets before the file's line.
+	headRunes = 1_500
+)
+
+// IsLongText says whether text goes to the agent as a file (see LongTextUnits).
+func IsLongText(text string) bool {
+	return len(utf16.Encode([]rune(text))) > LongTextUnits || strings.Count(text, "\n")+1 > LongTextLines
+}
+
+// Head is the start of a long message the box gets: its first headRunes characters, cut at a line's or a word's end
+// when one is near, and an ellipsis.
+func Head(text string) string {
+	r := []rune(strings.TrimSpace(text))
+	if len(r) <= headRunes {
+		return string(r)
+	}
+	head := string(r[:headRunes])
+	if i := strings.LastIndex(head, "\n"); i > len(head)/2 {
+		head = head[:i]
+	} else if i := strings.LastIndexAny(head, " \t"); i > len(head)/2 {
+		head = head[:i]
+	}
+	return strings.TrimRight(head, " \t\r\n") + " …"
+}
+
+// LongTextItem is the file a long message was kept in: the agent reads that the whole message is there and that the
+// words above are only its start.
+func LongTextItem(ref wire.AttachmentRef, path string, chars int) Item {
+	return Item{
+		Ref: wire.MessageRef{Kind: RefUpload, ID: ref.ID, Title: ref.Name},
+		Line: locale.Pick(
+			"The whole message ("+strconv.Itoa(chars)+" characters) is in the file "+OneLine(path)+
+				": the words above are only its start. Read the file to its end before you act — it is the person's message.",
+			"Сообщение целиком ("+strconv.Itoa(chars)+" символов) — в файле "+OneLine(path)+
+				": выше только его начало. Прочитай файл до конца, прежде чем действовать, — это сообщение человека."),
+	}
 }

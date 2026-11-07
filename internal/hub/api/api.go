@@ -504,7 +504,12 @@ func newProvider(cfg *config.Config) (provider.Provider, error) {
 func (h *Hub) Shutdown() {
 	h.Events.Close()
 	h.OrgEvents.Close()
-	h.Registry.CloseAll()
+	// Before the services the links' routines call (usage, environment): the dialer ends the links and waits for them.
+	if h.Dialer != nil {
+		h.Dialer.Close()
+	} else {
+		h.Registry.CloseAll()
+	}
 	if h.Ingest != nil {
 		h.Ingest.Close()
 	}

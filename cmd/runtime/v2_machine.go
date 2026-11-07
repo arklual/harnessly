@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -215,6 +216,16 @@ func (u v2Uploads) Resolve(ids []string) ([]wire.AttachmentRef, []string, wire.R
 		refs, paths = append(refs, ref), append(paths, path)
 	}
 	return refs, paths, ""
+}
+
+// Keep stores a text the runtime made a file of the message (a long message, see attach.IsLongText).
+func (u v2Uploads) Keep(name string, body []byte) (wire.AttachmentRef, string, bool) {
+	ref, code := u.up.Put(name, "text/markdown", int64(len(body)), bytes.NewReader(body))
+	if code != "" {
+		return wire.AttachmentRef{}, "", false
+	}
+	_, path, ok := u.up.Get(ref.ID)
+	return ref, path, ok
 }
 
 // v2Log writes the conversations' journal lines.

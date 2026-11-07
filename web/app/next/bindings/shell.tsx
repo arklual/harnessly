@@ -50,6 +50,12 @@ import { useNotices } from '@/next/bindings/notices';
 import { useNotify } from '@/next/stores/notices';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { useMessageSearch } from '@/next/bindings/use-message-search';
+import {
+  hasTestChats,
+  toggleShowTestChats,
+  useShowTestChats,
+  withoutTestChats,
+} from '@/next/features/sidebar/test-chats';
 import { revealMessage } from '@/next/stores/reveal';
 import type { ISearchRow } from '@/next/features/search/search-dialog';
 import AppFrame, { type IAppFrameProps } from '@/next/features/shell/app-frame';
@@ -443,8 +449,13 @@ const Shell = ({ owner }: IShellProps) => {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [drawerOpen]);
+  const showTests = useShowTestChats();
+  const shownChats = useMemo(
+    () => (model.chats === null ? null : withoutTestChats(model.chats, showTests, currentId)),
+    [model.chats, showTests, currentId],
+  );
   const keysHelp = useShellKeys({
-    chats: model.chats,
+    chats: shownChats,
     currentId,
     navigate,
     openChat,
@@ -476,15 +487,15 @@ const Shell = ({ owner }: IShellProps) => {
   const unread = notificationItems?.some((item) => item.unread) ?? false;
   const messages = useMessageSearch(model.active, query, searchOpen);
   const searchResults = useMemo(() => {
-    if (model.chats === null) return null;
-    const titles = searchChats(model.chats, model.projects ?? [], query);
+    if (shownChats === null) return null;
+    const titles = searchChats(shownChats, model.projects ?? [], query);
     // The messages are still being asked and no title answers yet: the dialog keeps its «searching» rather than «nothing».
     if (messages.asked && messages.hits === null && titles.length === 0) return null;
-    return messages.hits ? [...titles, ...messageGroups(messages.hits, model.chats, now)] : titles;
-  }, [model.chats, model.projects, query, messages.asked, messages.hits, now]);
+    return messages.hits ? [...titles, ...messageGroups(messages.hits, shownChats, now)] : titles;
+  }, [shownChats, model.projects, query, messages.asked, messages.hits, now]);
   const recent = useMemo(
-    () => (model.chats === null ? [] : recentChats(model.chats, model.projects ?? [])),
-    [model.chats, model.projects],
+    () => (shownChats === null ? [] : recentChats(shownChats, model.projects ?? [])),
+    [shownChats, model.projects],
   );
 
   const toggleNotifications = (anchor: HTMLElement, side: INotificationsState['side']) => {
@@ -552,11 +563,25 @@ const Shell = ({ owner }: IShellProps) => {
     },
   ];
   // «Hub first»: no Tasks and Help; Management is the hub's row (and only when this person has a hub).
-  const more: readonly IMoreItem[] = hubFirst
+  const moreBase: readonly IMoreItem[] = hubFirst
     ? hubEntry
       ? [{ ...moreAll[1]!, onSelect: () => window.location.assign(hubEntry), current: false }]
       : []
     : moreAll;
+  // test chats stay out of the list; the item that shows them is there while there are any (or they are shown).
+  const testItem: readonly IMoreItem[] =
+    showTests || hasTestChats(model.chats)
+      ? [
+          {
+            id: 'test-chats',
+            icon: showTests ? 'eye-off' : 'test-tube-diagonal',
+            label: showTests ? t('next.sidebar.testChatsHide') : t('next.sidebar.testChatsShow'),
+            current: false,
+            onSelect: toggleShowTestChats,
+          },
+        ]
+      : [];
+  const more: readonly IMoreItem[] = [...moreBase, ...testItem];
 
   // No machine runs the new runtime: nothing will load, the list is empty rather than a skeleton forever.
   const noV2 = boot.k === 'ready' && boot.machines.length === 0;
@@ -678,7 +703,7 @@ const Shell = ({ owner }: IShellProps) => {
     <Sidebar
       brand={appConfig().productName}
       hubHref={hubEntry}
-      chats={noV2 ? NO_CHATS : model.chats}
+      chats={noV2 ? NO_CHATS : shownChats}
       projects={noV2 ? NO_PROJECTS : model.projects}
       favorites={model.favorites}
       loadError={listFailed?.reason ?? null}

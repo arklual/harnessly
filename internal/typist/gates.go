@@ -168,6 +168,10 @@ func DrawnCommand(plain string) string {
 	return strings.Join(commandBlock(plain), "\n")
 }
 
+// DrawsCommand: the permission dialog on the screen asks about exactly this shell command (a summary «$ cmd»), whole
+// and alone in its box. False for a call whose summary is no shell command, and for a screen with no command box.
+func DrawsCommand(plain, summary, cwd string) bool { return shellDrawn(plain, summary, cwd) }
+
 // unwraps: the lines of the block, joined as the dialog wraps them (a break eats a space or none), are exactly the
 // command — no line before, none after, no character more or less.
 func unwraps(block []string, command string) bool {

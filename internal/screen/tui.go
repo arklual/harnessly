@@ -416,3 +416,6 @@ var (
 	echoRE   = re(`^❯` + sp + `(.+)$`)
 	answerRE = re(`^` + sp + `*⎿` + sp + `+(.*)$`)
 )
+
+// SpinnerLine: the line is Claude's spinner — «✻ Working… (2s)».
+func SpinnerLine(line string) bool { return claudeSpinnerRE.MatchString(line) }

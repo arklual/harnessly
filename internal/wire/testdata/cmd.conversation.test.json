@@ -1,0 +1,5 @@
+{
+  "op": "conversation.test",
+  "body": {"opId": "op-test1", "id": "tab-k3Jx9QmZ", "test": true},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1845, "rev": 18}
+}

@@ -6,6 +6,7 @@ import {
   DECK_CURSOR,
   DECK_EXPORT,
   DECK_FONT,
+  type TDeckSettingsFont,
   DECK_JOB,
   DECK_PART,
   DECK_REC_STATE,
@@ -63,6 +64,11 @@ const readStyle = (v: unknown): IDeckStyle | null =>
     ? { source: text(v.source, 200), system: textOrNull(v.system, 200), layouts: Math.max(0, num(v.layouts)) }
     : null;
 
+const readFont = (v: unknown): TDeckSettingsFont =>
+  typeof v === 'string' && /^kit:[a-z0-9-]+:[0-9][0-9A-Za-z.-]*:[a-z0-9-]+$/.test(v)
+    ? (v as TDeckSettingsFont)
+    : oneOf(DECK_FONT, v, DECK_FONT.inter);
+
 export const readDeckSettings = (v: unknown): IDeckSettings => {
   const r = isRecord(v) ? v : {};
   const settings: IDeckSettings = {
@@ -73,7 +79,7 @@ export const readDeckSettings = (v: unknown): IDeckSettings => {
     script: r.script !== false,
     style: readStyle(r.style),
     theme: text(r.theme, 32),
-    font: oneOf(DECK_FONT, r.font, DECK_FONT.inter),
+    font: readFont(r.font),
   };
   if (Array.isArray(r.themes)) {
     settings.themes = records(r.themes).flatMap((x) => readTheme(x) ?? []);

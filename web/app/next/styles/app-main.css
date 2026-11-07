@@ -34,9 +34,6 @@
   min-height: var(--hx-header-h);
   padding: 0 var(--hx-space-4);
 }
-.hx-appmain__menu {
-  display: none;
-}
 /* The app's glyph, as on its card in the apps list, a step smaller. */
 .hx-appmain__tile {
   display: inline-grid;
@@ -312,9 +309,6 @@
 
 /* narrow: one column; the chat takes the room under the app, a window or the field floats as it does */
 @media (max-width: 760px) {
-  .hx-appmain__menu {
-    display: inline-flex;
-  }
   .hx-appmain__body {
     flex-direction: column;
   }

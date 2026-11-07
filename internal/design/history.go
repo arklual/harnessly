@@ -98,6 +98,10 @@ func (l *Library) historyRepo() (historyRepo, error) {
 	if err != nil {
 		return historyRepo{}, historyErr(locale.Pick("The library folder does not exist: no history is kept", "Папки библиотеки нет: история не ведётся"))
 	}
+	if l.cfg.HistoryDir == "" && l.cfg.DataDir == "" {
+		// Without a data folder the repository would land in the process's working folder (a test's package folder).
+		return historyRepo{}, historyErr(locale.Pick("No data folder: no history is kept", "Нет папки данных: история не ведётся"))
+	}
 	return historyRepo{root: real, gitDir: l.HistoryGitDir(real)}, nil
 }
 

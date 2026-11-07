@@ -70,8 +70,9 @@ func (a *API) CLIPages(r *http.Request) Answer {
 		title, _ := strField(body, "title")
 		file, _ := strField(body, "file")
 		variant, _ := strField(body, "variantOf")
+		layout, _ := strField(body, "layout")
 		expand, _ := Field(body, "expand").(bool)
-		return answer(a.L.CreatePage(project, PageSpec{Title: title, File: file, Route: optional("route"), VariantOf: variant,
+		return answer(a.L.CreatePage(project, PageSpec{Title: title, File: file, Route: optional("route"), VariantOf: variant, Layout: layout,
 			W: size("w"), H: size("h"), Expand: expand, Widths: intList(Field(body, "widths"))}))
 	case "rename":
 		return answer(a.L.RenamePage(project, page, optional("title"), optional("file")))

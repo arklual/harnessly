@@ -110,10 +110,15 @@ func (c *conv) askPermission(ask PermissionAsk, reply chan PermissionReply, now 
 	c.leaveDialog(now)
 	plan := ask.Tool == planTool
 	summary := summaryOfInput(ask.Input)
-	if g := c.openGate(c.rec.State.PermissionID); g != nil && g.p != nil && g.reply == nil && (g.p.Kind == wire.PermPlan) == plan &&
-		g.state().K == wire.GateStateOpen && (plan || g.p.Command == nil || *g.p.Command == summary) {
+	if g := c.screenCardOf(ask, plan, summary); g != nil {
 		g.reply, g.ask = reply, ask
 		g.p.Options = hookOptions(ask)
+		// The screen's card was matched loosely (the dialog wraps the command); from now on the hook's call is what the
+		// person allows, so the card shows the hook's own command, not what the screen drew.
+		if !plan && summary != "" {
+			command := summary
+			g.p.Command = &command
+		}
 		if plan {
 			md := planOfInput(ask.Input)
 			g.p.PlanMD = &md
@@ -137,7 +142,10 @@ func (c *conv) askPermission(ask PermissionAsk, reply chan PermissionReply, now 
 			cwd := ask.Cwd
 			p.Cwd = &cwd
 		}
-		if e, ok := c.fd.PendingTool(); ok && e.Tool == ask.Tool && c.gates[wire.PermissionID(e.ToolUseID)] == nil {
+		// The main agent's pending call is this one only when the tool and the command are the same: a subagent asks
+		// about calls the main transcript does not hold.
+		if e, ok := c.fd.PendingTool(); ok && e.Tool == ask.Tool && e.Summary == summary &&
+			c.gates[wire.PermissionID(e.ToolUseID)] == nil {
 			p.ID = wire.PermissionID(e.ToolUseID)
 		}
 	}
@@ -160,6 +168,27 @@ func (c *conv) askPermission(ask PermissionAsk, reply chan PermissionReply, now 
 	} else {
 		c.emit(wire.PermissionRequestedEv{Permission: p})
 	}
+}
+
+// screenCardOf is the open card the screen made for the call this hook asks about, the card in the wait or any other
+// open card of the same command (the chat may have left its wait with the main agent's stop).
+func (c *conv) screenCardOf(ask PermissionAsk, plan bool, summary string) *gate {
+	fits := func(g *gate) bool {
+		return g != nil && g.p != nil && g.reply == nil && (g.p.Kind == wire.PermPlan) == plan &&
+			g.state().K == wire.GateStateOpen && (plan || g.p.Command == nil || sameCommand(*g.p.Command, summary))
+	}
+	if g := c.openGate(c.rec.State.PermissionID); fits(g) {
+		return g
+	}
+	if plan {
+		return nil
+	}
+	for _, id := range c.order {
+		if g := c.openGate(id); fits(g) && g.p.Command != nil && c.foreignGate(g) {
+			return g
+		}
+	}
+	return nil
 }
 
 // answerHook carries the person's decision to the hook. The gate is answered at once: the agent has the answer.

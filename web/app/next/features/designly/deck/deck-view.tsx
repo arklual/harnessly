@@ -17,7 +17,14 @@ import { usePresence, PRESENCE } from '@/next/ui/presence';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { putDeckSettingsLocal, putDeckSlide, useDeck } from '@/next/stores/deck';
 import { thumbPath } from '@/next/features/designly/api';
-import { patchDeck, putDeckNotes, putDeckSettings } from '@/next/features/designly/deck/api';
+import {
+  addDeckSlide,
+  fetchKitLayouts,
+  patchDeck,
+  putDeckNotes,
+  putDeckSettings,
+  type IKitLayout,
+} from '@/next/features/designly/deck/api';
 import {
   DECK_PRESS,
   postDeck,
@@ -242,6 +249,12 @@ const DeckView = (props: IDeckViewProps) => {
   const post = (message: TDeckHostMessage) => postDeck(frameRef.current, src, message);
   const pick = useDeckPick(id);
   const picking = pick.picking;
+  const [kitLayouts, setKitLayouts] = useState<readonly IKitLayout[]>([]);
+  useEffect(() => {
+    const abort = new AbortController();
+    fetchKitLayouts(machine, abort.signal).then(setKitLayouts, () => undefined);
+    return () => abort.abort();
+  }, [machine]);
   const comments = useDeckComments(machine, id);
   const dict = useDeckDictation(machine, id);
   const [sel, setSel] = useState<IDeckSelection | null>(null);
@@ -936,6 +949,12 @@ const DeckView = (props: IDeckViewProps) => {
         making={(board) => busy && slideOfBoard(slides, board)?.blank === true}
         pending={busy && total === 0 ? DECK_PENDING_THUMBS : 0}
         onAdd={stage?.ask ? () => ask(t('next.deck.strip.addAsk', { n })) : undefined}
+        layouts={kitLayouts}
+        onLayout={(l) =>
+          addDeckSlide(machine, id, l.address).catch((failure: Error) =>
+            toast(t('next.deck.strip.addFailed'), { tone: 'error', description: failure.message }),
+          )
+        }
       />
 
       <DeckStage
@@ -1096,6 +1115,7 @@ const DeckView = (props: IDeckViewProps) => {
 
       {shownPop.value === POP.style && (
         <DeckStyle
+          machine={machine}
           state={shownPop.state}
           settings={deck?.settings ?? null}
           onSettings={saveSettings}

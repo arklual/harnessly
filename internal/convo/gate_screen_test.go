@@ -45,13 +45,14 @@ func TestPermissionWithAWarningAndAnAutoDenyTimer(t *testing.T) {
 	}
 }
 
-// A menu the machine cannot match is not offered as buttons: the gate says so as soon as the screen is read.
-func TestPermissionOfAnotherCallIsRefusedAtOnce(t *testing.T) {
+// The pending call of the main agent is not the one the menu on the screen draws (a subagent asks): the card is the
+// screen's own, with the command it draws, and no key goes in by itself.
+func TestPermissionOfAnotherCallIsTheScreensOwnCard(t *testing.T) {
 	r := newRig(t)
 	r.bashPrompt(tui(t, "claude-2.1.311-bash-dangerous-rm-auto-deny.ansi.txt"), "git push --force origin main")
-	g := r.snap().Permissions[0].State
-	if g.K != wire.GateStateOpen || g.Refused == nil || *g.Refused != wire.GateRefusedMenuUnmatched {
-		t.Fatalf("gate: %+v", g)
+	p := r.snap().Permissions[0]
+	if p.ID == "p:toolu_rm" || p.Command == nil || strings.Contains(*p.Command, "git push") || p.State.K != wire.GateStateOpen {
+		t.Fatalf("permission: %+v", p)
 	}
 	r.tick(time.Second)
 	for _, c := range r.pane.calls {

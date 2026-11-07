@@ -107,7 +107,7 @@
   "next.inspector.noHandshake": "the window did not connect in {s} s: its scripts did not load or did not call connect()",
   "next.appmain.share": "Share",
   "next.appmain.shared": "Link copied",
-  "next.appmain.sharedHint": "It opens for teammates who have this app",
+  "next.appmain.sharedHint": "The link opens this app on your machine",
   "next.appmain.shareFailed": "Could not copy the link",
   "next.appmain.settings": "App settings",
   "next.appmain.chats": "Chats with this app",

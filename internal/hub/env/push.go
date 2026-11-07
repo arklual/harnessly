@@ -96,7 +96,8 @@ type PushDeps struct {
 // list changed, and sends it again every pass while the machine reports another hash.
 type Pusher struct {
 	// afterHello is told of a machine that can do setup runs coming online («При следующем запуске»).
-	afterHello func(machineID string)
+	// It runs in the pusher's wait group with the pusher's context: Close ends it and waits for it.
+	afterHello func(ctx context.Context, machineID string)
 	db         *store.DB
 	reg        Caller
 	feat       FeatureGate
@@ -140,9 +141,11 @@ func NewPusher(d PushDeps) *Pusher {
 	return p
 }
 
-// Close stops the pusher and waits for the pass running.
+// Close stops the pusher and waits for the pass running and for the runs asked at a connection.
 func (p *Pusher) Close() {
+	p.mu.Lock()
 	p.cancel()
+	p.mu.Unlock()
 	p.wg.Wait()
 }
 
@@ -160,14 +163,20 @@ func (p *Pusher) Connected(machineID string, hello hubproto.Hello) {
 		delete(p.held, machineID)
 	}
 	_, ok := p.held[machineID]
-	setup := p.setup[machineID]
-	after := p.afterHello
+	// Counted under mu, the way Close cancels: a pusher closing starts nothing more.
+	after := p.setup[machineID] && p.afterHello != nil && p.ctx.Err() == nil
+	if after {
+		p.wg.Add(1)
+	}
 	p.mu.Unlock()
 	if ok {
 		p.Kick()
 	}
-	if setup && after != nil {
-		go after(machineID)
+	if after {
+		go func() {
+			defer p.wg.Done()
+			p.afterHello(p.ctx, machineID)
+		}()
 	}
 }
 
@@ -439,24 +448,36 @@ func (p *Pusher) allowNewRun(machineID string) bool {
 }
 
 // fitSteps marshals the steps within maxRunBytes by emptying the logs from the oldest step on; false when even the
-// steps without logs do not fit.
+// steps without logs do not fit. It empties as few logs as that takes, marshalling the run once or twice: what emptying
+// a log saves is reckoned from the log alone (an upper bound, the key and comma included), and the run is marshalled
+// again only when the reckoning says it fits.
 func fitSteps(steps []hubproto.EnvStep) ([]byte, bool) {
-	for i := 0; ; i++ {
-		raw, err := json.Marshal(steps)
-		if err != nil {
-			return nil, false
-		}
-		if len(raw) <= maxRunBytes {
-			return raw, true
-		}
+	raw, err := json.Marshal(steps)
+	if err != nil {
+		return nil, false
+	}
+	over := len(raw) - maxRunBytes
+	for i := 0; over > 0; i++ {
 		for i < len(steps) && steps[i].Log == "" {
 			i++
 		}
 		if i >= len(steps) {
 			return nil, false
 		}
+		enc, err := json.Marshal(steps[i].Log)
+		if err != nil {
+			return nil, false
+		}
 		steps[i].Log = ""
+		over -= len(enc) + len(`,"log":`)
+		if over <= 0 {
+			if raw, err = json.Marshal(steps); err != nil {
+				return nil, false
+			}
+			over = len(raw) - maxRunBytes
+		}
 	}
+	return raw, true
 }
 
 // Run keeps a run a machine reported (the env.run event): the same run id replaces the earlier frame. The run belongs

@@ -12,6 +12,9 @@ export type TDeckTone = DesignDeckTone;
 
 export const DECK_FONT = { inter: 'inter', golos: 'golos', serif: 'serif' } as const;
 export type TDeckFont = (typeof DECK_FONT)[keyof typeof DECK_FONT];
+/** A deck's font: a built-in one, or a font of an installed kit by its address kit:<kit>:<version>:<font>. */
+export type TDeckSettingsFont = TDeckFont | `kit:${string}`;
+export const isKitFont = (f: string): f is `kit:${string}` => f.startsWith('kit:');
 /** The CSS stack of each font id, as the runtime writes it into deck-theme.css. */
 export const DECK_FONT_CSS = {
   inter: 'Inter, system-ui, sans-serif',
@@ -49,7 +52,7 @@ export interface IDeckSettings {
   script: boolean;
   style: IDeckStyle | null;
   theme: string;
-  font: TDeckFont;
+  font: TDeckSettingsFont;
   /** Absent: the built-in themes (Компания, Фиолет, Лес). */
   themes?: IDeckTheme[];
 }

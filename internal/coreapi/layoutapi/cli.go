@@ -167,6 +167,7 @@ func (a *api) cliDelegate(c *call, provider, panelType, workspaceID string, prom
 	}
 	session, _ := c.field("session")
 	notify, _ := c.field("notify")
+	test, _ := c.field("test")
 	// A caller that sends no session is an older CLI or a script: its tab is made as it always was, without a word.
 	if s, _ := session.(string); strings.TrimSpace(s) == "" {
 		return false
@@ -176,7 +177,7 @@ func (a *api) cliDelegate(c *call, provider, panelType, workspaceID string, prom
 		return false
 	}
 	res, err := a.d.Delegate(c.r.Context(), DelegateRequest{Session: stringOr(session), Provider: provider, Model: stringOr(model),
-		Effort: stringOr(effort), Prompt: text, Title: stringOr(name), Notify: notify == true})
+		Effort: stringOr(effort), Prompt: text, Title: stringOr(name), Notify: notify == true, Test: test == true})
 	var none *ErrNoParent
 	var refused *DelegateRefused
 	switch {

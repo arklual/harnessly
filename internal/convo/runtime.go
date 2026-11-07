@@ -1097,6 +1097,8 @@ func convOf(cmd wire.Command) string {
 		return m.ID
 	case wire.ConversationPinCmd:
 		return m.ID
+	case wire.ConversationTestCmd:
+		return m.ID
 	case wire.ConversationAppsCmd:
 		return m.ID
 	case wire.ConversationMoveCmd:
@@ -1332,7 +1334,7 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 	rec := wire.Conversation{ID: id, MachineID: r.d.MachineID, ProjectID: projectID, Cwd: cwd, Launch: m.Launch,
 		Provider: m.Provider, Model: m.Model, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
-		ParentID: parentID, Rev: 1}
+		ParentID: parentID, Test: m.Test, Rev: 1}
 	if r.d.AlwaysApps != nil {
 		if ids := r.d.AlwaysApps(); len(ids) > 0 && (r.d.AppsOK == nil || r.d.AppsOK(ids) == "") {
 			rec.Apps = append([]string(nil), ids...)

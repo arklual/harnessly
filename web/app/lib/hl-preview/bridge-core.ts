@@ -20,7 +20,8 @@ export interface IFoundComponent {
 }
 
 export type TParentMessage =
-  | { type: 'tk:pick'; on: boolean }
+  /** `keep`: picking goes on after a pick (annotating: one click puts one mark, the mode stays until it is turned off). */
+  | { type: 'tk:pick'; on: boolean; keep?: boolean }
   | { type: 'tk:go'; action: 'back' | 'forward' | 'reload' }
   /** The tab's answer to a page leaving for another site by script (`tk:redirect`): it goes there itself, or not. */
   | { type: 'tk:redirect-answer'; url: string; follow: boolean }
@@ -356,7 +357,9 @@ export const parseParentMessage = (data: unknown): TParentMessage | null => {
   if (!data || typeof data !== 'object') return null;
   const message = data as Record<string, unknown>;
   if (message.type === 'tk:pick' && typeof message.on === 'boolean')
-    return { type: 'tk:pick', on: message.on };
+    return message.on && message.keep === true
+      ? { type: 'tk:pick', on: true, keep: true }
+      : { type: 'tk:pick', on: message.on };
   if (message.type === 'tk:ping') return { type: 'tk:ping' };
   if (
     message.type === 'tk:redirect-answer' &&
@@ -1574,6 +1577,8 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   const domState = core.makeDomState(actRefs);
   let lastUrl = win.location.href;
   let picking = false;
+  // Picking that goes on after a click (annotating), asked by the parent.
+  let keepPicking = false;
   let box: any = null;
   let label: any = null;
 
@@ -1587,7 +1592,10 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   const setPicking = (on: boolean, report: boolean) => {
     if (picking === on) return;
     picking = on;
-    if (!on) hide();
+    if (!on) {
+      keepPicking = false;
+      hide();
+    }
     if (report && !on) post({ type: 'tk:pick', on: false });
   };
   const highlight = (el: any) => {
@@ -1764,7 +1772,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
         pick: remember(target),
         look: readLookSafely(target),
       });
-      setPicking(false, true);
+      if (!keepPicking) setPicking(false, true);
     },
     true,
   );
@@ -1927,8 +1935,10 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       if (message.type === 'tk:ping') hello();
       else if (message.type === 'tk:redirect-answer') answerLeave(message.url, message.follow);
       else if (message.type === 'tk:highlight') flash(message.selector);
-      else if (message.type === 'tk:pick') setPicking(message.on, false);
-      else if (message.type === 'tk:styles') setStyles(message.items);
+      else if (message.type === 'tk:pick') {
+        keepPicking = message.on && message.keep === true;
+        setPicking(message.on, false);
+      } else if (message.type === 'tk:styles') setStyles(message.items);
       else if (message.type === 'tk:anchors') setAnchors(message.items);
       else if (isDomMessage(message)) core.handleDomMessage(win, doc, bound, core, domState, message, post);
       else if (message.type === 'tk:act') {

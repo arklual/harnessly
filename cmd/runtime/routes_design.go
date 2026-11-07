@@ -14,6 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/wire"
 	"github.com/ly-solutions/harnessly/web"
 )
 
@@ -111,8 +112,12 @@ func designAPI(d deps) *design.API {
 		CLIToken:     cliTokenFirst(d.DataDir, d.TokenHeaders),
 		APIRefusal:   d.APIRefusal,
 		PlatformAPI:  platformAPI,
-		GuestApp:     webFiles(),
-		PublicToken:  designPublic(d.Secret),
+		UploadFile: func(id string) (string, bool) {
+			_, p, ok := (&wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads")}).Get(id)
+			return p, ok
+		},
+		GuestApp:    webFiles(),
+		PublicToken: designPublic(d.Secret),
 		Log: func(level, msg string, err error) {
 			fields := []agent.F{{K: "module", V: "design-library"}}
 			if err != nil {

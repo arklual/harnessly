@@ -203,7 +203,7 @@ func appRoutes(d deps, c *core) []gate.Route {
 	}
 	installLock(d, reg)
 	installShareGate(d, reg)
-	return appRouteList(d, reg, version, chats)
+	return append(appRouteList(d, reg, version, chats), chatRoutes(d, chats)...)
 }
 
 // decisionRate is how many decisions a launch may journal in a minute.
@@ -256,6 +256,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		return out, nil
 	}
 	viewServer := apps.NewViewServer(reg)
+	appViewSessions.Store(viewServer.Sessions)
 	widgets := apps.OpenWidgets(d.DataDir)
 	viewServer.Widgets = widgets
 	storage := apps.OpenStorage(d.DataDir)

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -77,6 +78,17 @@ func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 		if r.Steered && p.OwnText && screen.InterruptedLast(a.Screen.Plain) {
 			// The screen says the turn was stopped and the text is back in the box: the person's to edit, not to send.
 			ch.Events = append(ch.Events, b.Interrupted(now).Events...)
+			return nil, ch
+		}
+		if p.Decision == typist.DecideSend && p.OwnText && r.Rechecks >= maxRechecks {
+			// Every Enter left the text in the box: the agent does not take it (Claude Code refuses some long pastes
+			// without a word). It does not wait out its term «in the agent's queue»: back in the line, stalled, the box
+			// cleared, and the person decides.
+			if b.log != nil {
+				b.log.Warn("message not taken after its Enters; stalled", "conversationId", b.conv,
+					"clientId", r.Message.ClientID, "steered", r.Steered, "units", jscompat.Len(r.Message.Text))
+			}
+			b.stall(&ch, r, now)
 			return nil, ch
 		}
 		if p.Decision == typist.DecideSend && p.OwnText {
@@ -193,7 +205,7 @@ func (b *Box) typedTexts(except string) []string {
 
 // recheckDue: the message waits in-input and its box is to be looked at for it now.
 func (b *Box) recheckDue(r *Record, now time.Time) bool {
-	return !b.typing && b.paused == nil && r.Message.State.K == wire.MsgInInput && r.Rechecks < maxRechecks &&
+	return !b.typing && b.paused == nil && r.Message.State.K == wire.MsgInInput && r.Rechecks <= maxRechecks &&
 		r.RecheckAt > 0 && ms(now) >= r.RecheckAt
 }
 
@@ -557,7 +569,11 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 }
 
 // takes: a user entry with this text is this message's — all of it, or its start when Claude cut the paste short.
+// A message of pictures alone has no words: an entry of picture references alone is its own.
 func takes(entry, text string) bool {
+	if blankText(text) {
+		return screen.PicturesOnly(entry)
+	}
 	return screen.SameMessage(entry, text) || screen.CutShort(entry, text)
 }
 
@@ -841,7 +857,7 @@ func (b *Box) Wake() time.Time {
 	}
 	for _, r := range b.recs {
 		if (r.Message.ClientID == b.flight || r.Steered && b.flight == "") && r.Message.State.K == wire.MsgInInput &&
-			r.Rechecks < maxRechecks {
+			r.Rechecks <= maxRechecks {
 			soon(r.RecheckAt)
 		}
 	}

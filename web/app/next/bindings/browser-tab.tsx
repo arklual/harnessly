@@ -15,14 +15,22 @@ import { t } from '@/next/i18n';
 import type { Conversation } from '@/next/protocol/v2';
 import type { TTab } from '@/next/features/pane/pane-tabs';
 import { useFrameBridge } from '@/next/features/pane/use-frame-bridge';
-import { pickedWords, siteUrlOf } from '@/next/features/pane/frame-bridge';
+import { siteUrlOf } from '@/next/features/pane/frame-bridge';
+import {
+  addAnnotation,
+  annotationAnchors,
+  editAnnotation,
+  removeAnnotation,
+  type IAnnotation,
+} from '@/next/features/pane/annotations';
+import type { IAnnotationEditing } from '@/next/features/pane/annotation-layer';
 import { FILL_SCREEN, type IBrowserScreen } from '@/next/features/pane/browser-device';
 import { parseAddress } from '@/next/features/pane/address';
 import { LINK_PLACE, linkPlace, openOutside } from '@/next/features/chat/pane-sites';
 import { paneSitesSnapshot } from '@/next/stores/pane-sites';
 import { followsRedirect, makeHops } from '@/next/features/pane/redirect-hop';
 import { appConfig } from '@/platform/config';
-import { draftsStore, setDraft } from '@/next/stores/drafts';
+import { addDraftAnnotations, draftsStore, setDraft } from '@/next/stores/drafts';
 import { toast } from '@/next/ui/toast';
 import { fetchSlotTarget, mintFillToken, VaultError } from '@/next/core/net/vault';
 import { useVaultEntries } from '@/next/stores/vault-entries';
@@ -35,6 +43,9 @@ import type { ILivePage } from '@/next/core/net/live-browser';
 import type { ILiveControl } from '@/next/features/pane/live-view';
 import type { IFrameActed } from '@/next/features/pane/frame-bridge';
 import type { IFrameAct } from '@/next/features/pane/use-frame-bridge';
+
+/** How long the marks fade before the list is cleared by «Отправить». */
+const SEND_FADE_MS = 220;
 
 interface IBrowserTabProps {
   conv: Conversation;
@@ -250,9 +261,26 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
     onChange({ ...tab, hist: [...tab.hist.slice(0, tab.hi + 1), next], hi: tab.hi + 1 });
   };
 
+  // The marks put on the page: they stay while the tab does, and the bridge keeps each on its element.
+  const [marks, setMarks] = useState<IAnnotation[]>([]);
+  const [editing, setEditing] = useState<IAnnotationEditing | null>(null);
+  const [marksHidden, setMarksHidden] = useState(false);
+  const [sending, setSending] = useState(false);
+
   const bridge = useFrameBridge({
     frame,
     origin: slot?.origin ?? null,
+    // A click while annotating puts the next mark and opens its comment; picking goes on.
+    onPicked: (picked) => {
+      const next = addAnnotation(marks, picked);
+      if (next.length === marks.length) {
+        toast(t('next.pane.annot.limit'), { tone: 'warning' });
+        return;
+      }
+      setMarks(next);
+      setMarksHidden(false);
+      setEditing({ id: next[next.length - 1].id, fresh: true });
+    },
     // The proxy could not fetch the site: the machine's own browser gets a go at it, with the same checks of the
     // address. A port of the machine stays where it is: there is no other way to it.
     onFailed: () => {
@@ -389,18 +417,37 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
     });
   };
 
-  // A comment on a picked element lands in the chat's field.
-  const sendPicked = (comment: string) => {
-    const picked = bridge.picked;
-    if (!picked) return;
-    const words = pickedWords(picked, pageUrl(picked.url) ?? picked.url, comment, {
-      element: t('next.pane.pick.words.element'),
-      component: t('next.pane.pick.words.component'),
-      comment: t('next.pane.pick.words.comment'),
-    });
-    toChat(words);
+  // The marks follow their elements: the bridge is told which blocks, again for every new document of the frame.
+  const anchorItems = annotationAnchors(marks);
+  const anchorsKey = JSON.stringify(anchorItems);
+  const tellAnchors = useEffectEvent(() => bridge.post({ type: 'tk:anchors', items: anchorItems }));
+  useEffect(() => {
+    if (bridge.hellos > 0) tellAnchors();
+  }, [anchorsKey, bridge.hellos]);
+
+  // The marks, in words, land in the chat's field; the session is over.
+  const closeMarks = () => {
     bridge.endPick();
-    toast(t('next.pane.pick.sent'));
+    setMarks([]);
+    setEditing(null);
+  };
+  const sendMarks = () => {
+    // Each mark is a chip in the field, its page address as the person sees it (the draft keeps no frame addresses).
+    const added = addDraftAnnotations(
+      conv.id,
+      marks.map((a) => ({ ...a, url: pageUrl(a.url) ?? a.url })),
+    );
+    toast(t(added < marks.length ? 'next.pane.annot.limitField' : 'next.pane.annot.sent'));
+    // The marks fade where they stand, then the list is cleared and the bar leaves.
+    setSending(true);
+    window.setTimeout(() => {
+      closeMarks();
+      setSending(false);
+    }, SEND_FADE_MS);
+  };
+  const dropMark = (id: string) => {
+    setMarks((list) => removeAnnotation(list, id));
+    setEditing(null);
   };
 
   return (
@@ -456,9 +503,33 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
         if (dom.inspect) dom.setInspect(false);
         bridge.togglePick();
       }}
-      picked={bridge.picked}
-      onPickSend={sendPicked}
-      onPickCancel={bridge.endPick}
+      annotations={{
+        list: marks,
+        editing,
+        hidden: marksHidden,
+        sending,
+        at: bridge.url,
+        anchors: bridge.anchors,
+        onOpen: (id) => setEditing({ id, fresh: false }),
+        onCommit: (id, comment) => {
+          setMarks((list) => editAnnotation(list, id, comment));
+          setEditing(null);
+        },
+        onRemove: dropMark,
+        // Leaving a mark just put, without a word, takes it back.
+        onCancel: () => {
+          const open = editing;
+          if (open?.fresh && marks.find((a) => a.id === open.id)?.comment === '') dropMark(open.id);
+          else setEditing(null);
+        },
+        onToggleHidden: () => setMarksHidden((on) => !on),
+        onClear: () => {
+          setMarks([]);
+          setEditing(null);
+        },
+        onSend: sendMarks,
+        onClose: closeMarks,
+      }}
       screen={screen}
       onScreen={setScreen}
       outsideUrl={live ? (livePage?.url ?? liveUrl) : outsideUrl}

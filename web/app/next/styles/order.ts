@@ -35,6 +35,7 @@ import '@/next/styles/delegation.css';
 import '@/next/styles/artifacts.css';
 import '@/next/styles/designly.css';
 import '@/next/styles/annotate.css';
+import '@/next/styles/tab-annotations.css';
 import '@/next/styles/questions.css';
 import '@/next/styles/site.css';
 import '@/next/styles/mode.css';

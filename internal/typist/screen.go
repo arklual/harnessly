@@ -189,21 +189,31 @@ var toolBullet = regexp.MustCompile(`^● [A-Za-z_][\w:.\-]*\(`)
 // liveReplyMax is how much of the reply "now" carries.
 const liveReplyMax = 160
 
-// liveReply is the last text bullet of a plain screen — "● …" that is not a tool call — with the lines it wraps onto,
-// joined by spaces and cut to liveReplyMax characters.
+// liveReply is the reply Claude writes this moment: the last bullet of a plain screen when it is text — "● …", not a
+// tool call, not a group of calls (its "⎿" lines under it) — with the lines it wraps onto, joined by spaces and cut to
+// liveReplyMax characters. A text bullet with anything but the spinner or the input box under it is finished: the feed
+// has it already, and the line under the turn would only repeat an older thought.
 func liveReply(plain string) string {
 	lines := strings.Split(plain, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		rest, ok := strings.CutPrefix(lines[i], "● ")
-		if !ok || toolBullet.MatchString(lines[i]) {
+		if !ok {
 			continue
 		}
+		if toolBullet.MatchString(lines[i]) {
+			return ""
+		}
 		parts := []string{strings.TrimSpace(rest)}
-		for _, l := range lines[i+1:] {
+		next := len(lines)
+		for j, l := range lines[i+1:] {
 			if !strings.HasPrefix(l, "  ") || strings.TrimSpace(l) == "" || strings.HasPrefix(strings.TrimSpace(l), "⎿") {
+				next = i + 1 + j
 				break
 			}
 			parts = append(parts, strings.TrimSpace(l))
+		}
+		if !writtenNow(lines[next:]) {
+			return ""
 		}
 		text := strings.Join(parts, " ")
 		if rs := []rune(text); len(rs) > liveReplyMax {
@@ -212,6 +222,22 @@ func liveReply(plain string) string {
 		return text
 	}
 	return ""
+}
+
+// writtenNow: what stands under a text bullet leaves it the one Claude writes now — nothing, or (blank lines aside)
+// the spinner, a tip under it, or the input box.
+func writtenNow(below []string) bool {
+	for _, l := range below {
+		switch t := strings.TrimSpace(l); {
+		case t == "":
+			continue
+		case screen.SpinnerLine(t), boxRule.MatchString(l), strings.HasPrefix(t, "❯"):
+			return true
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // inputBoxText is the text of Claude's input box on a plain screen: its input line (❯ at the line's start) and the

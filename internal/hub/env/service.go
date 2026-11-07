@@ -57,20 +57,23 @@ type Deps struct {
 // Service is the environment and the catalog of the organizations.
 type Service struct {
 	recommended bool
-	db          *store.DB
-	gate        func(orgs.Handler) httpx.Handler
-	feat        FeatureGate
-	pub         Publisher
-	changed     func()
-	reg         Caller
-	push        *Pusher
-	log         *slog.Logger
-	now         func() time.Time
+	// applyDelay is the package's applyDelay when the service was made: a test changes that and puts it back while the
+	// service's routines may still read it.
+	applyDelay time.Duration
+	db         *store.DB
+	gate       func(orgs.Handler) httpx.Handler
+	feat       FeatureGate
+	pub        Publisher
+	changed    func()
+	reg        Caller
+	push       *Pusher
+	log        *slog.Logger
+	now        func() time.Time
 }
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now, recommended: d.Recommended}
+	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now, recommended: d.Recommended, applyDelay: applyDelay}
 	if s.now == nil {
 		s.now = time.Now
 	}

@@ -2397,3 +2397,218 @@ span.hx-takes__act {
 .hx-plus__item:disabled:hover {
   background: transparent;
 }
+
+/* Marks sent from the pane's browser: a chip each, with a card over it (page, element, comment to change, delete). The
+   chip comes in from a little below, a batch in a ladder (--step); it leaves with its own exit while the others slide
+   to its place (ui/use-flip.ts). The card is always there and shown by data-open, so it can fade both ways. Only
+   transform and opacity move. */
+.hx-pagenotes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  align-items: center;
+}
+.hx-pagenote {
+  position: relative;
+  display: inline-flex;
+  --step: 0;
+  animation: hx-pagenote-in 220ms var(--hx-ease-out) calc(var(--step) * 45ms) backwards;
+}
+.hx-pagenote[data-leaving] {
+  pointer-events: none;
+  animation: hx-pagenote-out 200ms var(--hx-ease-out) forwards;
+}
+.hx-pagenote .hx-pagenote__chip {
+  animation: none;
+  transition: background-color 120ms ease-out;
+}
+.hx-pagenote[data-open] .hx-pagenote__chip {
+  background: var(--hx-bg-hover);
+}
+.hx-pagenote__open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.hx-pagenote__open:focus-visible,
+.hx-pagenote__del:focus-visible,
+.hx-pagenote .hx-attach__x:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.hx-pagenote .hx-pagenote__num {
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--hx-accent);
+  color: var(--hx-bg-raised);
+  border-radius: 50%;
+}
+.hx-pagenote__pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 40;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 12px 10px;
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--hx-border),
+    0 18px 48px rgba(12, 14, 34, 0.14);
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px) scale(0.97);
+  transform-origin: bottom left;
+  transition:
+    opacity 140ms var(--hx-ease-out),
+    transform 200ms var(--hx-ease-out),
+    visibility 0s linear 200ms;
+}
+/* The gap between the chip and its card is part of the card, so the pointer travels across it. */
+.hx-pagenote__pop::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -12px;
+  height: 12px;
+}
+.hx-pagenote__pop[data-open='true'] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 240ms var(--hx-ease-out),
+    visibility 0s linear;
+}
+.hx-pagenote__title {
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  color: var(--hx-fg-1);
+}
+.hx-pagenote__facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 8px 0;
+  font-size: var(--hx-text-sm);
+}
+.hx-pagenote__facts dt {
+  color: var(--hx-fg-3);
+}
+.hx-pagenote__facts dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-1);
+}
+/* A fixed height: saving a change moves nothing. */
+.hx-pagenote__comment {
+  display: block;
+  width: 100%;
+  height: 58px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  resize: none;
+  border: 0;
+  border-radius: 8px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+}
+.hx-pagenote__comment:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 0;
+}
+.hx-pagenote__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+  height: 28px;
+  margin-top: 6px;
+}
+.hx-pagenote__hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+.hx-pagenote__hint[data-on] {
+  opacity: 1;
+}
+.hx-pagenote__del {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+}
+.hx-pagenote__del:hover {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+@keyframes hx-pagenote-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+  }
+}
+@keyframes hx-pagenote-out {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-pagenote {
+    animation-name: hx-pagenote-fade-in;
+  }
+  .hx-pagenote[data-leaving] {
+    animation-name: hx-pagenote-fade-out;
+  }
+  .hx-pagenote__pop,
+  .hx-pagenote__pop[data-open='true'] {
+    transform: none;
+    transition-property: opacity, visibility;
+  }
+}
+@keyframes hx-pagenote-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-pagenote-fade-out {
+  to {
+    opacity: 0;
+  }
+}

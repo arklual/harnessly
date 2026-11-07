@@ -31,7 +31,6 @@ const props = (over: Partial<IAppMainProps> = {}): IAppMainProps => ({
   float: null,
   onPlacement: vi.fn(),
   onFloat: vi.fn(),
-  onOpenDrawer: vi.fn(),
   menu: [],
   stage: <div data-testid="stage" />,
   chat: <div data-testid="chat" />,

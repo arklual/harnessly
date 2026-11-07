@@ -25,7 +25,7 @@ const (
 
 func (c *cli) design(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design needs a subcommand: page, notes, migrate, kit, engine, timeline, moment")
+		return usageErr("design needs a subcommand: page, notes, migrate, kit, layouts, engine, timeline, moment")
 	}
 	switch args[0] {
 	case "page", "pages":
@@ -36,6 +36,8 @@ func (c *cli) design(args []string) error {
 		return c.designMigrate(args[1:])
 	case "kit":
 		return c.designKit(args[1:])
+	case "layouts", "layout":
+		return c.designLayouts(args[1:])
 	case "engine":
 		return c.designEngine(args[1:])
 	case "timeline":
@@ -116,15 +118,15 @@ func (c *cli) designPage(args []string) error {
 	case "create", "new", "add":
 		rest, on := switches(rest, "fill")
 		f, err := parseFlags(rest, map[string]string{"title": "title", "t": "title", "file": "file", "route": "route",
-			"variant-of": "variant-of", "w": "w", "h": "h"})
+			"variant-of": "variant-of", "layout": "layout", "w": "w", "h": "h"})
 		if err != nil {
 			return err
 		}
 		if len(f.pos) != 1 || f.values["title"] == "" {
-			return usageErr("design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE] [--w N --h N] [--fill]")
+			return usageErr("design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE | --layout KIT/THEME/LAYOUT] [--w N --h N] [--fill]")
 		}
 		body := map[string]any{"action": "create", "project": f.pos[0], "title": f.values["title"]}
-		for flag, key := range map[string]string{"file": "file", "route": "route", "variant-of": "variantOf"} {
+		for flag, key := range map[string]string{"file": "file", "route": "route", "variant-of": "variantOf", "layout": "layout"} {
 			if v, ok := f.values[flag]; ok {
 				body[key] = v
 			}

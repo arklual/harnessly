@@ -1,7 +1,7 @@
 // The settings of a new presentation (board: «Настройки»): the design system or the company template, the length, the
 // slides, how to speak, the prompter text and whether the template's style is used. The length and the slides may be
 // left to the agent. The panel itself (popover or sheet) is create-panel.tsx.
-import CreatePanel, { DsChoice, type IDsOther } from '@/next/features/designly/create-panel';
+import CreatePanel, { DsChoice, type IDsOther, type IKitAdd } from '@/next/features/designly/create-panel';
 import type { IDesignSystem } from '@/next/features/designly/api';
 import Icon from '@/next/ui/icon';
 import Segmented from '@/next/ui/segmented';
@@ -33,6 +33,7 @@ interface IDeckSettingsProps {
   ds: string | null;
   onDs: (id: string | null) => void;
   template: IDsOther;
+  kit?: IKitAdd;
 }
 
 const DeckSettings = ({
@@ -46,6 +47,7 @@ const DeckSettings = ({
   ds,
   onDs,
   template,
+  kit,
 }: IDeckSettingsProps) => {
   const slides = slidesOf(settings);
   const perSlide = secondsPerSlide(settings);
@@ -53,7 +55,7 @@ const DeckSettings = ({
   const { minutes } = settings;
   return (
     <CreatePanel open={open} onClose={onClose} anchor={anchor} label={t('next.deck.settings.label')}>
-      <DsChoice systems={systems} value={ds} onChange={onDs} other={template} />
+      <DsChoice systems={systems} value={ds} onChange={onDs} other={template} kit={kit} />
       <div className="hx-deck-set__label">{t('next.deck.settings.length')}</div>
       <div className="hx-deck-set__big">
         {minutes === null ? (

@@ -437,9 +437,15 @@ export const useSiteStage = ({
   }, [creating?.conv, convId, feed?.loaded, key]);
 
   // Where the chat stands comes back as the person left it on this design (site-layout.ts).
-  const [kept] = useState(() => (keep ? keptLayout(key) : null));
-  const [mode, setMode] = useState<TSiteMode>(kept?.mode ?? 'island');
-  const [min, setMin] = useState(kept?.min ?? true);
+  // Unless the person placed it by hand, the chat of a design being edited stands docked on the left, not over the
+  // page: a place kept only because it was the old default does not count.
+  const [kept] = useState(() => {
+    const layout = keep ? keptLayout(key) : null;
+    return layout?.chosen ? layout : null;
+  });
+  const [mode, setMode] = useState<TSiteMode>(kept?.mode ?? 'chat');
+  const [min, setMin] = useState(kept?.min ?? false);
+  const [chosen, setChosen] = useState(kept !== null);
   const [float, setFloat] = useState<IFloat | null>(kept?.float ?? null);
   const [dock, setDock] = useState<TDock>(kept?.dock ?? 'left');
   const [chatW, setChatW] = useState(kept?.chatW ?? CHAT_WIDTH);
@@ -447,8 +453,8 @@ export const useSiteStage = ({
   // Where the chat stood open last: the folded one opens there again.
   const [opened, setOpened] = useState<TSiteMode>(kept?.opened ?? 'chat');
   useEffect(() => {
-    if (keep) keepLayout(key, { mode, min, dock, chatW, float, opened });
-  }, [keep, key, mode, min, dock, chatW, float, opened]);
+    if (keep) keepLayout(key, { mode, min, dock, chatW, float, opened, chosen });
+  }, [keep, key, mode, min, dock, chatW, float, opened, chosen]);
 
   // One draft for the folded field and the open one: the chat's, or the design's own before it has a chat.
   const designDraft: DraftKey = `design:${key}`;
@@ -585,6 +591,7 @@ export const useSiteStage = ({
       setMin(true);
       return;
     }
+    setChosen(true);
     if (zone === 'left' || zone === 'right') setDock(zone);
     if (zone === 'float' && drop) setFloat(drop);
     leaveTo(zone === 'left' || zone === 'right' ? 'chat' : zone);
@@ -647,6 +654,7 @@ export const useSiteStage = ({
   }));
   const changeMode = (next: TSiteMode, section: { width: number; height: number }) => {
     if (next === mode) return;
+    setChosen(true);
     if (next === 'float' && !float) setFloat(firstFloat(section));
     leaveTo(next);
     setMin(next === 'island' && empty);

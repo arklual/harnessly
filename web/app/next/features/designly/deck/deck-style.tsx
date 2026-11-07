@@ -1,7 +1,9 @@
 // «Стиль» (the board's .pr-pop): the deck's theme and font, written to the deck's settings (the runtime rewrites
 // deck-theme.css and every board redraws), and the layout of the slide on screen, which is the agent's to redo: a pick
 // asks it in the chat and marks the choice. The footer names the company template the theme came from.
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { fetchKitFonts, type IKitFont } from '@/next/features/designly/deck/api';
+import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { toast } from '@/next/ui/toast';
@@ -12,7 +14,8 @@ import {
   DECK_LAYOUT,
   type IDeckSettings,
   type IDeckTheme,
-  type TDeckFont,
+  isKitFont,
+  type TDeckSettingsFont,
   type TDeckLayout,
 } from '@/next/features/designly/deck/types';
 
@@ -93,18 +96,19 @@ const LAYOUTS = [
 /** Writes a theme's variables on an element (a swatch, the deck's root). */
 export const useThemeVars = <T extends HTMLElement>(
   vars: Record<string, string> | null,
-  font?: TDeckFont,
+  font?: TDeckSettingsFont,
 ) => {
   const ref = useRef<T>(null);
   const key = JSON.stringify([vars, font]);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const [v, f] = JSON.parse(key) as [Record<string, string> | null, TDeckFont | undefined];
+    const [v, f] = JSON.parse(key) as [Record<string, string> | null, TDeckSettingsFont | undefined];
     for (const [name, value] of Object.entries(v ?? {})) {
       if (name.startsWith('--deck-')) el.style.setProperty(name, value);
     }
-    if (f) el.style.setProperty('--deck-font', DECK_FONT_CSS[f]);
+    // A kit font's faces are loaded by the deck's own stylesheet, which sets --deck-font itself.
+    if (f && !isKitFont(f)) el.style.setProperty('--deck-font', DECK_FONT_CSS[f]);
   }, [key]);
   return ref;
 };
@@ -127,6 +131,7 @@ const Swatch = ({ theme, on, onPick }: { theme: IDeckTheme; on: boolean; onPick:
 };
 
 export interface IDeckStyleProps {
+  machine: MachineId;
   state: TPresenceState;
   /** null while the deck is not read yet. */
   settings: IDeckSettings | null;
@@ -137,7 +142,13 @@ export interface IDeckStyleProps {
   onLayout: (layout: TDeckLayout) => void;
 }
 
-const DeckStyle = ({ state, settings, onSettings, layout, onLayout }: IDeckStyleProps) => {
+const DeckStyle = ({ machine, state, settings, onSettings, layout, onLayout }: IDeckStyleProps) => {
+  const [kitFonts, setKitFonts] = useState<readonly IKitFont[]>([]);
+  useEffect(() => {
+    const abort = new AbortController();
+    fetchKitFonts(machine, abort.signal).then(setKitFonts, () => undefined);
+    return () => abort.abort();
+  }, [machine]);
   // The pick under way: shown as chosen until the runtime has it (or refuses).
   const [pending, setPending] = useState<Partial<IDeckSettings> | null>(null);
   const change = (next: Partial<IDeckSettings>) => {
@@ -186,6 +197,18 @@ const DeckStyle = ({ state, settings, onSettings, layout, onLayout }: IDeckStyle
             onClick={() => settings && change({ font: f.id })}
           >
             {t(f.key)}
+          </button>
+        ))}
+        {kitFonts.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            data-font={f.id}
+            data-on={f.id === font ? '1' : '0'}
+            aria-pressed={f.id === font}
+            onClick={() => settings && change({ font: f.id })}
+          >
+            {f.family}
           </button>
         ))}
       </div>

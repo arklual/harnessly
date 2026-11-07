@@ -1,6 +1,7 @@
 // A composer on its draft: the text and files of one field (a chat's, or the new chat's) from the drafts store, the
 // writes into it, and the caret at the end of a text that was there when the field came back.
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
+import type { IAnnotation } from '@/next/features/pane/annotations';
 import type { AttachmentRef, MessageRef } from '@/next/protocol/v2';
 import { draftText, setDraftText, useDraft, type DraftKey } from '@/next/stores/drafts';
 
@@ -9,6 +10,8 @@ export interface IDraftField {
   files: AttachmentRef[];
   /** The places attached to the field (a design, a document…). */
   refs: MessageRef[];
+  /** The marks sent from the pane's browser. */
+  notes: IAnnotation[];
   setText: (value: string) => void;
   /** The text as the store has it now (for a dictation that outlives the field). */
   read: () => string;
@@ -18,6 +21,7 @@ export interface IDraftField {
 // One empty list for every field without files: a fresh [] on each keystroke would re-render everything handed it.
 const NONE_FILES: AttachmentRef[] = [];
 const NONE_REFS: MessageRef[] = [];
+const NONE_NOTES: IAnnotation[] = [];
 
 export function useDraftField(key: DraftKey, field?: RefObject<HTMLTextAreaElement | null>): IDraftField {
   const draft = useDraft(key);
@@ -25,6 +29,7 @@ export function useDraftField(key: DraftKey, field?: RefObject<HTMLTextAreaEleme
   const ref = field ?? own;
   const files = draft?.attachments ?? NONE_FILES;
   const refs = draft?.refs ?? NONE_REFS;
+  const notes = draft?.annotations ?? NONE_NOTES;
   const setText = useCallback((value: string) => setDraftText(key, value), [key]);
   const read = useCallback(() => draftText(key), [key]);
   // Back in a chat with a draft, the person goes on writing after it, not before it.
@@ -33,5 +38,5 @@ export function useDraftField(key: DraftKey, field?: RefObject<HTMLTextAreaEleme
     if (!el || el.value === '' || document.activeElement === el) return;
     el.setSelectionRange(el.value.length, el.value.length);
   }, [key, ref]);
-  return { text: draft?.text ?? '', files, refs, setText, read, field: ref };
+  return { text: draft?.text ?? '', files, refs, notes, setText, read, field: ref };
 }

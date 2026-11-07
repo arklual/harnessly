@@ -170,6 +170,7 @@ type Conversation struct {
 	Title          string       `json:"title"`
 	TitleSource    TitleSource  `json:"titleSource"`
 	Pinned         bool         `json:"pinned"`
+	Test           bool         `json:"test,omitempty"` // a chat an agent made to check something (HRN-842): the sidebar leaves it out unless asked
 	CreatedAt      Ms           `json:"createdAt"`
 	LastActivityAt Ms           `json:"lastActivityAt"`
 	LastPromptAt   Ms           `json:"lastPromptAt"` // the person's last real message (createdAt until then); the sidebar orders by it
@@ -1734,6 +1735,8 @@ type ConversationCreateCmd struct {
 	ParentID string `json:"parentId,omitempty"`
 	// Title names the conversation from the start (as a rename would); empty takes the first message's line.
 	Title string `json:"title,omitempty"`
+	// Test starts the conversation as a test chat (see Conversation.Test).
+	Test bool `json:"test,omitempty"`
 }
 
 // Launch is what the conversations of one prompt started on several models share: the id of the launch and the prompt.
@@ -1773,6 +1776,13 @@ type ConversationPinCmd struct {
 	OpID   string `json:"opId"`
 	ID     string `json:"id"`
 	Pinned bool   `json:"pinned"`
+}
+
+// ConversationTestCmd marks a conversation as a test chat, or takes the mark off (see Conversation.Test).
+type ConversationTestCmd struct {
+	OpID string `json:"opId"`
+	ID   string `json:"id"`
+	Test bool   `json:"test"`
 }
 
 // ConversationAppsCmd sets the apps turned on in a conversation: the whole list, in the order the person turned them
@@ -1994,6 +2004,7 @@ func (ConversationCreateCmd) Op() Op  { return OpConversationCreate }
 func (ConversationRenameCmd) Op() Op  { return OpConversationRename }
 func (ConversationPinCmd) Op() Op     { return OpConversationPin }
 func (ConversationAppsCmd) Op() Op    { return OpConversationApps }
+func (ConversationTestCmd) Op() Op    { return OpConversationTest }
 func (ConversationRetitleCmd) Op() Op { return OpConversationRetitle }
 func (ConversationMoveCmd) Op() Op    { return OpConversationMove }
 func (ConversationDeleteCmd) Op() Op  { return OpConversationDelete }
@@ -2032,6 +2043,7 @@ func (c ConversationCreateCmd) OpKey() string  { return c.OpID }
 func (c ConversationRenameCmd) OpKey() string  { return c.OpID }
 func (c ConversationPinCmd) OpKey() string     { return c.OpID }
 func (c ConversationAppsCmd) OpKey() string    { return c.OpID }
+func (c ConversationTestCmd) OpKey() string    { return c.OpID }
 func (c ConversationRetitleCmd) OpKey() string { return c.OpID }
 func (c ConversationMoveCmd) OpKey() string    { return c.OpID }
 func (c ConversationDeleteCmd) OpKey() string  { return c.OpID }
@@ -2756,6 +2768,7 @@ const (
 	OpConversationRename  Op = "conversation.rename"
 	OpConversationPin     Op = "conversation.pin"
 	OpConversationApps    Op = "conversation.apps"
+	OpConversationTest    Op = "conversation.test"
 	OpConversationRetitle Op = "conversation.retitle"
 	OpConversationMove    Op = "conversation.move"
 	OpConversationDelete  Op = "conversation.delete"
@@ -2783,7 +2796,7 @@ const (
 )
 
 // Ops is every Op, in the schema's order.
-var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationApps, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpProjectUpdate, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
+var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationApps, OpConversationTest, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpProjectUpdate, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
 
 // PromoteTo is where promote moves a queued message.
 type PromoteTo string

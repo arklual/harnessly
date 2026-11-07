@@ -6,6 +6,8 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { IDesignSystem } from '@/next/features/designly/api';
+import KitImport from '@/next/features/designly/kit-import';
+import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import { SheetGrip, useFocusTrap, useSheetDrag } from '@/next/ui/sheet';
 import { usePortalContainer } from '@/next/ui/portal';
@@ -115,6 +117,12 @@ const CreatePanel = ({ open, onClose, anchor, label, children }: ICreatePanelPro
 
 export default CreatePanel;
 
+/** What «Добавить дизайн-систему» needs: the machine, and what to do once a kit is installed. */
+export interface IKitAdd {
+  machine: MachineId;
+  onAdded: () => void;
+}
+
 /** A look from elsewhere than the machine's systems (a deck's company template): the last row of the list. */
 export interface IDsOther {
   label: string;
@@ -130,10 +138,12 @@ interface IDsChoiceProps {
   value: string | null;
   onChange: (id: string | null) => void;
   other?: IDsOther;
+  /** Adds a kit file to the machine's systems; without it the list has no such button. */
+  kit?: IKitAdd;
 }
 
 /** The design system as the panel's first block: none, each of the machine's systems, and the other look. */
-export const DsChoice = ({ systems, value, onChange, other }: IDsChoiceProps) => {
+export const DsChoice = ({ systems, value, onChange, other, kit }: IDsChoiceProps) => {
   const viaOther = other?.active === true && value === null;
   return (
     <>
@@ -187,6 +197,7 @@ export const DsChoice = ({ systems, value, onChange, other }: IDsChoiceProps) =>
           </button>
         )}
       </div>
+      {kit && <KitImport machine={kit.machine} onAdded={kit.onAdded} />}
     </>
   );
 };

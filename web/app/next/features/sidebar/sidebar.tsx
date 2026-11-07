@@ -55,8 +55,7 @@ import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
 import ProductSwitcher from '@/next/features/sidebar/product-switcher';
 import useDrag, { afterTouchClick } from '@/next/ui/use-drag';
 import MachineAlert from '@/next/features/sidebar/machine-alert';
-import MachineCard from '@/next/features/sidebar/machine-card';
-import useRailTip, { isRail, opensRail } from '@/next/features/sidebar/use-rail-tip';
+import useRailTip, { opensRail } from '@/next/features/sidebar/use-rail-tip';
 import useRowCard from '@/next/features/sidebar/row-card';
 import '@/next/styles/delegation.css';
 import {
@@ -97,7 +96,6 @@ const DAY_LABEL: Record<TDayGroup, string> = {
 const SKELETON_GROUPS = [2, 3, 5] as const;
 
 /** A switch of the machine is pending under this key, a chat's action under the chat's id. */
-const MACHINE_KEY = 'machine';
 
 const ListSkeleton = () => (
   <div className="hx-sbsk" role="status" aria-label={t('next.sidebar.loading')}>
@@ -266,9 +264,9 @@ const DESIGNS_FOLDED_KEY = 'hx-sidebar-designs-folded';
 
 const readDesignsFolded = (): boolean => {
   try {
-    return localStorage.getItem(DESIGNS_FOLDED_KEY) === '1';
+    return localStorage.getItem(DESIGNS_FOLDED_KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 };
 
@@ -285,9 +283,9 @@ const APPS_FOLDED_KEY = 'hx-sidebar-apps-folded';
 
 const readAppsFolded = (): boolean => {
   try {
-    return localStorage.getItem(APPS_FOLDED_KEY) === '1';
+    return localStorage.getItem(APPS_FOLDED_KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 };
 
@@ -299,10 +297,11 @@ const keepAppsFolded = (folded: boolean) => {
   }
 };
 
-/** The apps that are on in chats, and the way to all the installed ones. */
+/** The last apps that are on in chats; all the installed ones open from «Приложения» itself. */
+const APP_ROWS = 3;
 const AppRows = ({ apps }: { apps: ISidebarApps }) => (
   <>
-    {apps.rows.map((a) => (
+    {apps.rows.slice(0, APP_ROWS).map((a) => (
       <button
         key={a.id}
         type="button"
@@ -314,15 +313,6 @@ const AppRows = ({ apps }: { apps: ISidebarApps }) => (
         <span className="hx-item__title">{a.name}</span>
       </button>
     ))}
-    <button
-      type="button"
-      className="hx-nav__kid"
-      aria-current={apps.allCurrent ? 'page' : undefined}
-      onClick={apps.onAll}
-    >
-      <Icon name="app-window" size="sm" className="hx-nav__kid-icon" />
-      <span className="hx-item__title">{t('next.sidebar.appsAll')}</span>
-    </button>
   </>
 );
 
@@ -362,24 +352,46 @@ const DesignRows = ({
   );
 };
 
-/** The theme's switch of the footer: the moon in a light page, the sun in a dark one. */
-const ThemeButton = ({ theme }: { theme: ISidebarTheme }) => {
-  const label = theme.dark ? t('next.sidebar.themeLight') : t('next.sidebar.themeDark');
+/** «Ещё»: the rest of the places, in a menu beside the item — not a list that pushes the chats down. */
+const MoreMenu = ({ items }: { items: readonly IMoreItem[] }) => {
+  const menuActions = useMenuActions();
+  const current = items.some((item) => item.current);
   return (
-    <button
-      type="button"
-      className="hx-btn hx-tipped hx-user__theme"
-      data-variant="ghost"
-      data-size="sm"
-      data-shape="icon"
-      aria-label={label}
-      onClick={theme.onToggle}
-    >
-      <Icon name={theme.dark ? 'sun' : 'moon'} />
-      <span className="hx-tip" data-pos="above" data-align="end">
-        {label}
-      </span>
-    </button>
+    <div className="hx-nav__group hx-enter" data-enter="up" data-eb="220" data-i={4}>
+      <Menu.Root actionsRef={menuActions}>
+        <Menu.Trigger
+          render={
+            <button
+              type="button"
+              className="hx-nav__item"
+              aria-current={current ? 'page' : undefined}
+              data-tip={t('next.sidebar.more')}
+            >
+              <span className="hx-nav__ic">
+                <Icon name="ellipsis" />
+              </span>
+              <span className="hx-nav__label">{t('next.sidebar.more')}</span>
+            </button>
+          }
+        />
+        <MenuPanel
+          actions={menuActions}
+          className="hx-cmenu"
+          label={t('next.sidebar.more')}
+          side="right"
+          align="start"
+          sideOffset={8}
+        >
+          {items.map((item) => (
+            <Menu.Item key={item.id} className="hx-cmenu__item" onClick={item.onSelect}>
+              <Icon name={item.icon} size="sm" />
+              <span className="hx-cmenu__txt">{item.label}</span>
+              {item.external && <Icon name="arrow-up-right" size="sm" />}
+            </Menu.Item>
+          ))}
+        </MenuPanel>
+      </Menu.Root>
+    </div>
   );
 };
 
@@ -452,13 +464,11 @@ const Sidebar = ({
   now,
   person,
   machine,
-  otherMachines,
   unread,
   notificationsOpen,
   searchOpen,
   more,
   profile,
-  theme,
   actions,
   onOpen,
   onNewChat,
@@ -468,9 +478,7 @@ const Sidebar = ({
   onNotifications,
   onToggleRail,
   onCloseDrawer,
-  onPickMachine,
   onManageMachines,
-  machineReveal = 0,
   people,
   designs = null,
   ref,
@@ -478,7 +486,6 @@ const Sidebar = ({
   const railKey = useKeyHint('global.rail');
   const { pending, run } = usePendingList();
   const [renaming, setRenaming] = useState<{ id: string; saving: boolean } | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [projectChoice, setProjectChoice] = useState<ReadonlyMap<string, boolean>>(new Map());
   // Folders whose «Дальше» was pressed: they show all their chats.
   const [longFolders, setLongFolders] = useState<ReadonlySet<string>>(new Set());
@@ -499,8 +506,6 @@ const Sidebar = ({
   // Ids the list has drawn; one that comes in later is fresh and slides in. null until the first list.
   const [known, setKnown] = useState<ReadonlySet<string> | null>(null);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
-  const [pickedMachine, setPickedMachine] = useState<string | null>(null);
-  const [alertReveal, setAlertReveal] = useState(0);
   const [foldedGroups, setFoldedGroups] = useState<ReadonlySet<string>>(new Set());
   const [creatingGroup, setCreatingGroup] = useState<TGroupState>(GROUP_STATE.off);
   const [renamingGroup, setRenamingGroup] = useState<{ id: string; state: TGroupState } | null>(null);
@@ -820,7 +825,6 @@ const Sidebar = ({
     sections !== null &&
     (!isFavEmpty(favView) || (actions.onPlaceFavorite !== undefined && chats !== null && chats.length > 0));
 
-  const switching = pending.get(MACHINE_KEY);
   // Day groups share one cascade, a label and its chats in a row, as the design staggers them.
   let cascade = 0;
 
@@ -921,7 +925,7 @@ const Sidebar = ({
           <NavItem
             icon="layout-grid"
             label={t('next.sidebar.apps')}
-            current={apps.allCurrent && apps.rows.length === 0}
+            current={apps.allCurrent}
             index={3}
             onClick={apps.onAll}
             expanded={apps.rows.length > 0 && !appsFolded}
@@ -931,43 +935,10 @@ const Sidebar = ({
             {apps.rows.length > 0 && <AppRows apps={apps} />}
           </NavItem>
         )}
-        <NavItem
-          icon="bell"
-          label={t('next.sidebar.notifications')}
-          current={notificationsOpen}
-          dot={unread}
-          index={4}
-          onClick={onNotifications}
-        />
-        {more.length > 0 && (
-          <NavItem
-            icon="layout-grid"
-            label={t('next.sidebar.more')}
-            expanded={moreOpen}
-            index={5}
-            onClick={(anchor) => {
-              if (isRail(anchor)) onToggleRail();
-              setMoreOpen((current) => !current);
-            }}
-          >
-            {more.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="hx-nav__kid"
-                aria-current={item.current ? 'page' : undefined}
-                onClick={item.onSelect}
-              >
-                <Icon name={item.icon} size="sm" className="hx-nav__kid-icon" />
-                <span className="hx-item__title">{item.label}</span>
-                {item.external && <Icon name="arrow-up-right" size="sm" className="hx-nav__kid-out" />}
-              </button>
-            ))}
-          </NavItem>
-        )}
+        {more.length > 0 && <MoreMenu items={more} />}
       </nav>
 
-      <MachineAlert alert={machine?.alert ?? null} onMore={() => setAlertReveal((n) => n + 1)} />
+      <MachineAlert alert={machine?.alert ?? null} onMore={() => onManageMachines?.()} />
 
       <div className="hx-sidebar__list" ref={listRef}>
         {showSkeleton && <ListSkeleton />}
@@ -1119,22 +1090,19 @@ const Sidebar = ({
 
       <div className="hx-user hx-enter" data-enter="up" data-eb="820" data-health={machine?.health}>
         <ProfileButton person={person} items={profile} current={view === SIDEBAR_VIEW.settings} />
-        {theme && <ThemeButton theme={theme} />}
-        <MachineCard
-          machine={machine}
-          others={otherMachines}
-          switching={switching && pickedMachine ? { id: pickedMachine, pending: switching } : null}
-          onPick={
-            onPickMachine
-              ? (id) => {
-                  setPickedMachine(id);
-                  void run(MACHINE_KEY, t('next.sidebar.machineFailed'), () => onPickMachine(id));
-                }
-              : undefined
-          }
-          onManage={onManageMachines}
-          reveal={machineReveal + alertReveal}
-        />
+        <button
+          type="button"
+          className="hx-btn hx-tipped hx-user__bell"
+          data-size="sm"
+          data-shape="icon"
+          data-tip={t('next.sidebar.notifications')}
+          aria-label={t('next.sidebar.notifications')}
+          aria-pressed={notificationsOpen}
+          onClick={(event) => onNotifications(event.currentTarget)}
+        >
+          <Icon name="bell" />
+          <span className="hx-user__dot" data-on={unread} aria-hidden />
+        </button>
       </div>
       {railTip.tip}
     </aside>

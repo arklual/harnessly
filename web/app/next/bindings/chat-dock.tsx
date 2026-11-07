@@ -73,7 +73,14 @@ import type { ConvId, MachineId, PromoteTo } from '@/next/protocol/v2';
 import { reconnectNow, useConnection } from '@/next/stores/connection';
 import { openGates, useFedClients, useGates, useQueue } from '@/next/stores/conversation';
 import { useConversation } from '@/next/stores/conversations';
-import { addDraftRef, clearDraft, removeDraftRef } from '@/next/stores/drafts';
+import {
+  addDraftRef,
+  clearDraft,
+  editDraftAnnotation,
+  removeDraftAnnotation,
+  removeDraftRef,
+} from '@/next/stores/drafts';
+import { annotationWords } from '@/next/features/pane/annotations';
 import { refKey } from '@/next/features/chat/attached';
 import { designThumb } from '@/next/features/composer/attach-sources';
 import type { IPlusAttach } from '@/next/features/composer/plus-menu';
@@ -157,7 +164,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const gates = useGates(conv);
   const pending = usePendingMessages(conv);
   const fed = useFedClients(conv);
-  const { text, files, refs, setText: onChange, read, field } = useDraftField(conv);
+  const { text, files, refs, notes, setText: onChange, read, field } = useDraftField(conv);
   const uploads = useUploads(machine, conv, files);
   const stash = useFieldStash(conv);
   const quotes = useQuotes(conv);
@@ -281,6 +288,20 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     onChat,
   });
   const cardSend = useRef<(() => boolean) | null>(null);
+  // The marks sent from the pane's browser: chips in the field, in words after the text once the message goes.
+  const withMarks = useCallback(
+    (words: string): string => {
+      if (notes.length === 0) return words;
+      const marks = annotationWords(notes, (from) => from, {
+        annotation: t('next.pane.annot.words.annotation'),
+        element: t('next.pane.pick.words.element'),
+        component: t('next.pane.pick.words.component'),
+        comment: t('next.pane.pick.words.comment'),
+      });
+      return words === '' ? marks : `${words}\n\n${marks}`;
+    },
+    [notes],
+  );
   const onSubmit = useCallback(
     (sendMode: TSendMode) => {
       if (question) {
@@ -301,7 +322,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       const send = () =>
         sendMessage(machine, {
           conversationId: conv,
-          text: withAnnotations((extra?.wrap ?? keepText)(withQuotes(quotes, text.trim())), [
+          text: withAnnotations((extra?.wrap ?? keepText)(withQuotes(quotes, withMarks(text.trim()))), [
             ...carried.map((note, i) => renumberBlock(note.raw, i + 1)),
             ...designNotes.map((note, i) =>
               formatAnnotation({
@@ -344,6 +365,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       conv,
       text,
       refs,
+      withMarks,
       quotes,
       designNotes,
       carried,
@@ -506,6 +528,9 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onRetryAttachment={uploads.onRetry}
         refs={refChips}
         onRemoveRef={(ref) => removeDraftRef(conv, ref)}
+        notes={notes}
+        onEditNote={(id, comment) => editDraftAnnotation(conv, id, comment)}
+        onRemoveNote={(id) => removeDraftAnnotation(conv, id)}
         attach={attach}
         stash={stash}
         takes={voice.onMic ? takes : null}

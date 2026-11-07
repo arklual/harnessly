@@ -152,3 +152,82 @@ export const fetchCheck = async (m: MachineId, id: string, signal?: AbortSignal)
   );
   return readCheck(answer.report);
 };
+
+// ---- a kit as one file (POST/GET /design/kit/import|export)
+
+export interface IKitDiff {
+  added: string[];
+  changed: string[];
+  removed: string[];
+}
+
+export type TKitImport =
+  | {
+      ok: true;
+      id: string;
+      version: string;
+      installed: boolean;
+      unchanged: boolean;
+      files: number;
+      restricted: number;
+      warnings: string[];
+    }
+  | { ok: false; error: string; id: string; version: string; conflict: IKitDiff | null };
+
+const strList = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+const rec = (v: unknown): Record<string, unknown> =>
+  typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+
+/** Checks an uploaded kit file (`dryRun`) or installs it; a version held with other content comes back as a conflict, never overwritten. */
+export const importKit = async (
+  m: MachineId,
+  uploadId: string,
+  opt: { dryRun?: boolean; asId?: string; asVersion?: string } = {},
+): Promise<TKitImport> => {
+  const q = new URLSearchParams({ upload: uploadId });
+  if (opt.dryRun) q.set('dryRun', '1');
+  if (opt.asId) q.set('asId', opt.asId);
+  if (opt.asVersion) q.set('asVersion', opt.asVersion);
+  const res = await fetch(
+    runtimePath(platformPath(`/design/kit/import?${q.toString()}` as `/${string}`), m),
+    {
+      method: 'POST',
+      credentials: 'same-origin',
+    },
+  );
+  const body = rec(await res.json().catch(() => null));
+  const manifest = rec(body.manifest);
+  if (!res.ok) {
+    const c = rec(body.conflict);
+    return {
+      ok: false,
+      error: typeof body.error === 'string' ? body.error : String(res.status),
+      id: typeof body.id === 'string' ? body.id : '',
+      version: typeof body.version === 'string' ? body.version : '',
+      conflict:
+        res.status === 409
+          ? { added: strList(c.added), changed: strList(c.changed), removed: strList(c.removed) }
+          : null,
+    };
+  }
+  return {
+    ok: true,
+    id: typeof body.id === 'string' ? body.id : '',
+    version: typeof body.version === 'string' ? body.version : '',
+    installed: body.installed === true,
+    unchanged: body.unchanged === true,
+    files: Array.isArray(manifest.files) ? manifest.files.length : 0,
+    restricted: Array.isArray(manifest.restricted) ? manifest.restricted.length : 0,
+    warnings: strList(body.warnings),
+  };
+};
+
+/** Where a kit is downloaded as one file; a kit with restricted files needs `acceptRestricted`. */
+export const kitExportHref = (m: MachineId, id: string, version: string, acceptRestricted: boolean): string =>
+  runtimePath(
+    platformPath(
+      `/design/kit/export?id=${encodeURIComponent(id)}&version=${encodeURIComponent(version)}${acceptRestricted ? '&acceptRestricted=1' : ''}` as `/${string}`,
+    ),
+    m,
+  );

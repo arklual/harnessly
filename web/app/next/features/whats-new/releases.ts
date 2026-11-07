@@ -13,6 +13,37 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-07k',
+    items: [{ key: 'sinopiaChatLeft', icon: 'panel-left' }],
+  },
+  {
+    id: '2026-11-07j',
+    items: [
+      { key: 'annotate', icon: 'message-square-plus' },
+      { key: 'annotateSend', icon: 'send' },
+      { key: 'annotateChips', icon: 'map-pin' },
+    ],
+  },
+  {
+    id: '2026-11-07i',
+    items: [
+      { key: 'tidyMenu', icon: 'panel-left' },
+      { key: 'fullTitle', icon: 'message-square-text' },
+    ],
+  },
+  {
+    id: '2026-11-07h',
+    items: [{ key: 'longMessages', icon: 'file-text' }],
+  },
+  {
+    id: '2026-11-07g',
+    items: [
+      { key: 'kitFile', icon: 'download' },
+      { key: 'kitFonts', icon: 'palette' },
+      { key: 'kitLayouts', icon: 'layout-grid' },
+    ],
+  },
+  {
     id: '2026-11-07f',
     items: [{ key: 'appHeader', icon: 'layout-grid' }],
   },

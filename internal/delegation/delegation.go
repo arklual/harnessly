@@ -182,6 +182,8 @@ type Task struct {
 	Title string
 	// Notify wakes the caller with the result when the chat finishes a turn.
 	Notify bool
+	// Test makes the chat a test chat: the sidebar leaves it out.
+	Test bool
 }
 
 // Delegate starts a chat with the task, under the caller.
@@ -213,7 +215,7 @@ func (s *Service) Delegate(ctx context.Context, callerID string, t Task) (wire.C
 	}
 	key := peers.NewID()
 	cmd := wire.ConversationCreateCmd{OpID: "delegate-" + key, Provider: t.Provider, Model: model, Profile: profile, ParentID: caller.ID,
-		Title: strings.TrimSpace(t.Title), First: &wire.FirstMessage{ClientID: "delegate-" + key, Text: prompt + Rules, AttachmentIDs: []string{}}}
+		Title: strings.TrimSpace(t.Title), Test: t.Test, First: &wire.FirstMessage{ClientID: "delegate-" + key, Text: prompt + Rules, AttachmentIDs: []string{}}}
 	if title := []rune(cmd.Title); len(title) > wire.RefTitleMax {
 		cmd.Title = string(title[:wire.RefTitleMax])
 	}

@@ -30,6 +30,9 @@ type API struct {
 	MachineAgent func(*http.Request) bool
 	// APIRefusal is the dispatcher's answer to a caller with neither; refused false for anyone else.
 	APIRefusal func(*http.Request) (status int, body any, h http.Header, refused bool)
+	// UploadFile is the file of a finished chunked upload by its id (nil while none is wired): a kit file too big for one
+	// request arrives that way.
+	UploadFile func(id string) (path string, ok bool)
 	// PlatformAPI prefixes the platform's routes.
 	PlatformAPI string
 	// Launch starts an agent conversation (nil while the core does not run).

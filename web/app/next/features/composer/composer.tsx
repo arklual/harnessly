@@ -31,6 +31,8 @@ import PlusMenu, {
 } from '@/next/features/composer/plus-menu';
 import type { IStash } from '@/next/features/composer/stash-list';
 import { RefChips, type IRefChip } from '@/next/features/chat/ref-chips';
+import { AnnotationChips } from '@/next/features/composer/annotation-chips';
+import type { IAnnotation } from '@/next/features/pane/annotations';
 import { usePromptHistory } from '@/next/features/composer/prompt-history';
 import { useSlashPalette, type ISlashSource } from '@/next/features/composer/slash-palette';
 import type {
@@ -143,6 +145,10 @@ export interface IComposerProps {
   /** The places attached to the message (a design, a document, a board, a file, an MR, a task): chips before the files. */
   refs?: readonly IRefChip[];
   onRemoveRef?: (ref: IRefChip) => void;
+  /** The marks sent from the pane's browser: a chip each, after the places; their words go with the message. */
+  notes?: readonly IAnnotation[];
+  onEditNote?: (id: string, comment: string) => void;
+  onRemoveNote?: (id: string) => void;
   /** What «+» can attach besides files; without it only files, prompts and contexts. */
   attach?: IPlusAttach | null;
   /** Drafts put aside («Отложить черновик», ⌘⇧S); without it the field has no such thing. */
@@ -338,6 +344,7 @@ const Composer = (props: IComposerProps) => {
     value.trim().length > 0 ||
     (props.quotes?.length ?? 0) > 0 ||
     (props.refs?.length ?? 0) > 0 ||
+    (props.notes?.length ?? 0) > 0 ||
     attachments.some((file) => file.status !== 'error');
   const canSend = hasContent && !tooLong && !failedFile;
   const working = mode === 'working';
@@ -509,6 +516,9 @@ const Composer = (props: IComposerProps) => {
             </span>
           ))}
           {props.refs && <RefChips refs={props.refs} onRemove={props.onRemoveRef} />}
+          {props.notes && props.onEditNote && props.onRemoveNote && (
+            <AnnotationChips notes={props.notes} onEdit={props.onEditNote} onRemove={props.onRemoveNote} />
+          )}
           {attachments.map((file) => (
             <span
               key={file.id}

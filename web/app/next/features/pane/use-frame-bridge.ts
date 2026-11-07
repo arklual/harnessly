@@ -2,6 +2,7 @@
 // as it moves on, and the offer page's «Открыть» for a redirect to another site. Only messages of the tab's frame from
 // the slot's origin count.
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from 'react';
+import { createAnchorStore } from '@/next/features/designly/note-anchor';
 import {
   readFrameMessage,
   type IFrameActed,
@@ -48,12 +49,22 @@ interface IFrameBridgeArgs {
   onRedirect: (url: string) => boolean;
   /** The proxy could not fetch the site: the tab may open it in the machine's own browser instead. */
   onFailed: (failure: { status: number; text: string }) => void;
+  /** The person clicked an element while picking (annotating): picking goes on. */
+  onPicked: (picked: IFramePicked) => void;
 }
 
-export const useFrameBridge = ({ frame, origin, onOpen, onRedirect, onFailed }: IFrameBridgeArgs) => {
+export const useFrameBridge = ({
+  frame,
+  origin,
+  onOpen,
+  onRedirect,
+  onFailed,
+  onPicked,
+}: IFrameBridgeArgs) => {
   // Null until the page's bridge says hello: a page without one cannot pick.
   const [picking, setPicking] = useState<boolean | null>(null);
-  const [picked, setPicked] = useState<IFramePicked | null>(null);
+  // Where the blocks the tab follows (`tk:anchors`) show now: marks write their place from it, no render per scroll.
+  const [anchors] = useState(createAnchorStore);
   const [url, setUrl] = useState<string | null>(null);
   // The document asked for a security key or Touch ID (WebAuthn), which the slot cannot give.
   const [keyStep, setKeyStep] = useState(false);
@@ -61,6 +72,7 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect, onFailed }: 
   const [hellos, setHellos] = useState(0);
   const opened = useEffectEvent((url: string) => onOpen(url));
   const redirected = useEffectEvent((url: string): boolean => onRedirect(url));
+  const picked = useEffectEvent((p: IFramePicked) => onPicked(p));
   const failed = useEffectEvent((failure: { status: number; text: string }) => onFailed(failure));
   // The actions waiting for the frame's answer, and those waiting for the next page's hello.
   const acts = useRef(new Map<string, TWaiter>());
@@ -94,10 +106,9 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect, onFailed }: 
         waiter?.(message.acted);
       } else if (message.k === 'nav') setUrl(message.url);
       else if (message.k === 'pick') setPicking(message.on);
-      else if (message.k === 'picked') {
-        setPicking(false);
-        setPicked(message.picked);
-      } else if (message.k === 'redirect') {
+      else if (message.k === 'picked') picked(message.picked);
+      else if (message.k === 'anchored') anchors.set(message.report);
+      else if (message.k === 'redirect') {
         // The page's bridge holds back a page that leaves by script until it hears whether the tab goes there itself.
         const follow = redirected(message.url);
         frame.current?.contentWindow?.postMessage(
@@ -110,38 +121,40 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect, onFailed }: 
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [frame, origin]);
+  }, [frame, origin, anchors]);
 
-  const post = (on: boolean) => {
-    if (origin !== null) frame.current?.contentWindow?.postMessage({ type: 'tk:pick', on }, origin);
+  const postPick = (on: boolean) => {
+    if (origin !== null)
+      frame.current?.contentWindow?.postMessage(
+        { type: 'tk:pick', on, ...(on ? { keep: true } : {}) },
+        origin,
+      );
   };
 
   return {
     /** The page asked for a security key or Touch ID; false again with its next document. */
     keyStep,
     picking,
-    picked,
+    anchors,
     /** The page's address in the slot, as its bridge last said; null before it did. */
     url,
     togglePick: () => {
       if (picking === null) return;
       const next = !picking;
       setPicking(next);
-      if (next) setPicked(null);
-      post(next);
+      postPick(next);
     },
     endPick: () => {
-      setPicked(null);
       if (picking) {
         setPicking(false);
-        post(false);
+        postPick(false);
       }
     },
     /** A new document in the frame: its bridge says hello again; what the old one was doing is lost with it. */
     onFrameLoad: () => {
       setKeyStep(false);
       setPicking(null);
-      setPicked(null);
+      anchors.set(null);
       setNonceNow(null);
       for (const waiter of [...acts.current.values()]) waiter(null);
       acts.current.clear();

@@ -12,6 +12,8 @@ export interface ISiteLayout {
   chatW: number;
   float: IFloat | null;
   opened: TSiteMode;
+  /** The person placed the chat by hand (picked a mode, dragged it): only then the kept place wins over the default. */
+  chosen: boolean;
 }
 
 const KEY = 'hx-site-layouts';
@@ -40,6 +42,7 @@ export const parseLayout = (raw: unknown): ISiteLayout | null => {
     chatW: l.chatW,
     float: l.float,
     opened: l.opened,
+    chosen: l.chosen === true,
   };
 };
 

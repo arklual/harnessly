@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
@@ -69,5 +71,53 @@ func TestShowsAppViews(t *testing.T) {
 	}
 	if (&previewSession{target: devtools.Target{Kind: "port", Port: 3000}}).showsAppViews() {
 		t.Fatal("a dev server is not the view server")
+	}
+}
+
+func TestAppViewAssetGoesWithoutTheSlotCookie(t *testing.T) {
+	sessions := apps.NewViewSessions()
+	live, err := sessions.Issue("acme.check", "main", "app", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { appViewPort.Store(0); appViewSessions.Store(nil) })
+	appViewPort.Store(42213)
+	appViewSessions.Store(sessions)
+	req := func(method, path, dest string) *http.Request {
+		r := httptest.NewRequest(method, "https://slot.example"+path, nil)
+		if dest != "" {
+			r.Header.Set("Sec-Fetch-Dest", dest)
+		}
+		return r
+	}
+	for _, c := range []struct {
+		name string
+		r    *http.Request
+		want bool
+	}{
+		{"the SDK", req("GET", apps.SDKPath, "script"), true},
+		{"the bridge shim", req("GET", apps.ShimPath, "script"), true},
+		{"a file of a live view", req("GET", "/"+live.Token+"/acme.check/ui/app.js", "script"), true},
+		{"a file of no view", req("GET", "/not-a-token/acme.check/ui/app.js", "script"), false},
+		{"the view's page itself", req("GET", "/"+live.Token+"/acme.check/ui/index.html", "iframe"), false},
+		{"the view's page, posing as a script", req("GET", "/"+live.Token+"/acme.check/ui/index.html", "script"), false},
+		{"a path with no extension", req("GET", "/"+live.Token+"/acme.check/ui", "script"), false},
+		{"a style of a live view", req("GET", "/"+live.Token+"/acme.check/ui/app.CSS", "style"), true},
+		{"a navigation", req("GET", apps.SDKPath, "document"), false},
+		{"no fetch metadata", req("GET", apps.SDKPath, ""), false},
+		{"a write", req("POST", "/"+live.Token+"/acme.check/ui/app.js", "script"), false},
+		{"a dev server's file", req("GET", "/src/main.ts", "script"), false},
+	} {
+		if got := appViewAsset(c.r); got != c.want {
+			t.Errorf("%s: appViewAsset = %v, want %v", c.name, got, c.want)
+		}
+	}
+	appViewPort.Store(0)
+	if appViewAsset(req("GET", apps.SDKPath, "script")) {
+		t.Error("no view server yet: nothing goes without the cookie")
+	}
+	appViewPort.Store(42213)
+	if sess := appViewSession("https://slot.example"); !sess.showsAppViews() || sess.origin != "https://slot.example" {
+		t.Errorf("the session goes to the view server under the slot's origin: %+v", sess)
 	}
 }

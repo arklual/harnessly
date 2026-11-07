@@ -285,7 +285,7 @@
     "Op": {
       "enum": [
         "send", "cancel", "retry", "promote", "answer", "decide", "interrupt", "queue.resume", "seen",
-        "conversation.create", "conversation.rename", "conversation.pin", "conversation.apps", "conversation.move",
+        "conversation.create", "conversation.rename", "conversation.pin", "conversation.apps", "conversation.test", "conversation.move",
         "conversation.delete", "conversation.restore", "conversation.resume", "model", "bg.stop",
         "project.create", "project.update", "favorites.group.create", "favorites.group.rename", "favorites.group.delete",
         "favorites.group.move", "favorites.place", "goal", "conversation.retitle", "draft.set", "queue.move", "terminal.stop", "rewind", "rewind.undo",
@@ -1546,6 +1546,7 @@
         "title": {"type": "string"},
         "titleSource": {"$ref": "#/$defs/TitleSource"},
         "pinned": {"type": "boolean"},
+        "test": {"type": "boolean"},
         "createdAt": {"type": "integer", "minimum": 0},
         "lastActivityAt": {"type": "integer", "minimum": 0},
         "lastPromptAt": {"type": "integer", "minimum": 0},
@@ -2758,6 +2759,7 @@
             "profile": {"$ref": "#/$defs/ProfileId"},
             "parentId": {"$ref": "#/$defs/ConvId"},
             "title": {"type": "string", "minLength": 1, "maxLength": 200},
+            "test": {"type": "boolean"},
             "first": {
               "type": "object",
               "required": ["clientId", "text", "attachmentIds"],
@@ -2784,6 +2786,7 @@
             "profile": {"$ref": "#/$defs/ProfileId"},
             "parentId": {"$ref": "#/$defs/ConvId"},
             "title": {"type": "string", "minLength": 1, "maxLength": 200},
+            "test": {"type": "boolean"},
             "first": {
               "type": "object",
               "required": ["clientId", "text", "attachmentIds"],
@@ -2825,6 +2828,16 @@
         "opId": {"type": "string", "minLength": 1},
         "id": {"$ref": "#/$defs/ConvId"},
         "apps": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 8}
+      }
+    },
+    "Cmd_conversation_test": {
+      "type": "object",
+      "required": ["opId", "id", "test"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "test": {"type": "boolean"}
       }
     },
     "Cmd_conversation_pin": {
@@ -3188,6 +3201,12 @@
           "type": "object",
           "required": ["op", "body"],
           "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.test"}, "body": {"$ref": "#/$defs/Cmd_conversation_test"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
           "properties": {"op": {"const": "conversation.move"}, "body": {"$ref": "#/$defs/Cmd_conversation_move"}}
         },
         {
@@ -3481,6 +3500,16 @@
           "properties": {
             "op": {"const": "conversation.apps"},
             "body": {"$ref": "#/$defs/Cmd_conversation_apps"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.test"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_test"},
             "result": {"$ref": "#/$defs/CmdResult"}
           }
         },

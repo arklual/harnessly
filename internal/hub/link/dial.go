@@ -66,6 +66,41 @@ type Dialer struct {
 
 	mu     sync.Mutex
 	nonces map[string]map[string]time.Time
+
+	// serving counts the links being served and their Connected routines: Close waits for them, so what they write
+	// (the hello, the last seen, the end of the link) is done before the hub's database closes.
+	serving  sync.WaitGroup
+	stopMu   sync.Mutex
+	stopping bool
+}
+
+// enter counts a link about to be served; false once the dialer is closing.
+func (d *Dialer) enter() bool {
+	d.stopMu.Lock()
+	defer d.stopMu.Unlock()
+	if d.stopping {
+		return false
+	}
+	d.serving.Add(1)
+	return true
+}
+
+func (d *Dialer) closing() bool {
+	d.stopMu.Lock()
+	defer d.stopMu.Unlock()
+	return d.stopping
+}
+
+// Close refuses new links, ends the ones open (Registry.CloseAll) and waits until their routines are done: the
+// Connected hook of a fresh link and the Disconnected hook of an ended one.
+func (d *Dialer) Close() {
+	d.stopMu.Lock()
+	d.stopping = true
+	d.stopMu.Unlock()
+	if d.Reg != nil {
+		d.Reg.CloseAll()
+	}
+	d.serving.Wait()
 }
 
 func (d *Dialer) now() time.Time {
@@ -124,6 +159,11 @@ func (d *Dialer) Sweep() {
 }
 
 func (d *Dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !d.enter() {
+		http.Error(w, "hub stopping", http.StatusServiceUnavailable)
+		return
+	}
+	defer d.serving.Done()
 	m, err := d.admit(r, hubproto.VerifyDial, true, "")
 	if err != nil {
 		httpx.WriteError(w, r, err)
@@ -142,9 +182,17 @@ func (d *Dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.Reg.Add(l)
+	if d.closing() {
+		// Close ran between enter and Add: its CloseAll did not see this link.
+		l.Close(websocket.StatusGoingAway, "hub restarting")
+	}
 	d.log().Info("agent linked", "machine", m.ID, "version", l.AgentVersion)
 	if d.Hooks.Connected != nil {
-		go d.Hooks.Connected(l, m)
+		d.serving.Add(1)
+		go func() {
+			defer d.serving.Done()
+			d.Hooks.Connected(l, m)
+		}()
 	}
 	err = l.Serve(context.Background(), func(ev Event) {
 		if d.Hooks.Event != nil {

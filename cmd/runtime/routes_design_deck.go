@@ -29,6 +29,9 @@ func designDeckRoutes(d deps) []gate.JSONRoute {
 	}
 	return []gate.JSONRoute{
 		designRoute(platformAPI+"/design/image", a.DesignImage),
+		designRoute(platformAPI+"/design/kit/fonts", a.KitFontsList),
+		designRoute(platformAPI+"/design/kit/layouts", a.KitLayoutsList),
+		designRoute(deckPath("/slide"), a.DeckSlide),
 		designRoute(deckPath(""), a.Deck),
 		designRoute(deckPath("/settings"), a.DeckSettings),
 		designRoute(deckPath("/notes"), a.DeckNotes),
@@ -52,6 +55,8 @@ func designDeckBodyRoutes(d deps) []gate.BodyRoute {
 	return []gate.BodyRoute{
 		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/image/file") }, Serve: a.DesignImageFile},
 		{Slice: "design", Match: at("/pptx-style"), Serve: a.DeckPptxStyle},
+		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/kit/import") }, Serve: a.KitImport},
+		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/kit/export") }, Serve: a.KitExport},
 		{Slice: "design", Match: at("/rec/chunk"), Serve: a.DeckRecChunk},
 		{Slice: "design", Match: at("/rec/media"), Serve: a.DeckRecMedia},
 		{Slice: "design", Match: at("/export/file"), Serve: a.DeckExportFile},

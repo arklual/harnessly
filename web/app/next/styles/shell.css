@@ -177,7 +177,6 @@ html:has(.hx-app) body {
     .hx-brand__name,
     .hx-item__title,
     .hx-user__text,
-    .hx-user__theme,
     .hx-brand__close,
     .hx-nav__chev,
     .hx-nav__fold,
@@ -263,6 +262,30 @@ html:has(.hx-app) body {
 }
 .hx-app[data-side='closed'] .hx-user {
   padding-left: 1px;
+}
+/* On the rail the bell stands under the avatar: the notifications stay one click away. */
+.hx-app[data-side='closed'] .hx-user__bell {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 9px;
+  animation: hx-bell-to-rail var(--hx-side-dur) var(--hx-side-ease) 80ms backwards;
+}
+/* The bell jumps between the footer row and the rail, so it fades over the move instead of snapping:
+   each side has its own keyframes, so changing the side replays one. */
+.hx-app[data-side='open'] .hx-user__bell {
+  animation: hx-bell-to-row var(--hx-side-dur) var(--hx-side-ease) 80ms backwards;
+}
+@keyframes hx-bell-to-rail {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes hx-bell-to-row {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .hx-app {

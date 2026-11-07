@@ -117,6 +117,8 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("Show the person what they should look at: after you publish a document or draw a board, or when a dev server is running, " +
 		"`harnessly open` it. To hand a task to another agent, make a nested chat: the MCP tool `delegate_task` or `harnessly tab create --prompt` " +
 		"(both give the person a chat under yours, the workspace's hooks, and a way to read the answer or be woken by it with `notify`). " +
+		"A chat you start only to check something: create it with `--test` (`delegate_task` with `test: true`), so it stays out of the person's chat list; " +
+		"`harnessly chat test current` marks the chat you are in.\n" +
 		"A `claude` or `codex` command typed into a shell tab starts it without the workspace's hooks.\n\n")
 	if !strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off") {
 		b.WriteString("## Browser\n\n")

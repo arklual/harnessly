@@ -230,3 +230,15 @@ func noSpace(s string) string {
 		return r
 	}, s)
 }
+
+// imageSourceRE is the line Claude Code writes under a picture it read from a path: `[Image: source: /x/y.png]`.
+var imageSourceRE = re(`\[Image:\s*source:[^\]]*\]`)
+
+// PicturesOnly: a user entry of the transcript holds picture references and nothing else — the entry of a message of
+// pictures alone, which has no words to be known by.
+func PicturesOnly(entry string) bool {
+	if !claudeImageRE.MatchString(entry) && !imageSourceRE.MatchString(entry) {
+		return false
+	}
+	return noSpace(imageSourceRE.ReplaceAllString(claudeImageRE.ReplaceAllString(entry, " "), " ")) == ""
+}

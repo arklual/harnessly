@@ -24,6 +24,9 @@ vi.mock('@/next/features/designly/deck/api', () => ({
   startDeckExport: vi.fn(),
   fetchDeckExport: vi.fn(),
   deckExportHref: () => '#',
+  fetchKitLayouts: vi.fn(() => Promise.resolve([])),
+  fetchKitFonts: vi.fn(() => Promise.resolve([])),
+  addDeckSlide: vi.fn(),
 }));
 vi.mock('@/next/features/designly/api', () => ({
   thumbPath: (_m: string, _id: string, board: string, v: string, fresh?: boolean) =>

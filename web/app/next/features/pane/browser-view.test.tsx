@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import { FILL_SCREEN } from '@/next/features/pane/browser-device';
-import BrowserView, { type IBrowserViewProps } from '@/next/features/pane/browser-view';
+import BrowserView, { idleAnnotations, type IBrowserViewProps } from '@/next/features/pane/browser-view';
 
 beforeAll(() => {
   pinLocale('en');
@@ -48,9 +48,7 @@ const props = (over: Partial<IBrowserViewProps> = {}): IBrowserViewProps => ({
   onNewTab: () => {},
   picking: null,
   onPick: () => {},
-  picked: null,
-  onPickSend: () => {},
-  onPickCancel: () => {},
+  annotations: idleAnnotations(),
   screen: FILL_SCREEN,
   onScreen: () => {},
   outsideUrl: null,
@@ -174,7 +172,7 @@ describe('BrowserView: the tools of a page', () => {
     const { rerender } = render(
       <BrowserView {...props({ address: 'stand.example.com', src: 'https://slot/x', onPick })} />,
     );
-    const pick = screen.getByRole('button', { name: 'Pick an element and comment' });
+    const pick = screen.getByRole('button', { name: 'Annotate the page' });
     fireEvent.click(pick);
     expect(onPick).not.toHaveBeenCalled();
     rerender(
@@ -188,37 +186,53 @@ describe('BrowserView: the tools of a page', () => {
         })}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Pick an element and comment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Annotate the page' }));
     expect(onPick).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Open in the browser' }));
     expect(open).toHaveBeenCalledWith('https://stand.example.com/x', '_blank', 'noopener,noreferrer');
     open.mockRestore();
   });
 
-  it('asks for a comment on the picked element and sends it', () => {
-    const onPickSend = vi.fn();
+  it('stands a mark with its comment row, and the bar sends the marks', () => {
+    const onCommit = vi.fn();
+    const onSend = vi.fn();
+    const onClose = vi.fn();
+    const mark = {
+      id: 'a1',
+      comment: '',
+      pick: null,
+      selector: 'button.buy',
+      tag: 'button',
+      text: 'Buy',
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+      html: '',
+      component: null,
+      url: 'https://slot/x',
+    };
     render(
       <BrowserView
         {...props({
           address: 'stand.example.com',
           src: 'https://slot/x',
-          picking: false,
-          onPickSend,
-          picked: {
-            selector: 'button.buy',
-            tag: 'button',
-            text: 'Buy',
-            rect: { x: 0, y: 0, width: 10, height: 10 },
-            html: '',
-            component: null,
-            url: 'https://slot/x',
-          },
+          picking: true,
+          annotations: idleAnnotations({
+            list: [mark],
+            editing: { id: 'a1', fresh: true },
+            onCommit,
+            onSend,
+            onClose,
+          }),
         })}
       />,
     );
+    expect(screen.getByText('Annotating · 1')).toBeTruthy();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bigger' } });
-    fireEvent.click(screen.getByRole('button', { name: 'To the chat' }));
-    expect(onPickSend).toHaveBeenCalledWith('bigger');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onCommit).toHaveBeenCalledWith('a1', 'bigger');
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(onSend).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Finish annotating' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('shows the page on a phone', () => {

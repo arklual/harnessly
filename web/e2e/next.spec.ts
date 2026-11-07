@@ -1498,11 +1498,13 @@ test('8. the new project dialog lists folders of the machine', async () => {
 });
 
 test('8b. «More» in the sidebar opens the statistics and the efficiency as pages', async () => {
+  // «More» is a menu beside the item.
   await page.locator('.hx-nav__item').filter({ hasText: 'More' }).click();
-  await page.locator('.hx-nav__kid').filter({ hasText: 'Statistics' }).click();
+  await page.getByRole('menuitem', { name: 'Statistics' }).click();
   await expect(page.locator('.hx-lscreen[data-screen="stats"]')).toBeVisible();
   await expect(page).toHaveURL(/\/stats$/);
-  await page.locator('.hx-nav__kid').filter({ hasText: 'Efficiency' }).click();
+  await page.locator('.hx-nav__item').filter({ hasText: 'More' }).click();
+  await page.getByRole('menuitem', { name: 'Efficiency' }).click();
   await expect(page.locator('.hx-lscreen[data-screen="efficiency"]')).toBeVisible();
   await page.locator('.hx-nav__item').filter({ hasText: 'New chat' }).click();
   await expect(page.locator('.hx-lscreen')).toHaveCount(0);
@@ -1687,8 +1689,12 @@ test('10. a new design opens with its chat; an edit picked on its page goes to t
     await page.mouse.move(end.x, end.y, { steps: 12 });
     await page.mouse.up();
   };
-  await expect(section).toHaveAttribute('data-min', 'true');
-  await page.locator('.hx-island__mini').click();
+  // A design opens with its chat docked on the left; the island is the person's pick, and it stays picked.
+  await expect(section).toHaveAttribute('data-mode', 'chat');
+  await page.locator('.hx-placement__btn').click();
+  await page.getByRole('menuitemradio', { name: /Island/ }).click();
+  await expect(section).toHaveAttribute('data-mode', 'island');
+  if ((await section.getAttribute('data-min')) === 'true') await page.locator('.hx-island__mini').click();
   await expect(section).toHaveAttribute('data-min', 'false');
 
   // ⌘R (Ctrl+R here) reloads the page of the design, as the button's tip says: what the old page kept is gone.
@@ -2048,15 +2054,15 @@ test('10b. the page is shown with its live settings and its DevTools: the elemen
 });
 
 test('11. «Apps» is the first of «More»: the tracker’s epics and stale tasks from the machine, GitLab (the stand-in of 7f) holds nothing for the person, and picked rows go to a new chat as mentions', async () => {
-  const kids = page.locator('.hx-nav__kid');
-  // «More» keeps its state between visits: it is opened only when it is closed.
+  const kids = page.getByRole('menuitem');
+  // «More» is a menu beside the item: opened for each visit.
   const openApps = async () => {
-    if (!(await kids.first().isVisible()))
-      await page.locator('.hx-nav__item').filter({ hasText: 'More' }).click();
+    await page.locator('.hx-nav__item').filter({ hasText: 'More' }).click();
     await kids.first().click();
   };
-  await openApps();
+  await page.locator('.hx-nav__item').filter({ hasText: 'More' }).click();
   await expect(kids).toHaveText(['Tasks and MRs', 'Efficiency', 'Statistics']);
+  await kids.first().click();
   await expect(page).toHaveURL(/\/tasks$/);
   const apps = page.locator('.hx-feedapp');
   await expect(apps).toBeVisible();
@@ -2285,10 +2291,8 @@ test('12. Settings opens from the profile menu, the Apps screen and the machine 
   await set.locator('.hx-app-card').first().getByRole('button', { name: 'Open' }).click();
   await expect(page).toHaveURL(/\/tasks$/);
 
-  // 6. From the machine card: «Set up machines».
-  await page.locator('.hx-machine__chip').click();
-  await page.getByRole('button', { name: 'Set up machines' }).click();
-  await expect(page).toHaveURL(/\/settings\/machines$/);
+  // 6. The machines are set up in the settings (the footer's machine chip left the sidebar).
+  await page.goto(at('/settings/machines'));
   await expect(nav.filter({ hasText: 'Machines' })).toHaveAttribute('aria-current', 'true');
 });
 

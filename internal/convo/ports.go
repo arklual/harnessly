@@ -154,6 +154,12 @@ type Uploads interface {
 	Resolve(ids []string) ([]wire.AttachmentRef, []string, wire.RefuseCode)
 }
 
+// TextKeeper is Uploads that can also keep a text the runtime wrote as a file of the message: a long message goes to
+// the agent as a file, not a paste (attach.IsLongText). The ref and its path on the machine; false when it could not.
+type TextKeeper interface {
+	Keep(name string, body []byte) (wire.AttachmentRef, string, bool)
+}
+
 // Refs describes the places a message points at that only the machine knows how to name (a design of the library), and
 // notes that the conversation points at them (the design lists the chat among its own).
 type Refs interface {

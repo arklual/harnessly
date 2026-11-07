@@ -237,6 +237,8 @@ func (c *cli) run(args []string) error {
 		return c.site(rest)
 	case "app", "apps":
 		return c.app(rest)
+	case "chat", "chats":
+		return c.chat(rest)
 	case "connections", "connection":
 		return c.connections(rest)
 	case "issues":
@@ -636,11 +638,15 @@ func orDash(s string) string {
 var panelTypes = []string{"terminal", "claude-code", "codex-cli", "agent-sessions", "web-browser", "diff"}
 
 func (c *cli) tabCreate(args []string) error {
-	notify := false
+	notify, test := false, false
 	rest := make([]string, 0, len(args))
 	for _, a := range args {
 		if a == "--notify" || a == "--notify=true" {
 			notify = true
+			continue
+		}
+		if a == "--test" || a == "--test=true" {
+			test = true
 			continue
 		}
 		rest = append(rest, a)
@@ -679,8 +685,13 @@ func (c *cli) tabCreate(args []string) error {
 		if notify {
 			body["notify"] = true
 		}
+		if test {
+			body["test"] = true
+		}
 	} else if notify {
 		return usageErr("--notify needs --prompt: it wakes this chat with the answer of the agent that gets the prompt")
+	} else if test {
+		return usageErr("--test needs --prompt: it marks the chat of the agent that gets the prompt as a test chat")
 	}
 	status, raw, err := c.call("POST", "/api/cli/tabs", nil, body)
 	if err != nil {

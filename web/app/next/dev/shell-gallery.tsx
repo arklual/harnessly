@@ -36,6 +36,7 @@ import PaneDrawer from '@/next/features/shell/pane-drawer';
 import ToolPane, { TOOLS_TAB } from '@/next/features/pane/tool-pane';
 import ToolsLauncher, { type ITool } from '@/next/features/pane/tools-launcher';
 import BrowserView, {
+  idleAnnotations,
   type IBrowserAgentView,
   type IBrowserDevtools,
 } from '@/next/features/pane/browser-view';
@@ -242,6 +243,7 @@ const SiteTabSample = () => {
     agent
       ? null
       : {
+          pick: null,
           selector: 'body > button',
           tag: 'button',
           text: 'Купить билет',
@@ -283,9 +285,13 @@ const SiteTabSample = () => {
       onNewTab={() => {}}
       picking={picked === null}
       onPick={() => {}}
-      picked={picked}
-      onPickSend={() => setPicked(null)}
-      onPickCancel={() => setPicked(null)}
+      annotations={idleAnnotations({
+        list: picked === null ? [] : [{ ...picked, id: 'a1', comment: '' }],
+        editing: picked === null ? null : { id: 'a1', fresh: false },
+        onCancel: () => setPicked(null),
+        onCommit: () => setPicked(null),
+        onRemove: () => setPicked(null),
+      })}
       screen={screen}
       onScreen={setScreen}
       outsideUrl="https://stand-1.preview.example.com/events"
@@ -461,9 +467,7 @@ const GalleryPane = ({
           onNewTab={() => {}}
           picking={false}
           onPick={() => {}}
-          picked={null}
-          onPickSend={() => {}}
-          onPickCancel={() => {}}
+          annotations={idleAnnotations()}
           screen={FILL_SCREEN}
           onScreen={() => {}}
           outsideUrl={null}

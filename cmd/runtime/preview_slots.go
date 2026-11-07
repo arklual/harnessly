@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"slices"
 	"strconv"
@@ -23,6 +24,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -602,6 +604,12 @@ func (s *previewSlots) slotHandler(slot int) http.Handler {
 			return
 		}
 		sess := s.session(r, slot, secret)
+		// A file of an app's view goes to the view server with or without the slot's cookie: the view's frame runs on an
+		// opaque origin, so a browser that keeps third-party cookies back sends it none, and the slot's cookie may name
+		// another target (a dev server the pane opened in this slot since).
+		if (sess == nil || !sess.showsAppViews()) && appViewAsset(r) {
+			sess = appViewSession(own)
+		}
 		if sess == nil {
 			previewDeny(w, 401, previewExpiredText())
 			return
@@ -863,6 +871,48 @@ func loopbackOrigin(origin string) bool {
 
 // appViewPort is the loopback port of the apps' view server once it is up (routes_apps.go), 0 before.
 var appViewPort atomic.Int64
+
+// appViewSessions are the live sessions of the apps' view server (routes_apps.go), nil before it is made.
+var appViewSessions atomic.Pointer[apps.ViewSessions]
+
+// appViewAssetExt are the kinds of file a view's page loads that may go without the slot's cookie: scripts, styles,
+// pictures, fonts, data. A page (.html, or a path with no extension) is not one of them.
+var appViewAssetExt = map[string]bool{".js": true, ".mjs": true, ".css": true, ".json": true, ".map": true, ".wasm": true,
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".avif": true, ".svg": true, ".ico": true,
+	".woff": true, ".woff2": true, ".ttf": true, ".otf": true, ".mp3": true, ".mp4": true, ".webm": true}
+
+// appViewAsset says whether a request is for a file of an app's view that needs no slot cookie: a load of the frame's
+// own page (GET or HEAD, not a navigation), for the SDK's public files or under the path of a live view session. The
+// token in that path is the view's capability, and the view server checks it again; the view's page itself still
+// comes only through the slot's ticket and cookie, which is what frames it.
+func appViewAsset(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead || appViewPort.Load() == 0 {
+		return false
+	}
+	switch r.Header.Get("Sec-Fetch-Dest") {
+	case "", "document", "iframe", "frame", "embed", "object":
+		return false
+	}
+	switch r.URL.Path {
+	case apps.SDKPath, apps.SDKModulePath, apps.ShimPath, apps.WidgetBaseCSSPath, apps.UICSSPath, apps.EChartsPath:
+		return true
+	}
+	token, rest, ok := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
+	sessions := appViewSessions.Load()
+	// Only what a page loads: never a page itself (its nonce is the bridge's check), whatever the request says it is.
+	if !ok || rest == "" || sessions == nil || !appViewAssetExt[strings.ToLower(path.Ext(rest))] {
+		return false
+	}
+	_, live := sessions.Get(token)
+	return live
+}
+
+// appViewSession is the slot's session for a file of an app's view: the view server, under the slot's own origin.
+func appViewSession(own string) *previewSession {
+	port := int(appViewPort.Load())
+	return &previewSession{sub: "app-view", origin: own, target: devtools.Target{Kind: "port", Port: port},
+		targetJSON: map[string]any{"kind": "port", "port": port}, portSlots: map[string]any{strconv.Itoa(port): own}}
+}
 
 // showsAppViews says whether the slot shows the apps' view server.
 func (s *previewSession) showsAppViews() bool {

@@ -21,6 +21,7 @@ describe('what the bridge of a page says', () => {
     expect(m).toEqual({
       k: 'picked',
       picked: {
+        pick: null,
         selector: 'main > button.buy',
         tag: 'button',
         text: 'Купить билет',
@@ -30,6 +31,28 @@ describe('what the bridge of a page says', () => {
         url: 'https://ai-7.preview.example.com/events/1',
       },
     });
+  });
+
+  it('keeps the number the bridge gave a picked block', () => {
+    const m = readFrameMessage({ ...picked, pick: 4 });
+    expect(m?.k === 'picked' && m.picked.pick).toBe(4);
+    const bad = readFrameMessage({ ...picked, pick: -1 });
+    expect(bad?.k === 'picked' && bad.picked.pick).toBeNull();
+  });
+
+  it('where the followed blocks show now', () => {
+    const m = readFrameMessage({
+      type: 'tk:anchored',
+      vw: 800,
+      vh: 600,
+      items: [{ key: 'a1', box: [1, 2, 30, 10], shown: [1, 2, 30, 10], covered: false }],
+    });
+    expect(m?.k).toBe('anchored');
+    if (m?.k === 'anchored') {
+      expect(m.report.vw).toBe(800);
+      expect(m.report.items.get('a1')?.box).toEqual({ x: 1, y: 2, w: 30, h: 10 });
+    }
+    expect(readFrameMessage({ type: 'tk:anchored', vw: 'x', items: [] })).toBeNull();
   });
 
   it('drops what is not an address or not whole', () => {

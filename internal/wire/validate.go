@@ -1028,6 +1028,7 @@ func (c ConversationRenameCmd) Validate() error { return byID(c.OpID, c.ID) }
 
 func (c ConversationRetitleCmd) Validate() error { return byID(c.OpID, c.ID) }
 func (c ConversationPinCmd) Validate() error     { return byID(c.OpID, c.ID) }
+func (c ConversationTestCmd) Validate() error    { return byID(c.OpID, c.ID) }
 
 // MaxConversationApps is how many apps one chat may have on at once.
 const MaxConversationApps = 8

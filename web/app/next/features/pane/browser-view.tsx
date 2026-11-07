@@ -1,13 +1,7 @@
 // A browser tab of the pane (.hx-tbrowser): back, forward, reload, the omnibox; with no address yet, the pinned pages and
 // the servers that listen on the machine, the chat's own first. The page is the address opened in a preview slot.
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import {
-  DeviceMenu,
-  MoreMenu,
-  PickCard,
-  VaultMenu,
-  type IVaultView,
-} from '@/next/features/pane/browser-tools';
+import { DeviceMenu, MoreMenu, VaultMenu, type IVaultView } from '@/next/features/pane/browser-tools';
 import { AgentCursor, type IAgentCursorAt } from '@/next/features/pane/agent-overlay';
 import SiteDevtools from '@/next/features/designly/site-devtools';
 import type { TDevTab } from '@/next/features/designly/devtools-data';
@@ -16,7 +10,13 @@ import type { MachineId } from '@/next/protocol/v2';
 import { usePresentFlag } from '@/next/ui/presence';
 import '@/next/styles/site-tools.css';
 import { screenFit, screenSize, type IBrowserScreen } from '@/next/features/pane/browser-device';
-import type { IFramePicked } from '@/next/features/pane/frame-bridge';
+import {
+  AnnotationBar,
+  AnnotationLayer,
+  type IAnnotationEditing,
+} from '@/next/features/pane/annotation-layer';
+import type { IAnnotation } from '@/next/features/pane/annotations';
+import { createAnchorStore, type IAnchorStore } from '@/next/features/designly/note-anchor';
 import { openOutside } from '@/next/features/chat/pane-sites';
 import Icon from '@/next/ui/icon';
 import Omnibox from '@/next/features/pane/omnibox';
@@ -71,13 +71,11 @@ export interface IBrowserViewProps {
   onHistory: (step: -1 | 1) => void;
   onReload: () => void;
   onNewTab: () => void;
-  /** Picking an element on the page is on; null when the page has no bridge to pick with (it has not loaded). */
+  /** Annotating is on (a click on an element puts a mark); null when the page has no bridge to pick with (it has not loaded). */
   picking: boolean | null;
   onPick: () => void;
-  /** The element the person picked, whose card asks for a comment; null for none. */
-  picked: IFramePicked | null;
-  onPickSend: (comment: string) => void;
-  onPickCancel: () => void;
+  /** The marks put on the page, and what is done with them. */
+  annotations: IBrowserAnnotations;
   /** What the page is looked at on. */
   screen: IBrowserScreen;
   onScreen: (screen: IBrowserScreen) => void;
@@ -92,6 +90,48 @@ export interface IBrowserViewProps {
   /** The page in the machine's live browser (an outside site); null when the page is in a slot. */
   live: IBrowserLive | null;
 }
+
+export interface IBrowserAnnotations {
+  list: readonly IAnnotation[];
+  /** The mark whose comment is open. */
+  editing: IAnnotationEditing | null;
+  /** The marks are put out of sight (they stay in the list). */
+  hidden: boolean;
+  /** «Отправить» was pressed: the marks fade, then the list is cleared. */
+  sending: boolean;
+  /** The page's address in its slot now; null before the bridge said. */
+  at: string | null;
+  /** Where the page's bridge says the marked elements show. */
+  anchors: IAnchorStore;
+  onOpen: (id: string) => void;
+  onCommit: (id: string, comment: string) => void;
+  onRemove: (id: string) => void;
+  onCancel: () => void;
+  onToggleHidden: () => void;
+  onClear: () => void;
+  onSend: () => void;
+  /** «×»: annotating is turned off. */
+  onClose: () => void;
+}
+
+/** No marks and nothing to do with them: for a view shown on its own (the galleries, the tests). */
+export const idleAnnotations = (over: Partial<IBrowserAnnotations> = {}): IBrowserAnnotations => ({
+  list: [],
+  editing: null,
+  hidden: false,
+  sending: false,
+  at: null,
+  anchors: createAnchorStore(),
+  onOpen: () => {},
+  onCommit: () => {},
+  onRemove: () => {},
+  onCancel: () => {},
+  onToggleHidden: () => {},
+  onClear: () => {},
+  onSend: () => {},
+  onClose: () => {},
+  ...over,
+});
 
 export interface IBrowserLive {
   machine: MachineId;
@@ -229,7 +269,7 @@ const BrowserView = (props: IBrowserViewProps) => {
               aria-label={t('next.pane.pick')}
               onClick={() => props.picking !== null && props.onPick()}
             >
-              <Icon name="square-mouse-pointer" size="sm" />
+              <Icon name="message-square-plus" size="sm" />
               <span className="hx-tip" data-pos="below" data-align="end">
                 {t('next.pane.pick')}
               </span>
@@ -488,13 +528,30 @@ const BrowserView = (props: IBrowserViewProps) => {
               title={address}
               allow="clipboard-write"
             />
-            <PickCard
-              picked={props.picked}
+            <AnnotationLayer
+              list={props.annotations.list}
+              editing={props.annotations.editing}
+              hidden={props.annotations.hidden}
+              sending={props.annotations.sending}
+              at={props.annotations.at}
+              anchors={props.annotations.anchors}
               frame={frame}
               stage={stage}
               fit={size === null ? 1 : fit}
-              onSend={props.onPickSend}
-              onCancel={props.onPickCancel}
+              onOpen={props.annotations.onOpen}
+              onCommit={props.annotations.onCommit}
+              onRemove={props.annotations.onRemove}
+              onCancel={props.annotations.onCancel}
+            />
+            <AnnotationBar
+              visible={props.picking === true || props.annotations.list.length > 0}
+              count={props.annotations.list.length}
+              hidden={props.annotations.hidden}
+              sending={props.annotations.sending}
+              onToggleHidden={props.annotations.onToggleHidden}
+              onClear={props.annotations.onClear}
+              onSend={props.annotations.onSend}
+              onClose={props.annotations.onClose}
             />
             <AgentCursor cursor={props.agent?.cursor ?? null} frame={frame} fit={size === null ? 1 : fit} />
           </div>

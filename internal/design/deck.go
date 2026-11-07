@@ -141,8 +141,8 @@ func ValidateDeckSettings(s DeckSettings) error {
 	if !okTone {
 		return deckErr(http400, "tone: talk, biz or short", "tone: talk, biz или short")
 	}
-	if _, ok := DeckFonts[s.Font]; !ok {
-		return deckErr(http400, "font: inter, golos or serif", "font: inter, golos или serif")
+	if _, ok := DeckFonts[s.Font]; !ok && !IsKitFontID(s.Font) {
+		return deckErr(http400, "font: inter, golos, serif or a kit's font", "font: inter, golos, serif или шрифт кита")
 	}
 	if s.Style != nil {
 		if utf8.RuneCountInString(s.Style.Source) > 200 || s.Style.Layouts < 0 || s.Style.Layouts > 200 {
@@ -187,7 +187,10 @@ func validateDeckVars(vars map[string]string) error {
 
 // DeckThemeCSS is the stylesheet the boards link: the theme's variables and the font, sorted so the same settings give
 // the same bytes.
-func DeckThemeCSSOf(s DeckSettings) string {
+func DeckThemeCSSOf(s DeckSettings) string { return deckThemeCSS(s, "", DeckFonts[s.Font]) }
+
+// deckThemeCSS is DeckThemeCSSOf with the font's @font-face rules (a kit font's) in front and its stack.
+func deckThemeCSS(s DeckSettings, faces, stack string) string {
 	vars := map[string]string{}
 	for _, t := range DeckThemesOf(s) {
 		if t.ID == s.Theme {
@@ -202,11 +205,11 @@ func DeckThemeCSSOf(s DeckSettings) string {
 	}
 	sort.Strings(keys)
 	var b strings.Builder
-	b.WriteString("/* Written by the runtime from meta/deck.json: change the deck's theme and font in its settings. */\n:root{")
+	b.WriteString("/* Written by the runtime from meta/deck.json: change the deck's theme and font in its settings. */\n" + faces + ":root{")
 	for _, k := range keys {
 		b.WriteString(k + ":" + vars[k] + ";")
 	}
-	b.WriteString("--deck-font:" + DeckFonts[s.Font] + ";}\n")
+	b.WriteString("--deck-font:" + stack + ";}\n")
 	return b.String()
 }
 
@@ -218,13 +221,21 @@ func (l *Library) WriteDeckSettings(id string, s DeckSettings) error {
 	if err := l.requireDeck(id); err != nil {
 		return err
 	}
+	faces, stack := "", DeckFonts[s.Font]
+	if IsKitFontID(s.Font) {
+		f, ok := l.kitFont(s.Font)
+		if !ok {
+			return deckErr(http400, "font: the kit or its font is not installed on this machine", "font: кит или его шрифт не установлен на этой машине")
+		}
+		faces, stack = kitFontCSS(f)
+	}
 	if err := l.ensureMetaDirs(id); err != nil {
 		return err
 	}
 	if _, err := writeIfChanged(l.deckFile(id, DeckSettingsFile), deckJSON(s)); err != nil {
 		return err
 	}
-	_, err := writeIfChanged(l.deckFile(id, DeckThemeCSS), []byte(DeckThemeCSSOf(s)))
+	_, err := writeIfChanged(l.deckFile(id, DeckThemeCSS), []byte(deckThemeCSS(s, faces, stack)))
 	return err
 }
 

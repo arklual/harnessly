@@ -1,5 +1,7 @@
 import { memo, useState, type KeyboardEvent } from 'react';
 import Icon from '@/next/ui/icon';
+import Tooltip from '@/next/ui/tooltip';
+import { SIDE } from '@/next/ui/hover-intent';
 import { t } from '@/next/i18n';
 import { PENDING, type TPending } from '@/next/ui/use-pending-list';
 import ChatMenu, { type IChatMenuProps } from '@/next/features/sidebar/chat-menu';
@@ -152,6 +154,8 @@ const ChatRow = ({
 }: IChatRowProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMount, setMenuMount] = useState<TMenuMount>(MENU_MOUNT.none);
+  /** The title is cut short in the row: the pointer on it shows it whole, over the row. */
+  const [cut, setCut] = useState(false);
   const look = chat.status === CHAT_STATUS.none ? null : STATUS_LOOK[chat.status];
   const busy = pending !== undefined;
   const label = pending === PENDING.slow ? t('next.chatRow.slow') : (chat.waitsFor ?? look?.label);
@@ -198,14 +202,20 @@ const ChatRow = ({
         )}
       </span>
       {rename === RENAME.off ? (
-        <button
-          type="button"
-          className="hx-item__open"
-          data-tip={label ? `${chat.title} · ${label}` : chat.title}
-          onClick={() => handlers.open(chat.id)}
-        >
-          <span className="hx-item__title">{chat.launch ? chat.launch.model : chat.title}</span>
-        </button>
+        <Tooltip label={chat.title} side={SIDE.top} disabled={!cut}>
+          <button
+            type="button"
+            className="hx-item__open"
+            data-tip={label ? `${chat.title} · ${label}` : chat.title}
+            onPointerEnter={(event) => {
+              const title = event.currentTarget.firstElementChild;
+              setCut(title !== null && title.scrollWidth > title.clientWidth);
+            }}
+            onClick={() => handlers.open(chat.id)}
+          >
+            <span className="hx-item__title">{chat.launch ? chat.launch.model : chat.title}</span>
+          </button>
+        </Tooltip>
       ) : (
         <RenameField
           title={chat.title}

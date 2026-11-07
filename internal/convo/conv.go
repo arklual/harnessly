@@ -111,7 +111,9 @@ type conv struct {
 	dialogPlain string
 	dialogSince time.Time
 	quietSince  time.Time
-	quietSize   int64
+	// menuGone counts the looks in a row that found no menu for a question the screen holds open.
+	menuGone  int
+	quietSize int64
 	// quietTurn: the turn ended on silence, not by the transcript; the agent seen at work again opens it again.
 	quietTurn string
 	// compactAt: when the agent's state took compacting (see CompactHold).
@@ -496,6 +498,12 @@ func (c *conv) effects(effects []agentstate.Effect, before wire.AgentState, now 
 		case agentstate.GateMovedOn:
 			c.moveOn(e.ID, now)
 		case agentstate.CloseGate:
+			if g := c.openGate(e.ID); c.foreignGate(g) && e.Reason == wire.ClosedTurnEnded {
+				// The main agent's turn ended; the subagent's question did not. The chat leaves its wait, the card
+				// stays, and the chat waits again for it (resumeHookGates, the next look).
+				c.setGate(nil)
+				continue
+			}
 			c.closeGate(e.ID, e.Reason, now)
 		case agentstate.CompactionStarted, agentstate.CompactionFinished:
 			// The page reads compacting off the state; the compaction entry comes as a step of the transcript.
@@ -1035,10 +1043,22 @@ func (c *conv) seeing(s seen, now time.Time) {
 	if look.Menu != typist.MenuOther {
 		c.dialogPlain, c.dialogSince = "", time.Time{}
 	}
-	if look.Menu == typist.NoMenu && k == wire.StateWaitingPermission && (look.Busy || look.InputLine && (c.fd.OpenTurn() == "" || c.onDialog())) {
+	if look.Menu != typist.NoMenu {
+		c.menuGone = 0
+	} else if k == wire.StateWaitingPermission && (look.Busy || look.InputLine && (c.fd.OpenTurn() == "" || c.onDialog())) {
 		// The prompt left and the agent works: it went past the permission. A prompt asked after the turn (a background
 		// agent's) leaves the input box behind, with no spinner of the chat's own.
-		c.input(agentstate.Input{K: agentstate.GateResolved}, now)
+		// A question only the screen holds open (no hook waits on it) is let go after a second look: one frame of a
+		// redraw is no answer, and the main agent's spinner stands on the screen the whole time a subagent asks.
+		if g := c.openGate(c.rec.State.PermissionID); c.foreignGate(g) && g.reply == nil && g.state().K == wire.GateStateOpen {
+			c.menuGone++
+		} else {
+			c.menuGone = menuGoneLooks
+		}
+		if c.menuGone >= menuGoneLooks {
+			c.menuGone = 0
+			c.input(agentstate.Input{K: agentstate.GateResolved}, now)
+		}
 	}
 	if look.Busy {
 		c.quietSince = time.Time{}
@@ -1088,6 +1108,9 @@ func (c *conv) compacting(now time.Time) bool {
 	return c.rec.State.K == wire.StateWorking && c.rec.State.Compacting && now.Sub(c.compactAt) < CompactHold
 }
 
+// menuGoneLooks: the looks in a row without the menu that let go a question only the screen holds.
+const menuGoneLooks = 2
+
 // screenGateFrom are the states a permission prompt on the screen opens a gate in: at work, unknown, and idle or ready —
 // the turn is over but a background agent of the chat still runs and asks.
 var screenGateFrom = map[wire.AgentStateKind]bool{wire.StateWorking: true, wire.StateUnknown: true, wire.StateIdle: true,
@@ -1098,7 +1121,7 @@ var screenGateFrom = map[wire.AgentStateKind]bool{wire.StateWorking: true, wire.
 func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 	c.leaveDialog(now)
 	if c.rec.State.PermissionID == "" {
-		if _, ok := c.fd.PendingTool(); !ok {
+		if _, ok := c.pendingOf(look); !ok {
 			// The menu is drawn after the call is written, and the read that came before the look may be older than
 			// the call: read again, so the gate is the call's own and not one made up from the screen.
 			c.read(now)
@@ -1112,15 +1135,31 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 			}
 			c.gateOnScreen(g, look, now)
 		}
+		c.menuGone = 0
 		return
 	}
 	// A chat whose turn is over asks too: its background agents run on and their prompts come up on the same screen.
 	if !screenGateFrom[c.rec.State.K] {
 		return
 	}
+	c.menuGone = 0
+	e, own := c.pendingOf(look)
+	drawn := ""
+	if !own {
+		drawn = typist.DrawnCommand(look.Plain)
+	}
+	// The question stands already (the chat left its wait when the main agent stopped, the menu is still up), or was
+	// decided a moment ago and the menu has not been redrawn yet: one command, one card.
+	if g := c.cardOfScreen(e, own, look.Plain, drawn, now); g != nil {
+		if g.state().K == wire.GateStateOpen {
+			c.input(agentstate.Input{K: agentstate.PermissionPrompt, GateID: g.id()}, now)
+			c.gateOnScreen(g, look, now)
+		}
+		return
+	}
 	p := wire.Permission{ConversationID: c.rec.ID, Kind: wire.PermTool, AskedAt: ms(now),
 		Options: permissionOptions(look.Options, false), State: wire.GateState{K: wire.GateStateOpen}}
-	if e, ok := c.fd.PendingTool(); ok {
+	if own {
 		p.ID = wire.PermissionID(e.ToolUseID)
 		tool := e.Tool
 		p.Tool = &tool
@@ -1131,26 +1170,81 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 	} else {
 		p.ID = wire.PermissionID(c.rec.ID + ":" + itoa(c.seq+1))
 		// No call of the chat's own is pending (a background agent asks): the card shows the command the dialog draws.
-		if drawn := typist.DrawnCommand(look.Plain); drawn != "" {
+		if drawn != "" {
 			sum := "$ " + drawn
 			p.Command = &sum
 		}
 	}
-	// The card stands in its turn: the open one, else the last (a background agent asks after it ended).
-	if open := c.fd.OpenTurn(); open != "" {
-		p.TurnID = &open
-	} else if last := c.fd.LastTurn(); last != nil {
-		id := last.ID
-		p.TurnID = &id
-	}
-	if g := c.gates[p.ID]; g != nil {
+	c.placeScreenGate(&p)
+	g := &gate{p: &p}
+	if !c.addGate(g) {
 		return
 	}
-	g := &gate{p: &p}
-	c.addGate(g)
 	c.input(agentstate.Input{K: agentstate.PermissionPrompt, GateID: p.ID}, now)
 	c.gateOnScreen(g, look, now)
 }
+
+// pendingOf is the main agent's pending call the menu on the screen is about. A subagent's calls are not in the main
+// transcript, so a pending call that is another tool or another command than the dialog draws is not the question.
+func (c *conv) pendingOf(look typist.Screen) (wire.Entry, bool) {
+	e, ok := c.fd.PendingTool()
+	if !ok {
+		return e, false
+	}
+	drawn := typist.DrawnCommand(look.Plain)
+	if e.Tool == "Bash" && drawn != "" && !typist.DrawsCommand(look.Plain, e.Summary, c.rec.Cwd) {
+		return e, false
+	}
+	if e.Tool != "Bash" && drawn != "" {
+		return e, false
+	}
+	return e, true
+}
+
+// sameCommand: two summaries of one command, however the dialog wrapped it. Loose (whitespace is dropped): it only
+// pairs a hook with the screen's card of its call, and the card then shows the hook's exact command (askPermission).
+func sameCommand(a, b string) bool {
+	squash := func(s string) string { return strings.Join(strings.Fields(s), "") }
+	return squash(a) == squash(b)
+}
+
+// foreignGate: the card of a question no call of the main agent's transcript names — a subagent's, the screen's or a
+// hook's. Nothing the main agent's transcript or turn does answers it; only the person, the menu going from the
+// screen or the hook going does.
+func (c *conv) foreignGate(g *gate) bool {
+	return g != nil && g.p != nil && g.p.Kind == wire.PermTool && strings.HasPrefix(g.p.ID, wire.PermissionID(c.rec.ID+":"))
+}
+
+// cardOfScreen is the card that already stands for the menu on the screen: an open one of the same command, or one
+// answered a moment ago.
+func (c *conv) cardOfScreen(e wire.Entry, own bool, plain, drawn string, now time.Time) *gate {
+	for i := len(c.order) - 1; i >= 0; i-- {
+		g := c.gates[c.order[i]]
+		if g == nil || g.p == nil || g.p.Kind != wire.PermTool || g.p.Command == nil {
+			continue
+		}
+		var match bool
+		if own {
+			match = g.p.ID == wire.PermissionID(e.ToolUseID)
+		} else {
+			// Strictly: the keys of this card go to the menu on the screen, so it must draw the card's own command.
+			match = c.foreignGate(g) && drawn != "" && typist.DrawsCommand(plain, *g.p.Command, c.rec.Cwd)
+		}
+		if !match {
+			continue
+		}
+		switch k := g.state().K; {
+		case k == wire.GateStateOpen || k == wire.GateStateAnswering:
+			return g
+		case k == wire.GateStateAnswered && now.Sub(g.closedAt) < redrawGrace:
+			return g
+		}
+	}
+	return nil
+}
+
+// redrawGrace is how long a menu just decided may stay on the screen before it is taken for a new question.
+const redrawGrace = 5 * time.Second
 
 // planOnScreen: Claude's plan approval is up. Claude writes the ExitPlanMode call only once the menu is answered, so the
 // screen opens the card when the transcript has not.

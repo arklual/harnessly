@@ -14,12 +14,19 @@ const layout: ISiteLayout = {
   chatW: 420,
   float: null,
   opened: 'chat',
+  chosen: true,
 };
 
 describe('site layout', () => {
   it('reads back what it kept', () => {
     const kept = withLayout(new Map(), 'm/d1', layout);
     expect(parseLayouts(JSON.stringify(Object.fromEntries(kept))).get('m/d1')).toEqual(layout);
+  });
+
+  // a place kept before the person placed the chat by hand is not their choice.
+  it('reads an older layout without the mark as not chosen', () => {
+    const { chosen: _chosen, ...older } = layout;
+    expect(parseLayout(older)?.chosen).toBe(false);
   });
 
   it('brings picking notes back as the field', () => {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/ly-solutions/harnessly/internal/designkit"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
@@ -172,6 +173,9 @@ type PageSpec struct {
 	W, H      *int
 	Expand    bool
 	Widths    []int
+	// Layout is a slide layout of an installed kit, <kit>[@version]/<theme>/<layout>: the page starts as that board and the
+	// theme's folder is put into the project as ds/<theme>/. Not with VariantOf or File.
+	Layout string
 }
 
 func cleanRoute(v *string) (*string, error) {
@@ -213,6 +217,21 @@ func (l *Library) CreatePage(id string, s PageSpec) (Page, error) {
 	if err != nil {
 		return Page{}, err
 	}
+	var layoutBoard []byte
+	var layoutRoot, layoutTheme string
+	if s.Layout != "" {
+		if s.VariantOf != "" || s.File != "" {
+			return Page{}, pageErr(400, locale.Pick("A layout comes with its own file: leave out --file and --variant-of", "Макет приносит свой файл: уберите --file и --variant-of"))
+		}
+		lay, root, err := designkit.FindLayout(l.KitsDir(), s.Layout)
+		if err != nil {
+			return Page{}, pageErr(404, err.Error())
+		}
+		if layoutBoard, err = designkit.LayoutBoard(root, lay); err != nil {
+			return Page{}, pageErr(404, err.Error())
+		}
+		layoutRoot, layoutTheme = root, lay.Theme
+	}
 	var base *Page
 	if s.VariantOf != "" {
 		b, err := ResolvePage(m, s.VariantOf)
@@ -253,8 +272,16 @@ func (l *Library) CreatePage(id string, s PageSpec) (Page, error) {
 			p.W, p.H = base.W, base.H
 		}
 	}
+	if layoutBoard != nil {
+		if _, err := designkit.InstallTheme(layoutRoot, layoutTheme, l.ProjectDir(id)); err != nil {
+			return Page{}, err
+		}
+	}
 	if !adopt {
 		seed := l.boardSeed(id)
+		if layoutBoard != nil {
+			seed = layoutBoard
+		}
 		if base != nil && IsBoardFile(base.File) {
 			if src, err := l.boardFile(id, base.File); err == nil {
 				if b, err := readFileLimited(src, 16<<20); err == nil {

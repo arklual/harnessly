@@ -32,12 +32,17 @@ SHOW THINGS TO THE PERSON
 TABS OF THIS WORKSPACE
   harnessly workspaces              list workspaces (id, name, folders)
   harnessly tab list                list the tabs of your workspace
-  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT] [--model M] [--effort E] [--notify]
+  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT] [--model M] [--effort E] [--notify] [--test]
                                     create a tab. TYPE: terminal (default), claude-code, codex-cli, agent-sessions,
                                     web-browser, diff. With --prompt, a claude-code or codex-cli agent gets that task
                                     as a chat nested under YOUR chat (like the MCP tool delegate_task): the person sees
-                                    it under yours, and --notify wakes you with its answer. Run from a plain terminal
+                                    it under yours, --notify wakes you with its answer, and --test marks it a test chat that
+                                    the person's sidebar leaves out (use it for a chat made only to check something).
+                                    Run from a plain terminal
                                     (no chat), it makes a separate tab and says why. Prints the new id.
+  harnessly chat test ID|current [--off]
+                                    mark a chat (current: the one this tab runs) as a test chat, hidden from the sidebar
+                                    unless the person shows test chats; --off takes the mark off
   harnessly tab send TAB_ID TEXT... send text into a tab ("-" reads it from stdin)
   harnessly tab status TAB_ID       is it alive, what runs in it, is the agent working or waiting
   harnessly tab result TAB_ID       the tab's visible screen: read what a delegated agent answered
@@ -153,7 +158,7 @@ ASK A PERSON (through the same bots; the person sets who and where in Settings â
 DESIGN PROJECTS
   harnessly doctor render [--json]            draw a real picture and a 2 s video here and read them back ("help doctor")
   harnessly design page list <project>        the pages of a design project: id, title, board file
-  harnessly design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE]
+  harnessly design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE | --layout KIT/THEME/LAYOUT]
                                     a new page: a permanent id and a board file made from the project's board template
   harnessly design page rename <project> <page> [--title TITLE] [--file NAME.dc.html]
                                     a new title (and file name); the id, and the page's claims, stay
@@ -200,6 +205,13 @@ Exit codes: 0 done, 1 refused or failed (the reason is printed), 2 wrong usage.
 `
 
 var commandHelp = map[string]string{
+	"chat": `harnessly chat test ID|current [--off]
+
+Marks a chat as a test chat: one made to check something, not for the person to read. The sidebar and the search leave
+it out (the person can show test chats; a chat that is open stays in view). "current" is the chat this tab runs; an id
+is the first column of "tab list". --off takes the mark off. Start a chat for a check with "tab create --prompt ... --test"
+(or delegate_task with test: true) and it is a test chat from the start.
+`,
 	"docs":         docsUsage,
 	"browser":      browserHelp,
 	"upgrade":      upgradeHelp,

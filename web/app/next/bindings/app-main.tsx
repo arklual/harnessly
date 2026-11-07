@@ -34,6 +34,7 @@ import { chatStatusOf } from '@/next/features/sidebar/status';
 import { useConnection } from '@/next/stores/connection';
 import { useTabTitle } from '@/next/stores/tabs';
 import { toast } from '@/next/ui/toast';
+import { appBasePath } from '@/platform/config';
 import { t } from '@/next/i18n';
 import { useAppsDebug } from '@/next/features/app-views/debug-mode';
 
@@ -85,7 +86,7 @@ const ChatIsland = ({
   );
 };
 
-const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPageProps) => {
+const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
   const conv = chat !== null && isConvId(chat) ? chat : null;
   const record = useConversation(conv);
   const answered = useConvsAnswered(record?.machineId ?? screen);
@@ -201,7 +202,8 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
     />
   );
   const share = () => {
-    const link = new URL(routePath({ kind: ROUTE.app, id }), window.location.origin).href;
+    // The page's own base (/m/<machine> on the hub) goes into the link, as the chat's «Скопировать ссылку» does.
+    const link = `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.app, id })}`;
     navigator.clipboard.writeText(link).then(
       () => toast(t('next.appmain.shared'), { description: t('next.appmain.sharedHint') }),
       () => toast(t('next.appmain.shareFailed'), { tone: 'error', description: link }),
@@ -266,7 +268,6 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
         float={layout.float}
         onPlacement={(placement, section) => place(withPlacement(layout, placement, section))}
         onFloat={(float) => place({ ...layout, float })}
-        onOpenDrawer={onOpenDrawer}
         menu={menu}
         stage={
           <AppFrame

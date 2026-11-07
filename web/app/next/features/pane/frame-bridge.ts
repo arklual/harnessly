@@ -1,8 +1,11 @@
 // What the bridge of a preview slot (web/app/lib/hl-preview/bridge-core.ts) tells the pane's browser tab about the page
 // in it: it is up, it went to another address, the person picked an element, picking ended; and what the slot's offer
 // page asks (open the site a redirect leads to). The page is foreign code: every field is checked, the rest dropped.
+import { readBridgeMessage, type IAnchorReport } from '@/next/features/designly/page-bridge';
 
 export interface IFramePicked {
+  /** The number the page's bridge gave the block (it follows the block by it); null when it gave none. */
+  pick: number | null;
   selector: string;
   tag: string;
   text: string;
@@ -21,6 +24,8 @@ export type TFrameMessage =
   | { k: 'nav'; url: string; title: string }
   | { k: 'pick'; on: boolean }
   | { k: 'picked'; picked: IFramePicked }
+  /** Where the blocks the tab asked it to follow (`tk:anchors`) show now. */
+  | { k: 'anchored'; report: IAnchorReport }
   /** The offer page of a redirect to another site: the person pressed «Открыть». */
   | { k: 'open'; url: string }
   /** The site redirected to another one: the offer page says so as it loads, before anyone presses anything. */
@@ -98,6 +103,7 @@ const pickedOf = (m: Record<string, unknown>): IFramePicked | null => {
   const url = httpUrl(m.url);
   if (typeof m.selector !== 'string' || !m.selector || url === null || rect === null) return null;
   return {
+    pick: Number.isInteger(m.pick) && (m.pick as number) > 0 ? (m.pick as number) : null,
     selector: line(m.selector.slice(0, MAX_SELECTOR)),
     tag: str(m.tag, 40)
       .toLowerCase()
@@ -127,6 +133,10 @@ export const readFrameMessage = (data: unknown): TFrameMessage | null => {
     case 'tk:picked': {
       const picked = pickedOf(data);
       return picked ? { k: 'picked', picked } : null;
+    }
+    case 'tk:anchored': {
+      const heard = readBridgeMessage(data);
+      return heard?.k === 'anchored' ? { k: 'anchored', report: heard.report } : null;
     }
     case 'tk:open': {
       const url = httpUrl(data.url);

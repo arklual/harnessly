@@ -80,7 +80,7 @@ func (c *core) cliDelegate(ctx context.Context, req layoutapi.DelegateRequest) (
 		return layoutapi.DelegateResult{}, &layoutapi.ErrNoParent{Reason: "this terminal is not the agent of a chat (a plain terminal tab), so there is no chat to nest the new one under"}
 	}
 	rec, err := v.delegation.Delegate(ctx, parent, delegation.Task{Provider: wire.Provider(req.Provider), Model: req.Model,
-		Effort: wire.Effort(req.Effort), Prompt: req.Prompt, Title: req.Title, Notify: req.Notify})
+		Effort: wire.Effort(req.Effort), Prompt: req.Prompt, Title: req.Title, Notify: req.Notify, Test: req.Test})
 	if err != nil {
 		var refusal *delegation.Refusal
 		if errors.As(err, &refusal) {

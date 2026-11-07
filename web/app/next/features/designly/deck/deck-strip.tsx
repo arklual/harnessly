@@ -1,8 +1,9 @@
 // The slides down the left of the editor (the board's .pr-strip): a numbered picture of each board, the one on screen
 // ringed, and «＋ слайд», which asks the agent for a slide after the current one. In the chat's sidebar the same strip
 // runs along the bottom without numbers (deck.css).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { t } from '@/next/i18n';
+import type { IKitLayout } from '@/next/features/designly/deck/api';
 import type { IDeckBoard } from '@/next/features/designly/deck/deck-view';
 
 export interface IDeckStripProps {
@@ -17,13 +18,28 @@ export interface IDeckStripProps {
   pending: number;
   /** Absent where the agent cannot be asked. */
   onAdd?: () => void;
+  /** The layouts of the installed kits: «＋ слайд» then opens a list of them (and the agent's blank slide). */
+  layouts?: readonly IKitLayout[];
+  onLayout?: (layout: IKitLayout) => void;
 }
 
 /** How many placeholders stand for the first slides being made. */
 export const DECK_PENDING_THUMBS = 3;
 
-const DeckStrip = ({ boards, index, onGo, thumb, making, pending, onAdd }: IDeckStripProps) => {
+const DeckStrip = ({
+  boards,
+  index,
+  onGo,
+  thumb,
+  making,
+  pending,
+  onAdd,
+  layouts,
+  onLayout,
+}: IDeckStripProps) => {
   const ref = useRef<HTMLElement>(null);
+  const [menu, setMenu] = useState(false);
+  const offered = onLayout && layouts && layouts.length > 0 ? layouts : null;
   // The slide on screen stays in view as the arrows turn the slides.
   useEffect(() => {
     ref.current
@@ -72,10 +88,46 @@ const DeckStrip = ({ boards, index, onGo, thumb, making, pending, onAdd }: IDeck
           </div>
         </div>
       ))}
-      {onAdd && (
-        <button type="button" className="hx-deck-th__add" onClick={onAdd}>
+      {(onAdd || offered) && (
+        <button
+          type="button"
+          className="hx-deck-th__add"
+          aria-haspopup={offered ? 'menu' : undefined}
+          aria-expanded={offered ? menu : undefined}
+          onClick={() => (offered ? setMenu((open) => !open) : onAdd?.())}
+        >
           {t('next.deck.strip.add')}
         </button>
+      )}
+      {offered && menu && (
+        <div className="hx-deck-layouts" role="menu" aria-label={t('next.deck.strip.layouts')}>
+          {onAdd && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenu(false);
+                onAdd();
+              }}
+            >
+              {t('next.deck.strip.askAgent')}
+            </button>
+          )}
+          {offered.map((l) => (
+            <button
+              key={l.address}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenu(false);
+                onLayout?.(l);
+              }}
+            >
+              <span>{l.name}</span>
+              <small>{[l.theme, l.mode, l.purpose].filter(Boolean).join(' · ')}</small>
+            </button>
+          ))}
+        </div>
       )}
     </nav>
   );

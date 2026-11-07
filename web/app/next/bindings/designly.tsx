@@ -234,6 +234,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
     true,
   );
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
+  const [kitsAdded, setKitsAdded] = useState(0);
   const restored = useLinkRestored(machine);
 
   // The systems are only an offer: without them the field has no chip, nothing else changes.
@@ -244,7 +245,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
       if (!abort.signal.aborted) setSystems((have) => have ?? []);
     });
     return () => abort.abort();
-  }, [machine, restored]);
+  }, [machine, restored, kitsAdded]);
 
   // The agent that draws starts the way a new chat does: the person's pick, else the CLI settings file's model and
   // effort, else the last pick. A design starts through its own request, which has no backend profile.
@@ -334,6 +335,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
           machine,
           initialKind,
           systems,
+          onKitAdded: () => setKitsAdded((n) => n + 1),
           onCreate,
           brief,
           onBrief: setBrief,

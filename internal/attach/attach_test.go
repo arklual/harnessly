@@ -90,3 +90,20 @@ func TestUploadItemKeepsTheNameInItsQuotes(t *testing.T) {
 		t.Errorf("no path in %s", it.Line)
 	}
 }
+
+// A text is long by its UTF-16 length or by its lines; its head stays short and ends at a line or a word.
+func TestLongTextAndItsHead(t *testing.T) {
+	if IsLongText(strings.Repeat("а", LongTextUnits)) || !IsLongText(strings.Repeat("а", LongTextUnits+1)) {
+		t.Fatal("by length")
+	}
+	if IsLongText(strings.Repeat("x\n", LongTextLines-1)) || !IsLongText(strings.Repeat("x\n", LongTextLines)) {
+		t.Fatal("by lines")
+	}
+	if Head("коротко") != "коротко" {
+		t.Fatal("a short text is its own head")
+	}
+	head := Head(strings.Repeat("слово ", 1000))
+	if n := len([]rune(head)); n > headRunes+2 || !strings.HasSuffix(head, "слово …") {
+		t.Fatalf("%d %q", n, head[len(head)-20:])
+	}
+}

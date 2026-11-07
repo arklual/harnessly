@@ -28,8 +28,8 @@ import (
 
 const (
 	// MaxArchiveBytes is the largest tarball read, MaxUnpackedBytes and MaxFiles what it may unpack to.
-	MaxArchiveBytes  = 128 << 20
-	MaxUnpackedBytes = 256 << 20
+	MaxArchiveBytes  = 2 << 30
+	MaxUnpackedBytes = 4 << 30
 	MaxFiles         = 5000
 
 	// ManifestFile is looked at, when the kit has it, to make sure the tarball is the kit and version asked for.
@@ -250,15 +250,24 @@ func Install(dir, id, version string, src io.Reader, opt Options) (Result, error
 	}
 	res := Result{Version: Version{Version: version, Files: files, Bytes: bytes, SHA256: sum, InstalledAt: now().Unix()}}
 
+	return commit(dir, id, version, root, res, opt.Force)
+}
+
+// commit moves an unpacked, checked kit folder into place as <dir>/<id>/<version>/ and writes its record.
+func commit(dir, id, version, root string, res Result, force bool) (Result, error) {
+	kitDir := filepath.Join(dir, id)
+	if err := os.MkdirAll(kitDir, 0o755); err != nil {
+		return Result{}, err
+	}
 	target := versionDir(dir, id, version)
 	if _, err := os.Lstat(target); err == nil {
-		if prev := readMeta(dir, id, version); prev.SHA256 == sum {
+		if prev := readMeta(dir, id, version); prev.SHA256 == res.SHA256 {
 			res.Version = prev
 			res.Version.Version = version
 			res.Unchanged = true
 			return res, nil
 		}
-		if !opt.Force {
+		if !force {
 			return Result{}, ErrExists
 		}
 		old, err := os.MkdirTemp(kitDir, ".replaced-")

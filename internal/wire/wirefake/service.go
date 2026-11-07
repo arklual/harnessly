@@ -882,6 +882,8 @@ func (s *Service) Do(ctx context.Context, device string, cmd wire.Command) wire.
 		return s.edit(c.ID, func(cv *conv) { cv.rec.Title, cv.rec.TitleSource = "Новое название", wire.TitleFromAgent })
 	case wire.ConversationPinCmd:
 		return s.edit(c.ID, func(cv *conv) { cv.rec.Pinned = c.Pinned })
+	case wire.ConversationTestCmd:
+		return s.edit(c.ID, func(cv *conv) { cv.rec.Test = c.Test })
 	case wire.ConversationAppsCmd:
 		return s.edit(c.ID, func(cv *conv) { cv.rec.Apps = append([]string(nil), c.Apps...) })
 	case wire.ConversationMoveCmd:
@@ -1420,7 +1422,7 @@ func (s *Service) create(c wire.ConversationCreateCmd) wire.CmdResult {
 	}
 	now := s.now()
 	id := newConvID()
-	cv := &conv{rec: wire.Conversation{ID: id, ParentID: parent, MachineID: s.opt.Machine, ProjectID: pid, Cwd: cwd, Provider: c.Provider, Model: c.Model, Launch: c.Launch,
+	cv := &conv{rec: wire.Conversation{ID: id, ParentID: parent, Test: c.Test, MachineID: s.opt.Machine, ProjectID: pid, Cwd: cwd, Provider: c.Provider, Model: c.Model, Launch: c.Launch,
 		TitleSource: wire.TitleFromFirstMessage, CreatedAt: now, LastActivityAt: now, LastPromptAt: now, SeenAt: now,
 		State: wire.AgentState{K: wire.StateStarting, Since: now, Step: wire.StepMachine, Wait: s.wait(wire.LaunchSlowMs, wire.LaunchDeadline)}},
 		snap: wire.ConvSnapshot{Turns: []wire.Turn{}, Entries: []wire.Entry{}, Messages: []wire.Message{}, Questions: []wire.Question{},

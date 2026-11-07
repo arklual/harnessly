@@ -15,7 +15,7 @@ func TestDeckRoutesAreRegistered(t *testing.T) {
 	json, body := designDeckRoutes(d), designDeckBodyRoutes(d)
 	want := map[string]string{
 		"": "json", "/settings": "json", "/notes": "json", "/tidy": "json", "/patch": "json", "/comments": "json",
-		"/rec": "json", "/rec/events": "json", "/rec/finish": "json", "/rec/edit": "json", "/export": "json", "/pdf": "json",
+		"/rec": "json", "/rec/events": "json", "/rec/finish": "json", "/rec/edit": "json", "/export": "json", "/pdf": "json", "/slide": "json",
 		"/pptx-style": "body", "/rec/chunk": "body", "/rec/media": "body", "/export/file": "body",
 	}
 	for p, kind := range want {
@@ -35,8 +35,10 @@ func TestDeckRoutesAreRegistered(t *testing.T) {
 			t.Errorf("%s: %d JSON and %d body routes match, want one %s route", p, jsonHits, bodyHits, kind)
 		}
 	}
-	// The pictures of a design (design/image, design/image/file) are registered beside the deck's.
-	pictures := map[string]string{platformAPI + "/design/image": "json", platformAPI + "/design/image/file": "body"}
+	// The pictures of a design (design/image, design/image/file) and the kit transfer (design/kit/import, design/kit/export) are registered beside the deck's.
+	pictures := map[string]string{platformAPI + "/design/image": "json", platformAPI + "/design/image/file": "body",
+		platformAPI + "/design/kit/import": "body", platformAPI + "/design/kit/export": "body",
+		platformAPI + "/design/kit/layouts": "json", platformAPI + "/design/kit/fonts": "json"}
 	for p, kind := range pictures {
 		r := httptest.NewRequest(http.MethodGet, p+"?artifact=acme", nil)
 		hits := 0

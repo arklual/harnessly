@@ -190,8 +190,6 @@ export interface IAppMainProps {
   float: IFloat | null;
   onPlacement: (placement: TPlacement, section: ISection) => void;
   onFloat: (float: IFloat) => void;
-  /** The sidebar, on a phone only (Sinopia's chat head keeps the same button there). */
-  onOpenDrawer: () => void;
   menu: readonly IAppMenuItem[];
   /** Before the title, at the head of the header: the switch between looking and editing. */
   lead?: ReactNode;
@@ -238,14 +236,6 @@ const AppMain = (props: IAppMainProps) => {
   return (
     <div className="hx-appmain" data-placement={placement}>
       <header className="hx-appmain__bar">
-        <button
-          type="button"
-          className="hx-head-btn hx-appmain__menu"
-          aria-label={t('next.header.openMenu')}
-          onClick={props.onOpenDrawer}
-        >
-          <Icon name="menu" />
-        </button>
         {props.lead}
         {props.icon && (
           <span className="hx-appmain__tile" aria-hidden="true">

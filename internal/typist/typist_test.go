@@ -520,6 +520,19 @@ func TestLiveReplyIsTheLastTextBullet(t *testing.T) {
 	if got := liveReply("● Bash(ls)\n  ⎿ a b\n✻ Working…\n"); got != "" {
 		t.Fatalf("a tool call is not a reply: %q", got)
 	}
+	// a finished thought with calls under it, and a group of calls, are no live reply.
+	done := "● Две проблемы на скриншоте: меню на месте.\n\n  Ran 1 shell command\n\n✻ Photosynthesizing… (1m 2s)\n"
+	if got := liveReply(done); got != "" {
+		t.Fatalf("a finished thought is repeated: %q", got)
+	}
+	group := "● Две проблемы.\n\n● Reading path-mode slot design\n  ⎿  $ git show x | sed -n 1,60p\n\n✻ Working… (2s)\n"
+	if got := liveReply(group); got != "" {
+		t.Fatalf("a group of calls is not a reply: %q", got)
+	}
+	streaming := "● Пишу ответ прямо\n  сейчас\n"
+	if got := liveReply(streaming); got != "Пишу ответ прямо сейчас" {
+		t.Fatalf("the reply on its way, the spinner off screen: %q", got)
+	}
 	long := "● " + strings.Repeat("слово ", 60)
 	if got := liveReply(long); len([]rune(got)) != liveReplyMax {
 		t.Fatalf("a long reply is cut to %d characters, it is %d", liveReplyMax, len([]rune(got)))

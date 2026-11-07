@@ -112,7 +112,7 @@ export const useAppDocStage = (
   };
 };
 
-const AppDocPage = ({ machine, id, chat = null, edit = false, onMode, onOpenDrawer }: IAppDocPageProps) => {
+const AppDocPage = ({ machine, id, chat = null, edit = false, onMode }: IAppDocPageProps) => {
   const [asked, setMode] = useDesignMode({ conv: chat, id, edit, onMode });
   const { title, stage, mayEdit } = useAppDocStage(machine, id, null, onMode !== undefined && !asked);
   // A document is looked at unless the editing is asked for; one that may not be changed has no way into it (its line
@@ -132,7 +132,6 @@ const AppDocPage = ({ machine, id, chat = null, edit = false, onMode, onOpenDraw
       float={null}
       onPlacement={() => undefined}
       onFloat={() => undefined}
-      onOpenDrawer={onOpenDrawer}
       menu={[]}
       lead={mode && <ModeButton mode={mode} />}
       stage={stage}

@@ -477,6 +477,7 @@ export function useShellModel(): IShellModel {
         ...(!projectIndex && c.machineId !== here ? { projectsElsewhere: true } : {}),
         ...(c.parentId ? { parentId: c.parentId } : {}),
         pinned: c.pinned,
+        ...(c.test ? { test: true } : {}),
         // The person's projects hold the chats of every machine; a machine's own project (the person's sidebar off)
         // is not one of another machine's, so such a chat stands outside the groups.
         projectId: projectOfChat(c),

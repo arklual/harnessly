@@ -99,9 +99,15 @@ func (s *Service) apply(w http.ResponseWriter, r *http.Request, p *auth.Principa
 }
 
 // applyPending runs the update a machine was marked for, a moment after it connected (its list goes out first).
-func (s *Service) applyPending(machineID string) {
-	time.Sleep(applyDelay)
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout+10*time.Second)
+func (s *Service) applyPending(ctx context.Context, machineID string) {
+	wait := time.NewTimer(s.applyDelay)
+	defer wait.Stop()
+	select {
+	case <-ctx.Done():
+		return // the hub stops; the mark stays for the next connection
+	case <-wait.C:
+	}
+	ctx, cancel := context.WithTimeout(ctx, callTimeout+10*time.Second)
 	defer cancel()
 	st := s.db.S()
 	orgID, by, ok, err := st.TakeEnvApplyPending(ctx, machineID)
@@ -117,8 +123,10 @@ func (s *Service) applyPending(machineID string) {
 	}
 	if _, err := s.startRun(ctx, orgID, m, hubproto.RunUpdate, nil, by); err != nil {
 		s.log.Warn("environment apply: run at connection not accepted", "machine", machineID, "error", err)
-		// Kept for the next connection.
-		_ = st.AddEnvApplyPending(ctx, machineID, orgID, by, s.now())
+		// Kept for the next connection, even when the run failed because the hub is stopping.
+		kctx, kcancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		_ = st.AddEnvApplyPending(kctx, machineID, orgID, by, s.now())
+		kcancel()
 	}
 }
 

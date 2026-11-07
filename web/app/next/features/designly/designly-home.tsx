@@ -104,6 +104,8 @@ export interface IDesignlyCompose {
   initialKind?: TDesignKind;
   /** The design systems a new project can take; null while they load. */
   systems: readonly IDesignSystem[] | null;
+  /** A kit was added: the systems are read again. Without it the list has no «Добавить дизайн-систему». */
+  onKitAdded?: () => void;
   /** Sending a brief: resolves once the project and its agent exist; rejects (the caller says why) when they do not. */
   onCreate: (start: IDesignStart) => Promise<void>;
   /** The brief in the field; the screen keeps it so dictation can write into it. */
@@ -274,6 +276,7 @@ const Hero = ({
   machine,
   initialKind = DESIGN_KIND.site,
   systems,
+  onKitAdded,
   onCreate,
   brief,
   onBrief,
@@ -309,6 +312,7 @@ const Hero = ({
   useFieldEdges(inputRef, brief);
 
   const offered = systems ?? [];
+  const kit = onKitAdded ? { machine, onAdded: onKitAdded } : undefined;
   const system = offered.find((x) => x.id === ds)?.label ?? null;
   const isDeck = kind === DESIGN_KIND.slides;
   const isVideo = kind === DESIGN_KIND.video;
@@ -585,6 +589,7 @@ const Hero = ({
           styleName={deck.style?.name ?? null}
           anchor={box}
           systems={offered}
+          kit={kit}
           ds={ds}
           onDs={deck.chooseSystem}
           template={{
@@ -614,7 +619,7 @@ const Hero = ({
           anchor={box}
           label={t('next.deck.create.settingsChip')}
         >
-          <DsChoice systems={offered} value={ds} onChange={setDs} />
+          <DsChoice systems={offered} value={ds} onChange={setDs} kit={kit} />
         </CreatePanel>
       )}
     </div>
