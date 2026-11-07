@@ -25,6 +25,7 @@ import {
   fetchLibrary,
   isPublicAddress,
   keptLibrary,
+  slotBoardHref,
   type IDesign,
   type IDesignLibrary,
 } from '@/next/features/designly/api';
@@ -379,9 +380,7 @@ const DesignlySiteBody = ({
   const onFirstPage = opened !== null && path === opened.path && !entered;
   const mayShow = opened !== null;
   const plainSrc =
-    mayShow && opened.origin !== null && path !== null
-      ? new URL(boardHref(id, path), opened.origin).href
-      : null;
+    mayShow && opened.origin !== null && path !== null ? slotBoardHref(opened.origin, id, path) : null;
   const src = mayShow ? (onFirstPage ? opened.enterUrl : plainSrc) : null;
   const slotOrigin = opened?.origin ?? null;
   const slotError = opened?.error ?? null;
@@ -775,7 +774,7 @@ const DesignlySiteBody = ({
       onGo: navigate,
       src,
       frameSrc: (page: string) =>
-        opened !== null && opened.origin !== null ? new URL(boardHref(id, page), opened.origin).href : null,
+        opened !== null && opened.origin !== null ? slotBoardHref(opened.origin, id, page) : null,
       slotError,
       onReload: () => setReloadKey((n) => n + 1),
       stage: viewing ? undefined : stage,

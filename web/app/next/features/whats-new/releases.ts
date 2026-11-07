@@ -13,6 +13,14 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-08a',
+    items: [
+      { key: 'libToolbar', icon: 'sliders-horizontal' },
+      { key: 'libCardMenu', icon: 'ellipsis' },
+      { key: 'slotPages', icon: 'presentation' },
+    ],
+  },
+  {
     id: '2026-11-07zz',
     items: [{ key: 'appMentions', icon: 'layout-grid' }],
   },

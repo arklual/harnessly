@@ -724,9 +724,12 @@ const DesignCard = memo(
       tabIndex={0}
       role="button"
       aria-label={card.title}
-      onClick={(event) =>
-        selecting || event.shiftKey || event.metaKey || event.ctrlKey ? onSelect(card) : onOpen(card.id)
-      }
+      onClick={(event) => {
+        // The card's «…» menu sits in a portal, yet React bubbles its clicks here: a menu item must not open or toggle the card.
+        if (!event.currentTarget.contains(event.target as Node)) return;
+        if (selecting || event.shiftKey || event.metaKey || event.ctrlKey) onSelect(card);
+        else onOpen(card.id);
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' && event.target === event.currentTarget) {
           if (selecting) onSelect(card);
@@ -1016,6 +1019,26 @@ const DesignlyHome = ({
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
+          {!trashOpen && (
+            <LibraryBar
+              filters={filters}
+              onFilters={setFilters}
+              systems={systems}
+              tools={
+                organizer
+                  ? {
+                      selecting,
+                      onNewFolder: newFolder,
+                      onSelect: () => (selecting ? stopSelecting() : setSelecting(true)),
+                      onTrash: () => {
+                        stopSelecting();
+                        setTrashOpen(true);
+                      },
+                    }
+                  : null
+              }
+            />
+          )}
           {compose && (
             <button type="button" className="hx-dl__new" tabIndex={-1} onClick={toTop}>
               <Icon name="plus" size="sm" />
@@ -1023,25 +1046,6 @@ const DesignlyHome = ({
             </button>
           )}
         </div>
-
-        {organizer && !trashOpen && (
-          <LibraryBar
-            filters={filters}
-            onFilters={setFilters}
-            systems={systems}
-            tools={{
-              selecting,
-              trashOpen,
-              onNewFolder: newFolder,
-              onSelect: () => (selecting ? stopSelecting() : setSelecting(true)),
-              onTrash: () => {
-                stopSelecting();
-                setTrashOpen(true);
-              },
-            }}
-          />
-        )}
-        {!organizer && <LibraryBar filters={filters} onFilters={setFilters} systems={systems} tools={null} />}
 
         {trashOpen && organizer && (
           <TrashView

@@ -927,6 +927,8 @@
       opacity 220ms ease,
       margin 420ms var(--dl-ease);
   }
+  /* The tabs and the two tool buttons fill the phone's row: the heading gives way. */
+  .hx-dl__heading,
   .hx-dl[data-stuck='true'] .hx-dl__heading {
     max-width: 0;
     margin-right: calc(-1 * var(--hx-space-2));
@@ -1135,15 +1137,6 @@
 /* What the machine lacks for designs (the board engine, a browser, ffmpeg) and the command that fixes it. */
 
 /* Library: filters, folders, selection, the trash. */
-.hx-dl__filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--hx-space-2);
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: var(--hx-space-2) 0 var(--hx-space-3);
-}
 .hx-dl__chip {
   display: inline-flex;
   align-items: center;
@@ -1179,10 +1172,47 @@
 .hx-dl__chip[data-danger='true']:hover:not(:disabled) {
   color: var(--hx-danger);
 }
-.hx-dl__nocheck {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
+.hx-dl__ibtn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 240ms var(--hx-ease-out),
+    color 240ms var(--hx-ease-out);
+}
+.hx-dl__ibtn:hover,
+.hx-dl__ibtn[data-popup-open] {
+  color: var(--hx-fg-1);
+  background: var(--hx-bg-hover);
+}
+/* Something other than the default is chosen: a dot, not a counter. */
+.hx-dl__ibtn[data-on='true']::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  box-shadow: 0 0 0 2px var(--dl-surface);
+}
+.hx-dl__fmenu {
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+.hx-dl__mlabel {
+  padding: 8px 10px 4px;
+  color: var(--hx-fg-3);
+  font-size: 12px;
 }
 .hx-dl__crumbs {
   display: flex;

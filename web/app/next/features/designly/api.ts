@@ -177,6 +177,13 @@ export const boardHref = (id: string, board: string): string => {
   return `/a/${id}/p/${encodeSegments(pathname)}${at < 0 ? '' : board.slice(at)}`;
 };
 
+/**
+ * A board in an open preview slot. The slot's origin may carry a path (a slot by path on the hub:
+ * `https://hub/m/<machine>/__pv/<n>-<key>`), so the board's root-absolute address is appended, not resolved against it.
+ */
+export const slotBoardHref = (slotOrigin: string, id: string, board: string): string =>
+  `${slotOrigin.replace(/\/+$/, '')}${boardHref(id, board)}`;
+
 /** An address another device can open: not the machine's own loopback (`localhost`, `127.*`, `::1`). */
 export const isPublicAddress = (href: string): boolean => {
   try {

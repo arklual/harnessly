@@ -1,4 +1,10 @@
 {
+  "next.whatsNew.2026-11-08a.libToolbar.title": "The library fits one row",
+  "next.whatsNew.2026-11-08a.libToolbar.text": "Kinds, recent, design system and sorting live in the filter button; new folder, select and the trash are under «⋯». A dot on the button says a filter is on.",
+  "next.whatsNew.2026-11-08a.libCardMenu.title": "«Select» and «Move to…» work",
+  "next.whatsNew.2026-11-08a.libCardMenu.text": "The items of a card's «…» menu do what they say again instead of opening the project.",
+  "next.whatsNew.2026-11-08a.slotPages.title": "Every page of a design opens",
+  "next.whatsNew.2026-11-08a.slotPages.text": "Decks, videos and sites with several pages no longer stop on the second page with «not found» on a team server.",
   "next.whatsNew.2026-11-07zz.appMentions.title": "«@» finds in apps too",
   "next.whatsNew.2026-11-07zz.appMentions.text": "Type «@» and the apps that are on show their finds beside the files and chats: tracker tasks, clients, whatever the app can look up. The one you pick goes into the field.",
   "next.whatsNew.2026-11-07z.designFolders.title": "Sinopia folders on any machine",

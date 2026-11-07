@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createRef } from 'react';
+import { PortalContext } from '@/next/ui/portal';
 import DesignlyHome, { type IDesignCard } from '@/next/features/designly/designly-home';
 import type { IAppKind } from '@/next/features/app-catalog/api';
 import type { MachineId } from '@/next/protocol/v2';
@@ -32,11 +34,13 @@ const Home = ({
   kinds = [kind],
   cards = [],
   onOpen = vi.fn(),
+  onDelete,
 }: {
   onAppKind?: (k: IAppKind, brief: string) => Promise<void>;
   kinds?: IAppKind[] | null;
   cards?: IDesignCard[];
   onOpen?: (id: string) => void;
+  onDelete?: (id: string) => Promise<void>;
 }) => (
   <DesignlyHome
     cards={cards}
@@ -44,6 +48,7 @@ const Home = ({
     now={0}
     onPin={vi.fn()}
     onOpen={onOpen}
+    onDelete={onDelete}
     onRetry={vi.fn()}
     compose={{
       machine: 'm1' as MachineId,
@@ -131,5 +136,42 @@ describe('the tiles of the types apps add', () => {
     expect(card.querySelector('.hx-dl-card__del')).toBeNull();
     fireEvent.click(card);
     expect(onOpen).toHaveBeenCalledWith('idei-1');
+  });
+});
+
+describe('the «…» menu of a card (HRN-872)', () => {
+  it('«Выбрать» starts the selection with the card and does not open it, though the menu sits in a portal', async () => {
+    const onOpen = vi.fn();
+    const mine: IDesignCard = {
+      id: 'mine-1',
+      title: 'Мой макет',
+      boards: 1,
+      updatedAt: 0,
+      image: null,
+      kind: 'site',
+      pinned: false,
+      drawing: false,
+      owner: null,
+      canDelete: true,
+    };
+    // Menus mount in the root's popup host, as in the app.
+    const host = createRef<HTMLDivElement>();
+    render(
+      <PortalContext.Provider value={host}>
+        <div className="hx-root" ref={host} />
+        <Home cards={[mine]} kinds={null} onOpen={onOpen} onDelete={vi.fn(() => Promise.resolve())} />
+      </PortalContext.Provider>,
+    );
+    const card = screen.getByRole('button', { name: 'Мой макет' });
+    fireEvent.click(card.querySelector('.hx-dl-card__del') as HTMLElement);
+    const items = await waitFor(() => {
+      const found = document.querySelectorAll<HTMLElement>('.hx-cmenu__item');
+      expect(found.length).toBeGreaterThan(0);
+      return found;
+    });
+    // Without folders the first item is «Выбрать», the last «Удалить».
+    fireEvent.click(items[0] as HTMLElement);
+    expect(onOpen).not.toHaveBeenCalled();
+    await waitFor(() => expect(card.getAttribute('data-selected')).toBe('true'));
   });
 });
