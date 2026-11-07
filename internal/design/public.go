@@ -392,6 +392,11 @@ func (a *API) Public(w http.ResponseWriter, r *http.Request) {
 		publicText(w, 404, "Not found")
 		return
 	}
+	// Fail closed: while the filesystem does not keep the guarantees a guest read relies on, nothing is served and no
+	// link is made (sharefs.go).
+	if a.refuseUnsafeFS(w, r, scope.pin) {
+		return
+	}
 	// A pinned link reads the snapshot of its version; the others read the folder as it is.
 	lib := a.L
 	if scope.rev != "" {
@@ -621,13 +626,8 @@ func (a *API) openPublic(lib *Library, project string, segments []string) (*os.F
 	if dir == "" || library == "" {
 		return nil, nil, "", false
 	}
-	root, err := os.OpenRoot(library)
-	if err != nil {
-		return nil, nil, "", false
-	}
-	defer root.Close()
 	rel := filepath.Join(append([]string{project, ProjectDirname}, segments...)...)
-	f, err := root.Open(rel)
+	f, err := openBeneath(library, rel)
 	if err != nil {
 		return nil, nil, "", false
 	}
@@ -676,6 +676,32 @@ type ShareRefusal struct {
 	Error   string `json:"error"`
 	Blocked bool   `json:"blocked"`
 	Results any    `json:"results"`
+}
+
+// refuseUnsafeFS answers when the share filesystem probe fails: 409 with the findings to the gateway's own call (it is
+// about to make a link), 503 marked with ShareRefusedHeader to a guest. false lets the request go on.
+func (a *API) refuseUnsafeFS(w http.ResponseWriter, r *http.Request, gateway bool) bool {
+	rep := a.L.ShareFS()
+	if rep.OK {
+		return false
+	}
+	if f := rep.Failed(); f != nil {
+		a.warn("guest sharing is off: the filesystem probe failed ("+f.Code+" "+f.ID+")", errors.New(f.Detail))
+	}
+	status := http.StatusServiceUnavailable
+	if gateway {
+		status = http.StatusConflict
+	}
+	body, _ := json.Marshal(ShareRefusal{Code: ShareUnsafeRuntime, Error: "This runtime's filesystem does not keep the guarantees guest links need. " + rep.Hint, Blocked: true, Results: rep})
+	h := w.Header()
+	h.Set("Content-Type", "application/json; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	h.Set(ShareRefusedHeader, ShareUnsafeRuntime)
+	w.WriteHeader(status)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(body)
+	}
+	return true
 }
 
 // ShareBlocked is the code of a refused link.

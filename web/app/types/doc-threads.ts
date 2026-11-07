@@ -67,6 +67,10 @@ export interface IDocSummary {
   openThreads: number;
   unread: number;
   lastActivityAt: string;
+  /** The documents adapter's own id when it differs from the slug (the slug is then its alias). */
+  externalId?: string;
+  /** True when the runtime serves the frame through the documents adapter (`content`), not from `url`. */
+  providerEmbed?: boolean;
 }
 
 /** A person offered by the @ list: the id is the email a mention carries. */

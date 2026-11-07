@@ -468,6 +468,8 @@ func (s *Service) sharesRoute(r *http.Request, m store.Machine, email, project s
 			if in.Rev, err = s.pin(ctx, m, project); err != nil {
 				return nil, 0, err
 			}
+		} else if err := s.shareGate(ctx, m, project); err != nil {
+			return nil, 0, err
 		}
 		var made map[string]any
 		if err := s.write(ctx, m, func(t *txn) error {

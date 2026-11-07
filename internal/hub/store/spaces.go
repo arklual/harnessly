@@ -56,6 +56,17 @@ func (s Store) CreateSpace(ctx context.Context, sp *Space) error {
 	return s.AddMember(ctx, sp.ID, sp.CreatedBy, RoleOwner)
 }
 
+// SetSpaceCreateKey records the key of the request that made the space (unique per author; see SpaceByCreateKey).
+func (s Store) SetSpaceCreateKey(ctx context.Context, spaceID, key string) error {
+	_, err := s.q.Exec(ctx, `UPDATE spaces SET create_key = ? WHERE id = ?`, key, spaceID)
+	return err
+}
+
+// SpaceByCreateKey is the space the user made with the request of this key.
+func (s Store) SpaceByCreateKey(ctx context.Context, userID, key string) (Space, error) {
+	return scanSpace(s.q.QueryRow(ctx, `SELECT `+spaceCols+` FROM spaces WHERE created_by = ? AND create_key = ?`, userID, key))
+}
+
 func (s Store) SpaceByID(ctx context.Context, id string) (Space, error) {
 	return scanSpace(s.q.QueryRow(ctx, `SELECT `+spaceCols+` FROM spaces WHERE id = ?`, id))
 }

@@ -2,15 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/ly-solutions/harnessly/internal/docprovider"
 	"github.com/ly-solutions/harnessly/internal/docshare"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -25,8 +30,42 @@ import (
 
 const docShareBodyMax = 4 << 10
 
+// providerPublisher publishes a shared file through a documents adapter and binds it to its conversation. The key is
+// the file, the document and the content, so a repeat of the same version (a retry, the watcher after a restart) is
+// one publish.
+func providerPublisher(p docprovider.Provider, store *docprovider.Bindings) docshare.Publisher {
+	return func(x docshare.Publication) (int, string, *docshare.Failure) {
+		sum := sha256.Sum256([]byte(x.Path + "\x00" + x.Slug + "\x00" + x.Content))
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		b, err := docprovider.PublishToConversation(ctx, p, store, docprovider.PublishRequest{Title: x.Title, Format: x.Format,
+			Content: x.Content, Slug: x.Slug, Note: x.Note, Visibility: "private", Conversation: x.Conversation}, hex.EncodeToString(sum[:16]))
+		var be *docprovider.BindError
+		switch {
+		case err == nil:
+			return b.Version, b.Slug, nil
+		case errors.Is(err, docprovider.ErrUnsupported):
+			return 0, "", &docshare.Failure{Status: http.StatusNotImplemented, Text: locale.Pick(
+				"The documents service of this workspace does not publish.", "Сервис документов этого пространства не принимает публикации.")}
+		case errors.Is(err, docprovider.ErrTooLarge):
+			return 0, "", &docshare.Failure{Status: http.StatusRequestEntityTooLarge, Text: locale.Pick(
+				"The documents service refused the file as too large.", "Сервис документов не принял файл: слишком большой.")}
+		case errors.As(err, &be):
+			return 0, "", &docshare.Failure{Status: http.StatusInternalServerError, Text: locale.Pick(
+				"The document was published but not bound to the conversation; share again to bind it.",
+				"Документ опубликован, но не привязан к беседе: поделитесь ещё раз, чтобы привязать.")}
+		}
+		return 0, "", &docshare.Failure{Status: http.StatusBadGateway, Text: locale.Pick(
+			"The documents service did not publish the file.", "Сервис документов не опубликовал файл.")}
+	}
+}
+
 func docShareRoutes(d deps, c *core) []gate.Route {
-	svc := docshare.New(docshare.Config{DataDir: d.DataDir, AgentTokenHeader: os.Getenv("RUNTIME_AGENT_TOKEN_HEADER")})
+	cfg := docshare.Config{DataDir: d.DataDir, AgentTokenHeader: os.Getenv("RUNTIME_AGENT_TOKEN_HEADER")}
+	if docprovider.Declared() {
+		cfg.Publisher = providerPublisher(docprovider.For(integrations.Config{}, nil), docprovider.BindingsAt(d.DataDir))
+	}
+	svc := docshare.New(cfg)
 	go svc.Run(context.Background())
 	prefix := platformAPI + "/doc-share/"
 	write := func(w http.ResponseWriter, status int, v any) {

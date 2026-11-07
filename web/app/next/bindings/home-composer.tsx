@@ -42,9 +42,7 @@ import { refKey } from '@/next/features/chat/attached';
 import { designThumb } from '@/next/features/composer/attach-sources';
 import type { IPlusAttach } from '@/next/features/composer/plus-menu';
 import type { IPlusApps } from '@/next/features/composer/apps-pane';
-import ChatAppsRow from '@/next/features/app-main/chat-apps-row';
 import { withApp } from '@/next/features/app-main/chat-apps';
-import { useInstalledApps } from '@/next/features/app-views/api';
 import { ROUTE, goTo } from '@/next/routes/routes';
 import { REFS_MAX } from '@/next/protocol/v2';
 import { settled } from '@/next/bindings/outcome';
@@ -81,23 +79,6 @@ interface IHomeComposerProps {
 }
 
 const noChat = () => undefined;
-
-/** The apps picked for the new chat, as the chat's own row shows them; the names are read once there is one. */
-const NewChatApps = ({
-  machine,
-  on,
-  onOff,
-}: {
-  machine: MachineId;
-  on: readonly string[];
-  onOff: (id: string) => void;
-}) => {
-  const installed = useInstalledApps(machine).list;
-  const chips = on.map((id) => ({ id, name: installed?.apps.find((a) => a.id === id)?.name ?? id }));
-  return (
-    <ChatAppsRow apps={chips} busy={null} onOpen={(id) => goTo({ kind: ROUTE.app, id })} onOff={onOff} />
-  );
-};
 
 const HomeComposer = ({
   machine,
@@ -339,7 +320,7 @@ const HomeComposer = ({
         ? {
             machine,
             on: apps,
-            onPick: (id) => setApps((on) => withApp(on, id, true)),
+            onPick: (id, next) => setApps((on) => withApp(on, id, next)),
             onAll: () => goTo({ kind: ROUTE.apps }),
           }
         : null,
@@ -362,13 +343,6 @@ const HomeComposer = ({
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
           <DockBar notice={voiceNotice} />
-          {machine && (
-            <NewChatApps
-              machine={machine}
-              on={apps}
-              onOff={(id) => setApps((on) => withApp(on, id, false))}
-            />
-          )}
           <Composer
             enterSends={enterSends}
             value={text}

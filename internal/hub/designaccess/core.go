@@ -74,6 +74,7 @@ func fail(code, msg string) *Error { return &Error{Code: code, Message: msg} }
 
 var statusOf = map[string]int{
 	"bad_request": 400, "forbidden": 403, "not_found": 404, "conflict": 409, "gone": 410, "rate_limited": 429, "unavailable": 503,
+	"share_unsafe_runtime": 409,
 }
 
 func asError(err error) (*Error, bool) {
@@ -102,10 +103,47 @@ func newUUID() string {
 }
 
 // rowID is a numeric id that sorts by time: milliseconds and three random digits, within JavaScript's safe integers.
+// It is where an insert starts looking, not a promise of uniqueness: insertRow takes the next free one.
 func rowID(now time.Time) int64 {
 	var b [2]byte
 	_, _ = rand.Read(b[:])
 	return now.UnixMilli()*1000 + int64(binary.BigEndian.Uint16(b[:])%1000)
+}
+
+// maxSafeID is JavaScript's Number.MAX_SAFE_INTEGER: the page reads these ids as numbers.
+const maxSafeID = 1<<53 - 1
+
+var errNoRowID = errors.New("designaccess: no free row id within JavaScript's safe integers")
+
+// insertRow inserts one row whose first value is a rowID, starting at rowID(t.now): an id already taken (several
+// writes in one millisecond, a clock that stands still) is skipped by «ON CONFLICT (id) DO NOTHING» and the next
+// integer is tried, until one is free or the request's context ends. A conflict on the id never fails a statement, so
+// a Postgres transaction is not aborted by it and the business write around it goes on; every other error (a foreign
+// key, another unique column, a dropped connection) is returned as it is. query is «INSERT INTO t (id, …) VALUES (?, …)»
+// and args are the values after the id. It returns the id the row got.
+func (t *txn) insertRow(query string, args ...any) (int64, error) {
+	query += " ON CONFLICT (id) DO NOTHING"
+	vals := make([]any, 0, len(args)+1)
+	for id := rowID(t.now); ; id++ {
+		if id > maxSafeID {
+			return 0, errNoRowID
+		}
+		if err := t.ctx.Err(); err != nil {
+			return 0, err
+		}
+		vals = append(append(vals[:0], id), args...)
+		res, err := t.q.Exec(t.ctx, query, vals...)
+		if err != nil {
+			return 0, err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return 0, err
+		}
+		if n == 1 {
+			return id, nil
+		}
+	}
 }
 
 func ms(t time.Time) int64 { return t.UnixMilli() }

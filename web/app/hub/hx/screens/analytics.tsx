@@ -161,11 +161,11 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
 
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles title="Аналитика" lead={lead} />
         <PeriodControls weeks={frame.weeks} change={frame.lastChange} state={picker} onChange={onPicker} />
       </div>
-      <div className="dash ad-dash anx" data-busy={d && !data.fresh && !data.error ? '1' : undefined}>
+      <div className="dash hb-dash anx" data-busy={d && !data.fresh && !data.error ? '1' : undefined}>
         {data.error && !data.fresh ? (
           <Failure title="Не удалось загрузить аналитику" error={data.error} retry={data.reload} />
         ) : !d ? (
@@ -231,10 +231,10 @@ const Screen = () => {
   if (frame.data) return <Body key={base} frame={frame.data} />;
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles title="Аналитика" lead="Считаем" />
       </div>
-      <div className="dash ad-dash anx">
+      <div className="dash hb-dash anx">
         {frame.error ? (
           <Failure title="Не удалось загрузить аналитику" error={frame.error} retry={frame.reload} />
         ) : (

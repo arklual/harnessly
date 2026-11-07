@@ -25,6 +25,7 @@ type fakeConvs struct {
 	feeds    map[string][]wire.Entry
 	turns    map[string][]wire.Turn
 	sent     map[string][]string // the texts DeliverPeer queued, by conversation
+	told     map[string][]string // the texts the platform sent a chat with Do (reminders), by conversation
 	queued   bool                // DeliverPeer answers queued: the agent is starting
 	projects []wire.Project
 	n        int
@@ -90,6 +91,21 @@ func (f *fakeConvs) entry(id string, e wire.Entry) {
 }
 
 func (f *fakeConvs) Do(_ context.Context, _ string, cmd wire.Command) wire.CmdResult {
+	if m, ok := cmd.(wire.SendCmd); ok {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		rec, ok := f.recs[m.ConversationID]
+		if !ok {
+			return wire.Refused(wire.RefuseNotFound)
+		}
+		if f.told == nil {
+			f.told = map[string][]string{}
+		}
+		f.told[m.ConversationID] = append(f.told[m.ConversationID], m.Text)
+		rec.State.K = wire.StateWorking
+		f.recs[m.ConversationID] = rec
+		return wire.CmdResult{R: wire.ResultAccepted}
+	}
 	c, ok := cmd.(wire.ConversationCreateCmd)
 	if !ok {
 		return wire.Refused(wire.RefuseUnsupported)
@@ -254,7 +270,7 @@ func TestDelegateWaitReadSendWake(t *testing.T) {
 
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		r.convs.finish(child, "The test compares maps in order; fixed with sorted keys.")
+		r.convs.finish(child, "The test compares maps in order; fixed with sorted keys.\n\n"+MarkDone)
 	}()
 	text, _ = r.call("tab-root", "wait_conversation", map[string]any{"id": child, "timeout_s": 5.0})
 	if !strings.Contains(text, "outcome: done") || !strings.Contains(text, "sorted keys") {
@@ -434,5 +450,234 @@ func TestSendQueuedIsDelivered(t *testing.T) {
 	r.convs.queued = true
 	if text, isErr := r.call("tab-root", "send_to_conversation", map[string]any{"id": child, "text": "second"}); isErr {
 		t.Fatalf("a queued message answered as refused: %s", text)
+	}
+}
+
+// Claude Code swaps an argument named `model` for its own subagent model, so agent_model is what carries the
+// model, and wins when both come.
+func TestDelegateTakesTheModelFromAgentModel(t *testing.T) {
+	r := newTestRig(t)
+	for _, c := range []struct {
+		args map[string]any
+		want string
+	}{
+		{map[string]any{"agent_model": "opus"}, "opus"},
+		{map[string]any{"agent_model": "opus", "model": "sonnet"}, "opus"},
+		{map[string]any{"model": "sonnet"}, "sonnet"},
+	} {
+		args := map[string]any{"provider": "claude", "prompt": "x"}
+		for k, v := range c.args {
+			args[k] = v
+		}
+		text, isErr := r.call("tab-root", "delegate_task", args)
+		if isErr {
+			t.Fatalf("%v: %s", c.args, text)
+		}
+		if rec, _ := r.convs.Record(idOf(t, text)); rec.Model == nil || rec.Model.ID != c.want {
+			t.Fatalf("%v: got %+v, want %s", c.args, rec.Model, c.want)
+		}
+	}
+}
+
+// finishes ends a turn of the chat with text, as finish does, but with no tool in it.
+func (r *rig) delegated(args map[string]any) string {
+	r.t.Helper()
+	a := map[string]any{"provider": "claude", "prompt": "Do the work", "title": "Work"}
+	for k, v := range args {
+		a[k] = v
+	}
+	text, isErr := r.call("tab-root", "delegate_task", a)
+	if isErr {
+		r.t.Fatal(text)
+	}
+	return idOf(r.t, text)
+}
+
+// at moves the rig's clock on.
+func (r *rig) at(d time.Duration) {
+	r.mu.Lock()
+	r.clock = r.clock.Add(d)
+	r.mu.Unlock()
+}
+
+// The task of a delegated chat carries the rules: work to the end, no status as a last word, a marker on the answer.
+func TestDelegatedTaskCarriesTheRules(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(nil)
+	first := r.convs.feeds[child][0].Text
+	if !strings.HasPrefix(first, "Do the work") || !strings.Contains(first, MarkDone) || !strings.Contains(first, MarkQuestion) || !strings.Contains(first, "foreground") {
+		t.Fatalf("task: %q", first)
+	}
+}
+
+// A turn that ends on a pause (no marker) tells the chat to go on and wakes nobody; the answer with its marker wakes the
+// parent once, without the marker.
+func TestPauseIsAnsweredWithAReminderNotAWake(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	r.convs.finish(child, "Looking at the parser; next I will run the suite once the build is done.")
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if len(r.convs.sent["tab-root"]) != 0 {
+		t.Fatalf("a status woke the parent: %v", r.convs.sent["tab-root"])
+	}
+	if told := r.convs.told[child]; len(told) != 1 || !strings.Contains(told[0], "automatic reminder 1 of 3") {
+		t.Fatalf("reminders: %v", told)
+	}
+	r.convs.finish(child, "Fixed: sorted keys.\n\n"+MarkDone)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	woken := r.convs.sent["tab-root"]
+	if len(woken) != 1 {
+		t.Fatalf("wake-ups: %v", woken)
+	}
+	env, _ := peers.Parse(woken[0])
+	if !strings.Contains(env.Text, "Fixed: sorted keys.") || strings.Contains(env.Text, MarkDone) || !strings.Contains(env.Text, "finished its turn.") {
+		t.Fatalf("wake-up: %s", env.Text)
+	}
+	if len(r.convs.told[child]) != 1 {
+		t.Fatalf("a finished chat was reminded: %v", r.convs.told[child])
+	}
+}
+
+// A chat that keeps pausing is reminded MaxNudges times, then the parent hears it stopped without an answer.
+func TestRemindersRunOutAndTheParentIsToldSo(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	for i := 0; i < MaxNudges; i++ {
+		r.convs.finish(child, "Still looking…")
+		r.svc.Observe(mustRecord(t, r.convs, child))
+		r.svc.Observe(mustRecord(t, r.convs, child))
+	}
+	if len(r.convs.told[child]) != MaxNudges || len(r.convs.sent["tab-root"]) != 0 {
+		t.Fatalf("told %d, woken %d", len(r.convs.told[child]), len(r.convs.sent["tab-root"]))
+	}
+	r.convs.finish(child, "Still looking…")
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if len(r.convs.told[child]) != MaxNudges {
+		t.Fatalf("one reminder too many: %d", len(r.convs.told[child]))
+	}
+	woken := r.convs.sent["tab-root"]
+	if len(woken) != 1 || !strings.Contains(woken[0], "stopped without a final answer") {
+		t.Fatalf("wake-ups: %v", woken)
+	}
+}
+
+// A question to the parent is an answer: it wakes the parent as one.
+func TestQuestionWakesTheParent(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	r.convs.finish(child, "Which branch should I rebase on?\n"+MarkQuestion)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	woken := r.convs.sent["tab-root"]
+	if len(woken) != 1 || !strings.Contains(woken[0], "with a question for you") || strings.Contains(woken[0], MarkQuestion) || len(r.convs.told[child]) != 0 {
+		t.Fatalf("wake-ups: %v, told %v", woken, r.convs.told[child])
+	}
+}
+
+// A turn that ends with background work running is no answer: nobody is woken or reminded until the work ends, or HoldMax.
+func TestBackgroundWorkHoldsTheWake(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	r.convs.finish(child, "Build started in the background.")
+	r.convs.setBg(child, 1)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	r.at(HoldMax - time.Minute)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if len(r.convs.sent["tab-root"]) != 0 || len(r.convs.told[child]) != 0 {
+		t.Fatalf("woken %v, told %v", r.convs.sent["tab-root"], r.convs.told[child])
+	}
+	r.at(2 * time.Minute)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	woken := r.convs.sent["tab-root"]
+	if len(woken) != 1 || !strings.Contains(woken[0], "background work of its own is still running") {
+		t.Fatalf("after the hold: %v", woken)
+	}
+}
+
+// A chat gone in the middle of a turn (its session ended) is told to go on, once, after the grace; the parent hears nothing.
+func TestChatCutShortIsToldToGoOn(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	r.convs.cut(child)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	r.at(EndedGrace / 2)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if len(r.convs.told[child]) != 0 {
+		t.Fatalf("told before the grace: %v", r.convs.told[child])
+	}
+	r.at(EndedGrace)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if told := r.convs.told[child]; len(told) != 1 || told[0] != RestartText {
+		t.Fatalf("told: %v", told)
+	}
+	if len(r.convs.sent["tab-root"]) != 0 {
+		t.Fatalf("the parent was woken: %v", r.convs.sent["tab-root"])
+	}
+}
+
+// A chat delegated before the rules existed is taken as it ends, and the person's Esc is no pause.
+func TestChatsWithoutTheContractAreTakenAsTheyEnd(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	r.svc.Book.Update(child, func(p *Page) { p.Contract = false })
+	r.convs.finish(child, "Looking at it.")
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if len(r.convs.sent["tab-root"]) != 1 || len(r.convs.told[child]) != 0 {
+		t.Fatalf("woken %d, told %v", len(r.convs.sent["tab-root"]), r.convs.told[child])
+	}
+	esc := r.delegated(map[string]any{"notify": true})
+	r.convs.finish(esc, "Stopped.")
+	r.convs.setStatus(esc, wire.TurnInterrupted)
+	r.svc.Observe(mustRecord(t, r.convs, esc))
+	if len(r.convs.told[esc]) != 0 || len(r.convs.sent["tab-root"]) != 2 {
+		t.Fatalf("told %v, woken %d", r.convs.told[esc], len(r.convs.sent["tab-root"]))
+	}
+}
+
+func (f *fakeConvs) setBg(id string, n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rec := f.recs[id]
+	rec.BgAgents = n
+	f.recs[id] = rec
+}
+
+func (f *fakeConvs) setStatus(id string, st wire.TurnStatus) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rec := f.recs[id]
+	t := *rec.LastTurn
+	t.Status = st
+	rec.LastTurn = &t
+	f.recs[id] = rec
+}
+
+// cut puts the chat in the state of one whose session ended in the middle of a turn.
+func (f *fakeConvs) cut(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rec := f.recs[id]
+	rec.State.K = wire.StateGone
+	rec.LastTurn = &wire.TurnSummary{ID: "t-cut", Status: wire.TurnLive}
+	f.recs[id] = rec
+}
+
+// A wait does not take a pause for the answer: it goes on while the chat is told to go on, and returns the answer after.
+func TestWaitDoesNotTakeAPauseForTheAnswer(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(nil)
+	r.convs.finish(child, "Looking at the parser…")
+	if text, _ := r.call("tab-root", "wait_conversation", map[string]any{"id": child, "timeout_s": 1.0}); !strings.Contains(text, "outcome: timeout") {
+		t.Fatalf("a pause ended the wait: %s", text)
+	}
+	if len(r.convs.told[child]) != 1 {
+		t.Fatalf("reminders: %v", r.convs.told[child])
+	}
+	r.convs.finish(child, "All fixed.\n"+MarkDone)
+	text, _ := r.call("tab-root", "wait_conversation", map[string]any{"id": child, "timeout_s": 1.0})
+	if !strings.Contains(text, "outcome: done") || !strings.Contains(text, "All fixed.") || strings.Contains(text, MarkDone) {
+		t.Fatalf("wait: %s", text)
 	}
 }

@@ -3,6 +3,7 @@ package hlcli
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -73,6 +74,13 @@ func (f *fakeRuntime) serve(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/api/cli/tabs" && r.Method == "GET":
 		_, _ = w.Write([]byte(`{"tabs":[{"tabId":"t-1","workspaceId":"ws-1","name":"main","sessionName":"hs-me","panelType":"codex-cli","agentProviderId":"codex"},` +
 			`{"tabId":"t-2","workspaceId":"ws-1","name":"sh","sessionName":"hs-sh","panelType":"terminal","agentProviderId":null}]}`))
+	case r.URL.Path == "/api/cli/tabs" && r.Method == "POST" && body["prompt"] == "nest it":
+		w.WriteHeader(201)
+		_, _ = w.Write([]byte(`{"tabId":"tab-kid","chatId":"tab-kid","workspaceId":"ws-1","panelType":"claude-code","agentProviderId":"claude",` +
+			`"launched":true,"delegated":true,"parentChatId":"tab-parent","model":"sonnet","notify":` + fmt.Sprint(body["notify"] == true) + `}`))
+	case r.URL.Path == "/api/cli/tabs" && r.Method == "POST" && body["prompt"] == "loose":
+		w.WriteHeader(201)
+		_, _ = w.Write([]byte(`{"tabId":"t-9","workspaceId":"ws-1","panelType":"codex-cli","agentProviderId":"codex","launched":true,"delegateNote":"plain terminal"}`))
 	case r.URL.Path == "/api/cli/tabs" && r.Method == "POST":
 		w.WriteHeader(201)
 		_, _ = w.Write([]byte(`{"tabId":"t-9","workspaceId":"ws-1","panelType":"codex-cli","agentProviderId":"codex","launched":true}`))
@@ -262,6 +270,38 @@ func TestTabCommandsUseTheOwnWorkspace(t *testing.T) {
 	f.run(t, "hs-me", "tab", "close", "t-2")
 	if got := f.last(); got.Method != "DELETE" || got.Path != "/api/cli/tabs/t-2" || got.Query != "workspaceId=ws-1" {
 		t.Errorf("close %+v", got)
+	}
+}
+
+// tab create --prompt names the terminal it runs in, so the runtime can nest the agent under that chat, and says
+// what it did.
+func TestTabCreateWithAPromptSaysItNestedTheChat(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "hs-me", "tab", "create", "-t", "claude-code", "--prompt", "nest it", "--model", "sonnet", "--notify")
+	got := f.last()
+	if r.code != 0 || got.Body["session"] != "hs-me" || got.Body["notify"] != true || got.Body["model"] != "sonnet" {
+		t.Fatalf("%+v sent %+v", r, got)
+	}
+	for _, want := range []string{"tab-kid\n", "nested under yours (tab-parent), model sonnet", "wake this chat", "tab result tab-kid"} {
+		if !strings.Contains(r.out, want) {
+			t.Errorf("no %q in %q", want, r.out)
+		}
+	}
+	r = f.run(t, "hs-me", "tab", "create", "-t", "claude-code", "--prompt", "nest it")
+	if got := f.last(); got.Body["notify"] != nil || !strings.Contains(r.out, "add --notify") || strings.Contains(r.out, "wake this chat") {
+		t.Errorf("without --notify: %+v %q", got, r.out)
+	}
+	r = f.run(t, "hs-me", "tab", "create", "-t", "codex-cli", "--prompt", "loose")
+	if !strings.Contains(r.out, "Not nested under a chat: plain terminal") || !strings.Contains(r.out, "Started codex in tab t-9") {
+		t.Errorf("fallback: %q", r.out)
+	}
+	r = f.run(t, "hs-me", "tab", "create", "-t", "terminal", "-n", "sh")
+	if _, has := f.last().Body["session"]; has {
+		t.Errorf("a tab without a prompt names no chat")
+	}
+	r = f.run(t, "hs-me", "tab", "create", "-t", "claude-code", "--notify")
+	if r.code != 2 || !strings.Contains(r.errs, "--notify needs --prompt") {
+		t.Errorf("notify without prompt: %+v", r)
 	}
 }
 

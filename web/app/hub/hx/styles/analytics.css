@@ -9,37 +9,37 @@
 }
 
 /* The card titles of the board are not buttons: no pointer on them. */
-.ad .anx .mx-card-title,
-.ad .anx .at-title {
+.hb .anx .mx-card-title,
+.hb .anx .at-title {
   cursor: default;
 }
 
 /* The week cells of the picker read their lines tight, as on the board (a looser inherited line makes the strip taller). */
-.ad .anx-wk {
+.hb .anx-wk {
   line-height: 1.25;
 }
 
 /* A new answer is on its way (the period changed): the old numbers stay, a little quieter, and still clickable. */
-.ad .anx[data-busy='1'] .anm-wrap,
-.ad .anx[data-busy='1'] .mx > .t-card {
+.hb .anx[data-busy='1'] .anm-wrap,
+.hb .anx[data-busy='1'] .mx > .t-card {
   opacity: 0.6;
   transition: opacity 160ms var(--hx-ease-out);
 }
-.ad .anx .anm-wrap,
-.ad .anx .mx > .t-card {
+.hb .anx .anm-wrap,
+.hb .anx .mx > .t-card {
   transition: opacity 200ms var(--hx-ease-out);
 }
 
 /* A tile with no number: the dash says so, the sparkline is not drawn. */
-.ad .anm__v[data-none='1'] {
+.hb .anm__v[data-none='1'] {
   color: var(--t-text-muted);
 }
-.ad .anm[data-none='1'] .anm-spark {
+.hb .anm[data-none='1'] .anm-spark {
   visibility: hidden;
 }
 
 /* The big chart: the place is held while the module and the series come. */
-.ad .anx-viz[data-wait='1']::before {
+.hb .anx-viz[data-wait='1']::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -54,18 +54,18 @@
   animation: hx-shimmer 1.4s linear infinite;
   pointer-events: none;
 }
-.ad .anx-viz[data-wait='1'] > * {
+.hb .anx-viz[data-wait='1'] > * {
   opacity: 0;
 }
-.ad .anx-viz > * {
+.hb .anx-viz > * {
   transition: opacity 180ms var(--hx-ease-out);
 }
-.ad .anx-viz[data-stale='1'] > * {
+.hb .anx-viz[data-stale='1'] > * {
   opacity: 0.55;
 }
 
 /* A card with nothing to show says so in one line. */
-.ad .an-empty {
+.hb .an-empty {
   margin: 0;
   padding: 8px 4px 4px;
   color: var(--hx-fg-3);
@@ -73,7 +73,7 @@
 }
 
 /* A failed load: the reason as it is and a retry. */
-.ad .an-err {
+.hb .an-err {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -85,85 +85,85 @@
   background: color-mix(in srgb, #e5484d 6%, transparent);
   font-size: var(--hx-text-sm);
 }
-.ad .an-err b {
+.hb .an-err b {
   font-weight: 600;
 }
-.ad .an-err span {
+.hb .an-err span {
   flex: 1 1 16rem;
   color: var(--hx-fg-2);
 }
 
 /* The shapes of the screen while the numbers are on their way. */
-.ad .an-sk {
+.hb .an-sk {
   display: flex;
   flex-direction: column;
   gap: 16px;
   margin-top: 20px;
 }
-.ad .an-sk__tiles {
+.hb .an-sk__tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
-.ad .an-sk .hx-sk {
+.hb .an-sk .hx-sk {
   border-radius: 14px;
 }
-.ad .an-sk__tile {
+.hb .an-sk__tile {
   height: 112px;
 }
-.ad .an-sk__chart {
+.hb .an-sk__chart {
   height: 340px;
 }
 @media (max-width: 900px) {
-  .ad .an-sk__tiles {
+  .hb .an-sk__tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 /* Phone: the title, then the two period buttons under it, the picker stays inside the screen, nothing scrolls sideways. */
 @media (max-width: 600px) {
-  .ad .ad-head {
+  .hb .hb-head {
     flex-direction: column;
     align-items: stretch;
     gap: 14px;
   }
-  .ad .ad-tools {
+  .hb .hb-tools {
     flex-wrap: wrap;
     padding-top: 0;
   }
-  .ad .anx-per__d {
+  .hb .anx-per__d {
     display: none;
   }
-  .ad .anx-what {
+  .hb .anx-what {
     flex: 1 1 100%;
   }
-  .ad .ad-tools,
-  .ad .anx-per {
+  .hb .hb-tools,
+  .hb .anx-per {
     width: 100%;
     max-width: 100%;
   }
-  .ad .anx-per__row {
+  .hb .anx-per__row {
     flex-wrap: wrap;
     justify-content: space-between;
   }
-  .ad .anx-per__f {
+  .hb .anx-per__f {
     flex: 1 1 140px;
     min-width: 0;
   }
-  .ad .anx-per__vs {
+  .hb .anx-per__vs {
     display: none;
   }
-  .ad .anx-per__btn {
+  .hb .anx-per__btn {
     width: 100%;
   }
-  .ad .anx-wp {
+  .hb .anx-wp {
     left: 0;
     right: 0;
     width: auto;
     max-width: calc(100vw - 32px);
   }
   /* The thirteen weeks do not fit: the strip scrolls, the newest weeks come first into view. */
-  .ad .anx-wp__weeks {
+  .hb .anx-wp__weeks {
     grid-template-columns: repeat(13, 44px);
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -171,29 +171,29 @@
 }
 
 /* The dates next to the name of a period: «Этот месяц · 2–8 ноя». */
-.ad .anx-per__d {
+.hb .anx-per__d {
   font: var(--t-font-ui-xs);
   color: var(--t-text-muted);
   font-weight: 400;
 }
 
 /* Быстрый период в днях и поля дат (флаг ui.hx.live). */
-.ad .an-quick {
+.hb .an-quick {
   margin-right: 8px;
 }
-.ad .an-dates {
+.hb .an-dates {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
   margin: 0 0 12px;
 }
-.ad .an-dates__f {
+.hb .an-dates__f {
   display: flex;
   align-items: center;
   gap: 6px;
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
 }
-.ad .an-dates__f input {
+.hb .an-dates__f input {
   min-width: 0;
 }

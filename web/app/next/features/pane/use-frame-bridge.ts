@@ -46,9 +46,11 @@ interface IFrameBridgeArgs {
   onOpen: (url: string) => void;
   /** The site redirected to another one (a sign-in, say): the tab may follow it by itself; true when it does. */
   onRedirect: (url: string) => boolean;
+  /** The proxy could not fetch the site: the tab may open it in the machine's own browser instead. */
+  onFailed: (failure: { status: number; text: string }) => void;
 }
 
-export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBridgeArgs) => {
+export const useFrameBridge = ({ frame, origin, onOpen, onRedirect, onFailed }: IFrameBridgeArgs) => {
   // Null until the page's bridge says hello: a page without one cannot pick.
   const [picking, setPicking] = useState<boolean | null>(null);
   const [picked, setPicked] = useState<IFramePicked | null>(null);
@@ -59,6 +61,7 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
   const [hellos, setHellos] = useState(0);
   const opened = useEffectEvent((url: string) => onOpen(url));
   const redirected = useEffectEvent((url: string): boolean => onRedirect(url));
+  const failed = useEffectEvent((failure: { status: number; text: string }) => onFailed(failure));
   // The actions waiting for the frame's answer, and those waiting for the next page's hello.
   const acts = useRef(new Map<string, TWaiter>());
   const waitHello = useRef(new Set<() => void>());
@@ -103,6 +106,7 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
         );
       } else if (message.k === 'open') opened(message.url);
       else if (message.k === 'key-step') setKeyStep(true);
+      else if (message.k === 'failed') failed({ status: message.status, text: message.text });
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);

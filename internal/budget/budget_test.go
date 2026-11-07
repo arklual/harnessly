@@ -169,9 +169,15 @@ func TestReplyInStopMode(t *testing.T) {
 	if reply(t, g.Reply("claude", "UserPromptSubmit", "s1", "")) == nil {
 		t.Error("the second prompt went through")
 	}
-	tool := reply(t, g.Reply("codex", "PreToolUse", "s1", ""))
+	tool := reply(t, g.Reply("claude", "PreToolUse", "s1", ""))
 	if tool["continue"] != false || tool["stopReason"] != text {
 		t.Fatalf("%v", tool)
+	}
+	// Codex takes only a deny with a reason at a tool call.
+	codex := reply(t, g.Reply("codex", "PreToolUse", "s1", ""))
+	out, _ := codex["hookSpecificOutput"].(map[string]any)
+	if codex["continue"] != nil || out["hookEventName"] != "PreToolUse" || out["permissionDecision"] != "deny" || out["permissionDecisionReason"] != text {
+		t.Fatalf("codex: %v", codex)
 	}
 	// Any other hook only tells.
 	if n := reply(t, g.Reply("claude", "Notification", "s1", "")); n["systemMessage"] != text || n["decision"] != nil {

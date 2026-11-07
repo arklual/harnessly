@@ -78,7 +78,7 @@ describe('AppsList', () => {
     const act = vi.fn();
     render(<AppsList {...props([app()], { team: team('member', [], act) })} />);
     fireEvent.click(screen.getByRole('button', { name: /Подробности|Details/ }));
-    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch', { name: /Включено у меня|On for me/ }));
     expect(act).toHaveBeenCalledWith(expect.objectContaining({ action: 'mute' }));
   });
 });

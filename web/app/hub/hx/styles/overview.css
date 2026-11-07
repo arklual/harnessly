@@ -9,7 +9,7 @@
 }
 
 /* A new answer is on its way (the period or the tenant changed): the old numbers stay, a little quieter. */
-.ad-dash[data-busy='1'] .mx {
+.hb-dash[data-busy='1'] .mx {
   opacity: 0.55;
   transition: opacity 160ms var(--hx-ease-out);
   pointer-events: none;
@@ -106,22 +106,22 @@
 }
 
 /* The board never sets a line-height on its page, so its lines are `normal`; the shell's 1.5 would grow every row. */
-.ad-dash {
+.hb-dash {
   line-height: normal;
 }
 
 /* The board draws the people list at desktop width only; on a phone the bar drops under the name and the figures stay
    on the right, so nothing runs past the card */
 @media (max-width: 640px) {
-  .ad .ld-head,
-  .ad .ld-row {
+  .hb .ld-head,
+  .hb .ld-row {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 6px 12px;
   }
-  .ad .ld-head > :nth-child(2) {
+  .hb .ld-head > :nth-child(2) {
     display: none;
   }
-  .ad .ld-row > .ld-bar {
+  .hb .ld-row > .ld-bar {
     grid-column: 1 / -1;
     grid-row: 2;
   }
@@ -134,42 +134,42 @@
 }
 
 /* «Куда ушли деньги»: the cut and the span on one line, the rows as the board's bars. */
-.ad .sp-tools {
+.hb .sp-tools {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   padding-top: 4px;
 }
-.ad .sp-rows .dash-bar__label small {
+.hb .sp-rows .dash-bar__label small {
   white-space: normal;
 }
-.ad .sp-rows .dash-bar[data-hl] .dash-bar__hit {
+.hb .sp-rows .dash-bar[data-hl] .dash-bar__hit {
   box-shadow: inset 0 0 0 1.5px var(--hx-accent, #8968f4);
   border-radius: 8px;
 }
-.ad .sp-rows .dash-bar__hit:disabled {
+.hb .sp-rows .dash-bar__hit:disabled {
   cursor: default;
 }
-.ad .sp-rows .dash-bar__value small {
+.hb .sp-rows .dash-bar__value small {
   font-weight: 400;
   color: var(--hx-fg-3);
 }
 
 /* «Кто сегодня в работе»: the person's initial, green while a chat of theirs is going on. */
-.ad .dash-bar__label.ac-who {
+.hb .dash-bar__label.ac-who {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 10px;
 }
-.ad .ac-who__t {
+.hb .ac-who__t {
   display: flex;
   flex-direction: column;
   min-width: 0;
   gap: 2px;
   padding: 3px 0;
 }
-.ad .ac-ava {
+.hb .ac-ava {
   width: 28px;
   height: 28px;
   flex: none;
@@ -182,7 +182,7 @@
   color: var(--hx-fg-2);
   position: relative;
 }
-.ad .ac-ava[data-on]::after {
+.hb .ac-ava[data-on]::after {
   content: '';
   position: absolute;
   right: -1px;
@@ -195,27 +195,27 @@
 }
 
 /* «Требует внимания»: the cell is a row, its fix and «Отложить» are two separate buttons under the text. */
-.ad-dash .mx-attention .at-cell {
+.hb-dash .mx-attention .at-cell {
   cursor: default;
 }
-.ad-dash .mx-attention .at-cell[data-link] {
+.hb-dash .mx-attention .at-cell[data-link] {
   cursor: pointer;
 }
-.ad-dash .mx-attention .at-cell__acts {
+.hb-dash .mx-attention .at-cell__acts {
   grid-column: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 1rem;
 }
-.ad-dash .mx-attention button.at-cell__action {
+.hb-dash .mx-attention button.at-cell__action {
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
   color: var(--t-text-primary);
 }
-.ad-dash .mx-attention button.at-cell__action:hover svg {
+.hb-dash .mx-attention button.at-cell__action:hover svg {
   transform: translate(2px, -2px);
 }
 .at-cell__snooze {

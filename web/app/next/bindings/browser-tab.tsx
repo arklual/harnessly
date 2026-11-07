@@ -102,7 +102,13 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   // An outside site goes to the machine's live browser; the proxy keeps the machine's servers and the team's
   // own sites, where the page is rewritten, inspected and edited.
   const liveUrl = at !== null && at.target.kind === 'url' ? `${at.target.origin}${at.path}` : null;
-  const live = liveUrl !== null && linkPlace(liveUrl, paneSitesSnapshot()) === LINK_PLACE.outside;
+  // A site of the team's own that the proxy could not fetch (a reset, a timeout, a certificate) goes to the live
+  // browser as well, for as long as this tab stays on it.
+  const [liveForced, setLiveForced] = useState<string | null>(null);
+  const live =
+    liveUrl !== null &&
+    (linkPlace(liveUrl, paneSitesSnapshot()) === LINK_PLACE.outside ||
+      (at.target.kind === 'url' && liveForced === at.target.origin));
   const [livePageSeen, setLivePage] = useState<ILivePage | null>(null);
   const livePage = live ? livePageSeen : null;
   const livePageRef = useRef<ILivePage | null>(null);
@@ -247,6 +253,12 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   const bridge = useFrameBridge({
     frame,
     origin: slot?.origin ?? null,
+    // The proxy could not fetch the site: the machine's own browser gets a go at it, with the same checks of the
+    // address. A port of the machine stays where it is: there is no other way to it.
+    onFailed: () => {
+      const now = liveTab.current.at;
+      if (now?.target.kind === 'url') setLiveForced(now.target.origin);
+    },
     // A redirect to another site: ours opens in this tab, any other in the person's browser.
     onOpen: (url) => {
       const next = linkPlace(url, paneSitesSnapshot()) === LINK_PLACE.pane ? parseAddress(url) : null;
@@ -411,8 +423,10 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
       onPin={(pin) => pins?.pin(pin)}
       onUnpin={(text) => pins?.unpin(text)}
       reloadKey={reloadKey}
-      onFrameLoad={(el) => {
+      onFrame={(el) => {
         frame.current = el;
+      }}
+      onFrameLoad={() => {
         bridge.onFrameLoad();
         stand.onFrameLoad();
       }}

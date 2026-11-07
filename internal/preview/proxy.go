@@ -580,6 +580,12 @@ func (p *Proxy) serveRequest(w *trackedWriter, r *http.Request) {
 		cancel()
 		log.fail(nodeCode(err), false)
 		status, text := failure(err, rt)
+		if rt.kind == "url" && c.ParentOrigin != "" && isDocumentRequest(r) && !w.wrote {
+			// The island hears of it and may open the site in the machine's own browser.
+			nonce := newNonce()
+			writePage(w, status, nonce, failedPage(status, text, c.ParentOrigin, nonce))
+			return
+		}
 		reply(w, status, text)
 		return
 	}
@@ -846,11 +852,14 @@ func (p *Proxy) needsSignIn(rt *route, a *answer) bool {
 	return ok && p.cfg.Stands.isSignInRedirect(rt.url.Origin(), next)
 }
 
-func writeOffer(w *trackedWriter, nonce, page string) {
+func writeOffer(w *trackedWriter, nonce, page string) { writePage(w, 200, nonce, page) }
+
+// writePage answers with one of the runtime's own pages that carries a script of its own (the nonce lets it run).
+func writePage(w *trackedWriter, status int, nonce, page string) {
 	h := w.Header()
 	writePageHeaders(h)
 	h.Set("Content-Security-Policy", offerPolicy(nonce))
-	w.WriteHeader(200)
+	w.WriteHeader(status)
 	_, _ = io.WriteString(w, page)
 }
 

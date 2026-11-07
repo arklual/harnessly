@@ -40,15 +40,15 @@ export const MemberView = ({ list }: { list: MachinesList }) => {
           {rows.map((m) => {
             const on = m.state === 'online' || m.state === 'idle';
             return (
-              <div className="ad-mrow" key={m.id}>
-                <span className="ad-mrow__ic">
+              <div className="hb-mrow" key={m.id}>
+                <span className="hb-mrow__ic">
                   <Icon i="server" />
                 </span>
-                <span className="ad-mrow__t">
+                <span className="hb-mrow__t">
                   <b>{m.name}</b>
                   <small>{memberMeta(m)}</small>
                 </span>
-                <span className="ad-live" data-live={on ? '1' : '0'}>
+                <span className="hb-live" data-live={on ? '1' : '0'}>
                   {on ? 'на связи' : 'не на связи'}
                 </span>
                 {m.opensRuntime !== false && (

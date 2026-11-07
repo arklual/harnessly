@@ -42,6 +42,9 @@ const (
 	seenPerMinute = 60
 	revHeader     = "X-Design-Rev"
 	pagesHeader   = "X-Design-Pages"
+	// refusedHeader marks the runtime's refusal to serve guests at all: its filesystem failed the share probe
+	// (design.ShareRefusedHeader, GitHub issue 30). It is not a machine that is down, and it is said so.
+	refusedHeader = "X-Design-Share-Refused"
 )
 
 var (
@@ -175,6 +178,10 @@ func (s *Service) fetch(ctx context.Context, machine string, req hubproto.Design
 	if err != nil {
 		return nil, err
 	}
+	if res.Header.Get(refusedHeader) != "" {
+		res.Body.Close()
+		return nil, gUnsafeRuntime
+	}
 	if res.StatusCode < 400 && ((req.Rev != "" && res.Header.Get(revHeader) != req.Rev) || (req.Pages != nil && res.Header.Get(pagesHeader) != "limited")) {
 		res.Body.Close()
 		return nil, errRuntime
@@ -201,6 +208,9 @@ func readAll(res *http.Response, max int64) ([]byte, error) {
 func (s *Service) pin(ctx context.Context, m store.Machine, project string) (string, error) {
 	failed := fail("unavailable", "Машина владельца не ответила, версию не удалось закрепить. Попробуйте ещё раз")
 	res, err := s.fetch(ctx, m.ID, hubproto.DesignPublicTokenRequest{Project: project, Pin: true}, []string{"__rev"}, nil)
+	if errors.Is(err, gUnsafeRuntime) {
+		return "", unsafeRuntime()
+	}
 	if err != nil {
 		return "", failed
 	}
@@ -223,6 +233,27 @@ func (s *Service) pin(ctx context.Context, m store.Machine, project string) (str
 		return "", failed
 	}
 	return rev, nil
+}
+
+// unsafeRuntime is the owner's answer when the machine refuses guest links: what is wrong and what to run instead.
+func unsafeRuntime() *Error {
+	return fail("share_unsafe_runtime", "Гостевые ссылки с этой машины выключены: среда рантайма не даёт гарантий файловой системы, "+
+		"которые нужны гостевому доступу (так бывает в песочницах вроде gVisor). Запустите рантайм прямо на Linux, в виртуальной машине "+
+		"или в контейнере с runc или crun и проверьте командой «harnessly doctor share»")
+}
+
+// shareGate asks the machine whether a link may be made before the hub makes one that is not pinned (a pinned one asks
+// through pin). Only the refusal of an unsafe runtime stops it here: a machine that does not answer gets its link as
+// before, and serves nothing to a guest until its probe passes, since every guest read is refused there too.
+func (s *Service) shareGate(ctx context.Context, m store.Machine, project string) error {
+	res, err := s.fetch(ctx, m.ID, hubproto.DesignPublicTokenRequest{Project: project, Pin: true}, []string{"__share"}, nil)
+	if errors.Is(err, gUnsafeRuntime) {
+		return unsafeRuntime()
+	}
+	if err == nil {
+		res.Body.Close()
+	}
+	return nil
 }
 
 // ---- the guest handler --------------------------------------------------------------------------------------------
@@ -248,6 +279,8 @@ var (
 	gNoMedia      = guestError{403, "Файл недоступен"}
 	gBadRange     = guestError{416, "Неверный диапазон"}
 	gBadGuestBody = guestError{400, "Некорректное тело запроса"}
+	// gUnsafeRuntime: the owner's machine refuses guests, its filesystem failed the share probe (see unsafeRuntime).
+	gUnsafeRuntime = guestError{503, "Владелец пока не может открыть этот дизайн по ссылке: его машина не даёт нужных гарантий безопасности. Попробуйте позже"}
 )
 
 var statusTitles = map[int]string{

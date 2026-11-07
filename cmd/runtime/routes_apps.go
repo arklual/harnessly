@@ -65,6 +65,8 @@ type appView struct {
 	// have no value yet: the app is «ждёт секрет».
 	Setup   bool     `json:"setup"`
 	Waiting []string `json:"waiting"`
+	// AppState is ready, waiting, failed or disabled, with the reason the page says in words.
+	apps.AppState
 	// WaitingConnections are the connections (catalog ids) the app's servers name that the person has not made or not
 	// signed in to: the app is «ждёт вход», its «О приложении» offers «Подключить». Its chat does not fail; those servers
 	// are left out of the launch.
@@ -233,6 +235,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		if err != nil {
 			return nil, err
 		}
+		safe := reg.SafeMode()
 		out := make([]appView, 0, len(installed))
 		for _, a := range installed {
 			// A team app turned off is found in the team's catalog; the environment's has no other place, so it stays
@@ -246,6 +249,8 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 				v.Waiting = a.Manifest.WaitingFor(func(name string) bool { return store.HasApp(a.ID, name) })
 			}
 			v.WaitingConnections = waitingConnections(mcpFor(d), reg, a)
+			_, readErr := os.Stat(filepath.Join(a.Dir, apps.ManifestPath))
+			v.AppState = apps.StateIn(a, safe, version, readErr, v.Waiting, v.WaitingConnections)
 			out = append(out, v)
 		}
 		return out, nil
@@ -289,7 +294,36 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			return
 		}
 		appViewPort.Store(int64(port))
-		secretJSON(w, http.StatusOK, map[string]any{"apps": views, "viewPort": port, "agentWalled": agentWalled(reg.Root), "slots": slots})
+		secretJSON(w, http.StatusOK, map[string]any{"apps": views, "viewPort": port, "agentWalled": agentWalled(reg.Root), "slots": slots, "safeMode": reg.SafeMode()})
+	}
+
+	// safeMode turns every app but the environment's pinned ones off for the chats that start from now. The
+	// person's page only: an agent cannot turn it off to get its apps back.
+	safeMode := func(w http.ResponseWriter, r *http.Request) {
+		if sameorigin.Refuse(w, r) {
+			return
+		}
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		var b struct {
+			On bool `json:"on"`
+		}
+		if !readSecretBody(r, &b) {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		if err := reg.SetSafeMode(b.On); err != nil {
+			failed(w, err)
+			return
+		}
+		agent.Log("info", "apps: safe mode", agent.F{K: "on", V: b.On})
+		secretJSON(w, http.StatusOK, map[string]any{"safeMode": b.On})
 	}
 
 	cliList := func(w http.ResponseWriter, r *http.Request) {
@@ -643,6 +677,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	}
 
 	routes := append(appBridgeRoutes(d, reg, storage, viewServer, chats), appAskRoutes(d, appAsks)...)
+	routes = append(routes, appPageRoutes(d, reg, appPages, chats)...)
 	routes = append(routes, appSetupRoutes(d, reg, storage)...)
 	routes = append(routes, appMCPProxyRoute(d, reg))
 	routes = append(routes, sinopiaRoutes(d, reg, viewServer)...)
@@ -654,6 +689,8 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	routes = append(routes, []gate.Route{
 		{Match: is(platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
 		{Match: is("/agents" + platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
+		{Match: is(platformAPI + "/apps/safe-mode"), Handler: http.HandlerFunc(safeMode)},
+		{Match: is("/agents" + platformAPI + "/apps/safe-mode"), Handler: http.HandlerFunc(safeMode)},
 		{Match: is("/api/cli/apps"), Handler: http.HandlerFunc(cliList)},
 		{Match: is("/api/cli/apps/install"), Handler: http.HandlerFunc(install)},
 		{Match: is("/api/cli/apps/remove"), Handler: http.HandlerFunc(remove)},

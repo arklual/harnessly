@@ -5,6 +5,9 @@ fonts. "The programs are on `PATH`" does not mean they draw: a browser that cann
 or an ffmpeg built without x264 pass that test and fail on the first export. The render kit pins what the built-in engine
 is tested with, and the doctor checks that it draws.
 
+A passing render check says nothing about guest links: whether a runtime may serve designs to guests is checked by
+`harnessly doctor share` ([design-sharing.md](design-sharing.md)).
+
 ## The check
 
 ```sh

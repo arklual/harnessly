@@ -63,6 +63,15 @@ type CatalogEntry struct {
 	// Sum is the SHA-256 of the archive of Version; PreviousSum that of Previous.
 	Sum         string `json:"sum"`
 	PreviousSum string `json:"previousSum,omitempty"`
+	// What a machine checks before it downloads the app: the harnessly it wants, the slash command and the
+	// document types it takes, the secrets it needs. An entry made before these were kept has none, and is checked at
+	// the install as before.
+	Harnessly string   `json:"harnessly,omitempty"`
+	Command   string   `json:"command,omitempty"`
+	Kinds     []string `json:"kinds,omitempty"`
+	Secrets   []string `json:"secrets,omitempty"`
+	// Check is this machine's answer for the entry, made when the list is given; it is never stored.
+	Check *Precheck `json:"check,omitempty"`
 }
 
 // TeamInstall is an app an owner installed for the team: the catalog entry's channel, and the version it is at.
@@ -237,6 +246,7 @@ func (r *Registry) PublishToTeam(id, version string, ch Channel, by, host string
 		ID: id, Channel: string(ch), Version: version, Name: m.Name, Description: m.Description, Trust: m.Trust,
 		Targets: m.Targets, Permissions: m.Permissions, By: by, At: now.UnixMilli(), Sum: sum,
 	}
+	e.describe(m)
 	if e.Targets == nil {
 		e.Targets = []string{}
 	}

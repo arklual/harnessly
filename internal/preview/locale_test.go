@@ -25,11 +25,13 @@ func TestEnglishPreviewPages(t *testing.T) {
 		"status":  statusPage(502, "x"),
 		"offer":   offerPage(u, "https://host.example", "nonce"),
 		"sign-in": signInPage("https://stand.example/login", "https://host.example", "nonce"),
+		"failed":  failedPage(504, "stand.example did not respond in time", "https://host.example", "nonce"),
 	}
 	for name, want := range map[string][]string{
 		"status":  {`<html lang="en">`, "<title>Preview · 502</title>"},
 		"offer":   {"Preview · redirect", "The site redirects to https://stand.example", "Open in preview", "Open in a new tab"},
 		"sign-in": {"Preview · sign-in", "The stand is behind a Keycloak sign-in", `Press "Sign in" above the page`, ">Sign in</a>"},
+		"failed":  {"<title>Preview · 504</title>", `data-status="504"`, `data-parent="https://host.example"`, "type: 'tk:failed'", `<script nonce="nonce">`},
 	} {
 		for _, w := range want {
 			if !strings.Contains(pages[name], w) {

@@ -245,7 +245,10 @@ const AppInspector = ({
                       <td>{clock(e.at)}</td>
                       <td>{e.method}</td>
                       <td>{e.permission || '—'}</td>
-                      <td>{resultOf(e)}</td>
+                      <td>
+                        {resultOf(e)}
+                        {e.message && <span className="hx-insp__msg">{e.message}</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

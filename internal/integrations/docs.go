@@ -29,6 +29,11 @@ type DocSummary struct {
 	LastActivityAt string `json:"lastActivityAt"`
 	// Session is the conversation that published it, when the catalog knows one.
 	Session string `json:"-"`
+	// ExternalID is a documents adapter's own id of the document, when it is not the slug (docprovider.Alias).
+	ExternalID string `json:"externalId,omitempty"`
+	// ProviderEmbed: the document, a board too, is framed through the runtime's content route (the provider's Embed),
+	// not through URL, which is the provider's viewer for people.
+	ProviderEmbed bool `json:"providerEmbed,omitempty"`
 }
 
 // DocAuthor is who wrote a comment or owns a document.

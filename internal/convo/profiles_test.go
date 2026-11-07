@@ -26,6 +26,8 @@ func (f fakeProfiles) Lookup(id string) (wire.Provider, bool, []string, bool) {
 		return wire.ProviderClaude, f.configured, []string{"kimi-k3"}, true
 	case "xai":
 		return wire.ProviderCodex, f.configured, []string{"grok-build"}, true
+	case "zai-router":
+		return wire.ProviderClaude, f.configured, []string{"zai/glm-5.3", "zai/glm-4.6"}, true
 	}
 	return "", false, nil, false
 }
@@ -37,7 +39,7 @@ func (f fakeProfiles) Model(profile, model string) (wire.AgentModel, bool) {
 	}
 	m := wire.AgentModel{ID: model, Efforts: []wire.Effort{}}
 	switch profile {
-	case "glm", "kimi":
+	case "glm", "kimi", "zai-router":
 		m.Efforts = []wire.Effort{wire.EffortLow, wire.EffortHigh, wire.EffortMax}
 	case "xai":
 		m.Efforts = []wire.Effort{wire.EffortLow, wire.EffortMedium, wire.EffortHigh, wire.EffortXHigh}
@@ -53,7 +55,7 @@ func (fakeProfiles) Window(profile, model string) int {
 }
 
 func (fakeProfiles) OwnsModel(m string) bool {
-	return slices.Contains([]string{"glm-5", "glm-4.5-air", "kimi-k3", "grok-build"}, m)
+	return slices.Contains([]string{"glm-5", "glm-4.5-air", "kimi-k3", "grok-build", "zai/glm-5.3", "zai/glm-4.6"}, m)
 }
 
 func profileRig(t *testing.T, f fakeProfiles) *rig {
@@ -129,11 +131,39 @@ func TestAProfileChatSwitchesOnlyAmongItsModels(t *testing.T) {
 	}
 }
 
+// GitHub #24: a profile of a routed backend names its models «vendor/model»; create, switch and fork keep them.
+func TestAProfileOfNamespacedModels(t *testing.T) {
+	r := profileRig(t, fakeProfiles{via: wire.ProviderClaude, configured: true})
+	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude, Profile: "zai-router",
+		Model: &wire.Model{ID: "zai/glm-5.3"}})
+	if res.R != wire.ResultAccepted || res.ID == nil {
+		t.Fatalf("create: %+v", res)
+	}
+	r.id = *res.ID
+	if got := r.launcher.launched; len(got) != 1 || got[0].Model == nil || got[0].Model.ID != "zai/glm-5.3" ||
+		got[0].Model.Profile != "zai-router" {
+		t.Fatalf("launched %+v", got)
+	}
+	if got := r.do(wire.ModelCmd{OpID: "m1", ID: r.id, Model: "zai/glm-4.6"}); got.R != wire.ResultAccepted {
+		t.Errorf("switch among the profile's own: %+v", got)
+	}
+	for i, bad := range []string{"zai/glm;id", "other/glm-5.3", "zai//glm"} {
+		got := r.do(wire.ModelCmd{OpID: fmt.Sprintf("b%d", i), ID: r.id, Model: bad})
+		if got.R != wire.ResultRefused {
+			t.Errorf("%q accepted: %+v", bad, got)
+		}
+	}
+}
+
 func TestAPlainChatDoesNotSwitchToAVendorModel(t *testing.T) {
 	r := profileRig(t, fakeProfiles{via: wire.ProviderClaude, configured: true})
 	r.open()
 	r.settle(wire.StateReady)
 	if got := r.do(wire.ModelCmd{OpID: "m1", ID: r.id, Model: "glm-5"}); got.R != wire.ResultRefused || got.Code != wire.RefuseOptionUnknown {
+		t.Errorf("%+v", got)
+	}
+	// A namespaced id is a profile's only: a plain chat refuses it as a bad request.
+	if got := r.do(wire.ModelCmd{OpID: "m2", ID: r.id, Model: "zai/glm-5.3"}); got.R != wire.ResultRefused {
 		t.Errorf("%+v", got)
 	}
 }

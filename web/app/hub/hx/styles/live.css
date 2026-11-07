@@ -3,11 +3,11 @@
    появление, переходы и отклик на наведение/нажатие. Экран «Окружение» не трогаем. */
 
 /* Каскад: шапка, панель, затем блоки страницы по очереди; первые 12 с шагом, остальные разом. */
-.hx-root[data-live] .hx-set__page-in > * > .ad-head,
-.hx-root[data-live] .hx-set__page-in .ad-head {
+.hx-root[data-live] .hx-set__page-in > * > .hb-head,
+.hx-root[data-live] .hx-set__page-in .hb-head {
   animation: hx-in-down var(--hx-dur-md) var(--hx-ease-out) backwards;
 }
-.hx-root[data-live] .hx-set__page-in .ad-tools {
+.hx-root[data-live] .hx-set__page-in .hb-tools {
   animation: hx-in-fade var(--hx-dur-md) var(--hx-ease-out) 60ms backwards;
 }
 .hx-root[data-live] .an-stage > *,

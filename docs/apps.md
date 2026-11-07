@@ -45,7 +45,7 @@ install points at your folder and is never deleted by `remove`.
 | `trust` | yes | `declarative` (no outbound `network` for views), `sandboxed` (adds `network` and a framed `https://` view), `trusted` (adds local processes; installed by hand). A view's scripts run on every tier |
 | `targets` | yes | `chat`, `pane`, `app`, `sinopia.<kind>`, `sinopia.*` |
 | `activation` | no | `on`: `document` turns the app on in the documents of its kinds; `always` turns it on in every new Claude chat of the machine (an app the person installed, not a team's); `command:/x` turns it on in a Claude chat when a message starts with `/x` (one app per command, the agent's own commands such as `/clear` are refused). `manual` is checked and turns nothing on; `view` and `template` are refused: not supported yet. `openView`: the view `harnessly open app:<id>` shows |
-| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `agents.read`, `pane.open`, `storage`, `storage.space.write`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|kind`, `notify`. `ai`, `users.read` and `sinopia.export` are refused: not supported yet |
+| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `agents.read`, `pane.open`, `storage`, `storage.space.write`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|kind`, `notify`, `tools.page`, `context.publish`. `ai`, `users.read` and `sinopia.export` are refused: not supported yet. Every right and the methods it opens: [reference](apps/reference.md) |
 | `network` | no | `connect`, `resources`, `frames`: host names; `*` needs `reason` |
 | `secrets` | no | `{name, description, optional}`; each needs the permission `secrets:<name>`. The person puts the value into the machine's safe from «О приложении», off the chat, under `app/<id>/<name>`. It reaches nobody but the app's MCP servers: the runtime's MCP proxy writes it in place of `${secret:<name>}` in a remote server's `headers` on each call (no file holds it), and a launch writes it in `env` of a local server of a `trusted` app (a folder only that chat's wall opens, removed when the agent is gone). A view, the agent, the host tools and the safe's list never get it. A new value is read at the next launch: no reinstall. An app with a required secret that has no value is «ждёт секрет» (shown in «О приложении»); its chat starts, without the servers that need it |
 | `settings` | no | JSON Schema of an object (`properties` of `string`, `number`, `integer`, `boolean`, with `title`, `description`, `enum`, `default`, `minimum`, `maximum`, `required`). The host draws a form from it in «О приложении» and checks the values against it. They are kept in the `install` storage under `_settings` (a view cannot write that key); a view reads them with `hl.settings.get()`, the agent with the host tool `settings_get` |
@@ -79,6 +79,12 @@ An app gets a chat only where it is on. The runtime refuses to issue a view sess
 app (`403 not-on`), so the view has no chat area, and the page does not pass the chat to an app that is off there
 (`chat.read`, `chat.card` and `chat.prompt` answer `permission_denied`). On the app's own page in such a chat the
 «…» menu offers «Включить в этом чате».
+
+**Safe mode.** The switch in the header of `/apps` (or `POST /apps/safe-mode {"on": true}` from the page) writes
+`<data>/apps/safe-mode`: from then on a chat starts without its apps, except the organization's pinned ones, and the
+list shows those apps as `disabled` with the reason `safe`. Chats already running keep what they had until their agent
+restarts. An app that is on in a chat but no longer installed is dropped from the launch the same way, so such a chat
+starts instead of failing.
 
 ## Views
 
@@ -191,6 +197,51 @@ line over it. The pane's «во всю ширину» on an app tab opens this p
 `?chat=` the app stands alone. A view for this target is declared with `targets: ["app"]` (alongside `pane`, if the
 same page serves both). The page's «…» has «О приложении» (the rights, targets and version), «Отладка» for a dev install
 and «Отключить в этом чате».
+
+### A view on the app's own server (remote)
+
+A view's `entry` can be an `https://` address of the app's own server instead of a file of the package; its host must be
+in `network.frames`. The page frames it directly, on that server's own origin (so its own sign-in, cookies and storage
+work), never on the page's. It gets the same bridge as a package view: the host issues a session the page holds (the view
+never sees it), hands the view a nonce in the address's fragment (`#hl-nonce=…`, which never reaches the server), and
+answers only that origin and that frame. The view serves the SDK itself: `harnessly app sdk ./public/hl` writes
+`bridge-shim.js` (load it first in the page: it reads and removes the nonce and makes the handshake) and `app-sdk.js`.
+A navigation inside the frame ends the bridge, as for a package view: sign the person in before the view's page, or in
+a popup.
+
+### Tools of the page for the agent
+
+A view can offer tools of its own page to the agent of the chat: fill a form, pick a row, run what the person sees. It
+needs the right `tools.page` and registers each tool with `hl.tools.register` or the standard WebMCP call
+`navigator.modelContext.registerTool` (the SDK provides it in the view):
+
+```js
+const hl = await harnessly.connect();
+navigator.modelContext.registerTool({
+  name: 'fill_order',
+  description: 'Fill the order form with a customer and items',
+  inputSchema: { type: 'object', properties: { customer: { type: 'string' } }, required: ['customer'] },
+  execute: async ({ customer }) => {
+    form.customer.value = customer;
+    return { filled: true };
+  },
+});
+await hl.publish({ step: 'items', total: 1200 }); // right context.publish: what the agent reads beside the tools
+```
+
+The agent lists them with the host tool `page_tools` (with what each view published) and calls one with `page_call`;
+the view runs it in the person's page and its answer comes back. Only a view that is open offers anything: a closed one's
+tools are gone within seconds, and a call it does not answer in a minute is refused. Tools go only to the agent of a chat
+the app is on in. A tool registered with `confirm: true` (or WebMCP's `annotations: { destructiveHint: true }`) runs
+only after the person agrees in a dialog of the page; a refusal comes back to the agent as the call's error.
+
+### Debug mode
+
+«Приложения» has a «Debug» switch, this browser's own. With it on, every app (not only a dev install) has the debug
+section in its «…» menu and in the right pane: the bridge calls with the reason of each refusal, the view's errors,
+`console.error` and `console.warn` lines and CSP blocks (the SDK sends them as `harnessly/debug.log`, also before the
+handshake), and a line when the view did not connect within 8 s, the usual sign that its scripts did not load. A view
+runs script files only: `harnessly app validate` warns of a `<script>` written into the page.
 
 ### Host calls beyond storage and tools
 

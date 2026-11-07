@@ -419,11 +419,11 @@ export const InviteSheet = ({
             ) : (
               <div className="tm-invites">
                 {list.map((i) => (
-                  <div key={i.id} className="ad-row">
-                    <span className="ad-ic">
+                  <div key={i.id} className="hb-row">
+                    <span className="hb-ic">
                       <Icon i={i.kind === 'email' ? 'mail' : 'link'} size="sm" />
                     </span>
-                    <span className="ad-row__t">
+                    <span className="hb-row__t">
                       <b>{i.kind === 'email' ? (i.email ?? 'Почта') : 'Ссылка'}</b>
                       <small>
                         {i.role === 'owner' && 'админ тенанта · '}

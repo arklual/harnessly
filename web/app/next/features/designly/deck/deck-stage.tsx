@@ -146,6 +146,7 @@ const DeckStage = ({
         <div
           className="hx-deck__slide"
           data-hold={hold ?? undefined}
+          data-loading={error === null && !frames.some((f) => f.loaded) ? true : undefined}
           aria-label={hold === null ? t('next.deck.stage.slide', { n }) : undefined}
         >
           {frames.map((frame, i) => {

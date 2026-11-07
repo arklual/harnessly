@@ -1,7 +1,7 @@
 // «Приложения»: the installed apps of the machine. Opening one takes it to the chat it was last on in, so the app
 // opens with its chat beside it; an app on in no chat opens alone.
 import { useState } from 'react';
-import { useInstalledApps, type IInstalledApp } from '@/next/features/app-views/api';
+import { setSafeMode, useInstalledApps, type IInstalledApp } from '@/next/features/app-views/api';
 import AppsCatalog from '@/next/features/app-catalog/apps-catalog';
 import PublicCatalog from '@/next/features/app-catalog/public-catalog';
 import { useTeam } from '@/next/features/app-catalog/use-team';
@@ -25,6 +25,10 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
     await muteTeamApp(machine, app.id, mute);
     onChanged();
   };
+  const safe = async (on: boolean) => {
+    await setSafeMode(machine, on);
+    onChanged();
+  };
   const open = (app: IInstalledApp) => {
     const chat = activeApps(chats ?? [], [app])[0]?.chat;
     goTo({ kind: ROUTE.app, id: app.id, ...(chat ? { chat } : {}) });
@@ -38,6 +42,8 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
       onHelp={() => goTo({ kind: ROUTE.help, section: 'build-apps', page: 'overview' })}
       team={team}
       onEnvMute={muteEnv}
+      safeMode={list?.safeMode}
+      onSafeMode={safe}
       footer={
         <>
           <AppsCatalog team={team} />

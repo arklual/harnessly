@@ -33,6 +33,7 @@ const props = (over: Partial<IBrowserViewProps> = {}): IBrowserViewProps => ({
   onPin: () => {},
   onUnpin: () => {},
   reloadKey: 0,
+  onFrame: () => {},
   onFrameLoad: () => {},
   signIn: 'none',
   onSignIn: () => {},
@@ -251,5 +252,20 @@ describe('BrowserView: the tools of a page', () => {
     expect(screen.getByText(/Take the step in the tab that opened/)).toBeTruthy();
     fireEvent.click(screen.getByText('Refresh'));
     expect(onKeyStepRefresh).toHaveBeenCalled();
+  });
+
+  it('hands the frame to the tab as it mounts, before its page loads', () => {
+    // A failure page tells the tab as it loads, before the frame's load event: the tab must know the frame by then.
+    const onFrame = vi.fn();
+    const onFrameLoad = vi.fn();
+    const { unmount } = render(
+      <BrowserView
+        {...props({ address: 'stand.example.com', src: 'https://slot/x', onFrame, onFrameLoad })}
+      />,
+    );
+    expect(onFrame).toHaveBeenLastCalledWith(expect.any(HTMLIFrameElement));
+    expect(onFrameLoad).not.toHaveBeenCalled();
+    unmount();
+    expect(onFrame).toHaveBeenLastCalledWith(null);
   });
 });

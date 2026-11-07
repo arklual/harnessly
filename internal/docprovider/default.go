@@ -13,7 +13,19 @@ import (
 var (
 	loadOnce sync.Once
 	adapters []*ExtProvider
+	pinned   Provider
 )
+
+// Pin makes For answer p in this process until the returned function is called: the seam a test or an embedding
+// program uses instead of a declared adapter file.
+func Pin(p Provider) (restore func()) {
+	was := pinned
+	pinned = p
+	return func() { pinned = was }
+}
+
+// Declared says whether a provider other than the built-in one is in use (an adapter of the file, or a pinned one).
+func Declared() bool { return pinned != nil || len(Adapters()) > 0 }
 
 // Adapters are the documents adapters the file RUNTIME_DOC_ADAPTERS_FILE declares, loaded once per process. Without the
 // variable there are none and the documents are the built-in catalog, as they always were. An adapter that does not
@@ -38,6 +50,9 @@ func Adapters() []*ExtProvider {
 // For is the provider of a runtime: the declared adapter (the first of the file) when there is one, the built-in
 // catalog otherwise.
 func For(cfg integrations.Config, store *integrations.Threads) Provider {
+	if pinned != nil {
+		return pinned
+	}
 	if a := Adapters(); len(a) > 0 {
 		return a[0]
 	}

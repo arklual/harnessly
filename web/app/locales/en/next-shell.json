@@ -1338,5 +1338,7 @@
   "next.settings.base.without": "Without it {what}",
   "next.settings.base.back": "Bring back",
   "next.settings.base.backed": "Back — the machine installs it",
-  "next.settings.base.backFailed": "The machine did not answer — try again"
+  "next.settings.base.backFailed": "The machine did not answer — try again",
+  "next.files.upRetry": "Retry: {name}",
+  "next.files.listMenu": "List actions"
 }

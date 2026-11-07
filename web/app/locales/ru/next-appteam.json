@@ -4,5 +4,11 @@
   "next.appteam.install": "Установить для команды",
   "next.appteam.uninstall": "Убрать у команды",
   "next.appteam.mute": "Выключить у меня",
-  "next.appteam.unmute": "Включить у меня"
+  "next.appteam.unmute": "Включить у меня",
+  "next.appteam.refuse.trust": "Не ставится из каталога: приложение запускает код на машине.",
+  "next.appteam.refuse.host": "Нужна другая версия harnessly: {range}.",
+  "next.appteam.refuse.name": "Занято имя: уже стоит {app}.",
+  "next.appteam.refuse.command": "Команда {command} уже у приложения {app}.",
+  "next.appteam.refuse.kind": "Тип документа {kind} уже добавляет {app}.",
+  "next.appteam.secrets": "После установки попросит секрет: {names}."
 }

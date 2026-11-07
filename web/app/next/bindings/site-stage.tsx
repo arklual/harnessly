@@ -4,6 +4,7 @@
 // over the site it is the island: the field, and over it the agent's last line with what it does now and «Стоп». A
 // design without a chat gets one with its first message, which is in the column from the moment it is sent.
 import { useTourFill } from '@/next/features/tour/use-tour-fill';
+import { useTourStep } from '@/next/features/tour/use-tour-step';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { interrupt, sendMessage } from '@/next/commands';
 import { uploadSrc } from '@/next/commands/uploads';
@@ -172,6 +173,7 @@ export const NoteCard = ({
       then(...args);
     };
   const voice = useVoice(machine, text, setText);
+  useTourFill(text, setText, 'note');
   const start = voice.onMic;
   const mic = start && {
     recording: voice.recording !== null,
@@ -569,6 +571,14 @@ export const useSiteStage = ({
     setPicking(false);
     setNoteDraft(null);
   };
+  // A lesson that edits the design keeps its chat docked beside the page: the field over the page hides what changes.
+  const sideChat = useTourStep()?.sideChat === true;
+  // Only when the step comes (adjusted while rendering): the person may move the chat back while it is on.
+  const [sideAsked, setSideAsked] = useState(false);
+  if (sideChat !== sideAsked) {
+    setSideAsked(sideChat);
+    if (sideChat && mode !== 'chat') leaveTo('chat');
+  }
   // Where the chat was dragged: it settles there with the field open; a pull of the field down folds it.
   const onZone = (zone: TZone, drop: IFloat | null) => {
     if (zone === 'min') {

@@ -1167,7 +1167,7 @@ type Limits struct {
 	MaxText        int   `json:"maxText"` // UTF-16 units
 	MaxAttachments int   `json:"maxAttachments"`
 	MaxImageBytes  int64 `json:"maxImageBytes"`
-	MaxFileBytes   int64 `json:"maxFileBytes"`
+	MaxFileBytes   int64 `json:"maxFileBytes"` // 0: no limit but the free space of the disk
 	SlowMs         int64 `json:"slowMs"`       // a command unanswered this long shows "дольше обычного"
 	CmdBudgetMs    int64 `json:"cmdBudgetMs"`  // the runtime answers every command within this, refused{timeout} at worst
 	CmdTimeoutMs   int64 `json:"cmdTimeoutMs"` // the page gives up on a command after this and offers retry or cancel
@@ -1175,7 +1175,7 @@ type Limits struct {
 
 // DefaultLimits are the limits of prompts.MaxQueuedPerTab, prompts.MaxQueuedText and the mockup's file sizes.
 var DefaultLimits = Limits{
-	MaxQueue: 20, MaxText: 100_000, MaxAttachments: 20, MaxImageBytes: 10 << 20, MaxFileBytes: 50 << 20,
+	MaxQueue: 20, MaxText: 100_000, MaxAttachments: 20, MaxImageBytes: 10 << 20, MaxFileBytes: 0,
 	SlowMs: 3000, CmdBudgetMs: 10_000, CmdTimeoutMs: 12_000,
 }
 

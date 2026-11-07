@@ -1453,6 +1453,16 @@ input.hx-tbrowser__url:focus {
   background: var(--hx-bg-raised);
   animation: hx-disk-bar-in 200ms var(--hx-ease-out) both;
 }
+.hx-upl[data-closing] {
+  animation: hx-upl-out 220ms var(--hx-ease-out) both;
+  pointer-events: none;
+}
+@keyframes hx-upl-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
 .hx-upl__top {
   display: flex;
   align-items: center;
@@ -1507,6 +1517,7 @@ input.hx-tbrowser__url:focus {
   border-radius: inherit;
   background: var(--hx-accent);
   transition: width 200ms linear;
+  width: calc(var(--p, 0) * 1%);
 }
 .hx-upl__row[data-state='done'] .hx-upl__bar > span {
   background: var(--hx-success);

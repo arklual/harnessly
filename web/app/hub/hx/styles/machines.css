@@ -1,46 +1,46 @@
 /* «Машины»: what the board does not draw because it has no loading, error or refusal in it. Only opacity moves. */
-.ad .mx-skel {
+.hb .mx-skel {
   display: block;
   border-radius: 8px;
   background: var(--hx-bg-hover);
   animation: hx-blink 1.2s ease-in-out infinite;
 }
-.ad .mx-skel-tiles {
+.hb .mx-skel-tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
-.ad .mx-skel-tiles .mx-skel {
+.hb .mx-skel-tiles .mx-skel {
   height: 112px;
   border-radius: 14px;
 }
-.ad .mx-skel-bar {
+.hb .mx-skel-bar {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-top: 16px;
 }
-.ad .mx-skel-bar .mx-skel {
+.hb .mx-skel-bar .mx-skel {
   height: 36px;
   width: 260px;
 }
-.ad .mx-skel-bar .mx-skel + .mx-skel {
+.hb .mx-skel-bar .mx-skel + .mx-skel {
   margin-left: auto;
   width: 200px;
 }
-.ad .mx-skel-list {
+.hb .mx-skel-list {
   margin-top: 12px;
   border: 1px solid var(--hx-border);
   border-radius: 14px;
   overflow: hidden;
 }
-.ad .mx-skel-list .mx-skel {
+.hb .mx-skel-list .mx-skel {
   height: 52px;
   border-radius: 0;
   background: none;
   position: relative;
 }
-.ad .mx-skel-list .mx-skel::after {
+.hb .mx-skel-list .mx-skel::after {
   content: '';
   position: absolute;
   left: 16px;
@@ -50,41 +50,41 @@
   border-radius: 5px;
   background: var(--hx-bg-hover);
 }
-.ad .mx-skel-list .mx-skel + .mx-skel {
+.hb .mx-skel-list .mx-skel + .mx-skel {
   box-shadow: inset 0 1px 0 var(--hx-border);
 }
-.ad .mx-skel-list .mx-skel:nth-child(2) {
+.hb .mx-skel-list .mx-skel:nth-child(2) {
   animation-delay: 0.12s;
 }
-.ad .mx-skel-list .mx-skel:nth-child(3) {
+.hb .mx-skel-list .mx-skel:nth-child(3) {
   animation-delay: 0.24s;
 }
-.ad .mx-skel-list .mx-skel:nth-child(4) {
+.hb .mx-skel-list .mx-skel:nth-child(4) {
   animation-delay: 0.36s;
 }
-.ad .mx-skel-card {
+.hb .mx-skel-card {
   display: grid;
   gap: 14px;
   padding: 4px 0;
 }
-.ad .mx-skel-card .mx-skel {
+.hb .mx-skel-card .mx-skel {
   height: 44px;
   border-radius: 12px;
 }
-.ad .mx-skel-card .mx-skel:nth-child(2) {
+.hb .mx-skel-card .mx-skel:nth-child(2) {
   height: 96px;
   animation-delay: 0.12s;
 }
-.ad .mx-skel-card .mx-skel:nth-child(3) {
+.hb .mx-skel-card .mx-skel:nth-child(3) {
   height: 72px;
   animation-delay: 0.24s;
 }
-.ad .mx-skel-card .mx-skel:nth-child(4) {
+.hb .mx-skel-card .mx-skel:nth-child(4) {
   height: 72px;
   animation-delay: 0.36s;
 }
 /* a failed load: one row with the retry */
-.ad .mx-err {
+.hb .mx-err {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -95,15 +95,15 @@
   color: var(--hx-fg-2);
   font-size: var(--hx-text-sm);
 }
-.ad .mx-err span {
+.hb .mx-err span {
   flex: 1;
   min-width: 0;
 }
-.ad .md .mx-err {
+.hb .md .mx-err {
   margin-top: 0;
 }
 /* a refused action in the card: the card is back to what it was, this says why */
-.ad .md-err {
+.hb .md-err {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -115,38 +115,38 @@
   font-size: var(--hx-text-xs);
   line-height: 1.45;
 }
-.ad .md-err span {
+.hb .md-err span {
   flex: 1;
   min-width: 0;
 }
-.ad .md-err .md-link {
+.hb .md-err .md-link {
   flex: none;
 }
-[data-hx-theme='dark'] .ad .md-err {
+[data-hx-theme='dark'] .hb .md-err {
   color: #f0948c;
 }
 @media (max-width: 900px) {
-  .ad .mx-skel-tiles {
+  .hb .mx-skel-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .ad .mx-skel-bar .mx-skel {
+  .hb .mx-skel-bar .mx-skel {
     width: 100%;
   }
-  .ad .mx-skel-bar .mx-skel + .mx-skel {
+  .hb .mx-skel-bar .mx-skel + .mx-skel {
     display: none;
   }
 }
 /* the board is drawn on a page whose text has the browser's own line height; the app's base is taller */
-.ad .mo,
-.ad .ad-mrow {
+.hb .mo,
+.hb .hb-mrow {
   line-height: normal;
 }
 
 /* «Открыть» in a row: over the last cell on hover, always on a touch screen */
-.ad .mt-row {
+.hb .mt-row {
   position: relative;
 }
-.ad .mt-open {
+.hb .mt-open {
   position: absolute;
   right: 12px;
   top: 50%;
@@ -166,28 +166,28 @@
   opacity: 0;
   transition: opacity 0.15s ease;
 }
-.ad .mt-row:hover .mt-open,
-.ad .mt-open:focus-visible,
-.ad .mt-open:disabled {
+.hb .mt-row:hover .mt-open,
+.hb .mt-open:focus-visible,
+.hb .mt-open:disabled {
   opacity: 1;
 }
 @media (hover: none) {
-  .ad .mt-open {
+  .hb .mt-open {
     opacity: 1;
   }
 }
-.ad .md-rename {
+.hb .md-rename {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.ad .md-rename .hx-set__input {
+.hb .md-rename .hx-set__input {
   flex: 1;
   min-width: 0;
 }
-.ad .md-remove .hx-btn {
+.hb .md-remove .hx-btn {
   margin-top: 10px;
 }
-.ad .mo-empty .hx-btn {
+.hb .mo-empty .hx-btn {
   margin-top: 12px;
 }

@@ -240,6 +240,9 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
 
     spaces: {
       create: (name: string) => post<{ space: Space }>('/api/spaces', { name }),
+      /** A tenant made in the organization in one step; the same requestId again returns the same tenant. */
+      createInOrg: (org: string, name: string, requestId: string) =>
+        post<{ space: Space }>(`/api/orgs/${enc(org)}/tenants`, { name, requestId }),
       get: (id: string) => get<{ space: Space }>(`/api/spaces/${enc(id)}`),
       bySlug: (slug: string) => get<{ space: Space }>(`/api/spaces/by-slug/${enc(slug)}`),
       update: (id: string, patchBody: { name?: string; onboardingStep?: OnboardingStep }) =>

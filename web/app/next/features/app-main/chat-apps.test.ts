@@ -40,8 +40,8 @@ describe('activeApps', () => {
 });
 
 describe('offeredApps', () => {
-  it('offers the installed apps that work in a chat and are not on', () => {
+  it('offers the installed apps that work in a chat, the ones on included', () => {
     const installed = [app('a.one'), app('b.two'), app('c.pane', ['pane'])];
-    expect(offeredApps(installed, ['a.one']).map((a) => a.id)).toEqual(['b.two']);
+    expect(offeredApps(installed).map((a) => a.id)).toEqual(['a.one', 'b.two']);
   });
 });

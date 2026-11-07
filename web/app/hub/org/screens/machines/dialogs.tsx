@@ -2,12 +2,14 @@
 // sheet, play their closing animation and keep a spinner on the button while the hub works (nothing changes before
 // the answer).
 import { type ReactNode, useState } from 'react';
-import { HardDrive, CircleStop, Coins, RotateCw, Users } from 'lucide-react';
+import { ArrowRightLeft, HardDrive, CircleStop, Coins, RotateCw, Users } from 'lucide-react';
 
 import { Button } from '@kit';
 
-import type { OrgMachine, RestartWhat, RestartWhen } from '../../api/machines';
+import type { MovePlan, OrgMachine, RestartWhat, RestartWhen } from '../../api/machines';
 import { orgErrorText } from '../../api/errors';
+import { useOrg } from '../../context';
+import { useAction } from '../../hooks';
 import { Seg } from '../../ui/page';
 import { useClosing } from '../../ui/closing';
 import { rub } from './format';
@@ -197,3 +199,102 @@ export const OffDialog = ({
     {error != null && <p className="hm-dlg__err">{orgErrorText(error)}</p>}
   </Card>
 );
+
+/** Lines of the plan of a move, as the dry run of the hub reports them. */
+export const movePlanLines = (p: MovePlan): { text: string; bad?: boolean }[] => {
+  const out: { text: string; bad?: boolean }[] = [];
+  if (p.noop) return [{ text: 'Машина уже в этом тенанте.' }];
+  if (p.teamCleared) out.push({ text: `Привязка к команде «${p.teamCleared}» снимется.` });
+  if (p.teamAssigned) out.push({ text: `Машина войдёт в команду «${p.teamAssigned}».` });
+  if (p.accessRevoked.length > 0) {
+    out.push({ text: `Доступ потеряют: ${p.accessRevoked.join(', ')}. Выдайте его заново в новом тенанте.` });
+  }
+  out.push({
+    text:
+      p.limits.toRules > 0
+        ? `Новые траты пойдут в лимиты «${p.to.name}» (правил: ${p.limits.toRules}); прошлые останутся в истории «${p.from.name}».`
+        : `Новые траты пойдут в «${p.to.name}» — лимитов там нет; прошлые останутся в истории «${p.from.name}».`,
+  });
+  if (p.kept.length > 0) out.push({ text: `Остаётся как было: ${p.kept.join(', ')}.` });
+  return out;
+};
+
+export const MoveDialog = ({
+  open,
+  m,
+  onClose,
+  onMoved,
+}: {
+  open: boolean;
+  m: OrgMachine;
+  onClose: () => void;
+  onMoved: () => void;
+}) => {
+  const { shell } = useOrg();
+  const targets = shell.tenants.filter((t) => t.id !== m.tenantId);
+  const [tenantId, setTenantId] = useState('');
+  const plan = useAction((a, to: string) => a.planMoveMachine(m.id, to));
+  const move = useAction((a, to: string) => a.moveMachine(m.id, to));
+  const [shown, setShown] = useState<MovePlan | undefined>();
+  const pick = (id: string) => {
+    setTenantId(id);
+    setShown(undefined);
+    move.reset();
+    if (id) void plan.run(id).then((r) => setShown(r));
+  };
+  const p = tenantId ? shown : undefined;
+  const blocked = !p || p.noop;
+  return (
+    <Card
+      open={open}
+      onClose={move.pending ? () => undefined : onClose}
+      icon={<ArrowRightLeft size={18} />}
+      title={`Перенести ${m.name} в другой тенант?`}
+      tone="accent"
+      actions={
+        <>
+          <Button appearance="ghost" onClick={onClose} disabled={move.pending}>
+            Отмена
+          </Button>
+          <Button
+            appearance="primary"
+            loading={move.pending}
+            disabled={blocked || plan.pending}
+            onClick={() => void move.run(tenantId).then((r) => r && onMoved())}
+          >
+            Перенести
+          </Button>
+        </>
+      }
+    >
+      <p className="hm-dlg__text">
+        Машина сохранит id и ключ: ничего переустанавливать не нужно. Переносить может админ обоих тенантов.
+      </p>
+      <label className="hm-dlg__text">
+        Куда перенести
+        <select value={tenantId} onChange={(e) => pick(e.target.value)} disabled={move.pending}>
+          <option value="">Выберите тенант</option>
+          {targets.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {plan.pending && <p className="hm-dlg__text">Считаем, что изменится…</p>}
+      {p && (
+        <ul className="hm-offs">
+          {movePlanLines(p).map((l) => (
+            <li key={l.text} style={l.bad ? { color: 'var(--danger, #c0392b)' } : undefined}>
+              <ArrowRightLeft size={14} />
+              {l.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {(plan.error != null || move.error != null) && (
+        <p className="hm-dlg__err">{orgErrorText(plan.error ?? move.error)}</p>
+      )}
+    </Card>
+  );
+};

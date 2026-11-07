@@ -2,7 +2,7 @@
 // largest thing; the action is a quiet button that waits for the machine. A machine that is in no team shows nothing.
 import { Button } from '@/next/ui/button';
 import type { ITeamState } from '@/next/features/app-catalog/use-team';
-import { ROW_ACTION, rowsOf, type TRowAction } from '@/next/features/app-catalog/model';
+import { refusalOf, ROW_ACTION, rowsOf, secretsOf, type TRowAction } from '@/next/features/app-catalog/model';
 import { t } from '@/next/i18n';
 import '@/next/styles/app-catalog.css';
 
@@ -33,6 +33,12 @@ const AppsCatalog = ({ team }: { team: ITeamState }) => {
             <span className="hx-appteam__text">
               <span className="hx-appteam__name">{row.entry.name}</span>
               {row.entry.description && <span className="hx-appteam__desc">{row.entry.description}</span>}
+              {!row.entry.installed && refusalOf(row.entry.check) !== null && (
+                <span className="hx-appteam__desc">{refusalOf(row.entry.check)}</span>
+              )}
+              {!row.entry.installed && row.action !== null && secretsOf(row.entry.check) !== null && (
+                <span className="hx-appteam__desc">{secretsOf(row.entry.check)}</span>
+              )}
             </span>
             {row.action !== null && (
               <Button

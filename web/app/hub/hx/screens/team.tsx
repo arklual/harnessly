@@ -42,7 +42,7 @@ const RoleMenu = ({ p, apply }: { p: Person; apply: (op: Op) => Promise<boolean>
     return (
       <button
         type="button"
-        className="ad-role"
+        className="hb-role"
         disabled
         title={
           p.self
@@ -60,7 +60,7 @@ const RoleMenu = ({ p, apply }: { p: Person; apply: (op: Op) => Promise<boolean>
     <span className="hx-set__pick" ref={root}>
       <button
         type="button"
-        className="ad-role hx-set__pick-btn"
+        className="hb-role hx-set__pick-btn"
         aria-haspopup="listbox"
         aria-expanded={pop.open}
         aria-label={`Роль: ${p.name}`}
@@ -111,14 +111,14 @@ const PeopleGroup = ({
     <div className="hx-set__group-title">Люди</div>
     <div className="hx-set__card">
       {b.people.length === 0 && (
-        <div className="ad-row tm-row">
-          <span className="ad-row__t">
+        <div className="hb-row tm-row">
+          <span className="hb-row__t">
             <small>В команде пока никого</small>
           </span>
         </div>
       )}
       {b.people.map((p) => (
-        <div className="ad-row tm-row" key={p.id}>
+        <div className="hb-row tm-row" key={p.id}>
           <button
             type="button"
             className="tm-hit"
@@ -126,11 +126,11 @@ const PeopleGroup = ({
             aria-label={`Открыть: ${p.name}`}
           >
             <span className="hx-avatar">{initial(p.name)}</span>
-            <span className="ad-row__t">
+            <span className="hb-row__t">
               <b>{p.name}</b>
               <small>{personMeta(p, now)}</small>
             </span>
-            <span className="ad-row__v">{p.invited ? '—' : kRub(p.spentRub)}</span>
+            <span className="hb-row__v">{p.invited ? '—' : kRub(p.spentRub)}</span>
           </button>
           <RoleMenu p={p} apply={apply} />
         </div>
@@ -167,7 +167,7 @@ const Limits = ({
           <div className="hx-set__row-text">
             <span className="hx-set__row-label">Бюджет в месяц</span>
             <span className="hx-set__row-hint">{bud.hint}</span>
-            <div className="ad-meter" data-tone={bud.warn ? 'warn' : undefined}>
+            <div className="hb-meter" data-tone={bud.warn ? 'warn' : undefined}>
               <i style={{ '--w': `${Math.round(bud.w * 100)}%` } as CSSProperties} />
             </div>
           </div>
@@ -178,7 +178,7 @@ const Limits = ({
             </button>
           ) : (
             <span
-              className="ad-row__v"
+              className="hb-row__v"
               title={b.needs.limit ? `Может поменять: ${needsText(b.needs.limit)}` : undefined}
             >
               {bud.value}
@@ -270,11 +270,11 @@ const Body = ({
     <div className="hx-set__group">
       <div className="hx-set__group-title">Окружение</div>
       <div className="hx-set__card">
-        <button type="button" className="ad-row ad-row--btn" onClick={() => navigate(`${base}/env`)}>
-          <span className="ad-ic">
+        <button type="button" className="hb-row hb-row--btn" onClick={() => navigate(`${base}/env`)}>
+          <span className="hb-ic">
             <Icon i="layers" size="sm" />
           </span>
-          <span className="ad-row__t">
+          <span className="hb-row__t">
             <b>Новый человек получит</b>
             <small>{envSummary(b)}</small>
           </span>
@@ -329,10 +329,10 @@ const Page = ({ teamId }: { teamId: string | null }) => {
   const lead = b ? teamLead(b) : '';
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles title={b?.name ?? 'Команда'} lead={lead} />
         {b && view && (
-          <div className="ad-tools">
+          <div className="hb-tools">
             {admin && b.id && (
               <Btn size="sm" icon="pencil" data-variant="outline" onClick={() => url.open({ dlg: 'edit' })}>
                 Изменить
@@ -347,7 +347,7 @@ const Page = ({ teamId }: { teamId: string | null }) => {
         )}
       </div>
       {tabs.length > 0 && (
-        <div className="ad-tenants" role="group" aria-label="Тенант">
+        <div className="hb-tenants" role="group" aria-label="Тенант">
           {tabs.map((t) => (
             <button key={t.slug} type="button" aria-pressed={t.slug === slug} onClick={() => setTn(t.slug)}>
               {t.name}
@@ -356,7 +356,7 @@ const Page = ({ teamId }: { teamId: string | null }) => {
         </div>
       )}
       {tabs.length > 0 && tenantName && (
-        <div className="ad-note">Лимиты и окружение ниже — для тенанта {tenantName}</div>
+        <div className="hb-note">Лимиты и окружение ниже — для тенанта {tenantName}</div>
       )}
       {error != null ? (
         <LoadFailed error={error} onRetry={reload} />

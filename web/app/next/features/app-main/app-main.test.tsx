@@ -23,12 +23,14 @@ afterEach(cleanup);
 
 const props = (over: Partial<IAppMainProps> = {}): IAppMainProps => ({
   title: 'Кешбэки',
+  icon: 'layout-grid',
   chatTitle: 'Кешбэк на АЗС',
+  chatSwitch: <button type="button">Кешбэк на АЗС</button>,
+  onShare: vi.fn(),
   placement: PLACEMENT.left,
   float: null,
   onPlacement: vi.fn(),
   onFloat: vi.fn(),
-  onBack: vi.fn(),
   onOpenDrawer: vi.fn(),
   menu: [],
   stage: <div data-testid="stage" />,
@@ -65,21 +67,28 @@ describe('AppMain', () => {
     expect(screen.queryByTestId('chat')).toBeNull();
   });
 
-  it('asks for the placement the person picks and goes back to the chat', () => {
+  it('asks for the placement the person picks and shares the app', () => {
     const onPlacement = vi.fn<IAppMainProps['onPlacement']>();
-    const onBack = vi.fn();
-    render(<AppMain {...props({ onPlacement, onBack })} />);
+    const onShare = vi.fn();
+    render(<AppMain {...props({ onPlacement, onShare })} />);
     fireEvent.click(screen.getByRole('radio', { name: /window|окне/i }));
     expect(onPlacement).toHaveBeenCalledTimes(1);
     expect(onPlacement.mock.calls[0]?.[0] as TPlacement).toBe(PLACEMENT.float);
-    fireEvent.click(screen.getByRole('button', { name: /Back to the chat|К чату/ }));
-    expect(onBack).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /^(Share|Поделиться)$/ }));
+    expect(onShare).toHaveBeenCalled();
   });
 
-  it('is the app alone when there is no chat: no column, no switch, no way back', () => {
-    render(<AppMain {...props({ chat: null, island: null, chatTitle: null, onBack: null })} />);
+  it('shows the chat switch under the name and no way back', () => {
+    render(<AppMain {...props()} />);
+    const titles = document.querySelector('.hx-appmain__titles');
+    expect(titles?.textContent).toContain('Кешбэки');
+    expect(titles?.contains(screen.getByRole('button', { name: 'Кешбэк на АЗС' }))).toBe(true);
+    expect(screen.queryByRole('button', { name: /Back to the chat|К чату/ })).toBeNull();
+  });
+
+  it('is the app alone when there is no chat: no column, no placement switch', () => {
+    render(<AppMain {...props({ chat: null, island: null, chatTitle: null })} />);
     expect(regions().col).toBeNull();
     expect(screen.queryByRole('radiogroup')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Back to the chat|К чату/ })).toBeNull();
   });
 });

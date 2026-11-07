@@ -665,6 +665,8 @@ func (s *Service) createLink(r *http.Request, m store.Machine, email, project st
 		if in.Rev, err = s.pin(ctx, m, project); err != nil {
 			return nil, 0, err
 		}
+	} else if err := s.shareGate(ctx, m, project); err != nil {
+		return nil, 0, err
 	}
 	var row shareRow
 	var token string

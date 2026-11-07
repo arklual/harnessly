@@ -478,6 +478,33 @@ describe('AppBridge: what the manifest grants', () => {
     expect(r.last()?.error.data.code).toBe('invalid_params');
   });
 
+  it('page tools need tools.page, carry checked tools and answers, and the context needs context.publish', async () => {
+    const got: { tools?: unknown; result?: unknown; data?: unknown } = {};
+    const handlers: IBridgeHandlers = {
+      pageTools: (tools) => void (got.tools = tools),
+      pageToolResult: (id, answer) => void (got.result = { id, answer }),
+      publish: (data) => void (got.data = data),
+    };
+    const none = rig([], handlers);
+    await none.start();
+    await none.call('harnessly/tools.register', { tools: [] }, 5);
+    expect(none.last()?.error.data.code).toBe('permission_denied');
+    const r = rig(['tools.page', 'context.publish'], handlers);
+    await r.start();
+    await r.call(
+      'harnessly/tools.register',
+      { tools: [{ name: 'fill', description: 'd', inputSchema: { type: 'object' } }] },
+      6,
+    );
+    expect(got.tools).toEqual([{ name: 'fill', description: 'd', inputSchema: { type: 'object' } }]);
+    await r.call('harnessly/tools.register', { tools: [{ name: '1 bad' }] }, 7);
+    expect(r.last()?.error.data.code).toBe('invalid_params');
+    await r.call('harnessly/tools.result', { id: 'c1', result: { ok: true } }, 8);
+    expect(got.result).toEqual({ id: 'c1', answer: { result: { ok: true } } });
+    await r.call('harnessly/context.publish', { data: { step: 2 } }, 9);
+    expect(got.data).toEqual({ step: 2 });
+  });
+
   it('limits a view to sixty calls a second', async () => {
     const r = rig([], { toast: () => undefined });
     await r.start();

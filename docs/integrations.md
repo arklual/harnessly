@@ -137,7 +137,7 @@ harnessly panel show|hide              the whole pane
 harnessly status                       what was asked of the pane, what the person has seen
 harnessly workspaces                   the workspaces
 harnessly tab list|create|send|status|result|close
-                                       tabs; `tab create -t claude-code|codex-cli --prompt TEXT` starts another agent
+                                       tabs; `tab create -t claude-code|codex-cli --prompt TEXT` hands a task to another agent as a nested chat
 ```
 
 `open` works with the page closed: the request waits with the conversation. Documents and boards open when their address

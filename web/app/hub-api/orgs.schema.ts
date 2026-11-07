@@ -88,7 +88,10 @@ export const auditEvent = obj({
   action: lit(
     'org.create',
     'org.update',
+    'tenant.create',
     'tenant.move',
+    'tenant.delete',
+    'machine.move',
     'team.create',
     'team.update',
     'team.delete',

@@ -122,6 +122,7 @@ func (s *Service) mountOrg(mux *http.ServeMux) {
 	mux.Handle("POST /api/machines/{machineId}/disable", s.orgHandler(s.disable))
 	mux.Handle("POST /api/machines/{machineId}/enable", s.orgHandler(s.enable))
 	mux.Handle("POST /api/machines/{machineId}/restart", s.orgHandler(s.restart))
+	mux.Handle("POST /api/machines/{machineId}/move", s.orgHandler(s.move))
 	s.mountResources(mux)
 }
 

@@ -3,6 +3,7 @@
 // button sends, or stops the agent while it works. Keys are in keys.ts; ↑ in an empty field opens the earlier prompts
 // and the quick ones (prompt-history.tsx), «/» the commands, skills and settings of the agent (slash-palette.tsx). On a phone the dock rides over the keyboard.
 import AttachmentThumb from '@/next/ui/attachment-thumb';
+import { formatProgress, percentOf } from '@/next/ui/transfer';
 import { useFileDrop } from '@/next/features/composer/use-file-drop';
 import ContextRing, { type IContextRingProps } from '@/next/features/composer/context-ring';
 import {
@@ -12,6 +13,7 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
@@ -73,6 +75,8 @@ const SHORT_PLACEHOLDER_KEYS: Partial<Record<ComposerMode, string>> = {
 };
 /** Narrower than this, the field's own text box takes the short placeholder. */
 const NARROW_FIELD_PX = 480;
+/** A file this big shows its percent, speed and time left on its chip; a small one only its bar. */
+const BIG_UPLOAD_BYTES = 8 * 1024 * 1024;
 
 /** Whether the text box is narrow, kept current as its column changes (the window, the pane, a design's chat). */
 const useNarrowField = (field: RefObject<HTMLTextAreaElement | null>): boolean => {
@@ -511,12 +515,23 @@ const Composer = (props: IComposerProps) => {
               className="hx-attach"
               data-kind={file.kind}
               data-status={file.status}
+              data-big={(file.progress && file.progress.size >= BIG_UPLOAD_BYTES) || undefined}
               title={file.name}
             >
               <AttachmentThumb item={file} className="hx-attach__thumb" />
-              <span className="hx-attach__name">{file.name}</span>
+              <span className="hx-attach__text">
+                <span className="hx-attach__name">{file.name}</span>
+                {file.progress && file.progress.size >= BIG_UPLOAD_BYTES && (
+                  <span className="hx-attach__meta">{formatProgress(file.progress)}</span>
+                )}
+              </span>
               {file.error && <span className="hx-attach__err">{file.error}</span>}
-              <span className="hx-attach__bar" aria-hidden="true" />
+              <span
+                className="hx-attach__bar"
+                aria-hidden="true"
+                data-real={file.progress ? 'true' : undefined}
+                style={file.progress ? ({ '--p': percentOf(file.progress) } as CSSProperties) : undefined}
+              />
               {file.status === 'error' && (
                 <button
                   type="button"

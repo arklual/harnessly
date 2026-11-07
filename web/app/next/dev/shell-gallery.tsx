@@ -263,6 +263,7 @@ const SiteTabSample = () => {
       onRetryPorts={() => {}}
       onWantPorts={() => {}}
       reloadKey={0}
+      onFrame={() => {}}
       onFrameLoad={() => {}}
       signIn="none"
       onSignIn={() => {}}
@@ -439,6 +440,7 @@ const GalleryPane = ({
           portsError={null}
           onRetryPorts={() => {}}
           reloadKey={0}
+          onFrame={() => {}}
           onFrameLoad={() => {}}
           signIn="none"
           onSignIn={() => {}}

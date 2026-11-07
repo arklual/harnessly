@@ -285,6 +285,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 		}
 	}
 	var apps agents.ClaudeApps
+	launch = agents.WithActiveApps(launch, c.Apps)
 	if launch != nil && len(launch.Apps) > 0 {
 		// The apps' settings file is the one chosen above plus the app-guard hook: Claude reads one --settings.
 		if c.Apps == nil {

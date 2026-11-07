@@ -136,6 +136,28 @@ var Efforts = []string{"none", "minimal", "low", "medium", "high", "xhigh", "max
 // ModelIDRe: a model id is typed into a shell, so it stays this strict (aliases, full ids, the [1m] suffix).
 var ModelIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}(\[1m\])?$`)
 
+// ProfileModelIDRe is a model of a vendor profile: routed backends name their models «vendor/model»
+// («zai/glm-5.3», «openrouter/moonshotai/Kimi-K2»), with capitals and an «:tag». Still no shell metacharacter: up to
+// four parts of [A-Za-z0-9._:-] joined by «/», each starting with a letter or a digit, and every launch line
+// single-quotes it (ShellQuote) or passes it as one argv entry. A catalog model (no profile) stays ModelIDRe.
+var ProfileModelIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}(/[A-Za-z0-9][A-Za-z0-9._:-]{0,63}){0,3}(\[1m\])?$`)
+
+// MaxProfileModelID caps a profile model id.
+const MaxProfileModelID = 128
+
+// IsProfileModelID is a model id a vendor profile may name.
+func IsProfileModelID(s string) bool {
+	return len(s) <= MaxProfileModelID && ProfileModelIDRe.MatchString(s)
+}
+
+// IsLaunchModelID is the model check of a launch: a profile's model may be namespaced, a catalog model may not.
+func IsLaunchModelID(profile, model string) bool {
+	if profile != "" {
+		return IsProfileModelID(model)
+	}
+	return ModelIDRe.MatchString(model)
+}
+
 // IsKnownEffort is a level of Efforts.
 func IsKnownEffort(e string) bool { return slices.Contains(Efforts, e) }
 
@@ -154,7 +176,7 @@ func CheckLaunch(l *Launch) error {
 	if l == nil {
 		return nil
 	}
-	if l.Model != nil && !ModelIDRe.MatchString(*l.Model) {
+	if l.Model != nil && !IsLaunchModelID(l.Profile, *l.Model) {
 		return ErrLaunchModel
 	}
 	if l.Effort != nil && !IsKnownEffort(*l.Effort) {
@@ -177,13 +199,19 @@ func CheckLaunch(l *Launch) error {
 // ReadLaunchShape reads a choice from request or stored values by shape only (model, effort as decoded from JSON).
 // nil, true when both are absent; false when one is malformed.
 func ReadLaunchShape(model, effort any) (*Launch, bool) {
+	return ReadProfileLaunchShape("", model, effort)
+}
+
+// ReadProfileLaunchShape is ReadLaunchShape of a launch on profile: its model may be namespaced (ProfileModelIDRe).
+// The profile is not set on the result; the caller that knows it does.
+func ReadProfileLaunchShape(profile string, model, effort any) (*Launch, bool) {
 	if model == nil && effort == nil {
 		return nil, true
 	}
 	l := &Launch{}
 	if model != nil {
 		s, ok := model.(string)
-		if !ok || !ModelIDRe.MatchString(s) {
+		if !ok || !IsLaunchModelID(profile, s) {
 			return nil, false
 		}
 		l.Model = &s
@@ -382,4 +410,30 @@ func BareAgentArgs(content, panelType string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimRightFunc(m[2], jscompat.IsSpace), true
+}
+
+// ActiveApps is what a launcher may say about the apps a launch names: which of them are installed and on now. A chat
+// whose app was removed, or one started in safe mode, starts with what is left — with none left, as a chat
+// with no apps at all, wall included.
+type ActiveApps interface {
+	Active(ids []string) []string
+}
+
+// WithActiveApps is the launch with only the apps the launcher says are on; the launch itself when it names none or
+// the launcher cannot say.
+func WithActiveApps(l *Launch, apps AppLauncher) *Launch {
+	if l == nil || len(l.Apps) == 0 {
+		return l
+	}
+	active, ok := apps.(ActiveApps)
+	if !ok {
+		return l
+	}
+	kept := active.Active(l.Apps)
+	if len(kept) == len(l.Apps) {
+		return l
+	}
+	out := *l
+	out.Apps = kept
+	return &out
 }

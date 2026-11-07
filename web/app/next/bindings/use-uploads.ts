@@ -2,7 +2,14 @@
 // draft. A failed one stays with its reason and a retry until it is removed; nothing uploads for ever (the upload ends
 // on silence).
 import { useCallback, useRef, useState } from 'react';
-import { uploadFile } from '@/next/commands';
+import {
+  newUploadSession,
+  UPLOAD_FAILURE,
+  uploadFile,
+  type IUploadSession,
+  type UploadOutcome,
+} from '@/next/commands/uploads';
+import { formatBytes } from '@/next/ui/transfer';
 import { fitPicture, isHeic, isSqueezable, limitFor, megabytes } from '@/next/commands/photo';
 import type { ComposerAttachment } from '@/next/features/composer/types';
 import type { AttachmentRef, MachineId } from '@/next/protocol/v2';
@@ -18,7 +25,27 @@ interface ILocal {
   error: string | null;
   /** The picked file, kept for a retry. */
   file: File;
+  sent: number;
+  speed: number;
 }
+
+/** The speed is smoothed over the last seconds so the time left does not jump. */
+const SPEED_SMOOTHING = 0.7;
+const SHOW_EVERY_MS = 150;
+
+/** Why a file did not go, in words the person can act on. */
+const failureText = (outcome: Extract<UploadOutcome, { ok: false }>): string => {
+  const { code } = outcome;
+  if (code === UPLOAD_FAILURE.noSpace)
+    return outcome.need !== undefined && outcome.free !== undefined
+      ? t('next.upload.noSpaceNumbers', { need: formatBytes(outcome.need), free: formatBytes(outcome.free) })
+      : t('next.upload.noSpace');
+  if (code === UPLOAD_FAILURE.network) return t('next.upload.network');
+  if (code === UPLOAD_FAILURE.refused || code === UPLOAD_FAILURE.tooLarge)
+    return outcome.message ?? t('next.refuse.attachment-too-large');
+  if (code === UPLOAD_FAILURE.http || code === 'timeout') return t(`next.failure.${code}`);
+  return t(`next.refuse.${code}`);
+};
 
 let seq = 0;
 
@@ -39,11 +66,33 @@ export interface IUploads {
 export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles: AttachmentRef[]): IUploads {
   const [local, setLocal] = useState<ILocal[]>([]);
   const controllers = useRef(new Map<string, AbortController>());
+  const sessions = useRef(new Map<string, IUploadSession>());
+  const rowSession = useCallback((id: string) => {
+    const have = sessions.current.get(id);
+    if (have) return have;
+    const made = newUploadSession();
+    sessions.current.set(id, made);
+    return made;
+  }, []);
 
   const fail = useCallback((id: string, error: string) => {
     controllers.current.delete(id);
     setLocal((rows) => rows.map((r) => (r.id === id ? { ...r, status: 'error', error } : r)));
   }, []);
+
+  const progressOf = useCallback(
+    (id: string, sent: number, mark: { at: number; sent: number; speed: number }) => {
+      const now = performance.now();
+      if (now - mark.at < SHOW_EVERY_MS) return;
+      const instant = ((sent - mark.sent) / (now - mark.at)) * 1000;
+      const speed = mark.speed > 0 ? mark.speed * SPEED_SMOOTHING + instant * (1 - SPEED_SMOOTHING) : instant;
+      mark.at = now;
+      mark.sent = sent;
+      mark.speed = Math.max(0, speed);
+      setLocal((rows) => rows.map((r) => (r.id === id ? { ...r, sent, speed: mark.speed } : r)));
+    },
+    [],
+  );
 
   const send = useCallback(
     (id: string, file: File, abort: AbortController) => {
@@ -53,27 +102,28 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       }
       const limits = limitsOf(machine);
       const { bytes } = limitFor(file, limits);
-      if (file.size > bytes) {
+      // A limit of 0 is none: a file is held back only by the free space of the machine's disk.
+      if (bytes > 0 && file.size > bytes) {
         fail(id, t('next.upload.tooLarge', { limit: megabytes(bytes) }));
         return;
       }
-      void uploadFile(machine, file, () => {}, abort.signal).then((outcome) => {
-        controllers.current.delete(id);
-        if (outcome.ok) {
-          setLocal((rows) => rows.filter((r) => r.id !== id));
-          const have = draftsStore.get(key) ?? { text: '', attachments: [] };
-          setDraft(key, { ...have, attachments: [...have.attachments, outcome.ref] });
-        } else if (outcome.code !== 'aborted') {
-          const error = t(
-            outcome.code === 'network' || outcome.code === 'http'
-              ? `next.failure.${outcome.code}`
-              : `next.refuse.${outcome.code}`,
-          );
-          fail(id, error);
-        }
-      });
+      const mark = { at: performance.now(), sent: 0, speed: 0 };
+      const session = rowSession(id);
+      void uploadFile(machine, file, (sent) => progressOf(id, sent, mark), abort.signal, session).then(
+        (outcome) => {
+          controllers.current.delete(id);
+          if (outcome.ok) {
+            setLocal((rows) => rows.filter((r) => r.id !== id));
+            sessions.current.delete(id);
+            const have = draftsStore.get(key) ?? { text: '', attachments: [] };
+            setDraft(key, { ...have, attachments: [...have.attachments, outcome.ref] });
+          } else if (outcome.code !== UPLOAD_FAILURE.aborted) {
+            fail(id, failureText(outcome));
+          }
+        },
+      );
     },
-    [machine, key, fail],
+    [machine, key, fail, progressOf, rowSession],
   );
 
   const start = useCallback(
@@ -112,6 +162,8 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
           status: 'uploading',
           error: null,
           file,
+          sent: 0,
+          speed: 0,
         };
         setLocal((rows) => [...rows, row]);
         start(id, file);
@@ -124,7 +176,9 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
     (id: string) => {
       const row = local.find((r) => r.id === id && r.status === 'error');
       if (!row) return;
-      setLocal((rows) => rows.map((r) => (r.id === id ? { ...r, status: 'uploading', error: null } : r)));
+      setLocal((rows) =>
+        rows.map((r) => (r.id === id ? { ...r, status: 'uploading', error: null, speed: 0 } : r)),
+      );
       start(id, row.file);
     },
     [local, start],
@@ -135,6 +189,7 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       controllers.current.get(id)?.abort();
       controllers.current.delete(id);
       setLocal((rows) => rows.filter((r) => r.id !== id));
+      sessions.current.delete(id);
       const have = draftsStore.get(key);
       if (have?.attachments.some((a) => a.id === id)) {
         setDraft(key, { ...have, attachments: have.attachments.filter((a) => a.id !== id) });
@@ -159,6 +214,7 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       kind: r.kind,
       status: r.status,
       error: r.error,
+      progress: r.status === 'uploading' ? { sent: r.sent, size: r.file.size, speed: r.speed } : undefined,
     })),
   ];
   return {

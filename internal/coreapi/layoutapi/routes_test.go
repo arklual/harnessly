@@ -1,6 +1,7 @@
 package layoutapi
 
 import (
+	"context"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -434,5 +435,65 @@ func TestShadowOnlyForSideEffectFreeGETs(t *testing.T) {
 	}
 	if r.shadow.Match(httptest.NewRequest("POST", "/api/workspace", nil)) {
 		t.Fatal("POST in the shadow")
+	}
+}
+
+// tab create with a prompt from a chat's terminal hands the task to a chat nested under that chat; from a terminal
+// that is no chat's, or by an older CLI, the tab is made as before and the first says why.
+func TestCLITabCreateNestsTheAgentUnderTheAskingChat(t *testing.T) {
+	r := newRig(t)
+	ws, _, tab := r.workspace("Alpha")
+	r.agents.start = StartResult{ConversationID: "tab-loose"}
+	var got DelegateRequest
+	r.deps.Delegate = func(_ context.Context, req DelegateRequest) (DelegateResult, error) {
+		got = req
+		switch req.Session {
+		case "pt-chat":
+			return DelegateResult{ChatID: "tab-kid", ParentID: "tab-parent", Provider: req.Provider, Model: req.Model}, nil
+		case "pt-full":
+			return DelegateResult{}, &DelegateRefused{Msg: "too-many: this chat already has 8 delegated chats"}
+		}
+		return DelegateResult{}, &ErrNoParent{Reason: "plain terminal"}
+	}
+	body := func(session string) string {
+		return `{"workspaceId":"` + ws + `","panelType":"claude-code","prompt":"say hi","model":"sonnet","effort":"high","name":"Hi","notify":true,"session":"` + session + `"}`
+	}
+
+	nested := r.do("t", "POST", "/api/cli/tabs", body("pt-chat"))
+	r.want(nested, 201, `{"tabId":"tab-kid","chatId":"tab-kid","workspaceId":"`+ws+`","paneId":null,"sessionName":null,"name":"Hi","panelType":"claude-code","agentProviderId":"claude","agentSessionId":null,"launched":true,"delegated":true,"parentChatId":"tab-parent","model":"sonnet","notify":true}`)
+	if got.Provider != "claude" || got.Model != "sonnet" || got.Effort != "high" || got.Prompt != "say hi" || got.Title != "Hi" || !got.Notify {
+		t.Fatalf("%+v", got)
+	}
+	if len(r.agents.started) != 0 {
+		t.Fatalf("a loose tab was started too: %+v", r.agents.started)
+	}
+
+	r.want(r.do("t", "POST", "/api/cli/tabs", body("pt-full")), 409, `{"error":"too-many: this chat already has 8 delegated chats"}`)
+	if len(r.agents.started) != 0 {
+		t.Fatal("a refused delegation fell back to a loose tab")
+	}
+
+	r.want(r.do("t", "POST", "/api/cli/tabs", body("pt-shell")), 201,
+		`{"tabId":"tab-loose","workspaceId":"`+ws+`","paneId":null,"sessionName":null,"name":"Hi","panelType":"claude-code","agentProviderId":"claude","agentSessionId":null,"launched":true,"delegateNote":"plain terminal"}`)
+	if len(r.agents.started) != 1 {
+		t.Fatalf("started %+v", r.agents.started)
+	}
+
+	// No session, or no prompt: nothing to nest under, nothing to say.
+	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"claude-code","prompt":"x"}`), 201,
+		`{"tabId":"tab-loose","workspaceId":"`+ws+`","paneId":null,"sessionName":null,"name":null,"panelType":"claude-code","agentProviderId":"claude","agentSessionId":null,"launched":true}`)
+	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"claude-code","session":"pt-chat"}`), 201,
+		`{"tabId":"tab-loose","workspaceId":"`+ws+`","paneId":null,"sessionName":null,"name":null,"panelType":"claude-code","agentProviderId":"claude","agentSessionId":null,"launched":true}`)
+
+	// The CLI names the nested chat by its own id; tab status and result find the tab it runs in.
+	r.want(r.do("t", "GET", "/api/cli/tabs/tab-kid?workspaceId="+ws, ""), 404, `{"error":"Tab not found"}`)
+	r.deps.ChatTab = func(chat string) string {
+		if chat == "tab-kid" {
+			return tab
+		}
+		return ""
+	}
+	if got := r.do("t", "GET", "/api/cli/tabs/tab-kid?workspaceId="+ws, "").json(t); got.String("tabId") != tab {
+		t.Fatalf("%v", got)
 	}
 }

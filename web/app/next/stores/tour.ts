@@ -79,3 +79,16 @@ export const tourSignal = (name: string) => {
 };
 
 export const tourSignals = (): ReadonlySet<string> => signals;
+
+let facts = new Set<string>();
+
+/** A feature says what holds on this page whatever the step (no agent can answer here): steps may pass over it. */
+export const tourFact = (name: string, on: boolean) => {
+  if (facts.has(name) === on) return;
+  facts = new Set(facts);
+  if (on) facts.add(name);
+  else facts.delete(name);
+  for (const listener of [...listeners]) listener();
+};
+
+export const tourFacts = (): ReadonlySet<string> => facts;

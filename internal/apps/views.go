@@ -430,6 +430,16 @@ var ErrViewNotFound = errors.New("apps: no such view")
 
 // ViewPath is the address of a view's entry on the view server without its session: /<app id>/<entry>. An external
 // entry has none. The page puts the session's token in front.
+// RemoteView is the address of a view the app's own server hosts (delivery mode remote): an https entry whose
+// host network.frames lists. A package view, or an address the manifest does not let be framed, is not one.
+func (m *Manifest) RemoteView(viewID string) (string, bool) {
+	v := m.view(viewID)
+	if v == nil || !strings.HasPrefix(v.Entry, "https://") {
+		return "", false
+	}
+	return m.FrameURL(v.Entry)
+}
+
 func (m *Manifest) ViewPath(viewID string) (string, error) {
 	for _, v := range m.Views {
 		if v.ID != viewID {
@@ -441,4 +451,12 @@ func (m *Manifest) ViewPath(viewID string) (string, error) {
 		return "/" + m.ID + "/" + path.Clean(v.Entry), nil
 	}
 	return "", fmt.Errorf("%w: %s", ErrViewNotFound, viewID)
+}
+
+// SDKFiles are the files a view the app's own server hosts serves itself (delivery mode remote): the shim first in its
+// page, then the SDK, by name.
+func SDKFiles() map[string][]byte {
+	return map[string][]byte{
+		"bridge-shim.js": shimJS, "app-sdk.js": sdkJS, "app-sdk.d.ts": sdkDTS, "hl-ui.css": hlUICSS,
+	}
 }

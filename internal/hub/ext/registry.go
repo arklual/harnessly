@@ -29,7 +29,13 @@ type Spec struct {
 	Protocol string `json:"protocol"`
 	// TimeoutSeconds bounds one attempt of a call; zero means 15.
 	TimeoutSeconds int `json:"timeoutSeconds,omitempty"`
+	// MaxAnswerBytes is the biggest answer taken from the adapter; zero means 1 MiB. A bigger answer is refused as too
+	// large, never cut.
+	MaxAnswerBytes int64 `json:"maxAnswerBytes,omitempty"`
 }
+
+// MaxAnswerLimit is the most maxAnswerBytes may raise the answer limit to: 64 MiB.
+const MaxAnswerLimit int64 = 64 << 20
 
 var (
 	nameRE     = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$`)
@@ -47,6 +53,8 @@ func (s Spec) Validate() error {
 		return fmt.Errorf("extension %q: protocol %q is not harnessly.<kind>/v<major>", s.Name, s.Protocol)
 	case s.TimeoutSeconds < 0:
 		return fmt.Errorf("extension %q: timeoutSeconds is negative", s.Name)
+	case s.MaxAnswerBytes < 0 || s.MaxAnswerBytes > MaxAnswerLimit:
+		return fmt.Errorf("extension %q: maxAnswerBytes is between 0 and %d", s.Name, MaxAnswerLimit)
 	}
 	return nil
 }
@@ -131,6 +139,7 @@ func NewRegistry(specs []Spec, base Config) (*Registry, error) {
 		if s.TimeoutSeconds > 0 {
 			c.Timeout = time.Duration(s.TimeoutSeconds) * time.Second
 		}
+		c.MaxAnswer = s.MaxAnswerBytes
 		cl, err := NewClient(c)
 		if err != nil {
 			return nil, fmt.Errorf("extension %q: %w", s.Name, err)

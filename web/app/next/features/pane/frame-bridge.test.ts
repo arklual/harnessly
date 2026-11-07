@@ -57,6 +57,17 @@ describe('what the bridge of a page says', () => {
     });
     expect(readFrameMessage({ type: 'tk:redirect', url: 'javascript:alert(1)' })).toBeNull();
   });
+  it('reads the failure of the proxy, a status of a failure only', () => {
+    expect(
+      readFrameMessage({ type: 'tk:failed', status: 504, text: 'stand.example did not respond\nin time' }),
+    ).toEqual({
+      k: 'failed',
+      status: 504,
+      text: 'stand.example did not respond in time',
+    });
+    expect(readFrameMessage({ type: 'tk:failed', status: 200, text: 'x' })).toBeNull();
+    expect(readFrameMessage({ type: 'tk:failed', status: '502', text: 'x' })).toBeNull();
+  });
 });
 
 describe("the page's own address", () => {

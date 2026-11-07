@@ -39,4 +39,12 @@ describe('placeCard', () => {
     expect(p.y + CARD.h).toBeLessThanOrEqual(VIEW.h);
     expect(p.x).toBeGreaterThanOrEqual(0);
   });
+
+  it('never covers a target at the top right whose menu fills the space below and beside it', () => {
+    const target = { x: 1300, y: 20, w: 40, h: 32 };
+    const menu = { x: 980, y: 56, w: 360, h: 600 };
+    const p = placeCard(target, CARD, VIEW, [menu]);
+    expect(covers(p, target)).toBe(false);
+    expect(covers(p, menu)).toBe(false);
+  });
 });

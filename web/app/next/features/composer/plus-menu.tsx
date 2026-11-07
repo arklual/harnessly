@@ -1,4 +1,4 @@
-// «+» of the field: a photo or screenshot (up to 10 MB), a file (up to 50 MB), the earlier and quick prompts, context to
+// «+» of the field: a photo or screenshot (up to 10 MB), a file (any size), the earlier and quick prompts, context to
 // mention (project, task, design), and — in a chat — what the machine and the team have: a file of the project, a
 // design, a document, a board, a merge request or a task. Each of those opens its picker in the same panel (back with
 // ←). On a computer it is a small menu over the button; on a phone a sheet from the bottom with large tiles.
@@ -332,9 +332,9 @@ const PlusMenu = ({
     <AppsPane
       apps={{
         ...apps,
-        onPick: (id) => {
+        onPick: (id, next) => {
           setOpen(false);
-          apps.onPick(id);
+          apps.onPick(id, next);
         },
         onAll: () => {
           setOpen(false);

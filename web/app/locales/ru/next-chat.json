@@ -146,7 +146,7 @@
   "next.now.working": "Работает",
   "next.plus.camera": "Камера",
   "next.plus.file": "Файл",
-  "next.plus.fileLimit": "до 50 МБ",
+  "next.plus.fileLimit": "любого размера",
   "next.plus.label": "Добавить",
   "next.plus.photo": "Фото или скриншот",
   "next.plus.photoLimit": "до 10 МБ",
@@ -508,5 +508,18 @@
   "next.message.copy": "Копировать",
   "next.message.copied": "Скопировано",
   "next.tool.guarded": "Приложение {app} не дало выполнить «{tool}»: правило {rule}",
-  "next.tool.guardedChat": "Приложения чата не дали выполнить «{tool}»: правило {rule}"
+  "next.tool.guardedChat": "Приложения чата не дали выполнить «{tool}»: правило {rule}",
+  "next.upload.network": "Связь прервалась. Нажмите «Повторить» — загрузка продолжится с того же места",
+  "next.upload.noSpace": "На диске машины не хватает места для этого файла",
+  "next.upload.noSpaceNumbers": "Не хватает места на машине: нужно {need}, свободно {free}",
+  "next.transfer.unit.b": "Б",
+  "next.transfer.unit.kb": "КБ",
+  "next.transfer.unit.mb": "МБ",
+  "next.transfer.unit.gb": "ГБ",
+  "next.transfer.unit.tb": "ТБ",
+  "next.transfer.perSecond": "{size}/с",
+  "next.transfer.of": "{sent} из {size}",
+  "next.transfer.leftSeconds": "ещё {n} с",
+  "next.transfer.leftMinutes": "ещё {n} мин",
+  "next.transfer.leftHours": "ещё {h} ч {m} мин"
 }

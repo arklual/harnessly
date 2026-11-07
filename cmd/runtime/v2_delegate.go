@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/netip"
@@ -14,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	browsertools "github.com/ly-solutions/harnessly/internal/agentbrowser/tools"
 	"github.com/ly-solutions/harnessly/internal/browseract"
+	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/design"
@@ -62,6 +64,49 @@ func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Se
 			agent.Log("warn", msg, fs...)
 		},
 	}
+}
+
+// cliDelegate is `harnessly tab create -t claude-code|codex-cli --prompt …` run in the terminal of a chat: the work goes
+// to a chat nested under that chat, as delegate_task makes it, not to a loose tab of the workspace. The chat
+// is the one that runs in the terminal the command names (the CLI sends its tmux session, as peers send does); a command
+// from a terminal that is no chat's gets layoutapi.ErrNoParent and the tab is made the old way.
+func (c *core) cliDelegate(ctx context.Context, req layoutapi.DelegateRequest) (layoutapi.DelegateResult, error) {
+	v := c.v2.Load()
+	if v == nil || v.delegation == nil || v.rt == nil {
+		return layoutapi.DelegateResult{}, &layoutapi.ErrNoParent{Reason: "the machine's chats are not running"}
+	}
+	parent := v.rt.ConvOfSession(req.Session)
+	if parent == "" {
+		return layoutapi.DelegateResult{}, &layoutapi.ErrNoParent{Reason: "this terminal is not the agent of a chat (a plain terminal tab), so there is no chat to nest the new one under"}
+	}
+	rec, err := v.delegation.Delegate(ctx, parent, delegation.Task{Provider: wire.Provider(req.Provider), Model: req.Model,
+		Effort: wire.Effort(req.Effort), Prompt: req.Prompt, Title: req.Title, Notify: req.Notify})
+	if err != nil {
+		var refusal *delegation.Refusal
+		if errors.As(err, &refusal) {
+			return layoutapi.DelegateResult{}, &layoutapi.DelegateRefused{Msg: refusal.Msg}
+		}
+		return layoutapi.DelegateResult{}, err
+	}
+	res := layoutapi.DelegateResult{ChatID: rec.ID, ParentID: parent, Provider: string(rec.Provider)}
+	if rec.Model != nil {
+		res.Model = rec.Model.ID
+	}
+	return res, nil
+}
+
+// chatTab is the layout tab a chat runs in, "" before it has one: the CLI's tab status, result, send and close name a
+// chat it started by the chat's id.
+func (c *core) chatTab(chat string) string {
+	v := c.v2.Load()
+	if v == nil || v.rt == nil || c.cfg.Tmux == nil {
+		return ""
+	}
+	tab, err := legacyTabOf(v.rt.Record, c.cfg.Tmux.ParseSessionName, chat)
+	if err != nil {
+		return ""
+	}
+	return tab.TabID
 }
 
 // serveDelegation gives the agents' MCP server the delegation tools and wakes the parents until done.

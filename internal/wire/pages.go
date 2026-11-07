@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -70,7 +71,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case p == "uploads":
 		s.Upload(w, r)
 	case strings.HasPrefix(p, "uploads/"):
-		s.uploadFile(w, r, strings.TrimPrefix(p, "uploads/"))
+		rest := strings.TrimPrefix(p, "uploads/")
+		id, action, _ := strings.Cut(rest, "/")
+		if action != "complete" {
+			id, action = rest, ""
+		}
+		if !s.uploadSessionCall(w, r, id, action) {
+			s.uploadFile(w, r, rest)
+		}
 	case p == "dirs":
 		s.dirs(w, r)
 	case p == "sessions":
@@ -395,6 +403,10 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 type Uploads struct {
 	Dir    string
 	Limits Limits
+
+	mu    sync.Mutex
+	busy  map[string]bool
+	swept time.Time
 }
 
 // imageMimes are the images an agent takes pasted; any other type is a file.
@@ -404,8 +416,12 @@ var imageMimes = map[string]bool{"image/png": true, "image/jpeg": true, "image/g
 // AttachmentRef, or a Refusal: bad-request without a name, attachment-type for a type that does not parse,
 // attachment-too-large past limits.maxImageBytes or maxFileBytes.
 func (s *Server) Upload(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		s.UploadCreate(w, r)
+		return
+	}
 	if r.Method != http.MethodPut {
-		w.Header().Set("Allow", http.MethodPut)
+		w.Header().Set("Allow", "PUT, POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -468,7 +484,7 @@ func (u *Uploads) Put(name, contentType string, size int64, body io.Reader) (Att
 	if imageMimes[typ] {
 		ref.Kind, limit = AttachmentImage, u.Limits.MaxImageBytes
 	}
-	if size > limit {
+	if limit > 0 && size > limit {
 		return AttachmentRef{}, RefuseAttachmentTooLarge
 	}
 	if err := os.MkdirAll(u.Dir, 0o700); err != nil {
@@ -479,6 +495,9 @@ func (u *Uploads) Put(name, contentType string, size int64, body io.Reader) (Att
 		return AttachmentRef{}, RefuseInternal
 	}
 	defer os.Remove(f.Name())
+	if limit <= 0 {
+		limit = 1<<63 - 2
+	}
 	n, err := io.Copy(f, io.LimitReader(body, limit+1))
 	if cerr := f.Close(); err == nil {
 		err = cerr

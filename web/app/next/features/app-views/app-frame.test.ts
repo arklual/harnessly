@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameSrc, fromApp } from '@/next/features/app-views/app-frame';
+import { frameSrc, fromApp, withNonce } from '@/next/features/app-views/app-frame';
 
 describe('fromApp: the chat always shows the real app', () => {
   it('puts the app’s name first on one line', () => {
@@ -27,5 +27,14 @@ describe('frameSrc: only an https view on another origin is framed', () => {
       'not a url',
     ])
       expect(frameSrc(url, page), url).toBeNull();
+  });
+});
+
+describe('withNonce: a remote view gets the nonce in its fragment', () => {
+  it('adds it, keeping a fragment of its own', () => {
+    expect(withNonce('https://views.acme.test/main', 'n1')).toBe('https://views.acme.test/main#hl-nonce=n1');
+    expect(withNonce('https://views.acme.test/main?q=1#tab', 'n1')).toBe(
+      'https://views.acme.test/main?q=1#tab&hl-nonce=n1',
+    );
   });
 });

@@ -102,6 +102,13 @@ machine**: a second request gets 409 `op_busy`.
 `when=after_chats` or `drain`); 200 `{ op }`, 409 `not_cancellable` for anything else, 409 `op_finished` when it is over,
 422 `drain_unsupported` when the agent is too old to be asked.
 
+### Move to another tenant
+
+`POST /api/machines/{id}/move` `{ tenantId, teamId?, dry_run? }` (manage on both tenants). The row stays (id, key,
+`created_at`); `space_id` changes, the team is reset (or set to `teamId` of the target) and `machine_access` is cleared.
+`dry_run` answers `{ plan }` with who loses access and `limits` (`fromRules`, `toRules`: the limit rules of each tenant
+and its teams; new spend counts against the target's). The number of machines never blocks a move. Moving to the same tenant is a no-op. See [orgs.md](orgs.md).
+
 ### Restart
 
 `POST /api/machines/{id}/restart` `{ what, when }` (manager; the endpoint is the organization's, so 404 with `HUB_ORGS`

@@ -188,6 +188,7 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 		return Start{}, false, err
 	}
 	var apps agents.CodexApps
+	launch = agents.WithActiveApps(launch, c.Apps)
 	if launch != nil && len(launch.Apps) > 0 {
 		if c.Apps == nil {
 			return Start{}, false, agents.ErrNoApps

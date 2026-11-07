@@ -22,16 +22,20 @@ import { lastLineOf } from '@/next/features/designly/last-line';
 import ChatView from '@/next/bindings/chat-view';
 import { useFeedItems } from '@/next/bindings/feed-items';
 import { useChatApps } from '@/next/bindings/use-chat-apps';
-import { interrupt, sendMessage } from '@/next/commands';
+import { createConversation, interrupt, sendMessage, setConversationApps } from '@/next/commands';
 import { settled } from '@/next/bindings/outcome';
 import { hub, useConversationChannel } from '@/next/core/realtime/hub';
 import { useCentralFeed } from '@/next/bindings/use-central';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE, routePath } from '@/next/routes/routes';
-import { useConversation, useConvsAnswered } from '@/next/stores/conversations';
+import { useConversation, useConversationList, useConvsAnswered } from '@/next/stores/conversations';
+import { ChatSwitch } from '@/next/features/designly/chat-switch';
+import { chatStatusOf } from '@/next/features/sidebar/status';
+import { useConnection } from '@/next/stores/connection';
 import { useTabTitle } from '@/next/stores/tabs';
 import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
+import { useAppsDebug } from '@/next/features/app-views/debug-mode';
 
 interface IAppMainPageProps {
   /** The machine of the screen; the chat's own machine wins when the address names a chat. */
@@ -89,11 +93,18 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
   const { list, error } = useInstalledApps(machine);
   const [layout, setLayout] = useState<IAppLayout>(readLayout);
   const [inspector, setInspector] = useState<'closed' | 'about' | 'debug'>('closed');
+  const debugMode = useAppsDebug();
   const [reload, setReload] = useState(0);
   const chatApps = useChatApps(machine, conv);
+  const chats = useConversationList(machine);
+  const connection = useConnection(machine);
+  const [making, setMaking] = useState(false);
 
   const app = list?.apps.find((a) => a.id === id) ?? null;
-  const view = app?.views.find((v) => v.targets.includes('app')) ?? null;
+  // An app with no screen of its own opens its pane view here, so a press in the sidebar never ends on a blank page.
+  const own = app?.views.find((v) => v.targets.includes('app'));
+  const view = own ?? app?.views.find((v) => v.targets.includes('pane')) ?? null;
+  const target = own ? 'app' : 'pane';
   useTabTitle(routePath({ kind: ROUTE.app, id, ...(chat ? { chat } : {}) }), app?.name ?? null);
 
   // A card's «Открыть в панели» of another app takes this page to that app; this one is already open. The chat goes
@@ -119,10 +130,83 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
   // then pulling a column in.
   if (list === null || (conv !== null && record === undefined && !answered))
     return <div className="hx-appview__wait" aria-busy="true" />;
-  if (!app || !view) return <p className="hx-appview__error">{t('next.appmain.gone')}</p>;
+  if (!app) return <p className="hx-appview__error">{t('next.appmain.gone')}</p>;
+  if (!view) return <p className="hx-appview__error">{t('next.appmain.noScreen')}</p>;
 
   const onChat = record !== undefined && conv !== null;
-  const back = onChat ? () => goTo({ kind: ROUTE.chat, id: conv }) : null;
+  const open = (to: ConvId | null) => goTo({ kind: ROUTE.app, id, ...(to ? { chat: to } : {}) });
+  // The switch lists the chats of this machine the app is on in, and the chat on screen even where it is off.
+  const online = connection === undefined || connection.k === 'live';
+  const rows = (chats ?? [])
+    .filter((c) => c.id === conv || c.apps?.includes(id))
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      machine: null,
+      status: chatStatusOf(c, online),
+      at: c.lastActivityAt,
+    }));
+  // A new chat starts where the chat on screen works (or the latest one of the machine), with the app already on in it.
+  const like = record ?? chats?.[0];
+  const newChat = like
+    ? async () => {
+        if (making) return;
+        setMaking(true);
+        try {
+          const made = await createConversation(machine, {
+            where: like.projectId ? { projectId: like.projectId } : { cwd: like.cwd },
+            provider: like.provider,
+            model: like.model,
+          }).conversation;
+          if (made === null) throw new Error(t('next.appmain.newChatFailed'));
+          await settled(setConversationApps(machine, made, [id]));
+          open(made);
+        } catch (e) {
+          toast(t('next.appmain.newChatFailed'), {
+            tone: 'error',
+            description: e instanceof Error ? e.message : undefined,
+          });
+        } finally {
+          setMaking(false);
+        }
+      }
+    : null;
+  const chatSwitch = (
+    <ChatSwitch
+      current={onChat ? conv : null}
+      title={onChat ? (record?.title ?? '') : t('next.appmain.noChat')}
+      rows={rows}
+      onPick={(to) => open(to as ConvId | null)}
+      chatsLabel={t('next.appmain.chats')}
+      lead={[
+        ...(newChat
+          ? [
+              {
+                id: 'new',
+                icon: 'square-pen',
+                label: t('next.appmain.newChat'),
+                selected: false,
+                onPick: () => void newChat(),
+              },
+            ]
+          : []),
+        {
+          id: 'none',
+          icon: 'app-window',
+          label: t('next.appmain.noChat'),
+          selected: !onChat,
+          onPick: () => open(null),
+        },
+      ]}
+    />
+  );
+  const share = () => {
+    const link = new URL(routePath({ kind: ROUTE.app, id }), window.location.origin).href;
+    navigator.clipboard.writeText(link).then(
+      () => toast(t('next.appmain.shared'), { description: t('next.appmain.sharedHint') }),
+      () => toast(t('next.appmain.shareFailed'), { tone: 'error', description: link }),
+    );
+  };
   const menu: IAppMenuItem[] = [
     {
       id: 'about',
@@ -130,7 +214,13 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
       label: t('next.appmain.about'),
       onSelect: () => setInspector((now) => (now === 'about' ? 'closed' : 'about')),
     },
-    ...(app.dev
+    {
+      id: 'settings',
+      icon: 'settings',
+      label: t('next.appmain.settings'),
+      onSelect: () => goTo({ kind: ROUTE.apps }),
+    },
+    ...(app.dev || debugMode
       ? [
           {
             id: 'debug',
@@ -168,12 +258,14 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
     <>
       <AppMain
         title={app.name}
+        icon={app.icon || 'layout-grid'}
         chatTitle={onChat ? (record?.title ?? null) : null}
+        chatSwitch={chatSwitch}
+        onShare={share}
         placement={layout.placement}
         float={layout.float}
         onPlacement={(placement, section) => place(withPlacement(layout, placement, section))}
         onFloat={(float) => place({ ...layout, float })}
-        onBack={back}
         onOpenDrawer={onOpenDrawer}
         menu={menu}
         stage={
@@ -181,7 +273,7 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
             machine={machine}
             app={app}
             view={view}
-            target="app"
+            target={target}
             viewPort={list.viewPort}
             conversation={onChat ? conv : null}
             reloadToken={reload}
@@ -213,7 +305,7 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
               machine={machine}
               app={app}
               view={view}
-              target="app"
+              target={target}
               conversation={onChat ? conv : null}
               debug={inspector === 'debug'}
               onReload={() => setReload((n) => n + 1)}

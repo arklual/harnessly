@@ -8,7 +8,19 @@ import TabStrip, { PACE, type IStripTab, type TPace } from '@/next/features/shel
 import { STATUS_LOOK } from '@/next/features/sidebar/status';
 import { CHAT_STATUS } from '@/next/features/sidebar/types';
 import type { ITabChat } from '@/next/bindings/shell-model';
+import {
+  isIdle,
+  isUntouched,
+  raiseIndex,
+  rankOf,
+  TAB_PLACE,
+  TAB_SWEEP_MS,
+  type ITidyTab,
+  type TRank,
+} from '@/next/features/shell/tab-tidy';
+import { draftsStore, emptyDraft } from '@/next/stores/drafts';
 import { t } from '@/next/i18n';
+import type { ConvId } from '@/next/protocol/v2';
 import { goTo, parseRoute, ROUTE, routePath, useRoute, type TRoute } from '@/next/routes/routes';
 import {
   activeTab,
@@ -77,6 +89,24 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
     return { id: tab.id, title: tab.title ?? route.id, icon: 'pen-tool', busy: null, attention: false };
   const fixed = FIXED[route.kind];
   return { id: tab.id, title: fixed.title(), icon: fixed.icon, busy: null, attention: false };
+};
+
+/** What the tidying rules read of a tab (features/shell/tab-tidy). */
+export const tidyTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ITidyTab => {
+  const route = parseRoute(tab.path);
+  const base = { id: tab.id, leftAt: tab.leftAt, status: null, empty: false, draft: false, activityAt: null };
+  if (route.kind === ROUTE.home) return { ...base, place: TAB_PLACE.home };
+  if (route.kind !== ROUTE.chat) return { ...base, place: TAB_PLACE.other };
+  const chat = chats.get(route.id);
+  const draft = draftsStore.get(route.id as ConvId);
+  return {
+    ...base,
+    place: TAB_PLACE.chat,
+    status: chat ? chat.status : null,
+    empty: chat?.empty === true,
+    draft: draft !== undefined && !emptyDraft(draft),
+    activityAt: chat?.lastActivityAt ?? null,
+  };
 };
 
 /** The scroll of the screen on view, by scroller. */
@@ -295,6 +325,66 @@ export const useShellTabs = (byId: ReadonlyMap<string, ITabChat>, enabled: boole
       if (title && title !== tab.title) tabsStore.patch(tab.id, { title });
     }
   }, [byId, state.tabs]);
+
+  // Tidying (features/shell/tab-tidy). The chats are read through a ref: the sweep and the leave are not redone
+  // at each status change.
+  const chatsRef = useRef(byId);
+  useLayoutEffect(() => {
+    chatsRef.current = byId;
+  }, [byId]);
+
+  // A tab the person leaves remembers when; one nothing was done in goes.
+  const wasActive = useRef(active.id);
+  useEffect(() => {
+    if (!enabled) return;
+    const prev = wasActive.current;
+    wasActive.current = active.id;
+    if (prev === active.id) return;
+    tabsStore.patch(active.id, { leftAt: null });
+    const left = tabsSnapshot().tabs.find((tab) => tab.id === prev);
+    if (!left) return;
+    if (isUntouched(tidyTabOf(left, chatsRef.current))) tabsStore.close(prev);
+    else tabsStore.patch(prev, { leftAt: Date.now() });
+  }, [active.id, enabled]);
+
+  // Tabs left alone for long, with nothing in them for the person, go.
+  useEffect(() => {
+    if (!enabled) return;
+    const sweep = () => {
+      const now = Date.now();
+      const snapshot = tabsSnapshot();
+      for (const tab of snapshot.tabs) {
+        if (tab.id === snapshot.active) continue;
+        if (tab.leftAt === null) tabsStore.patch(tab.id, { leftAt: now });
+        else if (isIdle(tidyTabOf(tab, chatsRef.current), now)) tabsStore.close(tab.id);
+      }
+    };
+    sweep();
+    const timer = setInterval(sweep, TAB_SWEEP_MS);
+    return () => clearInterval(timer);
+  }, [enabled]);
+
+  // A tab that comes to want the person moves to the front, behind those that want them as much or more.
+  const ranksWere = useRef<ReadonlyMap<string, TRank>>(new Map());
+  useEffect(() => {
+    if (!enabled) return;
+    const ranks = new Map<string, TRank>();
+    const known = new Map<string, TRank>();
+    for (const tab of state.tabs) {
+      const tidy = tidyTabOf(tab, byId);
+      ranks.set(tab.id, rankOf(tidy.status));
+      if (tidy.status !== null) known.set(tab.id, rankOf(tidy.status));
+    }
+    const were = ranksWere.current;
+    ranksWere.current = known;
+    for (const [id, rank] of known) {
+      const was = were.get(id);
+      if (was === undefined || rank >= was || id === state.active) continue;
+      const order = tabsSnapshot().tabs.map((tab) => tab.id);
+      const to = raiseIndex(order, ranks, id);
+      if (to !== null) tabsStore.move(id, to);
+    }
+  }, [byId, state.tabs, state.active, enabled]);
 
   const shown = useMemo(() => state.tabs.map((tab) => stripTabOf(tab, byId)), [state.tabs, byId]);
 

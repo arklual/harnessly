@@ -5,7 +5,7 @@ import { hub } from '@/next/core/realtime/hub';
 import { FakeRuntime } from '@/next/core/testing/fake-runtime';
 import { resetCore } from '@/next/core/testing/reset';
 import { bootFake, fakeEnv, settle, useFakeTime } from '@/next/core/testing/setup';
-import { bootNext, shutdownNext } from '@/next/boot';
+import { bootNext, ME_RETRY_MS, shutdownNext } from '@/next/boot';
 import { connectionStore } from '@/next/stores/connection';
 import { convsLoadedStore } from '@/next/stores/conversations';
 import { machinesStore } from '@/next/stores/machines';
@@ -150,6 +150,59 @@ describe('whose data the page keeps', () => {
     // Person a's own database still has their message for the next time they sign in.
     expect(kvs.get('a@x.ru')!.dump().outbox.has(id)).toBe(true);
     expect(kvs.get('b@x.ru')!.dump().outbox.size).toBe(0);
+  });
+
+  it('a me that failed is asked again: the page is ready meanwhile and the outbox starts once me answers (GitHub #29)', async () => {
+    const kvs = new Map<string, ReturnType<typeof memoryKV>>();
+    const id = await leaveUnsent(kvs);
+    const rt = new FakeRuntime();
+    await bootFake({ rt, start: false });
+    const openKV = (person: string) => {
+      if (!kvs.has(person)) kvs.set(person, memoryKV());
+      return kvs.get(person)!;
+    };
+    const good = localMeSource({ email: 'a@x.ru' });
+    let answers = 0;
+    const me: MeSource = {
+      // A runtime restarting mid-upgrade: a broken reply, then a refused connection, then the record.
+      load: async () => {
+        answers += 1;
+        if (answers === 1) throw new TypeError("Cannot read properties of undefined (reading 'density')");
+        if (answers === 2) return { k: 'failed', code: 'network' };
+        return good.load();
+      },
+      patch: good.patch,
+    };
+    const booting = bootNext(bootOpts(rt, openKV, me, 'a@x.ru'));
+    await vi.advanceTimersByTimeAsync(400);
+    const st = await booting;
+    expect(st).toEqual({ k: 'ready', machines: [rt.machineId] });
+    expect(meStore.get()).toEqual({ k: 'failed', code: 'http' });
+    expect(rt.commands.filter((c) => c.op === 'send')).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(ME_RETRY_MS[0] + ME_RETRY_MS[1] + 100);
+    await settle();
+    await vi.advanceTimersByTimeAsync(400);
+    await settle();
+    expect(answers).toBe(3);
+    expect(meStore.get().k).toBe('ready');
+    expect(messagesStore.get(id)).toBeDefined();
+    expect(rt.commands.filter((c) => c.op === 'send' && c.body.opId === id).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a me retry that hears 401 is the sign-in screen, not a local success', async () => {
+    const rt = new FakeRuntime();
+    await bootFake({ rt, start: false });
+    let answers = 0;
+    const me: MeSource = {
+      load: async () => (++answers === 1 ? { k: 'failed', code: 'timeout' } : { k: 'signed-out' }),
+      patch: async () => ({ r: 'failed' }),
+    };
+    const booting = bootNext(bootOpts(rt, () => memoryKV(), me, null));
+    await vi.advanceTimersByTimeAsync(400);
+    await booting;
+    await vi.advanceTimersByTimeAsync(ME_RETRY_MS[0] + 100);
+    await settle();
+    expect(meStore.get().k).toBe('signed-out');
   });
 
   it('empties the stores when the page lets the person go', async () => {

@@ -10,6 +10,21 @@ export type TChannel = (typeof CHANNELS)[number];
 export const TEAM_ROLE = { owner: 'owner', member: 'member' } as const;
 export type TTeamRole = (typeof TEAM_ROLE)[keyof typeof TEAM_ROLE];
 
+export const REFUSAL = {
+  trust: 'trust',
+  host: 'host',
+  name: 'name',
+  command: 'command',
+  kind: 'kind',
+} as const;
+export type TRefusal = (typeof REFUSAL)[keyof typeof REFUSAL];
+
+/** This machine's check of an entry before the download: why it cannot be installed here, and the secrets it will ask. */
+export interface IPrecheck {
+  refusals: { code: TRefusal; detail?: string }[];
+  secrets: string[];
+}
+
 export interface ICatalogEntry {
   id: string;
   channel: TChannel;
@@ -22,6 +37,8 @@ export interface ICatalogEntry {
   /** The team has this app installed on this channel. */
   installed: boolean;
   installedVersion?: string;
+  /** Absent from a runtime that does not check before the download. */
+  check?: IPrecheck;
 }
 
 export interface ITeamInfo {
@@ -57,6 +74,7 @@ export interface IPublicEntry {
   /** The archive that was shown; the install names it, so an entry that changed in between is refused. */
   sum: string;
   by: string;
+  check?: IPrecheck;
 }
 
 export const searchPublic = async (m: MachineId, query: string): Promise<IPublicEntry[]> => {

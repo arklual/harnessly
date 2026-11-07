@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"github.com/ly-solutions/harnessly/internal/docprovider"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/docprovider"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
 )
@@ -19,7 +20,7 @@ import (
 // one answers exactly as before.
 
 func integrationRoutes(d deps, c integrations.Config) []gate.Route {
-	if !d.Standalone && !c.Enabled() {
+	if !d.Standalone && !c.Enabled() && !docprovider.Declared() {
 		return nil
 	}
 	write := func(w http.ResponseWriter, status int, v any) {
@@ -109,8 +110,26 @@ func integrationRoutes(d deps, c integrations.Config) []gate.Route {
 					write(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 					return
 				}
-				boards, err := docprovider.For(c, nil).Boards(r.Context())
-				if err != nil {
+				// ?q= searches; a provider that only searches (docs/doc-adapters.md, boards-search) has no list, and says so.
+				p := docprovider.For(c, nil)
+				var boards []integrations.Board
+				var err error
+				if q, ok := r.URL.Query()["q"]; ok {
+					boards, err = p.SearchBoards(r.Context(), q[0])
+				} else {
+					boards, err = p.Boards(r.Context())
+				}
+				switch {
+				case errors.Is(err, docprovider.ErrSearchRequired):
+					write(w, 200, map[string]any{"boards": []integrations.Board{}, "searchRequired": true})
+					return
+				case errors.Is(err, docprovider.ErrUnsupported):
+					write(w, http.StatusNotImplemented, map[string]string{"code": "unsupported", "error": "boards are not supported by the documents service"})
+					return
+				case errors.Is(err, docprovider.ErrTooLarge):
+					write(w, http.StatusRequestEntityTooLarge, map[string]string{"code": "too_large", "error": "the documents service answered more boards than are taken; search instead"})
+					return
+				case err != nil:
 					failed(w, "boards", err)
 					return
 				}
@@ -123,25 +142,116 @@ func integrationRoutes(d deps, c integrations.Config) []gate.Route {
 				if refused(w, r) {
 					return
 				}
-				if r.Method != http.MethodGet {
-					w.Header().Set("Allow", "GET")
+				// The documents of a conversation through the provider (GitHub issue 26): the built-in catalog lists by
+				// session, an adapter's documents are the runtime's bindings (docprovider.Bindings).
+				p := docprovider.For(c, nil)
+				store := docprovider.BindingsAt(d.DataDir)
+				switch r.Method {
+				case http.MethodGet:
+					session := r.URL.Query().Get("session")
+					if session == "" || len(session) > 200 {
+						write(w, http.StatusBadRequest, map[string]string{"error": "session parameter required"})
+						return
+					}
+					docs, err := docprovider.ConversationDocuments(r.Context(), p, store, session)
+					if err != nil {
+						failed(w, "artifacts", err)
+						return
+					}
+					write(w, 200, map[string]any{"documents": docs})
+				case http.MethodPost:
+					publishToConversation(w, r, p, store, write, failed)
+				default:
+					w.Header().Set("Allow", "GET, POST")
 					write(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
-					return
 				}
-				session := r.URL.Query().Get("session")
-				if session == "" || len(session) > 200 {
-					write(w, http.StatusBadRequest, map[string]string{"error": "session parameter required"})
-					return
-				}
-				docs, err := c.Documents(r.Context(), session)
-				if err != nil {
-					failed(w, "artifacts", err)
-					return
-				}
-				write(w, 200, map[string]any{"documents": docs})
 			}),
 		},
 	}
+}
+
+// conversationPublishMax bounds a publish body: the biggest document (docshare.MaxBytes) and its JSON overhead.
+const conversationPublishMax = 4 << 20
+
+var requestKeyRe = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
+
+// publishToConversation publishes a document through the provider and binds it to the conversation:
+//
+//	POST /api/integrations/artifacts/documents {session, title, format, content, slug?, note?, requestId}
+//	 201 {document}        a new binding; 200 {document} the binding a repeat of requestId made before
+//	 501 code unsupported  the provider does not publish
+//	 502 code publish_failed  nothing was made
+//	 500 code bind_failed  published, not bound: {published}; a repeat of requestId binds without publishing again
+func publishToConversation(w http.ResponseWriter, r *http.Request, p docprovider.Provider, store *docprovider.Bindings,
+	write func(http.ResponseWriter, int, any), failed func(http.ResponseWriter, string, error)) {
+	var body struct {
+		Session   string `json:"session"`
+		Title     string `json:"title"`
+		Format    string `json:"format"`
+		Content   string `json:"content"`
+		Slug      string `json:"slug"`
+		Note      string `json:"note"`
+		RequestID string `json:"requestId"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, conversationPublishMax)).Decode(&body); err != nil {
+		var mb *http.MaxBytesError
+		if errors.As(err, &mb) {
+			write(w, http.StatusRequestEntityTooLarge, map[string]string{"code": "too_large", "error": "the document is too large"})
+			return
+		}
+		write(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		return
+	}
+	switch {
+	case body.Session == "" || len(body.Session) > 200:
+		write(w, http.StatusBadRequest, map[string]string{"error": "session required"})
+		return
+	case strings.TrimSpace(body.Title) == "" || body.Content == "":
+		write(w, http.StatusBadRequest, map[string]string{"error": "title and content required"})
+		return
+	case body.Format != "md" && body.Format != "html":
+		write(w, http.StatusBadRequest, map[string]string{"error": "format: md or html"})
+		return
+	case !requestKeyRe.MatchString(body.RequestID):
+		write(w, http.StatusBadRequest, map[string]string{"error": "requestId: 8 to 64 letters, digits, - or _"})
+		return
+	}
+	before, _ := store.Of(body.Session, p.Capabilities().Provider)
+	b, err := docprovider.PublishToConversation(r.Context(), p, store, docprovider.PublishRequest{Title: strings.TrimSpace(body.Title),
+		Format: body.Format, Content: body.Content, Slug: body.Slug, Note: body.Note, Visibility: "private", Conversation: body.Session}, body.RequestID)
+	var pe *docprovider.PublishError
+	var be *docprovider.BindError
+	switch {
+	case errors.Is(err, docprovider.ErrUnsupported):
+		write(w, http.StatusNotImplemented, map[string]string{"code": "unsupported", "error": "the documents service does not publish"})
+		return
+	case errors.As(err, &be):
+		agent.Log("warn", "integrations: published but not bound", agent.F{K: "err", V: be.Err.Error()})
+		write(w, http.StatusInternalServerError, map[string]any{"code": "bind_failed", "published": be.Published,
+			"error": "the document was published but not bound to the conversation; repeat the same requestId to bind it"})
+		return
+	case errors.As(err, &pe) && errors.Is(err, docprovider.ErrTooLarge):
+		write(w, http.StatusRequestEntityTooLarge, map[string]string{"code": "too_large", "error": "the documents service refused the document as too large"})
+		return
+	case errors.As(err, &pe):
+		var ue *integrations.UpstreamError
+		text := "the documents service is unreachable"
+		if errors.As(err, &ue) {
+			text = ue.Text
+		}
+		write(w, http.StatusBadGateway, map[string]string{"code": "publish_failed", "error": "publish failed: " + text})
+		return
+	case err != nil:
+		failed(w, "artifacts", err)
+		return
+	}
+	status := http.StatusCreated
+	for _, x := range before {
+		if x.Key == body.RequestID {
+			status = http.StatusOK
+		}
+	}
+	write(w, status, map[string]any{"document": b})
 }
 
 // personOf is who a board hand-off signs in: the page session's subject, named by the deployment when it knows the

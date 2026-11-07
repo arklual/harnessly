@@ -328,6 +328,12 @@ export function startOutbox(): () => void {
       wasLive.set(m, live);
     }
   });
+  // The outbox may start after the sockets (me answered late): a machine already live gets its flush now.
+  for (const m of [...connectionStore.keys()]) {
+    if (connectionStore.get(m)?.k !== 'live' || wasLive.get(m)) continue;
+    wasLive.set(m, true);
+    flushOutbox(m);
+  }
   return () => {
     unsubscribe();
     stopStatus();

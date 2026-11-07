@@ -12,7 +12,15 @@ import { hub, type HubOptions } from '@/next/core/realtime/hub';
 import { clearPersonData } from '@/next/core/session';
 import { batch, createStore } from '@/next/core/store';
 import { startOutbox } from '@/next/commands/messages';
-import { httpMeSource, loadMe, meStore, personKey, setMeSource, type MeSource } from '@/next/stores/me';
+import {
+  httpMeSource,
+  loadMe,
+  meStore,
+  personKey,
+  setMeSource,
+  type MeSource,
+  type MeState,
+} from '@/next/stores/me';
 import { machinesStore, putMachines } from '@/next/stores/machines';
 import { parsePage, type Machine, type MachineId } from '@/next/protocol/v2';
 
@@ -111,6 +119,83 @@ const flushOnHidden = () => {
 const withinCacheWait = (ready: Promise<void>) =>
   Promise.race([ready, new Promise<void>((r) => pageClock().setTimeout(r, CACHE_WAIT_MS))]);
 
+const signOut = (me: MeState): BootState => {
+  persistence?.stop();
+  persistence = null;
+  clearPersonData();
+  meStore.set(me);
+  return set({ k: 'signed-out' });
+};
+
+/** The person me confirmed: their cache and outbox (a different person than the hint is a clean start). */
+async function adopt(me: Extract<MeState, { k: 'ready' }>, openKV: (person: string) => KV): Promise<void> {
+  const person = personKey(me.me);
+  if (persistence?.person === person) {
+    await persistence.enableOutbox();
+  } else {
+    // Another person than the one this browser served last: nothing of the previous one is kept in memory.
+    persistence?.stop();
+    clearPersonData();
+    meStore.set(me);
+    persistence = startPersistence(openKV(person), { person });
+    await withinCacheWait(persistence.ready);
+  }
+  writeHint(person);
+  stopOutbox = startOutbox();
+  stopDraftSync = startDraftSync();
+}
+
+/** me is asked again after 1, 2, 4… up to 30 s, and at once when the browser is back online. */
+export const ME_RETRY_MS = [1000, 2000, 4000, 8000, 15000, 30000] as const;
+
+let stopMeRetry: (() => void) | null = null;
+
+function retryMe(mine: number, openKV: (person: string) => KV): void {
+  stopMeRetry?.();
+  const clock = pageClock();
+  let attempt = 0;
+  let timer: unknown = null;
+  let busy = false;
+  let done = false;
+  const stop = () => {
+    done = true;
+    clock.clearTimeout(timer);
+    if (typeof window !== 'undefined') window.removeEventListener('online', now);
+    if (stopMeRetry === stop) stopMeRetry = null;
+  };
+  const tryOnce = async () => {
+    if (done || busy) return;
+    if (mine !== generation) return stop();
+    busy = true;
+    clock.clearTimeout(timer);
+    const me = await loadMe();
+    busy = false;
+    if (done || mine !== generation) return stop();
+    if (me.k === 'ready') {
+      stop();
+      await adopt(me, openKV);
+      return;
+    }
+    if (me.k === 'signed-out') {
+      stop();
+      signOut(me);
+      return;
+    }
+    schedule();
+  };
+  function now() {
+    void tryOnce();
+  }
+  const schedule = () => {
+    const ms = ME_RETRY_MS[Math.min(attempt, ME_RETRY_MS.length - 1)]!;
+    attempt += 1;
+    timer = clock.setTimeout(now, ms);
+  };
+  if (typeof window !== 'undefined') window.addEventListener('online', now);
+  stopMeRetry = stop;
+  schedule();
+}
+
 /** Starts v2 once per page: cache of the last person → me → (their outbox) → machines → sockets. */
 export function bootNext(o: BootOptions = {}): Promise<BootState> {
   const mine = generation;
@@ -131,29 +216,11 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     if (gone()) return bootStore.get();
     const me = await loadMe();
     if (gone()) return bootStore.get();
-    if (me.k === 'signed-out') {
-      persistence?.stop();
-      persistence = null;
-      clearPersonData();
-      meStore.set(me);
-      return set({ k: 'signed-out' });
-    }
-    if (me.k === 'ready') {
-      const person = personKey(me.me);
-      if (persistence?.person === person) {
-        await persistence.enableOutbox();
-      } else {
-        // Another person than the one this browser served last: nothing of the previous one is kept in memory.
-        persistence?.stop();
-        clearPersonData();
-        meStore.set(me);
-        persistence = startPersistence(openKV(person), { person });
-        await withinCacheWait(persistence.ready);
-      }
-      writeHint(person);
-      stopOutbox = startOutbox();
-      stopDraftSync = startDraftSync();
-    }
+    if (me.k === 'signed-out') return signOut(me);
+    if (me.k === 'ready') await adopt(me, openKV);
+    // me did not answer as it should (a runtime restarting, a reply that is not a record): the machines still load,
+    // and me is asked again until it answers; its person's outbox starts then, without a reload.
+    else retryMe(mine, openKV);
     const machines = await loadMachines();
     if (gone()) return bootStore.get();
     if (machines === 'signed-out') return set({ k: 'signed-out' });
@@ -185,6 +252,7 @@ export async function shutdownNext(): Promise<void> {
   }
   booted = null;
   generation += 1;
+  stopMeRetry?.();
   // What was typed in the last second still reaches the person's own database.
   await p?.flushNow();
   p?.stop();

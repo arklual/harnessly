@@ -81,10 +81,10 @@ const List = () => {
 
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles title="Команды" lead={lead} />
         {view && (
-          <div className="ad-tools">
+          <div className="hb-tools">
             {scope.kind === 'tenant' && (
               <Btn
                 size="sm"

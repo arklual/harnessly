@@ -93,6 +93,8 @@ interface IRuntime {
   target: IDiskTarget;
   policy: TPolicy;
   uploadId: string | null;
+  /** The chunk the machine asked for, kept so a retry goes on in the same session. */
+  chunkSize: number;
   controller: AbortController;
   paused: boolean;
   canceled: boolean;
@@ -161,6 +163,7 @@ export class DiskUploadQueue {
         target,
         policy,
         uploadId: null,
+        chunkSize: 0,
         controller: new AbortController(),
         paused: false,
         canceled: false,
@@ -221,6 +224,20 @@ export class DiskUploadQueue {
         .request({ method: 'DELETE', path: `/api/fs/uploads/${rt.uploadId}`, signal: controller.signal })
         .catch(() => {});
     }
+  }
+
+  /** A failed file goes again; in the session the machine still holds it goes on from the bytes it has. */
+  retry(id: number): void {
+    const rt = this.runtimes.get(id);
+    const item = this.item(id);
+    if (!rt || item?.state !== UPLOAD_STATE.failed || rt.stopped) return;
+    rt.attempt = 0;
+    rt.paused = false;
+    rt.canceled = false;
+    rt.controller = new AbortController();
+    rt.mark = null;
+    this.patch(id, { state: UPLOAD_STATE.queued, speed: 0, note: null });
+    void this.pump();
   }
 
   resolveConflict(id: number, choice: TConflictChoice, forAll: boolean): void {
@@ -440,11 +457,20 @@ export class DiskUploadQueue {
 
   private async upload(id: number, rt: IRuntime, size: number): Promise<void> {
     const name = rt.file.name;
-    const session = await this.open(id, rt, size, name);
+    // After a failure the session may still be on the machine: ask where it is before opening a new one.
+    let kept = false;
+    if (rt.uploadId) {
+      const head = await this.call(id, rt, { method: 'HEAD', path: `/api/fs/uploads/${rt.uploadId}` });
+      kept = head.status === 200 && rt.chunkSize > 0;
+    }
+    const session = kept
+      ? { uploadId: rt.uploadId as string, offset: 0, chunkSize: rt.chunkSize }
+      : await this.open(id, rt, size, name);
     rt.uploadId = session.uploadId;
+    rt.chunkSize = session.chunkSize;
     const base = `/api/fs/uploads/${session.uploadId}`;
     let { offset } = session;
-    let resync = false;
+    let resync = kept;
     for (;;) {
       if (resync) {
         const head = await this.call(id, rt, { method: 'HEAD', path: base });

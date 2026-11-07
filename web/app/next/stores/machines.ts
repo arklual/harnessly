@@ -19,7 +19,7 @@ export const DEFAULT_LIMITS: Limits = {
   maxText: 100000,
   maxAttachments: 20,
   maxImageBytes: 10485760,
-  maxFileBytes: 52428800,
+  maxFileBytes: 0,
   slowMs: 3000,
   cmdBudgetMs: 10000,
   cmdTimeoutMs: 12000,

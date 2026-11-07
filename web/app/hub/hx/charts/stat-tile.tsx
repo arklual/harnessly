@@ -86,7 +86,7 @@ export const StatTile = ({
 
 /** The row of tiles with the board's wrappers. */
 export const StatTiles = ({ children }: { children: ReactNode }) => (
-  <div className="dash ad-dash mo-tiles">
+  <div className="dash hb-dash mo-tiles">
     <div className="sx-wrap">
       <div className="sx-grid">{children}</div>
     </div>

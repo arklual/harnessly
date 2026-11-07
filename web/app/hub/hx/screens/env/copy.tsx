@@ -69,10 +69,10 @@ export const CopyBody = ({ ctx }: { ctx: SheetCtx }) => {
                   setOff(new Set());
                 }}
               >
-                <span className="ad-dot" data-l="team">
+                <span className="hb-dot" data-l="team">
                   {m.initial}
                 </span>
-                <span className="ad-row__t">
+                <span className="hb-row__t">
                   <b>{m.short}</b>
                   <small>{peek(l)}</small>
                 </span>
@@ -148,10 +148,10 @@ export const CopyBody = ({ ctx }: { ctx: SheetCtx }) => {
           <span className="ev-check__box">
             <Icon i="check" />
           </span>
-          <span className="ad-ic">
+          <span className="hb-ic">
             <Icon i={KIND[x.r.kind].icon} size="sm" />
           </span>
-          <span className="ad-row__t">
+          <span className="hb-row__t">
             <b>{x.r.name}</b>
             <small>{x.hint}</small>
           </span>

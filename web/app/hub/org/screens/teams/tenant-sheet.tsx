@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, TextField } from '@kit';
 
 import { orgErrorText } from '../../api/errors';
-import type { TenantMember, TenantRole } from '../../api/tenant';
+import type { TenantDeletePlan, TenantMember, TenantRole } from '../../api/tenant';
 import { useOrg } from '../../context';
 import type { TenantRef } from '../../types';
 import { Seg } from '../../ui/page';
@@ -161,6 +161,86 @@ const People = ({ tenant }: { tenant: TenantRef }) => {
   );
 };
 
+const BLOCKER: Record<string, string> = {
+  machines: 'машин',
+  members: 'участников',
+  grants: 'выданных прав',
+  teams: 'команд',
+  invites: 'действующих приглашений',
+  sites: 'сайтов',
+  environment: 'записей окружения',
+};
+const REMOVES: Record<string, string> = {
+  limit_rules: 'правил лимитов',
+  revoked_machines_detached: 'отключённых машин (останутся с историей, без тенанта)',
+};
+
+const Delete = ({ tenant, onClose }: { tenant: TenantRef; onClose: () => void }) => {
+  const { api, shell, refreshShell } = useOrg();
+  const [plan, setPlan] = useState<TenantDeletePlan | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const load = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      setPlan(await api.planDeleteTenant(shell.org.slug, tenant.id));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPending(false);
+    }
+  };
+  const remove = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      await api.deleteTenant(shell.org.slug, tenant.id);
+      refreshShell();
+      onClose();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <section className="ht-field">
+      <h3 className="ht-h">Удаление тенанта</h3>
+      <p className="ht-note">Удалить можно только пустой тенант: без машин, людей, команд и сайтов.</p>
+      {plan && plan.blockers.length > 0 && (
+        <ul className="ht-note">
+          {plan.blockers.map((b) => (
+            <li key={b.kind}>
+              Мешает: {b.count} {BLOCKER[b.kind] ?? b.kind}
+            </li>
+          ))}
+        </ul>
+      )}
+      {plan && plan.canDelete && plan.removes.length > 0 && (
+        <ul className="ht-note">
+          {plan.removes.map((r) => (
+            <li key={r.kind}>
+              Уйдёт вместе с ним: {r.count} {REMOVES[r.kind] ?? r.kind}
+            </li>
+          ))}
+        </ul>
+      )}
+      {plan?.canDelete && <p className="ht-note">Тенант пуст. Удаление нельзя отменить.</p>}
+      {error != null && <p className="ht-err">{orgErrorText(error)}</p>}
+      {plan?.canDelete ? (
+        <Button appearance="danger" loading={pending} onClick={() => void remove()}>
+          Удалить тенант
+        </Button>
+      ) : (
+        <Button appearance="ghost" loading={pending} onClick={() => void load()}>
+          Проверить, можно ли удалить
+        </Button>
+      )}
+    </section>
+  );
+};
+
 export const TenantSheet = ({
   open,
   tenant,
@@ -173,5 +253,6 @@ export const TenantSheet = ({
   <Sheet open={open} onClose={onClose} title="Настройки тенанта" sub={tenant.name}>
     <Name tenant={tenant} />
     <People tenant={tenant} />
+    <Delete tenant={tenant} onClose={onClose} />
   </Sheet>
 );

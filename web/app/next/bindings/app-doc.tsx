@@ -132,7 +132,6 @@ const AppDocPage = ({ machine, id, chat = null, edit = false, onMode, onOpenDraw
       float={null}
       onPlacement={() => undefined}
       onFloat={() => undefined}
-      onBack={null}
       onOpenDrawer={onOpenDrawer}
       menu={[]}
       lead={mode && <ModeButton mode={mode} />}

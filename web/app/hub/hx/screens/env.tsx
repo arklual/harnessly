@@ -318,7 +318,7 @@ const Header = ({
   onApply?: ((when: ApplyWhen) => Promise<boolean>) | null;
   onAdd?: (() => void) | null;
 }) => (
-  <div className="ad-head" data-block="Заголовок">
+  <div className="hb-head" data-block="Заголовок">
     <Titles
       title="Окружение"
       end={
@@ -341,7 +341,7 @@ const Header = ({
         ) : undefined
       }
     />
-    <div className="ad-tools ev-tools">
+    <div className="hb-tools ev-tools">
       {onLogs && (
         <Btn variant="ghost" size="sm" onClick={onLogs} aria-label="Логи">
           <Icon i="file-text" size="sm" />

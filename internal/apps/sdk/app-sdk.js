@@ -39,6 +39,41 @@ const STORAGE_SCOPES = ['install', 'user', 'chat', 'space', 'doc'];
  * Handshake with the host. Throws HarnesslyError('host_unavailable') when the view is not inside a Harnessly frame or
  * the host does not answer.
  */
+// The view's errors and console.error lines go to the host's debug section (harnessly/debug.log): kept from the moment
+// the SDK loads, sent once the view is connected. A few, short: it is a hint for the author, not a log store.
+const debugQueue = [];
+let debugSend = null;
+const debugLog = (level, text) => {
+  const line = { level, text: String(text).slice(0, 2000) };
+  if (debugSend) debugSend(line);
+  else if (debugQueue.length < 20) debugQueue.push(line);
+};
+const debugText = (v) => {
+  if (v instanceof Error) return `${v.name}: ${v.message}`;
+  if (typeof v === 'string') return v;
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
+};
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (e) =>
+    debugLog('error', `${e.message || 'error'}${e.filename ? ` (${e.filename}:${e.lineno})` : ''}`),
+  );
+  window.addEventListener('unhandledrejection', (e) => debugLog('error', `unhandled: ${debugText(e.reason)}`));
+  window.addEventListener('securitypolicyviolation', (e) =>
+    debugLog('error', `CSP blocked ${e.blockedURI || 'inline'} by ${e.violatedDirective}`),
+  );
+  for (const level of ['error', 'warn']) {
+    const own = console[level];
+    console[level] = (...args) => {
+      debugLog(level, args.map(debugText).join(' '));
+      own.apply(console, args);
+    };
+  }
+}
+
 export async function connect(options = {}) {
   const parent = options.parent ?? window.parent;
   if (!parent || parent === window) throw new HarnesslyError('host_unavailable', 'the view is open outside Harnessly');
@@ -46,6 +81,23 @@ export async function connect(options = {}) {
   const pending = new Map();
   const listeners = new Map();
   let hostOrigin = null;
+  // The view's page tools (hl.tools.register) by name, and how a call of the agent runs one: the answer, or the error in
+  // words, goes back to the host.
+  let pageTools = new Map();
+  const runPageTool = async (p) => {
+    const id = p?.id;
+    if (typeof id !== 'string') return;
+    let body;
+    try {
+      const tool = pageTools.get(p.name);
+      if (!tool) throw new Error(`the view offers no tool ${p.name}`);
+      const result = await tool.run(p.arguments ?? {});
+      body = { id, result: result === undefined ? null : result };
+    } catch (e) {
+      body = { id, error: e instanceof Error ? e.message : String(e) };
+    }
+    request('harnessly/tools.result', body).catch(() => {});
+  };
   let seq = 0;
 
   const send = (message) => parent.postMessage({ jsonrpc: '2.0', ...message }, hostOrigin ?? '*');
@@ -124,6 +176,9 @@ export async function connect(options = {}) {
       case 'harnessly/notifications/agents':
         emit(m.method.slice('harnessly/notifications/'.length), m.params);
         break;
+      case 'harnessly/notifications/tool-call':
+        void runPageTool(m.params);
+        break;
       default:
         // A request the view does not know gets the standard answer, so the host does not wait.
         if (m.id !== undefined) send({ id: m.id, error: { code: -32601, message: 'method not found' } });
@@ -143,6 +198,8 @@ export async function connect(options = {}) {
   hl.host = init.hostInfo;
   applyTheme(hl.context);
   notify('ui/notifications/initialized', {});
+  debugSend = (line) => notify('harnessly/debug.log', line);
+  for (const line of debugQueue.splice(0)) debugSend(line);
 
   hl.on = (event, fn) => {
     if (!listeners.has(event)) listeners.set(event, new Set());
@@ -159,6 +216,66 @@ export async function connect(options = {}) {
   hl.agents = { list: () => request('harnessly/agents.list', {}).then((r) => r.agents) };
   hl.pane = { open: (target) => request('harnessly/pane.open', { target }) };
   hl.tools = { call: (name, args = {}) => request('tools/call', { name, arguments: args }) };
+  // Tools of the page (right tools.page): the agent of the chat lists them with page_tools and calls one with page_call;
+  // the view runs it here, in the person's page, and the answer goes back. The host is told the whole list each time.
+  const announce = () =>
+    request('harnessly/tools.register', {
+      tools: [...pageTools.values()].map(({ name, description, inputSchema, confirm }) => ({ name, description, inputSchema, confirm })),
+    });
+  hl.tools.register = (tool, run) => {
+    if (!tool || typeof tool.name !== 'string' || typeof run !== 'function')
+      return Promise.reject(new HarnesslyError('invalid_params', 'register({name, description, inputSchema}, run)'));
+    // A tool that changes something asks the person first: confirm, or WebMCP's destructiveHint.
+    const confirm = tool.confirm === true || tool.annotations?.destructiveHint === true;
+    pageTools.set(tool.name, { name: tool.name, description: tool.description ?? '', inputSchema: tool.inputSchema, confirm, run });
+    const ready = announce();
+    const unregister = () => {
+      if (pageTools.get(tool.name)?.run !== run) return Promise.resolve();
+      pageTools.delete(tool.name);
+      return announce();
+    };
+    return Object.assign(ready.then(() => ({ unregister })), { unregister });
+  };
+  // What the view shows, for the agent to read with page_tools (right context.publish): the last one stands.
+  hl.publish = (data) => request('harnessly/context.publish', { data }).then(() => undefined);
+  // The standard WebMCP API: a view that registers its tools with navigator.modelContext offers them to the chat's agent
+  // the same way. Where the browser has its own, a tool goes to both.
+  const own = navigator.modelContext;
+  const unregisters = new Map();
+  const modelContext = {
+    registerTool: (tool) => {
+      const run = (args) => tool.execute(args ?? {}, { requestUserInteraction: (cb) => cb() });
+      const handle = hl.tools.register(tool, run);
+      unregisters.set(tool.name, handle.unregister);
+      let native;
+      try {
+        native = own?.registerTool?.(tool);
+      } catch {
+        native = undefined;
+      }
+      return {
+        unregister: () => {
+          unregisters.delete(tool.name);
+          native?.unregister?.();
+          return handle.unregister();
+        },
+      };
+    },
+    unregisterTool: (name) => {
+      unregisters.get(name)?.();
+      unregisters.delete(name);
+      try {
+        own?.unregisterTool?.(name);
+      } catch {
+        // the browser's own may not know it
+      }
+    },
+  };
+  try {
+    Object.defineProperty(navigator, 'modelContext', { value: modelContext, configurable: true });
+  } catch {
+    // a frozen navigator: hl.tools.register still works
+  }
   // hl.flow and hl.data were never connected in the host (every call answered host_unavailable) and are gone. A view
   // that still calls them gets the reason, not a silent hang: use hl.storage (state) and hl.on('data') (a chat card).
   const removed = (name, instead) =>

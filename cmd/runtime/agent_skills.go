@@ -106,7 +106,7 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"harnessly open <link|file|port>   # show it to the person in the right pane (a document, a board, ./report.md, 4400)\n" +
 		"harnessly deliver <file>          # hand a file to the person (zip, docx, pdf, md): a card in the chat to open and download\n" +
 		"harnessly tab list                # the tabs of this workspace\n" +
-		"harnessly tab create -t codex-cli --prompt \"<the whole task>\"   # start another agent (claude-code | codex-cli | terminal)\n" +
+		"harnessly tab create -t codex-cli --prompt \"<the whole task>\" [--notify]   # hand a task to another agent: a chat nested under yours\n" +
 		"harnessly tab status <id>         # is it working or waiting\n" +
 		"harnessly tab result <id>         # what its screen shows: read its answer\n" +
 		"harnessly docs search <words>     # the documentation of harnessly and of this team: read it before guessing\n" +
@@ -115,8 +115,9 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"harnessly --help                  # everything, with examples\n" +
 		"```\n\n")
 	b.WriteString("Show the person what they should look at: after you publish a document or draw a board, or when a dev server is running, " +
-		"`harnessly open` it. Start another agent only with `tab create --prompt`; a `claude` or `codex` command typed into a shell tab " +
-		"starts it without the workspace's hooks.\n\n")
+		"`harnessly open` it. To hand a task to another agent, make a nested chat: the MCP tool `delegate_task` or `harnessly tab create --prompt` " +
+		"(both give the person a chat under yours, the workspace's hooks, and a way to read the answer or be woken by it with `notify`). " +
+		"A `claude` or `codex` command typed into a shell tab starts it without the workspace's hooks.\n\n")
 	if !strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off") {
 		b.WriteString("## Browser\n\n")
 		b.WriteString("A Chrome of your own is already available, with or without the person's page: use `chrome_*` tools or " +

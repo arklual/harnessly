@@ -239,7 +239,7 @@ export const GroupCard = ({
         onKeyDown={onKey(onToggle)}
       >
         <Icon i="chevron-right" size="sm" className="mo-g__chev" />
-        <span className="ad-dot tg-dot" style={{ '--c': g.color } as CSSProperties}>
+        <span className="hb-dot tg-dot" style={{ '--c': g.color } as CSSProperties}>
           {g.initial}
         </span>
         <span className="mo-g__t">

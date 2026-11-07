@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/pricing"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -227,8 +228,11 @@ func (fp FileProfile) preset() (Preset, []priceRow, error) {
 	}
 	var rows []priceRow
 	for _, fm := range fp.Models {
-		if fm.ID == "" || strings.ContainsAny(fm.ID, " \t\r\n'\"") {
-			return Preset{}, nil, errors.New("models: an id without spaces and quotes")
+		// The id is what a launch passes (agents.CheckLaunch): a profile the launcher would refuse is refused here,
+		// with the reason, not offered in the model picker and then failed as «Invalid launch model».
+		if !agents.IsProfileModelID(fm.ID) {
+			return Preset{}, nil, fmt.Errorf("model %q: an id is up to %d characters of letters, digits and . _ : -, "+
+				"with up to four parts joined by / (vendor/model)", fm.ID, agents.MaxProfileModelID)
 		}
 		m := Model{ID: fm.ID, Label: fm.Label, Hint: fm.Hint, Window: fm.Window}
 		if m.Label == "" {

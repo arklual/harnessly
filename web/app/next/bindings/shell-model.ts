@@ -288,8 +288,22 @@ export const chatLookOf = (c: Conversation, online: boolean): Pick<ISidebarChat,
   return waitsFor ? { status, waitsFor } : { status };
 };
 
-/** What a tab over the window shows of its chat. */
-export type ITabChat = Pick<ISidebarChat, 'id' | 'title' | 'status' | 'waitsFor'>;
+/** What a tab over the window shows of its chat, and what its tidying reads (features/shell/tab-tidy). */
+export type ITabChat = Pick<ISidebarChat, 'id' | 'title' | 'status' | 'waitsFor'> & {
+  /** No message of the person's and nothing on its way: the chat was opened and left as it came. */
+  empty?: boolean;
+  lastActivityAt?: number;
+};
+
+/** A chat nothing was done in yet: no turn, no message waiting in its queue, the agent not at work. */
+export const isEmptyChat = (
+  c: Pick<Conversation, 'lastTurn' | 'queue' | 'state' | 'lastPromptAt' | 'createdAt'>,
+) =>
+  c.lastTurn === null &&
+  c.queue.count === 0 &&
+  c.lastPromptAt <= c.createdAt &&
+  c.state.k !== 'working' &&
+  c.state.k !== 'starting';
 
 /**
  * The chats of every machine for the tabs over the window: a tab may hold a chat of a machine other than the open one,
@@ -340,6 +354,8 @@ export function useTabChats(): ReadonlyMap<string, ITabChat> {
           id: c.id,
           title: c.title || t('next.shellData.untitled'),
           ...chatLookOf(c, !away.has(c.machineId)),
+          empty: isEmptyChat(c),
+          lastActivityAt: c.lastActivityAt,
         },
       ]),
     );

@@ -39,18 +39,18 @@ const Switcher = () => {
   }, [setOpen]);
 
   return (
-    <div className="ad-ctx" ref={root}>
+    <div className="hb-ctx" ref={root}>
       <button
         type="button"
-        className="ad-ctx__btn"
+        className="hb-ctx__btn"
         aria-expanded={pop.open}
         aria-haspopup="menu"
         onClick={pop.toggle}
       >
-        <span className="ad-ctx__mark" data-org={isOrg ? '1' : '0'}>
+        <span className="hb-ctx__mark" data-org={isOrg ? '1' : '0'}>
           {initial(title)}
         </span>
-        <span className="ad-ctx__t">
+        <span className="hb-ctx__t">
           <b>{title}</b>
           <small>{sub}</small>
         </span>
@@ -83,18 +83,18 @@ const SwitcherPop = ({ closing, onPick }: { closing: '1' | undefined; onPick: ()
     <button
       key={`${pin ? 'p' : 'r'}-${t.id}`}
       type="button"
-      className="ad-pop__item"
+      className="hb-pop__item"
       role="menuitem"
       onClick={() => go(`${prefix}/${t.slug}/overview`)}
     >
-      <span className="ad-dot">{initial(t.name)}</span>
+      <span className="hb-dot">{initial(t.name)}</span>
       <span>{t.name}</span>
       {t.slug === here ? <Icon i="check" size="sm" /> : pin ? <Icon i="pin" size="sm" /> : null}
     </button>
   );
   return (
-    <div className="ad-pop ad-pop--wide" data-closing={closing} role="menu">
-      <label className="ad-pop__search">
+    <div className="hb-pop hb-pop--wide" data-closing={closing} role="menu">
+      <label className="hb-pop__search">
         <Icon i="search" size="sm" />
         <input
           ref={search}
@@ -108,30 +108,30 @@ const SwitcherPop = ({ closing, onPick }: { closing: '1' | undefined; onPick: ()
       {admin && !needle && (
         <button
           type="button"
-          className="ad-pop__item ad-pop__org"
+          className="hb-pop__item hb-pop__org"
           role="menuitem"
           onClick={() => go(`${prefix}/all/overview`)}
         >
-          <span className="ad-dot ad-dot--org">
+          <span className="hb-dot hb-dot--org">
             <Icon i="layers" size="sm" />
           </span>
           <span>Вся организация</span>
           {isOrg && <Icon i="check" size="sm" />}
         </button>
       )}
-      {recent.length > 0 && <div className="ad-pop__label">Недавние</div>}
+      {recent.length > 0 && <div className="hb-pop__label">Недавние</div>}
       {recent.map((t) => row(t, false))}
-      {pinned.length > 0 && <div className="ad-pop__label">Закреплённые</div>}
+      {pinned.length > 0 && <div className="hb-pop__label">Закреплённые</div>}
       {pinned.map((t) => row(t, true))}
       {needle && recent.length === 0 && pinned.length === 0 && (
-        <div className="ad-pop__empty">Ничего не нашлось</div>
+        <div className="hb-pop__empty">Ничего не нашлось</div>
       )}
       {!needle && admin && (
         <>
-          <div className="ad-pop__sep" />
+          <div className="hb-pop__sep" />
           <button
             type="button"
-            className="ad-pop__item"
+            className="hb-pop__item"
             data-muted="1"
             role="menuitem"
             onClick={() => go(`${prefix}/all/overview`)}
@@ -141,7 +141,7 @@ const SwitcherPop = ({ closing, onPick }: { closing: '1' | undefined; onPick: ()
           </button>
           <button
             type="button"
-            className="ad-pop__item"
+            className="hb-pop__item"
             data-muted="1"
             role="menuitem"
             onClick={() => go(`/new?org=${encodeURIComponent(shell.org.slug)}`)}
@@ -153,17 +153,17 @@ const SwitcherPop = ({ closing, onPick }: { closing: '1' | undefined; onPick: ()
       )}
       {!needle && shell.orgs.length > 0 && (
         <>
-          <div className="ad-pop__sep" />
-          <div className="ad-pop__label">Организации</div>
+          <div className="hb-pop__sep" />
+          <div className="hb-pop__label">Организации</div>
           {shell.orgs.map((o) => (
             <button
               key={o.slug}
               type="button"
-              className="ad-pop__item"
+              className="hb-pop__item"
               role="menuitem"
               onClick={() => go(`/o/${o.slug}`)}
             >
-              <span className="ad-dot">{initial(o.name)}</span>
+              <span className="hb-dot">{initial(o.name)}</span>
               <span>{o.name}</span>
               <small>{o.roleLabel}</small>
             </button>
@@ -182,7 +182,7 @@ const Nav = ({ onPick }: { onPick: () => void }) => {
     [shell.viewer.role, team?.name, shell.features, scope.kind],
   );
   return (
-    <nav className="hx-nav ad-hubnav" aria-label="Разделы хаба">
+    <nav className="hx-nav hb-hubnav" aria-label="Разделы хаба">
       {groups.map((g) => (
         <GroupItems key={g.label || 'main'} label={g.label}>
           {g.items.map((it) => {
@@ -219,7 +219,7 @@ const Nav = ({ onPick }: { onPick: () => void }) => {
 
 const GroupItems = ({ label, children }: { label: string; children: ReactNode }) => (
   <>
-    {label && <div className="hx-group__label ad-static ad-hubnav__h">{label}</div>}
+    {label && <div className="hx-group__label hb-static hb-hubnav__h">{label}</div>}
     {children}
   </>
 );
@@ -258,7 +258,7 @@ const Workspace = ({ onPick }: { onPick: () => void }) => {
     navigate(`${base}/machines`);
   };
   return (
-    <div className="hx-nav ad-hubnav hx-wsnav">
+    <div className="hx-nav hb-hubnav hx-wsnav">
       <div className="hx-nav__group">
         <button
           type="button"
@@ -341,7 +341,7 @@ export const HxShell = ({ children }: { children: ReactNode }) => {
   return (
     <LiveCtx.Provider value={live}>
       <div
-        className="hx-root hx-app ad"
+        className="hx-root hx-app hb"
         data-hx-theme={theme}
         data-live={live ? '1' : undefined}
         data-hxh-side={side ? 'open' : undefined}
@@ -364,7 +364,7 @@ export const HxShell = ({ children }: { children: ReactNode }) => {
             </span>
             <span className="hx-brand__name">harnessly</span>
             <span className="hx-spacer" />
-            <span className="ad-hubtag">хаб</span>
+            <span className="hb-hubtag">хаб</span>
           </div>
           <Switcher />
           <Nav onPick={() => setSide(false)} />

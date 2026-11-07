@@ -145,6 +145,7 @@
 }
 .hx-tour-card__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--hx-space-2);
   margin-top: var(--hx-space-3);
@@ -170,5 +171,47 @@
   .hx-tour-card {
     animation: none;
     transition: none;
+  }
+}
+
+/* The element a step rings inside the design's page: over its place in the frame, seen only by the tour. */
+.hx-tour-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  translate: var(--x) var(--y);
+  pointer-events: none;
+}
+.hx-tour-anchor[data-place='hidden'] {
+  display: none;
+}
+
+/* The design the step is on is still loading: the card says so beside a small spinner. */
+.hx-tour-card__wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  color: var(--hx-accent);
+  font-size: 13px;
+}
+.hx-tour-card__spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: hx-tour-spin 800ms linear infinite;
+}
+@keyframes hx-tour-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-tour-card__spin {
+    animation-duration: 2400ms;
   }
 }

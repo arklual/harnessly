@@ -19,8 +19,17 @@ export interface IChatSwitchRow {
   machine: string | null;
 }
 
+/** A row above the chats in place of the design's «Новый чат»: the app page's new chat and its «Без чата». */
+export interface IChatSwitchLead {
+  id: string;
+  icon: string;
+  label: string;
+  selected: boolean;
+  onPick: () => void;
+}
+
 export interface IChatSwitchProps {
-  /** The chat on screen; null: a new chat for the design. */
+  /** The chat on screen; null: a new chat for the design (or none, with `lead`). */
   current: string | null;
   /** Its title (it may not be in the rows yet: a chat made a moment ago). */
   title: string;
@@ -28,6 +37,10 @@ export interface IChatSwitchProps {
   onPick: (id: string | null) => void;
   /** The list opens: the machines are asked again for the design's chats. */
   onOpen?: () => void;
+  /** The rows above the chats; absent: the design's own «Новый чат», picked as null. */
+  lead?: readonly IChatSwitchLead[];
+  /** The heading over the chats; absent: «Чаты этого дизайна». */
+  chatsLabel?: string;
 }
 
 /** The menu's exit, as long as hx-dl-pop-out in site.css. */
@@ -49,7 +62,7 @@ const StatusMark = ({ status }: { status: TChatStatus }) => {
   );
 };
 
-export const ChatSwitch = ({ current, title, rows, onPick, onOpen }: IChatSwitchProps) => {
+export const ChatSwitch = ({ current, title, rows, onPick, onOpen, lead, chatsLabel }: IChatSwitchProps) => {
   const [open, setOpen] = useState(false);
   const menu = usePresence(open ? true : null, MENU_MS);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -72,6 +85,7 @@ export const ChatSwitch = ({ current, title, rows, onPick, onOpen }: IChatSwitch
     };
   }, [open]);
 
+  const heading = chatsLabel ?? t('next.site.chats');
   const choose = (id: string | null) => {
     setOpen(false);
     if (id !== current) onPick(id);
@@ -99,20 +113,39 @@ export const ChatSwitch = ({ current, title, rows, onPick, onOpen }: IChatSwitch
           className="hx-site-menu hx-site-menu--start hx-chatswitch__menu"
           data-state={menu.state}
           role="listbox"
-          aria-label={t('next.site.chats')}
+          aria-label={heading}
           onPointerDown={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
-            role="option"
-            className="hx-option hx-chatswitch__row"
-            aria-selected={current === null}
-            onClick={() => choose(null)}
-          >
-            <Icon name="square-pen" size="sm" />
-            <span className="hx-chatswitch__name">{t('next.site.newChat')}</span>
-          </button>
-          {rows.length > 0 && <div className="hx-dl-pop__label">{t('next.site.chats')}</div>}
+          {lead ? (
+            lead.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                role="option"
+                className="hx-option hx-chatswitch__row"
+                aria-selected={row.selected}
+                onClick={() => {
+                  setOpen(false);
+                  if (!row.selected) row.onPick();
+                }}
+              >
+                <Icon name={row.icon} size="sm" />
+                <span className="hx-chatswitch__name">{row.label}</span>
+              </button>
+            ))
+          ) : (
+            <button
+              type="button"
+              role="option"
+              className="hx-option hx-chatswitch__row"
+              aria-selected={current === null}
+              onClick={() => choose(null)}
+            >
+              <Icon name="square-pen" size="sm" />
+              <span className="hx-chatswitch__name">{t('next.site.newChat')}</span>
+            </button>
+          )}
+          {rows.length > 0 && <div className="hx-dl-pop__label">{heading}</div>}
           {rows.map((row) => (
             <button
               key={row.id}

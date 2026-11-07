@@ -5,6 +5,7 @@ package layoutapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -114,6 +115,36 @@ type Agents interface {
 	AutoResume()
 }
 
+// DelegateRequest is an agent tab with a first message, asked for by an agent of a chat: the chat the work is handed to
+// is nested under the chat that asks (internal/delegation), as the MCP tool delegate_task makes it.
+type DelegateRequest struct {
+	// Session is the tmux session of the terminal the command ran in; the chat that asks is the one that runs there.
+	Session  string
+	Provider string
+	Model    string
+	Effort   string
+	Prompt   string
+	Title    string
+	Notify   bool
+}
+
+// DelegateResult is the nested chat that was started.
+type DelegateResult struct {
+	ChatID, ParentID, Provider, Model string
+}
+
+// ErrNoParent says the command did not run in the terminal of a chat, so there is no chat to nest the new one under;
+// the tab is then made the old way, and Reason is told to the caller.
+type ErrNoParent struct{ Reason string }
+
+func (e *ErrNoParent) Error() string { return e.Reason }
+
+// DelegateRefused is a delegation the machine refused (too many chats, too deep, an unknown model): the person's limits,
+// not a reason to start a loose tab instead.
+type DelegateRefused struct{ Msg string }
+
+func (e *DelegateRefused) Error() string { return e.Msg }
+
 // Sync is the sync socket: an event to every page, and how many sockets are open (the agent's relay included).
 type Sync interface {
 	Broadcast(event *jsvalue.Object)
@@ -130,6 +161,12 @@ type Deps struct {
 	Tmux    Tmux
 	Status  Status
 	Agents  Agents
+	// Delegate starts the first message of an agent tab as a chat nested under the chat of the asking terminal; nil, or
+	// an *ErrNoParent, leaves the tab to be made the old way.
+	Delegate func(context.Context, DelegateRequest) (DelegateResult, error)
+	// ChatTab is the layout tab a chat runs in ("" while it has none): a chat's id is not the id of its tab, and the CLI
+	// names a delegated chat by its own id.
+	ChatTab func(chatID string) string
 	Sync    Sync
 	Intents *paneintents.Store
 	Panel   *panel.Bridge
@@ -284,6 +321,8 @@ type call struct {
 	out    []byte
 	json   bool
 	sent   bool
+	// noParent is why a tab create with a first message was not nested under a chat (tab create).
+	noParent string
 	// stream, when set, writes the answer itself after the headers (a server-sent stream).
 	stream func(w http.ResponseWriter)
 }

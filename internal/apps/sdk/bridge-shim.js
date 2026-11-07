@@ -18,6 +18,20 @@
 
   var meta = document.querySelector('meta[name="hl-nonce"]');
   var nonce = meta ? meta.getAttribute('content') || '' : '';
+  // A view the app's own server hosts (delivery mode remote) gets the nonce in the address's fragment, which never reaches
+  // that server; it is taken out of the address at once, so the page's own scripts and a reload do not see it.
+  if (!nonce) {
+    var found = /(?:^#|&)hl-nonce=([A-Za-z0-9_-]+)/.exec(location.hash);
+    if (found) {
+      nonce = found[1];
+      var rest = location.hash.replace(/(?:^#|&)hl-nonce=[A-Za-z0-9_-]+/, '').replace(/^&/, '');
+      try {
+        history.replaceState(history.state, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+      } catch (e) {
+        // an address the page cannot rewrite: the nonce stays in it
+      }
+    }
+  }
   var PREFIX = 'hl-shim-';
   var RETRY_MS = 250;
   var GIVE_UP_MS = 15000;

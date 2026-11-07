@@ -26,7 +26,14 @@ var (
 	ErrNotFound = errors.New("extension: not found")
 	// ErrCircuitOpen means the adapter failed several calls in a row and is not called until the pause is over.
 	ErrCircuitOpen = errors.New("extension: the circuit is open, the adapter is not called for now")
+	// ErrTooLarge means the answer is bigger than the client takes (Config.MaxAnswer), or the adapter said so itself
+	// (413 or `too_large`). The answer is not cut and parsed: the caller gets this error and nothing else.
+	ErrTooLarge = errors.New("extension: the answer is too large")
 )
+
+// DefaultMaxAnswer is the biggest answer a client reads when Config.MaxAnswer is zero: 1 MiB of JSON, overhead
+// (escaping, the envelope) included.
+const DefaultMaxAnswer int64 = 1 << 20
 
 // Error is a refusal or a failure from an adapter with its own code.
 type Error struct {
@@ -81,6 +88,8 @@ type Config struct {
 	BreakerFailures int
 	// BreakerPause is how long an open breaker lets no call through before it lets one try; zero means 30 seconds.
 	BreakerPause time.Duration
+	// MaxAnswer is the biggest answer body read, in bytes; zero means DefaultMaxAnswer. A bigger one is ErrTooLarge.
+	MaxAnswer int64
 }
 
 // Client calls one adapter: the token, the timeout, the retries, the idempotency key and the breaker.
@@ -91,6 +100,7 @@ type Client struct {
 	attempts int
 	backoff  time.Duration
 	breaker  *Breaker
+	max      int64
 }
 
 // NewClient makes a client. The address is checked and the token file is read now, so that a wrong setting stops the
@@ -100,7 +110,10 @@ func NewClient(c Config) (*Client, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, fmt.Errorf("extension: %q is not an http(s) address", c.BaseURL)
 	}
-	cl := &Client{base: u.String(), tokens: tokenFile{path: c.TokenFile}, client: c.Client, attempts: c.Attempts, backoff: c.Backoff}
+	cl := &Client{base: u.String(), tokens: tokenFile{path: c.TokenFile}, client: c.Client, attempts: c.Attempts, backoff: c.Backoff, max: c.MaxAnswer}
+	if cl.max <= 0 {
+		cl.max = DefaultMaxAnswer
+	}
 	if cl.client == nil {
 		t := c.Timeout
 		if t <= 0 {
@@ -124,6 +137,9 @@ func NewClient(c Config) (*Client, error) {
 	}
 	return cl, nil
 }
+
+// MaxAnswer is the biggest answer the client reads.
+func (c *Client) MaxAnswer() int64 { return c.max }
 
 // Breaker is the circuit breaker of the client, nil when it is turned off.
 func (c *Client) Breaker() *Breaker { return c.breaker }
@@ -182,7 +198,7 @@ func transient(err error) bool {
 	if errors.As(err, &e) {
 		return e.Status >= 500
 	}
-	return !errors.Is(err, ErrUnsupported) && !errors.Is(err, ErrNotFound)
+	return !errors.Is(err, ErrUnsupported) && !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrTooLarge)
 }
 
 func (c *Client) do(ctx context.Context, method, path string, in any, mutating bool, out any) error {
@@ -250,9 +266,12 @@ func (c *Client) once(ctx context.Context, method, path string, body []byte, key
 		return true, err
 	}
 	defer res.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	raw, err := io.ReadAll(io.LimitReader(res.Body, c.max+1))
 	if err != nil {
 		return true, err
+	}
+	if int64(len(raw)) > c.max {
+		return false, ErrTooLarge
 	}
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		if out == nil || len(bytes.TrimSpace(raw)) == 0 {
@@ -273,6 +292,8 @@ func (c *Client) once(ctx context.Context, method, path string, body []byte, key
 		return false, ErrUnsupported
 	case res.StatusCode == http.StatusNotFound:
 		return false, ErrNotFound
+	case res.StatusCode == http.StatusRequestEntityTooLarge || e.Error == "too_large":
+		return false, ErrTooLarge
 	}
 	return res.StatusCode >= 500, &Error{Status: res.StatusCode, Code: e.Error, Message: e.Message}
 }

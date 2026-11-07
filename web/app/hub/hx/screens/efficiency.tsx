@@ -225,7 +225,7 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
 
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles
           title="Эффективность"
           lead={d ? `${d.scopeLabel} · за ${nowLabel}: сколько стоит смёржённый MR и почему` : 'Считаем'}
@@ -235,7 +235,7 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
       <div className="ef-scales">
         <Scales />
       </div>
-      <div className="dash ad-dash anx" data-busy={d && !data.fresh && !data.error ? '1' : undefined}>
+      <div className="dash hb-dash anx" data-busy={d && !data.fresh && !data.error ? '1' : undefined}>
         {data.error && !data.fresh ? (
           <Failure title="Не удалось загрузить эффективность" error={data.error} retry={data.reload} />
         ) : !d ? (
@@ -404,10 +404,10 @@ const Screen = () => {
   if (frame.data) return <Body key={base} frame={frame.data} />;
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles title="Эффективность" lead="Считаем" />
       </div>
-      <div className="dash ad-dash anx">
+      <div className="dash hb-dash anx">
         {frame.error ? (
           <Failure title="Не удалось загрузить эффективность" error={frame.error} retry={frame.reload} />
         ) : (

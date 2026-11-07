@@ -389,3 +389,39 @@ func TestRecoverTabSession(t *testing.T) {
 		t.Fatal("an unreadable history is no reason to fail")
 	}
 }
+
+// GitHub #24: a profile's «vendor/model» launches; a catalog model stays strict; no shell metacharacter passes either.
+func TestProfileModelIDsAreNamespacedButSafe(t *testing.T) {
+	for _, id := range []string{"zai/glm-5.3", "openrouter/moonshotai/Kimi-K2", "qwen3:32b", "glm-5.3", "a/b/c/d", "zai/glm-5.3[1m]"} {
+		m := id
+		if err := agents.CheckLaunch(&agents.Launch{Model: &m, Profile: "zai-router"}); err != nil {
+			t.Errorf("profile model %q: %v", id, err)
+		}
+	}
+	for _, id := range []string{"zai/glm-5.3", "Kimi-K2"} {
+		m := id
+		if err := agents.CheckLaunch(&agents.Launch{Model: &m}); err != agents.ErrLaunchModel {
+			t.Errorf("catalog model %q: %v, want ErrLaunchModel", id, err)
+		}
+	}
+	for _, id := range []string{"zai/", "/glm", "zai//glm", "a/b/c/d/e", "zai/glm;rm -rf ~", "zai/$(id)", "zai/`id`", "zai/glm 5",
+		"zai/glm'x", "-zai/glm", "zai/-glm", "zai/glm\n", strings.Repeat("a", 129)} {
+		m := id
+		if err := agents.CheckLaunch(&agents.Launch{Model: &m, Profile: "zai-router"}); err != agents.ErrLaunchModel {
+			t.Errorf("profile model %q: %v, want ErrLaunchModel", id, err)
+		}
+	}
+	// The Codex launcher round-trip: «profile/vendor/model» splits at the profile only, and the shape check takes it.
+	m := "zai/glm-5.3"
+	sent := agents.LauncherModel(&agents.Launch{Model: &m, Profile: "zai-router"})
+	profile, model := agents.SplitLauncherModel(sent)
+	if profile != "zai-router" || model != "zai/glm-5.3" {
+		t.Fatalf("split %q = %q, %q", sent, profile, model)
+	}
+	if l, ok := agents.ReadProfileLaunchShape(profile, model, nil); !ok || l == nil || *l.Model != model {
+		t.Fatalf("shape of a profile model refused")
+	}
+	if _, ok := agents.ReadLaunchShape(model, nil); ok {
+		t.Fatalf("a namespaced id without a profile passed the catalog shape")
+	}
+}

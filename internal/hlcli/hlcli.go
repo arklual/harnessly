@@ -431,6 +431,20 @@ type tabInfo struct {
 	AgentProviderID string `json:"agentProviderId"`
 	AgentSessionID  string `json:"agentSessionId"`
 	Launched        bool   `json:"launched"`
+	// Delegated: the agent runs in a chat nested under ParentChatID (tab create --prompt from a chat); DelegateNote
+	// is why it did not, when it was started as a plain tab instead.
+	Delegated    bool   `json:"delegated"`
+	ParentChatID string `json:"parentChatId"`
+	Model        string `json:"model"`
+	Notify       bool   `json:"notify"`
+	DelegateNote string `json:"delegateNote"`
+}
+
+func modelNote(m string) string {
+	if m == "" {
+		return ""
+	}
+	return ", model " + m
 }
 
 func (c *cli) session() string {
@@ -622,6 +636,16 @@ func orDash(s string) string {
 var panelTypes = []string{"terminal", "claude-code", "codex-cli", "agent-sessions", "web-browser", "diff"}
 
 func (c *cli) tabCreate(args []string) error {
+	notify := false
+	rest := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--notify" || a == "--notify=true" {
+			notify = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	args = rest
 	f, err := parseFlags(args, map[string]string{"n": "name", "name": "name", "t": "type", "type": "type",
 		"prompt": "prompt", "model": "model", "effort": "effort"})
 	if err != nil {
@@ -646,6 +670,18 @@ func (c *cli) tabCreate(args []string) error {
 			body[k] = f.values[k]
 		}
 	}
+	if _, ok := f.values["prompt"]; ok {
+		// An agent started with a first message is a chat nested under the chat this command runs in; the
+		// runtime finds that chat by the terminal's session.
+		if s := c.session(); s != "" {
+			body["session"] = s
+		}
+		if notify {
+			body["notify"] = true
+		}
+	} else if notify {
+		return usageErr("--notify needs --prompt: it wakes this chat with the answer of the agent that gets the prompt")
+	}
 	status, raw, err := c.call("POST", "/api/cli/tabs", nil, body)
 	if err != nil {
 		return err
@@ -667,6 +703,20 @@ func (c *cli) tabCreate(args []string) error {
 	var t tabInfo
 	_ = json.Unmarshal(raw, &t)
 	c.out("%s\n", t.TabID)
+	if t.Delegated {
+		c.out("Started %s as a chat nested under yours (%s)%s: the person sees it under this chat, like a delegate_task chat.\n",
+			t.AgentProviderID, t.ParentChatID, modelNote(t.Model))
+		if t.Notify {
+			c.out("It will wake this chat with its answer when it finishes a turn (--notify); read it then with `harnessly tab result %s`.\n", t.TabID)
+		} else {
+			c.out("Read it with `harnessly tab result %s` (its screen) and `harnessly tab status %s` once it has started (a few seconds); "+
+				"add --notify to be woken with the answer instead of polling. MCP: read_conversation / wait_conversation with this id.\n", t.TabID, t.TabID)
+		}
+		return nil
+	}
+	if t.DelegateNote != "" {
+		c.out("Not nested under a chat: %s. Started as a separate tab of the workspace instead.\n", t.DelegateNote)
+	}
 	if t.Launched {
 		c.out("Started %s in tab %s. Read it with `harnessly tab status %s` and `harnessly tab result %s`.\n",
 			t.AgentProviderID, t.TabID, t.TabID, t.TabID)

@@ -3,6 +3,7 @@ package layoutapi
 import (
 	"errors"
 	"regexp"
+	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
@@ -28,6 +29,19 @@ type tabLocation struct {
 
 // findTab is a tab of a workspace that exists; the workspace's layout is created when it has none.
 func (a *api) findTab(wsID, tabID string) *tabLocation {
+	if found := a.findTabByID(wsID, tabID); found != nil {
+		return found
+	}
+	// A chat the CLI started (tab create --prompt) is named by the chat's id, which is not its tab's.
+	if a.d.ChatTab != nil {
+		if tab := a.d.ChatTab(tabID); tab != "" && tab != tabID {
+			return a.findTabByID(wsID, tab)
+		}
+	}
+	return nil
+}
+
+func (a *api) findTabByID(wsID, tabID string) *tabLocation {
 	ws := a.d.Store.Workspace(wsID)
 	if ws == nil {
 		return nil
@@ -142,6 +156,56 @@ func (a *api) cliTabs(c *call) {
 	}
 }
 
+// cliDelegate hands an agent tab's first message to a chat nested under the chat of the asking terminal, as delegate_task
+// does: the person sees it under that chat, and it can be read, waited for and woken on. It answers and returns
+// true when it did (or was refused); false leaves the tab to be made the old way, with the reason on c.noParent when the
+// caller asked from a terminal that is no chat's.
+func (a *api) cliDelegate(c *call, provider, panelType, workspaceID string, prompt, model, effort, name any) bool {
+	text, _ := prompt.(string)
+	if provider == "" || strings.TrimSpace(text) == "" {
+		return false
+	}
+	session, _ := c.field("session")
+	notify, _ := c.field("notify")
+	// A caller that sends no session is an older CLI or a script: its tab is made as it always was, without a word.
+	if s, _ := session.(string); strings.TrimSpace(s) == "" {
+		return false
+	}
+	if a.d.Delegate == nil {
+		c.noParent = "this runtime has no nested chats"
+		return false
+	}
+	res, err := a.d.Delegate(c.r.Context(), DelegateRequest{Session: stringOr(session), Provider: provider, Model: stringOr(model),
+		Effort: stringOr(effort), Prompt: text, Title: stringOr(name), Notify: notify == true})
+	var none *ErrNoParent
+	var refused *DelegateRefused
+	switch {
+	case errors.As(err, &none):
+		c.noParent = none.Reason
+		return false
+	case errors.As(err, &refused):
+		c.fail(409, refused.Msg)
+		return true
+	case err != nil:
+		c.fail(500, err.Error())
+		return true
+	}
+	out := jsvalue.NewObject("tabId", res.ChatID, "chatId", res.ChatID, "workspaceId", workspaceID, "paneId", nil, "sessionName", nil, "name", nil)
+	if n := stringOr(name); n != "" {
+		out.Set("name", n)
+	}
+	out.Set("panelType", panelType)
+	out.Set("agentProviderId", provider)
+	out.Set("agentSessionId", nil)
+	out.Set("launched", true)
+	out.Set("delegated", true)
+	out.Set("parentChatId", res.ParentID)
+	out.Set("model", res.Model)
+	out.Set("notify", notify == true)
+	c.reply(201, out)
+	return true
+}
+
 func (a *api) cliTabCreate(c *call) {
 	if c.body == nil {
 		panic("body is null")
@@ -191,6 +255,9 @@ func (a *api) cliTabCreate(c *call) {
 	}
 	provider := agents.ProviderOfPanel(resolved)
 	_, promptIsString := prompt.(string)
+	if a.cliDelegate(c, provider, resolved, id, prompt, model, effort, name) {
+		return
+	}
 	if (promptIsString || hasModel || hasEffort) && provider == "" {
 		c.fail(400, "prompt, model and effort need a claude-code or codex-cli tab")
 		return
@@ -236,6 +303,9 @@ func (a *api) cliTabCreate(c *call) {
 		out.Set("agentProviderId", provider)
 		out.Set("agentSessionId", nil)
 		out.Set("launched", true)
+		if c.noParent != "" {
+			out.Set("delegateNote", c.noParent)
+		}
 		c.reply(201, out)
 		return
 	}

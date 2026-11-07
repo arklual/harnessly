@@ -90,7 +90,7 @@ const Row = ({
           onClick={(e) => e.stopPropagation()}
         />
       )}
-      <span className="ad-ic">
+      <span className="hb-ic">
         <Icon i={KIND[r.kind].icon} size="sm" />
       </span>
       <span className="ev-row__t">
@@ -225,7 +225,7 @@ export const LayerCard = ({
       <div className="ev-layer__hd">
         <button type="button" className="ev-layer__head" onClick={a.onToggle}>
           <Icon i="chevron-right" size="sm" className="ev-chev" />
-          <span className="ad-dot" data-l={meta.kind}>
+          <span className="hb-dot" data-l={meta.kind}>
             {meta.initial}
           </span>
           <span className="ev-layer__t">

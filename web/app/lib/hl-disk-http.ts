@@ -2,6 +2,9 @@
 import { scopedAppPath } from '@/lib/app-path';
 import type { IDiskDeps, IDiskRequest, IDiskResponse } from '@/lib/hl-disk-uploader';
 
+/** No byte moves for this long: the link is taken as broken. */
+const IDLE_MS = 60_000;
+
 const abortError = (): Error => Object.assign(new Error('aborted'), { name: 'AbortError' });
 
 const parseJson = (text: string): unknown => {
@@ -32,8 +35,21 @@ export const xhrRequest = ({
     for (const [name, value] of Object.entries(headers ?? {})) xhr.setRequestHeader(name, value);
     const onAbort = () => xhr.abort();
     signal.addEventListener('abort', onAbort, { once: true });
-    const finish = () => signal.removeEventListener('abort', onAbort);
-    if (onProgress) xhr.upload.onprogress = (event) => onProgress(event.loaded);
+    let idle: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => xhr.abort(), IDLE_MS);
+    };
+    const finish = () => {
+      clearTimeout(idle);
+      signal.removeEventListener('abort', onAbort);
+    };
+    // A link that went silent ends the request instead of waiting for ever; the queue asks the machine where it is and
+    // goes on from there.
+    xhr.upload.onprogress = (event) => {
+      arm();
+      onProgress?.(event.loaded);
+    };
     xhr.onload = () => {
       finish();
       resolve({
@@ -49,8 +65,10 @@ export const xhrRequest = ({
     xhr.ontimeout = xhr.onerror;
     xhr.onabort = () => {
       finish();
-      reject(abortError());
+      if (signal.aborted) reject(abortError());
+      else reject(new Error('network'));
     };
+    arm();
     xhr.send(json === undefined ? (body ?? null) : JSON.stringify(json));
   });
 

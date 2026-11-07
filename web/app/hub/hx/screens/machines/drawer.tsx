@@ -170,7 +170,7 @@ export const MachineDrawer = ({
             <div className="md-sec__head">
               <span className="md-sec__t">Название</span>
               {renaming === null && busy == null && (
-                <button type="button" className="ad-add" onClick={() => setRenaming(m.name)}>
+                <button type="button" className="hb-add" onClick={() => setRenaming(m.name)}>
                   Переименовать
                 </button>
               )}

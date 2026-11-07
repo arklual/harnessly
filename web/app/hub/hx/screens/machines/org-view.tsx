@@ -60,8 +60,8 @@ const TenantPicker = ({
         <Icon i="chevron-down" size="sm" />
       </button>
       {pop.mounted && (
-        <div className="ad-pop mo-tf__pop" data-closing={pop.attr} role="dialog" aria-label="Тенанты">
-          <label className="ad-pop__search">
+        <div className="hb-pop mo-tf__pop" data-closing={pop.attr} role="dialog" aria-label="Тенанты">
+          <label className="hb-pop__search">
             <Icon i="search" size="sm" />
             <input
               value={q}
@@ -74,7 +74,7 @@ const TenantPicker = ({
             <button
               key={o.id}
               type="button"
-              className="ad-pop__item"
+              className="hb-pop__item"
               role="menuitemradio"
               aria-checked={filter.mode === o.id}
               onClick={() => onChange({ mode: o.id, pick: [] })}
@@ -84,8 +84,8 @@ const TenantPicker = ({
               {filter.mode === o.id && <Icon i="check" size="sm" />}
             </button>
           ))}
-          <div className="ad-pop__sep" />
-          <div className="ad-pop__label">Выбрать тенанты</div>
+          <div className="hb-pop__sep" />
+          <div className="hb-pop__label">Выбрать тенанты</div>
           <div className="mo-tf__list">
             {options.map((g) => {
               const on = filter.pick.includes(g.key);
@@ -93,7 +93,7 @@ const TenantPicker = ({
                 <button
                   key={g.key}
                   type="button"
-                  className="ad-pop__item mo-tf__opt"
+                  className="hb-pop__item mo-tf__opt"
                   role="menuitemcheckbox"
                   aria-checked={on}
                   onClick={() => onChange(toggleTenant(filter, g.key))}

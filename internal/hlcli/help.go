@@ -32,11 +32,12 @@ SHOW THINGS TO THE PERSON
 TABS OF THIS WORKSPACE
   harnessly workspaces              list workspaces (id, name, folders)
   harnessly tab list                list the tabs of your workspace
-  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT] [--model M] [--effort E]
+  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT] [--model M] [--effort E] [--notify]
                                     create a tab. TYPE: terminal (default), claude-code, codex-cli, agent-sessions,
-                                    web-browser, diff. With --prompt, a claude-code or codex-cli tab starts the agent
-                                    with that task the platform's way (hooks, status, workspace prompt included).
-                                    Prints the new tab's id.
+                                    web-browser, diff. With --prompt, a claude-code or codex-cli agent gets that task
+                                    as a chat nested under YOUR chat (like the MCP tool delegate_task): the person sees
+                                    it under yours, and --notify wakes you with its answer. Run from a plain terminal
+                                    (no chat), it makes a separate tab and says why. Prints the new id.
   harnessly tab send TAB_ID TEXT... send text into a tab ("-" reads it from stdin)
   harnessly tab status TAB_ID       is it alive, what runs in it, is the agent working or waiting
   harnessly tab result TAB_ID       the tab's visible screen: read what a delegated agent answered
@@ -85,6 +86,8 @@ DOCUMENTATION (harnessly's own and this team's: how it works, how to use it, how
 APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skills, MCP, views; turned on per chat)
   harnessly app docs [PAGE]         the guide, step by step, with diagrams and examples: start here (needs no runtime)
   harnessly app docs export DIR     write the guide and the example packages into DIR, to search and copy
+  harnessly app catalog [SECTION]   the targets, contributions, rights, bridge methods and agent tools an app can use
+  harnessly app sdk DIR             the SDK files a view on the app's own server (https entry) serves itself
   harnessly app new ID [--template chat|pane-chat] [--dir DIR]
                                     write a new package that passes validate, e.g. harnessly app new acme.cashback
   harnessly app validate [DIR] [--strict]
@@ -188,8 +191,10 @@ OPTIONS (anywhere on the line)
   -w, --workspace ID    the workspace to act in (default: the one your own tab belongs to)
   --json                print the runtime's answer as JSON
 
-Start another agent only with "tab create -t claude-code|codex-cli --prompt TEXT": a "claude ..." or "codex ..."
-typed into a shell tab with "tab send" starts it without the platform's hooks and its state is unreliable.
+Hand a task to another agent as a nested chat: the MCP tool delegate_task, or "tab create -t claude-code|codex-cli
+--prompt TEXT" - both make a chat under yours that the person sees, with the platform's hooks and state, that you can
+read and be woken by. Do not type a "claude ..." or "codex ..." command into a shell tab with "tab send": it starts
+without the hooks and its state is unreliable.
 
 Exit codes: 0 done, 1 refused or failed (the reason is printed), 2 wrong usage.
 `
@@ -306,7 +311,7 @@ Running it again updates in place and doubles nothing. Other options go to the s
 	"tab": `harnessly tab list|create|send|status|result|close
 
   harnessly tab list
-  harnessly tab create -t codex-cli -n review --prompt "Review the diff in /home/me/work/repo and list problems"
+  harnessly tab create -t codex-cli -n review --prompt "Review the diff in /home/me/work/repo and list problems" --notify
   harnessly tab status <tab id>
   harnessly tab result <tab id>
   harnessly tab send <tab id> "also check the tests"
@@ -314,6 +319,16 @@ Running it again updates in place and doubles nothing. Other options go to the s
 
 The tab id is the first column of "tab list" and what "tab create" prints. Types: terminal, claude-code, codex-cli,
 agent-sessions, web-browser, diff (claude and codex are accepted for the agents).
+
+Handing work to an agent: "tab create -t claude-code|codex-cli --prompt TEXT" run in a chat's terminal starts the agent
+as a chat nested under that chat, exactly as the MCP tool delegate_task does. The person sees it under your chat, the
+agent has the platform's hooks and workspace prompt, and you get its answer back: with --notify the runtime wakes your
+chat with it when the agent finishes a turn; without it, read it with "tab result <id>" (the screen) or, over MCP,
+read_conversation / wait_conversation with the same id. --model and --effort pick the model (the machine's default
+otherwise), --name titles the chat. The prompt is the whole briefing: the agent does not see your conversation.
+A delegated chat cannot delegate further, and the person's limit on the number of delegated chats applies; a refusal
+says so. Run outside a chat (a plain terminal tab) the command cannot nest the agent, starts a separate tab as before and
+prints the reason.
 `,
 	"panel": `harnessly panel show|hide
 

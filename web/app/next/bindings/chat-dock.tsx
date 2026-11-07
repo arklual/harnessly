@@ -78,7 +78,6 @@ import { refKey } from '@/next/features/chat/attached';
 import { designThumb } from '@/next/features/composer/attach-sources';
 import type { IPlusAttach } from '@/next/features/composer/plus-menu';
 import type { IPlusApps } from '@/next/features/composer/apps-pane';
-import ChatAppsRow from '@/next/features/app-main/chat-apps-row';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { useChatApps } from '@/next/bindings/use-chat-apps';
 import { REFS_MAX, type MessageRef } from '@/next/protocol/v2';
@@ -258,7 +257,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   );
   const onChat = useCallback((ref: MessageRef) => addDraftRef(conv, ref, REFS_MAX), [conv]);
 
-  // The apps on in this chat: a quiet row over the field, and «+» → «Приложение» to turn one on. The installed list is
+  // The apps on in this chat: «+» → «Приложение» turns them on and off (no row over the field). The installed list is
   // read only once the chat has an app (the «+» pane reads it when it opens).
   const chatApps = useChatApps(machine, conv);
   // A command of an app turns it on (see onSubmit): the list is read once the field starts with one.
@@ -382,10 +381,6 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         : null,
     [record, machine, cwd, attachedKeys, conv],
   );
-  const appChips = useMemo(
-    () => chatApps.on.map((id) => ({ id, name: installedApps?.apps.find((a) => a.id === id)?.name ?? id })),
-    [chatApps.on, installedApps],
-  );
   const plusApps = useMemo<IPlusApps | null>(
     () =>
       // Apps run in Claude Code chats for now.
@@ -393,7 +388,8 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         ? {
             machine,
             on: chatApps.on,
-            onPick: (id) => void chatApps.turn(id, true),
+            onPick: (id, next) => void chatApps.turn(id, next),
+            busy: chatApps.busy,
             onAll: () => goTo({ kind: ROUTE.apps }),
           }
         : null,
@@ -471,12 +467,6 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onMove={canMove ? (id, before) => settled(moveQueued(machine, conv, id, before)) : undefined}
         onResume={() => settled(resumeQueue(machine, conv))}
         onRetry={(id) => settled(retryMessage(id))}
-      />
-      <ChatAppsRow
-        apps={appChips}
-        busy={chatApps.busy}
-        onOpen={(id) => goTo({ kind: ROUTE.app, id, chat: conv })}
-        onOff={(id) => void chatApps.turn(id, false)}
       />
       <Composer
         enterSends={enterSends}

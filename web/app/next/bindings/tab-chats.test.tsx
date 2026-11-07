@@ -29,6 +29,7 @@ const conv = (id: string, machineId: MachineId, state: Conversation['state']): C
     createdAt: 1,
     lastPromptAt: 1,
     lastActivityAt: 1,
+    queue: { count: 0, paused: null },
     rev: 1,
   }) as unknown as Conversation;
 

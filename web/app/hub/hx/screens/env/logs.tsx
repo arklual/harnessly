@@ -123,7 +123,7 @@ export const LogsBody = ({ ctx }: { ctx: SheetCtx }) => {
               onClick={() => toggle(l)}
             >
               <Icon i={bad ? 'circle-x' : 'circle-check'} size="sm" />
-              <span className="ad-row__t">
+              <span className="hb-row__t">
                 <b>{l.step.name}</b>
                 <small>{`${who(l.run)} · ${l.run.machine.name} · ${whenText(l.run.startedAt, now)}`}</small>
               </span>

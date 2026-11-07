@@ -12,6 +12,8 @@ export interface ComposerAttachment {
   status: 'uploading' | 'ready' | 'error';
   /** Why it cannot go: empty, wrong type, too large. */
   error: string | null;
+  /** While it goes: bytes sent of the file's size, and the speed (bytes a second, 0 until known). */
+  progress?: { sent: number; size: number; speed: number };
 }
 
 export interface ComposerModel {

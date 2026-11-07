@@ -183,7 +183,28 @@ export interface MachineScopeArg {
 export type RestartWhat = 'runner' | 'machine';
 export type RestartWhen = 'now' | 'after_chats';
 
+/** What moving a machine to another tenant does (`POST /api/machines/{id}/move`, also with `dry_run`). */
+export interface MovePlan {
+  from: { id: string; name: string };
+  to: { id: string; name: string };
+  /** The machine is already there: nothing changes. */
+  noop: boolean;
+  /** Labels of the team access that is dropped / assigned. */
+  teamCleared: string | null;
+  teamAssigned: string | null;
+  /** Who loses access to the machine. */
+  accessRevoked: string[];
+  /** Spend limit rules of each tenant (and its teams): new spend counts against the target's. Machines are not capped. */
+  limits: { fromRules: number; toRules: number };
+  /** What stays as it was (id, key, history). */
+  kept: string[];
+}
+
 export interface MachinesApi {
+  /** A dry run: the plan of moving the machine to the tenant, nothing changes. */
+  planMoveMachine(id: string, tenantId: string, teamId?: string): Promise<MovePlan>;
+  /** Moves the machine to another tenant (the hub needs manage rights on both). */
+  moveMachine(id: string, tenantId: string, teamId?: string): Promise<MovePlan>;
   machinesList(org: string, arg: MachineScopeArg): Promise<MachinesList>;
   machineDetail(id: string): Promise<MachineDetail>;
   resizeMachine(id: string, to: { cores: number; ramGb: number; diskGb: number }): Promise<MachineDetail>;

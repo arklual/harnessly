@@ -85,9 +85,31 @@ export interface IInstalledApp {
   setup?: boolean;
   /** The required secrets without a value: the app is «ждёт секрет». */
   waiting?: string[];
+  /** Ready, or why not: waiting for a secret, a connection or another harnessly, a copy that fails, turned off. */
+  state?: TAppState;
+  reason?: TAppReason;
+  /** The secrets, connections or version range the reason is about, or what failed. */
+  detail?: string;
   /** The branding slot: the name, accent and support address the app brings. */
   branding?: IBranding;
 }
+
+export const APP_STATE = {
+  ready: 'ready',
+  waiting: 'waiting',
+  failed: 'failed',
+  disabled: 'disabled',
+} as const;
+export type TAppState = (typeof APP_STATE)[keyof typeof APP_STATE];
+export const APP_REASON = {
+  off: 'off',
+  secret: 'secret',
+  connection: 'connection',
+  host: 'host',
+  package: 'package',
+  safe: 'safe',
+} as const;
+export type TAppReason = (typeof APP_REASON)[keyof typeof APP_REASON];
 
 export interface IInstalledApps {
   apps: IInstalledApp[];
@@ -98,7 +120,13 @@ export interface IInstalledApps {
   agentWalled: boolean;
   /** Whether the machine runs with UI slots on (HARNESSLY_UI_SLOTS=on); without it the list holds no slot view. */
   slots?: boolean;
+  /** Safe mode: new chats start with only the apps the organization pinned. */
+  safeMode?: boolean;
 }
+
+/** Turns safe mode on or off (POST /apps/safe-mode); chats already running keep their apps. */
+export const setSafeMode = (m: MachineId, on: boolean): Promise<unknown> =>
+  runtimeJson(m, platformPath('/apps/safe-mode'), postJson({ on }));
 
 export const loadInstalledApps = (m: MachineId): Promise<IInstalledApps> =>
   runtimeJson<IInstalledApps>(m, platformPath('/installed-apps'));
@@ -123,8 +151,10 @@ export interface IViewSession {
   session: string;
   /** What the view's own pages carry (a meta tag) and the bridge asks for in ui/initialize. */
   nonce: string;
-  /** Where the view's entry is on the view server, with the session in it. */
-  path: string;
+  /** Where the view's entry is on the view server, with the session in it; absent for a remote view. */
+  path?: string;
+  /** The address of a view the app's own server hosts (delivery mode remote). */
+  url?: string;
 }
 
 /** Starts the session of a view the page mounts; the runtime refuses a view that is not the app's for the target. */

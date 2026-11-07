@@ -56,7 +56,10 @@ export const ago = (iso: string | null, now: number): string => {
 const ACTION: Partial<Record<AuditEntry['action'], string>> = {
   'org.create': 'создана организация',
   'org.update': 'изменена организация',
+  'tenant.create': 'тенант создан',
   'tenant.move': 'тенант перенесён в организацию',
+  'tenant.delete': 'тенант удалён',
+  'machine.move': 'машина перенесена в другой тенант',
   'team.update': 'изменена команда',
   'team.delete': 'удалена команда',
   'member.add': 'добавлен в команду',

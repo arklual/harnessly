@@ -56,5 +56,18 @@ func TestTimeoutSaysWhereItStood(t *testing.T) {
 		if w.Code != 504 || !strings.Contains(w.Body.String(), c.want) {
 			t.Errorf("%s: %d %q, want 504 with %q", name, w.Code, w.Body.String(), c.want)
 		}
+		// The page in the frame tells the tab, which opens the site in the machine's own browser.
+		if !strings.Contains(w.Body.String(), "type: 'tk:failed'") || !strings.Contains(w.Header().Get("Content-Security-Policy"), "'nonce-") {
+			t.Errorf("%s: the failure page does not tell the tab: %q", name, w.Body.String())
+		}
+		// A script or an image of the page fails as before: only the document tells.
+		r = httptest.NewRequest("GET", "/proxy/app.js", nil)
+		r.Header.Set("x-acme-preview", signClaim(secret, []byte(claim)))
+		r.Header.Set("sec-fetch-dest", "script")
+		w = httptest.NewRecorder()
+		p.ServeHTTP(w, r)
+		if w.Code != 504 || strings.Contains(w.Body.String(), "tk:failed") {
+			t.Errorf("%s: a script got %d %q, want a plain 504", name, w.Code, w.Body.String())
+		}
 	}
 }

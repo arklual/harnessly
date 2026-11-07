@@ -1,6 +1,6 @@
-// «+» → «Приложение»: the installed apps that work in a chat and are not on here yet; a pick turns the app on in this
-// chat. It sits in the «+» panel in place of the menu (a popover on a computer, the same sheet on a phone), after the
-// pickers of places. The list is read when the pane opens, not with the chat: a read starts the machine's view server.
+// «+» → «Приложение»: the installed apps that work in a chat; the ones on here carry a check, a pick turns the app on
+// or off in this chat (the only place to do it: the chat shows no row of its apps). It sits in the «+» panel in place
+// of the menu (a popover on a computer, the same sheet on a phone), after the pickers of places. The list is read when the pane opens, not with the chat: a read starts the machine's view server.
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { offeredApps } from '@/next/features/app-main/chat-apps';
 import type { MachineId } from '@/next/protocol/v2';
@@ -13,15 +13,17 @@ export interface IPlusApps {
   machine: MachineId;
   /** The ids already on in the chat. */
   on: readonly string[];
-  /** Turns the app on in the chat. */
-  onPick: (id: string) => void;
+  /** Turns the app on (`next` true) or off in the chat. */
+  onPick: (id: string, next: boolean) => void;
+  /** The app whose change waits for the machine: the rows ignore presses meanwhile. */
+  busy?: string | null;
   /** Opens the list of every installed app. */
   onAll: () => void;
 }
 
 const AppsPane = ({ apps, onBack }: { apps: IPlusApps; onBack: () => void }) => {
   const { list, error } = useInstalledApps(apps.machine);
-  const offered = list === null ? [] : offeredApps(list.apps, apps.on);
+  const offered = list === null ? [] : offeredApps(list.apps);
   let body = null;
   if (error) {
     body = (
@@ -42,23 +44,29 @@ const AppsPane = ({ apps, onBack }: { apps: IPlusApps; onBack: () => void }) => 
   } else if (offered.length === 0) {
     body = <div className="hx-pick__state">{t('next.chatapps.none')}</div>;
   } else {
-    body = offered.map((app) => (
-      <button
-        key={app.id}
-        type="button"
-        className="hx-pick__row"
-        role="option"
-        onClick={() => apps.onPick(app.id)}
-      >
-        <span className="hx-pick__thumb">
-          <Icon name="layout-grid" size="sm" />
-        </span>
-        <span className="hx-pick__text">
-          <span className="hx-pick__name">{app.name}</span>
-          {app.description && <span className="hx-pick__hint">{app.description}</span>}
-        </span>
-      </button>
-    ));
+    body = offered.map((app) => {
+      const on = apps.on.includes(app.id);
+      return (
+        <button
+          key={app.id}
+          type="button"
+          className="hx-pick__row"
+          role="option"
+          aria-selected={on}
+          disabled={Boolean(apps.busy)}
+          onClick={() => apps.onPick(app.id, !on)}
+        >
+          <span className="hx-pick__thumb">
+            <Icon name="layout-grid" size="sm" />
+          </span>
+          <span className="hx-pick__text">
+            <span className="hx-pick__name">{app.name}</span>
+            {app.description && <span className="hx-pick__hint">{app.description}</span>}
+          </span>
+          {on && <Icon name="check" size="sm" className="hx-pick__check" />}
+        </button>
+      );
+    });
   }
   return (
     <div className="hx-plus__pane hx-pick" data-sub="true" data-kind="apps">

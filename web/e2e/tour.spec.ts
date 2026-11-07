@@ -256,34 +256,72 @@ test('site lesson counts the real actions', async ({ page }) => {
 
   await page.locator('.hx-dl-card[data-id="relay-site"]').click();
   await expect(title(page)).toHaveText('Пощёлкайте переключатели', { timeout: 15_000 });
-  await page.waitForTimeout(1500);
+  // The ring stands on the flags inside the page: the page's bridge tells where they are.
+  const anchor = page.locator('.hx-tour-anchor[data-place="shown"]');
+  await expect(anchor).toBeVisible({ timeout: 20_000 });
   await snap(page, 'click');
-  await card(page).getByRole('button', { name: 'Сделал' }).click();
+  const site = page.frameLocator('.hx-site__iframe');
+  await site.locator('.flag').first().click();
+  await did(page);
 
   await expect(title(page)).toHaveText('Включите «Редактирование»');
   await snap(page, 'edit');
   await page.getByRole('button', { name: 'Редактирование' }).first().click();
+  // The lesson docks the design's chat beside the page.
+  await expect(page.locator('.hx-site__chat[aria-hidden="false"]')).toBeVisible({ timeout: 10_000 });
 
-  await expect(title(page)).toHaveText('Укажите блок', { timeout: 10_000 });
+  await expect(title(page)).toHaveText('Нажмите «Выделить»', { timeout: 10_000 });
   await snap(page, 'pick');
-  // The test's runtime shows the board without the page's bridge, so «Выделить» is off here: the step is done by hand.
-  await expect(page.locator('.hx-browser__tool[aria-label="Выделить"]')).toBeVisible();
-  await did(page);
+  const pick = page.locator('.hx-browser__tool[aria-label="Выделить"]');
+  await expect(pick).not.toHaveAttribute('aria-disabled', 'true', { timeout: 15_000 });
+  await pick.click();
 
-  await expect(title(page)).toHaveText('Попросите агента', { timeout: 10_000 });
-  await expect(page.getByRole('textbox', { name: /Опишите правку/ })).toHaveValue(/заголовок короче/);
+  await expect(title(page)).toHaveText('Нажмите на заголовок', { timeout: 10_000 });
+  await expect(anchor).toBeVisible({ timeout: 10_000 });
+  await snap(page, 'heading');
+  await site.locator('h1').click();
+
+  await expect(title(page)).toHaveText('Напишите, что поменять', { timeout: 10_000 });
+  await expect(page.locator('.hx-ann__input')).toHaveValue('Сделай заголовок короче и ярче');
+  await snap(page, 'note');
+  await page.locator('.hx-ann__ok').click();
+
+  await expect(title(page)).toHaveText('Отправьте агенту', { timeout: 10_000 });
+  await expect(page.locator('.hx-npin')).toHaveCount(1);
   await snap(page, 'ask');
   await card(page).getByRole('button', { name: 'Пропустить' }).click();
 
   await expect(title(page)).toHaveText('Откройте страницу «Цены»');
+  // Away from the design the lesson waits in a corner and leads back.
+  await page.locator('.hx-nav__group[data-i="0"] .hx-nav__item').click();
+  await expect(card(page).getByRole('button', { name: 'Вернуться' })).toBeVisible({ timeout: 5_000 });
+  await snap(page, 'away');
+  await card(page).getByRole('button', { name: 'Вернуться' }).click();
+  await expect(page).toHaveURL(/\/designly\/relay-site/);
+  await expect(title(page)).toHaveText('Откройте страницу «Цены»', { timeout: 10_000 });
   await snap(page, 'page');
   await page.getByText('Цены', { exact: true }).first().click();
   await expect(title(page)).toHaveText('Переключите «За год»', { timeout: 10_000 });
-  await card(page).getByRole('button', { name: 'Сделал' }).click();
+  await expect(anchor).toBeVisible({ timeout: 20_000 });
+  await site.locator('label[for="yr"]').click();
+  await did(page);
 
   await expect(title(page)).toHaveText('Посмотрите на iPhone 14', { timeout: 10_000 });
-  await snap(page, 'device');
   await page.locator('.hx-browser__dev').click();
+  // The card keeps off the button and the menu it opened.
+  await page.waitForTimeout(700);
+  const btn = await page.locator('.hx-browser__dev').boundingBox();
+  const box = await card(page).boundingBox();
+  expect(btn && box).toBeTruthy();
+  if (btn && box) {
+    const apart =
+      box.x >= btn.x + btn.width ||
+      box.x + box.width <= btn.x ||
+      box.y >= btn.y + btn.height ||
+      box.y + box.height <= btn.y;
+    expect(apart).toBe(true);
+  }
+  await snap(page, 'device');
   await page
     .getByRole('menuitemradio', { name: /^iPhone 14/ })
     .first()
@@ -301,21 +339,23 @@ test('slides lesson', async ({ page }) => {
   await expect(title(page)).toHaveText('Откройте «Relay — релизы без страха»', { timeout: 15_000 });
   await page.locator('.hx-dl-card[data-id="relay-deck"]').click();
   await expect(title(page)).toHaveText('Перелистните слайд', { timeout: 15_000 });
+  // While the deck loads the card says so; the slide turns once it is there.
+  await expect(page.locator('.hx-deck__slide[data-loading]')).toHaveCount(0, { timeout: 20_000 });
+  await expect(card(page).locator('.hx-tour-card__wait')).toHaveCount(0);
   await snap(page, 'deck-next');
   await page.locator('.hx-deck__frame[data-on="1"]').click();
   await page.keyboard.press('ArrowRight');
   await expect(title(page)).toHaveText('Включите «Редактирование»', { timeout: 10_000 });
   await snap(page, 'deck-edit');
-  await did(page);
-  await expect(title(page)).toHaveText('Оставьте комментарий');
+  await page.getByRole('button', { name: 'Редактирование' }).first().click();
+  await expect(title(page)).toHaveText('Оставьте комментарий', { timeout: 10_000 });
   await snap(page, 'deck-comment');
   await skip(page);
-  await expect(title(page)).toHaveText('Покажите во весь экран');
+  await expect(title(page)).toHaveText('Покажите колоду');
   await snap(page, 'deck-show');
-  await page.locator('.hx-deck__bar [data-k="full"]').click();
+  await page.locator('.hx-deck__bar [data-k="show"]').click();
   await expect(title(page)).toHaveText('Попросите агента', { timeout: 10_000 });
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Редактирование' }).first().click();
   await expect(page.locator('textarea').filter({ visible: true }).first()).toHaveValue(/отзывом клиента/);
   await snap(page, 'deck-ask');
 });
@@ -349,7 +389,7 @@ test('design system lesson', async ({ page }) => {
   await page.locator('.hx-dl-card[data-id="relay-ds"]').click();
   await expect(title(page)).toHaveText('Посмотрите, что внутри', { timeout: 15_000 });
   await snap(page, 'ds-look');
-  await did(page);
+  await card(page).getByRole('button', { name: 'Дальше' }).click();
   await expect(title(page)).toHaveText('Вернитесь в библиотеку');
   await page.locator('.hx-nav__group[data-i="2"] .hx-nav__item').click();
   await expect(title(page)).toHaveText('Выберите систему Relay', { timeout: 10_000 });

@@ -13,6 +13,7 @@ const CODES: Record<string, OrgApiError['code']> = {
   no_recipient: 'no_recipient',
   restart_unsupported: 'restart_unsupported',
   exists: 'exists',
+  conflict: 'hub',
   locked: 'locked',
   name_taken: 'name_taken',
   built_in: 'built_in',
@@ -69,7 +70,7 @@ export const http = {
   post: <T>(path: string, body: unknown = {}) => call<T>('POST', path, body),
   put: <T>(path: string, body: unknown = {}) => call<T>('PUT', path, body),
   patch: <T>(path: string, body: unknown = {}) => call<T>('PATCH', path, body),
-  del: (path: string) => call<undefined>('DELETE', path),
+  del: <T = undefined>(path: string, query?: Query) => call<T>('DELETE', path, undefined, query),
 };
 
 /** An endpoint of the contract the hub may not serve yet: its 404 says the data is not connected, not «такого нет». */

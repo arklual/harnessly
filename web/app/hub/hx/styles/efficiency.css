@@ -1,30 +1,30 @@
 /* Экран «Эффективность»: на готовых картах аналитики (t-card, anm, viz-card) — здесь только раскладка. */
-.ad .ef {
+.hb .ef {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.ad .ef-scales {
+.hb .ef-scales {
   display: flex;
   padding: 0 0 12px;
 }
-.ad .ef-scales:empty {
+.hb .ef-scales:empty {
   display: none;
 }
-.ad .ef-scale {
+.hb .ef-scale {
   max-width: 100%;
   overflow-x: auto;
 }
-.ad .ef-main {
+.hb .ef-main {
   padding: 0;
   overflow: hidden;
 }
-.ad .ef-tabs {
+.hb .ef-tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   border-bottom: 1px solid var(--hx-border);
 }
-.ad .ef-tab {
+.hb .ef-tab {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -42,24 +42,24 @@
     background 200ms var(--hx-ease-out),
     border-color 200ms var(--hx-ease-out);
 }
-.ad .ef-tab:hover {
+.hb .ef-tab:hover {
   background: var(--hx-bg-hover);
 }
-.ad .ef-tab[aria-selected='true'] {
+.hb .ef-tab[aria-selected='true'] {
   border-bottom-color: var(--hx-accent);
   color: var(--hx-fg-1);
 }
-.ad .ef-tab__t {
+.hb .ef-tab__t {
   font-size: var(--hx-text-sm);
 }
-.ad .ef-tab__v {
+.hb .ef-tab__v {
   font-size: 26px;
   font-weight: var(--hx-weight-semibold, 600);
   line-height: 1.1;
   color: var(--hx-fg-1);
   font-variant-numeric: tabular-nums;
 }
-.ad .ef-tab__d {
+.hb .ef-tab__d {
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
   overflow: hidden;
@@ -67,17 +67,17 @@
   white-space: nowrap;
   max-width: 100%;
 }
-.ad .ef-tab__d[data-tone='good'] {
+.hb .ef-tab__d[data-tone='good'] {
   color: var(--hx-ok, #1f9d55);
 }
-.ad .ef-tab__d[data-tone='bad'] {
+.hb .ef-tab__d[data-tone='bad'] {
   color: var(--hx-danger);
 }
-.ad .ef-main .dash-hero {
+.hb .ef-main .dash-hero {
   border: 0;
   box-shadow: none;
 }
-.ad .ef-note {
+.hb .ef-note {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -86,25 +86,25 @@
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
 }
-.ad .ef-note b {
+.hb .ef-note b {
   color: var(--hx-fg-1);
   font-size: 18px;
   font-weight: var(--hx-weight-medium);
 }
-.ad .ef-drivers .anm-group__h {
+.hb .ef-drivers .anm-group__h {
   margin: 0 0 8px;
 }
-.ad .ef-drivers .anm-grid {
+.hb .ef-drivers .anm-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.ad .ef-levers {
+.hb .ef-levers {
   display: flex;
   flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.ad .ef-lever {
+.hb .ef-lever {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -112,10 +112,10 @@
   padding: 12px 0;
   border-top: 1px solid var(--hx-border);
 }
-.ad .ef-lever:first-child {
+.hb .ef-lever:first-child {
   border-top: 0;
 }
-.ad .ef-lever__t {
+.hb .ef-lever__t {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -123,55 +123,55 @@
   font-size: var(--hx-text-sm);
   color: var(--hx-fg-3);
 }
-.ad .ef-lever__t b {
+.hb .ef-lever__t b {
   color: var(--hx-fg-1);
   font-weight: var(--hx-weight-medium);
 }
-.ad .ef-lever__v {
+.hb .ef-lever__v {
   flex: none;
   color: var(--hx-fg-1);
   font-size: var(--hx-text-sm);
   font-variant-numeric: tabular-nums;
 }
-.ad .ef-foot {
+.hb .ef-foot {
   margin: 0;
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
   line-height: 1.5;
 }
-.ad .ef-sk {
+.hb .ef-sk {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.ad .ef-sk__main {
+.hb .ef-sk__main {
   height: 340px;
   border-radius: 16px;
 }
-.ad .ef-sk__tiles {
+.hb .ef-sk__tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
-.ad .ef-sk__tile {
+.hb .ef-sk__tile {
   height: 150px;
   border-radius: 14px;
 }
-.ad .ef-sk__card {
+.hb .ef-sk__card {
   height: 200px;
   border-radius: 16px;
 }
 @media (max-width: 900px) {
-  .ad .ef-drivers .anm-grid,
-  .ad .ef-sk__tiles {
+  .hb .ef-drivers .anm-grid,
+  .hb .ef-sk__tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 600px) {
-  .ad .ef-tabs {
+  .hb .ef-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .ad .ef-lever {
+  .hb .ef-lever {
     align-items: flex-start;
     flex-direction: column;
     gap: 4px;

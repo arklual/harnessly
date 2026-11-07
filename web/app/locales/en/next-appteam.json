@@ -4,5 +4,11 @@
   "next.appteam.install": "Install for the team",
   "next.appteam.uninstall": "Remove from the team",
   "next.appteam.mute": "Turn off for me",
-  "next.appteam.unmute": "Turn on for me"
+  "next.appteam.unmute": "Turn on for me",
+  "next.appteam.refuse.trust": "Not installed from a catalog: the app runs code on the machine.",
+  "next.appteam.refuse.host": "Needs another harnessly: {range}.",
+  "next.appteam.refuse.name": "The name is taken: {app} is installed.",
+  "next.appteam.refuse.command": "The command {command} is already {app}'s.",
+  "next.appteam.refuse.kind": "The document type {kind} is already added by {app}.",
+  "next.appteam.secrets": "Will ask for a secret after the install: {names}."
 }

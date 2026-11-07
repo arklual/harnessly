@@ -198,10 +198,20 @@ const loadBoards =
   ({ machine }: IAttachScope): TAttachLoad =>
   async (query, signal) => {
     if (!appConfig().boardsUrl) return [];
-    const body = await kept(`board:${machine}`, () =>
-      runtimeJson<{ boards?: unknown }>(machine, '/api/integrations/boards'),
+    let body = await kept(`board:${machine}`, () =>
+      runtimeJson<{ boards?: unknown; searchRequired?: boolean }>(machine, '/api/integrations/boards'),
     );
     signal.throwIfAborted();
+    // A boards service that only searches lists nothing whole: ask it with the query (GitHub issue 27).
+    if (body.searchRequired) {
+      const q = query.trim();
+      if (!q) return [];
+      body = await runtimeJson<{ boards?: unknown }>(
+        machine,
+        `/api/integrations/boards?q=${encodeURIComponent(q)}`,
+      );
+      signal.throwIfAborted();
+    }
     const boards = Array.isArray(body.boards) ? body.boards.filter(isBoard) : [];
     return boards
       .filter((b) => matches(query, b.title, b.slug))

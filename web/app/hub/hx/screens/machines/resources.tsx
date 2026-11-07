@@ -274,7 +274,7 @@ export const ResourcesSection = ({
         {canOpen && !showEdit && (
           <button
             type="button"
-            className="ad-add"
+            className="hb-add"
             aria-disabled={!m.canAdmin}
             title={!m.canAdmin && m.needs ? NEEDS[m.needs] : undefined}
             onClick={() => m.canAdmin && onEdit()}

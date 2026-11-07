@@ -32,6 +32,6 @@ export const activeApps = (
   return [...seen.values()];
 };
 
-/** The apps a chat can turn on: installed ones that work in a chat and are not on already. */
-export const offeredApps = (installed: readonly IInstalledApp[], on: readonly string[]): IInstalledApp[] =>
-  installed.filter((a) => a.targets.includes('chat') && !on.includes(a.id));
+/** The apps a chat can turn on or off: the installed ones that work in a chat. */
+export const offeredApps = (installed: readonly IInstalledApp[]): IInstalledApp[] =>
+  installed.filter((a) => a.targets.includes('chat'));

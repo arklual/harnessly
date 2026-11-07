@@ -1,74 +1,5 @@
-/* An app as the main thing (/apps/<id>?chat=): the page, the chat beside it in three places, the quiet row of the
-   chat's apps, the list of installed apps. The look follows the board «Приложения — чат». */
-
-/* ---- the row of the chat's apps, over the field ---- */
-.hx-chatapps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hx-space-2);
-  margin: 0 18px var(--hx-space-2);
-}
-.hx-chatapps__chip {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  border: 1px solid var(--hx-border);
-  border-radius: 999px;
-  background: var(--hx-bg-raised);
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-xs);
-  animation: hx-chatapp-in var(--hx-dur-md) var(--hx-ease-out) backwards;
-  transition:
-    opacity 200ms var(--hx-ease-out),
-    transform 200ms var(--hx-ease-out);
-}
-.hx-chatapps__chip[data-leaving] {
-  opacity: 0;
-  transform: scale(0.94);
-  pointer-events: none;
-}
-.hx-chatapps__chip[data-busy] {
-  opacity: 0.6;
-}
-.hx-chatapps__name,
-.hx-chatapps__off {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--hx-space-2);
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.hx-chatapps__name {
-  min-width: 0;
-  padding: 3px 4px 3px 10px;
-  border-radius: 999px 0 0 999px;
-}
-.hx-chatapps__name span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-chatapps__off {
-  padding: 3px 8px 3px 4px;
-  border-radius: 0 999px 999px 0;
-  color: var(--hx-fg-3);
-}
-.hx-chatapps__name:hover,
-.hx-chatapps__off:hover:not(:disabled) {
-  color: var(--hx-fg-1);
-}
-.hx-chatapps__off:disabled {
-  cursor: default;
-}
-@keyframes hx-chatapp-in {
-  from {
-    opacity: 0;
-    transform: scale(0.94);
-  }
-}
+/* An app as the main thing (/apps/<id>?chat=): the page, the chat beside it in three places, the list of installed
+   apps. The look follows the board «Приложения — чат». */
 
 /* ---- «+» → «Приложение» ---- */
 .hx-pick[data-kind='apps'] .hx-pick__row:hover {
@@ -106,11 +37,41 @@
 .hx-appmain__menu {
   display: none;
 }
+/* The app's glyph, as on its card in the apps list, a step smaller. */
+.hx-appmain__tile {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
 .hx-appmain__titles {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   min-width: 0;
-  margin-left: var(--hx-space-2);
+  margin-left: var(--hx-space-1);
+}
+/* Sinopia's chat switch, quiet under the name: the name is the largest thing on the page. */
+.hx-appmain__titles .hx-chatswitch {
+  max-width: 100%;
+}
+.hx-appmain__titles .hx-chatswitch__btn {
+  height: 22px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-appmain__titles .hx-chatswitch__btn:hover,
+.hx-appmain__titles .hx-chatswitch__btn[aria-expanded='true'] {
+  color: var(--hx-fg-1);
+}
+.hx-appmain__titles .hx-chatswitch__menu {
+  top: calc(100% + 6px);
+  z-index: 30;
 }
 .hx-appmain__title {
   margin: 0;
@@ -118,13 +79,6 @@
   font-size: var(--hx-text-xl);
   font-weight: var(--hx-weight-semibold);
   letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-appmain__sub {
-  overflow: hidden;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -511,6 +465,16 @@
 .hx-insp__calls tr[data-ok='false'] td:last-child {
   color: var(--hx-danger);
 }
+/* Why a call failed, or what the view logged: under the result, wrapped. */
+.hx-insp__calls td:last-child {
+  white-space: normal;
+}
+.hx-insp__msg {
+  display: block;
+  color: var(--hx-fg-3);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 .hx-insp__scope {
   display: flex;
   gap: var(--hx-space-3);
@@ -539,6 +503,11 @@
 /* ---- the host's own questions ---- */
 .hx-appconfirm {
   width: min(420px, calc(100vw - 2 * var(--hx-space-6)));
+}
+/* A page tool's question carries the agent's arguments on a line of their own. */
+.hx-appconfirm .hx-modal__lead {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .hx-appconfirm__actions {
   display: flex;
@@ -790,7 +759,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hx-chatapps__chip,
   .hx-appmain,
   .hx-appmain__col,
   .hx-appmain__float,
@@ -800,4 +768,17 @@
     animation: none;
     transition: none;
   }
+}
+.hx-appslist__switches {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: var(--hx-space-2) var(--hx-space-4);
+}
+.hx-appslist__safe {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }

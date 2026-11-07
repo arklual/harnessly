@@ -92,13 +92,45 @@ export function localMeSource(initial: Partial<Me> = {}): MeSource {
 
 const SETTINGS_TIMEOUT_MS = 10000;
 
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+const strOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
+
+/**
+ * The strict reader of GET /api/v2/me and of the record a settings write answers. A record without its settings, its
+ * revision or a person is not one: it throws, and the request reads as failed{http} (a runtime that is restarting
+ * mid-upgrade, a proxy's page). A setting the runtime does not send yet (an older runtime of a rolling upgrade) is
+ * the default; one of the wrong type is too, so one bad field never takes the page down.
+ */
+export function readMe(v: unknown): Me {
+  if (!isObj(v) || !isObj(v.settings)) throw new Error('me: no settings');
+  if (typeof v.rev !== 'number' || !Number.isFinite(v.rev)) throw new Error('me: no rev');
+  const email = v.email ?? null;
+  const name = v.name ?? null;
+  if (!strOrNull(email) || !strOrNull(name)) throw new Error('me: bad person');
+  const got = v.settings;
+  const settings = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
+  for (const [key, def] of Object.entries(DEFAULT_SETTINGS)) {
+    const val = got[key];
+    if (val === undefined) continue;
+    const same =
+      def === null
+        ? val === null || typeof val === 'string'
+        : Array.isArray(def)
+          ? Array.isArray(val)
+          : typeof val === typeof def && (typeof def !== 'object' || isObj(val));
+    if (same) settings[key] = isObj(def) && isObj(val) ? { ...def, ...val } : val;
+  }
+  return { email, name, settings: settings as unknown as PersonSettings, rev: v.rev };
+}
+
 /** GET /api/v2/me: 401 is the sign-in screen; a 404 (no stage E yet) falls back to the local stand-in, and so do
- *  the settings writes where PATCH /api/v2/me/settings is not served. The record is not checked: its contract is stage
- *  E's. */
+ *  the settings writes where PATCH /api/v2/me/settings is not served. The record goes through readMe: a record that is
+ *  not one is a failure, which the page retries, never an exception. */
 export function httpMeSource(fallback: MeSource = localMeSource()): MeSource {
   return {
     async load() {
-      const res = await getPage(clusterApi('/me'), (v) => v as Me, 10000);
+      const res = await getPage(clusterApi('/me'), readMe, 10000);
       if ('ok' in res) return { k: 'ready', me: res.value };
       if (res.r === 'refused')
         return res.code === 'not-found' ? fallback.load() : { k: 'failed', code: 'http' };
@@ -110,7 +142,7 @@ export function httpMeSource(fallback: MeSource = localMeSource()): MeSource {
       const res = await sendJson(
         clusterApi('/me/settings'),
         { rev, patch },
-        (v) => (v as { me: Me }).me,
+        (v) => readMe(isObj(v) ? v.me : undefined),
         SETTINGS_TIMEOUT_MS,
       );
       if ('ok' in res) return { r: 'accepted', me: res.value };
@@ -155,12 +187,18 @@ export function setMeSource(next: MeSource): void {
 /** Finished turns fold; «full» was the old default, saved with every other setting, and no page
  *  offers the switch yet: a saved «full» is that default. Goes when the settings get the switch. */
 const folded = (st: MeState): MeState =>
-  st.k === 'ready' && st.me.settings.density === 'full'
+  st.k === 'ready' && st.me.settings?.density === 'full'
     ? { ...st, me: { ...st.me, settings: { ...st.me.settings, density: 'compact' } } }
     : st;
 
 export async function loadMe(): Promise<MeState> {
-  const st = folded(await source.load());
+  let st: MeState;
+  try {
+    st = folded(await source.load());
+  } catch {
+    // A source that throws (a stand-in, a reader's bug) is a failure like any other, never a page stuck on it.
+    st = { k: 'failed', code: 'http' };
+  }
   meStore.set(st);
   return st;
 }

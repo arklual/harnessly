@@ -142,9 +142,50 @@ func entryLine(e wire.Entry) string {
 	return ""
 }
 
-// lastAnswer is the agent's last answer in a snapshot: the answer entry of its last turn that has one, else its last
-// words.
-func lastAnswer(snap wire.ConvSnapshot) string {
+// Markers end the final message of a delegated chat: [[done]] when the task is complete, [[question]] when the agent
+// waits for its parent's answer. A turn that ends without one is a pause, not an answer.
+const (
+	MarkDone     = "[[done]]"
+	MarkQuestion = "[[question]]"
+)
+
+// Rules are added to the task of a delegated chat: what it must do so that its parent gets an answer and not a status.
+const Rules = "\n\n---\nYou work as a delegated chat of another agent; your last message is what it receives.\n" +
+	"- Work until the task is done. Do not end a turn with a status (\"looking at X…\", \"next I will do Y once Z\"): the work stops there until someone pushes you.\n" +
+	"- Wait for background commands in the foreground (a loop that polls until the condition holds), not by ending the turn.\n" +
+	"- If you need a decision from your parent, end the turn with the question itself; do not pause.\n" +
+	"- End your final message with the line " + MarkDone + " when the task is complete, or " + MarkQuestion + " when you wait for your parent's answer. " +
+	"A turn that ends without one is taken for a pause, and you will be told to go on."
+
+// NudgeText is what a delegated chat is told when its turn ended on a pause; n of max reminders.
+func NudgeText(n, max int) string {
+	return fmt.Sprintf("[automatic reminder %d of %d] Your last message was not a final answer. If the task is complete, answer with the result and end with the line %s. "+
+		"If you need your parent's decision, ask it and end with %s. Otherwise carry on with the work now and do not end the turn on a status; "+
+		"wait for background work in a foreground loop.", n, max, MarkDone, MarkQuestion)
+}
+
+// RestartText is what a delegated chat is told when its session ended in the middle of a turn.
+const RestartText = "[automatic] Your session ended in the middle of a turn (a restart). Carry on from where you stopped; when the task is complete, answer with the result and end with the line " + MarkDone + "."
+
+// markerOf is the marker a message ends with ("" for none) and the message without it.
+func markerOf(answer string) (string, string) {
+	trimmed := strings.TrimRight(answer, " \t\r\n")
+	line := trimmed
+	if i := strings.LastIndex(trimmed, "\n"); i >= 0 {
+		line = trimmed[i+1:]
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case MarkDone:
+		return MarkDone, strings.TrimRight(trimmed[:len(trimmed)-len(line)], " \t\r\n")
+	case MarkQuestion:
+		return MarkQuestion, strings.TrimRight(trimmed[:len(trimmed)-len(line)], " \t\r\n")
+	}
+	return "", answer
+}
+
+// fullAnswer is the agent's last answer in a snapshot, whole: the answer entry of its last turn that has one, else its
+// last words.
+func fullAnswer(snap wire.ConvSnapshot) string {
 	byID := make(map[string]wire.Entry, len(snap.Entries))
 	for _, e := range snap.Entries {
 		byID[e.ID] = e
@@ -152,16 +193,22 @@ func lastAnswer(snap wire.ConvSnapshot) string {
 	for i := len(snap.Turns) - 1; i >= 0; i-- {
 		if a := snap.Turns[i].AnswerEntryID; a != nil {
 			if e, ok := byID[*a]; ok && e.MD != "" {
-				return clip(e.MD, AnswerMax)
+				return e.MD
 			}
 		}
 	}
 	for i := len(snap.Entries) - 1; i >= 0; i-- {
 		if e := snap.Entries[i]; e.T == wire.EntrySay && e.MD != "" {
-			return clip(e.MD, AnswerMax)
+			return e.MD
 		}
 	}
 	return ""
+}
+
+// lastAnswer is the agent's last answer without its marker, as long as a report may be.
+func lastAnswer(snap wire.ConvSnapshot) string {
+	_, body := markerOf(fullAnswer(snap))
+	return clip(body, AnswerMax)
 }
 
 // ResultText is a wait's answer.
@@ -170,7 +217,16 @@ func ResultText(r Result) string {
 	b.WriteString(Head(r.Conv) + "\n")
 	switch r.Outcome {
 	case Done:
-		b.WriteString("outcome: done — the agent finished and waits for the next message\n")
+		switch {
+		case r.Marker == MarkQuestion:
+			b.WriteString("outcome: done — the agent asks you a question (last answer); answer it with send_to_conversation\n")
+		case r.GaveUp:
+			b.WriteString("outcome: done — the agent stopped without a final answer after " + fmt.Sprint(MaxNudges) + " reminders; its last words are below\n")
+		case r.Held:
+			b.WriteString("outcome: done — the agent ended its turn, but background work of its own is still running\n")
+		default:
+			b.WriteString("outcome: done — the agent finished and waits for the next message\n")
+		}
 	case NeedsPerson:
 		b.WriteString("outcome: needs-person — the agent waits for the person (a question, a permission or a paused queue); tell the person, or wait again\n")
 	case Ended:
@@ -188,9 +244,16 @@ func ResultText(r Result) string {
 func wakeText(r Result) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "The chat you delegated, %s «%s», ", r.Conv.ID, r.Conv.Title)
-	if r.Outcome == Done {
+	switch {
+	case r.Outcome == Done && r.Marker == MarkQuestion:
+		b.WriteString("finished its turn with a question for you.")
+	case r.Outcome == Done && r.GaveUp:
+		b.WriteString("stopped without a final answer, though it was reminded to go on " + fmt.Sprint(MaxNudges) + " times; treat what it wrote as a pause.")
+	case r.Outcome == Done && r.Held:
+		b.WriteString("finished its turn but background work of its own is still running.")
+	case r.Outcome == Done:
 		b.WriteString("finished its turn.")
-	} else {
+	default:
 		b.WriteString("stopped running (" + string(r.Conv.State.K) + ").")
 	}
 	if r.Answer != "" {

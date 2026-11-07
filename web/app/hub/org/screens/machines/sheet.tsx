@@ -12,15 +12,25 @@ import { useOrg } from '../../context';
 import { useAction } from '../../hooks';
 import { Sheet } from '../../ui/sheet';
 import { AccessEditor, accessSummary, Chip } from './access';
-import { OffDialog, RestartDialog } from './dialogs';
+import { MoveDialog, OffDialog, RestartDialog } from './dialogs';
 import { BUSY_TEXT, gb, plural, rub, stateOf } from './format';
 import { Spark } from './parts';
 import { ResourceEditor } from './resources';
 
 type Edit = 'resources' | 'access' | null;
-type Dlg = 'restart' | 'off' | null;
+type Dlg = 'restart' | 'off' | 'move' | null;
 
-const Body = ({ id, mlUrl, onChanged }: { id: string; mlUrl: string | null; onChanged: () => void }) => {
+const Body = ({
+  id,
+  mlUrl,
+  onChanged,
+  onClose,
+}: {
+  id: string;
+  mlUrl: string | null;
+  onChanged: () => void;
+  onClose: () => void;
+}) => {
   const { api } = useOrg();
   const now = useNow(60_000);
   const [d, setD] = useState<MachineDetail | null>(null);
@@ -291,6 +301,14 @@ const Body = ({ id, mlUrl, onChanged }: { id: string; mlUrl: string | null; onCh
         >
           Перезапустить
         </Button>
+        <Button
+          appearance="ghost"
+          disabled={!m.canAdmin || locked}
+          title={!m.canAdmin ? hint(m.needs) : undefined}
+          onClick={() => setDlg('move')}
+        >
+          Перенести
+        </Button>
         {disabled ? (
           <Button
             appearance="primary"
@@ -330,6 +348,16 @@ const Body = ({ id, mlUrl, onChanged }: { id: string; mlUrl: string | null; onCh
           ).then((ok) => ok && setDlg(null))
         }
       />
+      <MoveDialog
+        open={dlg === 'move'}
+        m={m}
+        onClose={() => setDlg(null)}
+        onMoved={() => {
+          setDlg(null);
+          onChanged();
+          onClose();
+        }}
+      />
       <OffDialog
         open={dlg === 'off'}
         m={m}
@@ -366,6 +394,6 @@ export const MachineSheet = ({
       </span>
     }
   >
-    {id && <Body key={id} id={id} mlUrl={mlUrl} onChanged={onChanged} />}
+    {id && <Body key={id} id={id} mlUrl={mlUrl} onChanged={onChanged} onClose={onClose} />}
   </Sheet>
 );

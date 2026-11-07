@@ -72,10 +72,10 @@ export const AddHome = ({ ctx }: { ctx: SheetCtx }) => {
             key={k}
             onClick={() => ctx.go({ mode: 'add', step: 'kind', kind: k })}
           >
-            <span className="ad-ic">
+            <span className="hb-ic">
               <Icon i={KIND[k].icon} size="sm" />
             </span>
-            <span className="ad-row__t">
+            <span className="hb-row__t">
               <b>{KIND[k].one}</b>
               <small>{KIND[k].about}</small>
             </span>
@@ -87,10 +87,10 @@ export const AddHome = ({ ctx }: { ctx: SheetCtx }) => {
       <div className="ev-pick">
         {ways.map((w) => (
           <button type="button" className="ev-pick__i" key={w.label} onClick={w.go}>
-            <span className="ad-ic">
+            <span className="hb-ic">
               <Icon i={w.icon} size="sm" />
             </span>
-            <span className="ad-row__t">
+            <span className="hb-row__t">
               <b>{w.label}</b>
               <small>{w.about}</small>
             </span>
@@ -183,11 +183,11 @@ export const AddKind = ({
                   ? 'есть у тенанта'
                   : '';
             return (
-              <div className="ad-row" key={c.id}>
-                <span className="ad-ic">
+              <div className="hb-row" key={c.id}>
+                <span className="hb-ic">
                   <Icon i={KIND[c.kind].icon} size="sm" />
                 </span>
-                <span className="ad-row__t">
+                <span className="hb-row__t">
                   <b>{c.name}</b>
                   <small>{c.hint}</small>
                 </span>
@@ -195,7 +195,7 @@ export const AddKind = ({
                 {(!at || justAdded) && (
                   <button
                     type="button"
-                    className="ad-add"
+                    className="hb-add"
                     data-on={justAdded ? 'true' : 'false'}
                     disabled={ctx.actions.busy}
                     onClick={() => {
@@ -327,10 +327,10 @@ export const AddLink = ({ ctx }: { ctx: SheetCtx }) => {
       )}
       {found && (
         <div className="ev-det">
-          <span className="ad-ic">
+          <span className="hb-ic">
             <Icon i={KIND[found.k].icon} size="sm" />
           </span>
-          <span className="ad-row__t">
+          <span className="hb-row__t">
             <small>{`Узнали: ${detWord(found)}`}</small>
             <b>{viewOf(found, ctx.repos).name}</b>
             <small>{viewOf(found, ctx.repos).hint}</small>

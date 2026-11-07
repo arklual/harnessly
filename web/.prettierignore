@@ -14,3 +14,4 @@ app/hub/hx/styles/components.css
 app/hub/hx/styles/settings.css
 app/hub/hx/styles/board.css
 app/hub/hx/styles/viz-pages.css
+app/next/features/app-views/surface.gen.ts

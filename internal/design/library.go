@@ -43,6 +43,8 @@ type Texts struct {
 // Config is what the deployment names.
 type Config struct {
 	DataDir string
+	// ShareProbe stands in for ProbeShareFS (a test of a runtime that fails it); it runs on every call, uncached.
+	ShareProbe func(dir string) ShareFSReport
 	// AgentTokenHeader carries the token of agent.json to the machine agent's loopback routes.
 	AgentTokenHeader string
 	// ConfigFile is the runtime's config (the owner's address).
@@ -89,6 +91,8 @@ type Library struct {
 
 	// ready caches the render doctor's result (doctor.go).
 	ready readyCache
+	// shareFS is the share filesystem probe's last result (sharefs.go).
+	shareFS shareFSCache
 
 	mu        sync.Mutex
 	locks     map[string]*sync.Mutex

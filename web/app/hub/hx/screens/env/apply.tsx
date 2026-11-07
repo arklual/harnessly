@@ -31,7 +31,7 @@ export const ApplyMenu = ({ onApply }: { onApply: (when: ApplyWhen) => Promise<b
       </button>
       {pop.mounted && (
         <div
-          className="ad-pop ev-move__pop ev-apply__pop"
+          className="hb-pop ev-move__pop ev-apply__pop"
           data-closing={pop.attr}
           role="listbox"
           aria-label="Когда применить"
@@ -39,7 +39,7 @@ export const ApplyMenu = ({ onApply }: { onApply: (when: ApplyWhen) => Promise<b
           {WHEN.map((w) => (
             <button
               type="button"
-              className="ad-pop__item"
+              className="hb-pop__item"
               role="option"
               aria-selected="false"
               key={w.when}

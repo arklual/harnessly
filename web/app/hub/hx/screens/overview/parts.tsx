@@ -460,7 +460,7 @@ export const SpendDonut = ({
       className="dash-span-12"
       title={<TitleLink onClick={onSpend}>Расход по командам</TitleLink>}
       actions={
-        <div className="hx-set__seg ad-unit" role="radiogroup" aria-label="В чём считать">
+        <div className="hx-set__seg hb-unit" role="radiogroup" aria-label="В чём считать">
           {units.map((u) => (
             <button
               key={u.id}
@@ -481,7 +481,7 @@ export const SpendDonut = ({
           <svg className="viz-donut__ring" viewBox="0 0 200 108" role="img" aria-label="Расход по командам">
             <path d="M 22.00 100.00 A 78 78 0 0 1 178.00 100.00" className="viz-donut__track" />
             {units.map((u) => (
-              <g key={u.id} className="ad-u" data-show={u.id === unit ? 'true' : 'false'}>
+              <g key={u.id} className="hb-u" data-show={u.id === unit ? 'true' : 'false'}>
                 {rings[u.id].map(
                   (s, i) =>
                     s.d && (
@@ -504,7 +504,7 @@ export const SpendDonut = ({
                   <div className="viz-donut__big-html">{big}</div>
                 </foreignObject>
                 <foreignObject x="0" y="88" width="200" height="14">
-                  <div className="ad-donut-cap">{cap}</div>
+                  <div className="hb-donut-cap">{cap}</div>
                 </foreignObject>
               </g>
             </g>
@@ -616,7 +616,7 @@ export const Subscriptions = ({ items, base }: { items: SubscriptionUse[]; base:
   const go = () => navigate(`${base}/accounts`);
   const one = (id: string) => () => navigate(`${base}/accounts?a=${encodeURIComponent(id)}`);
   return (
-    <div className="ad-one">
+    <div className="hb-one">
       <Card
         label="Подписки"
         className="dash-span-6"

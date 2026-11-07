@@ -23,6 +23,8 @@ type HostTools struct {
 	Registry *Registry
 	Storage  *Storage
 	Asks     *Asks
+	// Pages are the tools and the context the chat's open views offer (pagetools.go); nil refuses page_tools and page_call.
+	Pages *PageTools
 	// Enabled are the apps on in the chat now.
 	Enabled func() []string
 	// Open asks the chat's pane to open an app's tab (target is <id>[/<view>]).
@@ -42,7 +44,8 @@ func (HostTools) Instructions() string {
 		"app_data_get and app_data_set keep the app's data of this chat; app_ask puts a choice to the person in the app and waits for it. " +
 		"widget_show draws an app's chat view in the feed with the data you give; widget_render draws a widget you write yourself " +
 		"(HTML, CSS and a classic script, no network; window.echarts and window.widgetData are there). The same id changes a widget where it stands. " +
-		"The sinopia_* tools read and change the Sinopia document the editor shows beside this chat, for the apps that work in it."
+		"The sinopia_* tools read and change the Sinopia document the editor shows beside this chat, for the apps that work in it. " +
+		"catalog lists what an app can use (targets, contributions, rights, bridge methods): ask it when you write or fix an app."
 }
 
 func str(desc string) *jsvalue.Object {
@@ -88,11 +91,22 @@ func (HostTools) Tools() []any {
 				"script", str("Its script: a classic script that runs after the markup, optional. Up to 256 KB."),
 				"data", jsvalue.NewObject("description", "Any JSON, as window.widgetData and hl.context.data; up to 64 KB."),
 				"id", str("A widget of this chat to change; omit for a new one.")), "title", "html"),
+		tool("page_tools", "The tools the open views of this chat's apps offer from the page (registered with hl.tools.register or "+
+			"navigator.modelContext.registerTool), and what each view published for you to read (hl.publish). A view that is "+
+			"closed offers nothing: open it with `open` first. Answers [{app, tools: [{name, description, inputSchema}], context}].",
+			jsvalue.NewObject("app", str("Only this app's; omit for every app on in this chat."))),
+		tool("page_call", "Call a tool a view of an app offers from the page (see page_tools). The view runs it in the person's page "+
+			"and its answer comes back, or a refusal in words when the view is closed or does not answer within a minute.",
+			jsvalue.NewObject("app", app, "tool", str("The tool's name, as page_tools gives it."),
+				"arguments", jsvalue.NewObject("type", "object", "description", "The tool's arguments, by its inputSchema.")), "tool"),
+		tool("catalog", "What an app can use, from the table the manifest check reads: targets, contribution kinds, rights, "+
+			"the bridge methods each right opens and these tools. Ask it instead of guessing names when you write or fix an app.",
+			jsvalue.NewObject("section", str("targets, contributions, permissions, methods or tools; omit for all."))),
 	}, sinopiaToolList()...)
 }
 
 func (HostTools) Has(name string) bool {
-	return slices.Contains([]string{"open", "data_get", "data_set", "settings_get", "ask", "widget_show", "widget_render"}, name) || isSinopiaTool(name)
+	return slices.Contains([]string{"open", "data_get", "data_set", "settings_get", "ask", "widget_show", "widget_render", "catalog", "page_tools", "page_call"}, name) || isSinopiaTool(name)
 }
 
 func refuse(msg string) *jsvalue.Object { return mcpserver.TextResult("refused: "+msg, true) }
@@ -103,6 +117,12 @@ func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) 
 	}
 	if name == "widget_render" {
 		return t.widgetRender(args)
+	}
+	if name == "catalog" {
+		return catalogResult(args)
+	}
+	if name == "page_tools" {
+		return t.pageTools(args)
 	}
 	enabled := t.Enabled()
 	if len(enabled) == 0 {
@@ -121,6 +141,9 @@ func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) 
 	installed, err := t.Registry.Get(app)
 	if err != nil || installed.Manifest == nil {
 		return refuse(app + " is not installed")
+	}
+	if name == "page_call" {
+		return t.pageCall(ctx, installed, args)
 	}
 	text := func(key string) string { v, _ := args.Get(key); s, _ := v.(string); return s }
 	switch name {
@@ -291,4 +314,96 @@ func (t HostTools) widgetRender(args *jsvalue.Object) *jsvalue.Object {
 	w, err := t.Widgets.Show(t.Conv, WidgetInput{ID: text("id"), Kind: WidgetHTML, App: WidgetsApp, Title: text("title"),
 		Data: rawArg(args, "data"), HTML: html, Style: text("css"), Script: text("script")})
 	return t.widgetDone(w, err)
+}
+
+// catalogResult answers the catalog tool: it needs no app on, so an agent can ask before it writes one.
+func catalogResult(args *jsvalue.Object) *jsvalue.Object {
+	v, _ := args.Get("section")
+	section, _ := v.(string)
+	cat := SurfaceCatalog()
+	var out any = cat
+	switch section {
+	case "":
+	case "targets":
+		out = cat.Targets
+	case "contributions":
+		out = cat.Contributions
+	case "permissions":
+		out = cat.Permissions
+	case "methods":
+		out = cat.Methods
+	case "tools":
+		out = cat.Tools
+	default:
+		return refuse("no section " + section + ": targets, contributions, permissions, methods or tools")
+	}
+	raw, _ := json.Marshal(out)
+	return mcpserver.TextResult(string(raw), false)
+}
+
+// pageTools lists what the open views of the chat's apps offer: only apps on in the chat, with their rights.
+func (t HostTools) pageTools(args *jsvalue.Object) *jsvalue.Object {
+	if t.Pages == nil {
+		return refuse("this host has no page tools")
+	}
+	v, _ := args.Get("app")
+	only, _ := v.(string)
+	enabled := t.Enabled()
+	out := []PageReport{}
+	for _, r := range t.Pages.Offered(t.Conv) {
+		if !slices.Contains(enabled, r.App) || (only != "" && r.App != only) {
+			continue
+		}
+		in, err := t.Registry.Get(r.App)
+		if err != nil || in.Manifest == nil {
+			continue
+		}
+		if r = PageReportAllowed(in.Manifest, r); len(r.Tools) == 0 && len(r.Context) == 0 {
+			continue
+		}
+		if r.Tools == nil {
+			r.Tools = []PageTool{}
+		}
+		out = append(out, r)
+	}
+	raw, _ := json.Marshal(out)
+	return mcpserver.TextResult(string(raw), false)
+}
+
+func (t HostTools) pageCall(ctx context.Context, a Installed, args *jsvalue.Object) *jsvalue.Object {
+	if t.Pages == nil {
+		return refuse("this host has no page tools")
+	}
+	if !a.Manifest.Allows("tools.page") {
+		return refuse(a.ID + " does not offer page tools (no tools.page right)")
+	}
+	v, _ := args.Get("tool")
+	tool, _ := v.(string)
+	var raw json.RawMessage
+	if v, ok := args.Get("arguments"); ok && v != nil {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return refuse("arguments are a JSON object")
+		}
+		raw = b
+	}
+	answer, err := t.Pages.Call(ctx, t.Conv, a.ID, tool, raw)
+	switch {
+	case errors.Is(err, ErrPageToolArgs):
+		return refuse("the arguments are too large or not JSON")
+	case errors.Is(err, ErrPageToolGone):
+		return refuse("no open view of " + a.ID + " offers " + tool + ": open the app's view (open) and list page_tools again")
+	case errors.Is(err, ErrPageCallBusy):
+		return refuse("too many page calls wait in this chat")
+	case errors.Is(err, ErrPageCallTimeout):
+		return refuse("the view did not answer within a minute")
+	case err != nil:
+		return refuse("the call was cut off")
+	case answer.Error != "":
+		return mcpserver.TextResult(answer.Error, true)
+	}
+	if len(answer.Result) == 0 {
+		return mcpserver.TextResult("null", false)
+	}
+	return mcpserver.TextResult(string(answer.Result), false)
 }

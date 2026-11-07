@@ -185,10 +185,12 @@ func (c Config) BoardSignIn(ctx context.Context, who User, next string) (string,
 
 // Board is one whiteboard of the boards server as the page lists it.
 type Board struct {
-	Slug      string `json:"slug"`
-	Title     string `json:"title"`
-	URL       string `json:"url"`
-	UpdatedAt string `json:"updatedAt"`
+	Slug string `json:"slug"`
+	// ExternalID is a documents adapter's own id of the board, when it is not the slug.
+	ExternalID string `json:"externalId,omitempty"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+	UpdatedAt  string `json:"updatedAt"`
 }
 
 // BoardsMax is how many boards the list gives the page, the newest first as the server orders them.
@@ -230,7 +232,13 @@ func (c Config) ListBoards(ctx context.Context) ([]Board, error) {
 
 // Document is one entry of a conversation's documents.
 type Document struct {
-	Slug      string `json:"slug"`
+	// ID is the runtime's id of the binding, for a document of a documents adapter (docprovider.Bindings).
+	ID   string `json:"id,omitempty"`
+	Slug string `json:"slug"`
+	// ExternalID is the adapter's own id of the document, when it is not the slug.
+	ExternalID string `json:"externalId,omitempty"`
+	// Provider is the documents adapter that keeps it ("" is the built-in catalog).
+	Provider  string `json:"provider,omitempty"`
 	Title     string `json:"title"`
 	UpdatedAt string `json:"updatedAt"`
 	Version   int    `json:"version"`

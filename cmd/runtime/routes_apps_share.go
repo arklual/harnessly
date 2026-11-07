@@ -435,6 +435,11 @@ func appShareRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version str
 			shareRefused(w, err)
 			return
 		}
+		entries := make([]*apps.CatalogEntry, len(info.Catalog))
+		for i := range info.Catalog {
+			entries[i] = &info.Catalog[i].CatalogEntry
+		}
+		reg.Precheck(entries, version)
 		secretJSON(w, http.StatusOK, info)
 	}
 	teamPageInstall := func(w http.ResponseWriter, r *http.Request) {

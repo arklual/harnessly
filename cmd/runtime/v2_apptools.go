@@ -28,7 +28,7 @@ func (v *v2Live) serveAppTools(done <-chan struct{}) {
 			return noAppTools{why: why}
 		}
 		return apps.HostTools{
-			Conv: conv, Registry: reg, Storage: storage, Asks: appAsks, Widgets: widgets,
+			Conv: conv, Registry: reg, Storage: storage, Asks: appAsks, Pages: appPages, Widgets: widgets,
 			Enabled: func() []string {
 				rec, _ := v.rt.Record(conv)
 				return rec.Apps

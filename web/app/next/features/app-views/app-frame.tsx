@@ -1,6 +1,6 @@
 // An app's view in a sandboxed frame: shown through a preview slot (so it runs on an origin of its own, never the
 // page's, and the preview's DevTools see it), and talked to only through the bridge (bridge.ts).
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { slotLeases } from '@/next/features/pane/slot-lease';
 import { openPreview } from '@/next/core/net/preview';
 import {
@@ -23,6 +23,8 @@ import {
   type TTarget,
 } from '@/next/features/app-views/bridge';
 import { logCall, logKey } from '@/next/features/app-views/bridge-log';
+import { pageOffer } from '@/next/features/app-views/page-tools';
+import { askConfirm } from '@/next/features/app-views/confirm';
 import { watchLoads } from '@/next/features/app-views/frame-loads';
 import { chatOf, useHostHandlers } from '@/next/features/app-views/host-handlers';
 import { conversationsStore, useConversation } from '@/next/stores/conversations';
@@ -41,7 +43,23 @@ import type { ConvId, MachineId } from '@/next/protocol/v2';
  * reach the slot's storage or another app's view. What it keeps goes through the bridge. (The view server's CSP says
  * the same, for a frame made some other way.)
  */
+/** How long a view has to make its handshake before the debug section says it did not. */
+const HANDSHAKE_WAIT_MS = 8000;
+
 export const APP_FRAME_SANDBOX = 'allow-scripts allow-forms allow-popups';
+/**
+ * A view the app's own server hosts runs on that server's origin (its own sign-in and storage work), which is never the
+ * page's: frameSrc refuses the page's origin, so allow-same-origin gives it nothing of the host.
+ */
+export const REMOTE_FRAME_SANDBOX = `${APP_FRAME_SANDBOX} allow-same-origin`;
+
+/** The remote view's address with the nonce in its fragment (never sent to its server; the shim takes it out). */
+export const withNonce = (src: string, nonce: string): string => {
+  const u = new URL(src);
+  const rest = u.hash.replace(/^#/, '');
+  u.hash = rest === '' ? `hl-nonce=${nonce}` : `${rest}&hl-nonce=${nonce}`;
+  return u.href;
+};
 /** A sandboxed frame's messages carry this origin. */
 const OPAQUE = 'null';
 const MIN_HEIGHT = 48;
@@ -142,6 +160,8 @@ const AppFrame = ({
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
   const [reload, setReload] = useState(0);
   const bridge = useRef<AppBridge | null>(null);
+  // This frame among the views of the chat that offer page tools.
+  const frameId = useId();
   // A slot view holds a slot of its own: two views of one app on a page would share one cookie, and the second
   // one's session would replace the first one's.
   const lease = isSlotTarget(target) ? `app:${app.id}/${view.id}` : `app:${app.id}`;
@@ -154,10 +174,40 @@ const AppFrame = ({
 
   // Each app holds a slot of its own: a slot is one origin, and two apps on one would share it.
   useEffect(() => {
-    // A view the app's own server hosts needs no slot: the frame goes there directly.
-    if (view.url) return;
     let live = true;
     const fail = (error: string) => live && setOpened({ key, src: null, session: null, nonce: null, error });
+    // A view the app's own server hosts needs no slot: the frame goes there directly, with a session the page holds.
+    if (view.url) {
+      const direct = frameSrc(view.url, window.location.origin);
+      if (direct === null) {
+        fail(t('next.appview.badAddress'));
+        return;
+      }
+      createViewSession(machine, {
+        app: app.id,
+        view: view.id,
+        target,
+        conversation: chat,
+        ...(doc === undefined ? {} : { document: doc }),
+      })
+        .then((made) => {
+          const at = made.url === undefined ? null : frameSrc(made.url, window.location.origin);
+          if (!live) return;
+          if (at === null) fail(t('next.appview.badAddress'));
+          else
+            setOpened({
+              key,
+              src: withNonce(at, made.nonce),
+              session: made.session,
+              nonce: made.nonce,
+              error: null,
+            });
+        })
+        .catch((e: Error) => fail(e.message));
+      return () => {
+        live = false;
+      };
+    }
     if (view.path) {
       const slot = slotLeases.lease('port', lease);
       // The view server serves a view's files only under the token of a session the runtime issued for this mount.
@@ -169,6 +219,7 @@ const AppFrame = ({
         ...(doc === undefined ? {} : { document: doc }),
       })
         .then(async (made) => {
+          if (made.path === undefined) throw new Error(t('next.appview.noEntry'));
           const o = await openPreview(machine, { kind: 'port', port: viewPort }, slot, made.path);
           if (live)
             setOpened({ key, src: o.enterUrl, session: made.session, nonce: made.nonce, error: null });
@@ -209,15 +260,8 @@ const AppFrame = ({
   });
 
   const slotted = opened?.key === key ? opened : null;
-  const external = view.url ? frameSrc(view.url, window.location.origin) : null;
-  const shown = view.url
-    ? {
-        src: external,
-        session: null,
-        nonce: null,
-        error: external === null ? t('next.appview.badAddress') : null,
-      }
-    : slotted;
+  const remote = view.url !== undefined;
+  const shown = slotted;
   const ready = shown?.src != null && shown.error === null;
   const session = shown?.session ?? null;
   const nonce = shown?.nonce ?? null;
@@ -247,7 +291,34 @@ const AppFrame = ({
 
   useEffect(() => {
     if (!frame || !ready || navigated.current) return;
+    // Page tools and the published context reach the agent of the chat the app is on in; elsewhere they are refused.
+    const offer =
+      chat === null
+        ? null
+        : pageOffer(
+            machine,
+            chat,
+            frameId,
+            app.id,
+            (id, name, args) =>
+              bridge.current?.notify('harnessly/notifications/tool-call', { id, name, arguments: args }),
+            (tool, shown) =>
+              askConfirm(
+                app.name,
+                t('next.appview.pageToolConfirm', {
+                  tool: tool.name,
+                  action: tool.description || tool.name,
+                  args: shown,
+                }),
+              ),
+          );
+    const noChat = () => {
+      throw new BridgeError('host_unavailable', 'page tools work in a chat the app is on in');
+    };
     const host: IBridgeHandlers = {
+      pageTools: (tools) => (offer ? offer.tools(tools) : noChat()),
+      pageToolResult: (id, answer) => offer?.result(id, answer),
+      publish: (data) => (offer ? offer.publish(data) : noChat()),
       // The runtime reads the app, the target and the chat from the session; none of them is sent again.
       tool: (name, args) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
@@ -300,29 +371,64 @@ const AppFrame = ({
       // The host's own come last: the chat binding may read the chat or run a flow where a default has no way to.
       ...handlers,
     };
+    // A remote view speaks from its own origin, and is answered only there.
+    const remoteOrigin = remote && src !== null ? new URL(src).origin : null;
+    const key = logKey(app.id, chat);
+    host.debugLog = (level, text) =>
+      logCall(key, { method: `console.${level}`, permission: '', ok: false, message: text, at: Date.now() });
     const b = new AppBridge({
       frame: () => frame.contentWindow,
-      origin: OPAQUE,
-      replyTo: '*',
+      origin: remoteOrigin ?? OPAQUE,
+      replyTo: remoteOrigin ?? '*',
       app,
       context: latest.current.context,
       handlers: host,
       hostVersion: HOST_VERSION,
       ...(nonce === null ? {} : { nonce }),
       onCall: (entry) => {
-        logCall(logKey(app.id, chat), entry);
+        logCall(key, entry);
         latest.current.onBridgeCall?.(entry);
       },
     });
     bridge.current = b;
     const onMessage = (event: MessageEvent) => void b.onMessage(event);
     window.addEventListener('message', onMessage);
+    // A view that never connects shows nothing of why: the debug section says so.
+    const watchdog = window.setTimeout(() => {
+      if (!b.ready && bridge.current === b)
+        logCall(key, {
+          method: 'ui/initialize',
+          permission: '',
+          ok: false,
+          code: 'host_unavailable',
+          message: t('next.inspector.noHandshake', { s: HANDSHAKE_WAIT_MS / 1000 }),
+          at: Date.now(),
+        });
+    }, HANDSHAKE_WAIT_MS);
     return () => {
+      window.clearTimeout(watchdog);
       window.removeEventListener('message', onMessage);
       b.dispose();
       bridge.current = null;
+      offer?.drop();
     };
-  }, [frame, ready, session, nonce, machine, app, target, conversation, on, chat, handlers, work]);
+  }, [
+    frame,
+    ready,
+    session,
+    nonce,
+    machine,
+    app,
+    target,
+    conversation,
+    on,
+    chat,
+    handlers,
+    work,
+    frameId,
+    remote,
+    src,
+  ]);
 
   // `storage`: a key of the app's storage was written (by the agent, another view of the app, the view itself), told at
   // once from the runtime's stream. It names the scope and the key, never the value; the view reads the key again.
@@ -394,7 +500,7 @@ const AppFrame = ({
       ref={setFrame}
       className="hx-appview"
       title={view.title ?? app.name}
-      sandbox={APP_FRAME_SANDBOX}
+      sandbox={remote ? REMOTE_FRAME_SANDBOX : APP_FRAME_SANDBOX}
       referrerPolicy="no-referrer"
       allow=""
       src={shown?.src ?? undefined}

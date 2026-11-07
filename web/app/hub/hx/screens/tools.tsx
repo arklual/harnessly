@@ -293,7 +293,7 @@ const Screen = () => {
 
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles
           title="Инструменты"
           lead={

@@ -54,7 +54,7 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
   };
 
   return (
-    <div className="ad-tools">
+    <div className="hb-tools">
       {live && (
         <div className="hx-set__seg an-quick" role="group" aria-label="Быстрый период">
           {QUICK.map((q) => (

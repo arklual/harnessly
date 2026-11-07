@@ -51,7 +51,7 @@ const Screen = () => {
   const hint = card.shown ? (all.find((m) => m.id === card.shown) ?? null) : null;
 
   const end = canAdd ? (
-    <div className="ad-tools">
+    <div className="hb-tools">
       <Btn variant="outline" size="sm" icon="plus" onClick={() => setAdding(true)}>
         Добавить машину
       </Btn>
@@ -76,7 +76,7 @@ const Screen = () => {
 
   return (
     <>
-      <div className="ad-head">
+      <div className="hb-head">
         <Titles title={title} lead={data || member ? lead : undefined} />
         {end}
       </div>

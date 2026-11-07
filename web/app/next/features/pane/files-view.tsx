@@ -9,6 +9,7 @@ import {
   useState,
   type ChangeEvent,
   type DragEvent,
+  type MouseEvent,
   type PointerEvent,
   type ReactElement,
   type ReactNode,
@@ -17,6 +18,7 @@ import Segmented from '@/next/ui/segmented';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import { useKeys } from '@/next/features/keys/use-keys';
+import ListMenu from '@/next/features/pane/list-menu';
 import QuickOpen from '@/next/features/pane/quick-open';
 import FindInFiles, {
   NO_FIND,
@@ -361,6 +363,42 @@ const FilesView = ({
     event.target.value = '';
   };
   const [dropping, setDropping] = useState(false);
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const listItems = [
+    ...(take
+      ? [
+          {
+            icon: 'folder-plus' as const,
+            label: t('next.files.newFolder'),
+            onPick: () => startEdit({ kind: 'newFolder', name: '' }),
+          },
+        ]
+      : []),
+    ...(entryOps
+      ? [
+          {
+            icon: 'file-plus' as const,
+            label: t('next.files.newFile'),
+            onPick: () => startEdit({ kind: 'newFile', name: '' }),
+          },
+        ]
+      : []),
+    ...(take
+      ? [
+          {
+            icon: 'upload' as const,
+            label: t('next.files.upload'),
+            onPick: () => filesInput.current?.click(),
+          },
+        ]
+      : []),
+  ];
+  const openListMenu = (event: MouseEvent) => {
+    if (listItems.length === 0 || (event.target as HTMLElement).closest('.hx-disk__item, .hx-disk__name'))
+      return;
+    event.preventDefault();
+    setMenuAt({ x: event.clientX, y: event.clientY });
+  };
   const carriesFiles = (event: DragEvent) => event.dataTransfer.types.includes('Files');
   const dropTo = take
     ? {
@@ -540,6 +578,7 @@ const FilesView = ({
               data-picking={picking !== null || undefined}
               data-drop={dropping || undefined}
               {...dropTo}
+              onContextMenu={openListMenu}
               role={listing === null ? 'status' : undefined}
               aria-label={listing === null ? t('next.files.loading') : undefined}
             >
@@ -758,6 +797,7 @@ const FilesView = ({
           )}
         </PaneHead>
       </div>
+      <ListMenu at={menuAt} items={listItems} onClose={() => setMenuAt(null)} />
     </div>
   );
 };

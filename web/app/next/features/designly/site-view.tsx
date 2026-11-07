@@ -81,6 +81,8 @@ import type { IStyleItem } from '@/next/features/designly/element-style';
 import { fromFrame } from '@/next/features/designly/bridge-origin';
 import { AnchorContext, createAnchorStore, type IAnchorItem } from '@/next/features/designly/note-anchor';
 import { useDomBridge } from '@/next/features/designly/use-dom-bridge';
+import TourAnchor, { TOUR_ANCHOR } from '@/next/features/tour/tour-anchor';
+import { useTourStep } from '@/next/features/tour/use-tour-step';
 import SiteLoader from '@/next/features/designly/site-loader';
 import { loadStageOf, type ILoadProgress } from '@/next/features/designly/site-load';
 import { useSiteLoad } from '@/next/features/designly/use-site-load';
@@ -613,9 +615,13 @@ const SiteView = ({
   const latestInspect = useRef<() => void>(() => undefined);
   const latestDom = useRef(dom);
   const latestReload = useRef<(hard: boolean) => void>(() => undefined);
+  // The element of the page a step of the tour is about: the page follows it beside the notes' blocks.
+  const tourFrame = useTourStep()?.frame ?? null;
+  const latestTourFrame = useRef(tourFrame);
   useEffect(() => {
     latestStage.current = stage;
     latestImagesOn.current = imagesOn;
+    latestTourFrame.current = tourFrame;
   });
   // The page scrolls: the field narrows for a while, and a phone's bars fold or unfold by the direction.
   const track = useRef(SCROLL_START);
@@ -705,10 +711,12 @@ const SiteView = ({
   };
   const sendAnchors = () => {
     const slot = slotOf();
-    slot?.frame.contentWindow?.postMessage(
-      { type: 'tk:anchors', items: latestStage.current?.anchors ?? [] },
-      slot.origin,
-    );
+    const ring = latestTourFrame.current;
+    const items = [
+      ...(latestStage.current?.anchors ?? []),
+      ...(ring ? [{ key: TOUR_ANCHOR, pick: null, selector: ring }] : []),
+    ];
+    slot?.frame.contentWindow?.postMessage({ type: 'tk:anchors', items }, slot.origin);
   };
   const arm = (on: boolean) => {
     const slot = slotOf();
@@ -735,14 +743,30 @@ const SiteView = ({
     const slot = slotOf();
     slot?.frame.contentWindow?.postMessage({ type: 'tk:tweak', name, value }, slot.origin);
   };
+  const staged = stage !== undefined;
+  /** The frame (its src and reload) whose board's own script said it was ready: it says so once, at its load. */
+  const libFor = useRef<string | null>(null);
   useEffect(() => {
     const slot = frameOf();
     if (!slot) return;
     const { frame, origin } = slot;
+    const key = `${src}#${reloadKey}`;
+    // The board's script picks blocks and wears the notes' looks for the stage, as the slot's bridge does.
+    const toLib = () => {
+      const now = latestStage.current;
+      frame.contentWindow?.postMessage(boardChat(!guest && now !== null), origin);
+      if (!now) return;
+      frame.contentWindow?.postMessage({ type: 'tk:pick', on: now.pick }, origin);
+      frame.contentWindow?.postMessage({ type: 'tk:hold', on: now.hold === true }, origin);
+      frame.contentWindow?.postMessage({ type: 'tk:styles', items: now.styles }, origin);
+      now.onBridge(true);
+    };
     latestStage.current?.onBridge(false);
     anchorStore.set(null);
     // Asked again when the page of this frame has loaded already (the effect runs for other reasons too); a page still
-    // on its way says «hello» itself, and onLoad asks.
+    // on its way says «hello» itself, and onLoad asks. A board's script said its word at its load: the editing mode
+    // that comes after it is told it straight away.
+    if (libFor.current === key) toLib();
     ping();
     const onMessage = (event: MessageEvent) => {
       if (!fromFrame(event, frame.contentWindow, origin)) return;
@@ -821,15 +845,9 @@ const SiteView = ({
         // Its script tells Space and the middle button's drag on a canvas too.
         frame.contentWindow?.postMessage({ type: 'tk:canvas', on: true }, origin);
         sendTouch();
-        // Its error card may send the error to the chat when there is one.
-        frame.contentWindow?.postMessage(boardChat(!guest && now !== null), origin);
-        // And it picks blocks and wears the notes' looks, as the slot's bridge does.
-        if (now) {
-          frame.contentWindow?.postMessage({ type: 'tk:pick', on: now.pick }, origin);
-          frame.contentWindow?.postMessage({ type: 'tk:hold', on: now.hold === true }, origin);
-          frame.contentWindow?.postMessage({ type: 'tk:styles', items: now.styles }, origin);
-          now.onBridge(true);
-        }
+        // Its error card may send the error to the chat when there is one; it picks blocks for the stage.
+        libFor.current = key;
+        toLib();
         return;
       }
       if (message?.k === 'key') {
@@ -879,9 +897,10 @@ const SiteView = ({
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-    // slotOf reads the frame of this src; a new function each render must not listen again.
+    // slotOf reads the frame of this src; a new function each render must not listen again. The editing mode that comes
+    // over a page already loaded asks again: the page said its hello before there was a stage to hear it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, reloadKey]);
+  }, [src, reloadKey, staged]);
   useEffect(() => {
     arm(pick);
     // arm reads the frame of this src.
@@ -918,7 +937,7 @@ const SiteView = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [veilsKey, src, reloadKey]);
   // The blocks the pins stand on: the set goes again whenever it changes.
-  const anchorsKey = JSON.stringify(stage?.anchors ?? []);
+  const anchorsKey = JSON.stringify([stage?.anchors ?? [], tourFrame]);
   useEffect(() => {
     sendAnchors();
     // sendAnchors reads the frame of this src and the latest stage; the set's key says when it changed.
@@ -1971,9 +1990,12 @@ const SiteView = ({
                                   />
                                 )}
                               </Swap>
-                              {stage && (
+                              {(stage || tourFrame) && (
                                 <AnchorContext.Provider value={anchorStore}>
-                                  <div className="hx-site__pins">{stage.pins}</div>
+                                  <div className="hx-site__pins">
+                                    {stage?.pins}
+                                    {tourFrame && <TourAnchor />}
+                                  </div>
                                 </AnchorContext.Provider>
                               )}
                             </div>

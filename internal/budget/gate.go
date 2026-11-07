@@ -71,7 +71,7 @@ func (g *Gate) Reply(provider, event, session, model string) []byte {
 	}
 	text := Text(d.Entry)
 	if d.Block && (event == "UserPromptSubmit" || event == "PreToolUse") {
-		return stopReply(event, text)
+		return stopReply(provider, event, text)
 	}
 	if g.firstTime(session, d) {
 		raw, _ := json.Marshal(map[string]string{"systemMessage": text})
@@ -95,12 +95,19 @@ func (g *Gate) firstTime(session string, d Decision) bool {
 	return true
 }
 
-// stopReply refuses a prompt, or ends the turn at a tool call. The reason is shown to the person as it is.
-func stopReply(event, text string) []byte {
+// stopReply refuses a prompt, or ends the turn at a tool call. The reason is shown to the person as it is. Codex's
+// PreToolUse takes only a deny with a reason that is not empty: continue:false is rejected by its CLI and the call
+// would run.
+func stopReply(provider, event, text string) []byte {
 	var v any
-	if event == "UserPromptSubmit" {
+	switch {
+	case event == "UserPromptSubmit":
 		v = map[string]string{"decision": "block", "reason": text}
-	} else {
+	case provider == "codex":
+		v = map[string]any{"hookSpecificOutput": map[string]any{
+			"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": text,
+		}}
+	default:
 		v = map[string]any{"continue": false, "stopReason": text}
 	}
 	raw, _ := json.Marshal(v)

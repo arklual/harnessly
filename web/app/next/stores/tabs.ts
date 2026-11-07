@@ -16,6 +16,8 @@ export interface ITab {
   scroll: Readonly<Record<string, number>> | null;
   /** What views asked to keep (useTabState), by their key. */
   view: Readonly<Record<string, unknown>> | null;
+  /** Unix ms the person left the tab (or first saw it behind another); null while it is active (features/shell/tab-tidy). */
+  leftAt: number | null;
 }
 
 export interface ITabsState {
@@ -42,6 +44,7 @@ export const createTab = (path: string, id: string = newTabId()): ITab => ({
   title: null,
   scroll: null,
   view: null,
+  leftAt: null,
 });
 
 export const activeTab = (state: ITabsState): ITab =>
@@ -87,6 +90,7 @@ export const parseSaved = (raw: string | null): ITabsState | null => {
       title: typeof tab.title === 'string' ? tab.title : null,
       scroll: typeof tab.scroll === 'object' && tab.scroll !== null ? tab.scroll : null,
       view: typeof tab.view === 'object' && tab.view !== null ? tab.view : null,
+      leftAt: typeof tab.leftAt === 'number' ? tab.leftAt : null,
     }));
     if (tabs.length === 0) return null;
     const active = tabs.some((tab) => tab.id === data.active) ? String(data.active) : tabs[0].id;

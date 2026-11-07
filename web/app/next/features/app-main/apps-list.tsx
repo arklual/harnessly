@@ -7,10 +7,11 @@ import Sheet from '@/next/ui/sheet';
 import Switch from '@/next/ui/switch';
 import { Button, RoundButton } from '@/next/ui/button';
 import { Skeleton } from '@/next/ui/skeleton';
-import type { IInstalledApp } from '@/next/features/app-views/api';
+import { APP_REASON, APP_STATE, type IInstalledApp } from '@/next/features/app-views/api';
 import type { ITeamState } from '@/next/features/app-catalog/use-team';
 import { ROW_ACTION, rowsOf, type ICatalogRow } from '@/next/features/app-catalog/model';
 import { t } from '@/next/i18n';
+import { setAppsDebug, useAppsDebug } from '@/next/features/app-views/debug-mode';
 import '@/next/styles/app-main.css';
 
 export interface IAppsListProps {
@@ -27,7 +28,31 @@ export interface IAppsListProps {
   footer?: ReactNode;
   /** Turns the environment's app off (or on again) for the person; it rejects with the text to show. */
   onEnvMute?: (app: IInstalledApp, mute: boolean) => Promise<void>;
+  /** Safe mode, when the machine tells it: new chats start without the apps that are not pinned. */
+  safeMode?: boolean;
+  /** Turns safe mode on or off; it rejects with the text to show. */
+  onSafeMode?: (on: boolean) => Promise<void>;
 }
+
+/** Why the app does nothing now, in words; null when it is ready or only turned off (said by its switch). */
+export const reasonOf = (app: Pick<IInstalledApp, 'state' | 'reason' | 'detail'>): string | null => {
+  if (app.reason === APP_REASON.safe) return t('next.appslist.reason.safe');
+  if (app.state === undefined || app.state === APP_STATE.ready || app.state === APP_STATE.disabled)
+    return null;
+  const detail = app.detail ?? '';
+  switch (app.reason) {
+    case APP_REASON.secret:
+      return t('next.appslist.reason.secret', { names: detail });
+    case APP_REASON.connection:
+      return t('next.appslist.reason.connection', { names: detail });
+    case APP_REASON.host:
+      return t('next.appslist.reason.host', { range: detail });
+    case APP_REASON.package:
+      return t('next.appslist.reason.package');
+    default:
+      return null;
+  }
+};
 
 const stateOf = (app: IInstalledApp, row: ICatalogRow | null): string => {
   if (app.dev) return t('next.appslist.dev');
@@ -77,6 +102,47 @@ const EnvSwitch = ({
   );
 };
 
+/** The safe mode switch of the list's header. */
+const SafeSwitch = ({ on, onSet }: { on: boolean; onSet: (on: boolean) => Promise<void> }) => {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const toggle = async () => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      await onSet(!on);
+    } catch (err) {
+      setFailure(err instanceof Error ? err.message : t('next.appslist.envFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="hx-appslist__safe">
+      <label className="hx-appsheet__switch" title={t('next.appslist.safeHint')}>
+        <span>{t('next.appslist.safe')}</span>
+        <Switch label={t('next.appslist.safe')} checked={on} disabled={busy} onChange={() => void toggle()} />
+      </label>
+      {failure && (
+        <p className="hx-appteam__fail" role="alert">
+          {failure}
+        </p>
+      )}
+    </div>
+  );
+};
+
+/** The debug switch: this browser's, it opens the debug section of every app (calls, errors of the view, storage). */
+const DebugSwitch = () => {
+  const on = useAppsDebug();
+  return (
+    <label className="hx-appsheet__switch" title={t('next.appslist.debugHint')}>
+      <span>{t('next.appslist.debug')}</span>
+      <Switch label={t('next.appslist.debug')} checked={on} onChange={() => setAppsDebug(!on)} />
+    </label>
+  );
+};
+
 /** The team's catalog row of an app, when the team has it. */
 const teamRow = (team: ITeamState | undefined, app: IInstalledApp): ICatalogRow | null => {
   if (!team?.info || team.info.space === '') return null;
@@ -104,6 +170,7 @@ const AppCard = ({
       <span className="hx-appcard__state">
         {stateOf(app, row)}
         {(row?.muted || app.muted) && ` · ${t('next.appslist.off')}`}
+        {reasonOf(app) !== null && ` · ${reasonOf(app)}`}
       </span>
     </button>
     <RoundButton
@@ -145,6 +212,11 @@ const AppDetails = ({
           </span>
         </div>
         {app.description && <p className="hx-appsheet__text">{app.description}</p>}
+        {reasonOf(app) !== null && (
+          <p className="hx-appteam__fail" role="status">
+            {reasonOf(app)}
+          </p>
+        )}
         {app.env && onEnvMute && (
           <div className="hx-appsheet__sec">
             <EnvSwitch app={app} onMute={onEnvMute} />
@@ -205,7 +277,18 @@ const AppDetails = ({
   </Sheet>
 );
 
-const AppsList = ({ apps, error, onOpen, onOpenDrawer, onHelp, team, footer, onEnvMute }: IAppsListProps) => {
+const AppsList = ({
+  apps,
+  error,
+  onOpen,
+  onOpenDrawer,
+  onHelp,
+  team,
+  footer,
+  onEnvMute,
+  safeMode,
+  onSafeMode,
+}: IAppsListProps) => {
   const [details, setDetails] = useState<string | null>(null);
   const shown = apps?.find((a) => a.id === details) ?? null;
   let body = null;
@@ -255,7 +338,12 @@ const AppsList = ({ apps, error, onOpen, onOpenDrawer, onHelp, team, footer, onE
           <Icon name="menu" />
         </button>
         <h1 className="hx-appslist__h1">{t('next.sidebar.apps')}</h1>
+        <div className="hx-appslist__switches">
+          <DebugSwitch />
+          {safeMode !== undefined && onSafeMode && <SafeSwitch on={safeMode} onSet={onSafeMode} />}
+        </div>
       </div>
+      {safeMode && <p className="hx-appslist__hint">{t('next.appslist.safeOn')}</p>}
       {body}
       <button type="button" className="hx-appslist__help" onClick={onHelp}>
         <Icon name="book-open" size="sm" />

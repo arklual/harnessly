@@ -92,6 +92,9 @@ func TestProfilesFileRefusals(t *testing.T) {
 		"auto vendor":          strings.Replace(base(""), `"vendor":"glm"`, `"vendor":"auto"`, 1),
 		"no models":            `{"profiles":[{"id":"x","label":"X","vendor":"glm","api":"anthropic","base_url":"https://x.example.com","models":[]}]}`,
 		"codex without keyenv": strings.Replace(base(""), `"api":"anthropic"`, `"api":"openai-responses"`, 1),
+		// GitHub #24: an id the launcher would refuse is refused at load, not offered and then failed.
+		"model with a shell metacharacter": strings.Replace(base(""), `{"id":"m"}`, `{"id":"zai/glm;id"}`, 1),
+		"model with an empty part":         strings.Replace(base(""), `{"id":"m"}`, `{"id":"zai//glm"}`, 1),
 	} {
 		if err := AddProfiles([]byte(doc)); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -104,6 +107,22 @@ func TestProfilesFileRefusals(t *testing.T) {
 	mixed := `{"profiles":[{"id":"ok","label":"Ok","vendor":"glm","api":"anthropic","base_url":"https://ok.example.com","models":[{"id":"m"}]},{"id":"Bad"}]}`
 	if err := AddProfiles([]byte(mixed)); err == nil || len(Presets()) != len(presets) {
 		t.Fatalf("mixed file: %v, %d presets", err, len(Presets()))
+	}
+}
+
+func TestProfilesFileTakesNamespacedModels(t *testing.T) {
+	resetExtra(t)
+	doc := `{"profiles":[{"id":"zai-router","label":"Z","vendor":"glm","api":"anthropic","base_url":"https://x.example.com",` +
+		`"models":[{"id":"zai/glm-5.3"}]}]}`
+	if err := AddProfiles([]byte(doc)); err != nil {
+		t.Fatalf("vendor/model refused: %v", err)
+	}
+	p, ok := Find("zai-router")
+	if !ok {
+		t.Fatalf("profile not added")
+	}
+	if _, ok := p.ModelOf("zai/glm-5.3"); !ok {
+		t.Fatalf("model not offered")
 	}
 }
 

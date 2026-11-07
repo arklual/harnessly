@@ -744,15 +744,17 @@ func (t *txn) addGuestComment(l *shareTarget, c commentInput) (guestComment, err
 	if n >= maxCommentsByLink {
 		return guestComment{}, fail("rate_limited", "К ссылке набралось слишком много комментариев")
 	}
-	out := guestComment{ID: rowID(t.now), Board: c.Board, X: c.X, Y: c.Y, Text: c.Text, Name: c.Name, Anchor: c.Anchor, At: isoOf(t.now)}
+	out := guestComment{Board: c.Board, X: c.X, Y: c.Y, Text: c.Text, Name: c.Name, Anchor: c.Anchor, At: isoOf(t.now)}
 	var x, y any
 	if c.X != nil {
 		x, y = *c.X, *c.Y
 	}
-	if _, err := t.q.Exec(t.ctx, `INSERT INTO design_guest_comments (id, link_id, board, x, y, text, guest_id, guest_name, anchor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		out.ID, l.ID, c.Board, x, y, c.Text, c.GuestID, c.Name, jsonOrNil(c.Anchor, c.Anchor == nil), ms(t.now)); err != nil {
+	rowid, err := t.insertRow(`INSERT INTO design_guest_comments (id, link_id, board, x, y, text, guest_id, guest_name, anchor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		l.ID, c.Board, x, y, c.Text, c.GuestID, c.Name, jsonOrNil(c.Anchor, c.Anchor == nil), ms(t.now))
+	if err != nil {
 		return guestComment{}, err
 	}
+	out.ID = rowid
 	return out, t.writeLog(l.Project, "guest:"+c.Name, "share.comment", l.ID, map[string]any{"board": c.Board})
 }
 

@@ -13,6 +13,65 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-07f',
+    items: [{ key: 'appHeader', icon: 'layout-grid' }],
+  },
+  {
+    id: '2026-11-07e',
+    items: [{ key: 'appsDebug', icon: 'bug' }],
+  },
+  {
+    id: '2026-11-07d',
+    items: [{ key: 'appViewsLoad', icon: 'refresh-cw' }],
+  },
+  {
+    id: '2026-11-07c',
+    items: [{ key: 'liveFallback', icon: 'refresh-cw' }],
+  },
+  {
+    id: '2026-11-07b',
+    items: [
+      { key: 'uploadFiles', icon: 'upload' },
+      { key: 'anySize', icon: 'paperclip' },
+      { key: 'newFolder', icon: 'folder-plus' },
+    ],
+  },
+  {
+    id: '2026-11-07a',
+    items: [
+      { key: 'lessonRing', icon: 'square-mouse-pointer' },
+      { key: 'lessonPick', icon: 'message-square-text' },
+    ],
+  },
+  {
+    id: '2026-11-06zl',
+    items: [{ key: 'appSafeMode', icon: 'shield-question' }],
+  },
+  {
+    id: '2026-11-06zk',
+    items: [{ key: 'appPrecheck', icon: 'shield-question' }],
+  },
+  {
+    id: '2026-11-06zj',
+    items: [{ key: 'appState', icon: 'shield-question' }],
+  },
+  {
+    id: '2026-11-06zi',
+    items: [
+      { key: 'pageTools', icon: 'blocks' },
+      { key: 'remoteViews', icon: 'link' },
+    ],
+  },
+  {
+    id: '2026-11-06zh',
+    items: [
+      { key: 'tabsTidy', icon: 'layers' },
+      { key: 'tabsFront', icon: 'shield-question' },
+      { key: 'appCatalog', icon: 'blocks' },
+      { key: 'appsInPlus', icon: 'layout-grid' },
+    ],
+  },
+  {
     id: '2026-11-06zg',
     items: [
       { key: 'learn', icon: 'graduation-cap' },

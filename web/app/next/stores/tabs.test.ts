@@ -192,7 +192,7 @@ describe('tabs: persist', () => {
     expect(
       parseSaved(JSON.stringify({ v: 1, tabs: [{ id: 1 }, { id: 'a', path: '/x' }], active: 'zz' })),
     ).toEqual({
-      tabs: [{ id: 'a', path: '/x', title: null, scroll: null, view: null }],
+      tabs: [{ id: 'a', path: '/x', title: null, scroll: null, view: null, leftAt: null }],
       active: 'a',
     });
   });

@@ -18,6 +18,29 @@ const at = (id: string) => (env: ITourEnv) => new RegExp(`/designly/${id}(?:[/?#
 const signal = (name: string) => (env: ITourEnv) => env.signals.has(name);
 const signalLike = (test: (s: string) => boolean) => (env: ITourEnv) => [...env.signals].some(test);
 const chatStarted = (env: ITourEnv) => /[?&]chat=/.test(env.path);
+/** The design is in its editing mode: the address keeps it (`?edit=1`). */
+const editing = (env: ITourEnv) => /[?&]edit=1(?:&|$)/.test(env.path);
+const found =
+  (...selectors: string[]) =>
+  (env: ITourEnv) =>
+    selectors.some((sel) => env.find(sel) !== null);
+/** No agent on this machine can answer: a request of the lesson is passed over. */
+const noAgent = (env: ITourEnv) => env.facts.has('agent:none');
+
+/** The library, and a design of it, as the steps' places and the ways back to them. */
+const LIBRARY = /\/designly\/?(?:[?#]|$)/;
+const LIBRARY_PATH = '/designly';
+const IN = (id: string) => ({ where: new RegExp(`/designly/${id}(?:[/?#]|$)`), back: `/designly/${id}` });
+
+// The pick switch on (the bar's «Выделить» pressed), its card open over a block, a note pinned to a block.
+const PICK_ON = [
+  '.hx-browser__tool[aria-label="Выделить"][aria-pressed="true"]',
+  '.hx-browser__tool[aria-label="Pick"][aria-pressed="true"]',
+];
+const NOTE_CARD = '.hx-ann';
+const NOTE_PIN = '.hx-npin';
+// The send button of the design's chat docked beside the page, else the folded field's.
+const SEND = '.hx-site__chat .hx-round:has(.hx-icon[data-i="arrow-up"])';
 
 const openSinopia: ITourStep = {
   id: 'sinopia',
@@ -25,14 +48,27 @@ const openSinopia: ITourStep = {
   done: (env) => /\/designly(?:[/?#]|$)/.test(env.path),
 };
 
-const open = (id: string): ITourStep => ({ id: 'open', target: [card(id)], done: at(id) });
+const open = (id: string): ITourStep => ({
+  id: 'open',
+  target: [card(id)],
+  done: at(id),
+  where: LIBRARY,
+  back: LIBRARY_PATH,
+});
 
-const ask = (prompt: string, frame: string): ITourStep => ({
+/** The agent's request of a lesson: on the cheapest model, in the chat beside the design, passed over with no agent. */
+const ask = (id: string, prompt: string | undefined, frame: string): ITourStep => ({
   id: 'ask',
   // Where the field is folded away (a deck or a video looked at, not edited), the ring is on the mode switch.
-  target: [...COMPOSER, MODE, frame],
+  target: [SEND, ...COMPOSER, MODE, frame],
+  // The card keeps off the whole field: the note and the request in it are what is sent.
+  avoid: ['.hx-site__chat .hx-composer'],
   prompt,
   done: chatStarted,
+  cheap: true,
+  sideChat: true,
+  skip: noAgent,
+  ...IN(id),
 });
 
 const site: ITourTrack = {
@@ -40,18 +76,41 @@ const site: ITourTrack = {
   steps: [
     openSinopia,
     open('relay-site'),
-    { id: 'click', target: [SITE_FRAME] },
-    { id: 'edit', target: [MODE], done: signal('site:edit') },
-    // A block is picked on the page and rides in the agent's field as a note: the edit is asked for that block.
-    { id: 'text', target: [PICK, SITE_FRAME], done: signal('site:note'), manual: true },
-    ask('Сделай этот заголовок короче и ярче', SITE_FRAME),
+    // The flags of the hero's code: the ring stands on them inside the page.
+    { id: 'click', target: [SITE_FRAME], frame: '.flags', ...IN('relay-site') },
+    { id: 'edit', target: [MODE], done: signal('site:edit'), sideChat: true, ...IN('relay-site') },
+    {
+      id: 'pick',
+      target: [PICK],
+      done: found(...PICK_ON, NOTE_CARD, NOTE_PIN),
+      sideChat: true,
+      ...IN('relay-site'),
+    },
+    // A click on the heading opens its note: the request is written right there, about that block.
+    {
+      id: 'heading',
+      target: [SITE_FRAME],
+      frame: 'h1',
+      done: found(NOTE_CARD, NOTE_PIN),
+      ...IN('relay-site'),
+    },
+    {
+      id: 'note',
+      target: ['.hx-ann__input', NOTE_CARD],
+      note: 'Сделай заголовок короче и ярче',
+      done: (env) => env.signals.has('site:note') || env.find(NOTE_PIN) !== null,
+      needs: { test: found(NOTE_CARD, NOTE_PIN), back: 'pick' },
+      ...IN('relay-site'),
+    },
+    { ...ask('relay-site', undefined, SITE_FRAME), needs: { test: found(NOTE_PIN), back: 'pick' } },
     {
       id: 'page',
       target: ['.hx-strip__tabs', SITE_FRAME],
       done: signalLike((s) => s.startsWith('site:page:Цены')),
+      ...IN('relay-site'),
     },
-    { id: 'year', target: [SITE_FRAME] },
-    { id: 'device', target: ['.hx-browser__dev'], done: signal('site:device:ip14') },
+    { id: 'year', target: [SITE_FRAME], frame: 'label[for="yr"]', ...IN('relay-site') },
+    { id: 'device', target: ['.hx-browser__dev'], done: signal('site:device:ip14'), ...IN('relay-site') },
   ],
 };
 
@@ -60,15 +119,26 @@ const slides: ITourTrack = {
   steps: [
     openSinopia,
     open('relay-deck'),
-    { id: 'next', target: [NEXT_SLIDE, DECK_FRAME], done: signalLike((s) => /^deck:slide:[1-9]/.test(s)) },
-    { id: 'edit', target: [MODE, DECK_FRAME] },
-    { id: 'comment', target: ['[aria-label^="Комментир"]', DECK_FRAME], done: signal('deck:comment') },
+    {
+      id: 'next',
+      target: [NEXT_SLIDE, DECK_FRAME],
+      done: signalLike((s) => /^deck:slide:[1-9]/.test(s)),
+      ...IN('relay-deck'),
+    },
+    { id: 'edit', target: [MODE, DECK_FRAME], done: editing, sideChat: true, ...IN('relay-deck') },
+    {
+      id: 'comment',
+      target: ['[aria-label^="Комментир"]', DECK_FRAME],
+      done: signal('deck:comment'),
+      ...IN('relay-deck'),
+    },
     {
       id: 'show',
       target: ['.hx-deck__bar [data-k="full"]', '.hx-deck__bar [data-k="show"]'],
       done: (env) => env.signals.has('deck:full') || env.signals.has('deck:screen:show'),
+      ...IN('relay-deck'),
     },
-    ask('Добавь после «Решения» слайд с отзывом клиента', DECK_FRAME),
+    ask('relay-deck', 'Добавь после «Решения» слайд с отзывом клиента', DECK_FRAME),
   ],
 };
 
@@ -77,15 +147,21 @@ const video: ITourTrack = {
   steps: [
     openSinopia,
     open('relay-video'),
-    { id: 'play', target: [VIDEO_FRAME], done: signal('video:play') },
+    { id: 'play', target: [VIDEO_FRAME], done: signal('video:play'), ...IN('relay-video') },
     {
       id: 'scene',
       target: ['[aria-label="Следующая сцена"]', '.hx-video__timeline'],
       done: signalLike((s) => /^video:scene:[1-9]/.test(s)),
+      ...IN('relay-video'),
     },
-    { id: 'timeline', target: ['.hx-video__timeline'] },
-    ask('В сцене «Откат за секунду» замени подпись на «Откат — одним кликом»', VIDEO_FRAME),
-    { id: 'download', target: ['[data-k="download"]'], done: (env) => env.find('[role=menu]') !== null },
+    { id: 'timeline', target: ['.hx-video__timeline'], ...IN('relay-video') },
+    ask('relay-video', 'В сцене «Откат за секунду» замени подпись на «Откат — одним кликом»', VIDEO_FRAME),
+    {
+      id: 'download',
+      target: ['[data-k="download"]'],
+      done: (env) => env.find('[role=menu]') !== null,
+      ...IN('relay-video'),
+    },
   ],
 };
 
@@ -94,19 +170,25 @@ const ds: ITourTrack = {
   steps: [
     openSinopia,
     open('relay-ds'),
-    { id: 'look', target: [SITE_FRAME] },
-    { id: 'back', target: [SIDEBAR_SINOPIA], done: (env) => /\/designly\/?(?:[?#]|$)/.test(env.path) },
+    { id: 'look', target: [SITE_FRAME], look: true, ...IN('relay-ds') },
+    { id: 'back', target: [SIDEBAR_SINOPIA], done: (env) => LIBRARY.test(env.path) },
     {
       id: 'pick',
       target: ['.hx-deck-chip'],
       done: (env) =>
         env.find('.hx-deck-set__ds [role=radio]:not(:first-child)[aria-checked="true"]') !== null,
+      where: LIBRARY,
+      back: LIBRARY_PATH,
     },
     {
       id: 'make',
       target: [...COMPOSER, '.hx-dl__hero'],
       prompt: 'Страница «О компании» для Relay',
       done: at('[^/?#]+'),
+      cheap: true,
+      skip: noAgent,
+      where: LIBRARY,
+      back: LIBRARY_PATH,
     },
   ],
 };
@@ -128,6 +210,10 @@ const typed = (env: ITourEnv) => {
   return field instanceof HTMLTextAreaElement && field.value.trim().length > 0;
 };
 const inChat = (env: ITourEnv) => /\/c\/[^/?#]+/.test(env.path);
+/** A step in an open chat: elsewhere the card says to come back to it. */
+const CHAT = { where: /\/c\/[^/?#]+/ };
+/** A step of the agent at work: with no agent on the machine it is passed over. */
+const AGENT = { skip: noAgent };
 const inSettings = (section?: string) => (env: ITourEnv) =>
   new RegExp(`/settings${section ? `/${section}` : ''}(?:[/?#]|$)`).test(env.path);
 const look = (id: string, target: readonly string[] = []): ITourStep => ({ id, target, look: true });
@@ -154,20 +240,28 @@ const chat: ITourTrack = {
     { id: 'plus', target: ['.hx-plus-btn'], done: has('.hx-plus__group') },
     { id: 'model', target: ['.hx-model'], done: has('.hx-picker') },
     { id: 'mic', target: [ROUND('mic')] },
-    { id: 'send', target: [ROUND('arrow-up'), FIELD], done: inChat },
-    { id: 'turn', target: [TURN], done: has(`${TURN}[aria-expanded="true"]`) },
+    { id: 'send', target: [ROUND('arrow-up'), FIELD], done: inChat, cheap: true },
+    { id: 'turn', target: [TURN], done: has(`${TURN}[aria-expanded="true"]`), ...CHAT, ...AGENT },
   ],
 };
 
 const work: ITourTrack = {
   id: 'work',
   steps: [
-    { id: 'send', target: [FIELD], done: (env) => inChat(env) && env.find('.hx-work[data-live]') !== null },
-    look('list', ['.hx-sidebar__list']),
-    { id: 'turn', target: [TURN], done: has(`${TURN}[aria-expanded="true"]`) },
+    {
+      id: 'send',
+      target: [ROUND('arrow-up'), FIELD],
+      done: (env) => inChat(env) && env.find('.hx-work[data-live]') !== null,
+      cheap: true,
+      ...AGENT,
+    },
+    { ...look('list', ['.hx-sidebar__list']), ...AGENT },
+    { id: 'turn', target: [TURN], done: has(`${TURN}[aria-expanded="true"]`), ...CHAT, ...AGENT },
     {
       id: 'queue',
-      target: [FIELD],
+      target: [ROUND('arrow-up'), FIELD],
+      ...CHAT,
+      ...AGENT,
       // In the queue over the field, or already taken by the agent: the second message of the chat.
       done: (env) => env.find('.hx-queue__row') !== null || env.count('.hx-msg[data-kind="user"]') > 1,
     },
@@ -183,9 +277,9 @@ const pane: ITourTrack = {
   id: 'pane',
   steps: [
     openChat,
-    { id: 'term', target: ['.hx-header__term'], done: has('.hx-header__term[aria-pressed="true"]') },
-    { id: 'open', target: [TOOLS], done: has('.hx-pane[data-state="open"]') },
-    look('tools', ['.hx-pane']),
+    { id: 'term', target: ['.hx-header__term'], done: has('.hx-header__term[aria-pressed="true"]'), ...CHAT },
+    { id: 'open', target: [TOOLS], done: has('.hx-pane[data-state="open"]'), ...CHAT },
+    { ...look('tools', ['.hx-pane']), ...CHAT },
   ],
 };
 
@@ -193,8 +287,20 @@ const safe: ITourTrack = {
   id: 'safe',
   steps: [
     { id: 'settings', target: ['.hx-user__open'], done: inSettings() },
-    { id: 'safe', target: [SETTINGS_ITEM('safe')], done: inSettings('safe') },
-    { id: 'conn', target: [SETTINGS_ITEM('connections')], done: inSettings('connections') },
+    {
+      id: 'safe',
+      target: [SETTINGS_ITEM('safe')],
+      done: inSettings('safe'),
+      where: /\/settings(?:[/?#]|$)/,
+      back: '/settings',
+    },
+    {
+      id: 'conn',
+      target: [SETTINGS_ITEM('connections')],
+      done: inSettings('connections'),
+      where: /\/settings(?:[/?#]|$)/,
+      back: '/settings',
+    },
   ],
 };
 
@@ -202,9 +308,9 @@ const agents: ITourTrack = {
   id: 'agents',
   steps: [
     goHome,
-    { id: 'send', target: [FIELD], done: inChat },
+    { id: 'send', target: [ROUND('arrow-up'), FIELD], done: inChat, cheap: true },
     look('list', ['.hx-sidebar__list']),
-    { id: 'subs', target: [TOOLS, '.hx-pane'], done: has('.hx-tv[data-tool="subagents"]') },
+    { id: 'subs', target: [TOOLS, '.hx-pane'], done: has('.hx-tv[data-tool="subagents"]'), ...CHAT },
   ],
 };
 

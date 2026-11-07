@@ -120,7 +120,7 @@ export const MachineStrip = ({
     const update = st === 'stale';
     const block = (
       <>
-        <span className="ad-ic">
+        <span className="hb-ic">
           <Icon i={ICON[st]} size="sm" />
         </span>
         <span className="ev-me__t">

@@ -124,6 +124,18 @@ export const tenantMock = (_ctx: MockCtx): TenantApi => {
       members = members.filter((m) => m.userId !== userId);
       return later(undefined);
     },
+    planDeleteTenant: async () =>
+      later({
+        blockers: [
+          { kind: 'machines', count: machines.length },
+          { kind: 'members', count: members.length - 1 },
+        ].filter((b) => b.count > 0),
+        removes: [],
+        canDelete: false,
+      }),
+    deleteTenant: async () => {
+      throw new OrgApiError('hub', 'В тенанте остались машины и люди.');
+    },
     renameTenant: async (space, name) => {
       const saved = name.trim();
       renamedTenants.set(space, saved);

@@ -20,7 +20,7 @@ you, the agent; the person reads it too, to know what you know.
 harnessly docs search <words>        # this documentation and the team's: read before guessing
 harnessly open <link|file|port>      # show it to the person in the right pane
 harnessly deliver <file>             # hand a file the person asked for: a card in the chat
-harnessly tab create -t codex-cli --prompt "<the whole task>"   # start another agent
+harnessly tab create -t codex-cli --prompt "<the whole task>"   # hand a task to another agent (a nested chat)
 harnessly peers                      # other agents' chats you may write to
 harnessly secret run --env VAR=NAME -- cmd   # run a command with a secret from the safe
 harnessly issues --mine --open       # the person's tasks in their tracker
@@ -36,8 +36,10 @@ harnessly --help                     # everything, with examples
    file you touched.
 3. **Secrets go through the safe.** Never ask for a token in the chat, never print one, never write one into a file.
    `harnessly secret ask NAME --why "…"` gives the person a card to put it in.
-4. **Start another agent the platform's way.** `harnessly tab create --prompt` gives it the hooks and the prompt; a
-   `claude` typed into a shell does not.
+4. **Hand work to another agent as a nested chat.** `delegate_task` (MCP) or `harnessly tab create --prompt` make a chat under
+   yours that the person sees, with the hooks and the prompt, readable and wakeable (`notify`); a `claude` typed into a
+   shell does not. Both end in the same nested chat; `tab create --prompt` outside a chat (a plain terminal) falls back to
+   a separate tab and says so.
 5. **Ask the docs first.** How harnessly works and how this team has set things up is written down: `harnessly docs
    search`. When you found out something the docs lacked, offer to [add it](docs.md).
 

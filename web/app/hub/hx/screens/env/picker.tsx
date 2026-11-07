@@ -50,7 +50,7 @@ export const ScopePicker = ({
           disabled={disabled}
           onClick={toggle}
         >
-          <span className="ad-dot" data-l={m.kind}>
+          <span className="hb-dot" data-l={m.kind}>
             {m.initial}
           </span>
           <span className="ev-scope__t">
@@ -67,7 +67,7 @@ export const ScopePicker = ({
           disabled={disabled}
           onClick={toggle}
         >
-          <span className="ad-dot" data-l={m.kind}>
+          <span className="hb-dot" data-l={m.kind}>
             {m.initial}
           </span>
           <span>{m.pick}</span>
@@ -75,7 +75,7 @@ export const ScopePicker = ({
         </button>
       )}
       {pop.mounted && (
-        <div className="ad-pop ev-scope__pop" data-closing={pop.attr} role="listbox" aria-label={label}>
+        <div className="hb-pop ev-scope__pop" data-closing={pop.attr} role="listbox" aria-label={label}>
           {search && (
             <label className="ev-pop-search">
               <Icon i="search" size="sm" />
@@ -85,7 +85,7 @@ export const ScopePicker = ({
           {list.map((t, i) => {
             if (t.head)
               return (
-                <div className="ad-pop__label" key={`h${i}`}>
+                <div className="hb-pop__label" key={`h${i}`}>
                   {t.head}
                 </div>
               );
@@ -99,7 +99,7 @@ export const ScopePicker = ({
             return (
               <button
                 type="button"
-                className="ad-pop__item"
+                className="hb-pop__item"
                 role="option"
                 aria-selected={on ? 'true' : 'false'}
                 key={t.target ? `${t.target.layer}:${t.target.scopeId}` : i}
@@ -108,7 +108,7 @@ export const ScopePicker = ({
                   pop.close();
                 }}
               >
-                <span className="ad-dot" data-l={t.kind}>
+                <span className="hb-dot" data-l={t.kind}>
                   {t.initial}
                 </span>
                 <span>{t.name}</span>

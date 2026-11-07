@@ -78,7 +78,7 @@ describe('«+» → «Приложение»', () => {
     expect(screen.queryByRole('menuitem', { name: /Приложение|App/ })).toBeNull();
   });
 
-  it('lists the apps that work in a chat and are not on, and a pick turns that one on', async () => {
+  it('lists the apps that work in a chat, the ones on checked; a pick turns one on or off', async () => {
     vi.doMock('@/next/features/app-views/api', () => ({
       useInstalledApps: () => ({ list: installed, error: null }),
     }));
@@ -95,10 +95,11 @@ describe('«+» → «Приложение»', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /App/ }));
-    // Turned on already (a.one) and not for a chat (c.pane) stay out.
-    expect(screen.queryByText('Кешбэки')).toBeNull();
+    // Not for a chat (c.pane) stays out; the one on (a.one) is there, checked.
     expect(screen.queryByText('Только панель')).toBeNull();
+    expect(screen.getByRole('option', { name: /Кешбэки/ }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('option', { name: /Ревью/ }).getAttribute('aria-selected')).toBe('false');
     fireEvent.click(screen.getByRole('option', { name: /Ревью/ }));
-    expect(onPick).toHaveBeenCalledWith('b.two');
+    expect(onPick).toHaveBeenCalledWith('b.two', true);
   });
 });

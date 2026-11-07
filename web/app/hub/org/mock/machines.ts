@@ -8,6 +8,7 @@ import type {
   MachinesApi,
   MachinesList,
   MachinesSummary,
+  MovePlan,
   OrgMachine,
   PersonRef,
   ResourceQuote,
@@ -339,6 +340,19 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
     return m;
   };
   const put = (m: OrgMachine) => store.set(m.id, m);
+  const movePlan = (m: OrgMachine, tenantId: string): MovePlan => {
+    const revoked = (access.get(m.id)?.people ?? []).map((p) => p.name);
+    return {
+      from: { id: 'current', name: 'Текущий тенант' },
+      to: { id: tenantId, name: tenantId },
+      noop: false,
+      teamCleared: null,
+      teamAssigned: null,
+      accessRevoked: revoked,
+      limits: { fromRules: 0, toRules: 1 },
+      kept: ['id машины', 'ключ', 'история'],
+    };
+  };
   const detail = (m: OrgMachine): MachineDetail => ({
     machine: m,
     series:
@@ -455,6 +469,15 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
         throw new OrgApiError('invalid_request', 'Название — от 1 до 60 символов');
       put({ ...m, name: next });
       return later(detail(get(id)), 400);
+    },
+    planMoveMachine: async (id, tenantId) => later(movePlan(get(id), tenantId), 250),
+    moveMachine: async (id, tenantId) => {
+      const m = get(id);
+      need(m, true);
+      const plan = movePlan(m, tenantId);
+      await later(null, 500);
+      store.delete(id);
+      return plan;
     },
     removeMachine: async (id) => {
       need(get(id), true);

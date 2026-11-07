@@ -27,7 +27,7 @@ import {
 } from './calc';
 
 export const Tiles = ({ tiles }: { tiles: readonly Tile[] }) => (
-  <div className="dash ad-dash mo-tiles">
+  <div className="dash hb-dash mo-tiles">
     <div className="sx-wrap">
       <div className="sx-grid">
         {tiles.map((t, i) => (
@@ -331,7 +331,7 @@ export const Group = ({
     <div className="mo-g" aria-expanded={open} style={{ '--i': index } as CSSProperties}>
       <button type="button" className="mo-g__head" onClick={onToggle}>
         <Icon i="chevron-right" size="sm" className="mo-g__chev" />
-        <span className="ad-dot">{initial(group.name)}</span>
+        <span className="hb-dot">{initial(group.name)}</span>
         <span className="mo-g__t">
           <b>{group.name}</b>
           <small>{sub}</small>

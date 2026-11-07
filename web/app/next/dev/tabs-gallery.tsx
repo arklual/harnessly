@@ -84,7 +84,7 @@ const Gallery = () => {
   // The gallery keeps the order the way the store does, so the drop is the same move.
   const move = (id: string, index: number) => {
     const state: ITabsState = {
-      tabs: tabs.map((x) => ({ id: x.id, path: '/', title: null, scroll: null, view: null })),
+      tabs: tabs.map((x) => ({ id: x.id, path: '/', title: null, scroll: null, view: null, leftAt: null })),
       active,
     };
     const next = moveTab(state, id, index).tabs.map((x) => x.id);

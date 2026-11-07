@@ -62,6 +62,11 @@ harnessly tab close <tab id>
 - **Start another agent only with `tab create -t claude-code|codex-cli --prompt …`.** That start gets the
   workspace's hooks, status and instructions. A `claude …` or `codex …` command typed into a shell tab with
   `tab send` starts it without them and its state is unreliable.
+- Run from a chat, `tab create --prompt` starts a **nested chat under yours**, like the `delegate_task` tool: the
+  person sees it under this chat, and `tab status <id>` and `tab result <id>` work on its id. `--model`, `--effort`,
+  `--name` and `--notify` (wake this chat when it finishes) are passed through. From a plain terminal it opens an
+  ordinary tab and says why. Such a chat must end its work with `[[done]]` (or `[[question]]` to ask you); a turn
+  that ends on a status is answered with an automatic "go on", and you are told once.
 - A prompt is the whole briefing: say where the code is, what to produce, what not to touch, and how to report
   (for example "write the result into `/home/me/work/review.md`"). The new agent does not see this conversation.
 - Then poll: `tab status` until the agent is waiting for input again, `tab result` to read the screen, or read

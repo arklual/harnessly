@@ -31,6 +31,15 @@ const (
 	MaxWakes = 20
 	// Device is the device the delegated chats' commands come from.
 	Device = "agent"
+	// MaxNudges is how many times a delegated chat that ended a turn on a pause (or was cut short) is told to go on
+	// before its parent is told it stopped without an answer.
+	MaxNudges = 3
+	// HoldMax is how long a chat that ended a turn with background work still running keeps its parent from being
+	// woken: the work wakes the agent itself when it ends.
+	HoldMax = 30 * time.Minute
+	// EndedGrace is how long a delegated chat must have been gone in the middle of a turn before the platform tells it
+	// to go on: the runtime's own continue after a restart (RestartResumeAfter) comes first.
+	EndedGrace = 90 * time.Second
 	// PromptMax is the longest task or message, in characters.
 	PromptMax = 100_000
 )
@@ -204,7 +213,7 @@ func (s *Service) Delegate(ctx context.Context, callerID string, t Task) (wire.C
 	}
 	key := peers.NewID()
 	cmd := wire.ConversationCreateCmd{OpID: "delegate-" + key, Provider: t.Provider, Model: model, Profile: profile, ParentID: caller.ID,
-		Title: strings.TrimSpace(t.Title), First: &wire.FirstMessage{ClientID: "delegate-" + key, Text: prompt, AttachmentIDs: []string{}}}
+		Title: strings.TrimSpace(t.Title), First: &wire.FirstMessage{ClientID: "delegate-" + key, Text: prompt + Rules, AttachmentIDs: []string{}}}
 	if title := []rune(cmd.Title); len(title) > wire.RefTitleMax {
 		cmd.Title = string(title[:wire.RefTitleMax])
 	}
@@ -228,7 +237,7 @@ func (s *Service) Delegate(ctx context.Context, callerID string, t Task) (wire.C
 		return wire.Conversation{}, refuse(string(res.Code), "the chat was not started")
 	}
 	id := *res.ID
-	s.Book.Update(id, func(p *Page) { p.Notify, p.AskedAt = t.Notify, asked })
+	s.Book.Update(id, func(p *Page) { p.Notify, p.Contract = t.Notify, true; p.asked(asked) })
 	rec, ok := s.Convs.Record(id)
 	if !ok {
 		return wire.Conversation{}, refuse("not-found", "the chat went right after it started")
@@ -389,7 +398,7 @@ func (s *Service) Send(ctx context.Context, callerID, id, text string) (wire.Con
 		return wire.Conversation{}, refuse(string(res.Code), "the message was not queued")
 	}
 	if _, ok := s.Book.Get(id); ok {
-		s.Book.Update(id, func(p *Page) { p.AskedAt = asked })
+		s.Book.Update(id, func(p *Page) { p.asked(asked) })
 	}
 	return rec, nil
 }
@@ -441,8 +450,12 @@ func outcome(rec wire.Conversation, asked int64) Outcome {
 type Result struct {
 	Conv    wire.Conversation
 	Outcome Outcome
-	// Answer is the agent's last answer, "" when it gave none.
+	// Answer is the agent's last answer without its marker, "" when it gave none.
 	Answer string
+	// Marker is the marker the answer ended with (MarkDone, MarkQuestion), "" for none. GaveUp: the reminders to go on
+	// ran out; Held: background work still ran when the parent was told.
+	Marker       string
+	GaveUp, Held bool
 }
 
 // Wait blocks until the chat finishes what it was last given, needs the person, ends, or the timeout passes.
@@ -469,7 +482,9 @@ func (s *Service) Wait(ctx context.Context, callerID, id string, timeout time.Du
 	defer tick.Stop()
 	for {
 		if o := outcome(rec, asked); o != "" {
-			return s.result(ctx, rec, o), nil
+			if r, ok := s.waited(ctx, rec, o); ok {
+				return r, nil
+			}
 		}
 		select {
 		case <-ctx.Done():
@@ -486,9 +501,28 @@ func (s *Service) Wait(ctx context.Context, callerID, id string, timeout time.Du
 	}
 }
 
+// waited is the result of a wait that the chat's state ended, false when it did not end it: a pause is no answer, the chat
+// is told to go on (once, whoever sees it first) and the wait goes on.
+func (s *Service) waited(ctx context.Context, rec wire.Conversation, o Outcome) (Result, bool) {
+	r := Result{}
+	if o == Done && rec.LastTurn != nil {
+		page, _ := s.Book.Get(rec.ID)
+		held, proceed := s.judge(rec, page)
+		if !proceed {
+			return r, false
+		}
+		page, _ = s.Book.Get(rec.ID)
+		r = s.result(ctx, rec, o)
+		r.GaveUp, r.Held = page.GaveUp, held
+		return r, true
+	}
+	return s.result(ctx, rec, o), true
+}
+
 func (s *Service) result(ctx context.Context, rec wire.Conversation, o Outcome) Result {
 	r := Result{Conv: rec, Outcome: o}
 	if snap, err := s.Convs.Conversation(ctx, rec.ID); err == nil {
+		r.Marker, _ = markerOf(fullAnswer(snap))
 		r.Answer = lastAnswer(snap)
 	}
 	return r
@@ -507,28 +541,42 @@ func (s *Service) Children(ctx context.Context, callerID string) ([]wire.Convers
 	return kids, nil
 }
 
-// Sweep looks at every delegated chat whose parent waits to be woken (see Observe): what the runtime runs every few
-// seconds.
+// Sweep looks at every delegated chat that is watched (see Observe): what the runtime runs every few seconds.
 func (s *Service) Sweep() {
-	for _, id := range s.Book.notifying() {
+	for _, id := range s.Book.watched() {
 		if rec, ok := s.Convs.Record(id); ok {
 			s.Observe(rec)
 		}
 	}
 }
 
-// Observe hears a conversation's record as it changes. A delegated chat whose parent asked to be woken and that has
-// finished a turn (or ended) wakes the parent with its answer, once per turn and at most MaxWakes times. It may block
-// on the conversations' actors: the caller runs it off them.
+// Observe hears a conversation's record as it changes. A delegated chat that ended a turn on a pause, not on an
+// answer, is told to go on (at most MaxNudges times) and its parent hears nothing; one cut short in the middle of a turn
+// is told to go on once it has been gone EndedGrace. A chat whose parent asked to be woken and that has really finished
+// (answered, asked, or ran out of reminders) or ended wakes the parent with its answer, once per turn and at most
+// MaxWakes times. It may block on the conversations' actors: the caller runs it off them.
 func (s *Service) Observe(rec wire.Conversation) {
 	if rec.ParentID == nil {
 		return
 	}
 	page, ok := s.Book.Get(rec.ID)
-	if !ok || !page.Notify {
+	if !ok {
 		return
 	}
 	o := outcome(rec, page.AskedAt)
+	var held bool
+	if o == Done && rec.LastTurn != nil {
+		var proceed bool
+		if held, proceed = s.judge(rec, page); !proceed {
+			return
+		}
+		page, _ = s.Book.Get(rec.ID)
+	} else if s.resumeCut(rec, page) {
+		return
+	}
+	if !page.Notify {
+		return
+	}
 	var key string
 	switch o {
 	case Done:
@@ -550,6 +598,7 @@ func (s *Service) Observe(rec wire.Conversation) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	r := s.result(ctx, rec, o)
+	r.GaveUp, r.Held = page.GaveUp, held
 	text := wakeText(r)
 	if p, _ := s.Book.Get(rec.ID); p.Wakes >= MaxWakes {
 		text += fmt.Sprintf("\n\nThis chat has woken you %d times, the most it may: it will not wake you again. Use wait_conversation from now on.", MaxWakes)
@@ -557,4 +606,97 @@ func (s *Service) Observe(rec wire.Conversation) {
 	if res := s.deliver(ctx, rec, parent.ID, text); res.R == wire.ResultRefused && s.Log != nil {
 		s.Log("delegation: the parent was not woken", "parent", parent.ID, "child", rec.ID, "code", string(res.Code))
 	}
+}
+
+// judge decides what a finished turn of a delegated chat is. proceed: it is an answer (or as much of one as the chat
+// will give), the parent may be told; held then says background work still ran when the wait for it ran out. Not
+// proceed: the turn was a pause, and either the chat was told to go on or the parent keeps waiting for the work to end.
+func (s *Service) judge(rec wire.Conversation, page Page) (held, proceed bool) {
+	key := "turn:" + rec.LastTurn.ID
+	if page.Judged == key {
+		return page.HeldAt != 0, true
+	}
+	now := s.now().UnixMilli()
+	if rec.BgAgents > 0 {
+		// Background work of its own runs: the agent goes on when it ends, so this is not an answer yet.
+		if page.HeldAt == 0 {
+			s.Book.Update(rec.ID, func(p *Page) { p.HeldAt = now })
+			return false, false
+		}
+		if time.Duration(now-page.HeldAt)*time.Millisecond < HoldMax {
+			return false, false
+		}
+		s.Book.Update(rec.ID, func(p *Page) { p.Judged = key })
+		return true, true
+	}
+	if !page.Contract || rec.LastTurn.Status == wire.TurnInterrupted {
+		// Chats from before the rules, and a turn the person cut with Esc, are taken as they end.
+		s.Book.Update(rec.ID, func(p *Page) { p.Judged, p.HeldAt = key, 0 })
+		return false, true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	snap, err := s.Convs.Conversation(ctx, rec.ID)
+	if err != nil {
+		return false, false // the next sweep looks again
+	}
+	if marker, _ := markerOf(fullAnswer(snap)); marker != "" {
+		s.Book.Update(rec.ID, func(p *Page) { p.Judged, p.HeldAt = key, 0 })
+		return false, true
+	}
+	if page.Nudged == key {
+		return false, false // this turn's reminder is on its way
+	}
+	n, claimed := s.Book.nudge(rec.ID, key, MaxNudges)
+	if !claimed {
+		s.Book.Update(rec.ID, func(p *Page) { p.Judged, p.GaveUp, p.HeldAt = key, true, 0 })
+		return false, true
+	}
+	if !s.sendTo(ctx, rec.ID, NudgeText(n, MaxNudges)) {
+		s.Book.Update(rec.ID, func(p *Page) { p.Nudges--; p.Nudged = "" })
+	}
+	return false, false
+}
+
+// resumeCut tells a delegated chat that is gone in the middle of a turn to go on, once it has been gone EndedGrace and
+// at most MaxNudges times (the queue brings a stopped or lost agent back). It reports whether it did.
+func (s *Service) resumeCut(rec wire.Conversation, page Page) bool {
+	cut := page.Contract && (rec.State.K == wire.StateGone || rec.State.K == wire.StateStopped && rec.TerminalStop == nil) &&
+		rec.LastTurn != nil && rec.LastTurn.EndedAt == nil && rec.Queue.Count == 0
+	if !cut {
+		if page.EndedAt != 0 {
+			s.Book.Update(rec.ID, func(p *Page) { p.EndedAt = 0 })
+		}
+		return false
+	}
+	now := s.now().UnixMilli()
+	if page.EndedAt == 0 {
+		s.Book.Update(rec.ID, func(p *Page) { p.EndedAt = now })
+		return true
+	}
+	if time.Duration(now-page.EndedAt)*time.Millisecond < EndedGrace {
+		return true
+	}
+	if _, claimed := s.Book.nudge(rec.ID, "cut:"+rec.LastTurn.ID, MaxNudges); !claimed {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	s.sendTo(ctx, rec.ID, RestartText)
+	s.Book.Update(rec.ID, func(p *Page) { p.EndedAt = 0 })
+	return true
+}
+
+// sendTo queues a message of the platform's own in a delegated chat; true when it was taken.
+func (s *Service) sendTo(ctx context.Context, id, text string) bool {
+	cid := "delegate-nudge-" + peers.NewID()
+	res := s.Convs.Do(ctx, Device, wire.SendCmd{OpID: cid, ClientID: cid, ConversationID: id, Text: text, AttachmentIDs: []string{},
+		Mode: wire.ModeQueue, Kind: wire.KindPrompt})
+	if res.R == wire.ResultRefused {
+		if s.Log != nil {
+			s.Log("delegation: the chat was not told to go on", "child", id, "code", string(res.Code))
+		}
+		return false
+	}
+	return true
 }

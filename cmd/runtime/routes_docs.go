@@ -28,7 +28,7 @@ var (
 const docBodyMax = 16 << 10
 
 func docsRoutes(d deps, c integrations.Config) []gate.Route {
-	if !d.Standalone && c.ArtifactsURL == "" && len(docprovider.Adapters()) == 0 {
+	if !d.Standalone && c.ArtifactsURL == "" && !docprovider.Declared() {
 		return nil
 	}
 	threads := &integrations.Threads{Path: filepath.Join(d.DataDir, "doc-threads.json")}
@@ -55,7 +55,11 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 		var ue *integrations.UpstreamError
 		switch {
 		case errors.Is(err, docprovider.ErrUnsupported):
-			write(w, http.StatusNotImplemented, map[string]string{"error": locale.Pick("The documents service does not do this", "Сервис документов этого не умеет")})
+			write(w, http.StatusNotImplemented, map[string]string{"code": "unsupported", "error": locale.Pick("The documents service does not do this", "Сервис документов этого не умеет")})
+		case errors.Is(err, docprovider.ErrTooLarge):
+			write(w, http.StatusRequestEntityTooLarge, map[string]string{"code": "too_large", "error": locale.Pick(
+				"The document is larger than the documents service hands over here; open it in the service itself",
+				"Документ больше, чем сервис документов отдаёт сюда: откройте его в самом сервисе")})
 		case errors.Is(err, integrations.ErrNotConfigured):
 			write(w, http.StatusNotFound, map[string]string{"error": locale.Pick("Documents are not connected", "Документы не подключены")})
 		case errors.Is(err, integrations.ErrNoThread):
@@ -117,7 +121,7 @@ func docsRoutes(d deps, c integrations.Config) []gate.Route {
 				fail(w, err)
 				return
 			}
-			write(w, 200, map[string]any{"docs": withCounts(r, docs)})
+			write(w, 200, map[string]any{"docs": withCounts(r, docs), "capabilities": provider.Capabilities()})
 		case rest == "people" && r.Method == http.MethodGet:
 			q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 			type personOut struct {

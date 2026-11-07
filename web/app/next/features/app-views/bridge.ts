@@ -4,7 +4,12 @@
 //
 // A message is believed only when it comes from the frame's own window AND from the origin its messages carry (a view
 // runs sandboxed on an opaque origin, "null", so the window is what tells frames apart), then checked against what the app's manifest grants. The same table is held by the runtime
-// (internal/apps/bridge.go), which checks the calls that reach the machine once more.
+// (internal/apps/bridge.go), which checks the calls that reach the machine once more. Both are written from one
+// description, internal/apps/surface.go: the table here is surface.gen.ts.
+
+import { METHOD_PERMISSION, SINOPIA_METHODS } from './surface.gen';
+
+export { METHOD_PERMISSION, SINOPIA_METHODS };
 
 export type TBridgeCode =
   | 'permission_denied'
@@ -49,42 +54,6 @@ export class BridgeError extends Error {
 
 export const isBridgeCode = (v: unknown): v is TBridgeCode => typeof v === 'string' && CODES.includes(v);
 
-/** The right each method needs; '' is a method that needs none. */
-export const METHOD_PERMISSION = {
-  'ui/initialize': '',
-  'ui/notifications/initialized': '',
-  'ui/notifications/size-changed': '',
-  'ui/open-link': '',
-  'tools/call': '',
-  'ui/message': 'chat.prompt',
-  'harnessly/chat.read': 'chat.read',
-  'harnessly/chat.card': 'chat.card',
-  'harnessly/pane.open': 'pane.open',
-  'harnessly/agents.list': 'agents.read',
-  'harnessly/storage.get': 'storage',
-  'harnessly/storage.set': 'storage',
-  'harnessly/storage.delete': 'storage',
-  'harnessly/storage.keys': 'storage',
-  'harnessly/settings.get': '',
-  'harnessly/notify': 'notify',
-  'harnessly/files.read': 'files.read',
-  'harnessly/files.write': 'files.write',
-  'harnessly/ui.toast': '',
-  'harnessly/ui.confirm': '',
-  'harnessly/slot.done': '',
-  'harnessly/sinopia.document': 'sinopia.read',
-  'harnessly/sinopia.selection': 'sinopia.read',
-  'harnessly/sinopia.node': 'sinopia.read',
-  'harnessly/sinopia.query': 'sinopia.read',
-  'harnessly/sinopia.fields': 'sinopia.read',
-  'harnessly/sinopia.mark': 'sinopia.read',
-  'harnessly/sinopia.patch': 'sinopia.write',
-  'harnessly/sinopia.setFields': 'sinopia.write',
-  'harnessly/sinopia.boards.add': 'sinopia.write',
-  'harnessly/sinopia.render': 'sinopia.export',
-  'harnessly/sinopia.comment': 'sinopia.comment',
-} as const satisfies Record<string, string>;
-
 /** A file moves as text, at most as much as the runtime takes (4 MB, internal/apps/files.go). */
 const MAX_FILE_CHARS = 4 << 20;
 
@@ -115,20 +84,6 @@ export type TTarget =
   | 'hub-settings'
   | `sinopia.${string}`;
 
-/** The Sinopia methods (the part after `harnessly/sinopia.`). */
-export const SINOPIA_METHODS = [
-  'document',
-  'selection',
-  'node',
-  'query',
-  'fields',
-  'mark',
-  'patch',
-  'setFields',
-  'boards.add',
-  'render',
-  'comment',
-] as const;
 export type TSinopiaMethod = (typeof SINOPIA_METHODS)[number];
 
 /** Whether an app that lists these targets works in that one: `sinopia.*` stands for every document kind. */
@@ -174,6 +129,18 @@ export type TStorageScope = 'install' | 'user' | 'chat' | 'space' | 'doc';
 const SCOPES: readonly string[] = ['install', 'user', 'chat', 'space', 'doc'];
 
 /** The work behind the methods. A handler the host does not provide answers host_unavailable. */
+/** A tool a view offers from its page, as it described it. */
+export interface IPageTool {
+  name: string;
+  description: string;
+  inputSchema?: unknown;
+  /** The page asks the person before it runs the tool. */
+  confirm?: boolean;
+}
+
+const PAGE_TOOL_NAME = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
+const MAX_PAGE_TOOLS = 32;
+
 export interface IBridgeHandlers {
   tool?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
   storage?: (
@@ -199,8 +166,16 @@ export interface IBridgeHandlers {
   /** A slot view (an onboarding step) says it is finished. */
   slotDone?: () => void;
   confirm?: (text: string) => Promise<boolean>;
+  /** An error or console.error of the view, for the debug section (harnessly/debug.log). */
+  debugLog?: (level: 'error' | 'warn', text: string) => void;
   /** The Document API of Sinopia: the runtime does the work and checks the right once more. */
   sinopia?: (method: TSinopiaMethod, params: Record<string, unknown>) => Promise<unknown>;
+  /** The view's page tools, the whole list each time (tools.page). */
+  pageTools?: (tools: readonly IPageTool[]) => void;
+  /** The view's answer to a call of its tool. */
+  pageToolResult?: (id: string, answer: { result?: unknown; error?: string }) => void;
+  /** What the view published for the agent (context.publish). */
+  publish?: (data: unknown) => void;
   openLink?: (url: string) => void;
   resize?: (height: number) => void;
 }
@@ -252,6 +227,8 @@ export interface IBridgeLogEntry {
   permission: string;
   ok: boolean;
   code?: TBridgeCode;
+  /** Why the call failed, or what the view logged: for the debug section only. */
+  message?: string;
   at: number;
 }
 
@@ -371,7 +348,21 @@ export class AppBridge {
   }
 
   private log(method: string, permission: string, error: BridgeError | null): void {
-    this.opts.onCall?.({ method, permission, ok: error === null, code: error?.code, at: this.now() });
+    // The view's own log lines are written by the debugLog handler, not as calls.
+    if (method === 'harnessly/debug.log' && error === null) return;
+    this.opts.onCall?.({
+      method,
+      permission,
+      ok: error === null,
+      code: error?.code,
+      ...(error?.message ? { message: error.message.slice(0, 500) } : {}),
+      at: this.now(),
+    });
+  }
+
+  /** The view made the handshake and said it is ready. */
+  get ready(): boolean {
+    return this.initialized;
   }
 
   private async dispatch(
@@ -432,6 +423,8 @@ export class AppBridge {
         throw new BridgeError('host_unavailable', 'not the view the host mounted');
     } else if (method === 'ui/notifications/initialized') {
       if (!this.handshaken) throw new BridgeError('host_unavailable', 'ui/initialize first');
+    } else if (method === 'harnessly/debug.log') {
+      // A view's error before its handshake is the one most worth seeing.
     } else if (!this.initialized) throw new BridgeError('host_unavailable', 'ui/initialize first');
     if (!targetAllowed(app.targets, this.context.target))
       throw new BridgeError('not_in_target', `the app does not work in ${this.context.target}`);
@@ -580,6 +573,39 @@ export class AppBridge {
         return {};
       case 'harnessly/ui.confirm':
         return { ok: await this.need('confirm')(str('text', 500)) };
+      case 'harnessly/debug.log': {
+        const text = typeof p.text === 'string' ? p.text.slice(0, 2000) : '';
+        if (text !== '') this.opts.handlers.debugLog?.(p.level === 'warn' ? 'warn' : 'error', text);
+        return undefined;
+      }
+      case 'harnessly/tools.register': {
+        const list = Array.isArray(p.tools) ? p.tools : [];
+        if (list.length > MAX_PAGE_TOOLS)
+          throw new BridgeError('invalid_params', `at most ${MAX_PAGE_TOOLS} tools`);
+        const tools: IPageTool[] = [];
+        for (const t of list) {
+          if (!isRecord(t) || typeof t.name !== 'string' || !PAGE_TOOL_NAME.test(t.name))
+            throw new BridgeError('invalid_params', 'a tool has a name of latin letters, digits, _ . -');
+          const description = typeof t.description === 'string' ? t.description.slice(0, 1000) : '';
+          tools.push({
+            name: t.name,
+            description,
+            ...(isRecord(t.inputSchema) ? { inputSchema: t.inputSchema } : {}),
+            ...(t.confirm === true ? { confirm: true } : {}),
+          });
+        }
+        this.need('pageTools')(tools);
+        return {};
+      }
+      case 'harnessly/tools.result': {
+        const id = str('id', 100);
+        const error = typeof p.error === 'string' ? p.error.slice(0, 2000) : undefined;
+        this.need('pageToolResult')(id, error === undefined ? { result: p.result ?? null } : { error });
+        return {};
+      }
+      case 'harnessly/context.publish':
+        this.need('publish')(p.data ?? null);
+        return {};
       default: {
         // harnessly/sinopia.<method>: the bridge has checked the right; the params are the runtime's to read.
         const name = method.slice('harnessly/sinopia.'.length);

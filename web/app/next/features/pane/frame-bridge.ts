@@ -25,6 +25,8 @@ export type TFrameMessage =
   | { k: 'open'; url: string }
   /** The site redirected to another one: the offer page says so as it loads, before anyone presses anything. */
   | { k: 'redirect'; url: string }
+  /** The proxy could not fetch the site (a reset, a timeout, a certificate): its failure page says so as it loads. */
+  | { k: 'failed'; status: number; text: string }
   /** The page asked for a security key or Touch ID, which the slot's origin can never give (WebAuthn). */
   | { k: 'key-step' }
   /** The outcome of an agent's action (`tk:act`); rect is its element's box in the page's viewport. */
@@ -136,6 +138,13 @@ export const readFrameMessage = (data: unknown): TFrameMessage | null => {
       const url = httpUrl(data.url);
       return url ? { k: 'redirect', url } : null;
     }
+    case 'tk:failed':
+      return typeof data.status === 'number' &&
+        Number.isInteger(data.status) &&
+        data.status >= 400 &&
+        data.status <= 599
+        ? { k: 'failed', status: data.status, text: line(str(data.text, MAX_TEXT)) }
+        : null;
     case 'tk:acted':
       return typeof data.id === 'string' && data.id && typeof data.ok === 'boolean'
         ? {

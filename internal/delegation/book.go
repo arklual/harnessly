@@ -28,6 +28,26 @@ type Page struct {
 	// Woken is the turn (or the end) the parent was last woken for, Wakes how many wake-ups went to it.
 	Woken string `json:"woken,omitempty"`
 	Wakes int    `json:"wakes,omitempty"`
+	// Contract: the chat was started with the rules of a delegated chat (see Rules): its final answer ends with a
+	// marker, and a turn that ends without one is a pause the platform answers with a reminder. Chats that
+	// were delegated before the rules existed are not held to them.
+	Contract bool `json:"contract,omitempty"`
+	// Nudges are the reminders sent since AskedAt, Nudged the turn (or the end) the last one was for, Judged the turn
+	// found to be an answer (or given up on after the reminders ran out), GaveUp that the reminders ran out.
+	Nudges int    `json:"nudges,omitempty"`
+	Nudged string `json:"nudged,omitempty"`
+	Judged string `json:"judged,omitempty"`
+	GaveUp bool   `json:"gaveUp,omitempty"`
+	// HeldAt is when the chat's turn first ended with background work still running, Unix ms; EndedAt when it was
+	// first seen not running in the middle of a turn.
+	HeldAt  int64 `json:"heldAt,omitempty"`
+	EndedAt int64 `json:"endedAt,omitempty"`
+}
+
+// asked is a new piece of work from the parent: the reminders and the verdicts of the work before it are forgotten.
+func (p *Page) asked(at int64) {
+	p.AskedAt = at
+	p.Nudges, p.Nudged, p.Judged, p.GaveUp, p.HeldAt, p.EndedAt = 0, "", "", false, 0, 0
 }
 
 func (b *Book) load() {
@@ -82,14 +102,15 @@ func (b *Book) Update(id string, f func(p *Page)) Page {
 	return p
 }
 
-// notifying are the chats whose parents asked to be woken and still can be.
-func (b *Book) notifying() []string {
+// watched are the chats the sweep looks at: those whose parents asked to be woken and still can be, and those held to
+// the rules of a delegated chat.
+func (b *Book) watched() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.load()
 	var out []string
 	for id, p := range b.chats {
-		if p.Notify && p.Wakes < MaxWakes {
+		if p.Notify && p.Wakes < MaxWakes || p.Contract {
 			out = append(out, id)
 		}
 	}
@@ -110,4 +131,20 @@ func (b *Book) claim(id, key string, max int) bool {
 	b.chats[id] = p
 	b.save()
 	return true
+}
+
+// nudge claims a reminder for key unless one went for it already or they ran out: true when this caller is the one to
+// send it. Nudges is then the number sent including this one.
+func (b *Book) nudge(id, key string, max int) (int, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.load()
+	p, ok := b.chats[id]
+	if !ok || p.Nudged == key || p.Nudges >= max {
+		return p.Nudges, false
+	}
+	p.Nudged, p.Nudges = key, p.Nudges+1
+	b.chats[id] = p
+	b.save()
+	return p.Nudges, true
 }

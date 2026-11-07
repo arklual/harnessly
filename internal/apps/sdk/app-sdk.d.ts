@@ -136,7 +136,27 @@ export interface Harnessly {
   };
   /** `app:<id>[/<view>]`, or `chat:<id>` to open a conversation from `agents.list` (needs `agents.read` as well). */
   pane: { open(target: string): Promise<void> };
-  tools: { call(name: string, args?: Record<string, unknown>): Promise<unknown> };
+  tools: {
+    call(name: string, args?: Record<string, unknown>): Promise<unknown>;
+    /**
+     * Offer a tool of this page to the agent of the chat (right `tools.page`): it lists it with page_tools and calls it
+     * with page_call, and `run` answers in the person's page. `navigator.modelContext.registerTool` (WebMCP) does the
+     * same. Resolves once the host knows the tool; `unregister` takes it back. A tool with `confirm` (or WebMCP's
+     * `annotations.destructiveHint`) runs only after the person agrees in the page.
+     */
+    register(
+      tool: {
+        name: string;
+        description?: string;
+        inputSchema?: object;
+        confirm?: boolean;
+        annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+      },
+      run: (args: Record<string, unknown>) => unknown | Promise<unknown>,
+    ): Promise<{ unregister(): Promise<void> }> & { unregister(): Promise<void> };
+  };
+  /** What the view shows, for the agent of the chat to read with page_tools (right `context.publish`). */
+  publish(data: unknown): Promise<void>;
   /** @deprecated Removed: every call rejects with `invalid_params` and says to use `hl.storage`. */
   flow: { status(): Promise<never>; go(state: string): Promise<never> };
   /** @deprecated Removed: every call rejects with `invalid_params` and says to use `hl.storage`. */

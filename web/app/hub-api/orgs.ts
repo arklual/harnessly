@@ -108,7 +108,10 @@ export type Member = {
 export type AuditAction =
   | 'org.create'
   | 'org.update'
+  | 'tenant.create'
   | 'tenant.move'
+  | 'tenant.delete'
+  | 'machine.move'
   | 'team.create'
   | 'team.update'
   | 'team.delete'

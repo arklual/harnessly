@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -295,7 +296,10 @@ func (p *Package) checkFiles() Problems {
 		if v.Entry == "" || strings.HasPrefix(v.Entry, "https://") {
 			continue
 		}
-		_, _ = p.stat(fmt.Sprintf("views[%d].entry", i), v.Entry, &ps)
+		field := fmt.Sprintf("views[%d].entry", i)
+		if _, err := p.stat(field, v.Entry, &ps); err == nil {
+			p.checkInlineScripts(field, v.Entry, &ps)
+		}
 	}
 	if c := m.Chat; c != nil {
 		for i, cmd := range c.Commands {
@@ -459,4 +463,38 @@ func (p *Package) pluginParts() []string {
 		}
 	}
 	return out
+}
+
+// scriptTag is an opening <script> tag with its attributes.
+var scriptTag = regexp.MustCompile(`(?is)<script\b([^>]*)>`)
+
+// scriptSrc is the src attribute of a script tag: its code is a file.
+var scriptSrc = regexp.MustCompile(`(?i)\bsrc\s*=`)
+
+// dataScript is a script tag that holds data, not code (JSON, an import map is code to the CSP too).
+var dataScript = regexp.MustCompile(`(?i)\btype\s*=\s*["']?application/(ld\+)?json`)
+
+// checkInlineScripts warns of a script written into the page: a view's CSP runs script files only (script-src 'self'),
+// so the code would never run and the view would stand still without an error of its own.
+func (p *Package) checkInlineScripts(field, rel string, ps *Problems) {
+	if !strings.HasSuffix(strings.ToLower(rel), ".html") {
+		return
+	}
+	full, err := p.inside(rel)
+	if err != nil {
+		return
+	}
+	page, err := os.ReadFile(full)
+	if err != nil {
+		return
+	}
+	for _, m := range scriptTag.FindAllSubmatch(page, -1) {
+		attrs := m[1]
+		if scriptSrc.Match(attrs) || dataScript.Match(attrs) {
+			continue
+		}
+		*ps = append(*ps, Problem{Path: field, Warning: true,
+			Message: rel + " has a <script> written into the page: a view runs script files only (put the code in a .js file and load it with <script src>)"})
+		return
+	}
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ICatalogEntry, ITeamInfo } from '@/next/features/app-catalog/api';
-import { ROW_ACTION, rowsOf } from '@/next/features/app-catalog/model';
+import { refusalOf, ROW_ACTION, rowsOf, secretsOf } from '@/next/features/app-catalog/model';
 
 const entry = (over: Partial<ICatalogEntry> = {}): ICatalogEntry => ({
   id: 'acme.demo',
@@ -45,5 +45,22 @@ describe('catalog rows', () => {
       const action = rowsOf(team('member', [entry({ installed })]))[0]?.action;
       expect(action === ROW_ACTION.install || action === ROW_ACTION.uninstall).toBe(false);
     }
+  });
+});
+
+describe('the check before the download (HRN-700)', () => {
+  it('says each refusal in its own words and offers no install', () => {
+    const check = { refusals: [{ code: 'command' as const, detail: '/deck acme.deck' }], secrets: [] };
+    const rows = rowsOf({
+      space: 's',
+      role: 'owner',
+      catalog: [entry({ installed: false, check })],
+      muted: [],
+    });
+    expect(rows[0]?.action).toBeNull();
+    expect(refusalOf(check)).toContain('/deck');
+    expect(refusalOf({ refusals: [{ code: 'host', detail: '>=0.99' }], secrets: [] })).toContain('>=0.99');
+    expect(refusalOf({ refusals: [], secrets: [] })).toBeNull();
+    expect(secretsOf({ refusals: [], secrets: ['token'] })).toContain('token');
   });
 });

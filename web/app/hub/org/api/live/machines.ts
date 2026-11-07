@@ -11,6 +11,7 @@ import type {
   MachinesApi,
   MachinesList,
   MachinesSummary,
+  MovePlan,
   OrgMachine,
   PersonRef,
   ResourcePlan,
@@ -185,6 +186,32 @@ interface WireResources {
 
 const money = (m: WireMoney | null | undefined) => (m ? { amount: m.amount, currency: m.currency } : null);
 
+type WireAccess = { label: string };
+type WireMovePlan = Omit<MovePlan, 'teamCleared' | 'teamAssigned' | 'accessRevoked' | 'limits' | 'kept'> & {
+  teamCleared: WireAccess | null;
+  teamAssigned: WireAccess | null;
+  accessRevoked: WireAccess[] | null;
+  limits: MovePlan['limits'] | null;
+  kept: string[] | null;
+};
+
+const movePlanOf = ({ plan: p }: { plan: WireMovePlan }): MovePlan => ({
+  from: p.from,
+  to: p.to,
+  noop: p.noop,
+  teamCleared: p.teamCleared?.label ?? null,
+  teamAssigned: p.teamAssigned?.label ?? null,
+  accessRevoked: (p.accessRevoked ?? []).map((a) => a.label),
+  limits: p.limits ?? { fromRules: 0, toRules: 0 },
+  kept: p.kept ?? [],
+});
+
+const moveBody = (tenantId: string, teamId: string | undefined, dryRun: boolean) => ({
+  tenantId,
+  ...(teamId ? { teamId } : {}),
+  ...(dryRun ? { dry_run: true } : {}),
+});
+
 export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
   const list = async (): Promise<HubMachine[]> => {
     const c = ctx();
@@ -311,6 +338,17 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
       await http.patch(`/api/machines/${id}`, { name });
       return detail(id);
     },
+    planMoveMachine: async (id, tenantId, teamId) =>
+      movePlanOf(
+        await http.post<{ plan: WireMovePlan }>(`/api/machines/${id}/move`, moveBody(tenantId, teamId, true)),
+      ),
+    moveMachine: async (id, tenantId, teamId) =>
+      movePlanOf(
+        await http.post<{ plan: WireMovePlan }>(
+          `/api/machines/${id}/move`,
+          moveBody(tenantId, teamId, false),
+        ),
+      ),
     removeMachine: async (id) => {
       await http.del(`/api/machines/${id}`);
     },

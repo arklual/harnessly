@@ -54,17 +54,17 @@ export const Sheet = ({
   const c = closingAttr(closing);
   const el = (
     <>
-      <div className="ad-scrim" data-closing={c} onClick={onClose} />
+      <div className="hb-scrim" data-closing={c} onClick={onClose} />
       <aside
         ref={panel}
-        className="ad-sheet env-sh"
+        className="hb-sheet env-sh"
         data-closing={c}
         role="dialog"
         aria-modal="true"
         aria-label={label}
         tabIndex={-1}
       >
-        <div className="ad-sheet__head">
+        <div className="hb-sheet__head">
           <span ref={slot('back')} className="ev-sh__slot" />
           <div className="ev-sh__titles">
             <h3 ref={slot('title')} />
@@ -76,7 +76,7 @@ export const Sheet = ({
         </div>
         <div ref={slot('to')} className="ev-to-slot" />
         <SlotCtx.Provider value={slots}>
-          <div className="ad-sheet__body">{children}</div>
+          <div className="hb-sheet__body">{children}</div>
         </SlotCtx.Provider>
         <div ref={slot('foot')} className="ev-foot-slot" />
       </aside>
@@ -99,7 +99,7 @@ export const Title = ({
     <Slot name="sub">
       {sub && (
         <div className="ev-sh__sub">
-          <span className="ad-dot" data-l={sub.kind}>
+          <span className="hb-dot" data-l={sub.kind}>
             {sub.initial}
           </span>
           {sub.text}

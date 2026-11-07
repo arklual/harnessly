@@ -4,7 +4,8 @@ import { ApiError, createApi, type Fetcher } from '../../../lib/api';
 import { errorText } from '../../../lib/errors';
 import type { Invite } from '../../../lib/types';
 import { OrgApiError } from '../errors';
-import type { TenantApi, TenantInvite } from '../tenant';
+import type { TenantApi, TenantDeletePlan, TenantInvite } from '../tenant';
+import { http, orgPath } from './http';
 
 const CONTAINER_OFF = 'Контейнеры на этом хабе не настроены. Выберите другой доступ.';
 
@@ -17,6 +18,15 @@ const wrap = async <T>(run: () => Promise<T>, text?: (e: ApiError) => string | n
     throw new OrgApiError(e.code === 'network' ? 'network' : 'hub', own ?? errorText(e));
   }
 };
+
+const tenantPath = (org: string, spaceId: string): string =>
+  orgPath(org, `/tenants/${encodeURIComponent(spaceId)}`);
+
+const planOf = (p: Partial<TenantDeletePlan>): TenantDeletePlan => ({
+  blockers: p.blockers ?? [],
+  removes: p.removes ?? [],
+  canDelete: p.canDelete ?? false,
+});
 
 const inviteOf = (i: Invite): TenantInvite => ({
   id: i.id,
@@ -73,6 +83,17 @@ export const liveTenant = (fetcher?: Fetcher): TenantApi => {
         await api.spaces.setRole(spaceId, userId, role);
       }),
     removeTenantMember: (spaceId, userId) => wrap(() => api.spaces.removeMember(spaceId, userId)),
+    planDeleteTenant: (org, spaceId) =>
+      wrap(async () => {
+        const out = await http.del<{ plan: Partial<TenantDeletePlan> }>(tenantPath(org, spaceId), {
+          dry_run: 'true',
+        });
+        return planOf(out.plan);
+      }),
+    deleteTenant: (org, spaceId) =>
+      wrap(async () => {
+        await http.del(tenantPath(org, spaceId));
+      }),
     renameTenant: (spaceId, name) =>
       wrap(async () => (await api.spaces.update(spaceId, { name })).space.name),
   };

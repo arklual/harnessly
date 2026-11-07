@@ -24,8 +24,31 @@ type (
 	Board   = integrations.Board
 )
 
-// ErrUnsupported: the provider does not do this (a built-in catalog asked to publish, an adapter without comments).
-var ErrUnsupported = errors.New("docprovider: not supported")
+// Errors a provider answers besides the reader's own (not found, denied, unreachable).
+var (
+	// ErrUnsupported: the provider does not do this (a built-in catalog asked to publish, an adapter without comments).
+	ErrUnsupported = errors.New("docprovider: not supported")
+	// ErrTooLarge: the document (or the answer about it) is bigger than the runtime takes from the provider.
+	ErrTooLarge = errors.New("docprovider: too large")
+	// ErrSearchRequired: the provider finds boards only by a query and has no list of them.
+	ErrSearchRequired = errors.New("docprovider: boards are found by a query only")
+)
+
+// Capabilities is what a provider does, for the routes and the page to ask before they call.
+type Capabilities struct {
+	// Provider is the adapter's name, "builtin" for the built-in catalog.
+	Provider string `json:"provider"`
+	Publish  bool   `json:"publish"`
+	Access   bool   `json:"access"`
+	Comments bool   `json:"comments"`
+	// Boards: there is a list of boards. BoardsSearch: boards can be found by a query (without Boards, only so).
+	Boards       bool `json:"boards"`
+	BoardsSearch bool `json:"boardsSearch"`
+	// ProviderEmbed: documents and boards are framed through Embed, never through their viewer address.
+	ProviderEmbed bool `json:"providerEmbed"`
+	// MaxAnswerBytes is the biggest answer taken from the provider, 0 when there is no such limit.
+	MaxAnswerBytes int64 `json:"maxAnswerBytes,omitempty"`
+}
 
 // Content is a document's text at one version.
 type Content struct {
@@ -50,9 +73,12 @@ type PublishRequest struct {
 
 // Published is what a publish made.
 type Published struct {
-	Slug    string `json:"slug"`
-	Version int    `json:"version"`
-	URL     string `json:"url,omitempty"`
+	// Slug is the runtime's name of the document; ExternalID the provider's own (they differ for an adapter's ID that
+	// is not a slug, see Alias).
+	Slug       string `json:"slug"`
+	ExternalID string `json:"externalId,omitempty"`
+	Version    int    `json:"version"`
+	URL        string `json:"url,omitempty"`
 }
 
 // Embed is an address for a frame or a widget; it may expire.
@@ -105,7 +131,11 @@ type Provider interface {
 	Reply(ctx context.Context, slug, threadID, body string, by Author) (Thread, error)
 	// SetStatus opens or closes ("open", "resolved") a thread.
 	SetStatus(ctx context.Context, slug, threadID, status string) (Thread, error)
+	// Boards is the list of boards; ErrSearchRequired when the provider only finds them by a query.
 	Boards(ctx context.Context) ([]Board, error)
+	// SearchBoards finds boards by a query.
+	SearchBoards(ctx context.Context, query string) ([]Board, error)
+	Capabilities() Capabilities
 	Counts(ctx context.Context, person string) (Counts, error)
 	MarkRead(ctx context.Context, person, slug string) error
 }

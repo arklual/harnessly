@@ -3,10 +3,12 @@ package ext
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -176,6 +178,8 @@ func TestSpecsAreChecked(t *testing.T) {
 		"twice":    `[{"name":"a","url":"http://x","protocol":"harnessly.k/v1"},{"name":"a","url":"http://y","protocol":"harnessly.k/v1"}]`,
 		"not json": `{`,
 		"no url":   `[{"name":"a","protocol":"harnessly.k/v1"}]`,
+		"huge max": `[{"name":"a","url":"http://x","protocol":"harnessly.k/v1","maxAnswerBytes":999999999999}]`,
+		"neg max":  `[{"name":"a","url":"http://x","protocol":"harnessly.k/v1","maxAnswerBytes":-1}]`,
 	} {
 		f := filepath.Join(dir, "f.json")
 		_ = os.WriteFile(f, []byte(body), 0o600)
@@ -185,5 +189,46 @@ func TestSpecsAreChecked(t *testing.T) {
 	}
 	if _, err := NewRegistry([]Spec{{Name: "a", URL: "ftp://x", Protocol: "harnessly.k/v1"}}, Config{}); err == nil {
 		t.Error("an ftp address was accepted")
+	}
+}
+
+func TestAnAnswerOverTheLimitIsTooLargeNotCut(t *testing.T) {
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.Add(1)
+		switch r.URL.Path {
+		case "/big":
+			_, _ = w.Write([]byte(`{"content":"` + strings.Repeat("a", 2048) + `"}`))
+		case "/413":
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		case "/said":
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_, _ = w.Write([]byte(`{"error":"too_large"}`))
+		default:
+			_, _ = w.Write([]byte(`{"content":"ok"}`))
+		}
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Config{BaseURL: srv.URL, MaxAnswer: 1024, Backoff: time.Millisecond})
+	if c.MaxAnswer() != 1024 {
+		t.Fatalf("max %d", c.MaxAnswer())
+	}
+	for _, path := range []string{"/big", "/413", "/said"} {
+		n.Store(0)
+		var out struct{ Content string }
+		if err := c.Do(context.Background(), http.MethodPost, path, struct{}{}, false, &out); !errors.Is(err, ErrTooLarge) || out.Content != "" {
+			t.Fatalf("%s: %v %q", path, err, out.Content)
+		}
+		if n.Load() != 1 {
+			t.Fatalf("%s: too large was retried %d times", path, n.Load())
+		}
+	}
+	var out struct{ Content string }
+	if err := c.Do(context.Background(), http.MethodPost, "/small", struct{}{}, false, &out); err != nil || out.Content != "ok" {
+		t.Fatalf("small: %v %q", err, out.Content)
+	}
+	d, _ := NewClient(Config{BaseURL: srv.URL})
+	if d.MaxAnswer() != DefaultMaxAnswer {
+		t.Fatalf("default max %d", d.MaxAnswer())
 	}
 }

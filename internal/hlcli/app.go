@@ -26,6 +26,10 @@ func (c *cli) app(args []string) error {
 	switch sub {
 	case "docs":
 		return c.appDocs(args)
+	case "catalog":
+		return c.appCatalog(args)
+	case "sdk":
+		return c.appSDK(args)
 	case "new":
 		return c.appNew(args)
 	case "validate", "check":
@@ -74,7 +78,7 @@ func (c *cli) app(args []string) error {
 	case "explain", "why":
 		return c.appExplain(args)
 	}
-	return usageErr("app takes new, validate, install, dev, list, remove, enable, disable, explain, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
+	return usageErr("app takes catalog, sdk, docs, new, validate, install, dev, list, remove, enable, disable, explain, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
 }
 
 // appDir is a folder argument made absolute; none is the working folder.

@@ -6,7 +6,8 @@
       "type": "object",
       "properties": {
         "provider": {"type": "string", "enum": ["claude", "codex"], "description": "The agent CLI to run the task."},
-        "model": {"type": "string", "description": "A model id of that provider on this machine (as its model picker names it, e.g. opus or sonnet for Claude); omit for the machine's default. An unknown id is refused with the list of the ones there are."},
+        "agent_model": {"type": "string", "description": "A model id of that provider on this machine (as its model picker names it, e.g. opus or sonnet for Claude); omit for the machine's default. An unknown id is refused with the list of the ones there are."},
+        "model": {"type": "string", "description": "Deprecated, use agent_model. Claude Code replaces a parameter named exactly `model` with its own subagent model (CLAUDE_CODE_SUBAGENT_MODEL) before the call leaves it, so a model asked for here may not arrive; agent_model is never touched. When both are given, agent_model is used."},
         "effort": {"type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "ultra"], "description": "Reasoning effort; omit for the model's own."},
         "prompt": {"type": "string", "description": "The task, complete: goal, context, files, what to answer with."},
         "cwd": {"type": "string", "description": "Absolute folder to work in, inside this chat's folder or one of the machine's projects; omit for this chat's folder."},

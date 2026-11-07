@@ -179,7 +179,7 @@ export const AccessSection = ({
         {!editing && !locked && (
           <button
             type="button"
-            className="ad-add"
+            className="hb-add"
             aria-disabled={!m.canManage}
             title={!m.canManage ? 'Может поменять: лид команды' : undefined}
             onClick={() => m.canManage && onEdit()}

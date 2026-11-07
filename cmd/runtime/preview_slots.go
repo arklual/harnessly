@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/publicsuffix"
+
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
@@ -604,12 +606,13 @@ func (s *previewSlots) slotHandler(slot int) http.Handler {
 			previewDeny(w, 401, previewExpiredText())
 			return
 		}
-		// A loopback slot's cookie is unpartitioned SameSite=None (see enter), so any site open in the browser could
+		// A loopback slot's cookie, and that of a slot of the page's own site, is unpartitioned SameSite=None (see enter), so any site open in the browser could
 		// send it with a plain <img> or <script> load, which carries no Origin and, from a sandbox, no Referer either.
 		// Only an app's view needs cross-site loads (its opaque-origin frame makes every load one), and the view server
 		// answers nothing without the session's token in the path but the SDK's own code: a person's dev server never
 		// gets a cross-site request through a loopback slot.
-		if s.public == nil && loopbackOrigin(own) && r.Header.Get("Sec-Fetch-Site") == "cross-site" && !sess.showsAppViews() {
+		unpartitioned := s.public == nil && loopbackOrigin(own) || sameSiteOrigins(sess.origin, sess.app)
+		if unpartitioned && r.Header.Get("Sec-Fetch-Site") == "cross-site" && !sess.showsAppViews() {
 			previewDeny(w, 403, locale.Pick("A request from another address", "Запрос с чужого адреса"))
 			return
 		}
@@ -661,14 +664,16 @@ func (s *previewSlots) enter(w http.ResponseWriter, r *http.Request, slot int, s
 	}
 	// A loopback slot counts as secure too: browsers keep Secure cookies on http://127.0.0.1 and localhost, and an
 	// app's view frame has an opaque origin, so every load from it is cross-site and a Lax cookie never comes along.
-	// Not partitioned there: the page and a loopback slot are one site, so the enter navigation lands in the
-	// same-site partition while the frame's loads ask for the cross-site one and would find no cookie.
+	// Not partitioned where the page and the slot are one site (a loopback slot, or a slot on a subdomain of the page's
+	// domain, like <name>.preview.example.com beside ai.example.com): the enter navigation lands in the same-site
+	// partition while the frame's loads, from its opaque origin, ask for the cross-site one and would find no cookie,
+	// so a view's scripts would get 401.
 	loopback := loopbackOrigin(ticket.origin)
 	secure := strings.HasPrefix(ticket.origin, "https:") || loopback
 	cookie := &http.Cookie{Name: s.slotCookie(slot, secure), Value: agent.SignPayload(secret, previewSlotAudience, ticket.fields(), previewSlotTTL),
 		Path: "/", HttpOnly: true, MaxAge: int(previewSlotTTL / time.Second), SameSite: http.SameSiteLaxMode}
 	if secure {
-		cookie.Secure, cookie.SameSite, cookie.Partitioned = true, http.SameSiteNoneMode, !loopback
+		cookie.Secure, cookie.SameSite, cookie.Partitioned = true, http.SameSiteNoneMode, !loopback && !sameSiteOrigins(ticket.origin, ticket.app)
 	}
 	http.SetCookie(w, cookie)
 	h.Set("Location", path)
@@ -831,6 +836,18 @@ func previewBridgeFromWeb() func() ([]byte, bool) {
 }
 
 // loopbackOrigin: http://127.0.0.1:<port>, http://[::1]:<port> or http://localhost:<port>.
+// sameSiteOrigins: two origins of one site (scheme and registrable domain), as a browser's cookie partitions take it.
+func sameSiteOrigins(a, b string) bool {
+	ua, errA := url.Parse(a)
+	ub, errB := url.Parse(b)
+	if errA != nil || errB != nil || ua.Scheme != ub.Scheme || ua.Hostname() == "" || ub.Hostname() == "" {
+		return false
+	}
+	sa, errA := publicsuffix.EffectiveTLDPlusOne(ua.Hostname())
+	sb, errB := publicsuffix.EffectiveTLDPlusOne(ub.Hostname())
+	return errA == nil && errB == nil && sa == sb
+}
+
 func loopbackOrigin(origin string) bool {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "http" {

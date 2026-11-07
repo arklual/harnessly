@@ -198,9 +198,9 @@ const People = ({ tenant }: { tenant: TenantRef }) => {
             const who = m.name || m.email;
             const last = m.role === 'owner' && admins === 1;
             return (
-              <div key={m.userId} className="ad-row tm-member" data-busy={busy === m.userId || undefined}>
+              <div key={m.userId} className="hb-row tm-member" data-busy={busy === m.userId || undefined}>
                 <span className="hx-avatar tm-member__av">{initial(who)}</span>
-                <span className="ad-row__t">
+                <span className="hb-row__t">
                   <b>
                     {who}
                     {you && ' (вы)'}

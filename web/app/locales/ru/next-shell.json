@@ -1400,5 +1400,7 @@
   "next.settings.base.without": "Без этого {what}",
   "next.settings.base.back": "Вернуть",
   "next.settings.base.backed": "Вернули — машина поставит это сама",
-  "next.settings.base.backFailed": "Машина не ответила — попробуйте ещё раз"
+  "next.settings.base.backFailed": "Машина не ответила — попробуйте ещё раз",
+  "next.files.upRetry": "Повторить: {name}",
+  "next.files.listMenu": "Действия со списком"
 }

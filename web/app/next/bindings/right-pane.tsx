@@ -91,6 +91,7 @@ import { useKeys } from '@/next/features/keys/use-keys';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import { chatPaneOf, chatPanes, markUsed, useChatPane, type IChatPane } from '@/next/stores/pane-state';
 import { conversationsStore, convsLoadedStore } from '@/next/stores/conversations';
+import { useAppsDebug } from '@/next/features/app-views/debug-mode';
 
 // The views a tab shows come in their own chunk the first time that tab opens, not with the page (a shell is xterm).
 const later =
@@ -795,6 +796,7 @@ const PaneBody = (props: IPaneBodyProps) => {
   const { side } = props;
   // The tabs of dev apps whose inspector is open (a section under the view, not a tab of its own).
   const [inspecting, setInspecting] = useState<ReadonlySet<string>>(new Set());
+  const debugMode = useAppsDebug();
   const saveButton = tab?.kind === 'files' && edits.live?.tab === tab.id;
   const paneActions = () => {
     if (tab?.kind === 'side')
@@ -826,7 +828,7 @@ const PaneBody = (props: IPaneBodyProps) => {
           </button>
         </>
       );
-    if (tab?.kind === 'app' && installed.list?.apps.find((a) => a.id === tab.app)?.dev) {
+    if (tab?.kind === 'app' && (debugMode || installed.list?.apps.find((a) => a.id === tab.app)?.dev)) {
       const on = inspecting.has(tab.id);
       return (
         <button

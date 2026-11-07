@@ -2,6 +2,7 @@ package docprovider
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/integrations"
 )
@@ -76,6 +77,35 @@ func (b Builtin) SetStatus(_ context.Context, slug, id, status string) (Thread, 
 }
 
 func (b Builtin) Boards(ctx context.Context) ([]Board, error) { return b.Cfg.ListBoards(ctx) }
+
+// SearchBoards filters the list by the title: the boards server has no search of its own.
+func (b Builtin) SearchBoards(ctx context.Context, query string) ([]Board, error) {
+	all, err := b.Cfg.ListBoards(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return filterBoards(all, query), nil
+}
+
+func filterBoards(all []Board, query string) []Board {
+	q := strings.ToLower(strings.TrimSpace(query))
+	out := []Board{}
+	for _, x := range all {
+		if q == "" || strings.Contains(strings.ToLower(x.Title+" "+x.Slug), q) {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func (b Builtin) Capabilities() Capabilities {
+	return Capabilities{Provider: "builtin", Access: true, Comments: true, Boards: b.Cfg.BoardsURL != "", BoardsSearch: b.Cfg.BoardsURL != ""}
+}
+
+// ConversationDocuments is the catalog's own list by session: the catalog binds what the platform agent published.
+func (b Builtin) ConversationDocuments(ctx context.Context, conversation string) ([]integrations.Document, error) {
+	return b.Cfg.Documents(ctx, conversation)
+}
 
 func (b Builtin) Counts(_ context.Context, person string) (Counts, error) {
 	open, unread, last, err := b.Store.Counts(person)

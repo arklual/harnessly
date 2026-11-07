@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { setFetch } from '@/next/core/net/http';
-import { DEFAULT_SETTINGS, httpMeSource, localMeSource, type Me } from '@/next/stores/me';
+import {
+  DEFAULT_SETTINGS,
+  httpMeSource,
+  loadMe,
+  localMeSource,
+  meStore,
+  setMeSource,
+  type Me,
+} from '@/next/stores/me';
 
 const me = (rev: number, patch: Partial<Me['settings']> = {}): Me => ({
   email: 'a@example.com',
@@ -43,5 +51,55 @@ describe('httpMeSource.patch', () => {
     setFetch(async () => reply(404, { r: 'refused', code: 'not-found' }));
     const res = await httpMeSource(localMeSource({ rev: 1 })).patch(1, { textSize: 'l' });
     expect(res).toMatchObject({ r: 'accepted', me: { rev: 2, settings: { textSize: 'l' } } });
+  });
+});
+
+describe('the contract of /api/v2/me (GitHub #29)', () => {
+  it('a 200 without settings is a failure, not a person, and never throws', async () => {
+    setFetch(async () => reply(200, { email: 'a@example.com', name: 'Ann', rev: 3 }));
+    expect(await httpMeSource().load()).toEqual({ k: 'failed', code: 'http' });
+    setFetch(async () => reply(200, { email: 'a@example.com', settings: { ...DEFAULT_SETTINGS } }));
+    expect(await httpMeSource().load()).toEqual({ k: 'failed', code: 'http' });
+    setFetch(async () => reply(200, '<html>'));
+    expect(await httpMeSource().load()).toEqual({ k: 'failed', code: 'http' });
+  });
+
+  it('a setting an older runtime does not send yet is the default; one of the wrong type is too', async () => {
+    setFetch(async () =>
+      reply(200, { email: 'a@example.com', name: null, rev: 2, settings: { enterSends: false, density: 7 } }),
+    );
+    const st = await httpMeSource().load();
+    expect(st).toEqual({
+      k: 'ready',
+      me: {
+        email: 'a@example.com',
+        name: null,
+        rev: 2,
+        settings: { ...DEFAULT_SETTINGS, enterSends: false },
+      },
+    });
+  });
+
+  it('a refused or broken connection is a failure; 401 stays the sign-in screen', async () => {
+    setFetch(async () => {
+      throw new Error('reset');
+    });
+    expect(await httpMeSource().load()).toEqual({ k: 'failed', code: 'network' });
+    setFetch(async () => reply(502, { error: 'bad gateway' }));
+    expect(await httpMeSource().load()).toEqual({ k: 'failed', code: 'http' });
+    setFetch(async () => reply(401, { error: 'unauthorized' }));
+    expect(await httpMeSource().load()).toEqual({ k: 'signed-out' });
+  });
+
+  it('loadMe turns a source that throws into a failure', async () => {
+    setMeSource({
+      load: async () => {
+        throw new TypeError("Cannot read properties of undefined (reading 'density')");
+      },
+      patch: async () => ({ r: 'failed' }),
+    });
+    expect(await loadMe()).toEqual({ k: 'failed', code: 'http' });
+    expect(meStore.get()).toEqual({ k: 'failed', code: 'http' });
+    setMeSource(localMeSource());
   });
 });

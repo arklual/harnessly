@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/next/ui/button';
 import type { IPublicEntry } from '@/next/features/app-catalog/api';
 import type { IPublicState } from '@/next/features/app-catalog/use-public';
+import { refusalOf, secretsOf } from '@/next/features/app-catalog/model';
 import { t } from '@/next/i18n';
 import '@/next/styles/app-catalog.css';
 
@@ -43,8 +44,11 @@ const PublicCatalog = ({ catalog, installed }: { catalog: IPublicState; installe
                 <span className="hx-appteam__text">
                   <span className="hx-appteam__name">{entry.name}</span>
                   {entry.description && <span className="hx-appteam__desc">{entry.description}</span>}
+                  {!have && refusalOf(entry.check) !== null && (
+                    <span className="hx-appteam__desc">{refusalOf(entry.check)}</span>
+                  )}
                 </span>
-                {!have && asking !== entry.id && (
+                {!have && asking !== entry.id && refusalOf(entry.check) === null && (
                   <Button
                     size="sm"
                     variant="primary"
@@ -61,6 +65,7 @@ const PublicCatalog = ({ catalog, installed }: { catalog: IPublicState; installe
                     {entry.permissions.length === 0
                       ? t('next.apppublic.norights')
                       : t('next.apppublic.rights', { rights: entry.permissions.join(', ') })}
+                    {secretsOf(entry.check) !== null && ` ${secretsOf(entry.check)}`}
                   </span>
                   <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => setAsking(null)}>
                     {t('next.apppublic.cancel')}

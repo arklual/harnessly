@@ -37,6 +37,23 @@ func statusPage(status int, text string) string {
 	return layout(locale.Pick("Preview · ", "Превью · ")+strconv.Itoa(status), "<p>"+escapeHTML(text)+"</p>")
 }
 
+// failedPage: the site could not be fetched through the proxy (a reset, a timeout, a certificate). Inside a slot frame
+// the page tells the preview island as it loads (tk:failed), so the island can open the site in the machine's own
+// browser instead; on its own it is the status page.
+func failedPage(status int, text, parentOrigin, nonce string) string {
+	if parentOrigin == "" {
+		return statusPage(status, text)
+	}
+	script := `<script nonce="` + nonce + `">(function () {
+  var note = document.getElementById('tk-failed');
+  var parentOrigin = note.getAttribute('data-parent');
+  var ancestors = location.ancestorOrigins;
+  if (window.parent === window || (ancestors && ancestors.length && ancestors[0] !== parentOrigin)) return;
+  window.parent.postMessage({ type: 'tk:failed', status: Number(note.getAttribute('data-status')), text: note.textContent }, parentOrigin);
+})();</script>`
+	return layout(locale.Pick("Preview · ", "Превью · ")+strconv.Itoa(status), `<p id="tk-failed" data-status="`+strconv.Itoa(status)+`" data-parent="`+escapeHTML(parentOrigin)+`">`+escapeHTML(text)+`</p>`+script)
+}
+
 // offerPage: the site redirects to another origin. The runtime never follows it: the page tells the preview island as
 // it loads (tk:redirect; the island follows a hop between its own sites, a sign-in say) and asks it on a press to
 // open that origin as a new target (tk:open), which goes through the same checks again.

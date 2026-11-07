@@ -1,0 +1,173 @@
+{
+  "$comment": "Generated from internal/apps/surface.go and contributions.go (UPDATE_SURFACE=1 go test ./internal/apps -run TestSurfaceFilesAreCurrent); do not edit.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "activation": {},
+    "agent": {},
+    "backend": {},
+    "branding": {},
+    "chat": {},
+    "description": {},
+    "harnessly": {},
+    "icon": {},
+    "id": {
+      "description": "\u003cpublisher\u003e.\u003cname\u003e",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,39}\\.[a-z0-9][a-z0-9-]{0,39}$",
+      "type": "string"
+    },
+    "name": {},
+    "network": {},
+    "permissions": {
+      "items": {
+        "anyOf": [
+          {
+            "const": "chat.prompt",
+            "description": "Send a message to the agent of the chat (hl.chat.send)."
+          },
+          {
+            "const": "chat.read",
+            "description": "Read the chat's messages."
+          },
+          {
+            "const": "chat.card",
+            "description": "Put a card of the app in the chat's feed."
+          },
+          {
+            "const": "agents.read",
+            "description": "List the agents of the workspace."
+          },
+          {
+            "const": "pane.open",
+            "description": "Open a view of the app in the right pane."
+          },
+          {
+            "const": "storage",
+            "description": "Keep data of the app per chat, per document and per person."
+          },
+          {
+            "const": "storage.space.write",
+            "description": "Write the storage area shared by the whole space."
+          },
+          {
+            "description": "Read workspace files matching the mask.",
+            "pattern": "^files\\.read:.+$"
+          },
+          {
+            "description": "Write workspace files matching the mask.",
+            "pattern": "^files\\.write:.+$"
+          },
+          {
+            "description": "Have the machine put a secret the person typed into the app's server calls.",
+            "pattern": "^secrets:.+$"
+          },
+          {
+            "const": "notify",
+            "description": "Show the person a notification."
+          },
+          {
+            "const": "tools.page",
+            "description": "Offer tools from the view's page that the agent of the chat calls (hl.tools.register, navigator.modelContext.registerTool)."
+          },
+          {
+            "const": "context.publish",
+            "description": "Publish what the view shows for the agent of the chat to read (hl.publish)."
+          },
+          {
+            "const": "sinopia.read",
+            "description": "Read the Sinopia document the view is shown in."
+          },
+          {
+            "const": "sinopia.write",
+            "description": "Change the Sinopia document: patches, fields, new boards."
+          },
+          {
+            "const": "sinopia.comment",
+            "description": "Comment on the Sinopia document."
+          },
+          {
+            "const": "sinopia.kind",
+            "description": "Add Sinopia document types of the app's own."
+          }
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "secrets": {},
+    "settings": {},
+    "sinopia": {},
+    "storage": {},
+    "targets": {
+      "items": {
+        "anyOf": [
+          {
+            "const": "chat",
+            "description": "The chat: the agent profile, /-commands of the palette, cards and widgets in the feed."
+          },
+          {
+            "const": "pane",
+            "description": "A tab of the right pane beside the chat."
+          },
+          {
+            "const": "app",
+            "description": "A full screen of its own, opened from the apps page or by link."
+          },
+          {
+            "const": "settings",
+            "description": "A page in the settings."
+          },
+          {
+            "const": "onboarding",
+            "description": "A step of the first run."
+          },
+          {
+            "const": "object-action",
+            "description": "A button at an object (a machine, a chat) that opens the view."
+          },
+          {
+            "const": "hub-settings",
+            "description": "A page in the settings of a Hub."
+          },
+          {
+            "const": "branding",
+            "description": "The product's name and accent; declared values, no view."
+          },
+          {
+            "const": "sinopia.*",
+            "description": "The editor of every Sinopia document type."
+          },
+          {
+            "description": "The editor of one Sinopia document type.",
+            "pattern": "^sinopia\\.[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"
+          }
+        ]
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "trust": {
+      "enum": [
+        "declarative",
+        "sandboxed",
+        "trusted"
+      ]
+    },
+    "version": {
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z.-]+)?$",
+      "type": "string"
+    },
+    "views": {},
+    "when": {}
+  },
+  "required": [
+    "id",
+    "name",
+    "version",
+    "targets",
+    "permissions"
+  ],
+  "title": "harnessly/app.json",
+  "type": "object"
+}

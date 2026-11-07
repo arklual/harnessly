@@ -1,10 +1,11 @@
 // The files going into a folder of «Файлы», under its list: each with its progress, pause and cancel, and the
 // question when a file of that name is there already. Done ones stay until cleared, so the person sees what arrived.
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import Icon from '@/next/ui/icon';
 import { Button } from '@/next/ui/button';
+import { PRESENCE, usePresence } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
-import { formatBytes, formatSpeed } from '@/lib/hl-disk-format';
+import { formatProgress, percentOf } from '@/next/ui/transfer';
 import {
   CONFLICT_CHOICE,
   UPLOAD_STATE,
@@ -24,10 +25,7 @@ const STATE_KEY = {
 } as const;
 
 const statusOf = (upload: IDiskUpload): string => {
-  if (upload.state === UPLOAD_STATE.uploading)
-    return upload.speed > 0
-      ? `${formatBytes(upload.sent)} / ${formatBytes(upload.size)} · ${formatSpeed(upload.speed)}`
-      : `${formatBytes(upload.sent)} / ${formatBytes(upload.size)}`;
+  if (upload.state === UPLOAD_STATE.uploading) return formatProgress(upload);
   if (upload.note) return upload.note;
   if (upload.state === UPLOAD_STATE.retrying || upload.state === UPLOAD_STATE.failed) return '';
   return t(STATE_KEY[upload.state]);
@@ -65,6 +63,16 @@ const Row = ({ upload, queue }: { upload: IDiskUpload; queue: DiskUploadQueue })
             <Icon name="play" size="sm" />
           </button>
         )}
+        {upload.state === UPLOAD_STATE.failed && (
+          <button
+            type="button"
+            className="hx-head-btn"
+            aria-label={t('next.files.upRetry', { name: upload.name })}
+            onClick={() => queue.retry(upload.id)}
+          >
+            <Icon name="rotate-ccw" size="sm" />
+          </button>
+        )}
         {active && (
           <button
             type="button"
@@ -97,8 +105,12 @@ const Row = ({ upload, queue }: { upload: IDiskUpload; queue: DiskUploadQueue })
       ) : (
         <>
           {(active || upload.state === UPLOAD_STATE.done) && (
-            <span className="hx-upl__bar" aria-hidden="true">
-              <span style={{ width: `${(100 * upload.sent) / Math.max(upload.size, 1)}%` }} />
+            <span
+              className="hx-upl__bar"
+              aria-hidden="true"
+              style={{ '--p': percentOf(upload) } as CSSProperties}
+            >
+              <span />
             </span>
           )}
           <span className="hx-upl__status" role={upload.state === UPLOAD_STATE.failed ? 'alert' : undefined}>
@@ -110,11 +122,27 @@ const Row = ({ upload, queue }: { upload: IDiskUpload; queue: DiskUploadQueue })
   );
 };
 
-const UploadsStrip = ({ uploads, queue }: { uploads: readonly IDiskUpload[]; queue: DiskUploadQueue }) => {
-  if (uploads.length === 0) return null;
+const STRIP_EXIT_MS = 220;
+
+const UploadsStrip = ({
+  uploads: current,
+  queue,
+}: {
+  uploads: readonly IDiskUpload[];
+  queue: DiskUploadQueue;
+}) => {
+  // Cleared, it folds away instead of vanishing: the last rows stay in view while it leaves.
+  const { value, state } = usePresence(current.length > 0 ? current : null, STRIP_EXIT_MS);
+  if (value === null) return null;
+  const uploads = value;
   const busy = uploads.some((u) => isActiveUpload(u.state));
   return (
-    <div className="hx-upl" role="region" aria-label={t('next.files.uploads')}>
+    <div
+      className="hx-upl"
+      role="region"
+      aria-label={t('next.files.uploads')}
+      data-closing={state === PRESENCE.closing || undefined}
+    >
       <div className="hx-upl__top">
         <Icon name="upload" size="sm" />
         <span className="hx-upl__title">{t('next.files.uploads')}</span>

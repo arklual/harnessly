@@ -1,74 +1,74 @@
 /* «Инструменты»: строки таблицы на сетке .pt-row, остальное из набора хаба. */
-.ad .pt-row.tl-row {
+.hb .pt-row.tl-row {
   grid-template-columns: minmax(200px, 1.6fr) 110px 150px minmax(160px, 1fr) 130px;
 }
-.ad .tl-item + .tl-item {
+.hb .tl-item + .tl-item {
   box-shadow: inset 0 1px 0 var(--hx-border);
 }
-.ad .tl-item .pt-row + .pt-row,
-.ad .tl-item .pt-row {
+.hb .tl-item .pt-row + .pt-row,
+.hb .tl-item .pt-row {
   box-shadow: none;
 }
-.ad .tl-name {
+.hb .tl-name {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.3;
 }
-.ad .tl-name b {
+.hb .tl-name b {
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ad .tl-name small {
+.hb .tl-name small {
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
 }
-.ad .tl-num {
+.hb .tl-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.ad .tl-num[data-bad='1'] {
+.hb .tl-num[data-bad='1'] {
   color: #c4372f;
 }
-.ad .tl-who,
-.ad .tl-last {
+.hb .tl-who,
+.hb .tl-last {
   color: var(--hx-fg-2);
   font-size: var(--hx-text-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ad .tl-bar {
+.hb .tl-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
   margin: 0 0 14px;
 }
-.ad .tl-date {
+.hb .tl-date {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
 }
-.ad .tl-date .hx-set__input,
-.ad .tl-search {
+.hb .tl-date .hx-set__input,
+.hb .tl-search {
   width: auto;
 }
-.ad .tl-search {
+.hb .tl-search {
   flex: 1 1 200px;
   min-width: 160px;
 }
-.ad .tl-totals {
+.hb .tl-totals {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin: 0 0 14px;
 }
-.ad .tl-totals > div {
+.hb .tl-totals > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -78,11 +78,11 @@
   background: var(--hx-bg-window);
   min-width: 0;
 }
-.ad .tl-totals small {
+.hb .tl-totals small {
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
 }
-.ad .tl-totals b {
+.hb .tl-totals b {
   font-size: 20px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -90,10 +90,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ad .tl-totals b.tl-top {
+.hb .tl-totals b.tl-top {
   font-size: var(--hx-text-md, 16px);
 }
-.ad .tl-few {
+.hb .tl-few {
   margin: 0 0 12px;
   padding: 8px 12px;
   border-radius: 10px;
@@ -101,44 +101,44 @@
   color: var(--hx-fg-2);
   font-size: var(--hx-text-sm);
 }
-.ad .tl-more {
+.hb .tl-more {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 16px;
   padding: 4px 16px 16px;
 }
-.ad .tl-more small {
+.hb .tl-more small {
   display: block;
   margin-bottom: 6px;
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
 }
-.ad .tl-more ul {
+.hb .tl-more ul {
   margin: 0 0 8px;
   padding: 0;
   list-style: none;
   font-size: var(--hx-text-sm);
 }
-.ad .tl-more li {
+.hb .tl-more li {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   padding: 3px 0;
 }
-.ad .tl-spark {
+.hb .tl-spark {
   display: flex;
   align-items: flex-end;
   gap: 2px;
   height: 64px;
 }
-.ad .tl-spark i {
+.hb .tl-spark i {
   flex: 1 1 0;
   min-width: 2px;
   border-radius: 2px 2px 0 0;
   background: var(--hx-accent);
   transition: height var(--hx-dur-md, 240ms) var(--hx-ease-out);
 }
-.ad .tl-empty {
+.hb .tl-empty {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -147,30 +147,30 @@
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
 }
-.ad .tl-empty b {
+.hb .tl-empty b {
   color: var(--hx-fg-1);
   font-size: var(--hx-text-md, 16px);
 }
-.ad .tl-empty > div {
+.hb .tl-empty > div {
   display: flex;
   gap: 8px;
   margin-top: 6px;
 }
 @container (max-width: 760px) {
-  .ad .pt-row.tl-row {
+  .hb .pt-row.tl-row {
     grid-template-columns: minmax(0, 1fr) 72px 96px;
   }
-  .ad .tl-row > :nth-child(n + 4) {
+  .hb .tl-row > :nth-child(n + 4) {
     display: none;
   }
-  .ad .tl-totals {
+  .hb .tl-totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .ad .tl-more {
+  .hb .tl-more {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.ad .tl-row.mt-head > :nth-child(2),
-.ad .tl-row.mt-head > :nth-child(3) {
+.hb .tl-row.mt-head > :nth-child(2),
+.hb .tl-row.mt-head > :nth-child(3) {
   text-align: right;
 }

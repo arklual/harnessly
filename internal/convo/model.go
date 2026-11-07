@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -35,7 +36,10 @@ func (c *conv) model(m wire.ModelCmd, finish func(wire.CmdResult), now time.Time
 		finish(wire.Refused(wire.RefuseUnsupported))
 		return
 	}
-	if !modelIDRe.MatchString(m.Model) {
+	// A conversation on a vendor profile names the profile's models, which may be «vendor/model»; modelFits then
+	// holds them to the profile's own list.
+	onProfile := c.rec.Model != nil && c.rec.Model.Profile != ""
+	if !modelIDRe.MatchString(m.Model) && !(onProfile && agents.IsProfileModelID(m.Model)) {
 		finish(wire.Refused(wire.RefuseBadRequest))
 		return
 	}

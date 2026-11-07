@@ -167,7 +167,13 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 				}
 			}
 		}
+		// A view the app's own server hosts gets a session too (the page holds it; the view never sees it), and its address
+		// instead of a path on the view server.
+		remote, isRemote := m.RemoteView(b.View)
 		path, err := m.ViewPath(b.View)
+		if isRemote {
+			err = nil
+		}
 		if !inTarget || err != nil {
 			return refused(&apps.BridgeError{Code: apps.CodeNotInTarget, Message: "no such view for " + b.Target})
 		}
@@ -191,6 +197,9 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		sess, err := views.Sessions.IssueIn(b.App, b.View, b.Target, b.Conversation, b.Document)
 		if err != nil {
 			return refused(err)
+		}
+		if isRemote {
+			return http.StatusOK, map[string]any{"session": sess.Token, "nonce": sess.Nonce, "url": remote}
 		}
 		return http.StatusOK, map[string]any{"session": sess.Token, "nonce": sess.Nonce, "path": "/" + sess.Token + path}
 	})

@@ -1,5 +1,7 @@
 // «Пространство»: a name and, if the person wants, colleagues to invite by e-mail or by a link. With `?space=<slug>`
-// the same screen edits a space that exists (the step bar and «Изменить» of the last screen lead here).
+// the same screen edits a space that exists (the step bar and «Изменить» of the last screen lead here). With
+// `?org=<slug>` («Новый тенант» of an organization) the space is made as a tenant of that organization in one step:
+// a retry of the press sends the same request id and gets the same tenant back, never a second one.
 import { useEffect, useState } from 'react';
 
 import { Button, TextField } from '@kit';
@@ -18,6 +20,11 @@ import { CopyBox, Label, ListSkeleton, Msg, Note } from '../ui/parts';
 const PLACEHOLDERS = ['roma@company.ru', 'kirill@company.ru'];
 const NAME_MAX = 60;
 
+const newRequestId = (): string =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+
 export const NewSpaceScreen = () => {
   const api = useApi();
   const env = useEnv();
@@ -26,6 +33,8 @@ export const NewSpaceScreen = () => {
   const query = useQuery();
   const editSlug = query.get('space');
   const back = safeNext(query.get('back'));
+  const org = editSlug === null ? query.get('org') : null;
+  const [requestId] = useState(newRequestId);
 
   const [space, setSpace] = useState<Space | null>(null);
   const [loading, setLoading] = useState(editSlug !== null);
@@ -68,7 +77,9 @@ export const NewSpaceScreen = () => {
     }
     setNameError(null);
     if (!space) {
-      const { space: made } = await api.spaces.create(cleanName);
+      const { space: made } = org
+        ? await api.spaces.createInOrg(org, cleanName, requestId)
+        : await api.spaces.create(cleanName);
       setSpace(made);
       await reload();
       return made;
@@ -100,6 +111,20 @@ export const NewSpaceScreen = () => {
     }
   };
 
+  /** Where the screen goes on: a tenant of an organization to its machines there, a space to its setup. */
+  const goOn = async (target: Space) => {
+    if (editSlug !== null) {
+      navigate(back ?? `/s/${target.slug}/setup/machines`);
+      return;
+    }
+    if (org) {
+      navigate(`/o/${encodeURIComponent(org)}/${encodeURIComponent(target.slug)}/machines`);
+      return;
+    }
+    const { space: moved } = await api.spaces.update(target.id, { onboardingStep: 'machines' });
+    navigate(`/s/${moved.slug}/setup/machines`);
+  };
+
   const next = async () => {
     setError(null);
     const typed = emails.map((e) => e.trim()).filter(Boolean);
@@ -121,12 +146,7 @@ export const NewSpaceScreen = () => {
           return;
         }
       }
-      if (editSlug !== null) {
-        navigate(back ?? `/s/${target.slug}/setup/machines`);
-        return;
-      }
-      const { space: moved } = await api.spaces.update(target.id, { onboardingStep: 'machines' });
-      navigate(`/s/${moved.slug}/setup/machines`);
+      await goOn(target);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -138,12 +158,7 @@ export const NewSpaceScreen = () => {
     if (!space) return;
     setBusy('next');
     try {
-      if (editSlug !== null) {
-        navigate(back ?? `/s/${space.slug}/setup/machines`);
-        return;
-      }
-      const { space: moved } = await api.spaces.update(space.id, { onboardingStep: 'machines' });
-      navigate(`/s/${moved.slug}/setup/machines`);
+      await goOn(space);
     } catch (e) {
       setError(errorText(e));
     } finally {

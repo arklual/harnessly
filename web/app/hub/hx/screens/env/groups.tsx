@@ -76,7 +76,7 @@ export const GroupHead = ({
         onClick={onToggle}
       >
         <Icon i="chevron-right" size="sm" className="ev-chev" />
-        <span className="ad-ic ev-grp__ic">
+        <span className="hb-ic ev-grp__ic">
           <Icon i={open ? 'folder-open' : 'folder'} size="sm" />
         </span>
         <span className="ev-grp__t">
@@ -181,13 +181,13 @@ export const MoveTo = ({ row, groups, a }: { row: EnvEntryRow; groups: EnvGroup[
         </span>
       )}
       {pop.mounted && (
-        <div className="ad-pop ev-move__pop" data-closing={pop.attr} role="listbox" aria-label="В группу">
+        <div className="hb-pop ev-move__pop" data-closing={pop.attr} role="listbox" aria-label="В группу">
           {[null, ...groups].map((g) => {
             const on = (g?.id ?? '') === row.groupId;
             return (
               <button
                 type="button"
-                className="ad-pop__item"
+                className="hb-pop__item"
                 role="option"
                 aria-selected={on ? 'true' : 'false'}
                 key={g?.id ?? ''}

@@ -239,18 +239,8 @@ var (
 	toolNameRe = regexp.MustCompile(`^[A-Za-z0-9_:.()*@/ -]{1,120}$`)
 )
 
-// permissions are the rights an app may ask for; a parameterised one is written right:<value>.
-var permissions = map[string]bool{
-	"chat.prompt": true, "chat.read": true, "chat.card": true, "agents.read": true,
-	"pane.open": true, "storage": true, "storage.space.write": true, "ai": true,
-	"sinopia.read": true, "sinopia.write": true, "sinopia.comment": true, "sinopia.export": true, "sinopia.kind": true,
-	"users.read": true, "notify": true,
-}
-
-// unsupportedPermissions are rights the host accepts in no call yet.
-var unsupportedPermissions = map[string]bool{"ai": true, "users.read": true, "sinopia.export": true}
-
-var paramPermissions = map[string]bool{"files.read": true, "files.write": true, "secrets": true}
+// permissions, unsupportedPermissions and paramPermissions (a right written right:<value>) are made from the surface
+// (surface.go).
 
 // ParseManifest reads the manifest. A syntax error, or a field of the wrong type, comes back as one problem with the
 // line it stands on; otherwise the manifest is checked and every problem found is returned at once.

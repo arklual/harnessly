@@ -214,8 +214,8 @@ func (t *txn) writeLog(projectID, actor, action, subject string, details map[str
 	if err != nil {
 		return err
 	}
-	_, err = t.q.Exec(t.ctx, `INSERT INTO design_access_log (id, machine_id, project_id, actor, action, subject, details, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		rowID(t.now), t.m.ID, projectID, actor, action, subject, string(raw), ms(t.now))
+	_, err = t.insertRow(`INSERT INTO design_access_log (id, machine_id, project_id, actor, action, subject, details, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.m.ID, projectID, actor, action, subject, string(raw), ms(t.now))
 	return err
 }
 

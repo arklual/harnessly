@@ -143,7 +143,7 @@ export interface DrawerProps {
   over?: ReactNode;
 }
 
-/** The right-side sheet of the board (`.ad-scrim` + `aside.ad-sheet`), a bottom sheet on a phone. */
+/** The right-side sheet of the board (`.hb-scrim` + `aside.hb-sheet`), a bottom sheet on a phone. */
 export const Drawer = ({
   open,
   onClose,
@@ -166,17 +166,17 @@ export const Drawer = ({
   const c = closingAttr(closing);
   return (
     <InLayer>
-      <div className="ad-scrim" data-closing={c} onClick={onClose} />
+      <div className="hb-scrim" data-closing={c} onClick={onClose} />
       <aside
         ref={panel}
-        className={className ? `ad-sheet ${className}` : 'ad-sheet'}
+        className={className ? `hb-sheet ${className}` : 'hb-sheet'}
         data-closing={c}
         aria-label={label}
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
       >
-        <div className="ad-sheet__head">
+        <div className="hb-sheet__head">
           {lead}
           <h3>
             {title}
@@ -187,7 +187,7 @@ export const Drawer = ({
             <Icon i="x" />
           </Btn>
         </div>
-        <div className="ad-sheet__body">{children}</div>
+        <div className="hb-sheet__body">{children}</div>
         {over}
       </aside>
     </InLayer>

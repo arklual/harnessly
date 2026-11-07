@@ -1,11 +1,11 @@
-// The welcome of a first launch: once per browser, when the person has no chat yet and «Что нового» is not
-// on screen, a card at the top offers the one-minute introduction (a tour over the real greeting) or the lessons.
+// The welcome of a first launch: once per browser, on the greeting, when the person has no chat yet and
+// «Что нового» is not on screen, a card at the top offers the one-minute introduction (a tour over the real greeting) or the lessons.
 // It blocks nothing: the page stays clickable, and any answer puts it away for good.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { doLesson } from '@/next/features/learn/do-lesson';
 import { t } from '@/next/i18n';
-import { goTo, ROUTE } from '@/next/routes/routes';
+import { goTo, ROUTE, useRoute } from '@/next/routes/routes';
 import { useTour } from '@/next/stores/tour';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
@@ -50,6 +50,8 @@ interface ILearnWelcomeProps {
 const LearnWelcome = ({ fresh }: ILearnWelcomeProps) => {
   const container = usePortalContainer();
   const tour = useTour();
+  // Only over the greeting: on an open design or chat it would lie over what the person is working with.
+  const home = useRoute().kind === ROUTE.home;
   const [due, setDue] = useState(false);
   const [closed, setClosed] = useState(false);
 
@@ -63,7 +65,7 @@ const LearnWelcome = ({ fresh }: ILearnWelcomeProps) => {
     return () => window.clearTimeout(timer);
   }, [fresh]);
 
-  const open = due && !closed && tour.track === null;
+  const open = due && !closed && home && tour.track === null;
   const { value, state } = usePresence(open ? true : null, EXIT_MS);
   const host = container?.current;
   if (!value || !host) return null;

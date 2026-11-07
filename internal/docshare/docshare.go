@@ -86,6 +86,17 @@ type Config struct {
 	Poll             time.Duration
 	// Call posts to the machine agent; the default is agent.CallLocal. Tests put their own.
 	Call func(route string, body any) (int, []byte, error)
+	// Publisher, when set, publishes instead of the machine agent: the runtime sets it when a documents adapter is
+	// declared, so a shared file becomes a document of that service, bound to its conversation (GitHub issue 26).
+	Publisher Publisher
+}
+
+// Publisher publishes one version of a file and answers its version and slug.
+type Publisher func(p Publication) (version int, slug string, fail *Failure)
+
+// Publication is one version of a file to publish.
+type Publication struct {
+	Title, Format, Content, Slug, Path, Conversation, Note string
 }
 
 // Service keeps the registry and watches the linked files.
@@ -238,6 +249,9 @@ func (s *Service) Publish(req Request) (State, *Failure) {
 
 // send posts a document to the agent and returns its version and slug.
 func (s *Service) send(title, format, content, slug, path, conversation, note string) (int, string, *Failure) {
+	if s.cfg.Publisher != nil {
+		return s.cfg.Publisher(Publication{Title: title, Format: format, Content: content, Slug: slug, Path: path, Conversation: conversation, Note: note})
+	}
 	body := map[string]any{
 		"title": title, "format": format, "content": content, "visibility": "private",
 		"source": map[string]string{"path": path, "conversation": conversation, "cwd": filepath.Dir(path)},

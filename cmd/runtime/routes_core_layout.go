@@ -162,6 +162,7 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 	if c.agents == nil {
 		deps.Agents = nil
 	}
+	deps.Delegate, deps.ChatTab = c.cliDelegate, c.chatTab
 	access := workspaceAccess(d)
 	deps.Browser = c.browserTool(d)
 	deps.Deliver = func(path, title string) (delivery.Info, *delivery.Refusal) {

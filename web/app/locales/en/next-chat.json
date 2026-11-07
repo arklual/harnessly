@@ -144,7 +144,7 @@
   "next.now.working": "Working",
   "next.plus.camera": "Camera",
   "next.plus.file": "File",
-  "next.plus.fileLimit": "up to 50 MB",
+  "next.plus.fileLimit": "any size",
   "next.plus.label": "Add",
   "next.plus.photo": "Photo or screenshot",
   "next.plus.photoLimit": "up to 10 MB",
@@ -494,5 +494,18 @@
   "next.message.copy": "Copy",
   "next.message.copied": "Copied",
   "next.tool.guarded": "The app {app} did not let “{tool}” run: rule {rule}",
-  "next.tool.guardedChat": "The chat's apps did not let “{tool}” run: rule {rule}"
+  "next.tool.guardedChat": "The chat's apps did not let “{tool}” run: rule {rule}",
+  "next.upload.network": "The connection dropped. Press «Retry» — the upload goes on from where it stopped",
+  "next.upload.noSpace": "The machine's disk has no room for this file",
+  "next.upload.noSpaceNumbers": "Not enough room on the machine: needs {need}, {free} free",
+  "next.transfer.unit.b": "B",
+  "next.transfer.unit.kb": "KB",
+  "next.transfer.unit.mb": "MB",
+  "next.transfer.unit.gb": "GB",
+  "next.transfer.unit.tb": "TB",
+  "next.transfer.perSecond": "{size}/s",
+  "next.transfer.of": "{sent} of {size}",
+  "next.transfer.leftSeconds": "{n} s left",
+  "next.transfer.leftMinutes": "{n} min left",
+  "next.transfer.leftHours": "{h} h {m} min left"
 }

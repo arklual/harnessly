@@ -71,6 +71,15 @@ The holes it closes, each a test of `internal/hub/authz`:
 - **One key, different limits per person** — a rule with `userId` and `accountId`.
 - **A tenant moved between organizations** — only by an admin of both. The old organization's limits are dropped; the
   journal stays.
+- **A machine moved between tenants** — by a manager of both tenants (`POST /api/machines/{id}/move`). The machine keeps
+  its id, key and history; its team and the access list are dropped (access becomes «owner»), and the people have to be
+  granted access again in the new tenant. The hub caps spend, not machines, so a move is never refused by count: spend
+  made after the move counts against the target tenant's [limit rules](limits.md), past spend stays in the old
+  tenant's history; the plan names how many rules each side has. Sites the machine made stay in the old tenant. A `dry_run` shows the plan and changes nothing.
+- **An empty tenant deleted** — by the tenant's manager (`DELETE /api/orgs/{org}/tenants/{spaceId}`). Machines, other
+  members, tenant grants, teams, active invites, sites and tenant environment entries all block it (409
+  `tenant_not_empty` with `details.blockers`); limit rules go with it, revoked machines are detached (no tenant, history
+  kept). `?dry_run=true` returns the plan.
 
 Every change of roles, membership, limits, accounts, access and environment is written to the journal with «было» and
 «стало», in the transaction of the change.
@@ -143,7 +152,7 @@ type Member = {
 };
 
 type AuditAction =
-  | 'org.create' | 'org.update' | 'tenant.move'
+  | 'org.create' | 'org.update' | 'tenant.move' | 'tenant.delete' | 'machine.move'
   | 'team.create' | 'team.update' | 'team.delete'
   | 'member.add' | 'member.remove' | 'member.primary'
   | 'grant.add' | 'grant.remove'
@@ -175,7 +184,10 @@ All need a session; `{org}` is the organization's id or slug.
 | `POST /api/orgs` | any (`shadow`: instance admin) | `{ name, spaceIds: string[], tenantName?: string }` (name 1–60; `spaceIds` may be empty; `tenantName` makes the first tenant, owned by the author: empty string means «Основное», absent means none, as before) | 201 `OrgView` — makes the organization, makes the author its admin, and moves the listed spaces into it: each must be a space the author owns and in no organization, else 403 `forbidden_scope` (`details.spaceId`) and nothing is made. One transaction, journal `org.create` and `tenant.move` per space |
 | `GET /api/orgs/{org}` | anyone with something in it | | `OrgView` — tenants and teams the person can view (a member: their tenant and their teams only) |
 | `PATCH /api/orgs/{org}` | org admin | `{ name?, timezone?, currency? }` | `{ org: Org }` |
+| `POST /api/orgs/{org}/tenants` | org admin | `{ name, requestId? }` (name 1–60; `requestId` 8–64 of `A-Za-z0-9_-`, one per press of «Дальше») | 201 `{ tenant: Tenant, space: Space }` — makes the tenant in the organization in one transaction, the author its owner; journal `tenant.create`. The same `requestId` again: 200 with the tenant it made, never a second one; a `requestId` that made a space elsewhere: 409 `conflict` `request_reused`. A failure leaves nothing |
 | `POST /api/orgs/{org}/tenants/move` | org admin who owns the space (or admin of the space's organization too) | `{ spaceId }` | `{ tenant: Tenant }`; journal `tenant.move` in both organizations |
+| `DELETE /api/orgs/{org}/tenants/{spaceId}` | manage of the tenant, which must belong to `{org}` | `?dry_run=true\|1` | `{ dry_run: true, plan }` or `{ deleted: true, plan }`; plan = `{ tenant, blockers: {kind,count}[], removes: {kind,count}[], canDelete }`; 409 `tenant_not_empty` while there are blockers; journal `tenant.delete` |
+| `POST /api/machines/{machineId}/move` | manage of the source and of the target tenant | `{ tenantId, teamId?, dry_run? }` | `{ dry_run: true, plan }` or `{ machine, moved, plan }`; never refused by machine count (`plan.limits`: rules of each side); 404 for a tenant the caller cannot see; journal `machine.move` in both tenants |
 | `GET /api/orgs/{org}/teams?tenant=<id>` | view of the tenant | | `{ teams: Team[] }` |
 | `POST /api/orgs/{org}/teams` | tenant admin and above | `{ tenantId, name }` | 201 `{ team: Team }` (slug from the name like spaces) |
 | `PATCH /api/orgs/{org}/teams/{teamId}` | lead of the team and above | `{ name }` | `{ team: Team }` |

@@ -12,6 +12,7 @@
     "06-debugging.md",
     "07-sharing.md",
     "08-worked-example.md",
-    "../apps.md"
+    "../apps.md",
+    "../apps/reference.md"
   ]
 }

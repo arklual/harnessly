@@ -78,7 +78,7 @@ export interface IAppMenuItem {
   danger?: boolean;
 }
 
-/** «…» of the page: about the app, the debug section of a dev install, turning the app off in this chat. */
+/** «…» of the page: about the app, its settings, the debug section, turning the app off or on in this chat. */
 const AppMenu = ({ items }: { items: readonly IAppMenuItem[] }) => {
   const actions = useMenuActions();
   if (items.length === 0) return null;
@@ -178,14 +178,19 @@ const FloatWindow = ({ title, float, section, state, onFloat, onLive, children }
 
 export interface IAppMainProps {
   title: string;
-  /** The chat's title under the app's; null without a chat. */
+  /** The app's glyph before its name; absent on a document's page. */
+  icon?: string;
+  /** The chat's title, for the column and the window; null without a chat. */
   chatTitle: string | null;
+  /** Under the app's name: which chat the app works in (the switch of Sinopia's chat head). */
+  chatSwitch?: ReactNode;
+  /** «Поделиться»: the link to the app for the team; absent on a document's page. */
+  onShare?: () => void;
   placement: TPlacement;
   float: IFloat | null;
   onPlacement: (placement: TPlacement, section: ISection) => void;
   onFloat: (float: IFloat) => void;
-  /** Back to the chat's own page; null without a chat. */
-  onBack: (() => void) | null;
+  /** The sidebar, on a phone only (Sinopia's chat head keeps the same button there). */
   onOpenDrawer: () => void;
   menu: readonly IAppMenuItem[];
   /** Before the title, at the head of the header: the switch between looking and editing. */
@@ -241,26 +246,31 @@ const AppMain = (props: IAppMainProps) => {
         >
           <Icon name="menu" />
         </button>
-        {props.onBack && (
-          <button
-            type="button"
-            className="hx-head-btn hx-tipped"
-            aria-label={t('next.appmain.back')}
-            onClick={props.onBack}
-          >
-            <Icon name="arrow-left" />
-            <span className="hx-tip" data-pos="below" data-align="start">
-              {t('next.appmain.back')}
-            </span>
-          </button>
-        )}
         {props.lead}
+        {props.icon && (
+          <span className="hx-appmain__tile" aria-hidden="true">
+            <Icon name={props.icon} />
+          </span>
+        )}
         <div className="hx-appmain__titles">
           <h1 className="hx-appmain__title">{props.title}</h1>
-          {props.chatTitle && <span className="hx-appmain__sub">{props.chatTitle}</span>}
+          {props.chatSwitch}
         </div>
         <span className="hx-spacer" />
         {hasChat && <PlacementSwitch value={placement} onChange={(p) => props.onPlacement(p, size())} />}
+        {props.onShare && (
+          <button
+            type="button"
+            className="hx-head-btn hx-tipped"
+            aria-label={t('next.appmain.share')}
+            onClick={props.onShare}
+          >
+            <Icon name="share" />
+            <span className="hx-tip" data-pos="below" data-align="end">
+              {t('next.appmain.share')}
+            </span>
+          </button>
+        )}
         <AppMenu items={props.menu} />
       </header>
       <div className="hx-appmain__body" ref={bodyRef}>

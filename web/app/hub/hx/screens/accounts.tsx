@@ -104,7 +104,7 @@ const Row = ({ a, sub, onOpen }: { a: Account; sub: string; onOpen: () => void }
     onClick={onOpen}
   >
     <span className="pt-name">
-      <span className="ad-ic">
+      <span className="hb-ic">
         <Icon i={a.discovered ? 'circle-alert' : a.kind === 'api_key' ? 'key-round' : 'coins'} size="sm" />
       </span>
       <span className="mt-name__t">
@@ -500,7 +500,7 @@ const Screen = () => {
 
   return (
     <>
-      <div className="ad-head ac-head">
+      <div className="hb-head ac-head">
         <Titles
           title="Аккаунты"
           lead={
@@ -583,7 +583,7 @@ const Screen = () => {
         label={shown?.label ?? 'Аккаунт'}
         lead={
           <span
-            className="ad-ic ac-lead"
+            className="hb-ic ac-lead"
             style={{ '--c': shown?.discovered ? '#c8830b' : '#8968f4' } as CSSProperties}
           >
             <Icon i={shown?.kind === 'api_key' ? 'key-round' : 'coins'} />

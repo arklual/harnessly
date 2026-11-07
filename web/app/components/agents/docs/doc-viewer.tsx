@@ -744,7 +744,7 @@ const DocViewer = ({
             {notConfigured ? null : isBoard && detail ? (
               <iframe
                 className="td-board"
-                src={detail.doc.url}
+                src={detail.doc.providerEmbed ? docContentSrc(slug, null) : detail.doc.url}
                 title={detail.doc.title}
                 allow="clipboard-read; clipboard-write; fullscreen"
               />

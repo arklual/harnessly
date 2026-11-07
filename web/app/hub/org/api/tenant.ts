@@ -44,7 +44,18 @@ export interface TenantInvite {
   role: TenantRole;
 }
 
+/** What deleting a tenant does (`DELETE /api/orgs/{org}/tenants/{id}`, `?dry_run=true` for the plan). */
+export interface TenantDeletePlan {
+  /** What keeps the tenant from being deleted: kind (machines, members, teams…) and how many. */
+  blockers: { kind: string; count: number }[];
+  /** What goes away with it. */
+  removes: { kind: string; count: number }[];
+  canDelete: boolean;
+}
+
 export interface TenantApi {
+  planDeleteTenant(org: string, spaceId: string): Promise<TenantDeletePlan>;
+  deleteTenant(org: string, spaceId: string): Promise<void>;
   /** Machines of the tenant, to wait for the one that dials in with a code. */
   spaceMachines(spaceId: string): Promise<SpaceMachine[]>;
   /** POST …/machines/codes. `full` needs the confirmation, a container may be off on this hub. */

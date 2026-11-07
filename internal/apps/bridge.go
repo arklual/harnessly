@@ -46,41 +46,8 @@ func denied(format string, a ...any) error {
 	return &BridgeError{Code: CodePermissionDenied, Message: fmt.Sprintf(format, a...)}
 }
 
-// methodPermission is the right a method of the bridge needs; "" is a method that needs none.
-var methodPermission = map[string]string{
-	"ui/initialize":                 "",
-	"ui/notifications/initialized":  "",
-	"ui/notifications/size-changed": "",
-	"ui/open-link":                  "",
-	"tools/call":                    "",
-	"ui/message":                    "chat.prompt",
-	"harnessly/chat.read":           "chat.read",
-	"harnessly/chat.card":           "chat.card",
-	"harnessly/pane.open":           "pane.open",
-	"harnessly/agents.list":         "agents.read",
-	"harnessly/storage.get":         "storage",
-	"harnessly/storage.set":         "storage",
-	"harnessly/storage.delete":      "storage",
-	"harnessly/storage.keys":        "storage",
-	"harnessly/settings.get":        "",
-	"harnessly/notify":              "notify",
-	"harnessly/files.read":          "files.read",
-	"harnessly/files.write":         "files.write",
-	"harnessly/ui.toast":            "",
-	"harnessly/ui.confirm":          "",
-	"harnessly/slot.done":           "",
-	"harnessly/sinopia.document":    "sinopia.read",
-	"harnessly/sinopia.selection":   "sinopia.read",
-	"harnessly/sinopia.node":        "sinopia.read",
-	"harnessly/sinopia.query":       "sinopia.read",
-	"harnessly/sinopia.fields":      "sinopia.read",
-	"harnessly/sinopia.mark":        "sinopia.read",
-	"harnessly/sinopia.patch":       "sinopia.write",
-	"harnessly/sinopia.setFields":   "sinopia.write",
-	"harnessly/sinopia.boards.add":  "sinopia.write",
-	"harnessly/sinopia.render":      "sinopia.export",
-	"harnessly/sinopia.comment":     "sinopia.comment",
-}
+// methodPermission is the right a method of the bridge needs; "" is a method that needs none. It is made from the
+// surface (surface.go).
 
 // ErrUnknownMethod: the bridge has no such method.
 var ErrUnknownMethod = errors.New("apps: unknown bridge method")

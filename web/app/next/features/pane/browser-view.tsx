@@ -52,8 +52,10 @@ export interface IBrowserViewProps {
   onPin: (pin: IPin) => void;
   onUnpin: (text: string) => void;
   reloadKey: number;
-  /** The iframe: the tab talks to the page in it (the stand's wall asks for «Войти»). */
-  onFrameLoad: (frame: HTMLIFrameElement) => void;
+  /** The iframe as it mounts, before its page loads: a page tells the tab things as it loads (its failure, a redirect). */
+  onFrame: (frame: HTMLIFrameElement | null) => void;
+  /** A page in the iframe has loaded: the tab talks to it (the stand's wall asks for «Войти»). */
+  onFrameLoad: () => void;
   /** The stand wants a sign-in (asked), or the person is signing in elsewhere (waiting). */
   signIn: TSignIn;
   onSignIn: () => void;
@@ -474,8 +476,11 @@ const BrowserView = (props: IBrowserViewProps) => {
           <div ref={stage} className="hx-tbrowser__stage" data-device={props.screen.device}>
             <iframe
               key={reloadKey}
-              ref={frame}
-              onLoad={(event) => props.onFrameLoad(event.currentTarget)}
+              ref={(el) => {
+                frame.current = el;
+                props.onFrame(el);
+              }}
+              onLoad={props.onFrameLoad}
               className="hx-tbrowser__frame"
               data-theme={props.theme}
               data-picking={props.picking === true || undefined}

@@ -445,7 +445,7 @@ func (c *call) launchShape() (*agents.Launch, bool) {
 			model = s
 		}
 	}
-	l, ok := agents.ReadLaunchShape(model, effort)
+	l, ok := agents.ReadProfileLaunchShape(profile, model, effort)
 	if ok && l != nil {
 		l.Profile = profile
 	}

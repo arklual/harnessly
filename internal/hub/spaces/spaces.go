@@ -25,7 +25,9 @@ import (
 const (
 	// maxOwnedSpaces is how many spaces one person may own; a guard against a script filling the database.
 	maxOwnedSpaces = 20
-	maxNameRunes   = 60
+	// MaxOwned is maxOwnedSpaces for the other ways a space is made (a tenant of an organization).
+	MaxOwned     = maxOwnedSpaces
+	maxNameRunes = 60
 )
 
 var onboardingSteps = map[string]bool{"machines": true, "agents": true, "access": true, "done": true}
@@ -185,6 +187,9 @@ type SpaceView struct {
 	CreatedAt      string `json:"createdAt"`
 	OnboardingStep string `json:"onboardingStep"`
 }
+
+// View is the space as the spaces endpoints answer it, for the other ways a space is made.
+func View(sp store.Space, role string) SpaceView { return view(sp, role) }
 
 func view(sp store.Space, role string) SpaceView {
 	return SpaceView{ID: sp.ID, Slug: sp.Slug, Name: sp.Name, Role: role, CreatedAt: httpx.Time(sp.CreatedAt), OnboardingStep: sp.OnboardingStep}

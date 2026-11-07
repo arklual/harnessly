@@ -39,7 +39,7 @@ const usePeriod = (): [OverviewPeriod, (p: OverviewPeriod) => void] => {
 };
 
 const PeriodSeg = ({ value, onChange }: { value: OverviewPeriod; onChange: (p: OverviewPeriod) => void }) => (
-  <div className="ad-tools">
+  <div className="hb-tools">
     <div className="hx-set__seg" role="radiogroup" aria-label="Период">
       {PERIODS.map((p) => (
         <button
@@ -78,7 +78,7 @@ const Head = ({
   period: OverviewPeriod;
   onPeriod: (p: OverviewPeriod) => void;
 }) => (
-  <div className="ad-head">
+  <div className="hb-head">
     <Titles title="Обзор" lead={overviewLead(role, { tenantName, teamName }, period)} />
     <PeriodSeg value={period} onChange={onPeriod} />
   </div>
@@ -122,7 +122,7 @@ const StaffView = ({
   return (
     <>
       {head}
-      <div className="dash ad-dash" data-busy={data ? undefined : '1'}>
+      <div className="dash hb-dash" data-busy={data ? undefined : '1'}>
         {error ? <LoadFailed error={error} retry={reload} /> : null}
         <div className="an-stage">
           <div className="mx">
@@ -173,7 +173,7 @@ const MemberScreen = ({ period, onPeriod }: ViewProps) => {
   return (
     <>
       {head}
-      <div className="dash ad-dash" data-busy={data ? undefined : '1'}>
+      <div className="dash hb-dash" data-busy={data ? undefined : '1'}>
         {error ? <LoadFailed error={error} retry={reload} /> : null}
         <div className="an-stage">
           <div className="mx">
