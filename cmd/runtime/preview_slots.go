@@ -27,6 +27,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preview"
 	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 	"github.com/ly-solutions/harnessly/web"
+	"golang.org/x/net/publicsuffix"
 )
 
 // A standalone runtime opens the right pane's preview itself, as the fleet gateway does in front of it: eight slot
@@ -661,14 +662,16 @@ func (s *previewSlots) enter(w http.ResponseWriter, r *http.Request, slot int, s
 	}
 	// A loopback slot counts as secure too: browsers keep Secure cookies on http://127.0.0.1 and localhost, and an
 	// app's view frame has an opaque origin, so every load from it is cross-site and a Lax cookie never comes along.
-	// Not partitioned there: the page and a loopback slot are one site, so the enter navigation lands in the
-	// same-site partition while the frame's loads ask for the cross-site one and would find no cookie.
+	// Not partitioned when the page and the slot are one site (a loopback slot, or public slots under the page's own
+	// domain, p1.example.com beside app.example.com): the enter navigation lands in the same-site partition while the
+	// frame's loads ask for the cross-site one and would find no cookie.
 	loopback := loopbackOrigin(ticket.origin)
 	secure := strings.HasPrefix(ticket.origin, "https:") || loopback
+	unpartitioned := loopback || sameSite(ticket.origin, ticket.app)
 	cookie := &http.Cookie{Name: s.slotCookie(slot, secure), Value: agent.SignPayload(secret, previewSlotAudience, ticket.fields(), previewSlotTTL),
 		Path: "/", HttpOnly: true, MaxAge: int(previewSlotTTL / time.Second), SameSite: http.SameSiteLaxMode}
 	if secure {
-		cookie.Secure, cookie.SameSite, cookie.Partitioned = true, http.SameSiteNoneMode, !loopback
+		cookie.Secure, cookie.SameSite, cookie.Partitioned = true, http.SameSiteNoneMode, !unpartitioned
 	}
 	http.SetCookie(w, cookie)
 	h.Set("Location", path)
@@ -831,6 +834,26 @@ func previewBridgeFromWeb() func() ([]byte, bool) {
 }
 
 // loopbackOrigin: http://127.0.0.1:<port>, http://[::1]:<port> or http://localhost:<port>.
+// sameSite says whether two origins are one site for the browser: the same scheme and the same registrable domain
+// (eTLD+1 by the public suffix list), or the same host where there is none (an IP address, localhost).
+func sameSite(a, b string) bool {
+	ua, err := url.Parse(a)
+	if err != nil || ua.Hostname() == "" {
+		return false
+	}
+	ub, err := url.Parse(b)
+	if err != nil || ub.Hostname() == "" || ua.Scheme != ub.Scheme {
+		return false
+	}
+	site := func(host string) string {
+		if s, err := publicsuffix.EffectiveTLDPlusOne(host); err == nil {
+			return s
+		}
+		return host
+	}
+	return strings.EqualFold(site(ua.Hostname()), site(ub.Hostname()))
+}
+
 func loopbackOrigin(origin string) bool {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "http" {
