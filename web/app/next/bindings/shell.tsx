@@ -47,6 +47,7 @@ import { BrowserProfileAskHost } from '@/next/bindings/browser-profile-asks';
 import { BrowserLoginAskHost } from '@/next/bindings/browser-login-asks';
 import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { useNotices } from '@/next/bindings/notices';
+import { listenChatHandoff } from '@/next/features/app-views/chat-handoff';
 import { useNotify } from '@/next/stores/notices';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { useMessageSearch } from '@/next/bindings/use-message-search';
@@ -281,6 +282,8 @@ const Shell = ({ owner }: IShellProps) => {
   useEffect(() => {
     if (!onSite) restoreRailAfterDesign();
   }, [onSite]);
+  // A chat a view asks for from an app's own page (on another screen, say) comes to the page that had the focus last.
+  useEffect(() => listenChatHandoff(), []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationsState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -967,7 +970,7 @@ const Shell = ({ owner }: IShellProps) => {
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
         <AppMainPage
-          key={`${route.id}/${route.chat ?? ''}/${tabs.activeId}`}
+          key={`${route.id}/${tabs.activeId}`}
           machine={model.active}
           id={route.id}
           chat={route.chat ?? null}

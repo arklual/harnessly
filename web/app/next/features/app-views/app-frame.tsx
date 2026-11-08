@@ -26,6 +26,7 @@ import { watchLoads } from '@/next/features/app-views/frame-loads';
 import { chatOf, useHostHandlers } from '@/next/features/app-views/host-handlers';
 import { useConversation } from '@/next/stores/conversations';
 import { openAppTab } from '@/next/features/app-views/open';
+import { openChat, openWork } from '@/next/features/app-views/chat-handoff';
 import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
 import { toast } from '@/next/ui/toast';
@@ -75,6 +76,8 @@ export interface IAppFrameProps {
   /** The port of the view server (installed apps' `viewPort`). */
   viewPort: number;
   conversation: ConvId | null;
+  /** The chat shown beside the view when it is not the one the view's session is for; defaults to conversation. */
+  shownChat?: ConvId | null;
   /** For a card: the data its tool returned. */
   data?: unknown;
   /** What the host adds or replaces: the chat's reading, a flow, a confirm dialog… */
@@ -117,6 +120,7 @@ const AppFrame = ({
   target,
   viewPort,
   conversation,
+  shownChat,
   data,
   handlers,
   fit = false,
@@ -185,11 +189,12 @@ const AppFrame = ({
       theme: viewTheme(resolvedTheme === 'dark' ? 'dark' : 'light'),
       locale: locale(),
       chat: chat ? { id: chat } : null,
+      shown: (shownChat === undefined ? conversation : shownChat) ? { chat: (shownChat ?? conversation) as string } : null,
       user: null,
       ...(readOnly ? { readOnly } : {}),
       ...(data === undefined ? {} : { data }),
     }),
-    [app.id, app.version, target, view.id, resolvedTheme, chat, data, readOnly],
+    [app.id, app.version, target, view.id, resolvedTheme, chat, conversation, shownChat, data, readOnly],
   );
   const latest = useRef({ context, onBridgeCall, onSinopiaCall });
   useEffect(() => {
@@ -253,8 +258,11 @@ const AppFrame = ({
         sendMessage(machine, { conversationId: chatOf(conversation, on), text: fromApp(app.name, text) });
       },
       paneOpen: async (to) => {
+        const chatTo = /^chat:(.+)$/.exec(to);
+        if (chatTo && (await openChat(chatTo[1], app.id))) return;
+        if (/^(resume|new|stop!?):/.test(to) && (await openWork(to, app.id, machine))) return;
         if (!openAppTab(to))
-          throw new BridgeError('invalid_params', 'only app:<id>[/<view>] opens from a view for now');
+          throw new BridgeError('invalid_params', 'only app:<id>[/<view>], chat:<id>, resume:<id> and new:<provider>:<project> open from a view for now');
       },
       sinopia: async (method, params) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');

@@ -2,12 +2,13 @@
 // beside it (a column, a window or its field at the foot — the viewer's choice, kept), and the page's «…» holds the
 // app's rights, the debug section of a dev install and turning the app off in this chat. Without a chat the app stands
 // alone.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import AppAsks from '@/next/features/app-views/asks';
 import AppFrame from '@/next/features/app-views/app-frame';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import AppInspector from '@/next/features/app-views/inspector';
 import { onOpenAppTab } from '@/next/features/app-views/open';
+import { switchedByView } from '@/next/features/app-views/chat-handoff';
 import { parseAppTarget } from '@/next/features/app-views/target';
 import AppIsland from '@/next/features/app-main/app-island';
 import AppMain, { type IAppMenuItem } from '@/next/features/app-main/app-main';
@@ -91,6 +92,11 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
   const [inspector, setInspector] = useState<'closed' | 'about' | 'debug'>('closed');
   const [reload, setReload] = useState(0);
   const chatApps = useChatApps(machine, conv);
+  // The chat the view's session is for. It follows the page's chat, except to a chat the view itself asked for: then
+  // the view stays as it is, with no new session and no reload, and is only told the chat beside it (shownChat).
+  const shownConv = record !== undefined && conv !== null ? conv : null;
+  const sessionConv = useRef<ConvId | null>(shownConv);
+  if (shownConv !== sessionConv.current && !switchedByView(id, shownConv)) sessionConv.current = shownConv;
 
   const app = list?.apps.find((a) => a.id === id) ?? null;
   const view = app?.views.find((v) => v.targets.includes('app')) ?? null;
@@ -183,7 +189,8 @@ const AppMainPage = ({ machine: screen, id, chat, onOpenDrawer }: IAppMainPagePr
             view={view}
             target="app"
             viewPort={list.viewPort}
-            conversation={onChat ? conv : null}
+            conversation={sessionConv.current}
+            shownChat={onChat ? conv : null}
             reloadToken={reload}
           />
         }
