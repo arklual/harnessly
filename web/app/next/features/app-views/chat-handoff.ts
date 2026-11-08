@@ -28,11 +28,14 @@ const me = Math.random().toString(36).slice(2);
 // The chats an app's own page moved to because its view asked: the page keeps the view as it is for them (no new
 // session, no reload) and only tells it which chat is beside it now.
 const viewSwitches = new Set<string>();
-export const switchedByView = (appId: string, chat: string | null) => chat !== null && viewSwitches.has(`${appId}|${chat}`);
+export const switchedByView = (appId: string, chat: string | null) =>
+  chat !== null && viewSwitches.has(`${appId}|${chat}`);
 let lastFocus = 0;
 
 const appPage = (): string | null => {
-  const m = /^\/apps\/([^/?#]+)/.exec(window.location.pathname.slice(appBasePath().replace(/\/+$/, '').length));
+  const m = /^\/apps\/([^/?#]+)/.exec(
+    window.location.pathname.slice(appBasePath().replace(/\/+$/, '').length),
+  );
   return m ? decodeURIComponent(m[1] ?? '') : null;
 };
 const onAppPage = () => appPage() !== null;
@@ -57,7 +60,8 @@ export const listenChatHandoff = (): (() => void) => {
   ch.onmessage = (event: MessageEvent<Msg>) => {
     const m = event.data;
     if (!m || typeof m !== 'object') return;
-    if (m.t === 'who' && !onAppPage()) ch.postMessage({ t: 'here', ask: m.ask, from: me, focus: lastFocus } satisfies Msg);
+    if (m.t === 'who' && !onAppPage())
+      ch.postMessage({ t: 'here', ask: m.ask, from: me, focus: lastFocus } satisfies Msg);
     if (m.t === 'go' && m.to === me && CHAT_ID.test(m.id)) {
       goTo({ kind: ROUTE.chat, id: m.id });
       window.focus();
@@ -82,8 +86,13 @@ export const openWork = async (target: string, appId: string, machine: MachineId
     const id = stop[2] as ConvId;
     const stopped = await stopTerminal(machine, id, stop[1] === '!').done;
     const record = conversationsStore.get(id);
-    if (stopped.k === 'failed' && stopped.failure.r === 'refused' && stopped.failure.code === 'unsupported' &&
-        record && record.lastTurn === null) {
+    if (
+      stopped.k === 'failed' &&
+      stopped.failure.r === 'refused' &&
+      stopped.failure.code === 'unsupported' &&
+      record &&
+      record.lastTurn === null
+    ) {
       await settled(deleteConversation(machine, id, true)).catch((e: unknown) => {
         throw new BridgeError('policy_blocked', e instanceof Error ? e.message : String(e));
       });
@@ -109,7 +118,11 @@ export const openWork = async (target: string, appId: string, machine: MachineId
     const cwd = defaultCwdStore.get(machine);
     const where = fresh[2] !== '-' ? { projectId: fresh[2] } : cwd ? { cwd } : null;
     if (!where) return false;
-    const created = createConversation(machine, { where, provider: fresh[1] as 'claude' | 'codex', model: null });
+    const created = createConversation(machine, {
+      where,
+      provider: fresh[1] as 'claude' | 'codex',
+      model: null,
+    });
     const id = await created.conversation;
     return id ? openChat(id, appId) : false;
   }
