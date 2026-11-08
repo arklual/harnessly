@@ -283,7 +283,9 @@ const AppFrame = ({
       theme: viewTheme(resolvedTheme === 'dark' ? 'dark' : 'light'),
       locale: locale(),
       chat: chat ? { id: chat } : null,
-      shown: (shownChat === undefined ? conversation : shownChat) ? { chat: (shownChat ?? conversation) as string } : null,
+      shown: (shownChat === undefined ? conversation : shownChat)
+        ? { chat: (shownChat ?? conversation) as string }
+        : null,
       user: null,
       ...(readOnly ? { readOnly } : {}),
       ...(data === undefined ? {} : { data }),
@@ -462,7 +464,10 @@ const AppFrame = ({
         }
         if (/^(resume|new|stop!?):/.test(to) && (await openWork(to, app.id, machine))) return;
         if (!openAppTab(to))
-          throw new BridgeError('invalid_params', 'only app:<id>[/<view>], chat:<id>, resume:<id> and new:<provider>:<project> open from a view');
+          throw new BridgeError(
+            'invalid_params',
+            'only app:<id>[/<view>], chat:<id>, resume:<id> and new:<provider>:<project> open from a view',
+          );
       },
       sinopia: async (method, params) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
