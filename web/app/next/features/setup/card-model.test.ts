@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readBaseView, readSetupView, withBase, type ISetupView } from '@/next/features/setup/api';
-import { ACTION, INSIDE_MAX, MARK, cardOf } from '@/next/features/setup/card-model';
+import { ACTION, INSIDE_MAX, MARK, STEP_ACT, cardOf } from '@/next/features/setup/card-model';
 import { t } from '@/next/i18n';
 
 const view = (items: unknown[], extra: Record<string, unknown> = {}): ISetupView =>
@@ -43,6 +43,25 @@ describe('the setup card', () => {
     expect(c.steps[0]?.name).toBe('broken');
     expect(c.more).toBe(repos.length - INSIDE_MAX);
     expect(c.title).not.toBe(cardOf(view([item('x', 'repo', 'pending')]), null).title);
+  });
+
+  it('makes a waiting key and a failed step pressable, and shows the picked failure on the line', () => {
+    const c = cardOf(
+      view([
+        item('gitlab', 'access', 'pending', { secret: 'gitlab-token' }),
+        item('one', 'access', 'error', { message: 'первая' }),
+        item('two', 'access', 'error', { message: 'вторая' }),
+        item('ok', 'access', 'ok'),
+      ]),
+      null,
+      'two',
+    );
+    const act = Object.fromEntries(c.steps.map((s) => [s.name, s.act]));
+    expect(act).toEqual({ one: STEP_ACT.focus, two: STEP_ACT.focus, gitlab: STEP_ACT.safe, ok: null });
+    expect(c.line.title).toContain('two');
+    expect(c.line.rest).toBe('вторая');
+    expect(c.line.long).toBe(true);
+    expect(c.steps.find((s) => s.focused)?.name).toBe('two');
   });
 
   it('shows a picked stage instead of the current one', () => {

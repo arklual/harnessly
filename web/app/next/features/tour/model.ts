@@ -23,6 +23,18 @@ export interface ITourNeed {
   back: string;
 }
 
+/** What the person has to do before the step itself can be done, when that takes more than the step's own click. */
+export interface ITourStage {
+  /** Its text: `next.tour.stage.<id>` (and `.action` for the button). */
+  id: string;
+  /** The element to ring now. */
+  target: readonly string[];
+  /** A button of the card that does it for the person. */
+  action?: 'clear' | 'restoreDemo';
+  /** Words for the text. */
+  vars?: Record<string, string>;
+}
+
 export interface ITourStep {
   /** Its texts: `<track>.<id>.title` and `<track>.<id>.text` in next-tour.json. */
   id: string;
@@ -47,6 +59,8 @@ export interface ITourStep {
   /** The step makes no sense here (no agent to answer): it is passed over. */
   skip?: (env: ITourEnv) => boolean;
   needs?: ITourNeed;
+  /** The way to the step's element when the product hides it (a folder, a filter): null when it is in sight. */
+  stage?: (env: ITourEnv) => ITourStage | null;
   /** What the card must not cover beside the ring (the whole field whose button is ringed). */
   avoid?: readonly string[];
   /** A request of the step goes on the cheapest model the machine has (Haiku), unless the person picked one. */

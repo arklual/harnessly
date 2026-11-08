@@ -30,6 +30,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/selfupdate"
+	"github.com/ly-solutions/harnessly/internal/storelink"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/updatecheck"
@@ -129,6 +130,9 @@ type runtimeGate struct {
 	self *selfupdate.Updater
 	// envSetup does the machine setup of the hub's environment list, one runner per link folder; none when it is off.
 	envSetup []*envsetup.Runner
+	// library is the folder of the Sinopia library, store the store it syncs with (nil: none, docs/hub/store.md).
+	library func() string
+	store   *storelink.Link
 }
 
 // configFileOf is the runtime's config (the pair's secret, the person's settings).
@@ -507,7 +511,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		f.Add(upstreamGuard(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, previewOf(d).proxy.Matches))
 	}
 	rg := &runtimeGate{Gate: f, terms: terms, browser: remoteBrowser, agentBrowser: agentBrowser, core: ref, tmux: tm, home: home, self: self,
-		envSetup: setupRunners}
+		envSetup: setupRunners, library: func() string { return designAPI(d).L.Root() }}
 	if checkOn {
 		rg.update = checker
 	}
@@ -600,6 +604,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	f.startUpdateCheck(ctx)
 	f.startEnvSetup(ctx)
+	defer f.startStore(ctx, cfg)()
 	go watchBasepkg(ctx, cfg.DataDir)
 	// A GPT switch left on brings its proxy up again.
 	if a := f.core.c.agents; a != nil && a.gpt != nil {

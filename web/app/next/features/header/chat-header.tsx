@@ -11,29 +11,29 @@ import {
   type IHeaderBackground,
   type IHeaderToggle,
 } from '@/next/features/header/header-buttons';
+import MachineCard from '@/next/features/sidebar/machine-card';
 import {
-  MACHINE_HEALTH,
   type IChatActions,
+  type IMachineCard,
+  type IMachineChoice,
   type ISidebarChat,
   type ISidebarProject,
-  type TMachineHealth,
 } from '@/next/features/sidebar/types';
 import '@/next/styles/delegation.css';
 
-const HEALTH_LABEL: Record<TMachineHealth, string> = {
-  [MACHINE_HEALTH.ok]: t('next.machine.ok'),
-  [MACHINE_HEALTH.warn]: t('next.machine.warn'),
-  [MACHINE_HEALTH.critical]: t('next.machine.critical'),
-  [MACHINE_HEALTH.bad]: t('next.machine.bad'),
-  [MACHINE_HEALTH.off]: t('next.machine.off'),
-};
-
+/** The machine the window works on, in the header of a chat and of the start page: its card with the load and
+ *  what is wrong on hover, the other machines to move to on a click. */
 export interface IHeaderMachine {
-  name: string;
-  health: TMachineHealth;
-  /** What is wrong, said under the name on hover. */
-  issue: string | null;
+  /** null while the machines load, or when none is chosen: the card says so and still offers the others. */
+  card: IMachineCard | null;
+  others: readonly IMachineChoice[];
+  onPick?: (id: string) => Promise<void>;
+  onManage?: () => void;
+  /** Each new value opens the card pinned (the banner's «Подробнее», a notification). */
+  reveal?: number;
 }
+
+const MACHINE_KEY = 'machine';
 
 export type { IHeaderBackground };
 
@@ -42,7 +42,7 @@ export interface IChatHeaderProps {
   chat: ISidebarChat | null;
   projects: readonly ISidebarProject[] | null;
   actions: IChatActions;
-  machine: IHeaderMachine | null;
+  machine: IHeaderMachine;
   drawerOpen: boolean;
   onOpenDrawer: () => void;
   onNewChat?: () => void;
@@ -115,9 +115,8 @@ const ChatHeader = ({
     if (chat) void run(chat.id, failure, () => action(chat.id));
   };
 
-  const machineLabel = machine
-    ? [`${machine.name} · ${HEALTH_LABEL[machine.health]}`, machine.issue].filter(Boolean).join('. ')
-    : '';
+  const [pickedMachine, setPickedMachine] = useState<string | null>(null);
+  const switching = pending.get(MACHINE_KEY);
 
   return (
     <header className="hx-header" data-busy={busy !== undefined || undefined}>
@@ -244,21 +243,26 @@ const ChatHeader = ({
         )}
       </div>
 
-      {/* The machine always shows (HRN-870): a green dot when it is fine, its state and trouble on hover */}
-      {machine && (
-        <span
-          className="hx-headmach hx-tipped"
-          data-health={machine.health}
-          tabIndex={0}
-          aria-label={machineLabel}
-        >
-          <Icon name="server" size="sm" />
-          <span className="hx-headmach__dot" />
-          <span className="hx-tip" data-pos="below">
-            {machineLabel}
-          </span>
-        </span>
-      )}
+      {/* The machine always shows (HRN-870), with all about it in its card (HRN-891): on a chat and on the start page */}
+      <div className="hx-headmach-card">
+        <MachineCard
+          machine={machine.card}
+          others={machine.others}
+          switching={switching && pickedMachine ? { id: pickedMachine, pending: switching } : null}
+          onPick={
+            machine.onPick
+              ? (id) => {
+                  const pick = machine.onPick;
+                  if (!pick) return;
+                  setPickedMachine(id);
+                  void run(MACHINE_KEY, t('next.sidebar.machineFailed'), () => pick(id));
+                }
+              : undefined
+          }
+          onManage={machine.onManage}
+          reveal={machine.reveal}
+        />
+      </div>
 
       <span className="hx-spacer" />
 

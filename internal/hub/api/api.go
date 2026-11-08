@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/hub/analytics"
 	"io/fs"
 	"log/slog"
@@ -40,6 +41,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/sshinstall"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/storehub"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
@@ -87,6 +89,9 @@ type Options struct {
 	Publisher machines.Publisher
 	// SafeKV replaces the server of the machines' safes that HUB_SECRETS_VAULT_* name (tests).
 	SafeKV secrets.KV
+	// StoreMeta and StoreBlobs replace the store's configured drivers (tests); the hub does not close them.
+	StoreMeta  filestore.MetaStore
+	StoreBlobs filestore.BlobStore
 }
 
 // Hub is the assembled hub.
@@ -128,6 +133,8 @@ type Hub struct {
 	Ext *ext.Registry
 	// Safe keeps the machines' safes on the hub's server; nil when HUB_SECRETS_VAULT_ADDR is not set.
 	Safe *hubsafe.Broker
+	// Store keeps the spaces' collections the machines sync with (docs/hub/store.md); nil when HUB_STORE=off.
+	Store *storehub.Store
 
 	cfg     *config.Config
 	db      *store.DB
@@ -312,6 +319,9 @@ func New(o Options) (*Hub, error) {
 	if err := h.newSites(o); err != nil {
 		return nil, err
 	}
+	if err := h.newStore(o); err != nil {
+		return nil, err
+	}
 
 	var page http.Handler
 	switch {
@@ -360,6 +370,9 @@ func New(o Options) (*Hub, error) {
 		if !h.Sites.Subdomains() {
 			mux.Handle("/sites/", h.Sites.PathEdge())
 		}
+	}
+	if h.Store != nil {
+		h.Store.Mount(mux)
 	}
 	if c := h.Registry.Cluster(); c != nil {
 		mux.Handle("/internal/replica/v1/", c.Handler())
@@ -502,6 +515,7 @@ func newProvider(cfg *config.Config) (provider.Provider, error) {
 
 // Shutdown ends the open event streams, agent links and SSH installs, which would otherwise hold the server from stopping.
 func (h *Hub) Shutdown() {
+	defer h.Store.Close()
 	h.Events.Close()
 	h.OrgEvents.Close()
 	// Before the services the links' routines call (usage, environment): the dialer ends the links and waits for them.

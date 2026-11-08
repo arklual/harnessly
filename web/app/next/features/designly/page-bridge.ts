@@ -121,6 +121,8 @@ export type TBridgeMessage =
   /** The page is on its way: it has taken `resources` files so far. */
   | { k: 'progress'; state: TDocState; resources: number }
   | { k: 'lib-ready' }
+  /** The board's script saw the page drawn: its root filled, its fonts, pictures and videos in. */
+  | { k: 'drawn' }
   | { k: 'tweaks'; controls: ITweak[] }
   | { k: 'tweaks-panel'; open: boolean }
   | { k: 'picked'; picked: IPicked }
@@ -255,6 +257,7 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
   const m = data as Record<string, unknown>;
   if (m.type === 'tk:hello') return { k: 'hello' };
   if (m.type === 'tk:lib-ready') return { k: 'lib-ready' };
+  if (m.type === 'tk:drawn') return { k: 'drawn' };
   if (m.type === 'tk:images-hello') return { k: 'images-hello' };
   if (m.type === 'tk:image-act') {
     const act = readImageAct(m);

@@ -148,3 +148,69 @@ func TestMaskerCatchesAValueSplitBetweenWrites(t *testing.T) {
 		t.Fatalf("short values are not masked, nothing is held: %q", out.String())
 	}
 }
+
+// codeRuntime answers a code ask: waiting once, then the given status (with the code when ready).
+func codeRuntime(t *testing.T, end string) (*httptest.Server, *[]string) {
+	t.Helper()
+	var mu sync.Mutex
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		calls = append(calls, r.URL.Path+" "+string(raw))
+		n := len(calls)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/cli/secrets/use":
+			_ = json.NewEncoder(w).Encode(map[string]any{"values": map[string]string{"gitlab-token": cliFakeValue}})
+		case "/api/cli/secrets/code":
+			_, _ = w.Write([]byte(`{"id":"sc_1","until":9999999999999}`))
+		case "/api/cli/secrets/code/wait":
+			if n < 3 {
+				_, _ = w.Write([]byte(`{"status":"waiting"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"` + end + `","value":"` + map[bool]string{true: "407193"}[end == "ready"] + `"}`))
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &calls
+}
+
+func TestSecretRunWaitsForACodeAndRunsWithIt(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no sh")
+	}
+	srv, calls := codeRuntime(t, "ready")
+	r := runSafe(t, srv.URL, "secret", "run", "--code", "OTP", "--why", "npm publish vizloom", "--env", "TOKEN=gitlab-token",
+		"--", "sh", "-c", `echo "otp=$OTP len=${#OTP} tok=${#TOKEN}"`)
+	if r.code != 0 || strings.Contains(r.out+r.errs, "407193") || !strings.Contains(r.out, "otp=•••••• len=6 tok=26") {
+		t.Fatalf("code run: %d %q %q", r.code, r.out, r.errs)
+	}
+	if !strings.Contains(r.errs, "waiting for a code") {
+		t.Fatalf("no word of the wait: %q", r.errs)
+	}
+	if !strings.Contains((*calls)[1], `"digits":6`) || !strings.Contains((*calls)[1], `"why":"npm publish vizloom"`) {
+		t.Fatalf("open: %v", *calls)
+	}
+
+	srv, _ = codeRuntime(t, "cancelled")
+	r = runSafe(t, srv.URL, "secret", "run", "--code", "OTP", "--why", "x", "--", "sh", "-c", "echo ran")
+	if r.code != 1 || strings.Contains(r.out, "ran") || !strings.Contains(r.errs, "cancelled") {
+		t.Fatalf("cancelled: %d %q %q", r.code, r.out, r.errs)
+	}
+	for _, bad := range [][]string{
+		{"--code", "OTP", "--", "true"},
+		{"--code", "1x", "--why", "x", "--", "true"},
+		{"--code", "OTP", "--why", "x", "--digits", "3", "--", "true"},
+		{"--code", "OTP", "--why", "x", "--wait", "2h", "--", "true"},
+		{"--why", "x", "--env", "T=gitlab-token", "--", "true"},
+	} {
+		if r := runSafe(t, srv.URL, append([]string{"secret", "run"}, bad...)...); r.code != 2 {
+			t.Fatalf("%v: %d %q", bad, r.code, r.errs)
+		}
+	}
+}

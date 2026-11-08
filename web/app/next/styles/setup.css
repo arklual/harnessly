@@ -153,6 +153,34 @@
 .hx-setup__rest {
   color: var(--hx-fg-3);
 }
+/* An error of a machine is one line until «Подробнее»: a log does not stretch the card. */
+.hx-setup__rest[data-long='true'] {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hx-setup__rest[data-long='true'][data-open='true'] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+}
+.hx-setup__more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.hx-setup__more:hover {
+  color: var(--hx-fg-1);
+}
 .hx-setup__say b {
   display: block;
   color: var(--hx-fg-1);
@@ -349,6 +377,14 @@
 .hx-chain {
   display: flex;
   flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hx-chain__node {
+  flex: none;
+}
+.hx-chain__label {
+  white-space: nowrap;
 }
 .hx-chain__n {
   margin-left: -2px;
@@ -450,6 +486,23 @@
 }
 .hx-inside__it[data-s='fail'] .hx-inside__m {
   border: 0;
+}
+.hx-inside__it[data-act='true'] {
+  margin: -3px -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 3px;
+}
+.hx-inside__it[data-act='true']:hover,
+.hx-inside__it[data-focus='true'] {
+  background: var(--hx-bg-hover);
 }
 .hx-inside__it[data-stuck='true'] {
   color: var(--hx-warning);

@@ -7,10 +7,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -33,6 +35,8 @@ var secretReasons = map[string]string{
 	"denied":       "the safe's server refused this machine's login or this path: tell the person, do not retry",
 	"unavailable":  "the safe's server does not answer or is not set up right: tell the person, try again later",
 	"read-only":    "a vault: reference is read only: it is changed on the server, not through the safe",
+	"bad-code":     "a code is 4 to 8 digits (--digits)",
+	"no-chat":      "a code is asked only from a chat of this machine: the person types it in that chat's panel",
 }
 
 const (
@@ -175,8 +179,8 @@ func (c *cli) secretAsk(args []string) error {
 				v = args[i]
 			}
 			n, err := strconv.Atoi(v)
-			if err != nil || n < 0 || n > 600 {
-				return usageErr("--wait takes seconds, 0 to 600")
+			if err != nil || n < 0 || n > 1800 {
+				return usageErr("--wait takes seconds, 0 to 1800")
 			}
 			wait = time.Duration(n) * time.Second
 		case strings.HasPrefix(a, "-"):
@@ -227,7 +231,7 @@ func (c *cli) secretAsk(args []string) error {
 			if !r.PageOpen {
 				where = "the person's page is not open now: the card waits there for 30 minutes"
 			}
-			c.out("waiting: %s — %s. Run the same command again to keep waiting.\n", name, where)
+			c.out("waiting: %s — %s. Run the same command again to keep waiting (in the background with --wait 1800, its end wakes you).\n", name, where)
 			return nil
 		}
 	}
@@ -242,14 +246,77 @@ func pair(v string) (env, name string, ok bool) {
 	return env, name, envNameRe.MatchString(env) && name != ""
 }
 
+// codeAsk is a one-time code run waits for before it starts the command: the person types it in the chat's panel.
+type codeAsk struct {
+	env, why string
+	digits   int
+	wait     time.Duration
+}
+
+// flagValue is the value of --flag VALUE or --flag=VALUE at args[*i].
+func flagValue(args []string, i *int, flag string) (string, bool, error) {
+	a := args[*i]
+	if v, ok := strings.CutPrefix(a, flag+"="); ok {
+		return v, true, nil
+	}
+	if a != flag {
+		return "", false, nil
+	}
+	if *i+1 >= len(args) {
+		return "", true, usageErr("%s needs a value", flag)
+	}
+	*i++
+	return args[*i], true, nil
+}
+
 func (c *cli) secretRun(args []string) error {
 	envs, files := map[string]string{}, map[string]string{}
+	code := codeAsk{digits: 6, wait: 10 * time.Minute}
 	var cmd []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
 			cmd = args[i+1:]
 			break
+		}
+		if v, ok, err := flagValue(args, &i, "--code"); ok {
+			if err != nil {
+				return err
+			}
+			if !envNameRe.MatchString(v) || code.env != "" {
+				return usageErr("secret run: --code takes one variable name, e.g. --code OTP")
+			}
+			code.env = v
+			continue
+		}
+		if v, ok, err := flagValue(args, &i, "--why"); ok {
+			if err != nil {
+				return err
+			}
+			code.why = v
+			continue
+		}
+		if v, ok, err := flagValue(args, &i, "--digits"); ok {
+			if err != nil {
+				return err
+			}
+			n, e := strconv.Atoi(v)
+			if e != nil || n < 4 || n > 8 {
+				return usageErr("--digits takes 4 to 8")
+			}
+			code.digits = n
+			continue
+		}
+		if v, ok, err := flagValue(args, &i, "--wait"); ok {
+			if err != nil {
+				return err
+			}
+			d, e := time.ParseDuration(v)
+			if e != nil || d < time.Minute || d > 30*time.Minute {
+				return usageErr("--wait takes a duration from 1m to 30m (10m)")
+			}
+			code.wait = d
+			continue
 		}
 		var target map[string]string
 		v := ""
@@ -277,9 +344,76 @@ func (c *cli) secretRun(args []string) error {
 		}
 		target[env] = name
 	}
-	if len(cmd) == 0 || len(envs)+len(files) == 0 {
+	if len(cmd) == 0 || len(envs)+len(files) == 0 && code.env == "" {
 		return usageErr("secret run needs a secret and a command: harnessly secret run --env VAR=NAME -- COMMAND ARGS...")
 	}
+	if code.env != "" && strings.TrimSpace(code.why) == "" {
+		return usageErr("secret run --code needs --why: what the code is for, as the person sees it (\"npm publish vizloom\")")
+	}
+	if code.env == "" && code.why != "" {
+		return usageErr("secret run: --why goes with --code")
+	}
+	values := map[string]string{}
+	if len(envs)+len(files) > 0 {
+		v, err := c.secretValues(envs, files)
+		if err != nil {
+			return err
+		}
+		values = v
+	}
+	environ := os.Environ()
+	if c.env.Environ != nil {
+		environ = c.env.Environ()
+	}
+	masked := make([]string, 0, len(values)+1)
+	for _, v := range values {
+		masked = append(masked, v)
+	}
+	if code.env != "" {
+		value, err := c.waitCode(code)
+		if err != nil {
+			return err
+		}
+		environ = append(environ, code.env+"="+value)
+		masked = append(masked, value)
+	}
+	for v, n := range envs {
+		environ = append(environ, v+"="+values[n])
+	}
+	if len(files) > 0 {
+		dir, err := os.MkdirTemp("", "harnessly-secret-")
+		if err != nil {
+			return err
+		}
+		defer func() { _ = os.RemoveAll(dir) }()
+		for v, n := range files {
+			p := dir + string(os.PathSeparator) + v
+			if err := os.WriteFile(p, []byte(values[n]), 0o600); err != nil {
+				return err
+			}
+			environ = append(environ, v+"="+p)
+		}
+	}
+	stdout, stderr := newMasker(c.env.Stdout, masked), newMasker(c.env.Stderr, masked)
+	child := exec.Command(cmd[0], cmd[1:]...)
+	child.Env = environ
+	child.Stdin = c.env.Stdin
+	child.Stdout, child.Stderr = stdout, stderr
+	err := child.Run()
+	stdout.Flush()
+	stderr.Flush()
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &exit):
+		return exitCode(max(exit.ExitCode(), 1))
+	}
+	return fail("secret run: %v", err)
+}
+
+// secretValues reads the named secrets of run from the safe.
+func (c *cli) secretValues(envs, files map[string]string) (map[string]string, error) {
 	seen := map[string]bool{}
 	var names []string
 	for _, m := range []map[string]string{envs, files} {
@@ -293,58 +427,80 @@ func (c *cli) secretRun(args []string) error {
 	sort.Strings(names)
 	status, raw, err := c.call("POST", "/api/cli/secrets/use", nil, map[string]any{"session": c.session(), "names": names})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if status < 200 || status > 299 {
-		return c.secretRefused(status, raw)
+		return nil, c.secretRefused(status, raw)
 	}
 	var r struct {
 		Values map[string]string `json:"values"`
 	}
 	if err := json.Unmarshal(raw, &r); err != nil {
-		return fail("the runtime's answer is not readable")
+		return nil, fail("the runtime's answer is not readable")
 	}
-	environ := os.Environ()
-	if c.env.Environ != nil {
-		environ = c.env.Environ()
+	return r.Values, nil
+}
+
+// waitCode asks the person for a one-time code and waits for it in one run: the chat's panel shows the ask, the
+// person types the code, and it comes back here once. An interrupt takes the ask off the panel.
+func (c *cli) waitCode(code codeAsk) (string, error) {
+	status, raw, err := c.call("POST", "/api/cli/secrets/code", nil,
+		map[string]any{"session": c.session(), "why": code.why, "digits": code.digits, "wait": code.wait.Seconds()})
+	if err != nil {
+		return "", err
 	}
-	for v, n := range envs {
-		environ = append(environ, v+"="+r.Values[n])
+	if status < 200 || status > 299 {
+		return "", c.secretRefused(status, raw)
 	}
-	if len(files) > 0 {
-		dir, err := os.MkdirTemp("", "harnessly-secret-")
+	var opened struct {
+		ID    string `json:"id"`
+		Until int64  `json:"until"`
+	}
+	if json.Unmarshal(raw, &opened) != nil || opened.ID == "" {
+		return "", fail("the runtime's answer is not readable")
+	}
+	_, _ = io.WriteString(c.env.Stderr, "waiting for a code: the person types it in this chat's panel («Ждут код»), up to "+
+		code.wait.Round(time.Minute).String()+"; the command starts as soon as it comes\n")
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	defer signal.Stop(stop)
+	go func() {
+		if _, ok := <-stop; ok {
+			_, _, _ = c.call("POST", "/api/cli/secrets/code/cancel", nil, map[string]any{"session": c.session(), "id": opened.ID})
+			os.Exit(130)
+		}
+	}()
+	deadline := time.UnixMilli(opened.Until).Add(5 * time.Second)
+	for {
+		step := max(min(time.Until(deadline), secretAskStep), time.Second)
+		status, raw, err := c.call("POST", "/api/cli/secrets/code/wait", nil,
+			map[string]any{"session": c.session(), "id": opened.ID, "wait": step.Seconds()})
 		if err != nil {
-			return err
+			return "", err
 		}
-		defer func() { _ = os.RemoveAll(dir) }()
-		for v, n := range files {
-			p := dir + string(os.PathSeparator) + v
-			if err := os.WriteFile(p, []byte(r.Values[n]), 0o600); err != nil {
-				return err
+		if status < 200 || status > 299 {
+			return "", c.secretRefused(status, raw)
+		}
+		var r struct {
+			Status string `json:"status"`
+			Value  string `json:"value"`
+		}
+		_ = json.Unmarshal(raw, &r)
+		switch r.Status {
+		case "ready":
+			return r.Value, nil
+		case "waiting":
+			if time.Now().Before(deadline) {
+				continue
 			}
-			environ = append(environ, v+"="+p)
+			return "", fail("expired: no code came in %s; the command did not run", code.wait.Round(time.Minute))
+		case "cancelled":
+			return "", fail("cancelled: the person cancelled the code; the command did not run. Ask them before asking again")
+		case "expired":
+			return "", fail("expired: no code came in %s; the command did not run", code.wait.Round(time.Minute))
 		}
+		return "", fail("the code ask is gone (the runtime restarted); the command did not run: run it again")
 	}
-	values := make([]string, 0, len(r.Values))
-	for _, v := range r.Values {
-		values = append(values, v)
-	}
-	stdout, stderr := newMasker(c.env.Stdout, values), newMasker(c.env.Stderr, values)
-	child := exec.Command(cmd[0], cmd[1:]...)
-	child.Env = environ
-	child.Stdin = c.env.Stdin
-	child.Stdout, child.Stderr = stdout, stderr
-	err = child.Run()
-	stdout.Flush()
-	stderr.Flush()
-	var exit *exec.ExitError
-	switch {
-	case err == nil:
-		return nil
-	case errors.As(err, &exit):
-		return exitCode(max(exit.ExitCode(), 1))
-	}
-	return fail("secret run: %v", err)
 }
 
 func (c *cli) secretFile(args []string) error {

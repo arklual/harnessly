@@ -8,6 +8,7 @@ import { formatMs } from '@/next/features/designly/deck/clock';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { videoFileHref } from '@/next/features/designly/video/api';
+import { useBoardErrors } from '@/next/features/designly/use-board-errors';
 import { postVideo, readVideoMessage, type TVideoBoardMessage } from '@/next/features/designly/video/bridge';
 import {
   clampTime,
@@ -79,6 +80,8 @@ export interface IVideoPlayerProps {
   onPlaying?: (playing: boolean) => void;
   /** The overlay layer's editing. */
   overlays: IVideoOverlayEditor;
+  /** A board's error card sends its error to the design's chat; absent: it only copies. */
+  onBoardError?: (words: string) => void;
 }
 
 /** A playhead this far from where the player is (while it plays) is a seek of the view's, ms. */
@@ -111,6 +114,7 @@ const VideoPlayer = ({
   command = null,
   onPlaying,
   overlays,
+  onBoardError,
 }: IVideoPlayerProps) => {
   const total = video.durMs;
   const scenes = video.scenes;
@@ -164,6 +168,11 @@ const VideoPlayer = ({
     { src: slotSrc(0), title: slotTitle(sceneOf(0)) },
     { src: slotSrc(1), title: slotTitle(sceneOf(1)) },
   ] as const;
+  useBoardErrors({
+    report: onBoardError,
+    frames: () => frameRefs.map((ref, i) => ({ frame: ref.current, src: slots[i]?.src ?? null })),
+    board: () => current?.path ?? path,
+  });
   function slotTitle(i: number | null): string {
     return i === null ? '' : t('next.video.player.scene', { n: i + 1 });
   }

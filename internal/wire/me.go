@@ -28,6 +28,8 @@ type PersonSettings struct {
 	// turns the action off.
 	Keys  map[string][]string `json:"keys"`
 	Voice VoiceSettings       `json:"voice"`
+	// DayStartHour is the Moscow hour the person's day starts at (0–23): «today» of the spend is counted from it.
+	DayStartHour int `json:"dayStartHour"`
 }
 
 // VoiceEngines are the recognition models a person may pick for dictation: the machine's own, the ChatGPT plan's, OpenAI's,
@@ -93,7 +95,8 @@ type Me struct {
 func DefaultSettings() PersonSettings {
 	return PersonSettings{UIVersion: "next", Locale: "ru", Density: "compact", TextSize: "m", EnterSends: true,
 		Notify:       NotifySettings{Types: []string{"turn-finished", "question", "permission"}},
-		QuickPrompts: []string{}, Keys: map[string][]string{}, Voice: VoiceSettings{Engine: VoiceEngineLocal, Words: []VoiceWord{}}}
+		QuickPrompts: []string{}, Keys: map[string][]string{}, Voice: VoiceSettings{Engine: VoiceEngineLocal, Words: []VoiceWord{}},
+		DayStartHour: DefaultDayStartHour}
 }
 
 // Limits of the settings a page may write.
@@ -104,6 +107,8 @@ const (
 	MaxKeyActions     = 200
 	MaxKeysPerAction  = 8
 	MaxSettingsBody   = 128 << 10
+	// DefaultDayStartHour: the day starts at 03:00 in Moscow, 00:00 UTC.
+	DefaultDayStartHour = 3
 )
 
 // MeStore keeps the person of a runtime on its own.
@@ -130,7 +135,8 @@ type FileMe struct {
 func (f *FileMe) load() Me {
 	me := Me{Settings: DefaultSettings(), Rev: 1}
 	if raw, err := os.ReadFile(f.Path); err == nil {
-		var saved Me
+		// A setting newer than the record keeps its default.
+		saved := Me{Settings: DefaultSettings()}
 		// The file is the page's own record; one that does not read is as if the person changed nothing.
 		if json.Unmarshal(raw, &saved) == nil && saved.Rev > 0 {
 			me = saved
@@ -257,6 +263,10 @@ func applySettingsPatch(cur PersonSettings, patch json.RawMessage) (PersonSettin
 			var v VoiceSettings
 			ok = one(raw, &v) && validVoice(v)
 			next.Voice = v
+		case "dayStartHour":
+			var h int
+			ok = one(raw, &h) && h >= 0 && h <= 23
+			next.DayStartHour = h
 		}
 		if !ok {
 			return cur, ErrMeBadPatch

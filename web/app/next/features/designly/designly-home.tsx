@@ -3,7 +3,8 @@
 // its text and its files stay, «Настройки» offers what the kind has. Scrolled, the field goes up and the library's row
 // sticks. A card opens the design; a brief sent starts a project and its agent, and its card draws while it works.
 import { TOUR_ORDER } from '@/next/features/tour/tracks';
-import { startTour } from '@/next/stores/tour';
+import { startTour, tourFactGroup } from '@/next/stores/tour';
+import { registerLibraryControl } from '@/next/stores/library-view';
 import {
   memo,
   useEffect,
@@ -30,11 +31,13 @@ import {
 import TrashView from '@/next/features/designly/library-trash';
 import type { ILibraryOrganizer } from '@/next/features/designly/library-organizer';
 import {
+  DEMO_IDS,
   NO_FILTERS,
   childrenOf,
   isNarrowed,
   matchesFilters,
   projectsIn,
+  routeToCard,
   sortCards,
   systemsOf,
   type ILibraryFilters,
@@ -235,8 +238,6 @@ const CardShot = ({ image }: { image: string | null }) => {
   );
 };
 
-/** The demo projects every library starts with. */
-const DEMO_IDS = ['relay-site', 'relay-deck', 'relay-video', 'relay-ds'] as const;
 const demoMissing = (cards: readonly IDesignCard[]) => DEMO_IDS.some((id) => !cards.some((c) => c.id === id));
 
 /** What an empty list says: nothing matched the search, else nothing is in the tab. */
@@ -645,7 +646,8 @@ interface IDesignCardProps {
   onSelect: (card: IDesignCard) => void;
 }
 
-/** «…» of a card: move it, select it, delete it (the owner's). */
+/** «…» of a card: move it, select it, delete it (the owner's). The menu is drawn in a portal, but a click bubbles through
+ *  React's tree to the card: each item stops it, or the card opens its project under the dialog the item opened. */
 const CardMenu = ({
   card,
   deletable,
@@ -673,19 +675,38 @@ const CardMenu = ({
         sideOffset={6}
       >
         {movable && (
-          <Menu.Item className="hx-cmenu__item" onClick={() => onMove(card)}>
+          <Menu.Item
+            className="hx-cmenu__item"
+            onClick={(event) => {
+              event.stopPropagation();
+              onMove(card);
+            }}
+          >
             <Icon name="folder-input" size="sm" />
             <span className="hx-cmenu__txt">{t('next.designly.moveTo')}</span>
           </Menu.Item>
         )}
-        <Menu.Item className="hx-cmenu__item" onClick={() => onSelect(card)}>
+        <Menu.Item
+          className="hx-cmenu__item"
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect(card);
+          }}
+        >
           <Icon name="list-checks" size="sm" />
           <span className="hx-cmenu__txt">{t('next.designly.select')}</span>
         </Menu.Item>
         {deletable && (
           <>
             <Menu.Separator className="hx-cmenu__sep" />
-            <Menu.Item className="hx-cmenu__item" data-danger="true" onClick={() => onDelete(card)}>
+            <Menu.Item
+              className="hx-cmenu__item"
+              data-danger="true"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete(card);
+              }}
+            >
               <Icon name="trash-2" size="sm" />
               <span className="hx-cmenu__txt">{t('next.designly.delete')}</span>
             </Menu.Item>
@@ -874,7 +895,9 @@ const DesignlyHome = ({
   };
 
   const q = query.trim().toLowerCase();
-  const folders = organizer?.folders ?? [];
+  const organizedFolders = organizer?.folders;
+  const folders = useMemo(() => organizedFolders ?? [], [organizedFolders]);
+  const organized = organizer !== undefined;
   // A search or a filter looks through every folder; with none, the library shows the folder that is open.
   const searching = q !== '' || isNarrowed(filters);
   const here = folders.some((f) => f.id === folder) ? folder : '';
@@ -895,6 +918,57 @@ const DesignlyHome = ({
     () => new Set((cards ?? []).filter((c) => !c.appKind).map((c) => c.id)),
     [cards],
   );
+
+  // The tour's lessons lead to the demo projects: the library says where each lies and what hides it, and
+  // lets the tour clear the view or copy the demo back. Only the library page does (the pane's has no lessons).
+  const lessons = compose !== null;
+  const restoreNow = useStableFn(async () => {
+    if (onRestoreDemo) await onRestoreDemo();
+  });
+  useEffect(() => {
+    if (!lessons) return;
+    return registerLibraryControl({
+      clearView: () => {
+        setQuery('');
+        setFilters(NO_FILTERS);
+        setScope(DESIGN_SCOPE.all);
+        setTrashOpen(false);
+        setFolder('');
+        setSelecting(false);
+        setSelected(new Set());
+      },
+      restoreDemo: async () => {
+        setQuery('');
+        setFilters(NO_FILTERS);
+        setScope(DESIGN_SCOPE.all);
+        setTrashOpen(false);
+        setFolder('');
+        await restoreNow();
+      },
+    });
+  }, [lessons, restoreNow]);
+  useEffect(() => {
+    if (!lessons || cards === null) return;
+    const names = DEMO_IDS.map((id) => {
+      const card = cards.find((c) => c.id === id);
+      const matches =
+        card !== undefined &&
+        inScope(scope, card.owner) &&
+        (!q || card.title.toLowerCase().includes(q)) &&
+        matchesFilters(card, filters, now);
+      const way = routeToCard(card, {
+        folders,
+        here,
+        trashOpen,
+        matches,
+        searching,
+        organized,
+      });
+      return `lib:route:${id}:${way.route}${way.folder ? `:${way.folder}` : ''}`;
+    });
+    tourFactGroup('lib:route:', names);
+  }, [lessons, cards, scope, q, filters, now, folders, here, trashOpen, searching, organized]);
+  useEffect(() => () => tourFactGroup('lib:route:', []), []);
 
   // Pinning: the cards were measured before the machine kept the pin; when the new order is on screen, each one
   // travels from its old place (FLIP: all reads first, then the animations). Not with reduced motion.

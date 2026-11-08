@@ -312,6 +312,7 @@ type Usage struct {
 	dirty      bool
 	savedAt    time.Time
 	activity   map[string]*Activity
+	spend      *Spend
 	builtAt    time.Time
 	refreshing bool
 }
@@ -394,6 +395,7 @@ func (u *Usage) Build() map[string]*Activity {
 	from := asOf - activityDays*day
 	seen := map[string]bool{}
 	events := map[string][][2]float64{}
+	spend := newSpendHours(asOf)
 	for _, it := range list {
 		st, err := os.Stat(it.path)
 		if err != nil || float64(st.ModTime().Unix()) < keepFrom {
@@ -415,10 +417,15 @@ func (u *Usage) Build() map[string]*Activity {
 				continue
 			}
 			seen[r.key] = true
-			events[it.provider] = append(events[it.provider], [2]float64{r.ts, rowCost(it.provider, r)})
+			cost := rowCost(it.provider, r)
+			events[it.provider] = append(events[it.provider], [2]float64{r.ts, cost})
+			if it.provider == "claude" {
+				spend.add(r.ts, r.model, cost)
+			}
 		}
 	}
 	u.mu.Lock()
+	u.spend = spend.done()
 	u.dirty = u.dirty || dirty || len(files) != len(old)
 	u.files = files
 	save := u.dirty && u.CacheFile != "" && u.now().Sub(u.savedAt) >= cacheEvery

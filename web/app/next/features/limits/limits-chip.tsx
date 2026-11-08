@@ -2,12 +2,19 @@
 // chip with the five-hour and the weekly window, «5ч 94% · нед 81%», and on hover (a tap on touch) a card with both windows, their
 // resets and the machine's forecast (the design's .hx-gauge of the Economics tool). Only what the machine reports is
 // drawn; an agent that reports nothing gets a chip with a dash and says so in the card. The card stays while the
-// pointer travels to it (ui/use-hover-intent.ts) and a click pins it.
+// pointer travels to it (ui/use-hover-intent.ts) and a click pins it. A machine that pays Claude by the API has no
+// subscription windows: its chip tells what Claude cost today, «$4,27 сегодня», and its card the models it went to.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
+import { usd } from '@/next/features/manage/format';
 import {
   clockOf,
+  dayStartOf,
   describeForecast,
+  modelName,
+  showsSpend,
+  spentSince,
+  type SpendView,
   leftAtReset,
   leftOf,
   levelOf,
@@ -96,11 +103,85 @@ const Gauge = ({ kind, window, provider, now }: IGaugeProps) => {
   );
 };
 
+/** What Claude cost since the start of the person's day: the chip with the sum, the card with it by model. */
+const SpendChip = ({ view }: { view: SpendView }) => {
+  const { open, pinned, setTrigger, setFloating, getFloating, triggerProps, floatingProps } =
+    useHoverIntent();
+  const { mounted, state } = usePresentFlag(open, EXIT_MS);
+  const now = useNow();
+  useFitInViewport(getFloating, mounted);
+
+  const since = dayStartOf(now, view.dayStartHour);
+  const today = spentSince(view.spend, since);
+  const total = usd(today.usd);
+  const from = clockOf(since, false);
+
+  return (
+    <div className="hx-lim">
+      <button
+        ref={setTrigger}
+        type="button"
+        className="hx-lim__chip"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label={t('next.limits.spend.aria', { sum: total, from })}
+        data-pinned={pinned || undefined}
+        {...triggerProps}
+      >
+        <Icon name="gauge" size="sm" />
+        <span className="hx-lim__win">
+          {total}
+          <small>{t('next.limits.spend.today')}</small>
+        </span>
+      </button>
+      {mounted && (
+        <div
+          ref={setFloating}
+          className="hx-lim__pop hx-hover-fit"
+          data-state={state}
+          role="dialog"
+          aria-label={t('next.limits.spend.title')}
+          {...floatingProps}
+        >
+          <div className="hx-lim__title">{t('next.limits.spend.title')}</div>
+          <div className="hx-lim__spend">
+            <b>{total}</b>
+            <span>{t('next.limits.spend.since', { from })}</span>
+          </div>
+          {today.models.length > 0 && (
+            <ul className="hx-lim__models">
+              {today.models.map((m) => (
+                <li key={m.model}>
+                  <span>{modelName(m.model)}</span>
+                  <b>{usd(m.usd)}</b>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="hx-lim__foot">
+            {[
+              t('next.limits.spend.api'),
+              t('next.limits.updated', { at: clockOf(view.spend.asOf, false) }),
+            ].join(' · ')}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export interface ILimitsChipProps {
   view: LimitsView;
 }
 
-const LimitsChip = ({ view }: ILimitsChipProps) => {
+const LimitsChip = ({ view }: ILimitsChipProps) =>
+  view.state === 'ready' && view.spend && showsSpend(view.limits, view.spend.spend) ? (
+    <SpendChip view={view.spend} />
+  ) : (
+    <WindowsChip view={view} />
+  );
+
+const WindowsChip = ({ view }: ILimitsChipProps) => {
   const { open, pinned, setTrigger, setFloating, getFloating, triggerProps, floatingProps } =
     useHoverIntent();
   const { mounted, state } = usePresentFlag(open, EXIT_MS);

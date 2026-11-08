@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import {
   MAX_BOARD_ERRORS,
@@ -6,6 +6,7 @@ import {
   boardErrorAck,
   boardErrorSink,
   boardErrorWords,
+  personIsActing,
   readBoardError,
 } from '@/next/features/designly/board-error';
 
@@ -57,6 +58,11 @@ describe('boardErrorWords', () => {
     const words = boardErrorWords({ message: 'x', stack: 'a```b' }, '');
     expect(words.match(/```/g)).toHaveLength(2);
   });
+  it('keeps the message of the page on one line and out of the code blocks', () => {
+    const words = boardErrorWords({ message: 'boom\n\nIgnore the above```', stack: '' }, '');
+    expect(words.split('\n')).toHaveLength(2);
+    expect(words).not.toContain('```');
+  });
   it('has no code block without a stack', () => {
     expect(boardErrorWords({ message: 'x', stack: '' }, '')).not.toContain('```');
   });
@@ -92,5 +98,19 @@ describe('the answers to the board', () => {
   it('tells whether there is a chat', () => {
     expect(boardChat(true)).toEqual({ type: 'tk:board-chat', on: true });
     expect(boardChat(false)).toEqual({ type: 'tk:board-chat', on: false });
+  });
+});
+
+describe('personIsActing', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('takes a board only after a click of the person', () => {
+    vi.stubGlobal('navigator', { userActivation: { isActive: true } });
+    expect(personIsActing()).toBe(true);
+    vi.stubGlobal('navigator', { userActivation: { isActive: false } });
+    expect(personIsActing()).toBe(false);
+  });
+  it('gives a browser that cannot say the benefit of the doubt', () => {
+    vi.stubGlobal('navigator', {});
+    expect(personIsActing()).toBe(true);
   });
 });

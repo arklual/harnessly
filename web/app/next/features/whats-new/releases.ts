@@ -13,6 +13,51 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-09b',
+    items: [
+      { key: 'codeAsk', icon: 'key-round' },
+      { key: 'codeField', icon: 'smartphone' },
+    ],
+  },
+  {
+    id: '2026-11-09a',
+    items: [{ key: 'pagesList', icon: 'file-text' }],
+  },
+  {
+    id: '2026-11-08g',
+    items: [{ key: 'designLoader', icon: 'presentation' }],
+  },
+  {
+    id: '2026-11-08f',
+    items: [{ key: 'apiSpend', icon: 'gauge' }],
+  },
+  {
+    id: '2026-11-08e',
+    items: [{ key: 'machineCard', icon: 'server' }],
+  },
+  {
+    id: '2026-11-08d',
+    items: [
+      { key: 'journalWords', icon: 'list-checks' },
+      { key: 'trustInSkill', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-08c',
+    items: [
+      { key: 'setupSteps', icon: 'square-mouse-pointer' },
+      { key: 'setupCompact', icon: 'laptop' },
+    ],
+  },
+  {
+    id: '2026-11-08b',
+    items: [
+      { key: 'demoFolder', icon: 'folder-open' },
+      { key: 'tourWay', icon: 'graduation-cap' },
+      { key: 'boardErrorSend', icon: 'send' },
+    ],
+  },
+  {
     id: '2026-11-08a',
     items: [
       { key: 'libToolbar', icon: 'sliders-horizontal' },

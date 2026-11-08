@@ -43,6 +43,8 @@ TABS OF THIS WORKSPACE
   harnessly chat test ID|current [--off]
                                     mark a chat (current: the one this tab runs) as a test chat, hidden from the sidebar
                                     unless the person shows test chats; --off takes the mark off
+  harnessly chat delete ID          delete a chat this one delegated (the bin keeps it): frees its place
+                                    under the limit of delegated chats
   harnessly tab send TAB_ID TEXT... send text into a tab ("-" reads it from stdin)
   harnessly tab status TAB_ID       is it alive, what runs in it, is the agent working or waiting
   harnessly tab result TAB_ID       the tab's visible screen: read what a delegated agent answered
@@ -128,6 +130,9 @@ SECRETS (the safe of this machine: tokens and keys the person put in, outside th
   harnessly secret run --env VAR=NAME [--file VAR=NAME]... -- COMMAND ARGS...
                                     run a command with secrets in its environment (--file: VAR is the path of a
                                     temporary file with the value); the values are masked in its output
+  harnessly secret run --code VAR --why "npm publish vizloom" [--digits 6] [--wait 10m] -- COMMAND ARGS...
+                                    a one-time code (2FA, SMS, e-mail): the person types it in this chat's panel, the
+                                    command starts at once with it in VAR. Run it in the background: its end wakes you.
   harnessly secret file NAME [--ttl 15m]
                                     print the path of a short-lived file (0600) with the value, for a tool that wants
                                     a path. There is no command that prints a value.
@@ -206,11 +211,17 @@ Exit codes: 0 done, 1 refused or failed (the reason is printed), 2 wrong usage.
 
 var commandHelp = map[string]string{
 	"chat": `harnessly chat test ID|current [--off]
+harnessly chat delete ID
 
 Marks a chat as a test chat: one made to check something, not for the person to read. The sidebar and the search leave
 it out (the person can show test chats; a chat that is open stays in view). "current" is the chat this tab runs; an id
 is the first column of "tab list". --off takes the mark off. Start a chat for a check with "tab create --prompt ... --test"
 (or delegate_task with test: true) and it is a test chat from the start.
+
+harnessly chat delete ID
+
+Deletes a chat this one delegated, as the sidebar's «Удалить» does (the bin keeps it). A finished delegated chat still
+counts towards the person's limit of delegated chats until it goes. Only a chat of this one, and not while it works.
 `,
 	"docs":         docsUsage,
 	"browser":      browserHelp,
@@ -282,8 +293,17 @@ commands by name. The person puts a secret in Settings → Safe, or on the card 
   harnessly secret run --env TOKEN=gitlab-token -- sh -c 'curl -sf -H "PRIVATE-TOKEN: $TOKEN" https://gitlab.example/api/v4/user'
   harnessly secret run --file KUBECONFIG=kubeconfig -- kubectl get pods
   harnessly secret file deploy-key --ttl 10m
+  harnessly secret run --code npm_config_otp --why "npm publish vizloom" -- npm publish
+  harnessly secret run --code OTP --why "sign in to the bank" --env TOKEN=bank-token -- sh -c 'tool login --otp "$OTP"'
 
-ask waits up to 100 seconds (--wait N, 0 to 600) and prints "ready: NAME", "waiting: ..." (run it again to keep
+run --code asks the person for a one-time code (2FA from an authenticator, a code from an SMS or an e-mail): the chat's
+panel shows «Ждут код» with your --why, the person types it, and the command starts that moment with the code in VAR,
+so a code that lives 30 seconds is still fresh. The code is never stored: it is in the runtime's memory until this run
+takes it, once. One run waits the whole time (--wait, 1m to 30m, 10m by default) and exits 1 with "cancelled" or
+"expired" without running the command; run it in the background so its end wakes you, and do not poll. --digits is
+4 to 8 (6 by default). Never ask for a code in the chat or in a "!" command.
+
+ask waits up to 100 seconds (--wait N, 0 to 1800; in the background, --wait 1800 waits the whole time) and prints "ready: NAME", "waiting: ..." (run it again to keep
 waiting), or exits 1 with "declined". An accessible name is ready at once, unless --replace or a new --origin needs approval.
 Use --origin https://site for a website; HTTP is allowed only on localhost, 127.0.0.1 and [::1].
 A project-scoped secret requires a verified connection from an allowed project.

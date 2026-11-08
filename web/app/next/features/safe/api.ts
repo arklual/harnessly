@@ -19,6 +19,7 @@ export const SAFE_REASONS = [
   'denied',
   'unavailable',
   'read-only',
+  'bad-code',
 ] as const;
 
 /** What a secret's name may be: as the runtime checks it (secrets.ValidName). */
@@ -212,3 +213,52 @@ export const putAsk = (machine: MachineId, id: string, value: string): Promise<T
 
 export const grantAsk = (machine: MachineId, id: string): Promise<TSafeOutcome<string>> =>
   sendPage('POST', path(machine, `/secret-asks/${encodeURIComponent(id)}/grant`), readReady, TIMEOUT_MS);
+
+/** An agent's command waiting for a one-time code (2FA, SMS, e-mail): what it is for and until when, never the code. */
+export interface ICodeAsk {
+  id: string;
+  why: string;
+  conv: string;
+  title: string;
+  digits: number;
+  at: number;
+  /** When the command stops waiting, by the machine's clock. */
+  until: number;
+}
+
+export interface ICodeAsks {
+  codes: ICodeAsk[];
+  /** The machine's clock when it answered: `until` is counted against it. */
+  now: number;
+}
+
+const readCodeAsk = (v: unknown): ICodeAsk => {
+  const o = obj(v, 'code');
+  return {
+    id: str(o.id, 'id'),
+    why: str(o.why, 'why'),
+    conv: str(o.conv, 'conv'),
+    title: str(o.title, 'title'),
+    digits: num(o.digits, 'digits'),
+    at: num(o.at, 'at'),
+    until: num(o.until, 'until'),
+  };
+};
+const readCodeAsks = orRefusal((o): ICodeAsks => ({
+  codes: list(o.codes, 'codes', readCodeAsk),
+  now: num(o.now, 'now'),
+}));
+const readCancelled = orRefusal((o) => str(o.cancelled, 'cancelled'));
+
+const codeAsk = (id: string, action: 'put' | 'cancel'): `/${string}` =>
+  `/secret-codes/${encodeURIComponent(id)}/${action}`;
+
+export const loadCodeAsks = (machine: MachineId): Promise<TSafeOutcome<ICodeAsks>> =>
+  getPage(path(machine, '/secret-codes'), readCodeAsks, TIMEOUT_MS);
+
+/** Sends the person's code to the command that waits for it; the page keeps no copy. */
+export const putCode = (machine: MachineId, id: string, value: string): Promise<TSafeOutcome<string>> =>
+  sendBody('POST', path(machine, codeAsk(id, 'put')), { value }, readReady, TIMEOUT_MS);
+
+export const cancelCode = (machine: MachineId, id: string): Promise<TSafeOutcome<string>> =>
+  sendPage('POST', path(machine, codeAsk(id, 'cancel')), readCancelled, TIMEOUT_MS);

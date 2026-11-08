@@ -79,6 +79,8 @@ import '@/next/styles/providers.css';
 import '@/next/styles/notify-bots.css';
 import '@/next/styles/asks.css';
 import '@/next/styles/safe.css';
+import '@/next/styles/code-asks.css';
+import '@/next/styles/code-field.css';
 import '@/next/styles/project-access.css';
 import '@/next/styles/connections.css';
 import '@/next/styles/notices.css';

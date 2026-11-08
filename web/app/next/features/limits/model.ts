@@ -66,7 +66,31 @@ export interface ProviderLimits {
   error: string | null;
 }
 
-export type MachineLimits = Record<Provider, ProviderLimits | null>;
+/** How Claude Code is paid on the machine, as its own files say. */
+export const BILLING = { subscription: 'subscription', api: 'api' } as const;
+export type Billing = (typeof BILLING)[keyof typeof BILLING];
+
+/** One hour of Claude's cost: USD by the model family («opus», «sonnet», «haiku», or a model's own id). */
+export interface SpendHour {
+  /** Epoch seconds of the hour's start. */
+  start: number;
+  byModel: Record<string, number>;
+}
+
+/** Claude's cost on the machine by the hour over the last day (API prices, from its transcripts). */
+export interface ClaudeSpend {
+  hours: SpendHour[];
+  /** Epoch seconds the transcripts were read up to. */
+  asOf: number;
+  /** Null when the machine cannot tell. */
+  billing: Billing | null;
+}
+
+export interface MachineLimits {
+  claude: ProviderLimits | null;
+  codex: ProviderLimits | null;
+  claudeSpend: ClaudeSpend | null;
+}
 
 // ---- the reader
 
@@ -121,6 +145,27 @@ const readProvider = (v: unknown): ProviderLimits | null => {
   };
 };
 
+const readHour = (v: unknown): SpendHour | null => {
+  const h = rec(v);
+  const start = finite(h?.start);
+  const by = rec(h?.byModel);
+  if (start === null || !by) return null;
+  const byModel: Record<string, number> = {};
+  for (const [model, usd] of Object.entries(by)) {
+    const n = finite(usd);
+    if (n !== null && n > 0) byModel[model] = n;
+  }
+  return { start, byModel };
+};
+
+const readSpend = (v: unknown): ClaudeSpend | null => {
+  const s = rec(v);
+  const asOf = finite(s?.asOf);
+  if (!s || asOf === null || !Array.isArray(s.hours)) return null;
+  const billing = Object.values(BILLING).find((b) => b === s.billing) ?? null;
+  return { hours: s.hours.map(readHour).filter((h) => h !== null), asOf, billing };
+};
+
 /**
  * The limits of the machine in the answer of `…/machines`. The runtime answers for itself; a gateway lists every machine
  * of the person, so the machine is found by its id, or is the only one listed. Throws on an answer that is not a list.
@@ -131,7 +176,11 @@ export const readMachineLimits = (doc: unknown, machine: string): MachineLimits 
   const mine = list.find((m) => rec(m)?.id === machine) ?? (list.length === 1 ? list[0] : undefined);
   const limits = rec(rec(mine)?.limits);
   if (!limits) return null;
-  return { claude: readProvider(limits.claude), codex: readProvider(limits.codex) };
+  return {
+    claude: readProvider(limits.claude),
+    codex: readProvider(limits.codex),
+    claudeSpend: readSpend(limits.claudeSpend),
+  };
 };
 
 // ---- what to draw
@@ -280,7 +329,66 @@ export const describeForecast = (
   }
 };
 
+/** Claude's spend with the Moscow hour the person's day starts at (Settings). */
+export interface SpendView {
+  spend: ClaudeSpend;
+  dayStartHour: number;
+}
+
 /** What the composer's chip is given: the agent's limits on the machine, or that they could not be got. */
 export type LimitsView =
-  | { state: 'ready'; provider: Provider; limits: ProviderLimits | null }
+  | { state: 'ready'; provider: Provider; limits: ProviderLimits | null; spend: SpendView | null }
   | { state: 'failed'; provider: Provider; onRetry?: () => Promise<void> };
+
+// ---- the spend of a machine that pays by the API
+
+/** Moscow is UTC+3 all year. */
+const MSK_OFFSET_H = 3;
+
+/** The start of the person's «today», epoch seconds: the last moment at or before now that is `hour`:00 in Moscow. */
+export const dayStartOf = (nowMs: number, hour: number): number => {
+  const utcHour = (((hour - MSK_OFFSET_H) % 24) + 24) % 24;
+  const now = new Date(nowMs);
+  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour);
+  return (start > nowMs ? start - DAY * 1000 : start) / 1000;
+};
+
+export interface SpendModel {
+  model: string;
+  usd: number;
+}
+
+export interface SpendToday {
+  usd: number;
+  /** The biggest first. */
+  models: SpendModel[];
+}
+
+/** What the hours from `since` on cost (the day starts on the hour, so an hour is either in or out). */
+export const spentSince = (spend: ClaudeSpend, since: number): SpendToday => {
+  const by = new Map<string, number>();
+  for (const h of spend.hours) {
+    if (h.start < since) continue;
+    for (const [model, usd] of Object.entries(h.byModel)) by.set(model, (by.get(model) ?? 0) + usd);
+  }
+  const models = [...by].map(([model, usd]) => ({ model, usd })).sort((a, b) => b.usd - a.usd);
+  return { usd: models.reduce((sum, m) => sum + m.usd, 0), models };
+};
+
+/**
+ * Whether the chip shows Claude's spend instead of its limits: the machine pays by the API, or it cannot tell and
+ * reports no subscription window. A subscription is shown as it always was.
+ */
+export const showsSpend = (
+  limits: ProviderLimits | null,
+  spend: ClaudeSpend | null,
+): spend is ClaudeSpend => {
+  if (!spend || spend.billing === BILLING.subscription) return false;
+  return spend.billing === BILLING.api || windowsOf(limits).length === 0;
+};
+
+const FAMILY_NAMES = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku', fable: 'Fable' } as const;
+
+/** «Opus», or a model's own id when it is of no known family. */
+export const modelName = (model: string): string =>
+  model in FAMILY_NAMES ? FAMILY_NAMES[model as keyof typeof FAMILY_NAMES] : model;

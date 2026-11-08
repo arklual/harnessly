@@ -1,0 +1,372 @@
+// Package storelink is a runtime's connection to the store (internal/filestore, docs/hub/store.md): the hub's when
+// the machine belongs to a hub that keeps one, otherwise a store inside this process, SQLite and a folder in the data
+// folder. The model is the same either way: revisions in a database, contents by sha256, the folders on the machine
+// a working copy. A store inside the process is the one a hub connected later takes over (docs/hub/store.md).
+package storelink
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/ly-solutions/harnessly/internal/filestore"
+	"github.com/ly-solutions/harnessly/internal/filesync"
+)
+
+// Modes of RUNTIME_STORE.
+const (
+	// ModeAuto: the hub's store for a hub's machine whose hub has one; none for a runtime paired with a cluster's
+	// agent (that cluster keeps its own data); a store inside the process for a runtime on its own.
+	ModeAuto = "auto"
+	// ModeHub: only the hub's store; a machine that is not a hub's, or a hub without one, syncs nothing.
+	ModeHub = "hub"
+	// ModeEmbedded: the store inside the process, whatever else there is.
+	ModeEmbedded = "embedded"
+	// ModeOff: nothing syncs; the runtime keeps its data as it always did.
+	ModeOff = "off"
+)
+
+// Kind of link.
+const (
+	KindHub      = "hub"
+	KindEmbedded = "embedded"
+)
+
+// Options is what a runtime knows about where it runs.
+type Options struct {
+	DataDir string
+	Mode    string
+	// Machine is the hub's machine this runtime runs on; nil for none.
+	Machine *Machine
+	// Paired: the runtime is one end of a pair with a cluster's agent (AGENT_SECRET_FILE, AGENT_CLUSTER_URL) and not a
+	// hub's machine.
+	Paired bool
+	// Name is the machine's name in what a lost write leaves behind.
+	Name string
+	// HTTP is the client to the hub; nil for a plain one.
+	HTTP *http.Client
+	Log  *slog.Logger
+	Now  func() time.Time
+}
+
+// Link is where the runtime's collections live.
+type Link struct {
+	kind  string
+	base  string
+	token filesync.Token
+	hc    *http.Client
+	name  string
+	// stateKey names the store in the sync's state folder: a switch to another store starts a state of its own.
+	stateKey string
+	dataDir  string
+	log      *slog.Logger
+
+	machine  *Machine
+	embedded *filestore.Server
+}
+
+// Decide is the kind of link the options call for, "" for none, and why.
+func Decide(o Options) (string, string) {
+	switch o.Mode {
+	case ModeOff:
+		return "", "RUNTIME_STORE=off"
+	case ModeEmbedded:
+		return KindEmbedded, "RUNTIME_STORE=embedded"
+	case ModeHub:
+		if o.Machine == nil {
+			return "", "RUNTIME_STORE=hub and this machine is not a hub's"
+		}
+		return KindHub, "RUNTIME_STORE=hub"
+	}
+	switch {
+	case o.Machine != nil:
+		return KindHub, "a hub's machine"
+	case o.Paired:
+		return "", "paired with a cluster's agent, which keeps the data"
+	}
+	return KindEmbedded, "a runtime on its own: the store runs inside it"
+}
+
+// Open opens the link the options call for; nil (and no error) when there is none.
+func Open(o Options) (*Link, error) {
+	kind, why := Decide(o)
+	log := o.Log
+	if log == nil {
+		log = slog.Default()
+	}
+	log = log.With("module", "store")
+	if kind == "" {
+		log.Info("store: none, the data stays as it is", "why", why)
+		return nil, nil
+	}
+	hc := o.HTTP
+	if hc == nil {
+		hc = &http.Client{Timeout: 5 * time.Minute}
+	}
+	name := o.Name
+	if name == "" {
+		name, _ = os.Hostname()
+	}
+	l := &Link{kind: kind, name: sanitize(name), dataDir: o.DataDir, log: log, hc: hc}
+	now := o.Now
+	if now == nil {
+		now = time.Now
+	}
+	switch kind {
+	case KindHub:
+		base, err := origin(o.Machine.DialURL)
+		if err != nil {
+			return nil, err
+		}
+		l.machine = o.Machine
+		l.base = base + "/store"
+		s := &sessions{hc: hc, machine: *o.Machine, now: now}
+		l.token = s.token
+		l.stateKey = "hub-" + short(base+"\x00"+o.Machine.ID)
+	case KindEmbedded:
+		srv, err := filestore.OpenFolder(filepath.Join(o.DataDir, "store"), func(r *http.Request, coll string) (filestore.Access, error) {
+			return filestore.Access{Member: l.name, Room: coll}, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("store inside the runtime: %w", err)
+		}
+		l.embedded = srv
+		l.base = "http://store.invalid"
+		l.hc = &http.Client{Transport: Handler(srv.Handler())}
+		l.stateKey = KindEmbedded
+	}
+	log.Info("store: linked", "kind", kind, "why", why)
+	return l, nil
+}
+
+// Kind is KindHub or KindEmbedded.
+func (l *Link) Kind() string { return l.kind }
+
+// Embedded is the store inside the process, nil for the hub's (backup and the move into a hub reach it here).
+func (l *Link) Embedded() *filestore.Server { return l.embedded }
+
+// Client is a client of one of the link's collections.
+func (l *Link) Client(collection string) *filesync.Client {
+	return filesync.NewClient(l.base, collection, l.token, l.hc)
+}
+
+// Close closes the store inside the process.
+func (l *Link) Close() {
+	if l != nil && l.embedded != nil {
+		l.embedded.Close()
+	}
+}
+
+// Ready waits until the store answers that it is there: at once for the store inside the process; for the hub's, once
+// its capabilities list the store. A hub without one is asked again every recheck, since it may be upgraded.
+func (l *Link) Ready(ctx context.Context, recheck time.Duration) error {
+	if l.kind != KindHub {
+		return nil
+	}
+	base := strings.TrimSuffix(l.base, "/store")
+	wait := 5 * time.Second
+	told := false
+	for {
+		err := HubHasStore(ctx, l.hc, base)
+		if err == nil {
+			return nil
+		}
+		if errors.Is(err, errNoStore) {
+			if !told {
+				l.log.Info("store: the hub has none yet, the data stays as it is", "hub", base)
+				told = true
+			}
+			if !sleep(ctx, recheck) {
+				return ctx.Err()
+			}
+			continue
+		}
+		l.log.Warn("store: the hub does not answer", "hub", base, "err", err)
+		if !sleep(ctx, wait) {
+			return ctx.Err()
+		}
+		wait = min(wait*2, 5*time.Minute)
+	}
+}
+
+// SyncFolder keeps the folder root() names in step with a collection until ctx ends. The folder is asked again every
+// minute: a library that moved (another workspace) is synced from where it is now, with a state of its own.
+func (l *Link) SyncFolder(ctx context.Context, collection string, root func() string) {
+	if err := l.Ready(ctx, 10*time.Minute); err != nil {
+		return
+	}
+	for ctx.Err() == nil {
+		dir := root()
+		if dir == "" {
+			if !sleep(ctx, time.Minute) {
+				return
+			}
+			continue
+		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			l.log.Warn("store: the folder cannot be made", "dir", dir, "err", err)
+			if !sleep(ctx, time.Minute) {
+				return
+			}
+			continue
+		}
+		if !l.follow(ctx, collection, root, dir) {
+			return
+		}
+	}
+}
+
+// follow syncs dir until ctx ends (false), the sync stops with an error, or root() names another folder (true: go on
+// with it).
+func (l *Link) follow(ctx context.Context, collection string, root func() string, dir string) bool {
+	run, stop := context.WithCancel(ctx)
+	defer stop()
+	done := make(chan error, 1)
+	go func() { done <- l.syncOnce(run, collection, dir) }()
+	tick := time.NewTicker(time.Minute)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			if err := <-done; err != nil {
+				l.log.Debug("store: sync stopped", "dir", dir, "err", err)
+			}
+			return false
+		case err := <-done:
+			if err != nil && ctx.Err() == nil {
+				l.log.Warn("store: sync stopped, starting again", "dir", dir, "err", err)
+				return sleep(ctx, 10*time.Second)
+			}
+			return ctx.Err() == nil
+		case <-tick.C:
+			if now := root(); now != dir {
+				l.log.Info("store: the folder moved", "from", dir, "to", now)
+				stop()
+				if err := <-done; err != nil {
+					l.log.Debug("store: sync stopped", "dir", dir, "err", err)
+				}
+				return true
+			}
+		}
+	}
+}
+
+func (l *Link) syncOnce(ctx context.Context, collection, dir string) error {
+	state := filepath.Join(l.dataDir, "store-sync", l.stateKey, collection+"-"+short(dir))
+	a, err := filesync.New(filesync.Config{Root: dir, StateDir: state, Store: l.Client(collection), Machine: l.name,
+		Policy: filestore.PolicyFor(collection), Log: l.log})
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+	return a.Run(ctx)
+}
+
+func short(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:6])
+}
+
+// sanitize keeps a machine's name to what fits a file name.
+func sanitize(name string) string {
+	var b strings.Builder
+	for _, c := range strings.ToLower(name) {
+		switch {
+		case c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-' || c == '_':
+			b.WriteRune(c)
+		case b.Len() > 0:
+			b.WriteByte('-')
+		}
+	}
+	out := b.String()
+	if len(out) > 40 {
+		out = out[:40]
+	}
+	if out = strings.Trim(out, "-"); out == "" {
+		return "machine"
+	}
+	return out
+}
+
+func sleep(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// Handler is a transport that answers every request with h inside the process: the store inside the runtime is
+// spoken to over the same API as the hub's, without a socket.
+func Handler(h http.Handler) http.RoundTripper { return handlerTransport{h} }
+
+type handlerTransport struct{ h http.Handler }
+
+func (t handlerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// A pipe, not a recorder: a long poll holds its answer, and the caller must be able to give up on it.
+	pr, pw := io.Pipe()
+	rw := &pipeWriter{header: http.Header{}, pw: pw, ready: make(chan struct{})}
+	in := req.Clone(req.Context())
+	if in.Body == nil {
+		in.Body = http.NoBody
+	}
+	in.RequestURI = req.URL.RequestURI()
+	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				_ = pw.CloseWithError(fmt.Errorf("store handler panicked: %v", p))
+			}
+		}()
+		t.h.ServeHTTP(rw, in)
+		rw.WriteHeader(http.StatusOK)
+		_ = pw.Close()
+	}()
+	select {
+	case <-rw.ready:
+	case <-req.Context().Done():
+		_ = pr.CloseWithError(req.Context().Err())
+		return nil, req.Context().Err()
+	}
+	res := &http.Response{StatusCode: rw.status, Status: http.StatusText(rw.status), Header: rw.header, Body: pr,
+		Request: req, Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1, ContentLength: -1}
+	if req.Method == http.MethodHead {
+		res.Body = http.NoBody
+		go func() { _, _ = io.Copy(io.Discard, pr) }()
+	}
+	return res, nil
+}
+
+type pipeWriter struct {
+	header http.Header
+	pw     *io.PipeWriter
+	status int
+	ready  chan struct{}
+}
+
+func (w *pipeWriter) Header() http.Header { return w.header }
+
+func (w *pipeWriter) WriteHeader(code int) {
+	if w.status != 0 {
+		return
+	}
+	w.status = code
+	w.header = w.header.Clone()
+	close(w.ready)
+}
+
+func (w *pipeWriter) Write(p []byte) (int, error) {
+	w.WriteHeader(http.StatusOK)
+	return w.pw.Write(p)
+}

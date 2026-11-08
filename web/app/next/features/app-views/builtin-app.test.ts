@@ -82,6 +82,14 @@ describe('connectBuiltin', () => {
     expect(toast).toHaveBeenCalledWith('Сохранено', { tone: 'success', description: 'всё' });
   });
 
+  it('draws a window through the host, and refuses where the host draws none', () => {
+    const modal = vi.fn(() => 'window');
+    const props = { open: true, onClose: () => undefined, title: 'T', boxClass: 'x', children: null };
+    expect(connectBuiltin('harnessly.sinopia', { handlers: { modal } }).ui.modal(props)).toBe('window');
+    expect(modal).toHaveBeenCalledWith(props);
+    expect(() => connectBuiltin('harnessly.sinopia', { handlers: {} }).ui.modal(props)).toThrow(/no windows/);
+  });
+
   it('runs a screen’s shortcut commands with its own handlers, until it stops or goes', () => {
     const stop = vi.fn();
     let heard: (() => TAppKeyHandlers) | null = null;

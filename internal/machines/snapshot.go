@@ -37,6 +37,9 @@ type Machine struct {
 type MachineLimits struct {
 	Claude *ProviderLimits `json:"claude"`
 	Codex  *ProviderLimits `json:"codex"`
+	// ClaudeSpend is what Claude cost lately, for a machine that pays it by the API; apart from Claude's limits, which
+	// such a machine may not have at all.
+	ClaudeSpend *Spend `json:"claudeSpend,omitempty"`
 }
 
 // Release is the release the runtime runs.
@@ -184,6 +187,10 @@ type SnapshotConfig struct {
 	ReleaseFile string
 	// Activity is the spend history per provider (Usage.Activity); none when nil.
 	Activity func() map[string]*Activity
+	// Spend is Claude's cost by the hour (Usage.Spend), read after Activity; none when nil.
+	Spend func() *Spend
+	// Billing is how Claude Code is paid (ClaudeBilling.Mode); not told when nil.
+	Billing func() *string
 	// User is the runtime user's name; the process's own when empty.
 	User     string
 	Host     func() HostStats
@@ -310,10 +317,20 @@ func (s *Snapshot) Limits(now float64) MachineLimits {
 			return got
 		}
 	}
-	return MachineLimits{
+	out := MachineLimits{
 		Claude: BuildProviderLimits(getOr(raw, "claude"), samples("claude"), now, activity["claude"]),
 		Codex:  BuildProviderLimits(getOr(raw, "codex"), samples("codex"), now, activity["codex"]),
 	}
+	if s.cfg.Spend != nil {
+		if sp := s.cfg.Spend(); sp != nil {
+			c := *sp
+			if s.cfg.Billing != nil {
+				c.Billing = s.cfg.Billing()
+			}
+			out.ClaudeSpend = &c
+		}
+	}
+	return out
 }
 
 // Machine is the snapshot now.

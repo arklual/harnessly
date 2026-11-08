@@ -18,6 +18,14 @@ const STACK_LINES = 8;
 /** A page is foreign code: a few errors at most go into the field, however many it throws. */
 export const MAX_BOARD_ERRORS = 5;
 
+/**
+ * A board is foreign code, and its error goes to the agent as a message at once: only a click of the person may send it.
+ * A click inside the frame counts for the page that holds it (the browser's user activation): a page's own words,
+ * with no click behind them, are not taken. A browser that cannot say gets the benefit of the doubt.
+ */
+export const personIsActing = (): boolean =>
+  typeof navigator === 'undefined' || !navigator.userActivation || navigator.userActivation.isActive;
+
 const text = (v: unknown) => (typeof v === 'string' ? v : '');
 
 export const readBoardError = (data: unknown): IBoardError | null => {
@@ -33,7 +41,9 @@ export const readBoardError = (data: unknown): IBoardError | null => {
 export const boardErrorWords = (error: IBoardError, board: string): string => {
   const head = board === '' ? t('next.site.boardError.head') : t('next.site.boardError.headOf', { board });
   const stack = error.stack.split('\n').slice(0, STACK_LINES).join('\n').replaceAll('```', "'''").trim();
-  return stack === '' ? `${head}\n${error.message}` : `${head}\n${error.message}\n\`\`\`\n${stack}\n\`\`\``;
+  // The page wrote the words: one line, which neither closes nor opens a code block of the message.
+  const message = error.message.replace(/\s*\n\s*/g, ' ').replaceAll('```', "'''");
+  return stack === '' ? `${head}\n${message}` : `${head}\n${message}\n\`\`\`\n${stack}\n\`\`\``;
 };
 
 export interface IBoardErrorSink {

@@ -9,10 +9,15 @@ export interface ITourState {
   step: number;
   /** The lessons passed to the end. */
   passed: readonly string[];
+  /** The step was reached by «Назад»: what it asks may be done already, and that is not a reason to leave it again. */
+  back: boolean;
+  /** Which arrival at a step this is (every change of the tour counts): a step come back to is a new one, not the one done before. */
+  at: number;
 }
 
 const KEY = 'hx-tour';
-const NONE: ITourState = { track: null, step: 0, passed: [] };
+const NONE: ITourState = { track: null, step: 0, passed: [], back: false, at: 0 };
+let arrivals = 0;
 
 const listeners = new Set<() => void>();
 let state: ITourState | null = null;
@@ -27,6 +32,8 @@ const load = (): ITourState => {
       track: typeof v.track === 'string' ? v.track : null,
       step: typeof v.step === 'number' && v.step >= 0 ? v.step : 0,
       passed: Array.isArray(v.passed) ? v.passed.filter((x): x is string => typeof x === 'string') : [],
+      back: false,
+      at: 0,
     };
   } catch {
     return NONE;
@@ -38,11 +45,11 @@ export const tourState = (): ITourState => {
   return state;
 };
 
-const set = (next: ITourState) => {
-  state = next;
+const set = (next: Omit<ITourState, 'at'>) => {
+  state = { ...next, at: ++arrivals };
   signals = new Set();
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.localStorage.setItem(KEY, JSON.stringify(state));
   } catch {
     // The tour holds for the page.
   }
@@ -56,9 +63,12 @@ const subscribe = (listener: () => void) => {
 
 export const useTour = () => useSyncExternalStore(subscribe, tourState, () => NONE);
 
-export const startTour = (track: string) => set({ ...tourState(), track, step: 0 });
+export const startTour = (track: string) => set({ ...tourState(), track, step: 0, back: false });
 
-export const toStep = (step: number) => set({ ...tourState(), step });
+export const toStep = (step: number) => set({ ...tourState(), step, back: false });
+
+/** Back to an earlier step: it stays on screen even when it is done already (`ITourState.back`). */
+export const stepBack = (step: number) => set({ ...tourState(), step, back: true });
 
 export const finishTour = () => {
   const s = tourState();
@@ -66,10 +76,11 @@ export const finishTour = () => {
     track: null,
     step: 0,
     passed: s.track && !s.passed.includes(s.track) ? [...s.passed, s.track] : s.passed,
+    back: false,
   });
 };
 
-export const leaveTour = () => set({ ...tourState(), track: null, step: 0 });
+export const leaveTour = () => set({ ...tourState(), track: null, step: 0, back: false });
 
 /** A feature says something happened (a page opened, a mode changed); the running step may be waiting for it. */
 export const tourSignal = (name: string) => {
@@ -92,3 +103,12 @@ export const tourFact = (name: string, on: boolean) => {
 };
 
 export const tourFacts = (): ReadonlySet<string> => facts;
+
+/** A feature says a family of facts at once (`lib:route:`): every fact of the prefix is replaced by these names. */
+export const tourFactGroup = (prefix: string, names: readonly string[]) => {
+  const next = new Set([...facts].filter((f) => !f.startsWith(prefix)));
+  for (const name of names) next.add(name);
+  if (next.size === facts.size && [...next].every((f) => facts.has(f))) return;
+  facts = next;
+  for (const listener of [...listeners]) listener();
+};

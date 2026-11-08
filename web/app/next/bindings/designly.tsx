@@ -159,7 +159,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     setDesigns((list) => list?.filter((d) => !gone.has(d.id)) ?? null);
   }, []);
   const reload = useCallback(() => load(), [load]);
-  const { layout, organizer } = useLibraryOrganizer(machine, reload, forget);
+  const { layout, organizer, readLayout } = useLibraryOrganizer(machine, reload, forget);
 
   const cards = useMemo(() => {
     if (designs === null) return null;
@@ -186,7 +186,8 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
       toast(t('next.designly.restoreDemoFailed'), { tone: 'error', description: (failure as Error).message });
       throw failure;
     }
-    await load();
+    // The copies lie in the person's «Демо» folder: the library and the layout are read again.
+    await Promise.all([load(), readLayout()]);
   };
 
   const onRetry = () => {

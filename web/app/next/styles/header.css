@@ -177,40 +177,24 @@
     animation: hx-plus-in 200ms var(--hx-ease-out) backwards;
   }
 }
-.hx-headmach {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
+/* The machine's card in the header: the sidebar's card (sidebar.css), opening down and to the right of the
+   title, the chip a button to press for the other machines. */
+.hx-headmach-card {
+  flex: none;
   margin-left: 2px;
-  border-radius: 8px;
-  color: var(--hx-fg-3);
   animation: hx-status-in 420ms var(--hx-ease-out) backwards;
 }
-.hx-headmach:focus-visible {
-  outline: 2px solid var(--hx-focus);
-  outline-offset: 1px;
+.hx-headmach-card .hx-machine__chip {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
 }
-.hx-headmach__dot {
-  position: absolute;
-  right: 4px;
-  bottom: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--hx-success);
-  box-shadow: 0 0 0 2px var(--hx-bg-app);
-  transition: background var(--hx-dur-md) var(--hx-ease-out);
-}
-.hx-headmach[data-health='warn'] .hx-headmach__dot {
-  background: var(--hx-warning);
-}
-.hx-headmach[data-health='bad'] .hx-headmach__dot {
-  background: var(--hx-danger);
-}
-.hx-headmach[data-health='off'] .hx-headmach__dot {
-  background: var(--hx-fg-3);
+.hx-headmach-card .hx-machine__pop {
+  left: 0;
+  right: auto;
+  top: calc(100% + 6px);
+  width: 320px;
 }
 @keyframes hx-bg-breathe {
   50% {
@@ -241,7 +225,7 @@
     gap: 0;
   }
   .hx-header .hx-head-btn,
-  .hx-header .hx-headmach {
+  .hx-header .hx-headmach-card .hx-machine__chip {
     width: 40px;
     min-width: 40px;
     height: 44px;

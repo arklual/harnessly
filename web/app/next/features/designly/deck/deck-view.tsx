@@ -51,6 +51,7 @@ import {
 } from '@/next/features/designly/deck/types';
 import { DECK_BOARD_H, DECK_BOARD_W, deckIndexOf, deckStep } from '@/next/features/designly/deck/layout';
 import { DECK_KEY, useDeckKeys, type TDeckKey } from '@/next/features/designly/deck/use-deck-keys';
+import { useBoardErrors } from '@/next/features/designly/use-board-errors';
 import { useDeckBridge } from '@/next/features/designly/deck/use-deck-bridge';
 import ImageActions, { type IImageOpen } from '@/next/features/designly/image-gen/image-actions';
 import { frameScale, screenBoxOf, type IImageAct } from '@/next/features/designly/image-gen/image-act';
@@ -146,6 +147,8 @@ export interface IDeckViewProps {
   access?: ISiteAccess;
   /** The deck is looked at, as a guest of its link sees it (the `link` screen), until the editing is asked for. */
   viewing?: boolean;
+  /** A board's error card sends its error to the design's chat (switching to editing); absent: it only copies. */
+  onBoardError?: (words: string) => void;
   /** «Редактировать» / «Запросить доступ» while looking, «Просмотр» while editing; absent in the pane of a chat. */
   mode?: ISiteMode;
   /** The person may change the deck: its pictures get «Изменить» / «Сгенерировать» on them. */
@@ -222,6 +225,7 @@ const DeckView = (props: IDeckViewProps) => {
     mayEdit = false,
     deckError = null,
     viewing = false,
+    onBoardError,
   } = props;
   const deck = useDeck(id) ?? null;
   const phone = useMedia(DECK_PHONE_QUERY);
@@ -764,6 +768,16 @@ const DeckView = (props: IDeckViewProps) => {
     setImageOpen({ act: said, box: screenBoxOf(at, said) });
   };
   useDeckBridge(frameRef, src, onBoard, (key) => pressKey(placeOf(key, '')), onImage);
+  useBoardErrors({
+    report: onBoardError,
+    // The slide is two frames while it changes (the one leaving, the one coming): either may hold the board on screen.
+    frames: () =>
+      [...(frameRef.current?.parentElement?.querySelectorAll('iframe') ?? [])].map((frame) => ({
+        frame,
+        src: frame.src,
+      })),
+    board: () => path ?? '',
+  });
   useDeckKeys(!playing, screen, onKey);
 
   // The board on screen is in the deck's mode of the screen; a board loaded later is told when it loads.

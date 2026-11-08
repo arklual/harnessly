@@ -940,10 +940,12 @@ const Shell = ({ owner }: IShellProps) => {
         }
       : null;
 
-  const headerMachine = model.machine && {
-    name: model.machine.name,
-    health: model.machine.health,
-    issue: model.machine.issue?.text ?? model.machine.alert?.text ?? null,
+  const headerMachine = {
+    card: model.machine,
+    others: model.otherMachines,
+    onPick: pickMachine,
+    onManage: () => openScreen({ kind: ROUTE.settings, section: 'machines' }),
+    reveal: machineReveal,
   };
 
   return (

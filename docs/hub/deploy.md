@@ -203,6 +203,7 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 | `HUB_MAIL_LOG` | not set | `allow`: accept that, with no SMTP server, sign-in codes and invitation links are written to the hub's log although the hub is on https or in the cloud edition. Only for a hub whose log is as private as its database |
 | `HUB_AUTH_EMAIL` | `on` | `off`: no sign-in by a mailed code, no SMTP. People sign in through OpenID Connect, GitHub, Yandex or the gateway; an invitation is a link in the response that the inviter passes on. The hub does not start with `off` and no other way to sign in ([Sign in without mail](#sign-in-without-mail)) |
 | `HUB_STORAGE`, `HUB_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY`, `_SECRET_KEY`, `_REGION`, `_PREFIX` | `disk` | `s3`: the hub's files (published sites) live in one bucket instead of the data folder ([Files in S3](#files-in-s3)) |
+| `HUB_STORE`, `HUB_STORE_DIR`, `HUB_STORE_DATABASE_URL`, `HUB_STORE_S3_BUCKET`, `HUB_STORE_S3_PREFIX`, `HUB_STORE_LEGACY_SPACE` | `on`, in the hub's database and bucket | The store of people's data (the Sinopia library first): revisions in the hub's database, contents by sha256 in its data folder or bucket; `off` leaves the machines' data as it was ([the store](store.md)) |
 | `HUB_PASSKEY`, `HUB_RP_ID`, `HUB_RP_NAME` | `on`, host of the public URL, `harnessly` | Passkeys; need a domain name, not an IP address |
 | `HUB_GITHUB_CLIENT_ID`, `_SECRET`, `HUB_GITHUB_URL` | off | GitHub sign-in; the URL is for GitHub Enterprise |
 | `HUB_YANDEX_CLIENT_ID`, `_SECRET` | off | Yandex ID sign-in |

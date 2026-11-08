@@ -7,6 +7,8 @@
 // (internal/apps/bridge.go), which checks the calls that reach the machine once more. Both are written from one
 // description, internal/apps/surface.go: the table here is surface.gen.ts.
 
+import type { ReactNode } from 'react';
+import type { IModalProps } from '@/next/features/shell/modal';
 import {
   BUILTIN_APPS,
   DEPRECATED_METHODS,
@@ -225,6 +227,11 @@ export interface IBridgeHandlers {
    */
   elevate?: (method: string, detail: string) => Promise<boolean>;
   toast?: (text: string, options: IToastOptions) => void;
+  /**
+   * A window of the host's own over the page (ui.modal): drawn by the host with the app's words and the app's content.
+   * Only an app in the host's page has it (its content is its own components); a frame is not offered it.
+   */
+  modal?: (props: IModalProps) => ReactNode;
   /**
    * While the view is up, it runs the host's shortcut commands of a screen (keys.on): the host asks `handlers` on every
    * press of the person's keys for them; a handler that answers false leaves the press to the screen below. Returns

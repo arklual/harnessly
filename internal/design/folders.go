@@ -46,22 +46,92 @@ type System struct {
 type layoutFile struct {
 	Folders []Folder          `json:"folders"`
 	Placed  map[string]string `json:"placed"`
-	// Examples: the demo projects were laid in the examples folder once; what the person does with them after is theirs.
+	// Examples: the demo projects were laid in the demo folder once; what the person does with them after is theirs.
 	Examples bool `json:"examples,omitempty"`
+	// Named: the folder the first release called "Examples" was renamed to "Demo" once (or never was that).
+	Named bool `json:"named,omitempty"`
 }
 
 // DemoProjects are the onboarding projects every library starts with (cmd/runtime/demo). Each person finds them in
-// one folder of examples, made the first time their layout is read with any of them in the library; a person who
-// moves them out, renames the folder or deletes it does not get it back.
+// one folder, "Demo", made the first time their layout is read with any of them in the library (and again, when the
+// person asks for the demo back, for the projects that come back). A person who moves them out, renames the folder or
+// deletes it does not get it back on its own: what they do with it after is theirs.
 var DemoProjects = []string{"relay-site", "relay-deck", "relay-video", "relay-ds"}
 
-// ExamplesFolderID is the examples folder's id, the same for everyone.
-const ExamplesFolderID = "f-0000e0a1"
+// DemoFolderID is the demo folder's id, the same for everyone (it was the "Examples" folder first: same id, so the
+// libraries that already have it keep one folder, not two).
+const DemoFolderID = "f-0000e0a1"
 
-// withExamples lays the demo projects present in the library in the examples folder, once; true when it changed f.
-func (l *Library) withExamples(f *layoutFile) bool {
-	if f.Examples {
+// demoFolderName is the demo folder's default name.
+func demoFolderName() string { return locale.Pick("Demo", "Демо") }
+
+func isOldDemoFolderName(n string) bool {
+	return sameName(n, "Examples") || sameName(n, "Примеры")
+}
+
+// demoFolder finds the person's demo folder: by its id (a rename does not lose it), else a top folder of the default
+// name; it makes one when there is none and the person has room for it, and says whether it did.
+func demoFolder(f *layoutFile) (id string, made, ok bool) {
+	name := demoFolderName()
+	for _, fo := range f.Folders {
+		if fo.ID == DemoFolderID {
+			return fo.ID, false, true
+		}
+	}
+	for _, fo := range f.Folders {
+		if fo.Parent == "" && sameName(fo.Name, name) {
+			return fo.ID, false, true
+		}
+	}
+	if len(f.Folders) >= FolderMax {
+		return "", false, false
+	}
+	f.Folders = append(f.Folders, Folder{ID: DemoFolderID, Name: name})
+	return DemoFolderID, true, true
+}
+
+// placeDemo lays the given demo projects that are not placed yet in the demo folder; true when it changed f.
+func placeDemo(f *layoutFile, ids []string) bool {
+	if len(ids) == 0 {
 		return false
+	}
+	folder, made, ok := demoFolder(f)
+	if !ok {
+		return false
+	}
+	changed := made
+	for _, id := range ids {
+		if _, placed := f.Placed[id]; !placed {
+			f.Placed[id] = folder
+			changed = true
+		}
+	}
+	return changed
+}
+
+// withExamples (the layout's first read) lays the demo projects present in the library in the demo folder, once, and
+// renames the folder the first release called "Examples" ("Примеры") to "Demo" once, unless the person renamed it
+// themselves or has a folder of that name already; true when it changed f.
+func (l *Library) withExamples(f *layoutFile) bool {
+	changed := false
+	if f.Examples && !f.Named {
+		f.Named = true
+		changed = true
+		for i, fo := range f.Folders {
+			if fo.ID != DemoFolderID || !isOldDemoFolderName(fo.Name) {
+				continue
+			}
+			taken := false
+			for _, o := range f.Folders {
+				taken = taken || o.ID != fo.ID && o.Parent == fo.Parent && sameName(o.Name, demoFolderName())
+			}
+			if !taken {
+				f.Folders[i].Name = demoFolderName()
+			}
+		}
+	}
+	if f.Examples {
+		return changed
 	}
 	var present []string
 	for _, id := range DemoProjects {
@@ -70,29 +140,30 @@ func (l *Library) withExamples(f *layoutFile) bool {
 		}
 	}
 	if len(present) == 0 {
-		return false
+		return changed
 	}
-	name := locale.Pick("Examples", "Примеры")
-	folder := ""
-	for _, fo := range f.Folders {
-		if fo.ID == ExamplesFolderID || fo.Parent == "" && sameName(fo.Name, name) {
-			folder = fo.ID
-			break
-		}
-	}
-	if folder == "" && len(f.Folders) < FolderMax {
-		folder = ExamplesFolderID
-		f.Folders = append(f.Folders, Folder{ID: folder, Name: name})
-	}
-	if folder != "" {
-		for _, id := range present {
-			if _, placed := f.Placed[id]; !placed {
-				f.Placed[id] = folder
-			}
-		}
-	}
-	f.Examples = true
+	placeDemo(f, present)
+	f.Examples, f.Named = true, true
 	return true
+}
+
+// PlaceDemo lays the demo projects that came back (the person asked for them) in the demo folder: the one they have
+// (found by id, so a rename does not lose it) or a new one when they deleted it. A project they already placed stays
+// where it is.
+func (l *Library) PlaceDemo(person string, ids []string) error {
+	key, err := l.layoutKey(person)
+	if err != nil {
+		return err
+	}
+	m := l.lockOf("folders\x00" + key)
+	m.Lock()
+	defer m.Unlock()
+	f := l.readLayout(key)
+	f.Examples, f.Named = true, true
+	if !placeDemo(&f, ids) {
+		return nil
+	}
+	return l.writeLayout(key, f)
 }
 
 // Layout is a person's folders and where their projects lie (a project not named lies at the top).
@@ -146,7 +217,7 @@ func (l *Library) readLayout(key string) layoutFile {
 	if json.Unmarshal(raw, &f) != nil {
 		return out
 	}
-	out.Examples = f.Examples
+	out.Examples, out.Named = f.Examples, f.Named
 	known := map[string]Folder{}
 	for _, fo := range f.Folders {
 		if folderIDRe.MatchString(fo.ID) && fo.Name != "" {
@@ -211,7 +282,7 @@ func (l *Library) LayoutFor(person string) (Layout, error) {
 		return Layout{}, err
 	}
 	f := l.readLayout(key)
-	if !f.Examples {
+	if !f.Examples || !f.Named {
 		m := l.lockOf("folders\x00" + key)
 		m.Lock()
 		f = l.readLayout(key)

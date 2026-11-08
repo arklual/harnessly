@@ -204,3 +204,39 @@
     }
   }
 }
+
+/* The spend of a machine that pays Claude by the API: today's sum, then the models it went to */
+.hx-lim__spend {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 2px 4px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-lim__spend b {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-lg);
+  font-weight: var(--hx-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.hx-lim__models {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0 2px;
+  list-style: none;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.hx-lim__models li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hx-lim__models b {
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--hx-fg-1);
+}

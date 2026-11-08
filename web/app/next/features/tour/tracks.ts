@@ -1,7 +1,7 @@
 // The lessons of the hands-on tour: Sinopia on the demo projects of Relay, each step a real action.
 // Targets are the product's own elements; a step inside the board itself (a click on the page, a text edited there)
 // is not seen by the shell, so it ends with the person's «Done».
-import type { ITourEnv, ITourStep, ITourTrack } from '@/next/features/tour/model';
+import type { ITourEnv, ITourStage, ITourStep, ITourTrack } from '@/next/features/tour/model';
 
 const SIDEBAR_SINOPIA = '.hx-nav__group[data-i="2"] .hx-nav__item';
 const SITE_FRAME = '.hx-site__iframe';
@@ -48,12 +48,42 @@ const openSinopia: ITourStep = {
   done: (env) => /\/designly(?:[/?#]|$)/.test(env.path),
 };
 
+/** What hides a demo project in the library, to be set aside: the search, a chip, a tab, the trash. */
+const HIDING = [
+  '.hx-dl__trash button.hx-dl__crumb',
+  '.hx-dl__ibtn[data-on]:has(.hx-icon[data-i="sliders-horizontal"])',
+  '.hx-dl__search[data-filled="true"]',
+  '.hx-dl__tab[aria-selected="true"]:not(:first-child)',
+  '.hx-dl__toolbar',
+];
+const FOLDER_NAME = (id: string) => `.hx-dl-folder[data-drop-folder="${id}"] .hx-dl-folder__name`;
+
+/** The library's way to the project, click by click (the library says it in facts: library-model.ts routeToCard). */
+const wayTo =
+  (id: string) =>
+  (env: ITourEnv): ITourStage | null => {
+    const prefix = `lib:route:${id}:`;
+    const fact = [...env.facts].find((f) => f.startsWith(prefix))?.slice(prefix.length);
+    if (!fact || fact === 'card') return null;
+    if (fact === 'gone')
+      return { id: 'gone', target: ['.hx-dl__demo', '.hx-dl__body'], action: 'restoreDemo' };
+    if (fact === 'reset') return { id: 'reset', target: HIDING, action: 'clear' };
+    if (fact === 'up') return { id: 'up', target: ['.hx-dl__crumb[data-drop-folder=""]'] };
+    const folder = fact.replace(/^folder:/, '');
+    return {
+      id: 'folder',
+      target: [`.hx-dl-folder[data-drop-folder="${folder}"] .hx-dl-folder__open`],
+      vars: { folder: env.find(FOLDER_NAME(folder))?.textContent ?? '' },
+    };
+  };
+
 const open = (id: string): ITourStep => ({
   id: 'open',
   target: [card(id)],
   done: at(id),
   where: LIBRARY,
   back: LIBRARY_PATH,
+  stage: wayTo(id),
 });
 
 /** The agent's request of a lesson: on the cheapest model, in the chat beside the design, passed over with no agent. */
@@ -128,7 +158,7 @@ const slides: ITourTrack = {
     { id: 'edit', target: [MODE, DECK_FRAME], done: editing, sideChat: true, ...IN('relay-deck') },
     {
       id: 'comment',
-      target: ['[aria-label^="Комментир"]', DECK_FRAME],
+      target: ['.hx-deck__bar [data-k="comment"]', DECK_FRAME],
       done: signal('deck:comment'),
       ...IN('relay-deck'),
     },
@@ -150,7 +180,7 @@ const video: ITourTrack = {
     { id: 'play', target: [VIDEO_FRAME], done: signal('video:play'), ...IN('relay-video') },
     {
       id: 'scene',
-      target: ['[aria-label="Следующая сцена"]', '.hx-video__timeline'],
+      target: ['[aria-label="Следующая сцена"]', '[aria-label="Next scene"]', '.hx-video__timeline'],
       done: signalLike((s) => /^video:scene:[1-9]/.test(s)),
       ...IN('relay-video'),
     },
@@ -197,10 +227,14 @@ const ds: ITourTrack = {
 const NAV = (i: number) => `.hx-nav__group[data-i="${i}"] .hx-nav__item`;
 const NEW_CHAT = NAV(0);
 const SEARCH = NAV(1);
-const BELL = NAV(4);
+const BELL = '.hx-user__bell';
+// «Ещё» is the last of the sidebar's places: the lessons live in its menu.
+const MORE = NAV(4);
 const FIELD = '.hx-composer__layer';
 const ROUND = (icon: string) => `.hx-composer__bar .hx-round:has(.hx-icon[data-i="${icon}"])`;
 const TOOLS = '.hx-header__tools';
+// The same tools on the start page, where there is no chat yet to carry them in its header.
+const HOME_TOOLS = '.hx-hometools';
 const TURN = '.hx-work__head';
 const SETTINGS_ITEM = (id: string) => `.hx-set__nav-item[data-id="${id}"]`;
 
@@ -226,9 +260,9 @@ const welcome: ITourTrack = {
     look('plus', ['.hx-plus-btn']),
     look('model', ['.hx-model']),
     look('list', ['.hx-sidebar__list']),
-    look('pane', [TOOLS]),
+    look('pane', [TOOLS, HOME_TOOLS]),
     look('sinopia', [SIDEBAR_SINOPIA]),
-    look('learn', [NAV(5)]),
+    look('learn', [MORE]),
   ],
 };
 
@@ -323,19 +357,45 @@ const extra: ITourTrack = {
   ],
 };
 
-export const TOUR_TRACKS: Readonly<Record<string, ITourTrack>> = {
-  welcome,
-  chat,
-  work,
-  pane,
-  site,
-  slides,
-  video,
-  ds,
-  safe,
-  agents,
-  extra,
+/** The buttons that draw the sidebar out on a phone, one on each kind of page header. */
+const BURGER = [
+  '.hx-header__menu',
+  '.hx-learn__menu',
+  '.hx-appmain__menu',
+  '.hx-site__menu',
+  '.hx-help__menu',
+].map((c) => `.hx-head-btn${c}`);
+const PHONE_QUERY = '(max-width: 900px)';
+
+/** On a phone the sidebar is a drawer that lies shut: a step about its items first shows the button that opens it. */
+const viaDrawer = (step: ITourStep): ITourStep => {
+  if (step.stage || step.target.length === 0 || !step.target.every((s) => s.startsWith('.hx-nav')))
+    return step;
+  return {
+    ...step,
+    stage: (env) =>
+      window.matchMedia?.(PHONE_QUERY).matches && env.find('.hx-app[data-drawer="closed"]')
+        ? { id: 'drawer', target: BURGER }
+        : null,
+  };
 };
+const withDrawer = (track: ITourTrack): ITourTrack => ({ ...track, steps: track.steps.map(viaDrawer) });
+
+export const TOUR_TRACKS: Readonly<Record<string, ITourTrack>> = Object.fromEntries(
+  Object.entries({
+    welcome,
+    chat,
+    work,
+    pane,
+    site,
+    slides,
+    video,
+    ds,
+    safe,
+    agents,
+    extra,
+  }).map(([id, track]) => [id, withDrawer(track)]),
+);
 /** The track of this id; a key the object only inherits (`constructor`, from an address or storage) is none. */
 export const trackOf = (id: string | null): ITourTrack | null =>
   id !== null && Object.hasOwn(TOUR_TRACKS, id) ? (TOUR_TRACKS[id] ?? null) : null;

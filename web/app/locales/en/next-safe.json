@@ -66,5 +66,12 @@
   "next.safe.ask.site": "Site",
   "next.safe.ask.titleOriginGrant": "Allow {name} on site {site}?",
   "next.safe.ask.leadOriginGrant": "The agent is asking to use a secret already in the safe on this site",
-  "next.safe.ask.noteOriginGrant": "Allowing adds this site to the secret’s access list. You do not need to enter the value again."
+  "next.safe.ask.noteOriginGrant": "Allowing adds this site to the secret’s access list. You do not need to enter the value again.",
+  "next.safe.reason.bad-code": "Type every digit of the code",
+  "next.safe.code.title": "Waiting for a code",
+  "next.safe.code.left": "waits {time} more",
+  "next.safe.code.aria": "Code: {why}",
+  "next.safe.code.cancel": "Cancel",
+  "next.safe.code.failed": "The code did not reach the machine",
+  "next.safe.code.gone": "The command no longer waits for this code"
 }

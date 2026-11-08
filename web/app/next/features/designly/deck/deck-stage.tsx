@@ -46,14 +46,20 @@ const DeckHold = ({ hold }: { hold: TDeckHold | null }) => {
   );
 };
 
-/** A loaded board that does not say it is ready (an old board, a failed script) is shown after this long, ms. */
-const PAINT_WAIT_MS = 700;
+/** A loaded board that does not say it is drawn (a failed script) is shown after this long, ms. The board says it
+ *  only once its fonts, pictures and videos are in (client.js deckDrawn), which on a slow link takes seconds. */
+const PAINT_WAIT_MS = 8000;
+
+/** A slide that turns but is not drawn after this long shows the small spinner over the old one, ms. */
+const PENDING_SHOW_MS = 300;
 
 interface IFrame {
   src: string;
   /** The frame's document has loaded. */
   loaded: boolean;
-  /** The board has drawn itself (its `ready`), or did not say so in time: the frame fades in over the one under it. */
+  /** The board said it is drawn (its `ready`, after its fonts and pictures are in). */
+  painted: boolean;
+  /** Loaded and drawn, or did not say so in time: the frame fades in over the one under it. */
   shown: boolean;
 }
 
@@ -103,19 +109,35 @@ const DeckStage = ({
   if (src !== null && frames[frames.length - 1]?.src !== src) {
     setFrames([
       ...frames.filter((f) => f.shown && f.src !== src).slice(-1),
-      { src, loaded: false, shown: false },
+      { src, loaded: false, painted: false, shown: false },
     ]);
   }
   const top = frames[frames.length - 1];
   const settled = frames.length > 1 && top?.shown;
   const showTop = () =>
     setFrames((list) => list.map((f, i) => (i === list.length - 1 && f.loaded ? { ...f, shown: true } : f)));
-  // The board on screen said it is drawn.
+  // The board on screen said it is drawn: it shows once its document has loaded too.
   const [seenPaint, setSeenPaint] = useState(painted);
   if (seenPaint !== painted) {
     setSeenPaint(painted);
-    if (top?.loaded && !top.shown) showTop();
+    if (top && !top.shown)
+      setFrames((list) =>
+        list.map((f, i) => (i === list.length - 1 ? { ...f, painted: true, shown: f.loaded } : f)),
+      );
   }
+  // Nothing on screen yet (the first slide, or the slot opening): the slide's skeleton stands in.
+  const blank = error === null && hold === null && !frames.some((f) => f.shown);
+  // A turn to a slide that takes a while: the old one stays, a small spinner says the new one is coming.
+  const turning = error === null && hold === null && !blank && top !== undefined && !top.shown;
+  // The slide (its address) whose turn has taken long enough for the spinner.
+  const [slowFor, setSlowFor] = useState<string | null>(null);
+  const turningSrc = turning ? top.src : null;
+  useEffect(() => {
+    if (turningSrc === null) return;
+    const timer = setTimeout(() => setSlowFor(turningSrc), PENDING_SHOW_MS);
+    return () => clearTimeout(timer);
+  }, [turningSrc]);
+  const slow = turningSrc !== null && slowFor === turningSrc;
   const waiting = top !== undefined && top.loaded && !top.shown;
   useEffect(() => {
     if (!waiting) return;
@@ -146,7 +168,7 @@ const DeckStage = ({
         <div
           className="hx-deck__slide"
           data-hold={hold ?? undefined}
-          data-loading={error === null && !frames.some((f) => f.loaded) ? true : undefined}
+          data-loading={blank ? true : undefined}
           aria-label={hold === null ? t('next.deck.stage.slide', { n }) : undefined}
         >
           {frames.map((frame, i) => {
@@ -163,17 +185,29 @@ const DeckStage = ({
                 aria-hidden={isTop ? undefined : true}
                 allow="clipboard-write"
                 onLoad={() => {
-                  // The first frame has nothing under it: it shows at once; a later one waits for its board's ready.
+                  // Every frame, the first too, waits for its board's word that it is drawn (or PAINT_WAIT_MS).
                   setFrames((list) =>
-                    list.map((f) =>
-                      f.src === frame.src ? { ...f, loaded: true, shown: list.length === 1 } : f,
-                    ),
+                    list.map((f) => (f.src === frame.src ? { ...f, loaded: true, shown: f.painted } : f)),
                   );
                   if (isTop) onLoad();
                 }}
               />
             );
           })}
+          {blank && (
+            <div className="hx-deck__loading" role="status" aria-label={t('next.deck.stage.loading')}>
+              <span className="hx-sk hx-deck__loading-sk" />
+              <span className="hx-deck__spin" aria-hidden="true" />
+            </div>
+          )}
+          {slow && (
+            <span
+              className="hx-deck__spin"
+              data-corner="1"
+              role="status"
+              aria-label={t('next.deck.stage.loading')}
+            />
+          )}
           <DeckHold hold={error === null ? hold : null} />
           {error !== null && (
             <div className="hx-deck__failed" role="alert">

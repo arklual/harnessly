@@ -3,7 +3,7 @@
 // the ring and the card follow the element as the page moves. Nothing here blocks the page: the person clicks through.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { placeCard, type IRect, type ITourStep } from '@/next/features/tour/model';
+import { placeCard, type IRect, type ITourStage, type ITourStep } from '@/next/features/tour/model';
 import { nextLesson } from '@/next/features/learn/lessons';
 import { trackOf } from '@/next/features/tour/tracks';
 import { goTo, parseRoute, ROUTE } from '@/next/routes/routes';
@@ -11,10 +11,12 @@ import { t } from '@/next/i18n';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
 import { usePresence } from '@/next/ui/presence';
+import { libraryControl } from '@/next/stores/library-view';
 import {
   finishTour,
   leaveTour,
   startTour,
+  stepBack,
   toStep,
   tourFacts,
   tourSignals,
@@ -53,12 +55,32 @@ const envNow = (): ITourEnv => ({
   facts: tourFacts(),
 });
 
-const findTarget = (step: ITourStep): Element | null => {
-  for (const selector of step.frame ? [ANCHOR, ...step.target] : step.target) {
+const findTarget = (step: ITourStep, stage: ITourStage | null): Element | null => {
+  // On the way to the step's element the ring is on the click that leads there.
+  const selectors = stage ? stage.target : step.frame ? [ANCHOR, ...step.target] : step.target;
+  for (const selector of selectors) {
     const el = document.querySelector(selector);
     if (el && visible(rectOf(el))) return el;
   }
   return null;
+};
+
+/** The element is there but out of the view (a card far down the library, in a scrolled list): bring it in. */
+const scrolled = new WeakSet<Element>();
+const bringIntoView = (step: ITourStep, stage: ITourStage | null) => {
+  const selectors = stage ? stage.target : step.frame ? step.target : step.target;
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (!el) continue;
+    const r = rectOf(el);
+    if (r.w <= 0 || r.h <= 0) continue;
+    if (visible(r)) return;
+    if (!scrolled.has(el)) {
+      scrolled.add(el);
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    return;
+  }
 };
 
 interface IFrame {
@@ -70,12 +92,13 @@ const sameRect = (a: IRect | null, b: IRect | null) =>
   a === b || (!!a && !!b && Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1 && a.w === b.w && a.h === b.h);
 
 /** Where the step's element is and what is open around it, measured every tick while the step is on. */
-const useFrame = (step: ITourStep | null): IFrame => {
+const useFrame = (step: ITourStep | null, stage: ITourStage | null): IFrame => {
   const [frame, setFrame] = useState<IFrame>({ ring: null, popups: [] });
   useEffect(() => {
     if (!step) return;
     const measure = () => {
-      const el = findTarget(step);
+      bringIntoView(step, stage);
+      const el = findTarget(step, stage);
       const ring = el ? rectOf(el) : null;
       const avoid = (step.avoid ?? []).flatMap((sel) => [...document.querySelectorAll(sel)]);
       const popups = [...document.querySelectorAll(POPUPS), ...avoid].map(rectOf).filter(visible);
@@ -90,25 +113,38 @@ const useFrame = (step: ITourStep | null): IFrame => {
       clearInterval(timer);
       window.removeEventListener('resize', measure);
     };
-  }, [step]);
+  }, [step, stage]);
   return frame;
 };
 
-/** True once the step was done (the product showed it), checked every tick. */
-const useDone = (step: ITourStep | null, key: string): boolean => {
+/** Whether the step was done (the product showed it, checked every tick), and whether it was done already when the
+ *  person came back to it by «Назад»: then it stays, with a «Дальше», instead of leaving again at once. */
+const useDone = (step: ITourStep | null, key: string, back: boolean): { done: boolean; held: boolean } => {
   const [done, setDone] = useState<string | null>(null);
+  const [held, setHeld] = useState<string | null>(null);
   useEffect(() => {
     if (!step?.done) return;
     const check = step.done;
+    let armed = !back;
     const timer = setInterval(() => {
-      if (check(envNow())) {
+      const ok = check(envNow());
+      if (!armed) {
+        // Undone again (the person left the page): from now on it counts when done.
+        if (ok) setHeld(key);
+        else {
+          armed = true;
+          setHeld(null);
+        }
+        return;
+      }
+      if (ok) {
         setDone(key);
         clearInterval(timer);
       }
     }, TICK_MS);
     return () => clearInterval(timer);
-  }, [step, key]);
-  return done === key;
+  }, [step, key, back]);
+  return { done: done === key, held: held === key };
 };
 
 /** What stands between the person and the step: they left its page, its design is loading, a step before is undone. */
@@ -143,8 +179,34 @@ const useStepState = (step: ITourStep | null): TStepState => {
   return state;
 };
 
+/** The way to the step's element, when the library hides it; the same object while nothing about it changed. */
+const useStage = (step: ITourStep | null): ITourStage | null => {
+  const [stage, setStage] = useState<ITourStage | null>(null);
+  const read = step?.stage;
+  useEffect(() => {
+    if (!read) return;
+    const tick = () => {
+      const next = read(envNow());
+      const same = (a: ITourStage | null, b: ITourStage | null) =>
+        a === b ||
+        (!!a &&
+          !!b &&
+          a.id === b.id &&
+          a.target.join('|') === b.target.join('|') &&
+          JSON.stringify(a.vars) === JSON.stringify(b.vars));
+      setStage((was) => (same(was, next) ? was : next));
+    };
+    tick();
+    const timer = setInterval(tick, TICK_MS);
+    return () => clearInterval(timer);
+  }, [read]);
+  // A step with no way of its own has none, whatever the step before left.
+  return read ? stage : null;
+};
+
 /** What the card says of the step: its text, or why it waits (the person left its page, a step before is undone). */
-const stepText = (key: string, step: ITourStep, state: TStepState): string => {
+const stepText = (key: string, step: ITourStep, state: TStepState, stage: ITourStage | null): string => {
+  if (stage && state === STEP_STATE.on) return t(`next.tour.stage.${stage.id}`, stage.vars);
   if (state === STEP_STATE.away) return t('next.tour.away', { step: t(`${key}.${step.id}.title`) });
   if (state === STEP_STATE.needs) return t(`${key}.${step.id}.needs`);
   return t(`${key}.${step.id}.text`);
@@ -155,12 +217,15 @@ interface IStepActionProps {
   index: number;
   step: ITourStep;
   done: boolean;
+  /** Done already when the person came back to it. */
+  held: boolean;
   state: TStepState;
+  stage: ITourStage | null;
 }
 
 /** The card's main button: the way back to the step, to the step it needs, or «Done» / «Next» where the product cannot
  *  see the step. None while the design loads or once the step is done. */
-const StepAction = ({ track, index, step, done, state }: IStepActionProps) => {
+const StepAction = ({ track, index, step, done, held, state, stage }: IStepActionProps) => {
   if (done || state === STEP_STATE.loading) return null;
   if (state === STEP_STATE.away) {
     const back = step.back;
@@ -178,6 +243,29 @@ const StepAction = ({ track, index, step, done, state }: IStepActionProps) => {
       </Button>
     ) : null;
   }
+  if (stage?.action) {
+    const act = stage.action;
+    return (
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => {
+          const library = libraryControl();
+          if (act === 'clear') library?.clearView();
+          else void library?.restoreDemo().catch(() => undefined);
+        }}
+      >
+        {t(`next.tour.stage.${stage.id}.action`)}
+      </Button>
+    );
+  }
+  if (held) {
+    return (
+      <Button variant="primary" size="sm" onClick={() => toStep(index + 1)}>
+        {t('next.tour.next')}
+      </Button>
+    );
+  }
   if (step.done && !step.manual) return null;
   return (
     <Button variant="primary" size="sm" onClick={() => toStep(index + 1)}>
@@ -192,12 +280,14 @@ interface ICardProps {
   total: number;
   step: ITourStep | null;
   done: boolean;
+  held: boolean;
   frame: IFrame;
   closing: boolean;
   state: TStepState;
+  stage: ITourStage | null;
 }
 
-const Card = ({ track, index, total, step, done, frame, closing, state }: ICardProps) => {
+const Card = ({ track, index, total, step, done, held, frame, closing, state, stage }: ICardProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const passed = step === null;
 
@@ -279,10 +369,10 @@ const Card = ({ track, index, total, step, done, frame, closing, state }: ICardP
       ) : (
         <>
           <h3 className="hx-tour-card__title">
-            {done && <Icon name="check" size="sm" />}
+            {(done || held) && <Icon name="check" size="sm" />}
             {t(`${key}.${step.id}.title`)}
           </h3>
-          <p className="hx-tour-card__text">{stepText(key, step, state)}</p>
+          <p className="hx-tour-card__text">{stepText(key, step, state, stage)}</p>
           {state === STEP_STATE.loading && (
             <p className="hx-tour-card__wait" role="status">
               <span className="hx-tour-card__spin" aria-hidden="true" />
@@ -300,7 +390,7 @@ const Card = ({ track, index, total, step, done, frame, closing, state }: ICardP
           </div>
           <div className="hx-tour-card__actions">
             {index > 0 && (
-              <button type="button" className="hx-tour-card__link" onClick={() => toStep(index - 1)}>
+              <button type="button" className="hx-tour-card__link" onClick={() => stepBack(index - 1)}>
                 {t('next.tour.back')}
               </button>
             )}
@@ -308,7 +398,15 @@ const Card = ({ track, index, total, step, done, frame, closing, state }: ICardP
             <button type="button" className="hx-tour-card__link" onClick={() => toStep(index + 1)}>
               {t('next.tour.skip')}
             </button>
-            <StepAction track={track} index={index} step={step} done={done} state={state} />
+            <StepAction
+              track={track}
+              index={index}
+              step={step}
+              done={done}
+              held={held}
+              state={state}
+              stage={stage}
+            />
           </div>
         </>
       )}
@@ -333,10 +431,11 @@ const TourOverlay = () => {
   const track = trackOf(tour.track);
   const total = track?.steps.length ?? 0;
   const step = track && tour.step < total ? track.steps[tour.step] : null;
-  const key = `${tour.track}:${tour.step}`;
-  const done = useDone(step, key);
-  const frame = useFrame(step);
+  const key = `${tour.track}:${tour.step}:${tour.at}`;
+  const { done, held } = useDone(step, key, tour.back);
   const state = useStepState(step);
+  const stage = useStage(step);
+  const frame = useFrame(step, state === STEP_STATE.on ? stage : null);
 
   // A step that makes no sense here (no agent to answer a request) is passed over.
   useEffect(() => {
@@ -363,9 +462,11 @@ const TourOverlay = () => {
         total={total}
         step={step}
         done={done}
+        held={held}
         frame={frame}
         closing={shown.state === 'closing'}
         state={state}
+        stage={state === STEP_STATE.on ? stage : null}
       />
     </div>,
     document.body,

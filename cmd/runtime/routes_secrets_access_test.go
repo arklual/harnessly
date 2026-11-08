@@ -625,6 +625,14 @@ func TestSafeAccessRealRoutesDoNotTrustSessionWithoutSocketCaller(t *testing.T) 
 	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"secrets":[]}` {
 		t.Errorf("real list trusted claimed session: %d %s", w.Code, w.Body.String())
 	}
+	// A code ask is a chat's only by its connection: a claimed session opens none.
+	w = rig.call("POST", "/api/cli/secrets/code", map[string]any{"session": "session-a", "why": "npm publish", "digits": 6}, "a", nil)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "no-chat") {
+		t.Errorf("real code ask trusted claimed session: %d %s", w.Code, w.Body.String())
+	}
+	if got := rig.sf.codes.Pending(); len(got) != 0 {
+		t.Errorf("a code ask opened: %+v", got)
+	}
 }
 
 func TestSafeAccessRoutesOriginOnlyGrant(t *testing.T) {

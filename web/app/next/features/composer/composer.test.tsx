@@ -489,6 +489,7 @@ describe('Composer limits chip', () => {
       plan: null,
       error: null,
     },
+    spend: null,
   } as const;
 
   it('puts what is left of the agent beside the model pill, and nothing before the machine answers', () => {

@@ -74,3 +74,55 @@ export const folderChoices = (folders: readonly IFolder[]): { folder: IFolder; d
     { folder: top, depth: 0 as const },
     ...childrenOf(folders, top.id).map((sub) => ({ folder: sub, depth: 1 as const })),
   ]);
+
+/** The demo projects every library starts with; the tour's lessons are about them. */
+export const DEMO_IDS = ['relay-site', 'relay-deck', 'relay-video', 'relay-ds'] as const;
+
+/** The next click on the way to a card (the tour's), by what the library shows now. */
+export const ROUTE = {
+  /** The card is on screen. */
+  card: 'card',
+  /** A folder tile in the folder that is open leads on. */
+  folder: 'folder',
+  /** The card lies in another folder: back to the library's top. */
+  up: 'up',
+  /** A search, a filter, another tab or the trash hides it. */
+  reset: 'reset',
+  /** The library has no such project (deleted, or never there). */
+  gone: 'gone',
+} as const;
+export type TRoute = (typeof ROUTE)[keyof typeof ROUTE];
+
+export interface ILibraryRoute {
+  route: TRoute;
+  /** For `folder`: the tile to open. */
+  folder?: string;
+}
+
+interface IRouteView {
+  folders: readonly IFolder[];
+  /** The folder that is open; '' is the top. */
+  here: string;
+  trashOpen: boolean;
+  /** The card passes the search, the filters and the tab (so it is among the cards the view lists). */
+  matches: boolean;
+  /** A search or a filter looks through every folder: the card then stands in the flat list. */
+  searching: boolean;
+  /** Folders exist at all: an older runtime lays the library out flat. */
+  organized: boolean;
+}
+
+/** Where the person must click to reach the card, given what the library shows. */
+export const routeToCard = (card: IDesignCard | undefined, view: IRouteView): ILibraryRoute => {
+  if (!card) return { route: ROUTE.gone };
+  if (view.trashOpen || !view.matches) return { route: ROUTE.reset };
+  if (!view.organized || view.searching) return { route: ROUTE.card };
+  const place = view.folders.find((f) => f.id === card.folder);
+  const target = place?.id ?? '';
+  if (target === view.here) return { route: ROUTE.card };
+  const top = place?.parent ? place.parent : target;
+  // A folder shows its tiles under it only from its parent; a top folder is reached from the top.
+  if (place?.parent && view.here === place.parent) return { route: ROUTE.folder, folder: target };
+  if (view.here === '' && top !== '') return { route: ROUTE.folder, folder: top };
+  return { route: ROUTE.up };
+};

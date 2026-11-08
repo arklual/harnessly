@@ -54,8 +54,15 @@ func upstreamAlive(upstream string) func() bool {
 
 func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, hooks hookConfig) []gate.JSONRoute {
 	tz, _ := strconv.Atoi(os.Getenv("RUNTIME_USAGE_TZ_OFFSET_MINUTES"))
+	claudeDir := env("CLAUDE_CONFIG_DIR", filepath.Join(d.Home, ".claude"))
+	// Claude Code keeps its .claude.json in the home, or in its folder when the folder is set.
+	claudeConfig := filepath.Join(d.Home, ".claude.json")
+	if os.Getenv("CLAUDE_CONFIG_DIR") != "" {
+		claudeConfig = filepath.Join(claudeDir, ".claude.json")
+	}
+	billing := &machines.ClaudeBilling{ConfigDir: claudeDir, ConfigFile: claudeConfig}
 	usage := &machines.Usage{
-		ClaudeRoot: filepath.Join(env("CLAUDE_CONFIG_DIR", filepath.Join(d.Home, ".claude")), "projects"),
+		ClaudeRoot: filepath.Join(claudeDir, "projects"),
 		CodexRoot:  filepath.Join(limits.CodexHome(os.Getenv("CODEX_HOME"), d.Home), "sessions"),
 		TZOffset:   float64(tz) * 60,
 		CacheFile:  filepath.Join(d.DataDir, "limits-spend-cache.gob"),
@@ -67,6 +74,8 @@ func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, ho
 		Codexbar:    filepath.IsAbs(os.Getenv("RUNTIME_CODEXBAR_BIN")),
 		ReleaseFile: releaseFile,
 		Activity:    usage.Activity,
+		Spend:       usage.Spend,
+		Billing:     billing.Mode,
 	})
 	// The economics of a conversation shows its provider's limits as the snapshot has them.
 	providerLimits = func(provider string) any {

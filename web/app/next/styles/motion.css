@@ -268,7 +268,9 @@
       .hx-conn-row__spin,
       .hx-chain__node[data-s='run'] .hx-chain__dot::after,
       .hx-inside__it[data-s='run'] .hx-inside__m,
-      .hx-setup__spin
+      .hx-setup__spin,
+      .hx-deck__spin,
+      .hx-deck__spin[data-corner='1']
     ) {
     animation-duration: 2.4s !important;
     animation-iteration-count: infinite !important;

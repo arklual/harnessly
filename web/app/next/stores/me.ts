@@ -38,6 +38,8 @@ export interface PersonSettings {
   /** The shortcuts the person changed: an action's id to its shortcuts (features/keys); an empty list turns it off. */
   keys: Record<string, string[]>;
   voice: VoiceSettings;
+  /** The Moscow hour the person's day starts at (0–23): «today» of the agent's spend counts from it. */
+  dayStartHour: number;
 }
 
 export interface Me {
@@ -67,6 +69,7 @@ export const DEFAULT_SETTINGS: PersonSettings = {
   quickPrompts: [],
   keys: {},
   voice: { engine: 'local', words: [] },
+  dayStartHour: 3,
 };
 
 export type PatchResult =
@@ -164,6 +167,12 @@ export const useMe = (): MeState => useStore(meStore);
 export const useEnterSends = (): boolean => {
   const me = useMe();
   return me.k === 'ready' ? me.me.settings.enterSends : true;
+};
+
+/** The Moscow hour the person's day starts at (Settings); until the settings are known, the default one. */
+export const useDayStartHour = (): number => {
+  const me = useMe();
+  return me.k === 'ready' ? me.me.settings.dayStartHour : DEFAULT_SETTINGS.dayStartHour;
 };
 
 /** The dictation's settings: the model and the person's words; until the settings are known, the machine's own model. */

@@ -1085,7 +1085,7 @@ const Gallery = () => {
         parent={parentChat && { title: parentChat.title, onOpen: () => setCurrentId(parentChat.id) }}
         projects={projects}
         actions={actions}
-        machine={{ name: MACHINE.name, health: MACHINE.health, issue: MACHINE.issue?.text ?? null }}
+        machine={{ card: MACHINE, others: OTHERS }}
         drawerOpen={drawerOpen}
         onOpenDrawer={() => setDrawerOpen(true)}
         onNewChat={() => setCurrentId(null)}

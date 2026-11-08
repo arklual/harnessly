@@ -257,6 +257,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
   return (
     <GeneralSection
       enterSends={settings.enterSends}
+      dayStartHour={settings.dayStartHour}
       topTabs={topTabs}
       paneAuto={paneAuto}
       links={
@@ -285,6 +286,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
       delegation={runtime.value ? (runtime.value.delegation ?? DEFAULT_DELEGATION) : null}
       busy={new Set(waiting.keys())}
       onEnterSends={(enterSends) => void run('enterSends', failure, () => savePerson({ enterSends }))}
+      onDayStartHour={(dayStartHour) => void run('dayStartHour', failure, () => savePerson({ dayStartHour }))}
       onTopTabs={setTopTabs}
       onPaneAuto={setPaneAuto}
       onFeedKind={setFeedKind}

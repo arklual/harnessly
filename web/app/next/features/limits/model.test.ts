@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dayStartOf,
   describeForecast,
+  modelName,
+  showsSpend,
+  spentSince,
   FORECAST,
   FORECAST_TONE,
   leftAtReset,
@@ -11,6 +15,7 @@ import {
   span,
   WINDOW,
   windowsOf,
+  type ClaudeSpend,
   type LimitForecast,
 } from '@/next/features/limits/model';
 
@@ -161,5 +166,70 @@ describe('the forecast in words', () => {
     expect(describeForecast(forecast({}), WINDOW.fiveHour, 'Claude').text).toBe(
       'No forecast yet: too few samples',
     );
+  });
+});
+
+describe('the spend of a machine that pays by the API', () => {
+  const at = (iso: string) => Date.parse(iso) / 1000;
+
+  it('starts the day at the Moscow hour, the last one at or before now', () => {
+    expect(dayStartOf(Date.parse('2026-11-08T14:20:00Z'), 3)).toBe(at('2026-11-08T00:00:00Z'));
+    expect(dayStartOf(Date.parse('2026-11-08T00:00:00Z'), 3)).toBe(at('2026-11-08T00:00:00Z'));
+    expect(dayStartOf(Date.parse('2026-11-08T14:20:00Z'), 20)).toBe(at('2026-11-07T17:00:00Z'));
+    expect(dayStartOf(Date.parse('2026-11-08T01:30:00Z'), 0)).toBe(at('2026-11-07T21:00:00Z'));
+  });
+
+  it('sums the hours since the start, by model, the biggest first', () => {
+    const spend: ClaudeSpend = {
+      hours: [
+        { start: at('2026-11-07T23:00:00Z'), byModel: { opus: 9 } },
+        { start: at('2026-11-08T00:00:00Z'), byModel: { sonnet: 1.5, opus: 0.5 } },
+        { start: at('2026-11-08T13:00:00Z'), byModel: { opus: 2, 'glm-4.6': 0.25 } },
+      ],
+      asOf: at('2026-11-08T14:20:00Z'),
+      billing: 'api',
+    };
+    expect(spentSince(spend, at('2026-11-08T00:00:00Z'))).toEqual({
+      usd: 4.25,
+      models: [
+        { model: 'opus', usd: 2.5 },
+        { model: 'sonnet', usd: 1.5 },
+        { model: 'glm-4.6', usd: 0.25 },
+      ],
+    });
+    expect(spentSince(spend, at('2026-11-09T00:00:00Z'))).toEqual({ usd: 0, models: [] });
+    expect(modelName('opus')).toBe('Opus');
+    expect(modelName('glm-4.6')).toBe('glm-4.6');
+  });
+
+  it('reads the spend from the answer, and shows it only off a subscription', () => {
+    const doc = {
+      machines: [
+        {
+          id: 'm',
+          limits: {
+            claude: null,
+            codex: null,
+            claudeSpend: {
+              hours: [{ start: 1, byModel: { opus: 1, bad: 'x' } }, { start: 'x' }],
+              asOf: 5,
+              billing: 'api',
+            },
+          },
+        },
+      ],
+    };
+    const got = readMachineLimits(doc, 'm');
+    expect(got?.claudeSpend).toEqual({
+      hours: [{ start: 1, byModel: { opus: 1 } }],
+      asOf: 5,
+      billing: 'api',
+    });
+    const spend = got!.claudeSpend!;
+    expect(showsSpend(null, spend)).toBe(true);
+    expect(showsSpend(null, { ...spend, billing: 'subscription' })).toBe(false);
+    expect(showsSpend(null, { ...spend, billing: null })).toBe(true);
+    expect(showsSpend(null, null)).toBe(false);
+    expect(readMachineLimits({ machines: [{ id: 'm', limits: {} }] }, 'm')?.claudeSpend).toBeNull();
   });
 });

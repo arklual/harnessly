@@ -8,6 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // flagSettings names, per organization flag, what the page gets from it.
@@ -30,6 +31,7 @@ func (h *Hub) capabilitiesDoc(r *http.Request) capabilities.Document {
 	}
 	set.Switch("ssh", h.SSH.Available(), "connecting a server over SSH is off", "HUB_SSH")
 	set.Switch("sites", h.Sites != nil, "published sites are off", "HARNESSLY_SITES")
+	set.Switch(hubproto.StoreCapability, h.Store != nil, "the store is off: machines keep their data as before", "HUB_STORE")
 	set.Switch("sign-in.passkey", h.Auth.PasskeyOn(), "passkeys are not set up", "HUB_PUBLIC_URL over https")
 	set.Switch("sign-in.github", h.cfg.GitHubOn(), "GitHub sign-in is not set up", "HUB_GITHUB_CLIENT_ID, HUB_GITHUB_CLIENT_SECRET")
 	set.Switch("sign-in.oidc", len(h.Auth.OIDCProviders()) > 0, "no OpenID provider is set up", "HUB_OIDC_PROVIDERS")

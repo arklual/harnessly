@@ -2,6 +2,7 @@
 // the host — a message to the chat linked to the document, a toast, a question, the shortcut commands of its screens,
 // the tools and the context it offers the chat's agent — goes through the SDK in the page's own process, under the
 // rights of its manifest, not through the host's modules. This is the one place it is wired to the host's work.
+import { createElement } from 'react';
 import { sendMessage } from '@/next/commands/messages';
 import { BridgeError, type IBridgeHandlers } from '@/next/features/app-views/bridge';
 import { connectBuiltin, type IBuiltinHl } from '@/next/features/app-views/builtin-app';
@@ -10,6 +11,7 @@ import { hostKeys } from '@/next/features/app-views/host-keys';
 import { pageOffer } from '@/next/features/app-views/page-tools';
 import { t } from '@/next/i18n';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
+import Modal from '@/next/features/shell/modal';
 import { toast } from '@/next/ui/toast';
 
 export const SINOPIA_APP = 'harnessly.sinopia';
@@ -28,6 +30,7 @@ export interface ISinopiaWhere {
 const uiHandlers = (): IBridgeHandlers => ({
   toast: (text, options) => void toast(text, options),
   confirm: (text) => askConfirm(SINOPIA_NAME, text),
+  modal: (props) => createElement(Modal, props),
   ...hostKeys(() => true, true),
 });
 

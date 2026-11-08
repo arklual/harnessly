@@ -8,6 +8,8 @@
 # OSS_BASE             the public line the commit goes on (default origin/main)
 # OSS_BRANCH           the local branch it lands in (default oss/sync-<short sha of commit>); an existing one is refused
 # OSS_EXCLUDE_FILE     paths left out, git pathspecs as globs (default tools/oss-exclude.txt of the exported commit)
+# OSS_PATCH_DIR        patches only the public tree takes, applied in name order before the excludes (default
+#                      tools/oss-public of the exported commit); a patch that no longer applies stops the export
 # OSS_FORBIDDEN_FILE   the leak check's forbidden words (see tools/oss-leak-check.sh; default tools/oss-forbidden.txt of
 #                      this checkout when it has one)
 # OSS_AUTHOR_NAME/EMAIL  author and committer of the sync commit (default: git config user.name/user.email)
@@ -49,6 +51,24 @@ export GIT_INDEX_FILE=$work/index
 
 # The tree: the commit's, minus the excluded paths, staged in a private index (the clone's own index is untouched).
 git -C "$src" read-tree "$commit"
+
+# Public-only patches: what the public line must not have yet (a dependency too fresh for its release-age rule, say),
+# reverted in the public tree alone. They are applied to the private index; one that does not apply stops the export,
+# so a changed file never goes out half-patched.
+patches=$work/patches
+mkdir "$patches"
+if [ -n "${OSS_PATCH_DIR:-}" ]; then
+  [ -d "$OSS_PATCH_DIR" ] && cp "$OSS_PATCH_DIR"/*.patch "$patches"/ 2>/dev/null || true
+else
+  git -C "$src" ls-tree --name-only "$commit" tools/oss-public/ 2>/dev/null | grep '\.patch$' |
+    while IFS= read -r p; do git -C "$src" show "$commit:$p" >"$patches/${p##*/}"; done || true
+fi
+for p in "$patches"/*.patch; do
+  [ -e "$p" ] || continue
+  git -C "$src" apply --cached --binary "$p" || die "public patch ${p##*/} no longer applies to $short; regenerate it"
+  echo "oss-export: public patch ${p##*/} applied"
+done
+
 excludes=$work/exclude
 if [ -n "${OSS_EXCLUDE_FILE:-}" ]; then
   cp "$OSS_EXCLUDE_FILE" "$excludes"

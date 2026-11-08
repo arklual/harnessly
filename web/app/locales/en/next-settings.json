@@ -66,6 +66,8 @@
   "next.settings.general.editor.hint": "Not available yet: a browser cannot open a file on the machine",
   "next.settings.general.enter": "Enter sends",
   "next.settings.general.enter.hint": "A new line is Shift+Enter",
+  "next.settings.general.dayStart": "Day starts at",
+  "next.settings.general.dayStart.hint": "Claude's spend “today” counts from this hour, Moscow time",
   "next.settings.general.idleStop": "Stop idle terminals",
   "next.settings.general.idleStop.hint": "A chat's terminal with no work closes and frees memory; the next message starts the agent again",
   "next.settings.general.idleStop.off": "Off",

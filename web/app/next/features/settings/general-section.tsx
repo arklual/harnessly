@@ -27,12 +27,17 @@ export const FEED_ROWS = [
 export const THEMES = ['light', 'dark', 'system'] as const;
 export type ThemeChoice = (typeof THEMES)[number];
 export const TEXT_SIZES = ['s', 'm', 'l'] as const satisfies readonly PersonSettings['textSize'][];
+/** The hours a day may start at, Moscow time. */
+export const DAY_START_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+const hourLabel = (hour: number): string => `${String(hour).padStart(2, '0')}:00`;
 
 /** «Really sign out?» stands this long, then goes back to the plain link. */
 const ASK_MS = 3000;
 
 export interface IGeneralSectionProps {
   enterSends: boolean;
+  /** The Moscow hour the person's day starts at: «today» of the agent's spend. */
+  dayStartHour: number;
   /** The tabs over the window are on (this browser's, as the theme). */
   topTabs: boolean;
   /** The pane opens by itself what the agent works on: a design, a document, a board (this browser's). */
@@ -60,6 +65,7 @@ export interface IGeneralSectionProps {
   /** The keys of the rows waiting for the machine. */
   busy: ReadonlySet<string>;
   onEnterSends: (on: boolean) => void;
+  onDayStartHour: (hour: number) => void;
   onTopTabs: (on: boolean) => void;
   onPaneAuto: (on: boolean) => void;
   onFeedKind: (kind: TShownKind, on: boolean) => void;
@@ -104,6 +110,7 @@ const SignOutRow = ({ account, onSignOut }: Pick<IGeneralSectionProps, 'account'
 
 const GeneralSection = ({
   enterSends,
+  dayStartHour,
   topTabs,
   paneAuto,
   feedKinds,
@@ -115,6 +122,7 @@ const GeneralSection = ({
   restartContinue,
   busy,
   onEnterSends,
+  onDayStartHour,
   onTopTabs,
   onPaneAuto,
   onFeedKind,
@@ -169,6 +177,16 @@ const GeneralSection = ({
         on={enterSends}
         busy={busy.has('enterSends')}
         onChange={onEnterSends}
+      />
+      <MenuRow
+        label={t('next.settings.general.dayStart')}
+        hint={t('next.settings.general.dayStart.hint')}
+        value={dayStartHour}
+        choices={DAY_START_HOURS.map((hour) => ({ value: hour, label: hourLabel(hour), sub: null }))}
+        busy={busy.has('dayStartHour')}
+        onPick={(value) => {
+          if (typeof value === 'number') onDayStartHour(value);
+        }}
       />
       {idleStop !== null && (
         <SegRow

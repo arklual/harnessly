@@ -663,6 +663,16 @@ const DesignlySiteBody = ({
     !!project &&
     project.design.kind !== 'slides' &&
     project.design.kind !== 'video';
+  // A board's error card sends its error to the design's chat. Looking at the design, that is a request to edit it:
+  // the mode switches, the chat opens and the message goes there, so the person sees it and the answer.
+  const sendBoardError = stage?.report;
+  const onBoardError =
+    mayEdit && sendBoardError
+      ? (words: string) => {
+          if (viewing) setMode(true);
+          sendBoardError(words);
+        }
+      : undefined;
   const modeButton: ISiteMode | undefined = (() => {
     if (pane || !onMode) return undefined;
     const state = t(modeStateKey(modeKindOf(project?.design.kind), editing));
@@ -750,6 +760,7 @@ const DesignlySiteBody = ({
       onToggleMax={onToggleMax}
       maxed={maxed}
       stage={viewing ? undefined : stage}
+      onBoardError={onBoardError}
       pane={pane && { onShare: copyLink, chat: paneChat }}
       toolPane={viewing ? null : toolPane}
       mode={modeButton}
@@ -778,6 +789,7 @@ const DesignlySiteBody = ({
       slotError,
       onReload: () => setReloadKey((n) => n + 1),
       stage: viewing ? undefined : stage,
+      onBoardError,
       pane: pane && { onBack: pane.onBack },
       access: shareButton,
       viewing,

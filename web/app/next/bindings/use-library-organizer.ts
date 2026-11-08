@@ -37,7 +37,7 @@ export const useLibraryOrganizer = (
   reload: () => Promise<void>,
   /** The projects that went to the trash leave the cards at once. */
   forget: (ids: string[]) => void,
-): { layout: ILibraryLayout; organizer: ILibraryOrganizer } => {
+): { layout: ILibraryLayout; organizer: ILibraryOrganizer; readLayout: () => Promise<void> } => {
   const [layout, setLayout] = useState<ILibraryLayout>(NO_LAYOUT);
   const [trash, setTrash] = useState<ITrashItem[] | null>(null);
   const restored = useLinkRestored(machine);
@@ -131,5 +131,5 @@ export const useLibraryOrganizer = (
       setTrash((list) => list?.filter((i) => i.id !== id) ?? null);
     },
   };
-  return { layout, organizer };
+  return { layout, organizer, readLayout };
 };

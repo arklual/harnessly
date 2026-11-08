@@ -9,7 +9,7 @@
 // A stop waits for the runtime: the row says «Останавливаем…» until the task's own event ends it. Each group's name
 // carries its icon, and the person's fold is kept per browser (the commands start folded). Under the recap stand the
 // pictures the agent looked at (shots-strip.tsx).
-import { forwardRef, useCallback, useState } from 'react';
+import { forwardRef, useCallback, useState, type ReactNode } from 'react';
 import type { BackgroundTask, Recap, Shot } from '@/next/protocol/v2';
 import { orderAgents, splitAgents } from '@/next/features/background/agent-order';
 import { isWorkflow, progressOf, workflowName } from '@/next/features/workflows/run';
@@ -59,6 +59,8 @@ export interface IBackgroundPanelProps {
   onStop: (task: BackgroundTask) => void;
   /** Folds the column away: on the phone, where it is a bottom sheet, its scrim and a swipe down do it. */
   onHide?: () => void;
+  /** What stands under the groups: the one-time codes the chat's commands wait for (features/safe/code-asks.tsx). */
+  codes?: ReactNode;
 }
 
 const OVER_WORD = {
@@ -220,7 +222,7 @@ const Group = ({ group, label, rows, head, rest, renderRow }: IGroupProps) => {
 };
 
 const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
-  ({ tasks, recap, shots, shotSrc, shown, now, stopping, onStop, onHide }, ref) => {
+  ({ tasks, recap, shots, shotSrc, shown, now, stopping, onStop, onHide, codes }, ref) => {
     const phone = usePhone();
     const [aside, setAside] = useState<HTMLElement | null>(null);
     const setRef = useCallback(
@@ -266,6 +268,7 @@ const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
               renderRow={row}
             />
           ))}
+          {codes}
         </aside>
       </>
     );

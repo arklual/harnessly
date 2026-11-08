@@ -73,6 +73,7 @@ import {
   boardChat,
   boardErrorAck,
   boardErrorSink,
+  personIsActing,
   readBoardError,
   type IBoardErrorSink,
 } from '@/next/features/designly/board-error';
@@ -88,6 +89,7 @@ import { loadStageOf, type ILoadProgress } from '@/next/features/designly/site-l
 import { useSiteLoad } from '@/next/features/designly/use-site-load';
 import SiteTweaks from '@/next/features/designly/site-tweaks';
 import { PaneDock, ZoomControls } from '@/next/features/designly/site-dock';
+import PagePicker, { PICKER_PLACE } from '@/next/features/designly/page-picker';
 import { ZOOM_PILL, ZoomPill } from '@/next/features/designly/zoom-pill';
 import { showPill, usePillPrefs } from '@/next/features/designly/floating-pill';
 import { PHONE_PILL, PhonePill, usePhonePillHidden } from '@/next/features/designly/phone-pill';
@@ -115,6 +117,8 @@ import '@/next/styles/site.css';
 import '@/next/styles/site-tools.css';
 import '@/next/styles/site-pane.css';
 
+/** A board that loaded but did not say it is drawn (a failed script) leaves the loader after this long, ms. */
+const DRAW_WAIT_MS = 8000;
 const POP_MS = 200;
 /** The pill under the page in the pane: a device keeps this much free under it (the pill, its gap and its margin). */
 const DOCK_ROOM = 64;
@@ -220,6 +224,11 @@ export interface ISiteViewProps {
   maxed: boolean;
   /** The chat beside the site and the field over it; without it the design is only looked at. */
   stage?: ISiteStage;
+  /**
+   * A board's error card sends its error to the design's chat: this takes it (and, looking at the design, switches to
+   * editing, opens the chat and sends). Absent: the card offers to copy only.
+   */
+  onBoardError?: (words: string) => void;
   /** Set when the design is shown in the right pane. */
   pane?: ISitePane;
   /** The right pane of the design's chat (browser, files, terminal), as beside a chat: its switch in the strip. */
@@ -306,7 +315,10 @@ export interface ISiteStage {
   /** The chat alone, without the window it stands in (a deck's panel hosts it); absent where the stage has no chat. */
   deckChat?: ReactNode;
   /** Sends a message on the person's behalf (a deck's «Короче», a layout change, «＋ слайд»). */
-  ask?: (text: string) => void;
+  ask?: (
+    text: string,
+  ) => void; /** Sends a board's error to the design's chat, opened where it is seen (a board's «Отправить в чат»). */
+  report?: (text: string) => void;
 }
 
 interface IMoreItem {
@@ -383,6 +395,7 @@ const SiteView = ({
   onToggleMax,
   maxed,
   stage,
+  onBoardError,
   pane,
   toolPane = null,
   access,
@@ -414,6 +427,10 @@ const SiteView = ({
   const [browserId, setBrowserId] = useState<string | null>(memory.initial.browser);
   const [bars, setBars] = useState<TBars>(BARS.full);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  // A board of the library says when it is drawn (tk:drawn, after lib-ready): its frame is loading until then.
+  const [libReadyFor, setLibReadyFor] = useState<string | null>(null);
+  const [drawnFor, setDrawnFor] = useState<string | null>(null);
+  const [drawGaveUp, setDrawGaveUp] = useState<string | null>(null);
   /** What the page of a frame said of its way (the bridge's progress); a frame of another page starts without. */
   const [progress, setProgress] = useState<(ILoadProgress & { key: string }) | null>(null);
   const [closing, setClosing] = useState<string | null>(null);
@@ -602,9 +619,11 @@ const SiteView = ({
   const latestStage = useRef(stage);
   // A board's error card sends its error to the chat's field (board-error.ts): once per error, for the board on screen.
   const boardErrors = useRef<IBoardErrorSink | null>(null);
+  const latestBoardError = useRef(onBoardError);
   const latestPagePath = useRef(pagePath);
   useEffect(() => {
     latestPagePath.current = pagePath;
+    latestBoardError.current = onBoardError;
   });
   /** A button on a picture of the page was pressed: the editor or the generator is open for it. */
   const [imageOpen, setImageOpen] = useState<IImageOpen | null>(null);
@@ -754,7 +773,7 @@ const SiteView = ({
     // The board's script picks blocks and wears the notes' looks for the stage, as the slot's bridge does.
     const toLib = () => {
       const now = latestStage.current;
-      frame.contentWindow?.postMessage(boardChat(!guest && now !== null), origin);
+      frame.contentWindow?.postMessage(boardChat(!guest && latestBoardError.current !== undefined), origin);
       if (!now) return;
       frame.contentWindow?.postMessage({ type: 'tk:pick', on: now.pick }, origin);
       frame.contentWindow?.postMessage({ type: 'tk:hold', on: now.hold === true }, origin);
@@ -772,9 +791,8 @@ const SiteView = ({
       if (!fromFrame(event, frame.contentWindow, origin)) return;
       const boardError = readBoardError(event.data);
       if (boardError) {
-        const stageNow = latestStage.current;
-        if (guest || !stageNow) return;
-        boardErrors.current ??= boardErrorSink((words) => latestStage.current?.onAttach(words));
+        if (guest || !latestBoardError.current || !personIsActing()) return;
+        boardErrors.current ??= boardErrorSink((words) => latestBoardError.current?.(words));
         if (boardErrors.current.take(boardError, latestPagePath.current ?? ''))
           frame.contentWindow?.postMessage(boardErrorAck(boardError), origin);
         return;
@@ -835,7 +853,12 @@ const SiteView = ({
           setImageOpen({ act: message.act, box: screenBoxOf(frame.getBoundingClientRect(), message.act) });
         return;
       }
+      if (message?.k === 'drawn') {
+        setDrawnFor(`${src}#${reloadKey}`);
+        return;
+      }
       if (message?.k === 'lib-ready') {
+        setLibReadyFor(`${src}#${reloadKey}`);
         hostTweaks();
         sendImages();
         // A board of the library follows the pinned blocks itself (its script, not the slot's bridge, which says hello).
@@ -1079,7 +1102,14 @@ const SiteView = ({
   // The wait is the whole way: the machine opens the page, then the frame loads it. A design with no board has nothing
   // to wait for; a page that has not loaded for too long is a failure, not a wait.
   const waiting = src === null && error === null && (tabs.length > 0 || title === '');
-  const pending = waiting || (src !== null && loadedFor !== frameKey);
+  // A board of the library is drawn only when its script says so; a page without it, at its load.
+  const drawing = libReadyFor === frameKey && drawnFor !== frameKey && drawGaveUp !== frameKey;
+  const pending = waiting || (src !== null && (loadedFor !== frameKey || drawing));
+  useEffect(() => {
+    if (loadedFor !== frameKey || !drawing) return;
+    const timer = setTimeout(() => setDrawGaveUp(frameKey), DRAW_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [loadedFor, frameKey, drawing]);
   const clock = useSiteLoad(`${tab}|${pagePath ?? ''}|${reloadKey}`, pending);
   const stalled = clock.stalled;
   const failed = error !== null || stalled;
@@ -1410,26 +1440,17 @@ const SiteView = ({
                     </span>
                   </button>
                   {pop.shownPop === POP.add && (
-                    <div className="hx-site-menu hx-site-menu--start" data-state={pop.state} role="menu">
-                      <div className="hx-dl-pop__label">{t('next.site.pages')}</div>
-                      {pages.map((p) => (
-                        <button
-                          key={p.path}
-                          type="button"
-                          role="menuitem"
-                          className="hx-option"
-                          onClick={() => {
-                            pop.close();
-                            onNewTab(p.path);
-                          }}
-                        >
-                          <span className="hx-option__text">
-                            <span className="hx-option__name">{p.name}</span>
-                            <span className="hx-option__desc">{p.path}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                    <PagePicker
+                      pages={pages}
+                      path={pagePath}
+                      state={pop.state}
+                      place={PICKER_PLACE.start}
+                      onGo={(to) => {
+                        pop.close();
+                        onNewTab(to);
+                      }}
+                      onClose={pop.close}
+                    />
                   )}
                 </div>
               </div>
@@ -1540,50 +1561,27 @@ const SiteView = ({
                 <span className="hx-browser__load" data-on={loading} />
               </button>
               {pop.shownPop === POP.pages && (
-                <div
-                  className="hx-site-menu hx-site-menu--center hx-sheet-phone"
-                  data-state={pop.state}
-                  role="menu"
-                >
-                  <SheetGrip />
-                  <div className="hx-dl-pop__label">{t('next.site.pages')}</div>
-                  {pages.map((p) => (
-                    <div key={p.path} className="hx-site-page">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="hx-option"
-                        aria-selected={p.path === pagePath}
-                        onClick={() => {
+                <PagePicker
+                  pages={pages}
+                  path={pagePath}
+                  state={pop.state}
+                  place={PICKER_PLACE.center}
+                  onGo={(to) => {
+                    pop.close();
+                    onNavigate(to);
+                  }}
+                  onClose={pop.close}
+                  onSave={
+                    downloads
+                      ? (to, at) => {
+                          // The list leaves; the page's downloads open where its button was.
                           pop.close();
-                          onNavigate(p.path);
-                        }}
-                      >
-                        <span className="hx-option__text">
-                          <span className="hx-option__name">{p.name}</span>
-                          <span className="hx-option__desc">{p.path}</span>
-                        </span>
-                        <Icon name="check" size="sm" className="hx-option__check" />
-                      </button>
-                      {downloads && (
-                        <button
-                          type="button"
-                          className="hx-head-btn hx-site-page__dl"
-                          aria-label={t('next.download.pageOf', { name: p.name })}
-                          title={t('next.download.page')}
-                          onClick={(event) => {
-                            // The list leaves; the page's downloads open where its button was.
-                            const at = event.currentTarget.getBoundingClientRect();
-                            pop.close();
-                            setPageSaving({ path: p.path, x: at.right, y: at.bottom, open: true });
-                          }}
-                        >
-                          <Icon name="download" size="sm" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                          setPageSaving({ path: to, x: at.right, y: at.bottom, open: true });
+                        }
+                      : undefined
+                  }
+                  saveLabel={(p) => t('next.download.pageOf', { name: p.name })}
+                />
               )}
             </div>
             {compact && stage && (

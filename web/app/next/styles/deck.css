@@ -383,6 +383,56 @@
 .hx-deck__frame[data-on='1'] {
   opacity: 1;
 }
+/* The slide while its board loads: a skeleton of the slide with a spinner, until the board says it is drawn
+   (fonts, pictures, videos in); it fades out as the slide fades in. */
+.hx-deck__slide[data-loading] {
+  background: var(--hx-bg-raised);
+}
+.hx-deck__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  animation: hx-deck-loading-in 240ms var(--hx-ease-out) 120ms backwards;
+}
+.hx-deck__loading-sk {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+}
+@keyframes hx-deck-loading-in {
+  from {
+    opacity: 0;
+  }
+}
+.hx-deck__spin {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, var(--hx-fg-3) 35%, transparent);
+  border-top-color: var(--hx-fg-1);
+  animation: hx-spin 0.9s linear infinite;
+}
+/* A turn to a slide that takes a while: the old slide stays, the spinner sits in its corner. */
+.hx-deck__spin[data-corner='1'] {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  animation:
+    hx-spin 0.9s linear infinite,
+    hx-deck-loading-in 200ms var(--hx-ease-out) backwards;
+}
 .hx-deck[data-pick='1'] .hx-deck__slot {
   cursor: crosshair;
 }

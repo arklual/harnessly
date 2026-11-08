@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -113,5 +114,28 @@ func TestMeVoiceSettings(t *testing.T) {
 		if code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", bad); code != http.StatusBadRequest || res["code"] != "bad-request" {
 			t.Fatalf("%s: %d %v", bad, code, res)
 		}
+	}
+}
+
+// The hour the day starts at: 3 (Moscow) by default and for a record written before it, 0–23 taken, else refused.
+func TestMeDayStartHour(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "v2", "me.json")
+	_ = os.MkdirAll(filepath.Dir(file), 0o755)
+	_ = os.WriteFile(file, []byte(`{"settings":{"uiVersion":"next","locale":"en","textSize":"m","enterSends":true},"rev":4}`), 0o600)
+	srv := &wire.Server{Me: &wire.FileMe{Path: file}}
+	_, me := meCall(t, srv, "GET", "/api/v2/me", "")
+	settings, _ := me["settings"].(map[string]any)
+	if settings["dayStartHour"] != float64(3) || settings["locale"] != "en" || me["rev"] != float64(4) {
+		t.Fatalf("an older record: %v", me)
+	}
+	for _, bad := range []string{`24`, `-1`, `"5"`, `2.5`} {
+		if code, _ := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"dayStartHour":`+bad+`}}`); code == 200 {
+			t.Fatalf("%s taken", bad)
+		}
+	}
+	code, me := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"dayStartHour":0}}`)
+	settings, _ = me["me"].(map[string]any)["settings"].(map[string]any)
+	if code != 200 || settings["dayStartHour"] != float64(0) {
+		t.Fatalf("patch: %d %v", code, me)
 	}
 }

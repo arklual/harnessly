@@ -4,6 +4,7 @@
 import { useEffect } from 'react';
 import { createKeyedStore, useKey } from '@/next/core/store';
 import { useLinkRestored } from '@/next/stores/connection';
+import { useDayStartHour } from '@/next/stores/me';
 import { loadMachineLimits } from '@/next/features/limits/api';
 import type { LimitsView, MachineLimits } from '@/next/features/limits/model';
 import type { MachineId, Provider } from '@/next/protocol/v2';
@@ -31,6 +32,7 @@ export const useAgentLimits = (machine: MachineId | null, provider: Provider | n
   const entry = useKey(entries, machine);
   // The link coming back asks at once, not at the next minute.
   const restored = useLinkRestored(machine);
+  const dayStartHour = useDayStartHour();
 
   useEffect(() => {
     if (!machine) return;
@@ -57,7 +59,10 @@ export const useAgentLimits = (machine: MachineId | null, provider: Provider | n
   }, [machine, restored]);
 
   if (!entry || !provider || !machine) return null;
-  if (entry.limits) return { state: 'ready', provider, limits: entry.limits[provider] };
+  // The spend is Claude's: a Codex chat goes by its limits only.
+  const claudeSpend = provider === 'claude' ? (entry.limits?.claudeSpend ?? null) : null;
+  const spend = claudeSpend ? { spend: claudeSpend, dayStartHour } : null;
+  if (entry.limits) return { state: 'ready', provider, limits: entry.limits[provider], spend };
   if (entry.failed) return { state: 'failed', provider, onRetry: () => ask(machine) };
-  return { state: 'ready', provider, limits: null };
+  return { state: 'ready', provider, limits: null, spend: null };
 };

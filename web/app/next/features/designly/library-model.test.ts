@@ -9,6 +9,8 @@ import {
   isNarrowed,
   matchesFilters,
   projectsIn,
+  ROUTE,
+  routeToCard,
   sortCards,
   systemsOf,
 } from '@/next/features/designly/library-model';
@@ -81,5 +83,54 @@ describe('folders', () => {
   it('names the systems of the cards once', () => {
     const s = { id: 'k', label: 'K' };
     expect(systemsOf([card({ system: s }), card({ id: 'b', system: s }), card({ id: 'c' })])).toEqual([s]);
+  });
+});
+
+describe('the way to a card (the tour)', () => {
+  const folders = [
+    { id: 'f-demo', name: 'Демо', parent: '' },
+    { id: 'f-work', name: 'Работа', parent: '' },
+    { id: 'f-sub', name: 'Архив', parent: 'f-work' },
+  ];
+  const view = { folders, here: '', trashOpen: false, matches: true, searching: false, organized: true };
+
+  it('is the card where the card lies', () => {
+    expect(routeToCard(card({ folder: null }), view)).toEqual({ route: ROUTE.card });
+    expect(routeToCard(card({ folder: 'f-demo' }), { ...view, here: 'f-demo' })).toEqual({
+      route: ROUTE.card,
+    });
+  });
+
+  it('opens the folder the card lies in, one click at a time', () => {
+    expect(routeToCard(card({ folder: 'f-demo' }), view)).toEqual({ route: ROUTE.folder, folder: 'f-demo' });
+    expect(routeToCard(card({ folder: 'f-sub' }), view)).toEqual({ route: ROUTE.folder, folder: 'f-work' });
+    expect(routeToCard(card({ folder: 'f-sub' }), { ...view, here: 'f-work' })).toEqual({
+      route: ROUTE.folder,
+      folder: 'f-sub',
+    });
+  });
+
+  it('goes up from another folder', () => {
+    expect(routeToCard(card({ folder: 'f-demo' }), { ...view, here: 'f-work' })).toEqual({ route: ROUTE.up });
+    expect(routeToCard(card({ folder: null }), { ...view, here: 'f-demo' })).toEqual({ route: ROUTE.up });
+  });
+
+  it('asks to clear what hides the card, and leaves a search alone when the card shows in it', () => {
+    expect(routeToCard(card({ folder: 'f-demo' }), { ...view, matches: false })).toEqual({
+      route: ROUTE.reset,
+    });
+    expect(routeToCard(card({ folder: 'f-demo' }), { ...view, trashOpen: true })).toEqual({
+      route: ROUTE.reset,
+    });
+    expect(routeToCard(card({ folder: 'f-demo' }), { ...view, searching: true })).toEqual({
+      route: ROUTE.card,
+    });
+  });
+
+  it('knows a card that is gone, and a library that is not laid out', () => {
+    expect(routeToCard(undefined, view)).toEqual({ route: ROUTE.gone });
+    expect(routeToCard(card({ folder: 'f-demo' }), { ...view, organized: false })).toEqual({
+      route: ROUTE.card,
+    });
   });
 });

@@ -21,3 +21,6 @@ web/e2e/deck-share-pdf.spec.ts
 
 # The chart's pixel-parity check drives the internal design board's bundle as the reference and names its paths.
 web/e2e/parity/viz
+
+# Patches only the public tree takes (tools/oss-export.sh applies them); the public line gets their result, not them.
+tools/oss-public

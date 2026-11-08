@@ -580,7 +580,7 @@
   root.appendChild(card);
   var boards = [];
   var paint = function () {};
-  // «Send to the chat» asks the host to put the error into the chat's field (`tk:board-error`); the card says it is there only
+  // «Send to the chat» asks the host to send the error to the design's chat (`tk:board-error`); the card says it is there only
   // when the host answers (`tk:board-error-ack`). Only a host with a chat offers it (`tk:board-chat {on}`); elsewhere the
   // card offers to copy the error.
   var chatHost = false;
@@ -654,7 +654,7 @@
     var focused = root.activeElement && card.contains(root.activeElement) ? root.activeElement.getAttribute('data-act') : null;
     card.textContent = '';
     card.appendChild(make('h2', {}, 'The board did not render'));
-    card.appendChild(make('p', {}, state === 'sent' ? 'The error is in the chat\'s field: send the message, and the agent will fix it.' : state === 'local' ? 'The error is in the design\'s own code, not in the panel: it fails the same way in Claude Design.' : 'The error is in the design\'s code. Send it to the chat, and the agent will find the cause and fix it.'));
+    card.appendChild(make('p', {}, state === 'sent' ? 'The error is sent to the chat: the agent is looking into it.' : state === 'local' ? 'The error is in the design\'s own code, not in the panel: it fails the same way in Claude Design.' : 'The error is in the design\'s code. Send it to the chat, and the agent will find the cause and fix it.'));
     card.appendChild(make('pre', {}, first.message + (first.stack ? '\n\n' + first.stack.split('\n').slice(0, 6).join('\n') : '')));
     var actions = make('div', { class: 'actions' });
     if (state === 'sent') actions.appendChild(make('span', { class: 'done', role: 'status' }, 'In the chat ✓'));
@@ -942,6 +942,23 @@
   // What the board has to offer grows after its first paint (the runtime draws it, the list of boards arrives): look again.
   setInterval(function () { tellHost(false); }, 1000);
   if (parentWin) { try { parentWin.postMessage({ type: 'tk:lib-ready' }, hostOrigin); } catch (e) {} }
+  // The page is drawn: its runtime has put something in its root and the fonts, pictures and videos of it are
+  // in. Told once per load (tk:drawn): the host keeps its loader over the page until then, not over a blank page.
+  function pageRoot() { return document.getElementById('dc-root') || document.getElementById('root') || document.body; }
+  function tellDrawn() {
+    var tries = 0;
+    (function look() {
+      var root = pageRoot();
+      var has = !!root && Array.prototype.some.call(root.children, function (el) {
+        return !domOurs(el) && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
+      });
+      if (!has && tries++ < 100) { setTimeout(look, 100); return; }
+      boardDrawn(root || document.body).then(function () {
+        if (parentWin) { try { parentWin.postMessage({ type: 'tk:drawn' }, hostOrigin); } catch (e) {} }
+      });
+    })();
+  }
+  if (document.readyState === 'complete') tellDrawn(); else addEventListener('load', tellDrawn, { once: true });
 
   // The canvas's zoom lives in the host: a pinch (a wheel with ctrl on a trackpad), ⌘/Ctrl + wheel and Safari's gesture
   // over the board would zoom the browser's page or nothing. They are told to the host as a wheel's delta at the cursor
@@ -2018,12 +2035,68 @@
       if (!el.hasAttribute('data-tk-deck-text') && deckEditable(el)) el.setAttribute('data-tk-deck-text', '');
     });
   }
+  // The board is drawn when the engine has put something in #dc-root, its fonts are in, every picture (an <img> and a
+  // background) is decoded and a video has its first frame, then two frames later, when it is on the screen: the host
+  // shows the slide only then, not a blank page while it loads.
+  var deckDrawnTurn = 0;
+  function deckWaitPicture(url) {
+    return new Promise(function (done) {
+      var img = new Image();
+      img.onload = img.onerror = function () { done(); };
+      img.src = url;
+      if (img.decode) img.decode().then(done, done);
+    });
+  }
+  function deckDrawn() {
+    var root = document.getElementById('dc-root') || document.body;
+    if (!root || root.children.length === 0) return null;
+    return boardDrawn(root);
+  }
+  function boardDrawn(root) {
+    var waits = [];
+    if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
+    Array.prototype.forEach.call(root.querySelectorAll('img'), function (img) {
+      if (img.getAttribute('loading') === 'lazy') img.setAttribute('loading', 'eager');
+      if (img.complete && img.naturalWidth > 0) return;
+      waits.push(new Promise(function (done) {
+        img.addEventListener('load', function () { done(); }, { once: true });
+        img.addEventListener('error', function () { done(); }, { once: true });
+        if (img.complete) done();
+      }));
+    });
+    Array.prototype.forEach.call(root.querySelectorAll('video'), function (video) {
+      if (video.readyState >= 2) return;
+      waits.push(new Promise(function (done) {
+        video.addEventListener('loadeddata', function () { done(); }, { once: true });
+        video.addEventListener('error', function () { done(); }, { once: true });
+      }));
+    });
+    var seen = {};
+    var all = root.querySelectorAll('*');
+    for (var i = 0; i < all.length && i < 600; i++) {
+      var bg = getComputedStyle(all[i]).backgroundImage;
+      if (!bg || bg === 'none') continue;
+      bg.replace(/url\(["']?([^"')]+)["']?\)/g, function (_, url) {
+        if (!seen[url]) { seen[url] = true; waits.push(deckWaitPicture(url)); }
+        return '';
+      });
+    }
+    return Promise.all(waits).then(function () {
+      return new Promise(function (done) { requestAnimationFrame(function () { requestAnimationFrame(done); }); });
+    });
+  }
   function deckTellReady() {
     var message = { type: 'tk:deck-ready', w: innerWidth, h: innerHeight, steps: deckSteps() };
     var signature = JSON.stringify(message);
     if (signature === deckReady) return;
+    var drawn = deckDrawn();
+    // Nothing drawn yet: the engine's first render is on its way, and its change calls deckRefresh again.
+    if (drawn === null) return;
     deckReady = signature;
-    tellDeck(message);
+    var turn = ++deckDrawnTurn;
+    drawn.then(function () {
+      if (deckOn && turn === deckDrawnTurn) tellDeck(message);
+    });
   }
   // The engine draws again on every change of the board: marks and steps are put back, the size and steps told again.
   function deckRefresh() {

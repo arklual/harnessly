@@ -66,6 +66,8 @@
   "next.settings.general.editor.hint": "Пока недоступно: из браузера нельзя открыть файл на машине",
   "next.settings.general.enter": "Enter отправляет",
   "next.settings.general.enter.hint": "Перенос строки — Shift+Enter",
+  "next.settings.general.dayStart": "Начало дня",
+  "next.settings.general.dayStart.hint": "С этого часа по Москве считаются траты Claude «сегодня»",
   "next.settings.general.idleStop": "Останавливать простаивающие терминалы",
   "next.settings.general.idleStop.hint": "Терминал чата без работы закрывается и освобождает память; следующее сообщение запустит агента снова",
   "next.settings.general.idleStop.off": "Выкл",

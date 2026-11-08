@@ -86,6 +86,8 @@ export interface IVideoViewProps {
   access?: ISiteAccess;
   /** The video is looked at, without the chat, comments and the author's tools, until the editing is asked for. */
   viewing?: boolean;
+  /** A board's error card sends its error to the design's chat (switching to editing); absent: it only copies. */
+  onBoardError?: (words: string) => void;
   /** «Редактировать» / «Запросить доступ» while looking, «Просмотр» while editing; absent in the pane of a chat. */
   mode?: ISiteMode;
   /** The person may change the project: «Скачать» offers its files as archives too. */
@@ -337,6 +339,7 @@ const VideoView = (props: IVideoViewProps) => {
         loop={loop}
         onComment={() => !viewing && comment(range, null)}
         onPick={(pick) => !viewing && comment(null, pick)}
+        onBoardError={props.onBoardError}
         command={view.command}
         onPlaying={setPlaying}
         overlays={overlays}

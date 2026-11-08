@@ -14,7 +14,7 @@ import {
   type IBaseView,
   type ISetupView,
 } from '@/next/features/setup/api';
-import { ACTION, cardOf, type TAction } from '@/next/features/setup/card-model';
+import { ACTION, STEP_ACT, cardOf, type TAction } from '@/next/features/setup/card-model';
 import SetupCard from '@/next/features/setup/setup-card';
 import type { MachineId } from '@/next/protocol/v2';
 import { usePresence } from '@/next/ui/presence';
@@ -59,6 +59,8 @@ export const MachineSetup = ({
   const [seen, setSeen] = useState<ISeen | null>(null);
   const [hidden, setHidden] = useState(readHidden);
   const [picked, setPicked] = useState<number | null>(null);
+  // The failed step the person pressed: the line shows its error.
+  const [focus, setFocus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [doneGone, setDoneGone] = useState('');
   const [proxy, setProxy] = useState('');
@@ -118,7 +120,10 @@ export const MachineSetup = ({
     (!view.done || (seen?.wasOpen === true && doneGone !== view.hash));
   // The card is built once per view: usePresence takes a new object for a new card, and a fresh one on every render
   // would make it set its state on every render (React #301, a white page).
-  const shownCard = useMemo(() => (showing && view ? cardOf(view, picked) : null), [showing, view, picked]);
+  const shownCard = useMemo(
+    () => (showing && view ? cardOf(view, picked, focus) : null),
+    [showing, view, picked, focus],
+  );
   const card = usePresence(shownCard, EXIT_MS);
   if (!card.value) return null;
 
@@ -175,6 +180,10 @@ export const MachineSetup = ({
       closing={card.state === 'closing'}
       busy={busy}
       onPick={(i) => setPicked((p) => (p === i ? null : i))}
+      onStep={(step) => {
+        if (step.act === STEP_ACT.safe) onOpenSafe();
+        else setFocus(step.itemId);
+      }}
       onAction={(k) => void act(k)}
       onProxy={sendProxy}
       proxy={proxy}

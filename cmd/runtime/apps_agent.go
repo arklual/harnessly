@@ -51,6 +51,7 @@ var (
 		"/api/cli/asks", "/api/cli/apps", "/api/cli/design",
 		"/api/cli/notify/send", "/api/cli/notify/bots",
 		"/api/cli/secrets", "/api/cli/secrets/ask", "/api/cli/secrets/use", "/api/cli/secrets/file",
+		"/api/cli/secrets/code", "/api/cli/secrets/code/wait", "/api/cli/secrets/code/cancel",
 		"/api/sites-token",
 	}
 	agentRoutePrefixes = [...]string{"/api/cli/preview/", "/api/cli/asks/", "/api/cli/apps/", "/api/cli/design/", "/api/sites/"}

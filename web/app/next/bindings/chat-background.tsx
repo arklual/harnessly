@@ -5,15 +5,19 @@
 // says. The header's button shows it or folds it, and a fold stays until the chat is changed. A stop goes to the
 // runtime as bg.stop and waits for it.
 import { useState } from 'react';
+import { useCodeAsks } from '@/next/bindings/code-asks';
 import { settled } from '@/next/bindings/outcome';
 import { stopBackground } from '@/next/commands';
 import BackgroundPanel from '@/next/features/background/background-panel';
+import { cancelCode, isSafeRefusal, putCode, type ICodeAsk } from '@/next/features/safe/api';
+import CodeAsks, { CODE_EXIT_MS, CODE_SENT, type TCodeSent } from '@/next/features/safe/code-asks';
 import { useRailRoom } from '@/next/features/background/rail-room';
 import type { IHeaderBackground } from '@/next/features/header/chat-header';
 import { machineApi } from '@/next/core/net/machine';
 import type { BackgroundTask, ConvId, MachineId, Shot } from '@/next/protocol/v2';
 import { useBackground, useShots } from '@/next/stores/conversation';
 import { useConversation } from '@/next/stores/conversations';
+import { usePresentFlag } from '@/next/ui/presence';
 import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
 
@@ -30,7 +34,12 @@ export const useChatBackground = (
   const [rail, setRail] = useState<HTMLElement | null>(null);
   const [stopping, setStopping] = useState<ReadonlySet<string>>(() => new Set());
   const { room, pane } = useRailRoom(rail);
-  const has = tasks.length > 0 || recap !== null || (shots?.length ?? 0) > 0;
+  const codeAsks = useCodeAsks(machine);
+  // Only this chat's commands: a code is typed where its agent works.
+  const codes = conv ? codeAsks.asks.filter((a) => a.conv === conv) : [];
+  // The column stays while the last card folds away, then leaves with it.
+  const codesMounted = usePresentFlag(codes.length > 0, CODE_EXIT_MS * 2).mounted;
+  const has = tasks.length > 0 || recap !== null || (shots?.length ?? 0) > 0 || codesMounted;
   // The pane opening takes back a column the person had opened (a fold they made stays); this runs in render, once per change.
   const [paneWas, setPaneWas] = useState(pane);
   if (pane !== paneWas) {
@@ -38,8 +47,8 @@ export const useChatBackground = (
     if (pane && asked?.shown) setAsked(null);
   }
   const override = asked && asked.conv === conv ? asked.shown : null;
-  // On its own the column is open when it has room and the pane is shut.
-  const auto = room && !pane;
+  // On its own the column is open when it has room and the pane is shut, and whenever a command waits for a code.
+  const auto = (room && !pane) || codes.length > 0;
   const shown = has && (override ?? auto);
 
   // What the button asks for: what the room already says is no ask at all, so the column keeps following the room.
@@ -78,6 +87,15 @@ export const useChatBackground = (
         }
       : null;
 
+  const putOne = async (ask: ICodeAsk, code: string): Promise<TCodeSent> => {
+    if (!machine) return CODE_SENT.failed;
+    const res = await putCode(machine, ask.id, code);
+    if (!('ok' in res)) return CODE_SENT.failed;
+    if (!isSafeRefusal(res.value)) return CODE_SENT.ok;
+    if (res.value.refused === 'not-found') return CODE_SENT.gone;
+    return res.value.refused === 'bad-code' ? CODE_SENT.bad : CODE_SENT.failed;
+  };
+
   const panel = has ? (
     <BackgroundPanel
       ref={setRail}
@@ -90,6 +108,18 @@ export const useChatBackground = (
       stopping={stopping}
       onStop={onStop}
       onHide={shown ? toggle : undefined}
+      codes={
+        <CodeAsks
+          asks={codes}
+          now={now}
+          skew={codeAsks.skew}
+          onPut={putOne}
+          onCancel={async (ask) => {
+            if (machine) await cancelCode(machine, ask.id);
+          }}
+          onDone={(ask) => codeAsks.drop(ask.id)}
+        />
+      }
     />
   ) : null;
 

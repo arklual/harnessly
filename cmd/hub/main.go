@@ -85,6 +85,8 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 		return runSites(ctx, args, lookup, stdout, stderr)
 	case "storage":
 		return runStorage(ctx, args, lookup, stdout, stderr)
+	case "store":
+		return runStore(ctx, args, lookup, stdout, stderr)
 	case "seed":
 		return runSeed(ctx, args, lookup, stdout, stderr)
 	case "env-seed":
@@ -102,7 +104,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 }
 
-const usage = `usage: hub [serve | check-config | healthcheck | sites | storage migrate [--dry-run] [--remove-source] | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | doctor | schema snapshot [--dir d] [--postgres url] | machine-code --space <slug> --owner <email> [--profile p] | version]
+const usage = `usage: hub [serve | check-config | healthcheck | sites | storage migrate [--dry-run] [--remove-source] | store backup|gc|migrate | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | doctor | schema snapshot [--dir d] [--postgres url] | machine-code --space <slug> --owner <email> [--profile p] | version]
 
 The hub is configured by HUB_* environment variables; see docs/hub/deploy.md.
 `
@@ -283,6 +285,7 @@ func describe(w io.Writer, cfg *config.Config) {
 		fmt.Fprintf(w, "files          the data folder %s (HUB_STORAGE=s3 moves them to a bucket)\n", cfg.DataDir)
 	}
 	describeSites(w, cfg)
+	describeStore(w, cfg)
 	fmt.Fprintf(w, "SSH install    %s\n", on(cfg.SSH))
 	fmt.Fprintf(w, "container      %s\n", on(cfg.ContainerImage != ""))
 	fmt.Fprintf(w, "local machine  %s\n", on(cfg.LocalCodeFile != ""))

@@ -638,3 +638,43 @@ func TestLoadSafe(t *testing.T) {
 		}
 	}
 }
+
+// The store reuses the hub's database and bucket; its own settings only point it elsewhere.
+func TestStore(t *testing.T) {
+	data := t.TempDir()
+	m := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040", "HUB_DATA_DIR": data}
+	c, err := Load(env(m))
+	if err != nil || c.Store.Off || c.Store.DatabaseURL != "sqlite://"+filepath.Join(data, "store") || c.Store.S3.Endpoint != "" || c.Store.PGPrefix != "" {
+		t.Fatalf("default: %v %+v", err, c.Store)
+	}
+	m["HUB_DATABASE_URL"], m["HUB_DB_MIGRATE_URL"] = "postgres://u:p@pooler/hub", "postgres://u:p@db/hub"
+	if c, err = Load(env(m)); err != nil || c.Store.DatabaseURL != "postgres://u:p@db/hub" || c.Store.PGPrefix != "filestore_" {
+		t.Fatalf("the hub's Postgres, directly: %v %+v", err, c.Store)
+	}
+	m["HUB_STORE_DATABASE_URL"] = "postgres://u:p@center/design"
+	if c, err = Load(env(m)); err != nil || c.Store.DatabaseURL != "postgres://u:p@center/design" || c.Store.PGPrefix != "" {
+		t.Fatalf("a center's database as it is: %v %+v", err, c.Store)
+	}
+	m["HUB_STORE_S3_PREFIX"] = "design-blobs/"
+	if _, err := Load(env(m)); err == nil {
+		t.Fatal("a store prefix without HUB_STORAGE=s3")
+	}
+	m["HUB_STORAGE"], m["HUB_S3_ENDPOINT"], m["HUB_S3_BUCKET"], m["HUB_S3_ACCESS_KEY"], m["HUB_S3_SECRET_KEY"], m["HUB_S3_PREFIX"] = "s3", "http://minio:9000", "hub", "k", "s", "p/"
+	if c, err = Load(env(m)); err != nil || c.Store.S3.Bucket != "hub" || c.Store.S3.Prefix != "design-blobs/" || c.Store.S3.AccessKey != "k" {
+		t.Fatalf("the hub's bucket: %v %+v", err, c.Store.S3)
+	}
+	delete(m, "HUB_STORE_S3_PREFIX")
+	if c, err = Load(env(m)); err != nil || c.Store.S3.Prefix != "p/store/" {
+		t.Fatalf("the default prefix: %v %+v", err, c.Store.S3)
+	}
+	for k, v := range map[string]string{"HUB_STORE": "maybe", "HUB_STORE_DATABASE_URL": "mysql://x"} {
+		bad := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040", "HUB_DATA_DIR": data, k: v}
+		if _, err := Load(env(bad)); err == nil {
+			t.Errorf("%s=%s was taken", k, v)
+		}
+	}
+	m["HUB_STORE"] = "off"
+	if c, err = Load(env(m)); err != nil || !c.Store.Off {
+		t.Fatalf("off: %v %+v", err, c.Store)
+	}
+}

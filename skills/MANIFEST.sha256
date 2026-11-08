@@ -3,7 +3,7 @@ fed2fa9f5d1629c90259d31d21df949318deea06fb23a9b1b403382bd4164690  ./agent-skills
 14ea77bd7157e3453d73bf62fabcba03644637fe8c8d9a32ed139421889481d7  ./agent-skills/plugins/boards/skills/boards/SKILL.md
 1d77b9e33590fec868700eb7b7f81740f33a4e5d02f2dcc21b656611c4396de1  ./agent-skills/plugins/boards/skills/boards/scripts/boards
 d6276c0b307e6a7050a677ca964789e5bac1bd4206d02aa2cf608ff7ad9b157a  ./agent-skills/plugins/harnessly/.claude-plugin/plugin.json
-62afb0357d39aff23cc3ad564041079a41b2aae9b6dc8be77ac526f190552f9b  ./agent-skills/plugins/harnessly/skills/apps/SKILL.md
+60bc0bdc8dfa4270833c400e52dd46dbad877ffce4fed2a249e59b9a0a095df1  ./agent-skills/plugins/harnessly/skills/apps/SKILL.md
 04a56edb18c619c3b4bf3a4a9fc230c2444466b57a73bc5d01d470e919ff157f  ./agent-skills/plugins/harnessly/skills/harnessly/SKILL.md
 cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  ./artifacts/LICENSE
 e5470e80937dc5adb58f2ae034b15f278215182415187c84ae8b61c910bce908  ./artifacts/bin/artifacts.mjs

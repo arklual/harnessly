@@ -231,6 +231,16 @@ func (d *Dialer) AdmitSites(r *http.Request) (store.Machine, error) {
 	return m, err
 }
 
+// AdmitStore checks the signed request of a machine for a store session (POST /agent/store) and returns the machine.
+// Its nonces are kept apart from the dial's. A machine switched off by an administrator gets no session.
+func (d *Dialer) AdmitStore(r *http.Request) (store.Machine, error) {
+	m, err := d.admit(r, hubproto.VerifyStore, false, "store:")
+	if err == nil && m.DisabledAt != nil {
+		err = errDisabled
+	}
+	return m, err
+}
+
 // AdmitSecrets checks the signed request of a machine to its safe (POST /agent/secrets), signed over body, and returns
 // the machine. A machine switched off by an administrator reads no secrets either.
 func (d *Dialer) AdmitSecrets(r *http.Request, body []byte) (store.Machine, error) {

@@ -1,9 +1,9 @@
 // The hands-on tour on the demo projects: a lesson started by its link counts the person's real
 // actions, step by step, and puts the agent's request into the design's field. Runs with TOUR_E2E set.
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { startRuntime, type Runtime } from './runtime';
 
@@ -11,11 +11,14 @@ const PASSWORD = 'correct horse';
 const SHOTS = resolve(process.env.TOUR_SHOTS ?? 'test-results/tour');
 
 test.skip(!process.env.TOUR_E2E, 'walks the hands-on tour only when TOUR_E2E is set');
-test.describe.configure({ mode: 'default', timeout: 180_000 });
+// A machine under load needs longer: TOUR_SLOW multiplies the time the whole test and the runtime's start may take.
+const SLOW = Math.max(1, Number(process.env.TOUR_SLOW ?? 1));
+test.describe.configure({ mode: 'default', timeout: 180_000 * SLOW });
 
 let rt: Runtime;
 
 test.beforeAll(async () => {
+  test.setTimeout(120_000 * SLOW);
   mkdirSync(SHOTS, { recursive: true });
   rt = await startRuntime({ env: { RUNTIME_LOCALE: 'ru', RUNTIME_WEB_FEATURES: 'chats,design' } });
 });
@@ -68,6 +71,37 @@ const lessonAt = async (page: Page, track: string) => {
   await page.goto(`${rt.url}${base}/?tour=${track}`);
 };
 const did = (page: Page) => card(page).getByRole('button', { name: 'Сделал' }).click();
+
+/** The tour's ring stands over the element: its box holds the element's centre. */
+const ringOn = async (page: Page, target: Locator) => {
+  await expect
+    .poll(
+      async () => {
+        const ring = await page.locator('.hx-tour-ring').boundingBox();
+        const box = await target.boundingBox();
+        if (!ring || !box) return false;
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        return x >= ring.x && x <= ring.x + ring.width && y >= ring.y && y <= ring.y + ring.height;
+      },
+      { timeout: 10_000, message: 'the ring is not on the element' },
+    )
+    .toBe(true);
+};
+
+const demoTile = (page: Page) =>
+  page.locator('.hx-dl-folder', { hasText: 'Демо' }).locator('.hx-dl-folder__open');
+const demoCard = (page: Page, id: string) => page.locator(`.hx-dl-card[data-id="${id}"]`);
+
+/** A demo project lies in the «Демо» folder: the ring is on the folder, then on the card inside it. */
+const openDemo = async (page: Page, id: string) => {
+  await expect(card(page).locator('.hx-tour-card__text')).toContainText('«Демо»', { timeout: 15_000 });
+  await ringOn(page, demoTile(page));
+  await demoTile(page).click();
+  await expect(demoCard(page, id)).toBeVisible();
+  await ringOn(page, demoCard(page, id));
+  await demoCard(page, id).click();
+};
 
 test('welcome, the lessons page, a film and the first chat by hand', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -188,7 +222,7 @@ test('pane and small comforts lessons', async ({ page }) => {
   await page.locator('.hx-nav__group[data-i="1"] .hx-nav__item').click();
   await expect(title(page)).toHaveText('Откройте уведомления', { timeout: 10_000 });
   await page.keyboard.press('Escape');
-  await page.locator('.hx-nav__group[data-i="4"] .hx-nav__item').click();
+  await page.locator('.hx-user__bell').click();
   await expect(title(page)).toHaveText('Боковой чат — в панели', { timeout: 10_000 });
   await snap(page, 'extra-side');
 });
@@ -207,6 +241,8 @@ test('introduction points at the greeting, step by step', async ({ page }) => {
     'Уроки — в «Ещё»',
   ]) {
     await expect(title(page)).toHaveText(step);
+    // Every look has its element ringed: a ring on nothing is a target the redesign took away.
+    await expect(page.locator('.hx-tour-ring')).toBeVisible({ timeout: 10_000 });
     await next(page);
   }
   await expect(title(page)).toHaveText('Урок пройден');
@@ -236,7 +272,7 @@ test('while the agent works: the turn and the queue', async ({ page }) => {
 
 test('several agents: a new chat and the subagents in the pane', async ({ page }) => {
   await lessonAt(page, 'agents');
-  await expect(title(page)).toHaveText('Отправьте задачу', { timeout: 10_000 });
+  await expect(title(page)).toHaveText('Отправьте задачу', { timeout: 40_000 });
   await page.locator('.hx-composer__input').fill('Посчитай файлы в проекте');
   await page.locator('.hx-composer__input').press('Enter');
   await expect(title(page)).toHaveText('Статус — значком', { timeout: 15_000 });
@@ -254,7 +290,7 @@ test('site lesson counts the real actions', async ({ page }) => {
   await expect(title(page)).toHaveText('Откройте «Relay — лендинг»', { timeout: 15_000 });
   await snap(page, 'open');
 
-  await page.locator('.hx-dl-card[data-id="relay-site"]').click();
+  await openDemo(page, 'relay-site');
   await expect(title(page)).toHaveText('Пощёлкайте переключатели', { timeout: 15_000 });
   // The ring stands on the flags inside the page: the page's bridge tells where they are.
   const anchor = page.locator('.hx-tour-anchor[data-place="shown"]');
@@ -337,7 +373,7 @@ test('site lesson counts the real actions', async ({ page }) => {
 test('slides lesson', async ({ page }) => {
   await begin(page, 'slides');
   await expect(title(page)).toHaveText('Откройте «Relay — релизы без страха»', { timeout: 15_000 });
-  await page.locator('.hx-dl-card[data-id="relay-deck"]').click();
+  await openDemo(page, 'relay-deck');
   await expect(title(page)).toHaveText('Перелистните слайд', { timeout: 15_000 });
   // While the deck loads the card says so; the slide turns once it is there.
   await expect(page.locator('.hx-deck__slide[data-loading]')).toHaveCount(0, { timeout: 20_000 });
@@ -363,7 +399,7 @@ test('slides lesson', async ({ page }) => {
 test('video lesson', async ({ page }) => {
   await begin(page, 'video');
   await expect(title(page)).toHaveText('Откройте «Relay за 30 секунд»', { timeout: 15_000 });
-  await page.locator('.hx-dl-card[data-id="relay-video"]').click();
+  await openDemo(page, 'relay-video');
   await expect(title(page)).toHaveText('Запустите ролик', { timeout: 15_000 });
   await snap(page, 'video-play');
   await page.mouse.move(800, 400);
@@ -386,7 +422,7 @@ test('video lesson', async ({ page }) => {
 test('design system lesson', async ({ page }) => {
   await begin(page, 'ds');
   await expect(title(page)).toHaveText('Откройте «Дизайн-система Relay»', { timeout: 15_000 });
-  await page.locator('.hx-dl-card[data-id="relay-ds"]').click();
+  await openDemo(page, 'relay-ds');
   await expect(title(page)).toHaveText('Посмотрите, что внутри', { timeout: 15_000 });
   await snap(page, 'ds-look');
   await card(page).getByRole('button', { name: 'Дальше' }).click();
@@ -403,4 +439,130 @@ test('design system lesson', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(page.getByRole('textbox').first()).toHaveValue(/О компании/);
   await snap(page, 'ds-make');
+});
+
+/** Starts the site lesson on the library: the greeting, then Sinopia, the open step on screen. */
+const atOpen = async (page: Page) => {
+  await begin(page, 'site');
+  await expect(title(page)).toHaveText('Откройте «Relay — лендинг»', { timeout: 15_000 });
+};
+
+test('the way to the project: a filter, a search, another folder, the trash, a deleted project', async ({
+  page,
+}) => {
+  await atOpen(page);
+  const text = card(page).locator('.hx-tour-card__text');
+  await expect(text).toContainText('«Демо»', { timeout: 15_000 });
+  await ringOn(page, demoTile(page));
+  await snap(page, 'way-folder');
+
+  // A chip that hides the project: the lesson says so and clears it.
+  await page.getByRole('button', { name: 'Фильтры библиотеки' }).click();
+  await page.locator('.hx-cmenu__item', { hasText: 'Видео' }).click();
+  await page.keyboard.press('Escape');
+  await expect(text).toContainText('спрятан', { timeout: 10_000 });
+  await ringOn(page, page.locator('.hx-dl__ibtn[data-on]:has(.hx-icon[data-i="sliders-horizontal"])'));
+  await snap(page, 'way-filter');
+  await card(page).getByRole('button', { name: 'Сбросить' }).click();
+  await expect(page.locator('.hx-dl__ibtn[data-on]:has(.hx-icon[data-i="sliders-horizontal"])')).toHaveCount(
+    0,
+  );
+  await expect(text).toContainText('«Демо»', { timeout: 10_000 });
+
+  // A search that hides it, and a search that finds it (the card stands in the list, the ring on the card).
+  const search = page.locator('.hx-dl__search input');
+  await search.fill('qwerty');
+  await expect(text).toContainText('спрятан', { timeout: 10_000 });
+  await card(page).getByRole('button', { name: 'Сбросить' }).click();
+  await expect(search).toHaveValue('');
+  await search.fill('лендинг');
+  await expect(demoCard(page, 'relay-site')).toBeVisible();
+  await ringOn(page, demoCard(page, 'relay-site'));
+  await snap(page, 'way-search');
+  await search.fill('');
+
+  // Another tab of the library, and the trash.
+  await page.getByRole('tab', { name: 'Общие' }).click();
+  await expect(text).toContainText('спрятан', { timeout: 10_000 });
+  await card(page).getByRole('button', { name: 'Сбросить' }).click();
+  await page.locator('.hx-dl__ibtn[aria-label="Ещё"]').click();
+  await page.locator('.hx-cmenu__item', { hasText: 'Корзина' }).click();
+  await expect(text).toContainText('спрятан', { timeout: 10_000 });
+  await ringOn(page, page.locator('.hx-dl__trash button.hx-dl__crumb'));
+  await card(page).getByRole('button', { name: 'Сбросить' }).click();
+  await expect(demoTile(page)).toBeVisible();
+
+  // The project lies in another folder than the one that is open: the ring leads up first.
+  await demoTile(page).click();
+  await demoCard(page, 'relay-site')
+    .getByRole('button', { name: /Действия с/ })
+    .click();
+  await page.getByRole('menuitem', { name: 'Переместить в…' }).click();
+  await page.getByRole('option', { name: /Библиотека \(без папки\)/ }).click();
+  await expect(demoCard(page, 'relay-site')).toHaveCount(0);
+  await expect(text).toContainText('другой папке', { timeout: 10_000 });
+  await ringOn(page, page.locator('.hx-dl__crumb[data-drop-folder=""]'));
+  await snap(page, 'way-up');
+  await page.locator('.hx-dl__crumb[data-drop-folder=""]').click();
+  await expect(demoCard(page, 'relay-site')).toBeVisible();
+  await ringOn(page, demoCard(page, 'relay-site'));
+
+  // Gone from the library (the menu of a card cannot delete a project nobody owns, so its folder goes from the disk):
+  // the lesson brings the demo back, into the same one «Демо» folder.
+  const dir = join(rt.home, 'project', 'design-artifacts', 'relay-site');
+  expect(existsSync(dir)).toBe(true);
+  rmSync(dir, { recursive: true, force: true });
+  await page.reload();
+  // The library has loaded when something of it stands there (a count of 0 right after a reload proves nothing).
+  await expect(page.locator('.hx-dl-folder, .hx-dl-card').first()).toBeVisible({ timeout: 30_000 });
+  await expect(demoCard(page, 'relay-site')).toHaveCount(0);
+  await expect(text).toContainText('нет', { timeout: 30_000 });
+  await snap(page, 'way-gone');
+  await card(page).getByRole('button', { name: 'Вернуть демо' }).click();
+  await expect(page.locator('.hx-dl-folder', { hasText: 'Демо' })).toHaveCount(1, { timeout: 20_000 });
+  await expect(text).toContainText('«Демо»', { timeout: 20_000 });
+  await demoTile(page).click();
+  await expect(demoCard(page, 'relay-site')).toBeVisible();
+  await expect(demoCard(page, 'relay-deck')).toBeVisible();
+  await demoCard(page, 'relay-site').click();
+  await expect(title(page)).toHaveText('Пощёлкайте переключатели', { timeout: 15_000 });
+});
+
+test('«Назад» does not bounce a step that is done already', async ({ page }) => {
+  await atOpen(page);
+  await expect(card(page).locator('.hx-tour-card__text')).toContainText('«Демо»', { timeout: 15_000 });
+  await card(page).getByRole('button', { name: 'Назад' }).click();
+  // The library is open: the step «Откройте Синопию» is done, and stays with «Дальше» instead of leaving at once.
+  await expect(title(page)).toHaveText('Откройте Синопию');
+  await page.waitForTimeout(2_000);
+  await expect(title(page)).toHaveText('Откройте Синопию');
+  await snap(page, 'back-held');
+  await card(page).getByRole('button', { name: 'Дальше' }).click();
+  await expect(title(page)).toHaveText('Откройте «Relay — лендинг»');
+});
+
+test('the lesson finds the project on a phone', async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${rt.url}${base}/designly?tour=site`);
+  await expect(title(page)).toHaveText('Откройте «Relay — лендинг»', { timeout: 20_000 });
+  const inView = async (target: Locator) => {
+    const box = await target.boundingBox();
+    expect(box).toBeTruthy();
+    if (box)
+      expect(box.y >= 0 && box.y + box.height <= 844 && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+  };
+  await expect(demoTile(page)).toBeVisible();
+  await inView(demoTile(page));
+  await ringOn(page, demoTile(page));
+  await snap(page, 'phone-folder');
+  await demoTile(page).click();
+  await expect(demoCard(page, 'relay-site')).toBeVisible();
+  await ringOn(page, demoCard(page, 'relay-site'));
+  await snap(page, 'phone-card');
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(wide).toBeLessThanOrEqual(0);
+  await demoCard(page, 'relay-site').click();
+  await expect(title(page)).toHaveText('Пощёлкайте переключатели', { timeout: 20_000 });
+  await snap(page, 'phone-click');
 });

@@ -89,6 +89,10 @@ export const usePaneStage = ({ machine, design, fromChat, pageUrl, port }: IStag
     ask: (words) => {
       sendMessage(machine, { conversationId: conv, text: words, mode: 'queue' });
     },
+    // The chat the pane sits beside is on screen: the error goes to it.
+    report: (words) => {
+      sendMessage(machine, { conversationId: conv, text: words, mode: 'queue' });
+    },
     onMode: () => undefined,
     min: false,
     run: 'idle',

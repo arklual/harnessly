@@ -20,9 +20,13 @@ var demoProjects embed.FS
 // demoKinds are the kinds the folders do not tell by themselves (a deck and a video say so in their meta).
 var demoKinds = map[string]wire.DesignKind{"relay-site": wire.DesignSite, "relay-ds": wire.DesignDS}
 
-// Demo copies back the demo projects the person deleted.
-func (d *v2Designly) Demo(context.Context) (wire.DesignlyDemo, error) {
+// Demo copies back the demo projects the person deleted, into their "Demo" folder (the one they have, even renamed;
+// a new one when they deleted it).
+func (d *v2Designly) Demo(ctx context.Context) (wire.DesignlyDemo, error) {
 	ids, err := d.seedDemo(d.api.L, true)
+	if err == nil {
+		err = d.api.L.PlaceDemo(d.personOf(ctx), ids)
+	}
 	if err != nil {
 		return wire.DesignlyDemo{}, designlyFail(wire.RefuseInternal, locale.Pick("Could not restore the demo projects", "Не удалось вернуть демо-проекты"), "")
 	}

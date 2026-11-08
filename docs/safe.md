@@ -36,6 +36,7 @@ agent: harnessly secret run --env GITHUB_TOKEN=github-token -- gh pr create --fi
   by default, 2 hours at most, and on the runtime's restart). There is no command that prints a value.
 - **Never carried:** the lists (page and CLI), the asks, the log lines (names, conversations and outcomes only), the
   page's state after a send (the field is cleared the moment the value leaves).
+- **One-time codes** (2FA, SMS, e-mail confirmations) are not secrets: they are never stored. See below.
 - **The agents are told** in their system prompt (a block after the workspace prompt) to ask with `secret ask`, to use
   `secret run`/`secret file`, never to ask for a secret in the chat and never to print one.
 
@@ -396,3 +397,30 @@ and autofill writes; it does not prevent site storage or GET URLs. Stage 5 adds 
 not make a malicious or agent-writable allowed origin safe or recover manually submitted values missed by a scan.
 Site-origin approval adds a site without replacing the value; explicit --replace requests rotation. An accessible
 unscoped entry can receive a site approval even from a chat without a project.
+
+## One-time codes
+
+A code from an authenticator lives about 30 seconds, so it is not put in the safe: the command that needs it asks, and
+starts the moment the person types it.
+
+```
+agent (in the background): harnessly secret run --code npm_config_otp --why "npm publish vizloom" -- npm publish
+   │  POST /api/cli/secrets/code {why, digits, wait}     opens an ask of this chat (cli-token; a chat is required)
+   │  POST /api/cli/secrets/code/wait {id, wait ≤ 55 s}   the run waits on it, again and again, up to --wait (10 min)
+   ▼
+runtime ── GET <platform>/secret-codes ──▶ the chat's panel shows «Ждут код»: the reason, how long it waits, six cells
+   │  POST <platform>/secret-codes/<id>/put {value}       page session; sent on the last digit
+   ▼
+the waiting run gets the code once, in its wait's answer, and starts the command with it in VAR (masked in its output)
+```
+
+- **Memory only.** The code is held in the runtime's process from the person's answer until the asking run takes it,
+  then forgotten; an untaken code is dropped after 2 minutes. Nothing is written to disk.
+- **Only the asking chat.** An ask belongs to the chat whose agent opened it (the runtime knows the caller by its
+  connection); a wait from another chat reads it as gone.
+- **Ends.** «Отменить» on the panel (the run exits 1 with "cancelled"), the wait running out ("expired"), and the run
+  stopping: an interrupt takes the ask off, and an ask nobody waits on for 15 seconds leaves the panel.
+- **Never carried:** the list, the answers to the page and the log lines carry the reason, the chat and the outcome,
+  never the code; the page clears the cells once the code is sent.
+- **The same reach as `secret run`:** the child has the code in its environment, so a process of the same user can read
+  it there for the few seconds the command runs.

@@ -211,3 +211,71 @@ func TestSafeRoutesAskPutUse(t *testing.T) {
 		t.Fatal("the use is not logged")
 	}
 }
+
+func TestSafeRoutesOneTimeCode(t *testing.T) {
+	logs := captureStdio(t)
+	call, _, _ := safeRig(t)
+	page := map[string]string{"X-Test-Session": "yes"}
+	cli := map[string]string{"x-cli-token": "tok"}
+	const code = "407193"
+
+	if c, _ := call("POST", "/api/cli/secrets/code", `{"why":"npm publish vizloom","digits":6}`, cli); c != http.StatusBadRequest {
+		t.Fatalf("a code outside a chat: %d", c)
+	}
+	_, body := call("POST", "/api/cli/secrets/code", `{"session":"hs-agent","why":"npm publish vizloom","digits":6,"wait":300}`, cli)
+	var opened struct {
+		ID    string `json:"id"`
+		Until int64  `json:"until"`
+	}
+	if err := json.Unmarshal([]byte(body), &opened); err != nil || opened.ID == "" || opened.Until == 0 {
+		t.Fatalf("open: %s", body)
+	}
+	if c, _ := call("GET", "/api/platform/secret-codes", "", cli); c != http.StatusUnauthorized {
+		t.Fatalf("the cli-token lists no asks: %d", c)
+	}
+	_, body = call("GET", "/agents/api/platform/secret-codes", "", page)
+	if !strings.Contains(body, opened.ID) || !strings.Contains(body, `"why":"npm publish vizloom"`) || !strings.Contains(body, `"conv":"c-1"`) {
+		t.Fatalf("page list: %s", body)
+	}
+
+	got := make(chan string, 1)
+	go func() {
+		_, b := call("POST", "/api/cli/secrets/code/wait", `{"session":"hs-agent","id":"`+opened.ID+`","wait":5}`, cli)
+		got <- b
+	}()
+	time.Sleep(30 * time.Millisecond)
+	if c, b := call("POST", "/api/platform/secret-codes/"+opened.ID+"/put", `{"value":"12"}`, page); c != http.StatusBadRequest || !strings.Contains(b, "bad-code") {
+		t.Fatalf("a short code: %d %s", c, b)
+	}
+	if c, b := call("POST", "/api/platform/secret-codes/"+opened.ID+"/put", `{"value":"`+code+`"}`, page); c != http.StatusOK || strings.Contains(b, code) {
+		t.Fatalf("put: %d %s", c, b)
+	}
+	select {
+	case b := <-got:
+		if !strings.Contains(b, `"status":"ready"`) || !strings.Contains(b, code) {
+			t.Fatalf("wait: %s", b)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the waiting command did not wake")
+	}
+	if _, b := call("POST", "/api/cli/secrets/code/wait", `{"session":"hs-agent","id":"`+opened.ID+`","wait":0}`, cli); strings.Contains(b, code) || !strings.Contains(b, `"status":"gone"`) {
+		t.Fatalf("taken twice: %s", b)
+	}
+	_, body = call("GET", "/api/platform/secret-codes", "", page)
+	if strings.Contains(body, opened.ID) {
+		t.Fatalf("an answered ask is listed: %s", body)
+	}
+
+	// The person cancels: the command's wait ends cancelled.
+	_, body = call("POST", "/api/cli/secrets/code", `{"session":"hs-agent","why":"sms","digits":4}`, cli)
+	_ = json.Unmarshal([]byte(body), &opened)
+	if c, _ := call("POST", "/api/platform/secret-codes/"+opened.ID+"/cancel", "", page); c != http.StatusOK {
+		t.Fatalf("cancel: %d", c)
+	}
+	if _, b := call("POST", "/api/cli/secrets/code/wait", `{"session":"hs-agent","id":"`+opened.ID+`","wait":0}`, cli); !strings.Contains(b, `"status":"cancelled"`) {
+		t.Fatalf("after cancel: %s", b)
+	}
+	if out := logs(); strings.Contains(out, code) {
+		t.Fatal("the code reached the log")
+	}
+}

@@ -207,7 +207,7 @@ func (s *Service) Delegate(ctx context.Context, callerID string, t Task) (wire.C
 		return wire.Conversation{}, refuse("unavailable", "the machine's chats did not answer: %v", err)
 	}
 	if limit := s.settings().MaxChildren; len(kids) >= limit {
-		return wire.Conversation{}, refuse("too-many", "this chat already has %d delegated chats (the person's limit is %d); finish with one and delete it, or ask the person", len(kids), limit)
+		return wire.Conversation{}, refuse("too-many", "this chat already has %d delegated chats (the person's limit is %d); finish with one and delete it (harnessly chat delete ID), or ask the person", len(kids), limit)
 	}
 	model, profile, err := s.model(t, caller)
 	if err != nil {

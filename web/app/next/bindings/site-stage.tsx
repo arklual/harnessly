@@ -805,6 +805,17 @@ export const useSiteStage = ({
       }
       sendFirst(words, []);
     },
+    // A board's error card sends its error to the design's chat: the chat opens where the person sees it, and the
+    // message goes (the design's first one makes the chat).
+    report: (words) => {
+      leaveTo('chat');
+      setMin(false);
+      if (convId) {
+        sendMessage(machine, { conversationId: convId, text: words, mode: 'queue' });
+        return;
+      }
+      sendFirst(words, []);
+    },
     deckChat: (
       <DesignChat
         picked={swap.shown}

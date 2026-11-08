@@ -1,7 +1,14 @@
 import { Fragment, useState, type FormEvent } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
-import { ACTION, MARK, type ICard, type TAction } from '@/next/features/setup/card-model';
+import {
+  ACTION,
+  MARK,
+  STEP_ACT,
+  type ICard,
+  type ICardStep,
+  type TAction,
+} from '@/next/features/setup/card-model';
 
 export interface ISetupCardProps {
   card: ICard;
@@ -10,6 +17,8 @@ export interface ISetupCardProps {
   /** An action of the line is being sent. */
   busy: boolean;
   onPick: (stage: number) => void;
+  /** A step under the chain was pressed: its key opens the safe, its error comes to the line. */
+  onStep: (step: ICardStep) => void;
   onAction: (kind: TAction) => void;
   /** «Указать прокси» sent an address; resolves false when it did not fit (the form stays). */
   onProxy: (url: string) => Promise<boolean>;
@@ -66,8 +75,28 @@ const ProxyForm = ({
 };
 
 /** The start page's «Настройка машины»: the stages of the team's environment on this machine, as on the board «Главная». */
-const SetupCard = ({ card, closing, busy, onPick, onAction, onProxy, proxy, onHide }: ISetupCardProps) => {
+const StepMark = ({ step }: { step: ICardStep }) => (
+  <span className="hx-inside__m">
+    {step.mark === MARK.done && <Icon name="check" />}
+    {step.mark === MARK.fail && <Icon name="x" />}
+  </span>
+);
+
+const SetupCard = ({
+  card,
+  closing,
+  busy,
+  onPick,
+  onStep,
+  onAction,
+  onProxy,
+  proxy,
+  onHide,
+}: ISetupCardProps) => {
   const [proxyOpen, setProxyOpen] = useState(false);
+  // «Подробнее» of the error the line shows; another error starts folded.
+  const [openFor, setOpenFor] = useState('');
+  const detailOpen = card.line.long && openFor === card.line.title + card.line.rest;
   const act = (kind: TAction) => (kind === ACTION.proxy ? setProxyOpen(true) : onAction(kind));
   return (
     <div className="hx-setup" data-closing={closing ? 'true' : 'false'}>
@@ -86,7 +115,8 @@ const SetupCard = ({ card, closing, busy, onPick, onAction, onProxy, proxy, onHi
                   className="hx-chain__node"
                   role="listitem"
                   data-s={s.mark}
-                  data-pick={i === card.shown && i !== card.current ? 'true' : 'false'}
+                  data-pick={i === card.shown ? 'true' : 'false'}
+                  aria-pressed={i === card.shown}
                   data-cur={i === card.current ? 'true' : 'false'}
                   onClick={() => onPick(i)}
                 >
@@ -103,15 +133,34 @@ const SetupCard = ({ card, closing, busy, onPick, onAction, onProxy, proxy, onHi
           </div>
           {card.steps.length > 0 && (
             <div className="hx-inside">
-              {card.steps.map((x, k) => (
-                <span key={x.name} className="hx-inside__it" data-s={x.mark} style={{ ['--k' as string]: k }}>
-                  <span className="hx-inside__m">
-                    {x.mark === MARK.done && <Icon name="check" />}
-                    {x.mark === MARK.fail && <Icon name="x" />}
+              {card.steps.map((x, k) =>
+                x.act ? (
+                  <button
+                    key={x.itemId}
+                    type="button"
+                    className="hx-inside__it"
+                    data-s={x.mark}
+                    data-act="true"
+                    data-focus={x.focused ? 'true' : 'false'}
+                    style={{ ['--k' as string]: k }}
+                    title={x.act === STEP_ACT.safe ? t('next.setup.action.safe') : t('next.setup.stepError')}
+                    onClick={() => onStep(x)}
+                  >
+                    <StepMark step={x} />
+                    {x.name}
+                  </button>
+                ) : (
+                  <span
+                    key={x.itemId}
+                    className="hx-inside__it"
+                    data-s={x.mark}
+                    style={{ ['--k' as string]: k }}
+                  >
+                    <StepMark step={x} />
+                    {x.name}
                   </span>
-                  {x.name}
-                </span>
-              ))}
+                ),
+              )}
               {card.more > 0 && (
                 <span className="hx-inside__it">{t('next.setup.more', { n: card.more })}</span>
               )}
@@ -138,7 +187,25 @@ const SetupCard = ({ card, closing, busy, onPick, onAction, onProxy, proxy, onHi
               {card.line.title}
             </b>
           )}
-          {card.line.rest && <span className="hx-setup__rest">{card.line.rest}</span>}
+          {card.line.rest && (
+            <span
+              className="hx-setup__rest"
+              data-long={card.line.long ? 'true' : 'false'}
+              data-open={detailOpen ? 'true' : 'false'}
+            >
+              {card.line.rest}
+            </span>
+          )}
+          {card.line.long && (
+            <button
+              type="button"
+              className="hx-setup__more"
+              aria-expanded={detailOpen}
+              onClick={() => setOpenFor(detailOpen ? '' : card.line.title + card.line.rest)}
+            >
+              {detailOpen ? t('next.setup.less') : t('next.setup.details')}
+            </button>
+          )}
         </span>
         <span className="hx-setup__acts">
           {card.line.action && (

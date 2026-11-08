@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import LimitsChip from '@/next/features/limits/limits-chip';
-import type { LimitsView, ProviderLimits } from '@/next/features/limits/model';
+import type { ClaudeSpend, LimitsView, ProviderLimits } from '@/next/features/limits/model';
 
 afterEach(cleanup);
 
@@ -31,10 +31,26 @@ const limits = (over: Partial<ProviderLimits> = {}): ProviderLimits => ({
   ...over,
 });
 
-const ready = (value: ProviderLimits | null, provider: 'claude' | 'codex' = 'claude'): LimitsView => ({
+const ready = (
+  value: ProviderLimits | null,
+  provider: 'claude' | 'codex' = 'claude',
+  spend: ClaudeSpend | null = null,
+): LimitsView => ({
   state: 'ready',
   provider,
   limits: value,
+  spend: spend && { spend, dayStartHour: 3 },
+});
+
+/** An hour ago, and the start of the day since: both hours are today whatever the hour now. */
+const hourAgo = Math.floor(Date.now() / 3_600_000) * 3600 - 3600;
+const spend = (billing: ClaudeSpend['billing']): ClaudeSpend => ({
+  hours: [
+    { start: hourAgo, byModel: { opus: 3.5, sonnet: 0.25 } },
+    { start: hourAgo + 3600, byModel: { opus: 0.5 } },
+  ],
+  asOf: Date.now() / 1000,
+  billing,
 });
 
 describe('LimitsChip', () => {
@@ -100,5 +116,28 @@ describe('LimitsChip', () => {
     expect(screen.getByRole('dialog').textContent).toContain("Could not get the machine's limits");
     rerender(<LimitsChip view={ready(limits({ sevenDay: null }))} />);
     expect(screen.getAllByRole('meter')).toHaveLength(1);
+  });
+
+  it('shows what Claude cost today on a machine that pays by the API, and the models in the card', () => {
+    const today = new Date(Date.now()).getUTCHours() >= 1;
+    render(<LimitsChip view={ready(limits(), 'claude', spend('api'))} />);
+    const chip = screen.getByRole('button', { name: /Claude spend/ });
+    // Before 01:00 UTC the hour ago was yesterday by a day that starts at 00:00 UTC.
+    expect(chip.textContent).toBe(today ? '$4.25today' : '$0.5today');
+    fireEvent.click(chip);
+    const card = screen.getByRole('dialog');
+    expect(card.textContent).toContain('today since');
+    expect(card.textContent).toContain('Opus');
+    expect(card.textContent).toContain('Paid by API');
+    expect(screen.queryAllByRole('meter')).toHaveLength(0);
+  });
+
+  it('keeps the limits of a subscription, and tells the spend when the machine cannot say and has no window', () => {
+    const { rerender } = render(<LimitsChip view={ready(limits(), 'claude', spend('subscription'))} />);
+    expect(screen.getByRole('button', { name: /Claude limits/ }).textContent).toContain('5h94%');
+    rerender(<LimitsChip view={ready(limits(), 'claude', spend(null))} />);
+    expect(screen.getByRole('button', { name: /Claude limits/ })).toBeTruthy();
+    rerender(<LimitsChip view={ready(limits({ fiveHour: null, sevenDay: null }), 'claude', spend(null))} />);
+    expect(screen.getByRole('button', { name: /Claude spend/ })).toBeTruthy();
   });
 });

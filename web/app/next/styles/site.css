@@ -3682,30 +3682,6 @@
 .hx-browser__bar[data-compact='true'] .hx-browser__tool-label {
   display: none;
 }
-/* A page in the list of pages: the row opens it, its own button downloads it. */
-.hx-site-page {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.hx-site-page > .hx-option {
-  flex: 1;
-  min-width: 0;
-}
-.hx-site-page__dl {
-  flex: none;
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-.hx-site-page:hover > .hx-site-page__dl,
-.hx-site-page__dl:focus-visible {
-  opacity: 1;
-}
-@media (hover: none) {
-  .hx-site-page__dl {
-    opacity: 0.75;
-  }
-}
 /* «Скачать»: the rows say what file they make, so the menu is wide enough for them. */
 .hx-dlmenu {
   min-width: 260px;

@@ -264,6 +264,7 @@
   "next.deck.stage.noneHint": "Попросите агента в чате сделать первые слайды",
   "next.deck.stage.retry": "Ещё раз",
   "next.deck.stage.slide": "Слайд {n}",
+  "next.deck.stage.loading": "Слайд загружается",
   "next.deck.strip.layouts": "Макеты слайдов",
   "next.deck.strip.askAgent": "Пустой слайд (нарисует агент)",
   "next.deck.strip.addFailed": "Не удалось добавить слайд",

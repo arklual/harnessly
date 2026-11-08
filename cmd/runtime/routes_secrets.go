@@ -22,12 +22,14 @@ import (
 //
 //	GET <platform>/secrets, PUT|DELETE <platform>/secrets/<name>,
 //	GET <platform>/secret-asks, POST <platform>/secret-asks/<id>/decline
-//	                                     the person's page: a page session (Settings → Safe, the ask card)
-//	GET /api/cli/secrets, POST /api/cli/secrets/ask|use|file
+//	GET <platform>/secret-codes, POST <platform>/secret-codes/<id>/put|cancel
+//	                                     the person's page: a page session (Settings → Safe, the ask card, «Ждут код»)
+//	GET /api/cli/secrets, POST /api/cli/secrets/ask|use|file|code|code/wait|code/cancel
 //	                                     an agent of this machine: the cli-token (harnessly secret)
 //
 // A value comes in only by the page's PUT and goes out only by the CLI's use (into a command's environment) and file
-// (into a short-lived file). No list, no ask and no log line carries one.
+// (into a short-lived file). A one-time code comes in by the page's put of its ask and goes out once, to the command
+// that asked, by code/wait; it is kept in memory only. No list, no ask and no log line carries one.
 
 const (
 	secretBodyMax = 256 << 10
@@ -40,6 +42,7 @@ type safe struct {
 	store    *secrets.Safe
 	where    safeStore
 	asks     *secrets.Asks
+	codes    *secrets.Codes
 	files    *secrets.Files
 	identity func(string) secrets.Use
 }
@@ -72,6 +75,7 @@ func newSafe(d deps) *safe {
 		store: store,
 		where: where,
 		asks:  secrets.NewAsks(),
+		codes: secrets.NewCodes(),
 		files: secrets.NewFiles(os.Getenv("RUNTIME_SECRETS_FILES_DIR")),
 	}
 }
@@ -195,7 +199,15 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 		}
 		return use
 	}
-	base, asksBase := platformAPI+"/secrets", platformAPI+"/secret-asks"
+	// A code ask belongs to the chat the connection proves, never to a session the caller names: else one chat's agent
+	// could put an ask on another chat's panel. Only a rig without a resolver (tests) goes by the session.
+	codeUse := func(r *http.Request, session string) secrets.Use {
+		if len(resolvers) > 0 {
+			return identity(r, session)
+		}
+		return useOf(r, session)
+	}
+	base, asksBase, codesBase := platformAPI+"/secrets", platformAPI+"/secret-asks", platformAPI+"/secret-codes"
 	under := func(r *http.Request, p string) (string, bool) {
 		for _, prefix := range []string{p + "/", "/agents" + p + "/"} {
 			if rest, ok := strings.CutPrefix(r.URL.Path, prefix); ok && rest != "" {
@@ -522,6 +534,130 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 		secretJSON(w, http.StatusOK, map[string]any{"path": path, "expiresAt": time.Now().Add(ttl).UnixMilli()})
 	}
 
+	codes := func(w http.ResponseWriter, r *http.Request) {
+		if !pageOK(w, r) {
+			return
+		}
+		if r.Method != http.MethodGet {
+			notAllowed(w)
+			return
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"codes": sf.codes.Pending(), "now": time.Now().UnixMilli()})
+	}
+
+	// The person's answer to a code ask: put sends the code (never logged), cancel says no.
+	codeAnswer := func(w http.ResponseWriter, r *http.Request) {
+		rest, _ := under(r, codesBase)
+		if !pageOK(w, r) {
+			return
+		}
+		if r.Method != http.MethodPost {
+			notAllowed(w)
+			return
+		}
+		id, action, _ := strings.Cut(rest, "/")
+		switch action {
+		case "put":
+			var b struct {
+				Value string `json:"value"`
+			}
+			if !readSecretBody(r, &b) {
+				badBody(w)
+				return
+			}
+			found, err := sf.codes.Put(id, b.Value)
+			if !found {
+				secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
+				return
+			}
+			if err != nil {
+				secretRefusal(w, err)
+				return
+			}
+			agent.Log("info", "safe: code given", agent.F{K: "id", V: id})
+			secretJSON(w, http.StatusOK, map[string]any{"ready": id})
+		case "cancel":
+			if !sf.codes.Cancel(id) {
+				secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
+				return
+			}
+			agent.Log("info", "safe: code cancelled", agent.F{K: "id", V: id})
+			secretJSON(w, http.StatusOK, map[string]any{"cancelled": id})
+		default:
+			secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
+		}
+	}
+
+	cliCode := func(w http.ResponseWriter, r *http.Request) {
+		if !cliOK(w, r, http.MethodPost) {
+			return
+		}
+		var b struct {
+			Session string  `json:"session"`
+			Why     string  `json:"why"`
+			Digits  int     `json:"digits"`
+			Wait    float64 `json:"wait"`
+		}
+		if !readSecretBody(r, &b) || strings.TrimSpace(b.Why) == "" {
+			badBody(w)
+			return
+		}
+		use := codeUse(r, b.Session)
+		wait := time.Duration(b.Wait * float64(time.Second))
+		if wait <= 0 {
+			wait = secrets.DefaultCodeWait
+		}
+		a, err := sf.codes.Open(b.Why, use.Conv, use.Title, b.Digits, wait)
+		if err != nil {
+			secretRefusal(w, err)
+			return
+		}
+		agent.Log("info", "safe: code asked", agent.F{K: "id", V: a.ID}, agent.F{K: "conv", V: a.Conv})
+		secretJSON(w, http.StatusOK, map[string]any{"id": a.ID, "until": a.Until, "pageOpen": sf.asks.PageOpen()})
+	}
+
+	// The asking command waits on its ask; the code reaches it once, in this answer only.
+	cliCodeWait := func(w http.ResponseWriter, r *http.Request) {
+		if !cliOK(w, r, http.MethodPost) {
+			return
+		}
+		var b struct {
+			Session string  `json:"session"`
+			ID      string  `json:"id"`
+			Wait    float64 `json:"wait"`
+		}
+		if !readSecretBody(r, &b) || b.ID == "" {
+			badBody(w)
+			return
+		}
+		use := codeUse(r, b.Session)
+		wait := max(min(time.Duration(b.Wait*float64(time.Second)), secretWaitMax), 0)
+		state, value := sf.codes.Wait(r.Context(), b.ID, use.Conv, wait)
+		out := map[string]any{"status": state}
+		if state == secrets.CodeReady {
+			out["value"] = value
+		}
+		if state != secrets.CodeWaiting {
+			agent.Log("info", "safe: code ask ended", agent.F{K: "id", V: b.ID}, agent.F{K: "state", V: state})
+		}
+		secretJSON(w, http.StatusOK, out)
+	}
+
+	cliCodeCancel := func(w http.ResponseWriter, r *http.Request) {
+		if !cliOK(w, r, http.MethodPost) {
+			return
+		}
+		var b struct {
+			Session string `json:"session"`
+			ID      string `json:"id"`
+		}
+		if !readSecretBody(r, &b) || b.ID == "" {
+			badBody(w)
+			return
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"cancelled": sf.codes.CancelOf(b.ID, codeUse(r, b.Session).Conv)})
+	}
+
 	is := func(p string) func(*http.Request) bool { return func(r *http.Request) bool { return pathIs(r, p) } }
 	return []gate.Route{
 		{Match: is(base), Handler: http.HandlerFunc(list)},
@@ -532,5 +668,10 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 		{Match: is("/api/cli/secrets/ask"), Handler: http.HandlerFunc(cliAsk)},
 		{Match: is("/api/cli/secrets/use"), Handler: http.HandlerFunc(cliUse)},
 		{Match: is("/api/cli/secrets/file"), Handler: http.HandlerFunc(cliFile)},
+		{Match: is(codesBase), Handler: http.HandlerFunc(codes)},
+		{Match: func(r *http.Request) bool { _, ok := under(r, codesBase); return ok }, Handler: http.HandlerFunc(codeAnswer)},
+		{Match: is("/api/cli/secrets/code"), Handler: http.HandlerFunc(cliCode)},
+		{Match: is("/api/cli/secrets/code/wait"), Handler: http.HandlerFunc(cliCodeWait)},
+		{Match: is("/api/cli/secrets/code/cancel"), Handler: http.HandlerFunc(cliCodeCancel)},
 	}
 }

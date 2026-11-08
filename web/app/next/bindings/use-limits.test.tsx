@@ -38,7 +38,9 @@ describe('useAgentLimits', () => {
   it('reports an agent without limits as ready with none, not as a failure', async () => {
     vi.mocked(fetch).mockImplementation(() => respond(answer(10)));
     const { result } = renderHook(() => useAgentLimits('m-codex', 'codex'));
-    await waitFor(() => expect(result.current).toEqual({ state: 'ready', provider: 'codex', limits: null }));
+    await waitFor(() =>
+      expect(result.current).toEqual({ state: 'ready', provider: 'codex', limits: null, spend: null }),
+    );
   });
 
   it('says it failed for a machine that never answered, and keeps the last good answer through a stumble', async () => {

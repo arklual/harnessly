@@ -64,9 +64,17 @@ export interface ICardStage {
   linkDone: boolean;
 }
 
+/** What a step under the chain does when pressed: a key it waits for opens the safe, a failed one shows its error. */
+export const STEP_ACT = { safe: 'safe', focus: 'focus' } as const;
+export type TStepAct = (typeof STEP_ACT)[keyof typeof STEP_ACT];
+
 export interface ICardStep {
+  itemId: string;
   name: string;
   mark: TMark;
+  act: TStepAct | null;
+  /** The step's error is the one the line shows now. */
+  focused: boolean;
 }
 
 export const ACTION = {
@@ -83,6 +91,8 @@ export interface ICardLine {
   mark: TMark;
   title: string;
   rest: string;
+  /** The rest is an error of a machine: one line, the whole text behind «Подробнее». */
+  long: boolean;
   spin: boolean;
   action: { kind: TAction; label: string } | null;
   /** The quieter actions beside the main one («Пропустить»). */
@@ -108,7 +118,14 @@ export interface ICard {
   done: boolean;
 }
 
-export const cardOf = (view: ISetupView, picked: number | null): ICard => {
+const stepAct = (it: ISetupItem): TStepAct | null => {
+  if (it.status === SETUP_STATUS.error) return STEP_ACT.focus;
+  if (it.status === SETUP_STATUS.pending && it.secret) return STEP_ACT.safe;
+  return null;
+};
+
+/** `focus`: the item whose error the person picked among the steps; the line is about it while it is still failed. */
+export const cardOf = (view: ISetupView, picked: number | null, focus: string | null = null): ICard => {
   const groups = STAGES.map((s) => ({ ...s, items: view.items.filter((it) => it.kind === s.kind) })).filter(
     (g) => g.items.length > 0,
   );
@@ -129,7 +146,7 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
   // The steps that need something first: a failed or wanted one is never hidden behind «ещё».
   const order = (m: TMark) => ({ fail: 0, you: 1, run: 2, wait: 3, done: 4 })[m];
   const sorted = [...inside].sort((a, b) => order(markOf(a)) - order(markOf(b)));
-  const steps = sorted.slice(0, INSIDE_MAX).map((it) => ({ name: it.name, mark: markOf(it) }));
+  const focusItem = view.items.find((it) => it.itemId === focus && it.status === SETUP_STATUS.error);
 
   const running = view.items.find((it) => it.status === SETUP_STATUS.running);
   let run: ICard['run'] = null;
@@ -144,7 +161,7 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
     };
   }
 
-  const failed = view.items.find((it) => it.status === SETUP_STATUS.error);
+  const failed = focusItem ?? view.items.find((it) => it.status === SETUP_STATUS.error);
   const wanted = view.items.find((it) => it.status === SETUP_STATUS.pending && it.secret);
   const waiting = view.items.some((it) => it.status === SETUP_STATUS.pending);
   let line: ICardLine;
@@ -153,6 +170,7 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       mark: MARK.done,
       title: '',
       rest: t('next.setup.line.done'),
+      long: false,
       spin: false,
       action: null,
       extra: [],
@@ -164,6 +182,7 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       mark: MARK.fail,
       title: t('next.setup.line.failed', { name: failed.name }),
       rest: failed.message,
+      long: failed.message !== '',
       spin: false,
       action: running ? null : { kind: ACTION.retry, label: t('next.setup.action.retry') },
       extra: [],
@@ -175,6 +194,7 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       mark: MARK.you,
       title: t('next.setup.line.secret', { secret: wanted.secret }),
       rest: wanted.name,
+      long: false,
       spin: false,
       action: { kind: ACTION.safe, label: t('next.setup.action.safe') },
       extra: [],
@@ -186,6 +206,7 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       mark: MARK.run,
       title: t('next.setup.line.running'),
       rest: t('next.setup.line.runningRest'),
+      long: false,
       spin: true,
       action: null,
       extra: [],
@@ -197,6 +218,7 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
       mark: MARK.wait,
       title: t('next.setup.line.waiting'),
       rest: waiting ? t('next.setup.line.waitingRest') : '',
+      long: false,
       spin: false,
       action: { kind: ACTION.start, label: t('next.setup.action.start') },
       extra: [],
@@ -212,29 +234,38 @@ export const cardOf = (view: ISetupView, picked: number | null): ICard => {
     baseId: it.itemId.replace(/^base:/, ''),
     baseName: it.name,
   });
-  if (!view.done && noNet && !(failed && failed.kind !== SETUP_KIND.base && failed !== noNet)) {
+  if (!view.done && !focusItem && noNet && !(failed && failed.kind !== SETUP_KIND.base && failed !== noNet)) {
     line = {
       mark: MARK.you,
       title: noNet.base?.host
         ? t('next.setup.line.noAccessHost', { name: noNet.name, host: noNet.base.host })
         : t('next.setup.line.noAccess', { name: noNet.name }),
       rest: noNet.message,
+      long: noNet.message !== '',
       spin: false,
       action: { kind: ACTION.proxy, label: t('next.setup.action.proxy') },
       command: '',
       ...skip(noNet),
     };
-  } else if (!view.done && byHand && !failed && !wanted) {
+  } else if (!view.done && !focusItem && byHand && !failed && !wanted) {
     line = {
       mark: MARK.you,
       title: t('next.setup.line.byHand', { name: byHand.name }),
       rest: view.baseCommand || (byHand.base?.command ?? ''),
+      long: false,
       spin: false,
       action: { kind: ACTION.copy, label: t('next.setup.action.copy') },
       command: view.baseCommand || (byHand.base?.command ?? ''),
       ...skip(byHand),
     };
   }
+  const steps = sorted.slice(0, INSIDE_MAX).map((it): ICardStep => ({
+    itemId: it.itemId,
+    name: it.name,
+    mark: markOf(it),
+    act: stepAct(it),
+    focused: line.mark === MARK.fail && it === failed,
+  }));
   let titleKey = 'next.setup.title.first';
   if (view.done) titleKey = 'next.setup.title.done';
   else if (view.run) titleKey = 'next.setup.title.more';

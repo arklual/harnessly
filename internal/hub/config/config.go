@@ -177,6 +177,9 @@ type Config struct {
 	// HUB_S3_*: one bucket for every kind of file the hub holds). S3 is that bucket when Storage is "s3".
 	Storage string
 	S3      SitesS3
+	// Store (internal/filestore, docs/hub/store.md): the revisions and contents of the spaces' collections, which the
+	// machines sync with. On unless HUB_STORE=off.
+	Store StoreConfig
 	// FleetSites lets a fleet gateway mint narrow publishing sessions without registering its machines in the hub.
 	FleetSitesSecret string
 	FleetSitesSpace  string
@@ -269,6 +272,25 @@ type Features struct {
 
 // SitesS3 is an S3-compatible bucket for the sites' files (MinIO, Selectel). Endpoint empty: a folder.
 type SitesS3 struct{ Endpoint, Region, Bucket, Prefix, AccessKey, SecretKey string }
+
+// StoreConfig is where the store keeps its revisions and contents.
+type StoreConfig struct {
+	Off bool
+	// DatabaseURL is the store's metadata: sqlite:///folder or postgres://… . Set by HUB_STORE_DATABASE_URL, it is a
+	// database of the store's own (a design-sync center's database opens as it is); unset, the store shares the hub's
+	// Postgres under PGPrefix, or keeps SQLite in Dir next to a SQLite hub.
+	DatabaseURL string
+	PGPrefix    string
+	// Dir is the store's folder: its SQLite and, without a bucket, its blobs (HUB_STORE_DIR, default <data>/store).
+	Dir string
+	// S3 is the bucket of the contents when the hub keeps its files in one (HUB_STORAGE=s3): the hub's bucket under
+	// the prefix store/, or HUB_STORE_S3_BUCKET and HUB_STORE_S3_PREFIX for a bucket that holds a design-sync
+	// center's blobs already. Endpoint empty: blobs in Dir.
+	S3 SitesS3
+	// LegacySpace (HUB_STORE_LEGACY_SPACE, a space's slug) is the space whose collections are the rooms of a store
+	// that served one place (`design`, not `design-<space>`): how a design-sync center's library becomes a space's.
+	LegacySpace string
+}
 
 // StorageS3 says the hub keeps its files in an S3-compatible bucket (HUB_STORAGE=s3), not in its data folder.
 func (c *Config) StorageS3() bool { return c.Storage == "s3" }
@@ -920,6 +942,43 @@ func (c *Config) loadSafe(lookup func(string) (string, bool), bad func(string, .
 	c.SafeRefPrefixes = vaultkv.SplitPrefixes(plain("HUB_SECRETS_REF_PREFIXES"))
 }
 
+// loadStore reads HUB_STORE_*: the store reuses the hub's database and bucket unless told otherwise.
+func (c *Config) loadStore(get func(string) string, def func(string, string) string, bad func(string, ...any)) {
+	switch strings.ToLower(def("HUB_STORE", "on")) {
+	case "on", "true", "1", "yes":
+	case "off", "false", "0", "no":
+		c.Store.Off = true
+	default:
+		bad("HUB_STORE must be on or off")
+	}
+	c.Store.Dir = def("HUB_STORE_DIR", filepath.Join(c.DataDir, "store"))
+	c.Store.LegacySpace = strings.TrimSpace(get("HUB_STORE_LEGACY_SPACE"))
+	switch raw := get("HUB_STORE_DATABASE_URL"); {
+	case raw != "":
+		c.Store.DatabaseURL = raw
+		if u, err := url.Parse(raw); err != nil || (u.Scheme != "sqlite" && u.Scheme != "postgres" && u.Scheme != "postgresql") {
+			bad("HUB_STORE_DATABASE_URL must be sqlite:///folder or postgres://…")
+		}
+	case c.IsPostgres():
+		// The direct connection when there is one: a pooler in transaction mode may drop the search_path the store's
+		// rooms are kept apart by.
+		c.Store.DatabaseURL = c.DatabaseURL
+		if c.DBMigrateURL != "" {
+			c.Store.DatabaseURL = c.DBMigrateURL
+		}
+		c.Store.PGPrefix = "filestore_"
+	default:
+		c.Store.DatabaseURL = "sqlite://" + c.Store.Dir
+	}
+	if c.StorageS3() {
+		c.Store.S3 = c.S3
+		c.Store.S3.Prefix = def("HUB_STORE_S3_PREFIX", c.S3.Prefix+"store/")
+		c.Store.S3.Bucket = def("HUB_STORE_S3_BUCKET", c.S3.Bucket)
+	} else if get("HUB_STORE_S3_PREFIX") != "" || get("HUB_STORE_S3_BUCKET") != "" {
+		bad("HUB_STORE_S3_PREFIX and HUB_STORE_S3_BUCKET need HUB_STORAGE=s3: the store uses the hub's bucket and keys")
+	}
+}
+
 // loadSites reads the HARNESSLY_SITES_* settings and checks the domain the way the runtime domain is checked: sites run
 // pages of strangers, so their domain must not be one the hub's cookies reach.
 func (c *Config) loadSites(get func(string) string, def func(string, string) string, bad func(string, ...any)) {
@@ -959,6 +1018,7 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 		c.SitesS3 = c.S3
 		c.SitesS3.Prefix = c.S3.Prefix + "sites/"
 	}
+	c.loadStore(get, def, bad)
 	if c.SitesAbuseURL != "" {
 		if u, err := url.Parse(c.SitesAbuseURL); err != nil || (u.Scheme != "https" && u.Scheme != "http" && u.Scheme != "mailto") {
 			bad("HARNESSLY_SITES_ABUSE_URL must be an http(s) or mailto: address")

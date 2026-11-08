@@ -134,10 +134,7 @@
   color: var(--hx-fg-2);
 }
 
-/* The header's machine (it shows only when something is wrong) and the folded rail's avatar. */
-.hx-headmach[data-health='critical'] .hx-headmach__dot {
-  background: var(--hx-danger);
-}
+/* The folded rail's avatar. */
 .hx-app[data-side='closed'] .hx-user[data-health='critical'] .hx-avatar::after {
   content: '';
   position: absolute;

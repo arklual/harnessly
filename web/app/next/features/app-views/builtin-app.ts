@@ -2,6 +2,8 @@
 // reaches the host only through this — the bridge's own methods, rights and checks, called in the same process. Its
 // manifest (internal/apps/builtin/<app>/harnessly/app.json, read here from surface.gen.ts) names its rights, and a
 // method it has no right to is refused the same way a frame's is.
+import type { ReactNode } from 'react';
+import type { IModalProps } from '@/next/features/shell/modal';
 import {
   AppBridge,
   BridgeError,
@@ -34,6 +36,8 @@ export interface IBuiltinHl {
   ui: {
     toast: (text: string, options?: IToastOptions) => Promise<void>;
     confirm: (text: string) => Promise<boolean>;
+    /** A window of the host's own over the page, with the app's content: drawn in the app's tree (ui.modal). */
+    modal: (props: IModalProps) => ReactNode;
   };
   /** The host's shortcut commands of a screen, on the person's keys (keys.on, keys.press, keys.hints). */
   keys: {
@@ -170,6 +174,12 @@ export const connectBuiltin = (id: TBuiltinApp, opts: IBuiltinOptions): IBuiltin
       confirm: async (text) => {
         const got = (await call('harnessly/ui.confirm', { text })) as { ok?: boolean } | undefined;
         return got?.ok === true;
+      },
+      modal: (props) => {
+        const draw = opts.handlers.modal;
+        if (draw === undefined)
+          throw new BridgeError('host_unavailable', 'the host draws no windows for this app');
+        return draw(props);
       },
     },
     notify: async (text) => {

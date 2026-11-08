@@ -1,0 +1,139 @@
+/* A one-time code's cells (ui/code-field.tsx): the cells in a row, a dash between the halves, one real input over them. */
+.hx-code {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  max-width: 320px;
+}
+.hx-code__slot {
+  position: relative;
+  display: grid;
+}
+/* The dash sits in the gap before the second half. */
+.hx-code__slot[data-dash] {
+  margin-left: 10px;
+}
+.hx-code__slot[data-dash]::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -11px;
+  width: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--hx-border-strong);
+}
+.hx-code__cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  font-family: var(--hx-font-mono);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--hx-fg-1);
+  transition:
+    border-color 160ms var(--hx-ease-out),
+    box-shadow 160ms var(--hx-ease-out),
+    background 200ms var(--hx-ease-out),
+    transform 200ms var(--hx-ease-out);
+}
+.hx-code__cell[data-filled] {
+  border-color: var(--hx-fg-3);
+}
+.hx-code:focus-within .hx-code__cell[data-active] {
+  border-color: var(--hx-accent);
+  box-shadow: 0 0 0 3px var(--hx-accent-soft);
+}
+.hx-code:focus-within .hx-code__cell[data-active]::after {
+  content: '';
+  width: 2px;
+  height: 20px;
+  border-radius: 1px;
+  background: var(--hx-accent);
+  animation: hx-code-caret 1s steps(1) infinite;
+}
+@keyframes hx-code-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.hx-code[data-state='busy'] .hx-code__cell {
+  border-color: var(--hx-accent);
+  animation: hx-code-wave 900ms var(--hx-ease-in-out) infinite;
+}
+.hx-code[data-state='busy'] .hx-code__slot:nth-child(2) .hx-code__cell {
+  animation-delay: 60ms;
+}
+.hx-code[data-state='busy'] .hx-code__slot:nth-child(3) .hx-code__cell {
+  animation-delay: 120ms;
+}
+.hx-code[data-state='busy'] .hx-code__slot:nth-child(4) .hx-code__cell {
+  animation-delay: 180ms;
+}
+.hx-code[data-state='busy'] .hx-code__slot:nth-child(5) .hx-code__cell {
+  animation-delay: 240ms;
+}
+.hx-code[data-state='busy'] .hx-code__slot:nth-child(6) .hx-code__cell {
+  animation-delay: 300ms;
+}
+.hx-code[data-state='busy'] .hx-code__slot:nth-child(7) .hx-code__cell {
+  animation-delay: 360ms;
+}
+.hx-code[data-state='busy'] .hx-code__slot:nth-child(8) .hx-code__cell {
+  animation-delay: 420ms;
+}
+@keyframes hx-code-wave {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+.hx-code[data-state='done'] .hx-code__cell {
+  border-color: var(--hx-accent);
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-code[data-state='invalid'] .hx-code__cell {
+  border-color: var(--hx-danger);
+}
+.hx-code[data-state='invalid'] {
+  animation: hx-code-shake 320ms var(--hx-ease-out);
+}
+@keyframes hx-code-shake {
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.hx-code__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font-size: 16px; /* 16px keeps iOS from zooming on focus */
+  letter-spacing: 0;
+  cursor: text;
+}
+.hx-code__input::selection {
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-code[data-state='busy'] .hx-code__cell,
+  .hx-code[data-state='invalid'],
+  .hx-code:focus-within .hx-code__cell[data-active]::after {
+    animation: none;
+  }
+}
