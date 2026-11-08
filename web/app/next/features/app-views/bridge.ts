@@ -122,6 +122,8 @@ export interface IViewContext {
   theme: { mode: 'light' | 'dark'; tokens: Record<string, string> };
   locale: string;
   chat: { id: string } | null;
+  /** The chat the page shows beside the view, on or not for the app: its id only (fork: the Коворкинг marks it). */
+  shown?: { chat: string } | null;
   user: { name: string; role: string } | null;
   /** Set when the document the view is shown in may only be read: the view offers no edit, the host refuses one. */
   readOnly?: boolean;
