@@ -63,7 +63,6 @@ import { openAppTerminal } from '@/next/features/app-views/app-terminal';
 import { openAddressTab, openAppTab } from '@/next/features/app-views/open';
 import { agentRows, chatTarget, openConversation, watchAgents } from '@/next/features/app-views/agents';
 import { reaches, subscribeStorageChanges } from '@/next/features/app-views/storage-events';
-import { openChat, openWork } from '@/next/features/app-views/chat-handoff';
 import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
 import { toast } from '@/next/ui/toast';
@@ -523,6 +522,8 @@ const AppFrame = ({
       agents: async () => agentRows(machine),
       paneOpen: async (to) => {
         const chatId = chatTarget(to);
+        // Fork: loaded on use, so the routes (which read the base path on load) stay out of the cards' imports.
+        const { openChat, openWork } = await import('@/next/features/app-views/chat-handoff');
         if (chatId !== null) {
           // The bridge has checked agents.read; only a conversation of this machine opens.
           if (conversationsStore.get(chatId)?.machineId !== machine)
