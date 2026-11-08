@@ -126,9 +126,6 @@ importers:
       use-stick-to-bottom:
         specifier: ^1.1.6
         version: 1.1.6(react@19.3.1)
-      vizloom:
-        specifier: 0.1.0
-        version: 0.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       web-vitals:
         specifier: ^6.2.3
         version: 6.2.3
@@ -3238,13 +3235,6 @@ packages:
         optional: true
       jsdom:
         optional: true
-
-  vizloom@0.1.0:
-    resolution: {integrity: sha512-qhKWIvTdD8dw+BSVf7UCUGT77Pauo3Qek0WfBb+2dvj4ynXAdZITocgKFhNtlrbppfDsNNd1K5RIjykRja0vXA==}
-    engines: {node: '>=18.18'}
-    peerDependencies:
-      react: ^18.2.0 || ^19.0.0
-      react-dom: ^18.2.0 || ^19.0.0
 
   w3c-keyname@2.2.8:
     resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
@@ -6672,11 +6662,6 @@ snapshots:
       jsdom: 30.1.3
     transitivePeerDependencies:
       - msw
-
-  vizloom@0.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
-    dependencies:
-      react: 19.3.1
-      react-dom: 19.3.1(react@19.3.1)
 
   w3c-keyname@2.2.8: {}
 

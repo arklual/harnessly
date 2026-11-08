@@ -5,7 +5,6 @@ import './icons.css';
 import './components.css';
 import './settings.css';
 import './t-tokens.css';
-import './viz-theme.css';
 import './viz-pages.css';
 import './board.css';
 import './hub-page.css';

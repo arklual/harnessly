@@ -61,6 +61,19 @@ export default tseslint.config(
     },
   },
   {
+    // The chart module drives canvas engines imperatively (refs read in effects, engine state kept outside React,
+    // renders skipped on pointer moves), so the React Compiler purity rules do not apply to it.
+    files: ['viz/**/*.{ts,tsx}', 'e2e/parity/**/*.{ts,tsx}'],
+    rules: {
+      'react-hooks/refs': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-refresh/only-export-components': 'off',
+      'no-irregular-whitespace': ['error', { skipStrings: true, skipTemplates: true, skipComments: true }],
+    },
+  },
+  {
     // The new interface stands on its own (spec §6): from the current one only @/platform/{config,router,theme,head},
     // and none of the libraries it replaces. app/next/legacy is the one bridge to the current interface's pane tools,
     // and goes when they are written for the new one.

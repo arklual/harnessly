@@ -232,6 +232,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@kit': fileURLToPath(new URL('./kit', import.meta.url)),
+      '@viz': fileURLToPath(new URL('./viz', import.meta.url)),
       '@/': fileURLToPath(new URL('./app/', import.meta.url)),
       'next/router': fileURLToPath(new URL('./app/platform/router.ts', import.meta.url)),
       'next/head': fileURLToPath(new URL('./app/platform/head.tsx', import.meta.url)),
@@ -261,7 +262,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['app/**/*.test.{ts,tsx}', 'kit/**/*.test.{ts,tsx}'],
+    include: ['app/**/*.test.{ts,tsx}', 'kit/**/*.test.{ts,tsx}', 'viz/**/*.test.{ts,tsx}'],
     css: false,
     // The default cache lives in node_modules, which a worktree shares with the checkout it links to; a transformed
     // module (import.meta.glob of the locales above all) cached by another worktree then shows that one's files here.
