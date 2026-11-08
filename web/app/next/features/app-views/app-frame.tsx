@@ -63,6 +63,7 @@ import { openAppTerminal } from '@/next/features/app-views/app-terminal';
 import { openAddressTab, openAppTab } from '@/next/features/app-views/open';
 import { agentRows, chatTarget, openConversation, watchAgents } from '@/next/features/app-views/agents';
 import { reaches, subscribeStorageChanges } from '@/next/features/app-views/storage-events';
+import { openChat, openWork } from '@/next/features/app-views/chat-handoff';
 import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
 import { toast } from '@/next/ui/toast';
@@ -142,6 +143,8 @@ export interface IAppFrameProps {
   /** The port of the view server (installed apps' `viewPort`). */
   viewPort: number;
   conversation: ConvId | null;
+  /** The chat shown beside the view when it is not the one the view's session is for; defaults to conversation. */
+  shownChat?: ConvId | null;
   /** For a card: the data its tool returned. */
   data?: unknown;
   /** What the host adds or replaces: the chat's reading, a flow, a confirm dialog… */
@@ -188,6 +191,7 @@ const AppFrame = ({
   target,
   viewPort,
   conversation,
+  shownChat,
   data,
   handlers,
   fit = false,
@@ -348,11 +352,12 @@ const AppFrame = ({
       theme: viewTheme(resolvedTheme === 'dark' ? 'dark' : 'light'),
       locale: locale(),
       chat: chat ? { id: chat } : null,
+      shown: (shownChat === undefined ? conversation : shownChat) ? { chat: (shownChat ?? conversation) as string } : null,
       user: null,
       ...(readOnly ? { readOnly } : {}),
       ...(data === undefined ? {} : { data }),
     }),
-    [app.id, app.version, target, view.id, resolvedTheme, chat, data, readOnly],
+    [app.id, app.version, target, view.id, resolvedTheme, chat, conversation, shownChat, data, readOnly],
   );
   const latest = useRef({ context, onBridgeCall, onSinopiaCall });
   useEffect(() => {
@@ -520,11 +525,13 @@ const AppFrame = ({
           // The bridge has checked agents.read; only a conversation of this machine opens.
           if (conversationsStore.get(chatId)?.machineId !== machine)
             throw new BridgeError('invalid_params', 'no such conversation on this machine');
-          openConversation(chatId);
+          // Fork: from an app's own page the chat goes beside it or to the page focused last (chat-handoff).
+          if (!(await openChat(chatId, app.id))) openConversation(chatId);
           return;
         }
+        if (/^(resume|new|stop!?):/.test(to) && (await openWork(to, app.id, machine))) return;
         if (!openAppTab(to))
-          throw new BridgeError('invalid_params', 'only app:<id>[/<view>] and chat:<id> open from a view');
+          throw new BridgeError('invalid_params', 'only app:<id>[/<view>], chat:<id>, resume:<id> and new:<provider>:<project> open from a view');
       },
       sinopia: async (method, params) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');

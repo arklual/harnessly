@@ -49,6 +49,7 @@ import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { useNotices } from '@/next/bindings/notices';
 import SmartNoticeHost from '@/next/bindings/smart-notice';
 import { setHistoryPerson, useHistory } from '@/next/stores/notice-history';
+import { listenChatHandoff } from '@/next/features/app-views/chat-handoff';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
 import { useInstalledApps } from '@/next/features/app-views/api';
@@ -300,6 +301,8 @@ const Shell = ({ owner }: IShellProps) => {
   useEffect(() => {
     if (!onSite) restoreRailAfterDesign();
   }, [onSite]);
+  // A chat a view asks for from an app's own page (on another screen, say) comes to the page that had the focus last.
+  useEffect(() => listenChatHandoff(), []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationsState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1117,7 +1120,7 @@ const Shell = ({ owner }: IShellProps) => {
       {route.kind === ROUTE.learn && <LearnPage onOpenDrawer={() => setDrawerOpen(true)} />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
         <AppMainPage
-          key={`${route.id}/${route.chat ?? ''}/${tabs.activeId}`}
+          key={`${route.id}/${tabs.activeId}`}
           machine={model.active}
           id={route.id}
           chat={route.chat ?? null}
