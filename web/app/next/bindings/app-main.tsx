@@ -2,7 +2,7 @@
 // beside it (a column, a window or its field at the foot — the viewer's choice, kept), and the page's «…» holds the
 // app's rights, the debug section of a dev install and turning the app off in this chat. Without a chat the app stands
 // alone.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AppAsks from '@/next/features/app-views/asks';
 import AppFrame from '@/next/features/app-views/app-frame';
 import { useInstalledApps } from '@/next/features/app-views/api';
@@ -104,8 +104,8 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
   // The chat the view's session is for. It follows the page's chat, except to a chat the view itself asked for: then
   // the view stays as it is, with no new session and no reload, and is only told the chat beside it (shownChat).
   const shownConv = record !== undefined && conv !== null ? conv : null;
-  const sessionConv = useRef<ConvId | null>(shownConv);
-  if (shownConv !== sessionConv.current && !switchedByView(id, shownConv)) sessionConv.current = shownConv;
+  const [sessionConv, setSessionConv] = useState<ConvId | null>(shownConv);
+  if (shownConv !== sessionConv && !switchedByView(id, shownConv)) setSessionConv(shownConv);
 
   const app = list?.apps.find((a) => a.id === id) ?? null;
   // An app with no screen of its own opens its pane view here, so a press in the sidebar never ends on a blank page.
@@ -282,7 +282,7 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
             view={view}
             target={target}
             viewPort={list.viewPort}
-            conversation={sessionConv.current}
+            conversation={sessionConv}
             shownChat={onChat ? conv : null}
             reloadToken={reload}
           />
