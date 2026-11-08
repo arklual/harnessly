@@ -13,6 +13,7 @@ import ConsentBlock from '@/next/features/app-consent/consent-block';
 import AppInspector from '@/next/features/app-views/inspector';
 import { onOpenAppTab } from '@/next/features/app-views/open';
 import { keptFrames } from '@/next/features/app-views/kept-frames';
+import { switchedByView } from '@/next/features/app-views/chat-handoff';
 import { parseAppTarget } from '@/next/features/app-views/target';
 import type { IAppMenuItem } from '@/next/features/app-main/app-main';
 import AppStage, { appStageDesign } from '@/next/features/app-main/app-stage';
@@ -108,6 +109,11 @@ const AppStagePage = ({
   });
   const conv = stage.conv ?? null;
   const chatApps = useChatApps(machine, conv);
+  // Fork: the chat the view's session is for. It follows the chat beside the view, except to a chat the view itself
+  // asked for (chat-handoff): then the view stays as it is, with no new session and no reload, and is only told the
+  // chat beside it (shownChat).
+  const [sessionConv, setSessionConv] = useState<ConvId | null>(conv);
+  if (conv !== sessionConv && !switchedByView(id, conv)) setSessionConv(conv);
   useTabTitle(routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) }), object ?? app.name);
 
   // The app's own page is its one view: a pane view of it kept out of sight goes, rather than two players sounding.
@@ -225,7 +231,8 @@ const AppStagePage = ({
               view={view}
               target={target}
               viewPort={viewPort}
-              conversation={conv}
+              conversation={sessionConv}
+              shownChat={conv}
               reloadToken={reload}
               data={object ? { object } : undefined}
               handlers={handlers}

@@ -64,6 +64,7 @@ import { useNotices } from '@/next/bindings/notices';
 import { useTurnSummaries } from '@/next/bindings/turn-summary';
 import SmartNoticeHost from '@/next/bindings/smart-notice';
 import { setHistoryPerson } from '@/next/stores/notice-history';
+import { listenChatHandoff } from '@/next/features/app-views/chat-handoff';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
 import { useInstalledApps } from '@/next/features/app-views/api';
@@ -332,6 +333,8 @@ const Shell = ({ owner }: IShellProps) => {
   // An app, a design, an app's document and a kit take the whole window: the sidebar there keeps its own choice,
   // folded until the person opens it (rail.ts).
   useRailMode(railModeOf(route));
+  // A chat a view asks for from an app's own page (on another screen, say) comes to the page that had the focus last.
+  useEffect(() => listenChatHandoff(), []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationsState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1198,7 +1201,7 @@ const Shell = ({ owner }: IShellProps) => {
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
         <AppMainPage
-          key={`${route.id}/${route.object ?? ''}/${route.chat ?? ''}/${tabs.activeId}`}
+          key={`${route.id}/${route.object ?? ''}/${tabs.activeId}`}
           machine={model.active}
           id={route.id}
           object={route.object ?? null}
