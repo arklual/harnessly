@@ -96,7 +96,6 @@ import { agentRows, chatTarget, openConversation, watchAgents } from '@/next/fea
 import { objectTarget, shareTarget } from '@/next/features/app-views/target';
 import { APP_OBJECT_RE } from '@/next/routes/app-object';
 import { reaches, subscribeStorageChanges } from '@/next/features/app-views/storage-events';
-import { openChat, openWork } from '@/next/features/app-views/chat-handoff';
 import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
 import { toast } from '@/next/ui/toast';
@@ -916,6 +915,8 @@ const AppFrame = ({
           return;
         }
         const chatId = chatTarget(to);
+        // Fork: loaded on use, so the routes (which read the base path on load) stay out of the cards' imports.
+        const { openChat, openWork } = await import('@/next/features/app-views/chat-handoff');
         if (chatId !== null) {
           // The bridge has checked agents.read. A conversation of another machine of the person opens too, when the
           // page holds it (its machine's sidebar group): a run the app started on that machine is opened in place.
