@@ -73,6 +73,7 @@ import SmartNoticeHost, { noticeQuiet } from '@/next/bindings/smart-notice';
 import { setHistoryPerson } from '@/next/stores/notice-history';
 import { ROW_GO } from '@/next/features/search/search-dialog';
 import { SCOPE } from '@/next/features/search/smart-rows';
+import { listenChatHandoff } from '@/next/features/app-views/chat-handoff';
 import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { openAppTab } from '@/next/features/app-views/open';
@@ -359,7 +360,7 @@ const KeptPage = ({
   if (route.kind === ROUTE.app)
     return (
       <AppMainPage
-        key={isSpaceApp(route.id) ? 'spaces' : `${route.id}/${route.object ?? ''}/${route.chat ?? ''}`}
+        key={isSpaceApp(route.id) ? 'spaces' : `${route.id}/${route.object ?? ''}`}
         machine={machine}
         id={route.id}
         object={route.object ?? null}
@@ -824,6 +825,8 @@ const Shell = ({ owner }: IShellProps) => {
   useChatScreen(route);
   // …and keeps its view on the machine, for the person's other devices.
   useChatViewSync(route);
+  // A chat a view asks for from an app's own page (on another screen, say) comes to the page that had the focus last.
+  useEffect(() => listenChatHandoff(), []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationsState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);

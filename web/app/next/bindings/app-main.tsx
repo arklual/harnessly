@@ -29,6 +29,7 @@ import ConsentBlock from '@/next/features/app-consent/consent-block';
 import AppInspector from '@/next/features/app-views/inspector';
 import { onOpenAppTab } from '@/next/features/app-views/open';
 import { keptFrames } from '@/next/features/app-views/kept-frames';
+import { switchedByView } from '@/next/features/app-views/chat-handoff';
 import { parseAppTarget } from '@/next/features/app-views/target';
 import type { IAppMenuItem } from '@/next/features/app-main/app-menu';
 import type { IHostAction } from '@/next/features/app-views/bridge';
@@ -114,6 +115,8 @@ interface IStageFrameProps extends IStageApp {
   machine: MachineId;
   viewPort: number;
   conv: ConvId | null;
+  /** Fork (chat-handoff): the chat beside the view when it is not the one the view's session is for. */
+  shownChat?: ConvId | null;
   reload: number;
   space: boolean;
   /** On screen: the others of the spaces wait hidden, alive, with what they had open. */
@@ -139,6 +142,7 @@ const StageFrame = ({
   target,
   viewPort,
   conv,
+  shownChat,
   reload,
   space,
   active,
@@ -190,6 +194,7 @@ const StageFrame = ({
           target={target}
           viewPort={viewPort}
           conversation={conv}
+          shownChat={shownChat}
           reloadToken={reload}
           data={data}
           handlers={handlers}
@@ -269,6 +274,11 @@ const AppStagePage = ({
   });
   const conv = stage.conv ?? null;
   const chatApps = useChatApps(machine, conv);
+  // Fork: the chat the view's session is for. It follows the chat beside the view, except to a chat the view itself
+  // asked for (chat-handoff): then the view stays as it is, with no new session and no reload, and is only told the
+  // chat beside it (shownChat).
+  const [sessionConv, setSessionConv] = useState<ConvId | null>(conv);
+  if (conv !== sessionConv && !switchedByView(id, conv)) setSessionConv(conv);
   useTabTitle(routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) }), object ?? app.name);
 
   // A card's «Открыть в панели» of another app takes this page to that app; this one is already open. The chat goes
@@ -516,7 +526,8 @@ const AppStagePage = ({
               view={f.view}
               target={f.target}
               viewPort={viewPort}
-              conv={conv}
+              conv={sessionConv}
+              shownChat={conv}
               reload={shown ? reload : 0}
               space={space}
               active={shown}
