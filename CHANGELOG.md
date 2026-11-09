@@ -20,6 +20,13 @@ All notable changes to this project are documented here. The format follows
   git remote, and only between machines of the same person. A Claude conversation syncs its project before it starts.
   A note changed on two machines keeps both versions. `harnessly memory [sync]` shows the last sync and retries it
   (docs/hub/memory-sync.md).
+- Other CLIs of a machine sign in from the hub's page like the agents do in the console (GitHub #58): the machine
+  describes them in `cli-logins.json` of the agent's data folder (or `AGENT_CLI_LOGINS_FILE`) with an id, a label, a
+  fixed login command, a status command and a timeout; an extension pack writes the file, the core and the hub need no
+  change. The agent reports them as `clis` next to the agents, «Агенты» lists them under «Входы в CLI», and the sign-in
+  runs only in the console with `BROWSER=echo`, so the CLI prints its address and its loopback callback comes back
+  through the protected console (single use, its owner only). The hub starts a CLI only by an id the machine reported,
+  for a space owner.
 
 - The search over the chats, the sidebar's projects and favorites, and the turns a rewind left behind open from the
   cluster's and the hub's copy, with the machine off too: the hub serves `…/history/search`, `…/history/sidebar` (one

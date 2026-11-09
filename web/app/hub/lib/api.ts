@@ -3,6 +3,7 @@
 // the message.
 import type {
   AgentStatus,
+  CLIStatus,
   Config,
   Envelope,
   Invite,
@@ -320,7 +321,7 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
 
     agents: {
       list: (id: string, refresh = false) =>
-        get<{ agents: AgentStatus[] }>(`/api/machines/${enc(id)}/agents`, {
+        get<{ agents: AgentStatus[]; clis?: CLIStatus[] }>(`/api/machines/${enc(id)}/agents`, {
           refresh: refresh ? 1 : undefined,
         }),
       install: (id: string, provider: Provider, from?: 'provider') =>
@@ -330,8 +331,8 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
           `/api/machines/${enc(id)}/agents/${provider}/check`,
           proxyUrl ? { proxyUrl } : {},
         ),
-      login: (id: string, provider: Provider, method: 'link' | 'console') =>
-        post<{ login: Login }>(`/api/machines/${enc(id)}/agents/${provider}/login`, { method }),
+      login: (id: string, provider: string, method: 'link' | 'console') =>
+        post<{ login: Login }>(`/api/machines/${enc(id)}/agents/${enc(provider)}/login`, { method }),
       loginCode: (id: string, loginId: string, code: string) =>
         post<void>(`/api/machines/${enc(id)}/logins/${enc(loginId)}/code`, { code }),
       loginCancel: (id: string, loginId: string) => del(`/api/machines/${enc(id)}/logins/${enc(loginId)}`),

@@ -116,6 +116,22 @@ func provider(r *http.Request) (string, error) {
 	}
 }
 
+// loginProvider is provider, or a CLI the machine reported from its cli-logins.json (#58): such a CLI signs in by
+// console only, and an id the machine did not report is no route.
+func (s *Service) loginProvider(r *http.Request, m store.Machine, method string) (string, error) {
+	id := r.PathValue("provider")
+	if !machines.IsCLIID(id) {
+		return provider(r)
+	}
+	if !s.machines.HasCLI(m, id) {
+		return "", httpx.ErrNotFound
+	}
+	if method != hubproto.MethodConsole {
+		return "", httpx.Invalid("method", "Этот CLI входит только через консоль")
+	}
+	return id, nil
+}
+
 var hexID = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 func loginID(r *http.Request) (string, error) {
@@ -205,7 +221,13 @@ func (s *Service) agents(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	} else {
 		list = s.machines.Agents(m)
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"agents": list})
+	if r.URL.Query().Get("refresh") == "1" {
+		// The refresh changed what is kept of the CLIs too.
+		if fresh, err := s.owner(r, p); err == nil {
+			m = fresh
+		}
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"agents": list, "clis": s.machines.CLIs(m)})
 	return nil
 }
 
@@ -292,11 +314,11 @@ func (s *Service) loginStart(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	if req.Method != hubproto.MethodLink && req.Method != hubproto.MethodConsole {
 		return httpx.Invalid("method", "Способ входа — link или console")
 	}
-	prov, err := provider(r)
+	m, err := s.owner(r, p)
 	if err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
+	prov, err := s.loginProvider(r, m, req.Method)
 	if err != nil {
 		return err
 	}

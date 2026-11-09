@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Button, TextField } from '@kit';
 
-import { loginActive, PROVIDER_INFO, safeLoginUrl } from '../lib/agent-view';
+import { loginActive, PROVIDER_INFO, PROVIDERS, safeLoginUrl } from '../lib/agent-view';
 import { useApi, useEnv, type PendingWindow } from '../lib/env';
 import { errorText } from '../lib/errors';
 import { consoleTarget, hhmm } from '../lib/format';
@@ -13,7 +13,7 @@ import type { Live } from '../lib/hooks';
 import { t } from '../lib/i18n';
 import { loginOf } from '../lib/live';
 import { SealError } from '../lib/seal';
-import type { KeyCheck, Login, Machine, Provider } from '../lib/types';
+import type { CLIStatus, KeyCheck, Login, Machine, Provider } from '../lib/types';
 import { CircleCheck, Terminal } from '../ui/icons';
 import { CopyBox, LinkBox, LinkButton, Msg, Note, Segmented, StepLine, Waiting } from '../ui/parts';
 
@@ -74,6 +74,36 @@ export const LoginPanel = ({
   );
 };
 
+/** Signing one of the machine's other CLIs in (#58): only in the console, where the CLI prints its address. */
+export const CLILoginPanel = ({
+  machine,
+  cli,
+  live,
+  allowed,
+}: {
+  machine: Machine;
+  cli: CLIStatus;
+  live: Live;
+  allowed: boolean;
+}) => {
+  const [posted, setPosted] = useState<Login | null>(null);
+  const streamed = posted ? live.state.logins[posted.id]?.login : undefined;
+  const login = streamed ?? posted ?? loginOf(live.state, machine.id, cli.provider);
+  return (
+    <div className="hub-item__body">
+      {!allowed && <Msg tone="warn">{t('login.policyOff')}</Msg>}
+      <Note>{t('clis.how')}</Note>
+      <ConsoleLogin
+        machine={machine}
+        provider={cli.provider}
+        login={login}
+        onPosted={setPosted}
+        disabled={!allowed}
+      />
+    </div>
+  );
+};
+
 /** The end of a login that did not finish, and the way to start again. */
 const LoginEnd = ({
   login,
@@ -116,7 +146,7 @@ const LoginEnd = ({
 
 const useStart = (
   machine: Machine,
-  provider: Provider,
+  provider: string,
   method: 'link' | 'console',
   onPosted: (l: Login) => void,
 ) => {
@@ -288,14 +318,17 @@ const ConsoleLogin = ({
   disabled,
 }: {
   machine: Machine;
-  provider: Provider;
+  /** An agent, or one of the machine's CLIs (#58), whose command the machine knows and the page does not show. */
+  provider: string;
   login: Login | null;
   onPosted: (l: Login) => void;
   disabled: boolean;
 }) => {
   const api = useApi();
   const env = useEnv();
-  const info = PROVIDER_INFO[provider];
+  const command = (PROVIDERS as readonly string[]).includes(provider)
+    ? PROVIDER_INFO[provider as Provider].loginCommand
+    : null;
   const mine = login?.method === 'console' ? login : null;
   const { start, busy, error } = useStart(machine, provider, 'console', onPosted);
   const { cancel, error: cancelError } = useCancel(machine);
@@ -340,7 +373,7 @@ const ConsoleLogin = ({
   return (
     <div className="hub-stack">
       <StepLine n={1}>{t('login.console.open')}</StepLine>
-      <CopyBox text={info.loginCommand} />
+      {command && <CopyBox text={command} />}
       {!active && mine && <LoginEnd login={mine} onAgain={openTerminal} />}
       {!active && (!mine || mine.state === 'cancelled' || mine.state === 'done') && (
         <Button

@@ -8,6 +8,7 @@
 //   - Codex by link: a device-code login. `codex app-server` starts it and says when the person has confirmed; where it
 //     cannot be used, the screen of `codex login --device-auth` gives the same address and code.
 //   - By console: a terminal tab of the runtime runs the CLI's own login, the person works in it, and the status is polled.
+//     Other CLIs the machine's cli-logins.json describes (#58) sign in this way only, see CLI.
 //
 // A login ends in done, failed, expired or cancelled, and says so through Config.Emit each time its state changes.
 package agentlogin
@@ -71,6 +72,9 @@ type Config struct {
 	Emit func(hubproto.Login)
 	// Finished is told when a login has ended, so what the agent reports about its CLIs can be refreshed.
 	Finished func(provider string)
+	// CLI finds a CLI of the machine's cli-logins.json; such a CLI signs in by console only, with its own status. nil
+	// is no such CLIs.
+	CLI func(id string) (CLI, bool)
 
 	// EnvDir holds the agent's env files, which the login's commands source (a proxy is how the provider is reached).
 	EnvDir string
@@ -129,6 +133,7 @@ type entry struct {
 	cancel  context.CancelCauseFunc
 	started time.Time
 	code    chan string
+	cli     *CLI // a CLI of cli-logins.json, nil for an agent
 
 	mu       sync.Mutex
 	login    hubproto.Login
@@ -138,13 +143,21 @@ type entry struct {
 
 // Start begins a login. The Login it returns is in state starting; the rest is told through Emit.
 func (m *Manager) Start(loginID, provider, method string) (hubproto.Login, error) {
+	if method != hubproto.MethodLink && method != hubproto.MethodConsole {
+		return hubproto.Login{}, hubproto.Errf(hubproto.CodeInvalid, "unknown login method %q", method)
+	}
+	var cli *CLI
 	switch provider {
 	case hubproto.ProviderClaude, hubproto.ProviderCodex:
 	default:
-		return hubproto.Login{}, hubproto.Errf(hubproto.CodeUnsupported, "no login for %q", provider)
-	}
-	if method != hubproto.MethodLink && method != hubproto.MethodConsole {
-		return hubproto.Login{}, hubproto.Errf(hubproto.CodeInvalid, "unknown login method %q", method)
+		c, ok := m.findCLI(provider)
+		if !ok {
+			return hubproto.Login{}, hubproto.Errf(hubproto.CodeUnsupported, "no login for %q", provider)
+		}
+		if method != hubproto.MethodConsole {
+			return hubproto.Login{}, hubproto.Errf(hubproto.CodeUnsupported, "%s signs in by console only", provider)
+		}
+		cli = &c
 	}
 	if loginID == "" || len(loginID) > 64 {
 		return hubproto.Login{}, hubproto.Errf(hubproto.CodeInvalid, "bad login id")
@@ -159,7 +172,7 @@ func (m *Manager) Start(loginID, provider, method string) (hubproto.Login, error
 		return hubproto.Login{}, hubproto.Errf(hubproto.CodeBusy, "a login for %s is already running", m.active.login.Provider)
 	}
 	ctx, cancel := context.WithCancelCause(m.ctx)
-	e := &entry{m: m, ctx: ctx, cancel: cancel, started: m.cfg.Now(), code: make(chan string, 1),
+	e := &entry{m: m, ctx: ctx, cancel: cancel, started: m.cfg.Now(), code: make(chan string, 1), cli: cli,
 		login: hubproto.Login{ID: loginID, Provider: provider, Method: method, State: hubproto.LoginStarting}}
 	m.active = e
 	m.byID[loginID] = e
@@ -372,6 +385,13 @@ func (m *Manager) script(provider, run string) string {
 export BROWSER=
 unset DISPLAY WAYLAND_DISPLAY
 ` + run
+}
+
+func (m *Manager) findCLI(id string) (CLI, bool) {
+	if m.cfg.CLI == nil || Reserved(id) {
+		return CLI{}, false
+	}
+	return m.cfg.CLI(id)
 }
 
 // verified is the status when the provider says the login worked, else nil.
@@ -732,18 +752,24 @@ func (m *Manager) console(e *entry) {
 		e.finish(hubproto.LoginFailed, "Консоль на этой машине недоступна", nil)
 		return
 	}
-	command := "claude auth login --claudeai"
-	if provider == hubproto.ProviderCodex {
-		command = "codex login --device-auth"
+	ttlOf := t.ConsoleTTL
+	var line string
+	switch {
+	case e.cli != nil:
+		line, ttlOf = e.cli.LoginLine(m.cfg.EnvDir), e.cli.TTL(t.ConsoleTTL)
+	case provider == hubproto.ProviderCodex:
+		line = agents.ForAnyShell(agents.EnvSourcePrefix(m.cfg.EnvDir, provider) + "codex login --device-auth")
+	default:
+		line = agents.ForAnyShell(agents.EnvSourcePrefix(m.cfg.EnvDir, provider) + "claude auth login --claudeai")
 	}
-	url, err := m.cfg.Console(e.ctx, provider, agents.ForAnyShell(agents.EnvSourcePrefix(m.cfg.EnvDir, provider)+command))
+	url, err := m.cfg.Console(e.ctx, provider, line)
 	if err != nil {
 		if !e.cancelled() {
 			e.finish(hubproto.LoginFailed, "Не удалось открыть консоль: "+scrub(err.Error(), ""), nil)
 		}
 		return
 	}
-	expires, left := e.expiry(t.ConsoleTTL)
+	expires, left := e.expiry(ttlOf)
 	e.update(func(l *hubproto.Login) {
 		l.State, l.ConsoleURL, l.ExpiresAt = hubproto.LoginWaiting, &url, &expires
 	})

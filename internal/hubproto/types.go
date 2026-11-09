@@ -68,6 +68,9 @@ const (
 	ProviderGemini = "gemini"
 )
 
+// KindCLI marks the status of a CLI the machine's owner described for sign-in, not an agent.
+const KindCLI = "cli"
+
 // Operations the hub asks of the agent (the `op` of a request).
 const (
 	OpHello         = "hello"
@@ -268,7 +271,10 @@ const (
 
 // AgentStatus is how one agent stands on the machine.
 type AgentStatus struct {
-	Provider     string         `json:"provider"`
+	Provider string `json:"provider"`
+	// Kind is "cli" for a CLI of the machine's cli-logins.json (#58), "" for an agent; Label is that CLI's name.
+	Kind         string         `json:"kind,omitempty"`
+	Label        string         `json:"label,omitempty"`
 	Soon         bool           `json:"soon,omitempty"`
 	Installed    bool           `json:"installed"`
 	Version      *string        `json:"version"`

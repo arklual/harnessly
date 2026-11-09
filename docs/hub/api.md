@@ -407,10 +407,10 @@ All of these relay one agent operation and answer 502/504 per [errors](#errors) 
 
 | Method, path | Request | Response | Agent op |
 | --- | --- | --- | --- |
-| `GET /api/machines/{id}/agents?refresh=1` | | `{ agents: AgentStatus[] }` (cached without `refresh`) | `agents.status` |
+| `GET /api/machines/{id}/agents?refresh=1` | | `{ agents: AgentStatus[], clis: CLIStatus[] }` (cached without `refresh`; `clis` are the machine's [other CLIs](machine.md#cli-sign-in)) | `agents.status` |
 | `POST /api/machines/{id}/agents/{provider}/install` | `{ from?: 'provider' }` | 202 `{ jobId }` | `agents.install` |
 | `POST /api/machines/{id}/agents/{provider}/check` | `{ proxyUrl?: string }` (check through this proxy without saving it) | `{ check: ProviderCheck }` (timeout 30 s) | `provider.check` |
-| `POST /api/machines/{id}/agents/{provider}/login` | `{ method: 'link' \| 'console' }` | 202 `{ login: Login }` (state `starting`); 409 `conflict` (`login_running`) | `login.start` |
+| `POST /api/machines/{id}/agents/{provider}/login` | `{ method: 'link' \| 'console' }` | 202 `{ login: Login }` (state `starting`); 409 `conflict` (`login_running`). `{provider}` may be the id of a CLI the machine reported, with `console` only (400 otherwise); an id it did not report is 404 | `login.start` |
 | `POST /api/machines/{id}/logins/{loginId}/code` | `{ code }` | 204 | `login.code` |
 | `DELETE /api/machines/{id}/logins/{loginId}` | | 204 | `login.cancel` |
 | `POST /api/machines/{id}/agents/{provider}/key` | `{ envelope: Envelope }` | `{ check: KeyCheck }` | `key.deliver` |

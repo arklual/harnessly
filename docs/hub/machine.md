@@ -414,6 +414,25 @@ variables.
   `::1`) and only a port a process of that console listens on; once per console; the console belongs to the first
   signed-in person who opened it, anyone else is refused (403); the address is never logged and the listener's answer
   isn't sent back, only its status.
+- <a id="cli-sign-in"></a>**Other CLIs (GitHub #58).** A machine signs in more CLIs than the agents the same console
+  way. They are described in `cli-logins.json` of the agent's data folder, or in the file `AGENT_CLI_LOGINS_FILE`
+  names; an organization's extension pack writes it, and the agent reads it on each use (no restart, no hub setting):
+
+  ```json
+  [{"id": "example-cli", "label": "Example CLI", "login": ["example-cli", "login"],
+    "status": ["example-cli", "whoami"], "timeout": 600}]
+  ```
+
+  `id`: lower-case letters, digits and dashes, 2 to 32, not `claude`, `codex` or `gemini`. `label`: up to 60
+  characters. `login` and `status`: a command as arguments (up to 32, no line breaks), run as they are, nothing from the
+  browser is added. `timeout`: seconds a sign-in may take (900 when absent, at most 3600). Up to 16 CLIs; a wrong entry
+  is skipped and noted once in the audit log (`cli-logins.load`). Both commands run with the machine's `all.env` and
+  `<id>.env`, `BROWSER=echo` and no display, so the CLI prints its address in the console instead of opening a
+  browser nobody sees. `status` exits 0 when signed in; its output is thrown away (it may print a token); a missing
+  command reads as not installed. The agent reports each CLI next to the agents (`kind: "cli"`, `label`, `installed`,
+  `login`), the hub keeps the list per machine, and «Агенты» shows it under «Входы в CLI». The sign-in is the console
+  above and nothing else: the hub starts it only for an id the machine reported (404 otherwise), only by `console`
+  (400), only for a space owner (403); the loopback callback goes through the console page, once, for its owner only.
 - **API key.** Sealed in the browser to the machine's X25519 key, opened here, checked with the provider (a models-list
   request), stored in `claude.env` or `codex.env`. A key already exported on the machine is checked in place.
 - **Proxy.** `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` in an env file, for all agents or for one. A `socks5://` proxy gets

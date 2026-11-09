@@ -205,7 +205,7 @@ func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 		}
 		if e.Login.Status != nil {
 			// A login that finished carries the new status of the agent.
-			s.IngestAgents(ctx, m, []hubproto.AgentStatus{*e.Login.Status})
+			s.ingestAgents(ctx, m, []hubproto.AgentStatus{*e.Login.Status}, false)
 		}
 	case hubproto.EventAgents:
 		var e struct{ Agents []hubproto.AgentStatus }
@@ -323,10 +323,24 @@ func (s *Service) SetProxy(ctx context.Context, m store.Machine, p hubproto.Prox
 // IngestAgents merges reported agent statuses into what is remembered, and records the summary of each in the
 // database. Only claude and codex are taken: gemini is a card the hub draws itself.
 func (s *Service) IngestAgents(ctx context.Context, m store.Machine, reported []hubproto.AgentStatus) {
+	s.ingestAgents(ctx, m, reported, true)
+}
+
+// ingestAgents remembers statuses. A full report (all of the machine's agents and CLIs) replaces the CLIs it had, so a
+// CLI taken out of cli-logins.json goes; one status (a login that finished) changes only its own.
+func (s *Service) ingestAgents(ctx context.Context, m store.Machine, reported []hubproto.AgentStatus, full bool) {
 	st := s.db.S()
 	now := s.now().UTC()
 	fresh := map[string]json.RawMessage{}
+	clis, cliOrder := map[string]json.RawMessage{}, []string(nil)
 	for _, a := range reported {
+		if a.Kind == hubproto.KindCLI {
+			if raw, ok := cliStatus(a); ok && clis[a.Provider] == nil && len(cliOrder) < maxCLIs {
+				clis[a.Provider] = raw
+				cliOrder = append(cliOrder, a.Provider)
+			}
+			continue
+		}
 		if a.Provider != hubproto.ProviderClaude && a.Provider != hubproto.ProviderCodex {
 			continue
 		}
@@ -356,10 +370,16 @@ func (s *Service) IngestAgents(ctx context.Context, m store.Machine, reported []
 			s.log.Warn("agent summary not saved", "machine", m.ID, "provider", a.Provider, "error", err)
 		}
 	}
-	if len(fresh) == 0 {
+	if len(fresh) == 0 && len(clis) == 0 {
 		return
 	}
 	s.update(ctx, m, func(in *info) {
+		if len(clis) > 0 || full {
+			in.CLIs = mergeCLIs(in.CLIs, clis, cliOrder, full)
+		}
+		if len(fresh) == 0 {
+			return
+		}
 		merged := map[string]json.RawMessage{}
 		var old []json.RawMessage
 		_ = json.Unmarshal(in.Agents, &old)
@@ -397,6 +417,29 @@ func (s *Service) RefreshAgents(ctx context.Context, m store.Machine) ([]json.Ra
 	var in info
 	_ = json.Unmarshal([]byte(fresh.Info), &in)
 	return agentsView(in.Agents), nil
+}
+
+// CLIs are the remembered statuses of the machine's other CLIs to sign in (#58), in the order the machine lists them.
+func (s *Service) CLIs(m store.Machine) []json.RawMessage {
+	var in info
+	_ = json.Unmarshal([]byte(m.Info), &in)
+	var list []json.RawMessage
+	_ = json.Unmarshal(in.CLIs, &list)
+	if list == nil {
+		list = []json.RawMessage{}
+	}
+	return list
+}
+
+// HasCLI says the machine reported a CLI to sign in under id.
+func (s *Service) HasCLI(m store.Machine, id string) bool {
+	for _, raw := range s.CLIs(m) {
+		var c struct{ Provider string }
+		if json.Unmarshal(raw, &c) == nil && c.Provider == id {
+			return true
+		}
+	}
+	return false
 }
 
 // Agents is what is remembered of the machine's agents, without asking it.

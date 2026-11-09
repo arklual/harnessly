@@ -318,6 +318,11 @@ export const en: Record<Key, Entry> = {
   'agents.soon': 'Soon',
   'agents.installing': 'Installing…',
   'agents.noAccess': 'No access',
+  'clis.title': 'CLI sign-ins',
+  'clis.how':
+    'The machine sets the sign-in command. The CLI prints its link in the terminal: open it and sign in, the answer reaches the CLI through the console.',
+  'clis.missing': 'Not installed on the machine',
+  'clis.unknown': 'Could not check the sign-in',
   'agents.needsLogin': 'Sign-in needed',
   'agents.install': 'Install',
   'agents.login': 'Sign in',

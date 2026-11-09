@@ -73,6 +73,15 @@ export type AgentStatus = {
   access: ProviderCheck | null;
 };
 
+/** Another CLI of the machine signed in from here (#58): described on the machine, reported by its agent. */
+export type CLIStatus = {
+  provider: string;
+  kind: 'cli';
+  label: string;
+  installed: boolean;
+  login: 'logged_in' | 'logged_out' | 'unknown';
+};
+
 export type ProxyScope = 'all' | 'claude' | 'codex';
 export type ProxyEntry = { scheme: 'http' | 'https' | 'socks5'; host: string; bridge: string | null };
 export type ProxySummary = { all: ProxyEntry | null; claude: ProxyEntry | null; codex: ProxyEntry | null };
@@ -95,6 +104,8 @@ export type Machine = {
   policy: Policy | null;
   preflight: PreflightReport | null;
   agents: AgentStatus[];
+  /** Absent from hubs before #58. */
+  clis?: CLIStatus[];
   proxy: ProxySummary;
   env: string[];
   createdAt: string;
@@ -117,7 +128,8 @@ export type LoginState =
   'starting' | 'url' | 'waiting' | 'verifying' | 'done' | 'failed' | 'expired' | 'cancelled';
 export type Login = {
   id: string;
-  provider: Provider;
+  /** An agent, or the id of one of the machine's CLIs. */
+  provider: Provider | (string & {});
   method: 'link' | 'console';
   state: LoginState;
   url: string | null;
@@ -126,7 +138,7 @@ export type Login = {
   consoleUrl: string | null;
   expiresAt: number | null;
   error: string | null;
-  status: AgentStatus | null;
+  status: AgentStatus | CLIStatus | null;
 };
 
 export type KeyCheck = {

@@ -95,10 +95,11 @@ type hub struct {
 	allowKnown   bool
 	runsSent     map[string]time.Time
 
-	mu      sync.Mutex
-	checks  map[string]hubproto.ProviderCheck // the last provider check of each agent, for its status
-	emitted []hubproto.AgentStatus            // the statuses the hub was last told
-	revoked bool
+	mu        sync.Mutex
+	checks    map[string]hubproto.ProviderCheck // the last provider check of each agent, for its status
+	emitted   []hubproto.AgentStatus            // the statuses the hub was last told
+	cliWarned bool                              // what is wrong in cli-logins.json was recorded
+	revoked   bool
 
 	// state is agent-link.json, for `harnessly-agent status`.
 	stateMu sync.Mutex
@@ -211,6 +212,7 @@ func (h *hub) start(ctx context.Context) error {
 		Console:  h.openConsole,
 		Emit:     func(l hubproto.Login) { h.emit(hubproto.EventLogin, "login", l) },
 		Finished: func(string) { h.goBG(func() { h.refreshAgents(true) }) },
+		CLI:      func(id string) (agentlogin.CLI, bool) { return agentlogin.FindCLI(h.clisFile(), id) },
 	})
 	h.goBG(func() {
 		t := time.NewTicker(switchPoll)
@@ -558,6 +560,9 @@ func (h *hub) oneStatus(ctx context.Context, provider string) hubproto.AgentStat
 	case hubproto.ProviderCodex:
 		st = codex.Status(ctx, h.shell, h.a.cfg.EnvDir)
 	default:
+		if c, ok := agentlogin.FindCLI(h.clisFile(), provider); ok && !agentlogin.Reserved(provider) {
+			return agentlogin.CLIStatus(ctx, h.shell, h.a.cfg.EnvDir, c)
+		}
 		return hubproto.AgentStatus{Provider: provider, Login: hubproto.LoginUnknown}
 	}
 	h.mu.Lock()
@@ -572,7 +577,7 @@ func (h *hub) oneStatus(ctx context.Context, provider string) hubproto.AgentStat
 // statuses are the agents' statuses, the providers looked at in parallel.
 func (h *hub) statuses(ctx context.Context, providers []string) []hubproto.AgentStatus {
 	if len(providers) == 0 {
-		providers = []string{hubproto.ProviderClaude, hubproto.ProviderCodex}
+		providers = append([]string{hubproto.ProviderClaude, hubproto.ProviderCodex}, h.cliIDs()...)
 	}
 	out := make([]hubproto.AgentStatus, len(providers))
 	var wg sync.WaitGroup
@@ -585,6 +590,39 @@ func (h *hub) statuses(ctx context.Context, providers []string) []hubproto.Agent
 	}
 	wg.Wait()
 	return out
+}
+
+// clisFile is the machine's description of its other CLIs to sign in (#58): AGENT_CLI_LOGINS_FILE, or cli-logins.json
+// in the agent's data folder.
+func (h *hub) clisFile() string {
+	if p := os.Getenv("AGENT_CLI_LOGINS_FILE"); p != "" {
+		return p
+	}
+	return filepath.Join(h.a.cfg.DataDir, agentlogin.CLIsFile)
+}
+
+// cliIDs are the CLIs the file describes now. What is wrong in it goes to the audit log once, by entry, without its
+// commands.
+func (h *hub) cliIDs() []string {
+	list, bad := agentlogin.LoadCLIs(h.clisFile())
+	if len(bad) > 0 {
+		h.mu.Lock()
+		warn := !h.cliWarned
+		h.cliWarned = true
+		h.mu.Unlock()
+		if warn {
+			why := make([]string, len(bad))
+			for i, err := range bad {
+				why[i] = err.Error()
+			}
+			h.audit.Record("cli-logins.load", false, map[string]any{"skipped": why})
+		}
+	}
+	ids := make([]string, len(list))
+	for i, c := range list {
+		ids[i] = c.ID
+	}
+	return ids
 }
 
 // refreshAgents tells the hub the agents' statuses when they differ from what it was last told (always, with force).

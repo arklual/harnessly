@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agentlogin"
 	"github.com/ly-solutions/harnessly/internal/agentnet"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/install"
@@ -51,6 +52,17 @@ func provider(req map[string]json.RawMessage) (string, error) {
 		return "", hubproto.Errf(hubproto.CodeUnsupported, "there is nothing for %s on a machine yet", p)
 	}
 	return "", invalid("provider must be claude or codex")
+}
+
+// loginProvider is provider, or a CLI of the machine's cli-logins.json, which only signs in (#58).
+func (h *hub) loginProvider(req map[string]json.RawMessage) (string, error) {
+	p, _ := field[string](req, "provider")
+	if !agentlogin.Reserved(p) {
+		if _, ok := agentlogin.FindCLI(h.clisFile(), p); ok {
+			return p, nil
+		}
+	}
+	return provider(req)
 }
 
 // opHistory is history.start and history.ack: the hub's copy of the chats, the same replica as a cluster's.
@@ -266,7 +278,7 @@ func (h *hub) opLogin(op string, req map[string]json.RawMessage, pol hubproto.Po
 	loginID, _ := field[string](req, "loginId")
 	switch op {
 	case hubproto.OpLoginStart:
-		p, err := provider(req)
+		p, err := h.loginProvider(req)
 		if err != nil {
 			return nil, nil, err
 		}

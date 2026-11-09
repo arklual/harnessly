@@ -243,9 +243,11 @@ type View struct {
 	Policy       json.RawMessage   `json:"policy"`
 	Preflight    json.RawMessage   `json:"preflight"`
 	Agents       []json.RawMessage `json:"agents"`
-	Proxy        json.RawMessage   `json:"proxy"`
-	Env          []string          `json:"env"`
-	CreatedAt    string            `json:"createdAt"`
+	// CLIs are the machine's other CLIs to sign in by console (#58): provider, kind "cli", label, installed, login.
+	CLIs      []json.RawMessage `json:"clis"`
+	Proxy     json.RawMessage   `json:"proxy"`
+	Env       []string          `json:"env"`
+	CreatedAt string            `json:"createdAt"`
 	// OwnerID is the person whose own machine it is: their chats, their sidebar (#57); null for an unclaimed one.
 	OwnerID *string `json:"ownerId"`
 	// Runtime is whether the machine's page opens on this hub: ready, needs_trust (an owner of its space can allow it)
@@ -259,6 +261,8 @@ type info struct {
 	Preflight json.RawMessage `json:"preflight,omitempty"`
 	Agents    json.RawMessage `json:"agents,omitempty"`
 	Proxy     json.RawMessage `json:"proxy,omitempty"`
+	// CLIs are the statuses of the machine's other CLIs to sign in, from its cli-logins.json (#58).
+	CLIs json.RawMessage `json:"clis,omitempty"`
 }
 
 // opensRuntime says whether the hub may open the machine's runtime: not when the machine's last policy refused runtime
@@ -302,7 +306,7 @@ func (s *Service) View(ctx context.Context, m store.Machine) (View, error) {
 		ID: m.ID, Name: m.Name, Hostname: m.Hostname, OS: m.OS, Arch: m.Arch, UnixUser: m.UnixUser, Profile: m.Profile, Via: m.Via,
 		Status: s.status(m), LastSeenAt: httpx.TimePtr(m.LastSeenAt), AgentVersion: m.AgentVersion, EncKey: m.EncPub,
 		Policy: nullable(in.Policy), Preflight: nullable(in.Preflight), Proxy: in.Proxy, Env: env, CreatedAt: httpx.Time(m.CreatedAt),
-		Agents: agentsView(in.Agents),
+		Agents: agentsView(in.Agents), CLIs: s.CLIs(m),
 	}
 	if m.SpaceID != "" {
 		id := m.SpaceID

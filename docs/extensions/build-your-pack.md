@@ -8,14 +8,15 @@ are invented: `example-corp`, `example.com`. A working copy is [examples/ext-pac
 
 ## What a pack can hold
 
-| Part             | Interface                                  | Where it runs             | Reference                             |
-| ---------------- | ------------------------------------------ | ------------------------- | ------------------------------------- |
-| Machines         | `harnessly.machine-provider/v1`            | next to the hub           | [hub/provider.md](../hub/provider.md) |
-| Memory store     | `harnessly.memory/v1`                      | next to the runtime       | memory-adapters.md                    |
-| Tracker and wiki | `harnessly.connection/v1`                  | next to the runtime       | connection-adapters.md                |
-| Documents        | `harnessly.docs/v1`                        | next to the runtime       | [doc-adapters.md](../doc-adapters.md) |
-| Secrets          | vault mode of the safe, configuration only | the runtime's environment | [safe.md](../safe.md)                 |
-| Interface        | an app of kind `ui` filling slots          | the runtime               | [apps.md](../apps.md)                 |
+| Part             | Interface                                    | Where it runs             | Reference                                       |
+| ---------------- | -------------------------------------------- | ------------------------- | ----------------------------------------------- |
+| Machines         | `harnessly.machine-provider/v1`              | next to the hub           | [hub/provider.md](../hub/provider.md)           |
+| Memory store     | `harnessly.memory/v1`                        | next to the runtime       | memory-adapters.md                              |
+| Tracker and wiki | `harnessly.connection/v1`                    | next to the runtime       | connection-adapters.md                          |
+| Documents        | `harnessly.docs/v1`                          | next to the runtime       | [doc-adapters.md](../doc-adapters.md)           |
+| Secrets          | vault mode of the safe, configuration only   | the runtime's environment | [safe.md](../safe.md)                           |
+| Interface        | an app of kind `ui` filling slots            | the runtime               | [apps.md](../apps.md)                           |
+| CLI sign-ins     | `cli-logins.json` in the agent's data folder | the machine               | [hub/machine.md](../hub/machine.md#cli-sign-in) |
 
 A pack takes any of them: a company with one tracker builds one adapter. The memory and tracker references ship with
 the changes that add those interfaces; the extension frame itself is [hub/extensions.md](../hub/extensions.md).

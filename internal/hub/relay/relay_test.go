@@ -391,8 +391,6 @@ func TestProxy(t *testing.T) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 func TestSecrets(t *testing.T) {
 	f := setup(t)
 	stream := f.owner.Events(f.spaceID)
@@ -730,3 +728,117 @@ func TestQueryOfAnOpenRequestIsNotLogged(t *testing.T) {
 		t.Error("a query string reached the log")
 	}
 }
+
+// TestCLILogins is #58 on the hub: a machine reports the CLIs of its cli-logins.json with its agents, the page lists
+// them apart, and they sign in by console only. An id the machine did not report is no route, a login that finished
+// changes its CLI's status, and a CLI taken out of the file goes.
+func TestCLILogins(t *testing.T) {
+	f := setup(t)
+	report := func(clis ...hubproto.AgentStatus) {
+		f.a.Handle("agents.status", func(hubtest.Call) (any, error) {
+			return map[string]any{"agents": append([]hubproto.AgentStatus{
+				{Provider: "claude", Installed: true, Login: hubproto.LoggedIn}, {Provider: "codex", Login: hubproto.LoggedOut}}, clis...)}, nil
+		})
+	}
+	type cli struct {
+		Provider, Kind, Label, Login string
+		Installed                    bool
+	}
+	list := func(refresh bool) []cli {
+		path := f.base + "/agents"
+		if refresh {
+			path += "?refresh=1"
+		}
+		var out struct {
+			Agents []struct{ Provider string }
+			CLIs   []cli `json:"clis"`
+		}
+		r := f.owner.Do("GET", path, nil)
+		r.JSON(&out)
+		if r.Code != 200 || len(out.Agents) != 3 {
+			t.Fatalf("agents: %s", r)
+		}
+		return out.CLIs
+	}
+	if got := list(false); got == nil || len(got) != 0 {
+		t.Fatalf("no CLIs yet, as a list: %v", got)
+	}
+	report(
+		hubproto.AgentStatus{Provider: "example-cli", Kind: "cli", Label: "Example CLI", Installed: true, Login: hubproto.LoggedOut,
+			AuthMode: ptr("subscription")},
+		hubproto.AgentStatus{Provider: "claude", Kind: "cli", Label: "An agent's name", Login: hubproto.LoggedIn},
+		hubproto.AgentStatus{Provider: "Bad Id", Kind: "cli", Label: "x"},
+		hubproto.AgentStatus{Provider: "other-cli", Kind: "cli", Label: strings.Repeat("я", 100), Login: "weird"},
+	)
+	got := list(true)
+	if len(got) != 2 || got[0] != (cli{"example-cli", "cli", "Example CLI", "logged_out", true}) ||
+		got[1].Provider != "other-cli" || len([]rune(got[1].Label)) != 60 || got[1].Login != "unknown" {
+		t.Fatalf("clis: %+v", got)
+	}
+	if r := f.owner.Do("GET", f.base, nil); !strings.Contains(string(r.Body), `"clis":[{`) {
+		t.Errorf("the machine's view has no clis: %s", r)
+	}
+
+	f.a.Handle("login.start", func(c hubtest.Call) (any, error) {
+		return hubproto.Login{ID: c.Str("loginId"), Provider: c.Str("provider"), Method: c.Str("method"), State: hubproto.LoginStarting}, nil
+	})
+	if r := f.owner.Do("POST", f.base+"/agents/example-cli/login", map[string]any{"method": "link"}); r.Code != 400 || r.Detail("field") != "method" {
+		t.Errorf("a CLI by link: %s", r)
+	}
+	if r := f.owner.Do("POST", f.base+"/agents/missing-cli/login", map[string]any{"method": "console"}); r.Code != 404 {
+		t.Errorf("a CLI the machine did not report: %s", r)
+	}
+	if r := f.owner.Do("POST", f.base+"/agents/example-cli/install", map[string]any{}); r.Code != 404 {
+		t.Errorf("a CLI is only signed in: %s", r)
+	}
+	member := f.s.SignIn("member@example.com")
+	f.owner.Join(f.spaceID, member)
+	stranger := f.s.SignIn("stranger@example.com")
+	for who, p := range map[string]*hubtest.Person{"member": member, "stranger": stranger} {
+		if r := p.Do("POST", f.base+"/agents/example-cli/login", map[string]any{"method": "console"}); r.Code != 403 {
+			t.Errorf("%s: %s", who, r)
+		}
+	}
+	if n := len(f.a.Calls("login.start")); n != 0 {
+		t.Fatalf("the agent was asked %d times", n)
+	}
+	r := f.owner.Do("POST", f.base+"/agents/example-cli/login", map[string]any{"method": "console"})
+	var out struct{ Login map[string]any }
+	r.JSON(&out)
+	if r.Code != 202 || out.Login["provider"] != "example-cli" || out.Login["method"] != "console" {
+		t.Fatalf("login: %s", r)
+	}
+	if c := f.a.Calls("login.start")[0]; param(c, "provider") != "example-cli" || param(c, "method") != "console" {
+		t.Errorf("call = %v", c.Params)
+	}
+
+	// The login ends done with the CLI's new status; the other CLI stays as it was.
+	f.a.Emit(map[string]any{"event": hubproto.EventLogin, "login": hubproto.Login{ID: out.Login["id"].(string), Provider: "example-cli",
+		Method: "console", State: hubproto.LoginDone, Status: &hubproto.AgentStatus{Provider: "example-cli", Kind: "cli", Label: "Example CLI",
+			Installed: true, Login: hubproto.LoggedIn}}})
+	deadline := time.Now().Add(5 * time.Second)
+	for got = list(false); got[0].Login != "logged_in" && time.Now().Before(deadline); got = list(false) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(got) != 2 || got[0].Login != "logged_in" || got[1].Provider != "other-cli" {
+		t.Fatalf("after the login: %+v", got)
+	}
+	var agents struct {
+		Agents []struct{ Provider, Login string }
+	}
+	f.owner.Do("GET", f.base+"/agents", nil).JSON(&agents)
+	if agents.Agents[0].Login != "logged_in" || agents.Agents[1].Login != "logged_out" {
+		t.Errorf("a CLI's status changed an agent's: %+v", agents)
+	}
+
+	// The CLI is taken out of the file: the next full report drops it, and it cannot be signed in.
+	report()
+	if got := list(true); len(got) != 0 {
+		t.Fatalf("after removal: %+v", got)
+	}
+	if r := f.owner.Do("POST", f.base+"/agents/example-cli/login", map[string]any{"method": "console"}); r.Code != 404 {
+		t.Errorf("a removed CLI: %s", r)
+	}
+}
+
+func ptr[T any](v T) *T { return &v }

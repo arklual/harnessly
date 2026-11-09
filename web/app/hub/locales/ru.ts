@@ -321,6 +321,11 @@ export const ru = {
   'agents.soon': 'Скоро',
   'agents.installing': 'Устанавливаем…',
   'agents.noAccess': 'Нет доступа',
+  'clis.title': 'Входы в CLI',
+  'clis.how':
+    'Команду входа задаёт машина. Ссылку CLI напечатает в терминале: откройте её и войдите, ответ вернётся в CLI через консоль.',
+  'clis.missing': 'Не установлен на машине',
+  'clis.unknown': 'Не удалось проверить вход',
   'agents.needsLogin': 'Нужно войти',
   'agents.install': 'Установить',
   'agents.login': 'Войти',

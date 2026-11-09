@@ -12,11 +12,11 @@ import { checkAnswer, checkedAgo } from '../lib/format';
 import { useNow, type Live } from '../lib/hooks';
 import { t, type Key } from '../lib/i18n';
 import { installJobOf } from '../lib/live';
-import type { Job, Machine, Provider, ProviderCheck } from '../lib/types';
+import type { CLIStatus, Job, Machine, Provider, ProviderCheck } from '../lib/types';
 import { StepFrame } from '../ui/frame';
-import { CircleCheck, Cpu, Download, LogIn, Server, TriangleAlert } from '../ui/icons';
+import { CircleCheck, Cpu, Download, LogIn, Server, Terminal, TriangleAlert } from '../ui/icons';
 import { Checks, ListSkeleton, LinkButton, Msg, Note, Pill } from '../ui/parts';
-import { LoginPanel } from './agent-login';
+import { CLILoginPanel, LoginPanel } from './agent-login';
 import { ProxyBar, ProxyForm } from './agent-proxy';
 import { jobRows } from './machines';
 import { useGoStep, useSpace, useStepNav } from './space';
@@ -134,9 +134,12 @@ export const MachineAgents = ({ machine, live }: { machine: Machine; live: Live 
     let alive = true;
     void api.agents
       .list(machine.id, true)
-      .then(({ agents }) => {
+      .then(({ agents, clis }) => {
         if (!alive) return;
-        live.push({ type: 'event', event: { type: 'machine', data: { machine: { ...machine, agents } } } });
+        live.push({
+          type: 'event',
+          event: { type: 'machine', data: { machine: { ...machine, agents, ...(clis ? { clis } : {}) } } },
+        });
         setError(null);
         setLoading(false);
       })
@@ -183,12 +186,66 @@ export const MachineAgents = ({ machine, live }: { machine: Machine; live: Live 
           ))}
         </div>
       )}
+      {!!machine.clis?.length && (
+        <>
+          <h3 className="hub-section__t">{t('clis.title')}</h3>
+          <div className="hub-list">
+            {machine.clis.map((c) => (
+              <CLIRow key={c.provider} machine={machine} cli={c} live={live} />
+            ))}
+          </div>
+        </>
+      )}
       <ProxyBar machine={machine} live={live} />
     </>
   );
 };
 
 type Panel = 'login' | 'none';
+
+/** One of the machine's other CLIs (#58): signed in or not, and «Войти» by console. */
+const CLIRow = ({ machine, cli, live }: { machine: Machine; cli: CLIStatus; live: Live }) => {
+  const [open, setOpen] = useState(false);
+  const ready = cli.login === 'logged_in';
+  const sub = !cli.installed
+    ? t('clis.missing')
+    : ready
+      ? t('agents.sub.ready')
+      : cli.login === 'unknown'
+        ? t('clis.unknown')
+        : t('agents.sub.installed');
+  return (
+    <div className="hub-item" data-cli={cli.provider}>
+      <div className="hub-item__head">
+        <span className="hub-agent" aria-hidden="true">
+          <Terminal size={14} />
+        </span>
+        <span className="hub-t">
+          <span className="hub-t__n">{cli.label}</span>
+          <span className="hub-item__s">{sub}</span>
+        </span>
+        {ready ? (
+          <CircleCheck size={16} className="hub-ok" />
+        ) : (
+          cli.installed &&
+          !open && (
+            <Button size="xs" icon={<LogIn size={14} />} onClick={() => setOpen(true)}>
+              {t('agents.login')}
+            </Button>
+          )
+        )}
+      </div>
+      {open && !ready && cli.installed && (
+        <CLILoginPanel
+          machine={machine}
+          cli={cli}
+          live={live}
+          allowed={policyAllows(machine, 'agentLogin')}
+        />
+      )}
+    </div>
+  );
+};
 
 const installLabel = (id: string, provider: Provider, machine: Machine): string =>
   t(`job.agent.${id}` as Key, {
