@@ -82,6 +82,11 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 		a.peersRoute(w, r)
 		return
 	}
+	// The memory of this machine's person, kept by the hub (docs/hub/memory-sync.md): the same relay token, its own audience.
+	if r.Method == http.MethodPost && (r.URL.RequestURI() == "/memory/pull" || r.URL.RequestURI() == "/memory/put") {
+		a.memoryRoute(w, r)
+		return
+	}
 	switch {
 	case r.URL.RequestURI() == "/healthz":
 		reply(w, 200, map[string]any{"ok": true, "version": a.cfg.Version})

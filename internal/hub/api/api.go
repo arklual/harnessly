@@ -414,6 +414,11 @@ func New(o Options) (*Hub, error) {
 		mux.Handle("POST /agent/peers/send", httpx.Handler(h.peersSend))
 		mux.Handle("POST /agent/peers/directory", httpx.Handler(h.peersDirectory))
 	}
+	// A person's agent memory for all of the person's machines (docs/hub/memory-sync.md): off unless HUB_MEMORY_SYNC=on.
+	if h.cfg.Memory {
+		mux.Handle("POST "+hubproto.MemoryPullPath, httpx.Handler(h.memoryPull))
+		mux.Handle("POST "+hubproto.MemoryPutPath, httpx.Handler(h.memoryPut))
+	}
 	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { httpx.WriteError(w, r, httpx.ErrNotFound) })
 	mux.Handle("/api/", notFound)
 	mux.Handle("/agent/", notFound)

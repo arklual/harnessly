@@ -267,9 +267,11 @@ func TestIngestEndToEnd(t *testing.T) {
 			t.Errorf("rollup row after the session moved = %+v", r)
 		}
 	}
-	if cur, _ := st.CursorOf(ctx, a.MachineID, "usage"); cur.Epoch != "e2" || cur.Seq != 2 || cur.AckedAt == nil {
-		t.Errorf("cursor = %+v", cur)
-	}
+	// The hub writes the cursor after the ack's call returns: the agent holding the ack is not yet the row.
+	s.Eventually("the cursor of the new epoch kept", func() bool {
+		cur, _ := st.CursorOf(ctx, a.MachineID, "usage")
+		return cur.Epoch == "e2" && cur.Seq == 2 && cur.AckedAt != nil
+	})
 }
 
 // A machine whose clock runs ahead has its batch moved back to the hub's time, and the rows say so.

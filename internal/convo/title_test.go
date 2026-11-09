@@ -248,7 +248,7 @@ func TestAConversationOfALaunchWorksInAWorktreeOfItsOwn(t *testing.T) {
 	if len(made) != 1 || made[0][0] != "/w" || !strings.HasPrefix(made[0][1], "l1-opus-") {
 		t.Fatalf("made: %v", made)
 	}
-	r.id = *res.ID
+	r.id = r.made(res)
 	rec := r.record()
 	if rec.Cwd != "/w/.worktrees/"+made[0][1] || rec.Launch == nil || rec.Launch.ID != "l1" {
 		t.Fatalf("record: %q %+v", rec.Cwd, rec.Launch)

@@ -232,6 +232,8 @@ func (c *cli) run(args []string) error {
 		return c.widget(rest)
 	case "peers", "peer":
 		return c.peers(rest)
+	case "memory":
+		return c.memory(rest)
 	case "secret", "secrets":
 		return c.secret(rest)
 	case "supervise":

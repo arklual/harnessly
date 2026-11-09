@@ -101,7 +101,7 @@ func (c *core) newLauncher() {
 		Store: c.store, Lines: lines, Availability: avail, Keeper: c.keeperOf,
 		WorkspaceRoot: lc.WorkspaceRoot, Home: c.cfg.Home, DataDir: c.cfg.DataDir, DataDirLabel: lc.DataDirLabel,
 		EnvPrefix: lc.EnvPrefix, EnvSource: c.envSource, PromptDir: filepath.Join(c.cfg.DataDir, "launch-prompts"), FirstWorkspaceName: lc.FirstWorkspaceName,
-		Admit: c.budgetAdmit,
+		Admit: c.budgetAdmit, BeforeAgent: memoryBeforeAgent,
 	})
 	c.inbox = &launch.Inbox{Starter: c.launcher, Tmux: inboxTmux{c}, Log: coreLog,
 		Submit: func(session, text string) error {

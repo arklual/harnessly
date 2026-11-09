@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -124,6 +125,11 @@ var errPeersNotServed = errors.New("this hub does not carry messages between mac
 
 // peersCall posts body to the hub's path, signed with the machine's key, and reads the answer into out.
 func (h *hub) peersCall(ctx context.Context, path string, body, out any) error {
+	return h.signedCall(ctx, hubproto.SignPeers, path, body, out)
+}
+
+// signedCall posts body to the hub's path with a header sign makes from the machine's key, and reads the answer.
+func (h *hub) signedCall(ctx context.Context, sign func(ed25519.PrivateKey, string, time.Time, string) (string, error), path string, body, out any) error {
 	m := h.machine
 	host, err := hubproto.DialHost(m.DialURL)
 	if err != nil {
@@ -140,7 +146,7 @@ func (h *hub) peersCall(ctx context.Context, path string, body, out any) error {
 		u.Scheme = "http"
 	}
 	u.Path, u.RawQuery = path, ""
-	auth, err := hubproto.SignPeers(m.SigningKey(), m.MachineID, time.Now(), host)
+	auth, err := sign(m.SigningKey(), m.MachineID, time.Now(), host)
 	if err != nil {
 		return err
 	}

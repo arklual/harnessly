@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Your Claude Code memory can follow you to all your machines (opt-in: `HUB_MEMORY_SYNC=on` on the hub,
+  `RUNTIME_MEMORY_SYNC_URL` on the runtime). Only the notes of a project's `memory/` folder sync, under the project's
+  git remote, and only between machines of the same person. A Claude conversation syncs its project before it starts.
+  A note changed on two machines keeps both versions. `harnessly memory [sync]` shows the last sync and retries it
+  (docs/hub/memory-sync.md).
+
 - The search over the chats, the sidebar's projects and favorites, and the turns a rewind left behind open from the
   cluster's and the hub's copy, with the machine off too: the hub serves `…/history/search`, `…/history/sidebar` (one
   document per person, written on its revision) and `…/history/conversations/<id>/rewinds/<n>/turns`, as the gateway

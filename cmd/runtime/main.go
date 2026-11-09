@@ -487,6 +487,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(docShareRoutes(d, ref.c)...)
 	f.Add(githubRoutes(d, githubFromEnv())...)
 	f.Add(peerRoutes(d, ref.c)...)
+	f.Add(memoryRoutes(d)...)
 	checker, checkOn := newUpdateChecker(cfg.Standalone())
 	self := newSelfUpdater()
 	f.Add(updateRoutes(d, checker, checkOn, self)...)

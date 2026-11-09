@@ -579,7 +579,7 @@ func TestCreateLaunchesWithTheFirstMessage(t *testing.T) {
 	if res.R != wire.ResultAccepted || res.ID == nil || !wire.ValidConvID(*res.ID) {
 		t.Fatalf("create: %+v", res)
 	}
-	r.id = *res.ID
+	r.id = r.made(res)
 	st := r.state()
 	if st.K != wire.StateStarting || st.Wait == nil {
 		t.Fatalf("state: %+v", st)
@@ -612,7 +612,7 @@ func TestCreateLaunchesWithTheFirstMessage(t *testing.T) {
 func TestMessageToAStartingAgentIsTypedWhenItIsReady(t *testing.T) {
 	r := newRig(t)
 	res := r.do(wire.ConversationCreateCmd{OpID: "c2", Cwd: "/w", Provider: wire.ProviderClaude})
-	r.id = *res.ID
+	r.id = r.made(res)
 	r.send("m1", "start here", wire.ModeQueue)
 	if m := r.message("m1"); m.State.K != wire.MsgQueued || m.State.Reason != wire.QueuedLaunching {
 		t.Fatalf("first: %+v", m.State)
@@ -637,7 +637,7 @@ func TestCarriedMessageGoesBackWhenTheLaunchFails(t *testing.T) {
 	r := newRig(t)
 	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude,
 		First: &wire.FirstMessage{ClientID: "first", Text: "start here", AttachmentIDs: []string{}}})
-	r.id = *res.ID
+	r.id = r.made(res)
 	r.rt.LaunchFailed(r.id, wire.LaunchFailedCliMissing)
 	r.tick(time.Second)
 	if m := r.message("first"); m.State.K != wire.MsgQueued || m.State.Reason != wire.QueuedPaused {
@@ -651,7 +651,7 @@ func TestResumeAfterAFailedFirstLaunchStartsFresh(t *testing.T) {
 	r := newRig(t)
 	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude,
 		First: &wire.FirstMessage{ClientID: "first", Text: "start here", AttachmentIDs: []string{}}})
-	r.id = *res.ID
+	r.id = r.made(res)
 	r.rt.LaunchFailed(r.id, wire.LaunchFailedCliMissing)
 	r.tick(time.Second)
 	if st := r.state(); st.K != wire.StateLaunchFailed || r.snap().Queue.Paused == nil {
@@ -680,7 +680,7 @@ func TestLaunchWithAShellLeftFailsAndResumeStartsFresh(t *testing.T) {
 	r := newRig(t)
 	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude,
 		First: &wire.FirstMessage{ClientID: "first", Text: "start here", AttachmentIDs: []string{}}})
-	r.id = *res.ID
+	r.id = r.made(res)
 	if err := r.rt.Attach(r.id, "s1", "", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -706,7 +706,7 @@ func TestMessageAfterAFailedFirstLaunchStartsFresh(t *testing.T) {
 	r := newRig(t)
 	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude,
 		First: &wire.FirstMessage{ClientID: "first", Text: "start here", AttachmentIDs: []string{}}})
-	r.id = *res.ID
+	r.id = r.made(res)
 	r.rt.LaunchFailed(r.id, wire.LaunchFailedCliMissing)
 	r.tick(time.Second)
 	r.send("m2", "and this", wire.ModeQueue)
@@ -725,7 +725,7 @@ func TestMessageAfterAFailedFirstLaunchStartsFresh(t *testing.T) {
 func TestLaunchDeadline(t *testing.T) {
 	r := newRig(t)
 	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude})
-	r.id = *res.ID
+	r.id = r.made(res)
 	r.tick(time.Duration(wire.LaunchDeadline) * time.Millisecond)
 	if st := r.state(); st.K != wire.StateLaunchFailed || st.Reason != string(wire.LaunchFailedNoPromptBox) {
 		t.Fatalf("state: %+v", st)

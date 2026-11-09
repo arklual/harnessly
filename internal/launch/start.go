@@ -68,6 +68,9 @@ type Config struct {
 	// Admit is the reason a new conversation of the provider may not start (a limit of the hub, see internal/budget);
 	// nil, or "", lets it start.
 	Admit func(provider string, launch *agents.Launch) string
+	// BeforeAgent runs just before the agent of a conversation starts in cwd (the person's memory synced from the hub,
+	// docs/hub/memory-sync.md); nil does nothing. It must return quickly and never fails the start.
+	BeforeAgent func(provider, cwd string)
 }
 
 // Starter starts conversations.
@@ -329,6 +332,9 @@ func (s *Starter) Start(o Options) (Result, error) {
 		l := *launch
 		l.Conversation = tabID
 		launch = &l
+	}
+	if s.cfg.BeforeAgent != nil {
+		s.cfg.BeforeAgent(o.Provider, cwd)
 	}
 	var line string
 	switch {

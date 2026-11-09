@@ -301,7 +301,7 @@ func TestFailedHandoffLaunchKeepsBootstrapFirstOnRetry(t *testing.T) {
 	if res.R != wire.ResultAccepted || res.ID == nil {
 		t.Fatalf("handoff: %+v", res)
 	}
-	r.id = *res.ID
+	r.id = r.made(res)
 	first := r.launcher.launched[len(r.launcher.launched)-1].First
 	if message := r.message("retry-handoff"); message.Mode != wire.ModeQueue {
 		t.Fatalf("the carried first prompt is exposed as %q, want an ordinary queued prompt", message.Mode)

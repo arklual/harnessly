@@ -56,6 +56,11 @@ OTHER AGENTS (this machine and the fleet's other machines)
                                     or exits 1 with "refused: <reason> — <why>". The other agent reads it as a
                                     <peer-message> with your machine, owner and chat, and answers by building the same command from its ref.
 
+YOUR MEMORY ON ALL YOUR MACHINES (opt-in, docs/hub/memory-sync.md)
+  harnessly memory [status]         the last sync of your Claude Code memory through the hub, conflicts and errors
+  harnessly memory sync [--cwd DIR | --all]  sync the project in DIR (the current folder) or every project synced before;
+                                    a conflict keeps both versions (<name>.conflict-<version>.md beside the note)
+
 INSTALLING A RELEASE
   harnessly upgrade plan|apply|rollback
                                     a signed release as one set: what changes and which extensions break (plan), replace,
@@ -448,6 +453,17 @@ REF is <machine>/<conversation id> as the list prints it (a bare conversation id
 as <peer-message person=… machine=… chat=… ref=…>…</peer-message>: build the answer yourself from its ref, as
 "harnessly peers send <ref> …"; the envelope carries no command to copy. The
 other side decides who may write to it (Settings → Machines → «Связь между агентами»); a refusal says why.
+`,
+	"memory": `harnessly memory [status] | harnessly memory sync [--cwd DIR | --all]
+
+  harnessly memory
+  harnessly memory sync
+  harnessly memory sync --cwd ~/src/app
+
+Only Claude Code's memory notes sync (<projects>/<entry>/memory/*.md), under the project's git remote, through the hub of
+this machine, to the other machines of the same person. A Claude conversation syncs its project before it starts. A
+note changed on two machines keeps both: the other version lands beside it as <name>.conflict-<version>.md; merge them
+and delete the copy. A failure leaves the local notes as they were; run sync again.
 `,
 	"notify": `harnessly notify [list] | harnessly notify send [--bot NAME] [--silent] TEXT...
 

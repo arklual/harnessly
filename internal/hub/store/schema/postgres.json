@@ -3002,6 +3002,55 @@
         }
       ]
     },
+    "memory_notes": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "project",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "version",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "deleted",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "project",
+        "name"
+      ]
+    },
     "merged_mrs": {
       "columns": [
         {

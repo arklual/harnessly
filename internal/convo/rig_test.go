@@ -183,8 +183,12 @@ func newRig(t *testing.T) *rig {
 }
 
 func (r *rig) runtime() *Runtime {
+	// The rig runs inline on a fake clock: the command budget is real time, so a loaded CI machine must not run out of
+	// it (the budget's own tests set theirs, async_test.go).
+	limits := wire.DefaultLimits
+	limits.CmdBudgetMs = 120_000
 	d := Deps{MachineID: "m1", Publisher: r.pub, Machine: r.machine, Launcher: r.launcher, Clock: r.clock,
-		Store: NewStore(filepath.Join(r.dir, "v2")), Limits: wire.DefaultLimits, TerminalOff: r.termOff.Load}
+		Store: NewStore(filepath.Join(r.dir, "v2")), Limits: limits, TerminalOff: r.termOff.Load}
 	if r.deps != nil {
 		r.deps(&d)
 	}
@@ -277,6 +281,15 @@ func (r *rig) hook(kind string) {
 func (r *rig) do(cmd wire.Command) wire.CmdResult {
 	r.t.Helper()
 	return r.rt.Do(context.Background(), "dev-1", cmd)
+}
+
+// made is the id of the conversation a create answered; a create that answered something else fails the test.
+func (r *rig) made(res wire.CmdResult) string {
+	r.t.Helper()
+	if res.ID == nil {
+		r.t.Fatalf("create: %+v", res)
+	}
+	return *res.ID
 }
 
 func (r *rig) send(id, text string, mode wire.MessageMode) wire.CmdResult {

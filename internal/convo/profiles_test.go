@@ -80,7 +80,7 @@ func TestCreateOnAProfile(t *testing.T) {
 		got[0].Model.Profile != "glm" || got[0].Model.Effort == nil || *got[0].Model.Effort != high {
 		t.Fatalf("%+v", got)
 	}
-	r.id = *res.ID
+	r.id = r.made(res)
 	if m := r.record().Model; m == nil || m.Profile != "glm" {
 		t.Fatalf("the record keeps the profile: %+v", m)
 	}
@@ -121,7 +121,7 @@ func TestAProfileChatSwitchesOnlyAmongItsModels(t *testing.T) {
 	if res.ID == nil {
 		t.Fatalf("%+v", res)
 	}
-	r.id = *res.ID
+	r.id = r.made(res)
 	if got := r.do(wire.ModelCmd{OpID: "m1", ID: r.id, Model: "opus"}); got.R != wire.ResultRefused || got.Code != wire.RefuseOptionUnknown {
 		t.Errorf("a profile chat to Claude's own model: %+v", got)
 	}
@@ -143,7 +143,7 @@ func TestAProfileOfNamespacedModels(t *testing.T) {
 	if res.R != wire.ResultAccepted || res.ID == nil {
 		t.Fatalf("create: %+v", res)
 	}
-	r.id = *res.ID
+	r.id = r.made(res)
 	if got := r.launcher.launched; len(got) != 1 || got[0].Model == nil || got[0].Model.ID != "zai/glm-5.3" ||
 		got[0].Model.Profile != "zai-router" {
 		t.Fatalf("launched %+v", got)
@@ -227,7 +227,7 @@ func TestHandoffAmongProfiles(t *testing.T) {
 				profileOf(rec.Model) != c.want {
 				t.Errorf("%s: origin %+v model %+v", name, o, rec.Model)
 			}
-			r.id = *res.ID
+			r.id = r.made(res)
 			for i, mode := range []wire.MessageMode{wire.ModeNow, wire.ModeSteer} {
 				if sent := r.send(fmt.Sprintf("after-%d", i), "after handoff", mode); sent.R == wire.ResultRefused {
 					t.Errorf("%s: %s after handoff: %+v", name, mode, sent)

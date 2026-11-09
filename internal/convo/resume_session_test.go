@@ -41,7 +41,7 @@ func TestResumeASessionOpensAConversationOnIt(t *testing.T) {
 	if res.R != wire.ResultAccepted || res.ID == nil || res.Ch != wire.ChannelConvs || !wire.ValidConvID(*res.ID) {
 		t.Fatalf("resume: %+v", res)
 	}
-	r.id = *res.ID
+	r.id = r.made(res)
 	if len(r.launcher.launched) != 1 {
 		t.Fatalf("launched %d", len(r.launcher.launched))
 	}

@@ -235,6 +235,9 @@ type Config struct {
 	// Peers (HUB_PEERS=on) lets the machines' agents exchange messages between their chats through the hub
 	// (docs/hub/peers.md); off: POST /agent/peers/* answer 404.
 	Peers bool
+	// Memory (HUB_MEMORY_SYNC=on) keeps each person's agent memory for all of the person's machines
+	// (docs/hub/memory-sync.md); off: POST /agent/memory/* answer 404.
+	Memory bool
 	// DesignShareURL (HUB_DESIGN_SHARE_URL) is the origin of the guest links to designs (docs/hub/design-access.md); it
 	// must be an origin of its own, not the hub's and not a machine's. Empty: links to designs are off.
 	DesignShareURL string
@@ -624,6 +627,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_PEERS must be on or off")
+	}
+	switch strings.ToLower(def("HUB_MEMORY_SYNC", "off")) {
+	case "on", "true", "1", "yes":
+		c.Memory = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_MEMORY_SYNC must be on or off")
 	}
 	if u := get("HUB_DESIGN_SHARE_URL"); u != "" {
 		pu, err := url.Parse(u)

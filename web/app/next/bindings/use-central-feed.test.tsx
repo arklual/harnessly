@@ -4,8 +4,10 @@
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const page = vi.hoisted(() => ({ getPage: vi.fn() }));
+const page = vi.hoisted(() => ({ getPage: vi.fn(), adopt: vi.fn() }));
 vi.mock('@/next/core/net/http', () => ({ getPage: page.getPage }));
+// The messages parked in the cluster have their own tests; here only that the feed asks for them.
+vi.mock('@/next/commands/messages', () => ({ adoptParkedMessages: page.adopt }));
 vi.mock('@/next/core/net/machine', () => ({ gatewayPath: (p: string) => `/agents/api/x${p}` }));
 
 import { useCentralFeed } from '@/next/bindings/use-central';
