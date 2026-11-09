@@ -389,206 +389,6 @@ html:has(.hx-app) body {
     right: 0;
   }
 }
-.hx-notif {
-  position: fixed;
-  left: var(--nx);
-  top: var(--ny);
-  z-index: 60;
-  width: 360px;
-  max-height: min(560px, calc(100dvh - var(--ny) - 16px));
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--hx-radius-md);
-  border: 1px solid var(--hx-border-strong);
-  background: var(--hx-bg-raised);
-  box-shadow: var(--hx-shadow-overlay);
-  transform-origin: 0 0;
-  animation: hx-notif-in 200ms var(--hx-ease-out) backwards;
-  overflow: hidden;
-}
-.hx-notif[data-ending-style] {
-  animation: hx-notif-out 160ms ease-in both;
-  pointer-events: none;
-}
-.hx-notif__pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  animation: hx-plus-pane 160ms var(--hx-ease-out) backwards;
-}
-.hx-notif__pane[data-sub='true'] {
-  animation-name: hx-plus-sub;
-}
-.hx-notif__head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 8px 6px 14px;
-}
-.hx-notif__pane[data-sub='true'] .hx-notif__head {
-  padding-left: 6px;
-}
-.hx-notif__title {
-  font-size: var(--hx-text-md);
-  font-weight: var(--hx-weight-semibold);
-}
-.hx-notif__link {
-  border: 0;
-  background: transparent;
-  color: var(--hx-fg-2);
-  font: inherit;
-  font-size: var(--hx-text-xs);
-  padding: 4px 6px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.hx-notif__link:hover {
-  color: var(--hx-fg-1);
-  background: var(--hx-bg-hover);
-}
-.hx-notif__body {
-  overflow-y: auto;
-  padding: 0 6px 6px;
-}
-.hx-notif__label {
-  padding: 10px 8px 4px;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-}
-.hx-notif__row,
-.hx-notif__opt {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 8px 8px 18px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--hx-fg-1);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.hx-notif__opt {
-  align-items: center;
-  padding-left: 8px;
-}
-.hx-notif__row:hover,
-.hx-notif__opt:hover {
-  background: var(--hx-bg-hover);
-}
-.hx-notif__row::before {
-  content: '';
-  position: absolute;
-  left: 7px;
-  top: 15px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--hx-accent);
-  opacity: 0;
-  transition: opacity 200ms ease;
-}
-.hx-notif__row[data-unread='true']::before {
-  opacity: 1;
-}
-.hx-notif__row[data-unread='false'] .hx-notif__name {
-  color: var(--hx-fg-2);
-  font-weight: var(--hx-weight-regular, 400);
-}
-.hx-notif__ic {
-  margin-top: 2px;
-  flex: none;
-  color: var(--hx-fg-3);
-}
-.hx-notif__row[data-tone='warn'] .hx-notif__ic {
-  color: var(--hx-warning);
-}
-.hx-notif__row[data-tone='ok'] .hx-notif__ic {
-  color: var(--hx-success);
-}
-.hx-notif__row[data-tone='bad'] .hx-notif__ic {
-  color: var(--hx-danger);
-}
-.hx-notif__count {
-  display: none;
-}
-.hx-notif__main {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.hx-notif__name {
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-notif__text {
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-xs);
-  line-height: 16px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.hx-notif__when {
-  flex: none;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-  margin-top: 2px;
-}
-.hx-notif__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 28px 16px;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-sm);
-  text-align: center;
-}
-.hx-notif__warn {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  margin: 0 8px 6px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--hx-warning) 10%, transparent);
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-xs);
-}
-.hx-notif__warn .hx-icon {
-  color: var(--hx-warning);
-  flex: none;
-}
-.hx-notif .hx-switch {
-  pointer-events: none;
-}
-@media (max-width: 700px) {
-  .hx-notif {
-    left: 8px;
-    right: 8px;
-    top: 56px;
-    width: auto;
-  }
-}
-.hx-notif__empty b {
-  color: var(--hx-fg-1);
-  font-weight: var(--hx-weight-medium);
-}
-.hx-notif__test {
-  display: block;
-  margin: 0 0 4px 2px;
-  color: var(--hx-accent);
-}
 .hx-srch {
   position: fixed;
   inset: 0;
@@ -1340,11 +1140,6 @@ html:has(.hx-app) body {
     display: none !important;
   }
 }
-@media (pointer: coarse) {
-  .hx-notif__row {
-    min-height: 44px;
-  }
-}
 @media (max-width: 900px) {
   .hx-app {
     --dw: 0;
@@ -1393,9 +1188,6 @@ html:has(.hx-app) body {
     margin: 0;
     border-radius: 0;
     box-shadow: none;
-  }
-  .hx-notif {
-    transform-origin: 100% 0;
   }
   .hx-hello {
     padding: 0 calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left));
@@ -1509,18 +1301,6 @@ html:has(.hx-app) body {
     transform: translateY(8px) scale(0.98);
   }
 }
-@keyframes hx-notif-in {
-  from {
-    opacity: 0;
-    transform: translateX(-6px) scale(0.98);
-  }
-}
-@keyframes hx-notif-out {
-  to {
-    opacity: 0;
-    transform: translateX(-6px) scale(0.98);
-  }
-}
 @keyframes hx-plus-pane {
   from {
     opacity: 0;
@@ -1580,26 +1360,10 @@ html:has(.hx-app) body {
   z-index: 100;
 }
 
-/* Base UI places the menu and the notification centre: the positioner holds the place, the popup only draws. */
-.hx-cmenu-pos,
+/* Base UI places the notification centre (the menus: menu.css): the positioner holds the place, the popup only draws. */
 .hx-notif-pos {
   z-index: 120;
   outline: 0;
-}
-.hx-cmenu-pos > .hx-cmenu,
-.hx-notif-pos > .hx-notif {
-  position: relative;
-  top: auto;
-  left: auto;
-  transform-origin: var(--transform-origin);
-}
-.hx-notif-pos > .hx-notif {
-  max-height: min(560px, var(--available-height));
-}
-@media (max-width: 700px) {
-  .hx-notif-pos > .hx-notif {
-    width: calc(100vw - 16px);
-  }
 }
 
 /* The dialogs' parts close on Base UI's ending state instead of the prototype's data-state. */
@@ -1637,20 +1401,6 @@ html:has(.hx-app) body {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
   text-align: center;
-}
-.hx-notif__sk {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 8px;
-}
-.hx-notif__sk .hx-sk {
-  height: 40px;
-  border-radius: 12px;
-}
-.hx-notif__link[data-busy] {
-  opacity: 0.5;
-  pointer-events: none;
 }
 .hx-create__slow {
   margin: 0;
@@ -1765,87 +1515,3 @@ html:has(.hx-app) body {
 /* The notification centre on the phone: a bottom sheet (ui/sheet.tsx). The title is the largest line, each
    section says how many it holds, a row is a finger tall with its whole name and two lines of what happened, an unread
    row is tinted besides its dot, and the machines' section (a machine about to fail its work) stands first, in red. */
-.hx-notif-sheet .hx-notif__pane {
-  min-height: 0;
-}
-.hx-notif-sheet .hx-notif__head {
-  min-height: 44px;
-  padding: 0 4px 6px 12px;
-}
-.hx-notif-sheet .hx-notif__title {
-  margin: 0;
-  font-size: var(--hx-text-lg);
-  font-weight: var(--hx-weight-semibold);
-}
-.hx-notif-sheet .hx-notif__link {
-  min-height: 44px;
-  padding: 0 12px;
-  border-radius: 12px;
-  color: var(--hx-accent);
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
-}
-.hx-notif-sheet .hx-notif__body {
-  padding: 0 0 4px;
-}
-.hx-notif-sheet .hx-notif__label {
-  display: flex;
-  gap: 6px;
-  padding: 14px 12px 6px;
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-xs);
-  font-weight: var(--hx-weight-medium);
-}
-.hx-notif-sheet .hx-notif__count {
-  display: inline;
-  color: var(--hx-fg-3);
-  font-variant-numeric: tabular-nums;
-}
-.hx-notif-sheet .hx-notif__row {
-  min-height: 64px;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px 10px 26px;
-  border-radius: 14px;
-}
-.hx-notif-sheet .hx-notif__row + .hx-notif__row {
-  margin-top: 2px;
-}
-.hx-notif-sheet .hx-notif__row[data-unread='true'] {
-  background: color-mix(in srgb, var(--hx-accent) 7%, transparent);
-}
-.hx-notif-sheet .hx-notif__section[data-kind='machine'] .hx-notif__row {
-  background: color-mix(in srgb, var(--hx-danger) 8%, transparent);
-}
-.hx-notif-sheet .hx-notif__row::before {
-  left: 11px;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  margin-top: -4px;
-}
-.hx-notif-sheet .hx-notif__ic {
-  margin-top: 0;
-  width: 20px;
-  height: 20px;
-}
-.hx-notif-sheet .hx-notif__main {
-  gap: 2px;
-}
-.hx-notif-sheet .hx-notif__name {
-  font-size: var(--hx-text-md);
-  line-height: 20px;
-}
-.hx-notif-sheet .hx-notif__text {
-  font-size: var(--hx-text-sm);
-  line-height: 19px;
-}
-.hx-notif-sheet .hx-notif__when {
-  align-self: flex-start;
-  margin-top: 2px;
-  font-size: var(--hx-text-xs);
-}
-.hx-notif-sheet .hx-notif__empty {
-  padding: 40px 16px 48px;
-  font-size: var(--hx-text-md);
-}

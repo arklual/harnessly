@@ -220,6 +220,9 @@ type Deps struct {
 	// Titler names a conversation from its first message and the agent's first answer, for an agent that wrote no title
 	// of its own (Codex, or Claude before it did); nil never names one, and the first message stays the title.
 	Titler func(p wire.Provider, firstMessage, firstAnswer string) (string, error)
+	// Summarizer writes a few lines on what the agent did in a turn, from the person's message and the agent's replies
+	// (never the tools' input or output); nil writes none, and the notification keeps the start of the answer.
+	Summarizer func(p wire.Provider, message string, replies []string) (string, error)
 	// Worktree makes a git worktree for a conversation and returns its folder; nil: a git worktree off the HEAD of the
 	// repository the folder is in (a folder that is none is used as it is).
 	Worktree func(cwd, name string) (string, error)
@@ -274,6 +277,11 @@ type Deps struct {
 	// AppsOK checks the apps a conversation is asked to turn on: each installed on this machine and working in a chat.
 	// It answers the id of the first that is not, or "". nil: no app can be turned on (refused{unsupported}).
 	AppsOK func(ids []string) string
+
+	// AppsLive says whether the running agent of a conversation takes its apps changed to ids as it runs: the
+	// tools of the apps it did not start with come to it live, their words on its next turn. false (or nil) stops an
+	// agent at rest, and the next message brings it back with the apps.
+	AppsLive func(rec wire.Conversation, ids []string) bool
 
 	// AlwaysApps are the apps a new chat starts with: the installed ones that ask to be on in every chat. nil or
 	// empty: a new chat has none.

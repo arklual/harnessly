@@ -199,6 +199,7 @@ export const InviteSheet = ({
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<TenantRole>('member');
   const [fresh, setFresh] = useState<TenantInvite | null>(null);
+  const [joined, setJoined] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [badMail, setBadMail] = useState(false);
@@ -210,6 +211,7 @@ export const InviteSheet = ({
       setEmail('');
       setRole('member');
       setFresh(null);
+      setJoined(null);
       setError(null);
       setBadMail(false);
       setList(null);
@@ -260,13 +262,21 @@ export const InviteSheet = ({
     void act('mail', async () => {
       const made = await api.inviteByEmail(tenant!.id, address, role, team?.id);
       setEmail('');
-      setFresh(made.sent === false && made.url ? made : null);
+      setFresh(made && made.sent === false && made.url ? made : null);
+      setJoined(
+        made
+          ? null
+          : team
+            ? `${address} уже в тенанте и теперь в команде «${team.name}».`
+            : `${address} уже в тенанте, приглашать не нужно.`,
+      );
     });
   };
   const makeLink = () =>
     void act('link', async () => {
       const made = await api.inviteByLink(tenant!.id, team?.id);
       setFresh(made.url ? made : null);
+      setJoined(null);
       setCopied(false);
     });
   const revoke = (i: TenantInvite) => {
@@ -388,6 +398,11 @@ export const InviteSheet = ({
                 Создать ссылку
               </Btn>
             </div>
+            {joined && (
+              <p className="md-note tm-first" role="status">
+                {joined}
+              </p>
+            )}
             {fresh?.url && (
               <div className="tm-copy">
                 <p className="md-note tm-first">

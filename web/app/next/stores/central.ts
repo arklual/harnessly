@@ -96,7 +96,10 @@ export async function refreshCentral(): Promise<void> {
       for (const c of list) {
         const have = conversationsStore.get(c.id);
         if (have && have.lastActivityAt > c.lastActivityAt) continue;
-        conversationsStore.set(c.id, stopped ? asOffline(c) : c);
+        // The copy only draws the chat until the machine speaks: at rev 0 any word of the machine (its list, a state
+        // change) replaces it, whatever rev the copy kept (a runtime that started over counts from 1 again).
+        const copy = { ...c, rev: 0 };
+        conversationsStore.set(c.id, stopped ? asOffline(copy) : copy);
       }
       if (!convsLoadedStore.has(machine)) convsCachedStore.set(machine, true);
     }
@@ -118,9 +121,19 @@ export function loadCentralChat(
 ): Promise<PageOutcome<CentralChat>> {
   const q = new URLSearchParams({ limit: String(limit) });
   if (before) q.set('before', before);
-  return getPage(
-    gatewayPath(`/history/conversations/${encodeURIComponent(conv)}?${q}`),
-    parseCentral.chat,
-    TIMEOUT_MS,
-  );
+  const read = () =>
+    getPage(
+      gatewayPath(`/history/conversations/${encodeURIComponent(conv)}?${q}`),
+      parseCentral.chat,
+      TIMEOUT_MS,
+    );
+  if (before || limit !== 33) return read();
+  // The chat's newest page is asked by its feed and by its machine channel at once: one request serves both.
+  const have = newestInFlight.get(conv);
+  if (have) return have;
+  const p = read().finally(() => newestInFlight.delete(conv));
+  newestInFlight.set(conv, p);
+  return p;
 }
+
+const newestInFlight = new Map<string, Promise<PageOutcome<CentralChat>>>();

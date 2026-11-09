@@ -570,6 +570,50 @@ export const en: Record<Key, Entry> = {
     'The agent on it stops and will not connect again. Files and agents on the machine itself stay.',
   'settings.machine.removeDo': 'Remove',
 
+  // ---- the closed network
+  'network.title': 'Closed network',
+  'network.entry':
+    'Internal domains, root certificates, proxy and app signing for every machine of this hub.',
+  'network.open': 'Set up the closed network',
+  'network.adminOnly': 'Only an administrator of the hub edits the network policy.',
+  'network.lead':
+    'One policy for the whole hub. Machines take it themselves within a few minutes, no restart needed.',
+  'network.hosts.title': 'Internal domains',
+  'network.hosts.label': 'Domains that may be on the internal network',
+  'network.hosts.hint': 'One per line: crm.bank.local or *.bank.local. No http:// and no path.',
+  'network.ca.title': 'Root certificates',
+  'network.ca.label': "Your certificate authority's certificates",
+  'network.ca.hint': 'PEM, several in a row are fine. Certificates only: never paste a private key here.',
+  'network.proxy.title': 'Proxy',
+  'network.proxy.label': 'Corporate proxy',
+  'network.proxy.hint': 'http://host:port or https://host:port. Empty: direct.',
+  'network.noProxy.label': 'Bypass the proxy',
+  'network.noProxy.hint': 'One per line: a name, .suffix, *.suffix, an address or a network like 10.0.0.0/8.',
+  'network.sign.title': 'App signing',
+  'network.sign.lead':
+    'A publisher signs an app package with their key. When a signature is required, only packages signed by a publisher on the list are installed.',
+  'network.sign.off': 'Do not require',
+  'network.sign.on': 'Require a signature',
+  'network.pub.name': 'Publisher',
+  'network.pub.key': 'Public key',
+  'network.pub.add': 'Add a publisher',
+  'network.pub.remove': 'Remove the publisher',
+  'network.pub.hint': 'The publisher gets the public key with harnessly app key and sends it to you.',
+  'network.saved': 'Saved. Machines will pick the policy up by themselves.',
+  'network.reset': 'Discard changes',
+  'network.err.host':
+    '"{value}" is not a host name: write crm.bank.local or *.bank.local, no http:// and no path.',
+  'network.err.caKey': 'The field holds a private key. Only root certificates go here: remove the key.',
+  'network.err.caPem': 'That is not a PEM certificate: it starts with -----BEGIN CERTIFICATE-----.',
+  'network.err.proxy': 'A proxy is http://host:port or https://host:port.',
+  'network.err.noProxy':
+    '"{value}" is not a name, an address or a network: write host.corp, .corp or 10.0.0.0/8.',
+  'network.err.pubName': 'A publisher has no name.',
+  'network.err.pubKey': 'The key of "{value}" is not an ed25519 public key: take it from harnessly app key.',
+  'network.err.pubTwice': 'The key of "{value}" is already on the list.',
+  'network.err.noPublishers':
+    'A signature is required but there are no publishers: nobody could install an app. Add a publisher.',
+
   // ---- the person
   'account.title': 'Account',
   'account.back': 'Back',

@@ -443,6 +443,7 @@ func (r *Registry) InstallChannel(id string, ch Channel, opt InstallOptions) (In
 	}
 	opt.Channel = string(ch)
 	opt.Dev = false
+	opt.Signed = r.versionSigned(id, version)
 	return r.Install(r.VersionDir(id, version), opt)
 }
 
@@ -528,7 +529,7 @@ func (r *Registry) followOne(a Installed, ch Channel, opt SyncOptions) (SyncResu
 			return res, nil
 		}
 	}
-	if _, _, err := r.Install(dir, InstallOptions{HostVersion: opt.HostVersion, Channel: string(ch), Consent: ConsentAsk}); err != nil {
+	if _, _, err := r.Install(dir, InstallOptions{HostVersion: opt.HostVersion, Channel: string(ch), Consent: ConsentAsk, Signed: r.versionSigned(a.ID, p.Current)}); err != nil {
 		return res, err
 	}
 	res.Applied = true

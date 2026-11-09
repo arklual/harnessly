@@ -18,6 +18,7 @@ var flagSettings = map[string]string{
 	features.Catalog:          "catalog",
 	features.MachineResources: "machine.resources",
 	features.OrgEvents:        "org.events",
+	features.Efficiency:       "efficiency",
 }
 
 // capabilitiesDoc is what this hub does, in the one shape the web reads (internal/capabilities). The organizations'
@@ -32,6 +33,7 @@ func (h *Hub) capabilitiesDoc(r *http.Request) capabilities.Document {
 	set.Switch("ssh", h.SSH.Available(), "connecting a server over SSH is off", "HUB_SSH")
 	set.Switch("sites", h.Sites != nil, "published sites are off", "HARNESSLY_SITES")
 	set.Switch(hubproto.StoreCapability, h.Store != nil, "the store is off: machines keep their data as before", "HUB_STORE")
+	set.Switch(hubproto.MigrationCapability, h.Migration != nil, "no journal of the move of the machines' data: the store is off", "HUB_STORE")
 	set.Switch("sign-in.passkey", h.Auth.PasskeyOn(), "passkeys are not set up", "HUB_PUBLIC_URL over https")
 	set.Switch("sign-in.github", h.cfg.GitHubOn(), "GitHub sign-in is not set up", "HUB_GITHUB_CLIENT_ID, HUB_GITHUB_CLIENT_SECRET")
 	set.Switch("sign-in.oidc", len(h.Auth.OIDCProviders()) > 0, "no OpenID provider is set up", "HUB_OIDC_PROVIDERS")

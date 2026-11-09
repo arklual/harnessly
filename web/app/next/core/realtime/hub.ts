@@ -7,6 +7,7 @@ import { deviceId } from '@/next/core/device';
 import { getPage } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { storeSink } from '@/next/core/realtime/apply';
+import { noteCentralCursor, waitsForCentral } from '@/next/core/realtime/central-first';
 import {
   browserEnv,
   RealtimeClient,
@@ -114,9 +115,23 @@ class Hub {
   openConversation(m: MachineId, conv: ConvId): () => void {
     ensureFeed(conv, m);
     const unhold = holdConversation(conv);
-    const release = this.ensure(m).subscribe(`conv:${conv}` as Channel);
+    const ch = `conv:${conv}` as Channel;
+    if (!waitsForCentral(m, conv)) {
+      const release = this.ensure(m).subscribe(ch);
+      return () => {
+        release();
+        unhold();
+      };
+    }
+    // the copy draws the feed; the machine is asked for what came after the copy's newest entry.
+    let release: (() => void) | null = null;
+    let gone = false;
+    void noteCentralCursor(m, conv).finally(() => {
+      if (!gone) release = this.ensure(m).subscribe(ch);
+    });
     return () => {
-      release();
+      gone = true;
+      release?.();
       unhold();
     };
   }

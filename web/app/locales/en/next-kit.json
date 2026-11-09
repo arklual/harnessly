@@ -35,6 +35,9 @@
   "next.kit.section.components": "Components",
   "next.kit.section.templates": "Templates",
   "next.kit.section.assets": "Assets",
+  "next.kit.section.reference": "Guide",
+  "next.kit.section.providers": "Providers",
+  "next.kit.panel.parts": "Parts",
   "next.kit.section.colors": "Colours",
   "next.kit.section.type": "Typography",
   "next.kit.section.tokens": "Tokens",
@@ -64,8 +67,7 @@
   "next.kit.panel.insertWhere": "Into which deck",
   "next.kit.panel.noDecks": "No decks yet",
   "next.kit.panel.toChat": "Send to chat",
-  "next.kit.slot.image": "image",
-  "next.kit.slot.chart": "chart",
+  "next.kit.slot.chart": "the template's chart",
   "next.kit.single.prev": "Previous",
   "next.kit.single.next": "Next",
   "next.kit.single.grid": "Back to the grid",
@@ -77,5 +79,10 @@
   "next.kit.link.from": "From the kit: {name}",
   "next.kit.link.openNode": "Open in the kit",
   "next.kit.link.showLayout": "Show the layout",
-  "next.kit.link.hideLayout": "Hide the layout"
+  "next.kit.link.hideLayout": "Hide the layout",
+  "next.kit.card.templates": {
+    "one": "{n} template",
+    "other": "{n} templates"
+  },
+  "next.kit.slot.imageHint": "An asset's name or an address"
 }

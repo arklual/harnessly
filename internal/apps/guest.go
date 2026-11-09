@@ -84,6 +84,9 @@ func (l GuestLink) Live(now time.Time) bool { return !l.Revoked && now.UnixMilli
 type Guests struct {
 	reg     *Registry
 	storage *Storage
+	// lookup, when set, finds a link and its app by the token's hash instead of this machine's list: the hub's own
+	// serving of a link from the store (NewGuestsFrom).
+	lookup func(hash string) (GuestLink, Installed, error)
 	// Now is the clock; nil is the real one.
 	Now func() time.Time
 	// OnCreate and OnRevoke are told, without blocking, of a link made and of a link ended (revoked, or its app
@@ -96,6 +99,16 @@ type Guests struct {
 
 // NewGuests is the links of a registry; the storage is where the links' areas are.
 func NewGuests(reg *Registry, storage *Storage) *Guests { return &Guests{reg: reg, storage: storage} }
+
+// NewGuestsFrom serves links that lookup finds by the token's hash (with the app they show, unpacked somewhere), the
+// links' areas in storage: the hub answers a link from the store this way with the machine that made it off. It makes
+// no links of its own.
+func NewGuestsFrom(lookup func(hash string) (GuestLink, Installed, error), storage *Storage) *Guests {
+	return &Guests{lookup: lookup, storage: storage}
+}
+
+// GuestHash is the hash a link keeps of its token.
+func GuestHash(token string) string { return hashToken(token) }
 
 func (g *Guests) now() time.Time {
 	if g.Now != nil {
@@ -334,13 +347,33 @@ func (g *Guests) Resolve(token string) (GuestLink, Installed, error) {
 		return GuestLink{}, Installed{}, ErrGuestGone
 	}
 	h := hashToken(token)
+	now := g.now()
+	check := func(l GuestLink, app Installed) (GuestLink, Installed, error) {
+		if l.Hash != h || !l.Live(now) || app.ID != l.App || app.Manifest == nil || (!l.Check && !app.Manifest.HasTarget(TargetApp)) {
+			return GuestLink{}, Installed{}, ErrGuestGone
+		}
+		if _, ok := l.viewOf(app.Manifest); !ok {
+			return GuestLink{}, Installed{}, ErrGuestGone
+		}
+		return l, app, nil
+	}
+	if g.lookup != nil {
+		l, app, err := g.lookup(h)
+		if err != nil {
+			return GuestLink{}, Installed{}, err
+		}
+		// A check's link is for the machine's own browser: never served from the store.
+		if l.Check {
+			return GuestLink{}, Installed{}, ErrGuestGone
+		}
+		return check(l, app)
+	}
 	g.mu.Lock()
 	list, err := g.read()
 	g.mu.Unlock()
 	if err != nil {
 		return GuestLink{}, Installed{}, err
 	}
-	now := g.now()
 	for _, l := range list {
 		if l.Hash != h {
 			continue
@@ -353,13 +386,10 @@ func (g *Guests) Resolve(token string) (GuestLink, Installed, error) {
 			find = g.reg.Find
 		}
 		app, err := find(l.App)
-		if err != nil || app.Manifest == nil || (!l.Check && !app.Manifest.HasTarget(TargetApp)) {
+		if err != nil {
 			return GuestLink{}, Installed{}, ErrGuestGone
 		}
-		if _, ok := l.viewOf(app.Manifest); !ok {
-			return GuestLink{}, Installed{}, ErrGuestGone
-		}
-		return l, app, nil
+		return check(l, app)
 	}
 	return GuestLink{}, Installed{}, ErrGuestGone
 }
@@ -448,9 +478,15 @@ func (g *Guests) page(w http.ResponseWriter, r *http.Request, token string, l Gu
 	}
 	v, _ := l.viewOf(app.Manifest)
 	lang := guestLang(r)
-	cfg, _ := json.Marshal(map[string]any{
+	hostPage(w, r, lang, app, v, map[string]any{
 		"nonce": guestNonce(token), "app": app.ID, "version": app.Version, "view": v.ID, "write": l.Write, "locale": lang, "check": l.Check,
 	})
+}
+
+// hostPage writes the shell of a view opened without the chat's page: the view in a sandboxed frame and the host
+// script, which reads cfg (a guest's link, or a member's app at the hub).
+func hostPage(w http.ResponseWriter, r *http.Request, lang string, app Installed, v View, conf map[string]any) {
+	cfg, _ := json.Marshal(conf)
 	title := html.EscapeString(app.Manifest.Name)
 	body := `<!doctype html><html lang="` + lang + `"><head><meta charset="utf-8">` +
 		`<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">` +
@@ -513,6 +549,11 @@ func relativeSDK(body []byte, rel string, script bool) []byte {
 // file serves one file of the shown app's views, as the view server does for a session: only a view's own files, under
 // the app's CSP, a page with the nonce and the shim.
 func (g *Guests) serveFile(w http.ResponseWriter, r *http.Request, token, rest string, app Installed) {
+	serveViewFile(w, r, g.reg, guestNonce(token), rest, app)
+}
+
+// serveViewFile serves rest (<app id>/<path>) of the app's views to a page whose nonce is nonce.
+func serveViewFile(w http.ResponseWriter, r *http.Request, reg *Registry, nonce, rest string, app Installed) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -524,7 +565,7 @@ func (g *Guests) serveFile(w http.ResponseWriter, r *http.Request, token, rest s
 		return
 	}
 	miss := func(why string) {
-		g.reg.LogEventOnce(app.ID, "", ViewLogServe, "GET "+clip(rel, 200)+" — 404: "+why)
+		reg.LogEventOnce(app.ID, "", ViewLogServe, "GET "+clip(rel, 200)+" — 404: "+why)
 		http.NotFound(w, r)
 	}
 	pkg := &Package{Dir: app.Dir, Manifest: app.Manifest}
@@ -557,7 +598,7 @@ func (g *Guests) serveFile(w http.ResponseWriter, r *http.Request, token, rest s
 		page = relativeSDK(raw, rel, isJS)
 		if isHTML {
 			up := strings.Repeat("../", strings.Count(rel, "/")+1)
-			page = injectNonceShim(page, guestNonce(token), up+"__hl/bridge-shim.js")
+			page = injectNonceShim(page, nonce, up+"__hl/bridge-shim.js")
 		}
 		size = int64(len(page))
 	}
@@ -606,25 +647,41 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 		guestRefusal(w, http.StatusForbidden, CodePermissionDenied, "the app does not ask for the storage right")
 		return
 	}
-	var b struct {
-		Op        string          `json:"op"`
-		Key       string          `json:"key"`
-		Value     json.RawMessage `json:"value"`
-		IfVersion *int64          `json:"ifVersion"`
+	b, ok := readStorageCall(w, r)
+	if !ok {
+		return
 	}
+	runStorageCall(w, g.storage, app.ID, ScopeDoc, guestOwner(l), b, l.Write, "this link only reads", "the link's storage is full")
+}
+
+// storageBody is a view's hl.storage call as a host page posts it.
+type storageBody struct {
+	Op        string          `json:"op"`
+	Scope     string          `json:"scope"`
+	Key       string          `json:"key"`
+	Value     json.RawMessage `json:"value"`
+	IfVersion *int64          `json:"ifVersion"`
+}
+
+func readStorageCall(w http.ResponseWriter, r *http.Request) (storageBody, bool) {
+	var b storageBody
 	raw, err := io.ReadAll(io.LimitReader(r.Body, maxGuestBody+1))
 	if err != nil || len(raw) > maxGuestBody || json.Unmarshal(raw, &b) != nil {
 		guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, "a bad request")
-		return
+		return b, false
 	}
-	owner := guestOwner(l)
+	return b, true
+}
+
+// runStorageCall runs a storage call on one area; a write only when write is set (else readOnly says why).
+func runStorageCall(w http.ResponseWriter, st *Storage, appID string, scope Scope, owner string, b storageBody, write bool, readOnly, full string) {
 	fail := func(err error) {
 		var conflict *ConflictError
 		switch {
 		case errors.As(err, &conflict):
 			guestJSON(w, http.StatusConflict, map[string]any{"error": CodeConflict, "message": "the key changed since it was read", "version": conflict.Current})
 		case errors.Is(err, ErrQuota):
-			guestRefusal(w, http.StatusRequestEntityTooLarge, CodeQuotaExceeded, "the link's storage is full")
+			guestRefusal(w, http.StatusRequestEntityTooLarge, CodeQuotaExceeded, full)
 		case errors.Is(err, ErrStorageArgs):
 			guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, "a bad key")
 		default:
@@ -633,7 +690,7 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 	}
 	switch b.Op {
 	case "get":
-		v, version, ok, err := g.storage.GetVersioned(app.ID, ScopeDoc, owner, b.Key)
+		v, version, ok, err := st.GetVersioned(appID, scope, owner, b.Key)
 		if err != nil {
 			fail(err)
 			return
@@ -644,7 +701,7 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 		}
 		guestJSON(w, http.StatusOK, map[string]any{"value": v, "version": version})
 	case "keys":
-		keys, err := g.storage.Keys(app.ID, ScopeDoc, owner)
+		keys, err := st.Keys(appID, scope, owner)
 		if err != nil {
 			fail(err)
 			return
@@ -654,8 +711,8 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 		}
 		guestJSON(w, http.StatusOK, map[string]any{"keys": keys})
 	case "set", "delete":
-		if !l.Write {
-			guestRefusal(w, http.StatusForbidden, CodePermissionDenied, "this link only reads")
+		if !write {
+			guestRefusal(w, http.StatusForbidden, CodePermissionDenied, readOnly)
 			return
 		}
 		var err error
@@ -669,9 +726,9 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 				guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, "ifVersion is 0 or more")
 				return
 			}
-			version, err = g.storage.SetIf(app.ID, ScopeDoc, owner, b.Key, b.Value, b.IfVersion)
+			version, err = st.SetIf(appID, scope, owner, b.Key, b.Value, b.IfVersion)
 		} else {
-			err = g.storage.Delete(app.ID, ScopeDoc, owner, b.Key)
+			err = st.Delete(appID, scope, owner, b.Key)
 		}
 		if err != nil {
 			fail(err)

@@ -552,5 +552,9 @@
   "next.transfer.of": "{sent} из {size}",
   "next.transfer.leftSeconds": "ещё {n} с",
   "next.transfer.leftMinutes": "ещё {n} мин",
-  "next.transfer.leftHours": "ещё {h} ч {m} мин"
+  "next.transfer.leftHours": "ещё {h} ч {m} мин",
+  "next.feedMenu.label": "Меню чата",
+  "next.feedMenu.copyAnswer": "Скопировать ответ",
+  "next.feedMenu.copyChatLink": "Скопировать ссылку на чат",
+  "next.feedMenu.pane": "Правая панель"
 }

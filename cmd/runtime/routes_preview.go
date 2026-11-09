@@ -532,7 +532,8 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 	}
 	srv := &mcpserver.Server{Name: s.mcpName, Sets: []mcpserver.Toolset{s.mcp}}
 	if r.URL.Query().Get("server") == apps.HostServer {
-		srv = &mcpserver.Server{Name: apps.HostServer}
+		// Its tools follow the apps on in the chat; the GET stream says when they change (v2_applive.go).
+		srv = &mcpserver.Server{Name: apps.HostServer, ListChanged: true}
 		if more := s.appTools.Load(); more != nil {
 			if set := (*more)(r); set != nil {
 				srv.Sets = append(srv.Sets, set)

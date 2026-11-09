@@ -1,13 +1,13 @@
 // The smart notice on made-up events (`?dev=notifs`), for the eye and for screenshots: the real plate with buttons
 // that make each kind of waiting, and a field at the bottom it stands over.
 //
-//   ?dev=notifs                    an empty page and the buttons
+//   ?dev=notifs                    a mock window of the app (chats, a chat, its field) and the buttons in its side
 //   &set=pile                      a code, a question and a permission at once; &set=one a question
 //   &open=1                        the card open
-//   &place=top-right|…             where it stands (the middle of the bottom edge by default)
+//   &place=top-right|…             where it stands (the middle of the top edge by default); the side switches it
 //   &settings=1                    Settings → Notifications under the buttons
 //   &theme=light|dark&lang=en|ru
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { playSound, unlockSound } from '@/next/features/notifications/ping';
 import { NoticesPage } from '@/next/bindings/settings-notices';
 import SmartNotice, {
@@ -20,6 +20,8 @@ import SmartNotice, {
 import { pinLocale, type TLang } from '@/next/i18n';
 import { NOTICE_PLACES, type TNoticePlace } from '@/next/stores/notices';
 import { ToastHost, toast } from '@/next/ui/toast';
+import Drops from '@/next/features/smart-notice/drops';
+import { fly, snap } from '@/next/features/smart-notice/fly';
 import '@/next/styles/tokens.css';
 import '@/next/styles/motion.css';
 import '@/next/styles/icons.css';
@@ -32,7 +34,19 @@ import '@/next/dev/notifs-gallery.css';
 const params = new URLSearchParams(window.location.search);
 const LANG: TLang = params.get('lang') === 'en' ? 'en' : 'ru';
 pinLocale(LANG);
-const PLACE: TNoticePlace = NOTICE_PLACES.find((p) => p === params.get('place')) ?? 'bottom-center';
+const FIRST_PLACE: TNoticePlace = NOTICE_PLACES.find((p) => p === params.get('place')) ?? 'top-center';
+/** The places to compare by eye: as Dynamic Island, in the corner, over the field. */
+const PLACES: readonly { place: TNoticePlace; label: string }[] = [
+  { place: 'top-center', label: 'Сверху по центру' },
+  { place: 'top-right', label: 'Справа сверху' },
+  { place: 'bottom-center', label: 'Над полем' },
+];
+/** News lives this long here too (bindings/smart-notice.tsx NEWS_MS), longer while held. */
+const NEWS_MS = 7000;
+const GRACE_MS = 2500;
+const NEWS: ReadonlySet<TSmartKind> = new Set([SMART_KIND.done, SMART_KIND.failed, SMART_KIND.limit]);
+const twoFrames = (run: () => void) => requestAnimationFrame(() => requestAnimationFrame(run));
+const CHATS = ['Лендинг кофейни', 'Миграция базы', 'Публикация пакета', 'Меню на сайте', 'Отчёт за октябрь'];
 
 type TSample = 'question' | 'permission' | 'code' | 'machine' | 'done' | 'failed';
 
@@ -98,7 +112,12 @@ const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { deta
     icon: 'circle-check',
     title: 'Меню на сайте',
     text: 'Добавил раздел «Сезонное» и пометку у трёх позиций',
-    detail: { k: 'plain' },
+    detail: {
+      k: 'done',
+      summary:
+        'Добавил раздел «Сезонное» с тремя позициями, пометил их в общем меню и обновил цены. Проверил вёрстку на телефоне — всё на месте. Осталось решить, показывать ли раздел зимой.',
+      canReply: true,
+    },
   },
   failed: {
     kind: SMART_KIND.failed,
@@ -147,6 +166,37 @@ const Gallery = () => {
   const [open, setOpen] = useState(params.get('open') === '1');
   const [mainKey, setMainKey] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [place, setPlace] = useState<TNoticePlace>(FIRST_PLACE);
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const [arriving, setArriving] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [held, setHeld] = useState(false);
+  const [graceUntil, setGraceUntil] = useState(0);
+  const [anchor, setAnchor] = useState<{ x: number; bottom: number } | null>(null);
+  const onHold = useCallback((on: boolean) => {
+    setHeld(on);
+    if (!on) setGraceUntil(Date.now() + GRACE_MS);
+  }, []);
+  const pick = (next: TNoticePlace) => {
+    setPlace(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set('place', next);
+    window.history.replaceState(null, '', url);
+  };
+  const pile = () => setItems(byRank((['question', 'permission', 'code'] as const).map(made)));
+
+  // Over the field: the middle of the mock chat's field, a little above it.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const field = document.querySelector('.hx-ng__composer');
+      if (!field) return;
+      const r = field.getBoundingClientRect();
+      setAnchor({ x: r.left + r.width / 2, bottom: window.innerHeight - r.top + 12 });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
 
   const fire = (sample: TSample) => {
     const item = made(sample);
@@ -168,7 +218,60 @@ const Gallery = () => {
   }, []);
   useEffect(() => unlockSound(), []);
 
-  const main = items.find((i) => i.key === mainKey) ?? items[0] ?? null;
+  const keep = open || held || now < graceUntil;
+  const live = items.filter((i) => !hidden.has(i.key) && (keep || !NEWS.has(i.kind) || now - i.at < NEWS_MS));
+  const drops = items
+    .filter((i) => hidden.has(i.key) && !NEWS.has(i.kind))
+    .map((item) => {
+      const detail = SAMPLES[item.sample].detail;
+      const what = detail.k === 'code' ? detail.why : detail.k === 'permission' ? detail.command : item.text;
+      return { item, what };
+    });
+  // Put away by hand, the shape flows into its drop; a drop pressed flows back into the card, open.
+  const hideItem = (item: ISmartItem, from: DOMRect | null) => {
+    if (NEWS.has(item.kind)) {
+      drop(item.key);
+      return;
+    }
+    const view = from ? snap(document.querySelector('.hx-sn .hx-sn__body:not([data-ghost])')) : null;
+    setHidden((was) => new Set(was).add(item.key));
+    if (!from) return;
+    twoFrames(() => {
+      const el = document.querySelector<HTMLElement>(`[data-drop-key="${CSS.escape(item.key)}"]`);
+      if (!el) return;
+      const to = snap(el);
+      el.dataset.arriving = '';
+      void fly(
+        { rect: from, radius: 24, view },
+        { rect: el.getBoundingClientRect(), radius: 22, view: to },
+      ).then(() => {
+        delete el.dataset.arriving;
+      });
+    });
+  };
+  const backItem = (key: string, from: DOMRect | null, view: HTMLElement | null) => {
+    setHidden((was) => {
+      const next = new Set(was);
+      next.delete(key);
+      return next;
+    });
+    setMainKey(key);
+    setOpen(true);
+    if (!from) return;
+    setArriving(true);
+    twoFrames(() => {
+      const body = document.querySelector<HTMLElement>('.hx-sn .hx-sn__body:not([data-ghost])');
+      if (!body) {
+        setArriving(false);
+        return;
+      }
+      void fly(
+        { rect: from, radius: 22, view },
+        { rect: body.getBoundingClientRect(), radius: 28, view: snap(body) },
+      ).then(() => setArriving(false));
+    });
+  };
+  const main = live.find((i) => i.key === mainKey) ?? live[0] ?? null;
   const settle = async (item: ISmartItem, said: string) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
     toast(item.title, { description: said });
@@ -177,35 +280,85 @@ const Gallery = () => {
 
   return (
     <div className="hx-root hx-ng" data-testid="gallery">
-      <div className="hx-ng__row">
-        {(Object.keys(SAMPLES) as TSample[]).map((sample) => (
-          <button
-            key={sample}
-            type="button"
-            className="hx-ng__btn"
-            data-testid={`fire-${sample}`}
-            onClick={() => fire(sample)}
-          >
-            {sample}
-          </button>
-        ))}
-        <button type="button" className="hx-ng__btn" data-testid="clear" onClick={() => setItems([])}>
-          clear
-        </button>
-      </div>
-      {params.get('settings') === '1' && (
-        <div className="hx-ng__settings">
-          <NoticesPage />
+      <aside className="hx-ng__side">
+        <b className="hx-ng__label">Место</b>
+        <div className="hx-ng__col">
+          {PLACES.map((one) => (
+            <button
+              key={one.place}
+              type="button"
+              className="hx-ng__btn"
+              data-on={place === one.place || undefined}
+              data-testid={`place-${one.place}`}
+              onClick={() => pick(one.place)}
+            >
+              {one.label}
+            </button>
+          ))}
         </div>
-      )}
-      <div className="hx-ng__field hx-composer">Сообщение агенту</div>
+        <b className="hx-ng__label">События</b>
+        <div className="hx-ng__row">
+          {(Object.keys(SAMPLES) as TSample[]).map((sample) => (
+            <button
+              key={sample}
+              type="button"
+              className="hx-ng__btn"
+              data-testid={`fire-${sample}`}
+              onClick={() => fire(sample)}
+            >
+              {sample}
+            </button>
+          ))}
+          <button type="button" className="hx-ng__btn" data-testid="pile" onClick={pile}>
+            стопка
+          </button>
+          <button type="button" className="hx-ng__btn" data-testid="clear" onClick={() => setItems([])}>
+            clear
+          </button>
+        </div>
+        <b className="hx-ng__label">Чаты</b>
+        <ul className="hx-ng__chats">
+          {CHATS.map((chat, i) => (
+            <li key={chat} data-on={i === 0 || undefined}>
+              {chat}
+            </li>
+          ))}
+        </ul>
+      </aside>
+      <main className="hx-ng__chat">
+        <header className="hx-ng__head">Лендинг кофейни</header>
+        <div className="hx-ng__feed">
+          <p className="hx-ng__msg" data-me="">
+            Сделай главную для кофейни: шапка, меню, адрес.
+          </p>
+          <p className="hx-ng__msg">Собрал главную: шапка с фото, меню из трёх разделов, карта с адресом.</p>
+          <p className="hx-ng__msg">Осталось выбрать вариант шапки — спросил в уведомлении.</p>
+          {params.get('settings') === '1' && (
+            <div className="hx-ng__settings">
+              <NoticesPage />
+            </div>
+          )}
+        </div>
+        <div className="hx-ng__composer hx-composer">Сообщение агенту</div>
+      </main>
+      <aside className="hx-ng__rail">
+        <section className="hx-ng__card">
+          <b>Цель</b>
+          <p>Главная кофейни: шапка, меню из трёх разделов, адрес на карте.</p>
+        </section>
+        <section className="hx-ng__card">
+          <b>Сабагенты</b>
+          <p>Проверка вёрстки · 2 мин</p>
+        </section>
+        <Drops drops={drops} now={now} onBack={backItem} />
+      </aside>
       <SmartNotice
-        items={items}
+        items={live}
         mainKey={main?.key ?? null}
         detail={main ? SAMPLES[main.sample].detail : { k: 'plain' }}
-        open={open && items.length > 0}
-        place={PLACE}
-        anchor={PLACE === 'bottom-center' ? { x: window.innerWidth / 2, bottom: 112 } : null}
+        open={open && live.length > 0}
+        place={place}
+        anchor={place === 'bottom-center' ? anchor : null}
         now={now}
         onOpen={setOpen}
         onMain={setMainKey}
@@ -223,15 +376,26 @@ const Gallery = () => {
         onCancelCode={async (item) => drop(item.key)}
         onStop={(item, heavy) => settle(item, `stopped ${heavy}`)}
         onOpenMachine={(item) => toast(item.title, { description: 'open machine' })}
-        onHide={(item) => {
-          drop(item.key);
-          toast('Скрыто', { description: 'Чат всё ещё ждёт ответа' });
+        onHide={hideItem}
+        arriving={arriving}
+        reply={{
+          text: replyText,
+          setText: setReplyText,
+          recording: null,
+          onCancelRecording: () => undefined,
+          onFinishRecording: () => undefined,
+        }}
+        onReply={async (item, text) => {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          toast(item.title, { description: `→ ${text}` });
+          setTimeout(() => drop(item.key), 1800);
         }}
         onMute={(sound) => toast('Звук выключен', { description: sound })}
         onSettings={() => toast('settings')}
-        announceMs={4000}
+        announceMs={5000}
         returnFocus={() => undefined}
         focusOnOpen={false}
+        onHold={onHold}
       />
       <ToastHost />
     </div>

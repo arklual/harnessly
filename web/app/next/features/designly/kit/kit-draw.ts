@@ -198,6 +198,50 @@ const drawFitted = (
   ctx.drawImage(img, sx, sy, sw, sh, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
 };
 
+/** A component's card as a grid of the assets it takes (Icon: real icons), false until their atlas is loaded. */
+const drawSamples = (
+  ctx: CanvasRenderingContext2D,
+  d: IDrawInput,
+  samples: { atlas: string; cells: number[] },
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): boolean => {
+  const entry = d.atlases.get(samples.atlas);
+  const sheet = entry ? d.pictures.get(entry.url) : null;
+  if (!entry || !sheet) return false;
+  const cols = 6;
+  const rows = Math.ceil(samples.cells.length / cols);
+  const pad = Math.min(w, h) * 0.08;
+  const cw = (w - pad * 2) / cols;
+  const ch = (h - pad * 2) / rows;
+  const s = Math.min(cw, ch) * 0.7;
+  samples.cells.forEach((cell, i) => {
+    const { sx, sy } = atlasCell(entry.atlas, cell);
+    const cx = x + pad + (i % cols) * cw + (cw - s) / 2;
+    const cy = y + pad + Math.floor(i / cols) * ch + (ch - s) / 2;
+    drawFitted(ctx, sheet, sx, sy, entry.atlas.cellW, entry.atlas.cellH, cx, cy, s, s, false);
+  });
+  return true;
+};
+
+/** A whole picture fitted into a box: scaled as one, never cut by a source rectangle (an SVG without its own size
+ * is drawn wrong when a part of it is asked for). */
+const drawWhole = (
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) => {
+  const iw = img.naturalWidth || 1;
+  const ih = img.naturalHeight || 1;
+  const k = Math.min(w / iw, h / ih);
+  ctx.drawImage(img, x + (w - iw * k) / 2, y + (h - ih * k) / 2, iw * k, ih * k);
+};
+
 const PICTURE_PAD: Partial<Record<IWorldItem['kind'], number>> = {
   [ITEM.icon]: 0.18,
   [ITEM.image]: 0.08,
@@ -357,7 +401,12 @@ const drawCell = (
     }
     return;
   }
-  if (it.kind === ITEM.token || it.kind === ITEM.component) {
+  if (it.kind === ITEM.component && it.samples && drawSamples(ctx, d, it.samples, x, y, w, h)) return;
+  // A component with a picture (its thumb, or its cell of the group's atlas) is drawn as that picture below.
+  if (
+    it.kind === ITEM.token ||
+    (it.kind === ITEM.component && it.file === undefined && it.atlas === undefined)
+  ) {
     const px = Math.min(18, Math.max(0, (it.kind === ITEM.component ? 28 : 20) * cam.s));
     if (px >= 6) {
       ctx.font = `600 ${px}px ${pal.font}`;
@@ -380,12 +429,20 @@ const drawCell = (
   const cover = it.kind === ITEM.layout || it.kind === ITEM.stack;
   const entry = it.atlas !== undefined ? d.atlases.get(it.atlas) : undefined;
   const lod = lodOf(w, entry ? entry.atlas.cellW : 0);
-  const own = lod !== LOD.far && it.file ? d.pictures.get(d.fileUrl(it.file)) : null;
+  // A picture the atlas does not hold (a vector logo) is its own file at every distance, or far away it is empty.
+  const inAtlas = entry !== undefined && it.cell !== undefined;
+  const own = it.file && (lod !== LOD.far || !inAtlas) ? d.pictures.get(d.fileUrl(it.file)) : null;
+  if (it.bg) {
+    ctx.fillStyle = it.bg;
+    rounded(ctx, x, y, w, h, radius);
+    ctx.fill();
+  }
   if (own) {
     ctx.save();
     rounded(ctx, x, y, w, h, radius);
     ctx.clip();
-    drawFitted(ctx, own, 0, 0, own.naturalWidth, own.naturalHeight, bx, by, bw, bh, cover);
+    if (cover) drawFitted(ctx, own, 0, 0, own.naturalWidth, own.naturalHeight, bx, by, bw, bh, cover);
+    else drawWhole(ctx, own, bx, by, bw, bh);
     ctx.restore();
     return;
   }

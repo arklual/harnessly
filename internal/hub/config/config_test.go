@@ -659,6 +659,23 @@ func TestStore(t *testing.T) {
 	if _, err := Load(env(m)); err == nil {
 		t.Fatal("a store prefix without HUB_STORAGE=s3")
 	}
+	// A center's own bucket and keys: the hub's files stay on its disk.
+	own := map[string]string{"HUB_STORE_S3_ENDPOINT": "https://s3.ru-3.storage.selcloud.ru", "HUB_STORE_S3_REGION": "ru-3",
+		"HUB_STORE_S3_BUCKET": "acme-docs-boards", "HUB_STORE_S3_ACCESS_KEY": "ak", "HUB_STORE_S3_SECRET_KEY": "sk"}
+	for k, v := range own {
+		m[k] = v
+	}
+	if c, err = Load(env(m)); err != nil || c.StorageS3() || c.SitesS3.Endpoint != "" || c.Store.S3.Bucket != "acme-docs-boards" ||
+		c.Store.S3.Prefix != "design-blobs/" || c.Store.S3.Region != "ru-3" || c.Store.S3.SecretKey != "sk" {
+		t.Fatalf("the store's own bucket: %v %+v", err, c.Store.S3)
+	}
+	delete(m, "HUB_STORE_S3_SECRET_KEY")
+	if _, err := Load(env(m)); err == nil {
+		t.Fatal("the store's own bucket without its keys")
+	}
+	for k := range own {
+		delete(m, k)
+	}
 	m["HUB_STORAGE"], m["HUB_S3_ENDPOINT"], m["HUB_S3_BUCKET"], m["HUB_S3_ACCESS_KEY"], m["HUB_S3_SECRET_KEY"], m["HUB_S3_PREFIX"] = "s3", "http://minio:9000", "hub", "k", "s", "p/"
 	if c, err = Load(env(m)); err != nil || c.Store.S3.Bucket != "hub" || c.Store.S3.Prefix != "design-blobs/" || c.Store.S3.AccessKey != "k" {
 		t.Fatalf("the hub's bucket: %v %+v", err, c.Store.S3)
@@ -676,5 +693,29 @@ func TestStore(t *testing.T) {
 	m["HUB_STORE"] = "off"
 	if c, err = Load(env(m)); err != nil || !c.Store.Off {
 		t.Fatalf("off: %v %+v", err, c.Store)
+	}
+}
+
+func TestDesignImport(t *testing.T) {
+	m := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040", "HUB_DATA_DIR": t.TempDir()}
+	if c, err := Load(env(m)); err != nil || c.DesignImport.Mode != "" {
+		t.Fatalf("off by default: %v %+v", err, c.DesignImport)
+	}
+	m["HUB_DESIGN_IMPORT_GATEWAY"] = "apply"
+	if _, err := Load(env(m)); err == nil {
+		t.Fatal("apply without the gateway's database or a space")
+	}
+	m["HUB_DESIGN_IMPORT_GATEWAY_URL"] = "postgres://u:p@gateway/llm"
+	m["HUB_STORE_LEGACY_SPACE"] = "acme-team"
+	m["HUB_DESIGN_IMPORT_TEAMS"] = "acme=ge34, harnessly=ufpe"
+	m["HUB_DESIGN_IMPORT_MACHINES"] = "ann@example.org@vm-1=6kj6"
+	c, err := Load(env(m))
+	if err != nil || c.DesignImport.Mode != "apply" || c.DesignImport.Space != "acme-team" || c.DesignImport.Teams["harnessly"] != "ufpe" ||
+		c.DesignImport.Machines["ann@example.org@vm-1"] != "6kj6" {
+		t.Fatalf("apply: %v %+v", err, c.DesignImport)
+	}
+	m["HUB_DESIGN_IMPORT_GATEWAY"] = "yes"
+	if _, err := Load(env(m)); err == nil {
+		t.Fatal("an unknown mode")
 	}
 }

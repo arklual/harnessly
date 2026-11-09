@@ -59,6 +59,9 @@ func shareRefused(w http.ResponseWriter, err error) {
 		{apps.ErrGuestGone, "not-found", http.StatusNotFound},
 		{apps.ErrGuestLimit, "too-many", http.StatusConflict},
 		{apps.ErrArchive, "archive", http.StatusUnprocessableEntity},
+		{apps.ErrUnsigned, "signature", http.StatusForbidden},
+		{apps.ErrUntrustedKey, "signature", http.StatusForbidden},
+		{apps.ErrBadSignature, "signature", http.StatusForbidden},
 	} {
 		if errors.Is(err, r.err) {
 			code, status = r.code, r.status
@@ -139,6 +142,9 @@ func appShareRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version str
 			Dir     string `json:"dir"`
 			Channel string `json:"channel"`
 			Team    bool   `json:"team"`
+			// Archive is a .hlapp to publish instead of a folder, Sig its signature.
+			Archive string `json:"archive"`
+			Sig     string `json:"sig"`
 		}
 		// The agent of a chat with apps publishes to dev and beta only (as the guard hook has it), read from this one
 		// decoding of the body: a body that is not exactly these fields is refused to it, never read as narrow.
@@ -152,7 +158,7 @@ func appShareRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version str
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
-		if !strings.HasPrefix(b.Dir, "/") {
+		if !strings.HasPrefix(b.Dir, "/") && !strings.HasPrefix(b.Archive, "/") {
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
@@ -164,7 +170,18 @@ func appShareRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version str
 		if !ok {
 			return
 		}
-		pv, problems, err := reg.Publish(b.Dir, ch, apps.PublishOptions{})
+		var pv apps.PublishedVersion
+		var problems apps.Problems
+		var err error
+		if b.Archive != "" {
+			pv, problems, err = publishHlapp(reg, b.Archive, b.Sig, ch)
+			if errors.Is(err, apps.ErrUnsigned) || errors.Is(err, apps.ErrUntrustedKey) || errors.Is(err, apps.ErrBadSignature) {
+				secretJSON(w, http.StatusForbidden, map[string]any{"error": "signature", "message": err.Error()})
+				return
+			}
+		} else {
+			pv, problems, err = reg.Publish(b.Dir, ch, apps.PublishOptions{})
+		}
 		if problems == nil {
 			problems = apps.Problems{}
 		}

@@ -64,6 +64,11 @@ export type DockNotice =
       onRetry: () => void;
       onDrop: () => Promise<unknown>;
     }
+  /**
+   * The move of the chat's machine's data into the hub stopped on objects with errors: try again, or hand it
+   * to an agent on that machine.
+   */
+  | { kind: 'move'; line: string; codes: string; onRetry: () => Promise<unknown>; onAgent: () => void }
   /** The machine of the chat has been switched off for a while: what is written waits for it and goes by itself. */
   | { kind: 'off'; machine: string }
   /** A new chat has no machine to start on: every one of the person's is down. */

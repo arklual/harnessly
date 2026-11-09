@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { boardUrl, readGuestConfig, sharedView } from '@/next/features/designly/guest/guest-config';
+import {
+  boardUrl,
+  eventsUrlOf,
+  readGuestConfig,
+  sharedView,
+} from '@/next/features/designly/guest/guest-config';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -42,6 +47,13 @@ describe('the config of a guest page', () => {
 
   it('gives no right to comment unless the link says it', () => {
     expect(page('{"v":1,"rights":"admin"}')?.rights).toBe('view');
+  });
+});
+
+describe('the live revisions of a link (HRN-881)', () => {
+  it('are read beside the files', () => {
+    expect(eventsUrlOf('/s/tok/f/')).toBe('/s/tok/events');
+    expect(eventsUrlOf('elsewhere/')).toBe('./events');
   });
 });
 

@@ -93,6 +93,18 @@ describe('central history', () => {
     expect(isMachineOff('b')).toBe(false);
   });
 
+  it('draws at rev 0, so the machine word replaces the copy whatever rev it kept', async () => {
+    connectionStore.set('b', { k: 'connecting' } as never);
+    answer(
+      true,
+      [],
+      [{ ...chat('tab-2', 'b', 6), rev: 99, state: { k: 'working' } } as unknown as Conversation],
+    );
+    await refreshCentral();
+    expect(conversationsStore.get('tab-2')?.rev).toBe(0);
+    expect(conversationsStore.get('tab-2')?.state.k).toBe('working');
+  });
+
   it('leaves a machine with a live link to itself', async () => {
     connectionStore.set('a', { k: 'live' } as never);
     convsLoadedStore.set('a', true);

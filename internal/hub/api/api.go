@@ -11,16 +11,20 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
+	"github.com/ly-solutions/harnessly/internal/hub/automations"
 	"github.com/ly-solutions/harnessly/internal/hub/buildinfo"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/designaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/dist"
 	"github.com/ly-solutions/harnessly/internal/hub/docs"
+	"github.com/ly-solutions/harnessly/internal/hub/efficiency"
 	"github.com/ly-solutions/harnessly/internal/hub/env"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
@@ -33,6 +37,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
+	"github.com/ly-solutions/harnessly/internal/hub/migration"
 	"github.com/ly-solutions/harnessly/internal/hub/mrsource"
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/provider"
@@ -44,8 +49,10 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/sshinstall"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/storehub"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
+	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/secrets"
 	"github.com/ly-solutions/harnessly/internal/secrets/vaultkv"
@@ -108,6 +115,8 @@ type Hub struct {
 	Env *env.Service
 	// Features are the organizations' flags.
 	Features *features.Store
+	// Switches are the rollout switches by person and machine.
+	Switches *switches.Store
 	Machines *machines.Service
 	// Ingest pulls the machines' spend facts; nil unless HUB_USAGE_INGEST=on.
 	Ingest *ingest.Service
@@ -121,6 +130,10 @@ type Hub struct {
 	Proxy   *proxy.Service
 	// Docs is the documents and boards of the installation (HUB_DOCS).
 	Docs *docs.Service
+	// Efficiency serves the figures of the «Эффективность» screen behind the organization flag.
+	Efficiency *efficiency.Service
+	// Automations is the rules and runs of the installation (HUB_AUTOMATIONS).
+	Automations *automations.Service
 	// Design is who may see and change a machine's designs, and the guest links to them.
 	Design   *designaccess.Service
 	Dist     *dist.Handler
@@ -141,12 +154,24 @@ type Hub struct {
 	appTokens *appTokens
 	// Store keeps the spaces' collections the machines sync with (docs/hub/store.md); nil when HUB_STORE=off.
 	Store *storehub.Store
+	// Migration is the journal of the move of the machines' data into the store (docs/migrations); nil with
+	// the store off.
+	Migration *migration.Service
 
 	cfg     *config.Config
 	db      *store.DB
 	log     *slog.Logger
 	limiter *ratelimit.Limiter
 }
+
+// AppsView serves the apps from the store (appsview.Hub): guest links, and a space's apps to its members with every
+// machine off; the hub's main sets it, as DesignView. Nil: an app opens only on a machine.
+var AppsView func(st *storehub.Store, dataDir string, log *slog.Logger) storehub.AppsViewer
+
+// DesignView makes the store's view of design projects (designview.Hub): guest links and the team's reads and edits
+// through the hub with no machine. The hub's main sets it; this package does not import the view, whose design code
+// imports the agent, whose tests import this package. Nil: projects are read from the machines only.
+var DesignView func(st *storehub.Store, dataDir string, app fs.FS, log *slog.Logger) designaccess.Viewer
 
 // New builds the hub.
 func New(o Options) (*Hub, error) {
@@ -191,6 +216,7 @@ func New(o Options) (*Hub, error) {
 	}
 	rb := &rates.Book{DB: db, URL: cfg.RatesURL, Client: o.HTTPClient, Log: log, Now: o.Now}
 	h.Features = features.New(db, cfg.Features, o.Now)
+	h.Switches = switches.New(db, o.Now)
 	if kv := o.SafeKV; kv != nil || cfg.SafeVault != nil {
 		if kv == nil {
 			c, err := vaultkv.New(*cfg.SafeVault)
@@ -302,9 +328,17 @@ func New(o Options) (*Hub, error) {
 	h.Design = designaccess.New(designaccess.Deps{
 		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL,
 		PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
-		LinkKey: linkKey, Notice: notice,
+		LinkKey: linkKey, Notice: notice, Shared: !cfg.Store.Off,
 	})
-	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry})
+	h.Efficiency = &efficiency.Service{DB: db, Gate: h.Orgs.Gate, Features: h.Features, Now: o.Now}
+	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Notice: func(ctx context.Context, to, subject, body, link string) error {
+		if n, ok := o.Mailer.(mail.Noticer); ok {
+			_, err := n.SendNotice(ctx, to, subject, body, link)
+			return err
+		}
+		return nil
+	}})
+	h.Automations = automations.New(automations.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry})
 	var historySink machines.HistorySink
 	if cfg.History {
 		h.History = history.New(history.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
@@ -313,7 +347,7 @@ func New(o Options) (*Hub, error) {
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
-		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Docs: h.Docs,
+		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Docs: h.Docs, Automations: h.Automations,
 		History: historySink,
 	})
 	h.Analytics.UseMachines(h.Machines)
@@ -342,11 +376,39 @@ func New(o Options) (*Hub, error) {
 	if err := h.newSites(o); err != nil {
 		return nil, err
 	}
+	var appsView storehub.AppsViewer
 	if err := h.newStore(o); err != nil {
 		return nil, err
 	}
+	if cfg.VaultKeys != "" {
+		// The hub's central password safe (docs/hub/vault.md); without HUB_VAULT_KEYS the page's /vault calls go to a machine as before.
+		if kr, err := vaultsvc.ParseKeys(cfg.VaultKeys); err != nil {
+			log.Warn("the password safe is off: HUB_VAULT_KEYS is not valid", "error", err)
+		} else {
+			px.UseVault(vaultsvc.New(db, vaultsvc.Config{Keyring: kr, SharedMembers: vaultsvc.Emails(cfg.VaultSharedMembers), SharedEditors: vaultsvc.Emails(cfg.VaultSharedEditors)}, log, o.Now))
+		}
+	}
 	if h.Store != nil {
 		px.UseUploads(h.Store)
+		h.Migration = migration.NewService(migration.New(h.db, o.Now), h.Auth, h.Store.SessionMachine, h.mayOpenMachine,
+			h.mayChangeMachine, h.Store)
+		if h.History != nil {
+			now := o.Now
+			if now == nil {
+				now = time.Now
+			}
+			h.Migration.UseSidebars(h.db, func() int64 { return now().UnixMilli() })
+		}
+		// guest links read their projects from the store, put into folders of the hub; no machine takes part.
+		if DesignView != nil {
+			if v := DesignView(h.Store, cfg.DataDir, o.Workspace, log); v != nil {
+				h.Design.UseView(v)
+			}
+		}
+		// an app's guest link opens from the store, with the machine that made it off.
+		if AppsView != nil && appsView == nil {
+			appsView = AppsView(h.Store, cfg.DataDir, log)
+		}
 	}
 
 	var page http.Handler
@@ -374,6 +436,8 @@ func New(o Options) (*Hub, error) {
 	h.Env.Mount(mux)
 	h.Machines.Mount(mux)
 	h.Docs.Mount(mux)
+	h.Efficiency.Mount(mux)
+	h.Automations.Mount(mux)
 	if h.SSH != nil {
 		h.SSH.Mount(h.Spaces.Sub())
 	} else {
@@ -384,6 +448,10 @@ func New(o Options) (*Hub, error) {
 	}
 	h.Relay.Mount(mux)
 	h.Dist.Mount(mux)
+	h.Dist.MountAdmin(mux, func(f func(http.ResponseWriter, *http.Request, bool) error) httpx.Handler {
+		return h.Auth.Require(func(w http.ResponseWriter, r *http.Request, p *auth.Principal) error { return f(w, r, p.Admin) })
+	})
+	h.mountSwitches(mux)
 	h.Proxy.Mount(mux)
 	if h.Sites != nil {
 		h.Sites.Mount(mux)
@@ -399,6 +467,7 @@ func New(o Options) (*Hub, error) {
 	}
 	if h.Store != nil {
 		h.Store.Mount(mux)
+		h.Migration.Mount(mux)
 	}
 	if c := h.Registry.Cluster(); c != nil {
 		mux.Handle("/internal/replica/v1/", c.Handler())
@@ -420,15 +489,35 @@ func New(o Options) (*Hub, error) {
 		mux.Handle("POST "+hubproto.MemoryPutPath, httpx.Handler(h.memoryPut))
 	}
 	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { httpx.WriteError(w, r, httpx.ErrNotFound) })
+	if appsView != nil {
+		mux.Handle("/apps/guest/", appsView)                   // apps.GuestPrefix
+		mux.HandleFunc("/apps/space/", h.appsMember(appsView)) // apps.MemberPrefix
+		h.Spaces.Sub().Handle("GET /api/spaces/{spaceId}/apps", h.Auth.Require(h.spaceApps(appsView)))
+	}
 	mux.Handle("/api/", notFound)
 	mux.Handle("/agent/", notFound)
 	mux.Handle("/dl/", notFound)
 	mux.Handle("/", page)
 
 	csrf := h.Auth.CSRF(mux)
+	// A separate origin for the guests of apps (HUB_APPS_GUEST_URL): it serves the guest links and nothing of the hub.
+	guestHost := ""
+	if u, err := url.Parse(cfg.AppsGuestURL); err == nil && cfg.AppsGuestURL != "" {
+		guestHost = strings.ToLower(u.Host)
+	}
+	isGuestHost := func(host string) bool { return guestHost != "" && strings.EqualFold(host, guestHost) }
 	shares := h.Design.Public()
 	routed := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case isGuestHost(r.Host):
+			if appsView == nil || !strings.HasPrefix(r.URL.Path, "/apps/guest/") {
+				httpx.WriteError(w, r, httpx.ErrNotFound)
+				return
+			}
+			appsView.ServeHTTP(w, r)
+		case guestHost != "" && strings.HasPrefix(r.URL.Path, "/apps/guest/"):
+			// With a host of their own the guest links are not served next to the hub's session.
+			httpx.WriteError(w, r, httpx.ErrNotFound)
 		case h.Design.IsShareHost(r.Host):
 			// A guest link runs on its own origin: the page of one project and nothing of the hub.
 			shares.ServeHTTP(w, r)
@@ -450,7 +539,7 @@ func New(o Options) (*Hub, error) {
 	})
 	secured := securityHeaders(cfg.Secure, routed)
 	guarded := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) {
+		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) || isGuestHost(r.Host) {
 			// A published page sets its own headers; the hub's (frame ban, referrer policy) are for the hub's pages.
 			routed.ServeHTTP(w, r)
 			return
@@ -486,11 +575,15 @@ func (h *Hub) Run(ctx context.Context) {
 	go h.Design.Run(ctx)
 	go h.Proxy.RunOutbox(ctx) // messages written to a machine that was off, handed over once it is back
 	go h.Docs.Run(ctx)        // comments not yet handed to their conversations
+	go h.Automations.Run(ctx) // queued automation runs, started on their owners' machines (HUB_AUTOMATIONS)
 	if h.Ext != nil {
 		go h.Ext.Run(ctx, ext.CheckEvery)
 	}
 	if h.Sites != nil {
 		go h.Sites.Run(ctx)
+	}
+	if c := h.efficiencyCollector(); c != nil {
+		go c.Run(ctx)
 	}
 	if p := mrsource.New(h.cfg.MRSourceURL, h.cfg.MRSourceGroups, h.cfg.MRSourceToken, h.db.S(), h.log); p != nil {
 		go p.Run(ctx)
@@ -582,4 +675,18 @@ func (g anyGate) On(ctx context.Context, orgID, name string) bool {
 		}
 	}
 	return false
+}
+
+// efficiencyCollector reads the sources of the «Эффективность» screen. It uses the merge request source of the hub
+// (HUB_MR_SOURCE_GITLAB_*) and runs only when the instance turns the flag on for everyone or forces it (HUB_FEATURES_*);
+// nothing is collected for a hub that does not show the screen. Nil when there is nothing to do.
+func (h *Hub) efficiencyCollector() *efficiency.Collector {
+	if !slices.Contains(h.Features.Instance(), features.Efficiency) {
+		return nil
+	}
+	gl := efficiency.NewGitLab(h.cfg.MRSourceURL, h.cfg.MRSourceGroups, h.cfg.MRSourceToken)
+	if gl == nil {
+		return nil
+	}
+	return &efficiency.Collector{Store: h.db.S(), Code: gl, Log: h.log, Now: time.Now}
 }

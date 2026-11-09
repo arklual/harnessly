@@ -13,6 +13,7 @@ vi.mock('@/next/core/net/machine', () => ({
 import { loadEntries, loadOlderTurns, loadOutput, loadRewound, searchMessages } from '@/next/commands/pages';
 import { centralStore } from '@/next/stores/central';
 import { connectionStore } from '@/next/stores/connection';
+import { key, turnStore } from '@/next/stores/conversation';
 
 const page = {
   turns: [],
@@ -84,6 +85,29 @@ describe('a chat history from the cluster copy', () => {
       '/gw/history/conversations/tab-1/turns/t9/entries',
       '/m/a/conversations/tab-1/turns/t9/entries',
     ]);
+  });
+
+  it('asks a machine that is there for the steps of a turn the copy holds fewer of than the turn counts', async () => {
+    keep();
+    connectionStore.set('a', { k: 'live' } as never);
+    turnStore.set(key('tab-1', 't3'), { turn: { id: 't3', stepCount: 5 } as never, entryIds: [] });
+    const answer = { t: 'say', id: 'e9', turnId: 't3', at: 1, rev: 1, text: 'done' };
+    net.getPage
+      .mockResolvedValueOnce({ ok: true, value: { turnId: 't3', entries: [answer] } })
+      .mockResolvedValueOnce({ ok: true, value: { turnId: 't3', entries: [answer] } });
+    await loadEntries('a', 'tab-1', 't3');
+    expect(urls()).toEqual([
+      '/gw/history/conversations/tab-1/turns/t3/entries',
+      '/m/a/conversations/tab-1/turns/t3/entries',
+    ]);
+
+    // With the machine off, what the copy holds is what there is.
+    net.getPage.mockReset();
+    keep(['a']);
+    connectionStore.delete('a');
+    net.getPage.mockResolvedValueOnce({ ok: true, value: { turnId: 't3', entries: [answer] } });
+    await loadEntries('a', 'tab-1', 't3');
+    expect(urls()).toEqual(['/gw/history/conversations/tab-1/turns/t3/entries']);
   });
 
   it('goes to the machine as before when the copy is off for the person', async () => {

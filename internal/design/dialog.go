@@ -92,7 +92,7 @@ func (l *Library) ContinueInstructions(a *Artifact) string {
 			"- Do not create a canvas on claude.ai and do not publish anything until the person asks for it directly: the design lives in the project folder.",
 			"- Comments from the pane arrive as <annotation> blocks: template is the board file and line, rules are the rules, comment is what to change.",
 			"- Larger reworks go on a new board next to the original.",
-			"- After an edit, say briefly what you changed and on which board.",
+			"- After an edit, say briefly what you changed and on which board." + l.kitLine(a.ID),
 			"",
 		}, "\n")
 	}
@@ -108,9 +108,31 @@ func (l *Library) ContinueInstructions(a *Artifact) string {
 		"- Холст на claude.ai не создавай и ничего не публикуй, пока человек прямо не попросит: макет живёт в папке проекта.",
 		"- Комментарии из панели приходят блоками <annotation>: template — файл доски и строка, rules — правила, comment — что поменять.",
 		"- Крупные переделки — новой доской рядом с исходной. Тексты по-русски, «мероприятие», а не «событие».",
-		"- После правки коротко напиши, что поменял и на какой доске.",
+		"- После правки коротко напиши, что поменял и на какой доске." + l.kitLine(a.ID),
 		"",
 	}, "\n")
+}
+
+// kitLine is where the agent finds the project's kit, which the project does not carry a copy of, as a line of its own
+// (it starts with a line break); "" without a kit.
+func (l *Library) kitLine(project string) string {
+	if kit := l.ProjectKit(project).KitDraftOf; kit != "" {
+		return l.kitDraftLine(kit, l.ProjectDir(project))
+	}
+	pin, root, ok := l.kitFolderOf(project)
+	if !ok {
+		return ""
+	}
+	if !locale.Russian() {
+		if pin.Draft {
+			return "\n- The project's UI kit " + pin.ID + " is shown from its draft: " + root + " (themes/<theme>/ is ds/<theme>/ of the boards). An edit of the kit goes there and shows in the boards at once; do not copy the kit into the project."
+		}
+		return "\n- The project's UI kit is " + pin.ID + " " + pin.Version + ", read only: " + root + " (themes/<theme>/ is ds/<theme>/ of the boards). Do not copy it into the project; the kit is changed in its draft (\"Edit in kit\")."
+	}
+	if pin.Draft {
+		return "\n- UI-кит проекта " + pin.ID + " показан из черновика: " + root + " (themes/<тема>/ — это ds/<тема>/ досок). Правка кита — там, она сразу видна в досках; копию кита в проект не клади."
+	}
+	return "\n- UI-кит проекта — " + pin.ID + " " + pin.Version + ", только чтение: " + root + " (themes/<тема>/ — это ds/<тема>/ досок). Копию в проект не клади; кит правят в черновике («Править в ките»)."
 }
 
 // AttachedLine is what a chat outside the design's folder reads when the person attaches the design to a message: where
@@ -305,3 +327,20 @@ func (l *Library) PrepareDialog(id string) (art *Artifact, file, text string, er
 
 // ErrGone: the project of the library is not there.
 var ErrGone = errors.New("design: the project is gone")
+
+// kitDraftLine is the agent's line in the kit's draft: the folder is the kit, its edits show at once, a version
+// is the person's «Опубликовать версию»; a kit for viewing only is not changed at all.
+func (l *Library) kitDraftLine(kit, root string) string {
+	if !locale.Russian() {
+		line := "\n- This project is the draft of the UI kit " + kit + ": its folder " + root + " is the kit (kit.json, themes/<theme>/ with design-system.json, tokens.json, components and layouts). An edit shows at once on the kit screen and in the projects on the draft; the next version is the person's \"Publish version\", do not install or publish the kit yourself. A picked node of the kit comes as an <annotation>."
+		if l.KitReadOnly(kit) {
+			line += "\n- The kit is view only for everyone now: change no file of it, answer questions only."
+		}
+		return line
+	}
+	line := "\n- Этот проект — черновик UI-кита " + kit + ": его папка " + root + " и есть кит (kit.json, themes/<тема>/ с design-system.json, tokens.json, компонентами и макетами). Правка сразу видна на экране кита и в проектах на черновике; новую версию выпускает человек кнопкой «Опубликовать версию», сам кит не устанавливай и не публикуй. Выбранный узел кита приходит блоком <annotation>."
+	if l.KitReadOnly(kit) {
+		line += "\n- Кит сейчас «Только просмотр для всех»: файлы не меняй, только отвечай на вопросы."
+	}
+	return line
+}

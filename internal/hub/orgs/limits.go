@@ -619,6 +619,55 @@ func ScopeIn(ctx context.Context, st store.Store, p *auth.Principal, ref, scope 
 	return o, sc, nil
 }
 
+// MemberScopeIn is the scope for a person who only belongs to it: no admin or lead role, a member of its tenants. It is
+// asked after ScopeIn refused, by the screens a member reads too (the machines they may open). It answers the tenants of
+// the scope the person is in; none is the refusal ScopeIn gave.
+func MemberScopeIn(ctx context.Context, st store.Store, p *auth.Principal, ref, scope string) (store.Org, authz.Scope, map[string]bool, error) {
+	o, err := Resolve(ctx, st, p, ref)
+	if err != nil {
+		return o, authz.Scope{}, nil, err
+	}
+	sc, err := scopeParam(o, scope)
+	if err != nil {
+		return o, sc, nil, err
+	}
+	chain, err := chainIn(ctx, st, o, sc)
+	if err != nil {
+		return o, sc, nil, err
+	}
+	var candidates []string
+	switch sc.Kind {
+	case store.ScopeOrg:
+		sps, err := st.SpacesByOrg(ctx, o.ID)
+		if err != nil {
+			return o, sc, nil, err
+		}
+		for _, sp := range sps {
+			candidates = append(candidates, sp.ID)
+		}
+	default:
+		for _, c := range chain {
+			if c.Kind == store.ScopeTenant {
+				candidates = append(candidates, c.ID)
+			}
+		}
+	}
+	in := map[string]bool{}
+	for _, id := range candidates {
+		role, err := st.Role(ctx, id, p.User.ID)
+		if err != nil {
+			return o, sc, nil, err
+		}
+		if role != "" {
+			in[id] = true
+		}
+	}
+	if len(in) == 0 {
+		return o, sc, nil, authz.ErrForbiddenScope.With("scope", sc.Key()).With("needs", authz.NeedsTenantAdmin)
+	}
+	return o, sc, in, nil
+}
+
 // Chain is the scope with its ancestors, the organization first; not found when the scope is not the organization's.
 func Chain(ctx context.Context, st store.Store, o store.Org, sc authz.Scope) ([]authz.Scope, error) {
 	return chainIn(ctx, st, o, sc)

@@ -28,6 +28,94 @@
   justify-content: center;
 }
 
+/* The screen's skeleton while the canvas loads: the head, the tree, cards on the canvas and the panel as bars. */
+.hx-kit--sk .hx-kit__head {
+  gap: var(--hx-space-3);
+}
+.hx-kit-sk__btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--hx-radius-full);
+}
+.hx-kit-sk__crumbs {
+  width: 220px;
+  height: 14px;
+  border-radius: 7px;
+}
+.hx-kit-sk__themes {
+  width: 360px;
+  height: 32px;
+  margin-left: auto;
+  border-radius: var(--hx-radius-full);
+}
+.hx-kit-sk__search {
+  width: 120px;
+  height: 32px;
+  border-radius: var(--hx-radius-full);
+}
+.hx-kit-sk__side {
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-4);
+}
+.hx-kit-sk__row {
+  width: 70%;
+  height: 12px;
+  border-radius: 6px;
+}
+.hx-kit-sk__row:nth-child(3n + 2) {
+  width: 52%;
+  margin-left: var(--hx-space-3);
+}
+.hx-kit-sk__row:nth-child(4n) {
+  width: 60%;
+  margin-left: var(--hx-space-3);
+}
+.hx-kit-sk__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-5);
+  padding: var(--hx-space-6);
+}
+.hx-kit-sk__title {
+  width: 240px;
+  height: 22px;
+  border-radius: 8px;
+}
+.hx-kit-sk__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--hx-space-4);
+}
+.hx-kit-sk__card {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--hx-radius-md);
+}
+.hx-kit-sk__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-4);
+  border-left: 1px solid var(--hx-border);
+  background: var(--hx-bg-window);
+}
+.hx-kit-sk__shot {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--hx-radius-md);
+}
+.hx-kit-sk__line {
+  width: 80%;
+  height: 12px;
+  border-radius: 6px;
+}
+@media (max-width: 900px) {
+  .hx-kit-sk__themes,
+  .hx-kit-sk__side,
+  .hx-kit-sk__panel {
+    display: none;
+  }
+}
+
 /* The head: back, the tree's toggle, where you are, the theme and the search. */
 .hx-kit__head {
   display: flex;
@@ -424,8 +512,12 @@ button.hx-kit__crumb:hover {
   border-radius: var(--hx-radius-md);
   background: var(--hx-bg-raised);
 }
-.hx-kit-panel__asset[data-dark] {
+.hx-kit-panel__asset[data-dark],
+.hx-kit-panel__asset[data-tone='dark'] {
   background: var(--hx-p-gray-900);
+}
+.hx-kit-panel__asset[data-tone='light'] {
+  background: var(--hx-p-white);
 }
 .hx-kit-panel__asset img {
   max-width: 100%;
@@ -477,6 +569,26 @@ button.hx-kit__crumb:hover {
   color: var(--hx-fg-3);
   font-size: 11px;
   overflow-wrap: anywhere;
+}
+/* A template's fields: the name over the input, as in a form. */
+.hx-kit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+.hx-kit-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  min-width: 0;
+}
+.hx-kit-field__label {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-kit-field__note {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
 }
 .hx-kit-input {
   width: 100%;
@@ -705,11 +817,14 @@ button.hx-kit__crumb:hover {
 }
 
 /* The library's row of kits. */
+/* The library's row of kits: in the library's own column (the toolbar's, the folders', the projects'), so it scrolls
+   under the sticky toolbar like the rest and never hangs to the left of it. */
 .hx-kit-shelf {
   display: flex;
   flex-direction: column;
   gap: var(--hx-space-3);
-  margin-bottom: var(--hx-space-6);
+  max-width: 1120px;
+  margin: var(--hx-space-3) auto var(--hx-space-6);
 }
 .hx-kit-shelf__h {
   margin: 0;
@@ -719,8 +834,8 @@ button.hx-kit__crumb:hover {
 }
 .hx-kit-shelf__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--hx-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--hx-space-6) var(--hx-space-5);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -767,6 +882,9 @@ button.hx-kit__crumb:hover {
 .hx-kit-shelf__meta {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
+}
+.hx-kit-shelf__meta > span + span::before {
+  content: ' · ';
 }
 
 /* The project's kit on its bar. */

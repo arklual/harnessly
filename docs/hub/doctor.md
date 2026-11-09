@@ -74,6 +74,13 @@ An OpenID provider's configuration cannot be read. The issuer (`HUB_OIDC_<ID>_IS
 ## HUB-E001
 An extension adapter is unreachable or unhealthy; the lines under `extensions` say which ([extensions.md](extensions.md)).
 
+## HUB-M001
+A machine's move of its own data into the store stopped on objects with errors (docs/migrations): the line names the
+machine, how many of how many objects are in the hub and the error codes. The machine keeps every object, so nothing is
+lost; the web shows the same in «Машины» with «Повторить» and «Продолжить с агентом». On the machine,
+`harnessly migrate status` lists the objects; each code's cause and fix is in the page of the move,
+`docs/migrations/<id>.md`, which `hub doctor` prints under the line.
+
 ## HUB-X001
 Any other error that stopped the hub; the message is the cause.
 

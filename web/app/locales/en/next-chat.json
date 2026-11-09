@@ -538,5 +538,9 @@
   "next.transfer.of": "{sent} of {size}",
   "next.transfer.leftSeconds": "{n} s left",
   "next.transfer.leftMinutes": "{n} min left",
-  "next.transfer.leftHours": "{h} h {m} min left"
+  "next.transfer.leftHours": "{h} h {m} min left",
+  "next.feedMenu.label": "Chat menu",
+  "next.feedMenu.copyAnswer": "Copy answer",
+  "next.feedMenu.copyChatLink": "Copy link to chat",
+  "next.feedMenu.pane": "Right pane"
 }

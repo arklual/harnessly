@@ -52,7 +52,13 @@ const SmallfeatsGallery = () => {
   pinLocale(query.lang === 'en' ? 'en' : 'ru');
   const goalState = (query.goal ?? 'active') as GoalStatus | 'none';
   const portalRef = useRef<HTMLDivElement>(null);
-  const [beta, setBeta] = useState({ retitle: true, multiModel: false, hubFirst: false });
+  const [beta, setBeta] = useState({
+    retitle: true,
+    multiModel: false,
+    hubFirst: false,
+    chatNav: false,
+    chatShare: false,
+  });
   const multi = query.multi !== undefined;
   const [draft, setDraft] = useState('Сделай форму оплаты с проверкой карты');
   const [rows, setRows] = useState(() => [

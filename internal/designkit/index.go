@@ -57,10 +57,14 @@ func buildIndex(c *Canvas) []IndexEntry {
 		for _, k := range g.Components {
 			var props []string
 			for _, p := range k.Props {
-				props = append(props, p.Name)
+				props = append(props, p.Name, p.Description)
 			}
-			out = append(out, IndexEntry{Node: k.NodeID, Kind: KindComponent, Title: k.Name, Path: g.Title,
-				Words: words(k.Name, k.ID, k.Description, g.Title, strings.Join(props, " "))})
+			path := g.Title
+			if k.Part != "" && k.Part != PartProvider {
+				path += " › " + k.Part
+			}
+			out = append(out, IndexEntry{Node: k.NodeID, Kind: KindComponent, Title: k.Name, Path: path,
+				Words: words(k.Name, k.ID, k.Description, strings.Join(k.Keywords, " "), g.Title, strings.Join(props, " "))})
 		}
 	}
 	for _, t := range c.Templates {
@@ -112,10 +116,17 @@ func buildIndex(c *Canvas) []IndexEntry {
 	return out
 }
 
-// queryTerms splits a query into lower-case terms; a leading # of a colour stays out.
+// The search rule, the same here and on the kit screen (web/…/designly/kit/kit-search.ts); both are checked against
+// testdata/search-cases.json. A query is split into terms; each term is cut to its stem (a Russian or English ending
+// off, so «подтверждение» finds «подтверждения», «booking» finds «booked»); an entry answers a term when its words or
+// title hold the stem. An entry is found when it answers at least half of the terms; more answered terms rank first,
+// then a title that is the first term, starts with it, holds it.
+
+// queryTerms splits a query into lower-case terms (ё as е); a leading # of a colour stays out.
 func queryTerms(q string) []string {
 	var out []string
-	for _, f := range strings.FieldsFunc(strings.ToLower(q), func(r rune) bool { return unicode.IsSpace(r) || r == ',' }) {
+	q = strings.ReplaceAll(strings.ToLower(q), "ё", "е")
+	for _, f := range strings.FieldsFunc(q, func(r rune) bool { return unicode.IsSpace(r) || r == ',' }) {
 		if f = strings.TrimPrefix(f, "#"); f != "" {
 			out = append(out, f)
 		}
@@ -123,25 +134,56 @@ func queryTerms(q string) []string {
 	return out
 }
 
-// score is how well an entry answers the terms: 0 when a term is missing; a title that starts with the first term
-// ranks above one that holds it, and that above words that hold it.
+// Endings cut off a term, longest first; a stem keeps at least stemMin letters.
+var stemEndings = []string{
+	"ированием", "ирование", "ирования", "ованием", "ование", "ования", "ениями", "ениям", "ением", "ениях",
+	"ение", "ения", "ений", "ению", "ании", "ание", "ания", "аниям", "ться", "иями", "ями", "ами", "ого", "его",
+	"ому", "ему", "ыми", "ими", "ией", "ость", "ости", "ая", "яя", "ое", "ее", "ые", "ие", "ый", "ий", "ой", "ую",
+	"юю", "ов", "ев", "ах", "ях", "ом", "ем", "ам", "ям", "ть", "ет", "ит", "ут", "ют", "ат", "ят", "а", "я", "о",
+	"е", "ы", "и", "у", "ю", "ь", "й",
+	"ations", "ation", "ings", "ing", "ers", "er", "ies", "ied", "ed", "es", "s",
+}
+
+const stemMin = 3
+
+// stem is a term without its ending; a short term, a number or a colour stays whole.
+func stem(term string) string {
+	r := []rune(term)
+	if len(r) <= stemMin+1 {
+		return term
+	}
+	for _, e := range stemEndings {
+		er := []rune(e)
+		if len(r)-len(er) >= stemMin && strings.HasSuffix(term, e) {
+			return string(r[:len(r)-len(er)])
+		}
+	}
+	return term
+}
+
+// score is how well an entry answers the terms, 0 when it answers fewer than half of them.
 func score(e IndexEntry, terms []string) int {
-	title := strings.ToLower(e.Title)
-	s := 1
-	for i, t := range terms {
-		if !strings.Contains(e.Words, t) && !strings.Contains(title, t) {
-			return 0
+	title := strings.ReplaceAll(strings.ToLower(e.Title), "ё", "е")
+	text := strings.ReplaceAll(e.Words, "ё", "е")
+	hit := 0
+	for _, t := range terms {
+		s := stem(t)
+		if strings.Contains(text, s) || strings.Contains(title, s) {
+			hit++
 		}
-		if i == 0 {
-			switch {
-			case title == t:
-				s += 4
-			case strings.HasPrefix(title, t):
-				s += 3
-			case strings.Contains(title, t):
-				s += 2
-			}
-		}
+	}
+	if hit == 0 || hit*2 < len(terms) {
+		return 0
+	}
+	s := hit * 10
+	first := stem(terms[0])
+	switch {
+	case title == terms[0]:
+		s += 4
+	case strings.HasPrefix(title, first):
+		s += 3
+	case strings.Contains(title, first):
+		s += 2
 	}
 	return s
 }

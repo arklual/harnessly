@@ -39,6 +39,11 @@
       "name": "secrets.vault",
       "enabled": false,
       "forced": false
+    },
+    {
+      "name": "efficiency",
+      "enabled": false,
+      "forced": false
     }
   ]
 }

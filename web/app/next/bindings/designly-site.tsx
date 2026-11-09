@@ -50,6 +50,14 @@ import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
 import { onOpenNotePage, takeNoteBoard } from '@/next/features/designly/open-note';
 import DesignlyDeck from '@/next/bindings/designly-deck';
+import KitBand, { hasKitBand, useProjectKit } from '@/next/features/designly/versions/kit-band';
+import {
+  changeProjectKit,
+  KIT_ACTION,
+  KIT_DRAFT_VERSION,
+} from '@/next/features/designly/versions/versions-api';
+import VersionsPanel from '@/next/features/designly/versions/versions-panel';
+import { usePresentFlag } from '@/next/ui/presence';
 import DesignlyVideo from '@/next/bindings/designly-video';
 import SinopiaStage from '@/next/features/app-views/sinopia/sinopia-stage';
 import { useSinopia, type IPickedBlock } from '@/next/features/app-views/sinopia/use-sinopia';
@@ -76,6 +84,8 @@ const PANE_OUTSIDE_SLOT = 5;
 const SLOT_FRESH_MS = 11 * 60 * 60 * 1000;
 /** The waits before each new read of the library for a project the gateway says is the person's (about 15 s in all). */
 const RETRY_STEPS_MS = [500, 1000, 2000, 4000, 4000, 4000];
+/** How often a project not in the store yet is looked for while its card is shown. */
+const AWAY_POLL_MS = 15_000;
 
 interface IProject {
   design: IDesign;
@@ -144,6 +154,8 @@ const designAddress = (id: string) => new URL(routePath({ kind: ROUTE.site, id }
 /** The design's first pages are its tabs from the start, as in the design; the rest are opened with «+». */
 /** How often the pages are read again while an agent works on the design, ms. */
 const PAGES_POLL_MS = 4000;
+/** The «Версии» panel's exit, as long as its animation in sinopia.css. */
+const VERSIONS_EXIT_MS = 220;
 const SEED_TABS = 6;
 const seedTabs = (boards: readonly { path: string }[]): ISiteTab[] =>
   boards.slice(0, SEED_TABS).map((b) => newTab(b.path));
@@ -307,18 +319,17 @@ const DesignlySiteBody = ({
   useEffect(() => {
     if (!missing || !granted) return;
     const step = RETRY_STEPS_MS[retries.current];
-    if (step === undefined) {
-      setExhausted(true);
-      return;
-    }
+    // After the waits the project is still on its way to the store: the card says so and the library is read again
+    // now and then, so the project opens by itself when it arrives.
+    if (step === undefined) setExhausted(true);
     const timer = setTimeout(() => {
       retries.current += 1;
       setAttempt((n) => n + 1);
-    }, step);
+    }, step ?? AWAY_POLL_MS);
     return () => clearTimeout(timer);
   }, [missing, granted, attempt]);
   // A project the gateway gives the person no place in, and no gateway at all, lead back to the library. One they have a
-  // place in but their library does not have after the waits stays on its own card (ProjectAway): it is somewhere else.
+  // place in but their library does not have after the waits stays on its own card (ProjectAway): not in the store yet.
   useEffect(() => {
     if (missing && gate.state.k !== ACCESS.loading && !turnedAway && !granted) onMissing();
     // onMissing is the host's; a new one each render must not run it again.
@@ -642,6 +653,11 @@ const DesignlySiteBody = ({
     return { label: t('next.pane.designShare'), onOpen: () => sinopia.gate(() => openShare(false)) };
   })();
 
+  // The versions of the project and of its kit: «Версии» beside the mode switch, the kit's band over the view.
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const versionsShown = usePresentFlag(versionsOpen && project !== null, VERSIONS_EXIT_MS).mounted;
+  const kitInfo = useProjectKit(machine, id);
+
   // Who may change pictures: where there is no gateway the design is as it was (its person edits); otherwise the owner and editors.
   const back = pane ? pane.onBack : () => goTo({ kind: ROUTE.designly });
   if (gated !== null && gated.role === null) {
@@ -657,7 +673,7 @@ const DesignlySiteBody = ({
     );
   }
   if (missing && project === null && granted && exhausted) {
-    return <ProjectAway ownerName={gated?.ownerName ?? ''} onRetry={lookAgain} onBack={back} />;
+    return <ProjectAway ownerName={gated?.ownerName ?? ''} onBack={back} />;
   }
 
   // «Опубликовать как сайт» lives in «Поделиться», where a manager edits a site design.
@@ -692,13 +708,68 @@ const DesignlySiteBody = ({
       />
     ) : null;
 
+  const versions = project ? { open: versionsOpen, onToggle: () => setVersionsOpen((v) => !v) } : undefined;
   const modeButton: ISiteMode | undefined = (() => {
     if (pane || !onMode) return undefined;
     const state = t(modeStateKey(modeKindOf(project?.design.kind), editing));
-    if (editing) return { state, editing, action: { onClick: () => setMode(false), ask: false } };
-    if (mayEdit) return { state, editing, action: { onClick: () => setMode(true), ask: false } };
-    return { state, editing, action: shareButton ? { onClick: () => openShare(true), ask: true } : null };
+    if (editing) return { state, editing, versions, action: { onClick: () => setMode(false), ask: false } };
+    if (mayEdit) return { state, editing, versions, action: { onClick: () => setMode(true), ask: false } };
+    return {
+      state,
+      editing,
+      versions,
+      action: shareButton ? { onClick: () => openShare(true), ask: true } : null,
+    };
   })();
+  // «Править в ките» on an element of the kit: the project goes onto the draft and the kit's screen opens on
+  // the element in its editing mode. Not for a kit its maker set for viewing only.
+  const pinnedKit = kitInfo.kit?.pin?.id ?? null;
+  const editInKit =
+    mayEdit && pinnedKit !== null && kitInfo.state?.mayEdit === true
+      ? (node: string) => {
+          changeProjectKit(machine, id, KIT_ACTION.edit).then(
+            () =>
+              goTo({
+                kind: ROUTE.kit,
+                id: pinnedKit,
+                version: KIT_DRAFT_VERSION,
+                node,
+                ...(kitLink?.theme ? { theme: kitLink.theme } : {}),
+              }),
+            (failure: Error) =>
+              toast(t('next.versions.failed'), { tone: 'error', description: failure.message }),
+          );
+        }
+      : undefined;
+  const kitBand =
+    project !== null && hasKitBand(kitInfo) ? (
+      <KitBand
+        machine={machine}
+        id={id}
+        info={kitInfo}
+        origin={slotOrigin}
+        page={path}
+        mayEdit={mayEdit}
+        onOpenProject={(other) => goTo({ kind: ROUTE.site, id: other })}
+        onOpenKit={(kit) => goTo({ kind: ROUTE.kit, id: kit, version: KIT_DRAFT_VERSION })}
+        onKitChanged={() => setReloadKey((n) => n + 1)}
+      />
+    ) : undefined;
+  const versionsPanel = versionsShown ? (
+    <VersionsPanel
+      open={versionsOpen}
+      onClose={() => setVersionsOpen(false)}
+      machine={machine}
+      id={id}
+      origin={slotOrigin}
+      page={path}
+      mayEdit={mayEdit}
+      onRestored={() => {
+        setAttempt((n) => n + 1);
+        setReloadKey((n) => n + 1);
+      }}
+    />
+  ) : undefined;
 
   // Before the project is known (the library, the gateway's answer, the waits for a role just given) the design's
   // frame stands with its loader, and a failed read says why with a retry: the screen is never empty.
@@ -814,6 +885,7 @@ const DesignlySiteBody = ({
       access: shareButton,
       kit: kitChip,
       kitLink,
+      ...(editInKit ? { onEditInKit: editInKit } : {}),
       viewing,
       mode: modeButton,
       mayEdit,
@@ -837,6 +909,8 @@ const DesignlySiteBody = ({
         conversation={appsChat}
         sinopia={sinopia}
         viewing={viewing}
+        band={kitBand}
+        side={versionsPanel}
       >
         {kindView()}
       </SinopiaStage>

@@ -75,5 +75,15 @@
   "next.keys.cmd.site.stopInspect": "Выйти из выбора элемента",
   "next.keys.cmd.files.quickOpen": "Перейти к файлу",
   "next.keys.cmd.files.find": "Найти в файлах",
-  "next.keys.cmd.global.notice": "Раскрыть умное уведомление"
+  "next.keys.cmd.global.notice": "Раскрыть умное уведомление",
+  "next.keys.cmd.global.navigator": "Навигатор по диалогу",
+  "next.keys.cmd.global.chat1": "Открыть чат №1 в списке",
+  "next.keys.cmd.global.chat2": "Открыть чат №2 в списке",
+  "next.keys.cmd.global.chat3": "Открыть чат №3 в списке",
+  "next.keys.cmd.global.chat4": "Открыть чат №4 в списке",
+  "next.keys.cmd.global.chat5": "Открыть чат №5 в списке",
+  "next.keys.cmd.global.chat6": "Открыть чат №6 в списке",
+  "next.keys.cmd.global.chat7": "Открыть чат №7 в списке",
+  "next.keys.cmd.global.chat8": "Открыть чат №8 в списке",
+  "next.keys.cmd.global.chat9": "Открыть чат №9 в списке"
 }

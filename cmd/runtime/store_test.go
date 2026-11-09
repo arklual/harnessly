@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"path/filepath"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
@@ -13,7 +14,7 @@ import (
 // RUNTIME_STORE picks the store from where the runtime runs: a hub's machine (machine.json in the data folder) syncs
 // with the hub, a runtime paired with a cluster's agent keeps its data as it is, one on its own keeps a store inside.
 func TestStoreOptions(t *testing.T) {
-	for _, k := range []string{"RUNTIME_STORE", "AGENT_SECRET_FILE", "AGENT_CLUSTER_URL", "AGENT_MACHINE_FILE", "RUNTIME_STORE_MACHINE"} {
+	for _, k := range []string{"RUNTIME_STORE", "AGENT_SECRET_FILE", "AGENT_CLUSTER_URL", "AGENT_MACHINE_FILE", "RUNTIME_STORE_MACHINE", "AGENT_HUB_OBSERVE_FILE"} {
 		t.Setenv(k, "")
 	}
 	alone, hubs := gate.Config{DataDir: t.TempDir()}, gate.Config{DataDir: t.TempDir()}
@@ -44,6 +45,15 @@ func TestStoreOptions(t *testing.T) {
 	t.Setenv("AGENT_SECRET_FILE", "/run/agent.secret")
 	if k := kind(alone); k != "" {
 		t.Errorf("paired with a cluster's agent: %q", k)
+	}
+	// a cluster's agent that also keeps an observe link to a hub (<data>/hub/machine.json) makes its runtime a
+	// hub's machine: the library syncs with that hub's store, not a store of its own.
+	observed := gate.Config{DataDir: t.TempDir()}
+	if err := m.Save(filepath.Join(observed.DataDir, "hub", "machine.json")); err != nil {
+		t.Fatal(err)
+	}
+	if k := kind(observed); k != storelink.KindHub {
+		t.Errorf("a cluster's runtime with an observe link: %q", k)
 	}
 	t.Setenv("RUNTIME_STORE", "embedded")
 	if k := kind(alone); k != storelink.KindEmbedded {

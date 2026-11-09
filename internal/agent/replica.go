@@ -28,13 +28,24 @@ import (
 // cluster moves the cursor and, on the page with no older turn, marks the chat whole. A walk cut short (the link went,
 // the runtime restarted) goes on from the cursor next time. A cluster without `pending` gets the old backfill.
 const (
-	replicaBuffer    = 5000 // events kept per channel while the cluster has not stored them
-	replicaInflight  = 2000 // events sent per channel that the cluster has not acknowledged
-	replicaBatch     = 200  // events in one frame
-	replicaConvBatch = 100  // chat records in one backfill frame
-	replicaPages     = 40   // pages of turns read for a chat the cluster has never seen (a cluster without cursors)
-	replicaWalkPages = 2000 // pages of one chat walked in one go by its cursor: 200 000 turns, a guard against a loop
+	replicaBuffer    = 5000  // events kept per channel while the cluster has not stored them
+	replicaInflight  = 2000  // events sent per channel that the cluster has not acknowledged
+	replicaBatch     = 200   // events in one frame
+	replicaConvBatch = 100   // chat records in one backfill frame
+	replicaPages     = 40    // pages of turns read for a chat the cluster has never seen (a cluster without cursors)
+	replicaWalkPages = 10000 // pages of one chat walked in one go by its cursor: 200 000 turns, a guard against a loop
+	replicaWalkTurns = 20    // turns in a page of a walk: it carries the steps of each, so the copy opens a folded turn
 	replicaPause     = 150 * time.Millisecond
+	// replicaConvsWait is how long the agent waits for the runtime's chat list before it asks again, doubled up to
+	// replicaConvsWaitMax: a runtime too busy to make the list in its budget only logs it and answers nothing, and the
+	// backfill of the cluster waited for the next link (an hour and more on a loaded machine).
+	replicaConvsWait    = 30 * time.Second
+	replicaConvsWaitMax = 5 * time.Minute
+	// replicaRetryWait is how long a chat whose page the runtime did not give waits before its backfill goes on from
+	// where it stopped, doubled up to replicaRetryWaitMax: a backfill runs when a link starts, and a chat cut by one
+	// busy answer stayed behind until the next link.
+	replicaRetryWait    = time.Minute
+	replicaRetryWaitMax = 15 * time.Minute
 )
 
 // evV2Events carries events `fromSeq`.. of one channel of one epoch.
@@ -78,10 +89,12 @@ type replica struct {
 	emit      func(any)
 	connected func() bool
 	askConvs  func()
-	pages     func(conv, before string, limit int) (json.RawMessage, error)
+	pages     func(conv, before string, limit int, steps bool) (json.RawMessage, error)
 	entries   func(conv, turn string) (json.RawMessage, error)
 	output    func(conv, entry string) (json.RawMessage, error)
 	pause     time.Duration
+	convsWait time.Duration // the first wait for the chat list (replicaConvsWait)
+	retryWait time.Duration // the first wait before a cut chat's backfill goes on (replicaRetryWait)
 
 	// The tool outputs the cluster's copy gets whole (replica_outputs.go).
 	outQ    chan outputJob
@@ -95,7 +108,9 @@ type replica struct {
 	cursors    map[string]cursor
 	known      map[string]int64
 	pending    map[string]string // nil: the cluster keeps no backfill cursors (an older one)
+	steps      map[string]string // the chats held whole without the steps of every turn, by their steps cursor
 	generation int               // a new `v2.start` or a new runtime epoch starts a new backfill; the old one stops
+	answered   int               // the generation the runtime's chat list came for
 }
 
 func newReplica(a *Agent) *replica {
@@ -109,6 +124,8 @@ func newReplica(a *Agent) *replica {
 		connected: a.connected,
 		askConvs:  func() {},
 		pause:     replicaPause,
+		convsWait: replicaConvsWait,
+		retryWait: replicaRetryWait,
 		chans:     map[string]*replicaChan{},
 		outQ:      make(chan outputJob, outputQueue),
 		outSeen:   map[string]int64{},
@@ -117,10 +134,17 @@ func newReplica(a *Agent) *replica {
 
 // start is `v2.start`: the switch, where the cluster's copy stands per channel, and the revision of each chat it holds.
 func (r *replica) start(enabled bool, cursors map[string]cursor, known map[string]int64, pending map[string]string) {
+	r.startWith(enabled, cursors, known, pending, nil)
+}
+
+// startWith is start with `v2.start.steps`: the chats the cluster holds whole but not with the steps of every turn,
+// each with where their steps walk stands.
+func (r *replica) startWith(enabled bool, cursors map[string]cursor, known map[string]int64, pending, steps map[string]string) {
 	r.mu.Lock()
 	r.enabled = enabled
-	r.cursors, r.known, r.pending = cursors, known, pending
+	r.cursors, r.known, r.pending, r.steps = cursors, known, pending, steps
 	r.generation++
+	generation := r.generation
 	r.chans = map[string]*replicaChan{}
 	r.mu.Unlock()
 	// A new start may be another cluster or one that lost what it had: the outputs seen go again.
@@ -128,8 +152,32 @@ func (r *replica) start(enabled bool, cursors map[string]cursor, known map[strin
 	r.outSeen = map[string]int64{}
 	r.outMu.Unlock()
 	if enabled {
-		r.askConvs() // the runtime answers with its chats, and `convs` below backfills them
+		r.ask(generation) // the runtime answers with its chats, and `convs` below backfills them
 	}
+}
+
+// ask asks the runtime for its chat list, and again while no list came for this generation: the runtime answers
+// nothing when it could not make the list in its budget.
+func (r *replica) ask(generation int) {
+	r.askConvs()
+	wait := r.convsWait
+	if wait <= 0 {
+		return
+	}
+	go func() {
+		for {
+			time.Sleep(wait)
+			r.mu.Lock()
+			waiting := r.enabled && r.generation == generation && r.answered != generation
+			r.mu.Unlock()
+			if !waiting {
+				return
+			}
+			Log("info", "the runtime's chat list did not come, asked again", F{"wait", wait.String()})
+			r.askConvs()
+			wait = min(wait*2, replicaConvsWaitMax)
+		}
+	}()
 }
 
 // ack is `v2.ack`: the cluster has stored `ch` up to ackSeq (of `epoch`); gap: it got a frame that began after that.
@@ -161,10 +209,11 @@ func (r *replica) hello(epoch string) {
 	r.epoch = epoch
 	r.chans = map[string]*replicaChan{}
 	r.generation++
+	generation := r.generation
 	enabled := r.enabled
 	r.mu.Unlock()
 	if enabled {
-		r.askConvs()
+		r.ask(generation)
 	}
 }
 
@@ -249,7 +298,8 @@ func (r *replica) flushLocked(ch string, c *replicaChan) {
 func (r *replica) convs(records []json.RawMessage) {
 	r.mu.Lock()
 	generation := r.generation
-	known, pending := r.known, r.pending
+	r.answered = generation
+	known, pending, steps := r.known, r.pending, r.steps
 	enabled := r.enabled
 	r.mu.Unlock()
 	if !enabled || !r.connected() {
@@ -288,11 +338,14 @@ func (r *replica) convs(records []json.RawMessage) {
 		jobs = append(jobs, newest...)
 	} else {
 		// The changed chats' newest pages first (cheap, and what people open), then the walks: the chats the cluster has
-		// never seen, then the ones whose backfill stopped part way.
-		var newest, fresh, rest []backfillJob
+		// never seen, then the ones whose backfill stopped part way, last the chats held whole that lack steps.
+		var newest, fresh, rest, stepWalks []backfillJob
 		for _, h := range heads {
 			rev, seen := known[h.ID]
 			from, open := pending[h.ID]
+			if stepsFrom, ok := steps[h.ID]; ok && seen && !open {
+				stepWalks = append(stepWalks, backfillJob{id: h.ID, from: stepsFrom, pages: replicaWalkPages, walk: true, steps: true})
+			}
 			switch {
 			case !seen:
 				fresh = append(fresh, backfillJob{id: h.ID, pages: replicaWalkPages, walk: true})
@@ -305,7 +358,7 @@ func (r *replica) convs(records []json.RawMessage) {
 				newest = append(newest, backfillJob{id: h.ID, pages: 1})
 			}
 		}
-		jobs = append(append(newest, fresh...), rest...)
+		jobs = append(append(append(newest, fresh...), rest...), stepWalks...)
 	}
 	go r.backfill(generation, jobs)
 }
@@ -317,6 +370,7 @@ type backfillJob struct {
 	from  string
 	pages int
 	walk  bool
+	steps bool // a walk for the steps of a chat held whole: its pages move the steps cursor, not the history's
 }
 
 func (r *replica) current(generation int) bool {
@@ -328,37 +382,58 @@ func (r *replica) current(generation int) bool {
 // backfill reads the pages of turns of the chats the cluster lacks and hands them over as `feed_reset` events, one chat at
 // a time with a pause between: the machine is somebody's working machine.
 func (r *replica) backfill(generation int, jobs []backfillJob) {
-	for _, job := range jobs {
+	wait := r.retryWait
+	for {
+		var cut []backfillJob
+		for _, job := range jobs {
+			if !r.current(generation) {
+				return
+			}
+			if rest := r.backfillChat(generation, job); rest != nil {
+				cut = append(cut, *rest)
+			}
+			time.Sleep(r.pause)
+		}
+		if len(cut) == 0 || wait <= 0 {
+			return
+		}
+		// The chats whose page did not come go on from where they stopped, a while later, while this backfill is the current one.
+		time.Sleep(wait)
 		if !r.current(generation) {
 			return
 		}
-		r.backfillChat(generation, job)
-		time.Sleep(r.pause)
+		Log("info", "backfill goes on with the chats a page stopped", F{"chats", strconv.Itoa(len(cut))})
+		jobs, wait = cut, min(wait*2, replicaRetryWaitMax)
 	}
 }
 
-func (r *replica) backfillChat(generation int, job backfillJob) {
+// backfillChat reads one chat's pages; what is left of it when the runtime did not give a page (nil when nothing is).
+func (r *replica) backfillChat(generation int, job backfillJob) *backfillJob {
 	ch := "conv:" + job.id
 	before := job.from
+	limit := 100
+	if job.walk {
+		limit = replicaWalkTurns
+	}
 	for page := 0; page < job.pages; page++ {
-		raw, err := r.pages(job.id, before, 100)
+		raw, err := r.pages(job.id, before, limit, job.walk)
 		if err != nil {
 			Log("warn", "chat page not read for the cluster", F{"conv", job.id}, F{"error", err.Error()})
-			return
+			return &backfillJob{id: job.id, from: before, pages: job.pages - page, walk: job.walk}
 		}
 		var p struct {
 			Turns        []json.RawMessage `json:"turns"`
 			BeforeTurnID *string           `json:"beforeTurnId"`
 		}
 		if json.Unmarshal(raw, &p) != nil {
-			return
+			return nil
 		}
 		ev, ok := feedReset(raw)
 		if ok && job.walk {
-			ev, ok = markWalk(ev, before)
+			ev, ok = markWalk(ev, job.steps, before)
 		}
 		if !ok || !r.current(generation) {
-			return
+			return nil
 		}
 		r.emit(evV2Backfill{Event: "v2.backfill", Ch: ch, Events: []json.RawMessage{ev}})
 		r.noteOutputs(ch, raw)
@@ -367,22 +442,27 @@ func (r *replica) backfillChat(generation int, job backfillJob) {
 			r.backfillSteps(generation, job.id, p.Turns)
 		}
 		if p.BeforeTurnID == nil || *p.BeforeTurnID == "" || *p.BeforeTurnID == before {
-			return
+			return nil
 		}
 		before = *p.BeforeTurnID
 		time.Sleep(r.pause)
 	}
+	return nil
 }
 
 // markWalk says on a page of a walk where it was read from: the cluster moves the chat's cursor from `from` to the page's
 // `beforeTurnId`, and a page with none is the chat's first.
-func markWalk(ev json.RawMessage, from string) (json.RawMessage, bool) {
+func markWalk(ev json.RawMessage, steps bool, from string) (json.RawMessage, bool) {
 	var p map[string]json.RawMessage
 	if json.Unmarshal(ev, &p) != nil {
 		return nil, false
 	}
 	mark, _ := json.Marshal(map[string]string{"from": from})
-	p["history"] = mark
+	key := "history"
+	if steps {
+		key = "steps" // a steps walk of a chat held whole moves the cluster's steps cursor (HRN-879)
+	}
+	p[key] = mark
 	out, err := json.Marshal(p)
 	return out, err == nil
 }
@@ -432,10 +512,13 @@ func feedReset(page json.RawMessage) (json.RawMessage, bool) {
 func (a *Agent) startReplica(ctx context.Context) {
 	r := a.replica
 	r.askConvs = func() { a.replicaSend(`{"k":"convs"}`) }
-	r.pages = func(conv, before string, limit int) (json.RawMessage, error) {
+	r.pages = func(conv, before string, limit int, steps bool) (json.RawMessage, error) {
 		q := url.Values{"limit": {strconv.Itoa(limit)}}
 		if before != "" {
 			q.Set("before", before)
+		}
+		if steps {
+			q.Set("steps", "all")
 		}
 		return a.runtimeGet(a.cfg.V2Path + "/conversations/" + url.PathEscape(conv) + "/turns?" + q.Encode())
 	}
@@ -538,9 +621,14 @@ func (r *replica) frame(data []byte) {
 	}
 }
 
+// runtimePageTO is how long a page of the runtime may take to read: the first page of a long chat makes the runtime
+// read its whole transcript (tens of megabytes), which can take longer than a command's runtimeCallTO; a page cut there
+// stopped the chat's backfill.
+const runtimePageTO = 90 * time.Second
+
 // runtimeGet reads a page of the runtime over loopback, as a page would with its session.
 func (a *Agent) runtimeGet(path string) (json.RawMessage, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), runtimeCallTO)
+	ctx, cancel := context.WithTimeout(context.Background(), runtimePageTO)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.runtimeURL(path), nil)
 	if err != nil {
@@ -552,9 +640,16 @@ func (a *Agent) runtimeGet(path string) (json.RawMessage, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
-	out, _ := io.ReadAll(io.LimitReader(res.Body, relayReadLimit))
-	if res.StatusCode != http.StatusOK || !json.Valid(out) {
+	out, err := io.ReadAll(io.LimitReader(res.Body, relayReadLimit))
+	if err != nil {
+		// Not «answered 200»: the answer was cut (the deadline, the runtime went away), and that is what the log says.
+		return nil, fmt.Errorf("runtime answer not read whole (%d bytes): %w", len(out), err)
+	}
+	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("runtime answered %d", res.StatusCode)
+	}
+	if !json.Valid(out) {
+		return nil, fmt.Errorf("runtime answered %d with %d bytes that are not JSON", res.StatusCode, len(out))
 	}
 	return out, nil
 }

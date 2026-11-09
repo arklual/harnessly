@@ -19,6 +19,7 @@ import { DoneScreen } from './screens/done';
 import { HomeScreen } from './screens/home';
 import { InviteScreen } from './screens/invite';
 import { MachinesScreen } from './screens/machines';
+import { NetworkScreen } from './screens/network';
 import { NewSpaceScreen } from './screens/new-space';
 import { NewSiteScreen, SiteScreen, useSitesOn } from './screens/sites';
 import { SpaceProvider, useSpace } from './screens/space';
@@ -30,7 +31,7 @@ import { orgLanding, orgStepDue, orgStepOn } from './org/step';
 import type { OrgList } from '../hub-api/orgs';
 import { OrgRoutes } from './org/routes';
 import { PlainPage } from './ui/frame';
-import { appPathOn, machineForApp } from './lib/app-address';
+import { appPathOn, appTarget } from './lib/app-address';
 
 const ROUTES = [
   '/',
@@ -39,6 +40,7 @@ const ROUTES = [
   '/invite/:token',
   '/new',
   '/settings',
+  '/network',
   '/browser/:machineId',
   '/s/:slug',
   '/s/:slug/settings',
@@ -189,7 +191,10 @@ const Landing = () => {
   return <Loading />;
 };
 
-/** `/apps/<id>`: the app's page lives on a machine; the person's machine in their last space opens it. */
+/**
+ * `/apps/<id>`: the app's page lives on a machine; the person's machine in their last space opens it. With
+ * none of them online, an app installed for the space opens at the hub, from the store.
+ */
 const AppRedirect = ({ app, search }: { app: string; search: string }) => {
   const api = useApi();
   const env = useEnv();
@@ -203,9 +208,21 @@ const AppRedirect = ({ app, search }: { app: string; search: string }) => {
         if (!ref) throw new Error('no space');
         const { space } = await api.spaces.bySlug(ref.slug);
         const { machines } = await api.machines.list(space.id);
-        const id = machineForApp(machines);
-        if (!id) throw new Error('no machine');
-        const { url } = await api.machines.open(id, appPathOn(id, app, search));
+        const online = machines.some((m) => m.status === 'online');
+        // The space's apps are asked only when no machine is online; a hub without a store has none to give.
+        const installed = online
+          ? []
+          : await api.spaces.apps(space.id).then(
+              (r) => r.apps,
+              () => [],
+            );
+        const to = appTarget(machines, app, installed);
+        if (!to) throw new Error('no machine');
+        if ('hub' in to) {
+          if (alive) env.assign(to.hub);
+          return;
+        }
+        const { url } = await api.machines.open(to.machine, appPathOn(to.machine, app, search));
         if (alive) env.assign(url);
       } catch {
         if (alive) setNone(true);
@@ -337,6 +354,7 @@ const Routes = () => {
     );
   }
   if (route === '/settings') return <AccountScreen />;
+  if (route === '/network') return <NetworkScreen />;
   if (route === '/apps/:app') return <AppRedirect app={params.app ?? ''} search={search} />;
   if (route === '/browser/:machineId') return <BrowserScreen machineId={params.machineId ?? ''} />;
   if (route === '/o/:org' || route === '/o/:org/:scope' || route === '/o/:org/:scope/:section') {

@@ -191,6 +191,8 @@ export interface ISiteMode {
   /** The way to the other mode (the switch's other part); null: there is none, the mode is a label. ask: editing is
       not allowed, its part asks for access. */
   action: { onClick: () => void; ask: boolean } | null;
+  /** «Версии» of the project beside the switch; absent where the project has no history to show. */
+  versions?: { open: boolean; onToggle: () => void };
 }
 
 export interface ISiteViewProps {

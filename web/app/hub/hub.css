@@ -1767,3 +1767,32 @@ a.k-btn {
 .hub-drop[data-over] {
   border-color: var(--k-accent, currentColor);
 }
+
+/* ---- the closed network */
+.hub-net {
+  display: grid;
+  gap: 1.5rem;
+}
+.hub-net__pubs {
+  display: grid;
+  gap: 0.75rem;
+}
+.hub-net__pub {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(12rem, 2fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+}
+.hub-net__pem textarea {
+  font-family: var(--k-font-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+}
+@media (max-width: 40rem) {
+  .hub-net__pub {
+    grid-template-columns: 1fr auto;
+  }
+  .hub-net__pub > :nth-child(2) {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}

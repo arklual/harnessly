@@ -1258,152 +1258,6 @@ button.hx-nav__add {
   background: none;
   cursor: pointer;
 }
-.hx-cmenu {
-  position: fixed;
-  top: var(--my);
-  left: var(--mx);
-  z-index: 120;
-  width: 236px;
-  padding: 5px;
-  border: 1px solid var(--hx-border-strong);
-  border-radius: 14px;
-  background: var(--hx-bg-raised);
-  box-shadow: var(--hx-shadow-overlay);
-  transform-origin: 16px 0;
-  animation: hx-dl-pop-in 260ms var(--hx-ease-out) backwards;
-}
-.hx-cmenu[data-ending-style] {
-  animation: hx-dl-pop-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
-  pointer-events: none;
-}
-.hx-cmenu__item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  height: 34px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 9px;
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: 13.5px;
-  text-align: left;
-  cursor: pointer;
-}
-.hx-cmenu__item > .hx-icon:first-child {
-  color: var(--hx-fg-2);
-}
-.hx-cmenu__item:hover,
-.hx-cmenu__item[data-highlighted] {
-  background: var(--hx-bg-hover);
-}
-.hx-cmenu__item[data-danger='true'],
-.hx-cmenu__item[data-danger='true'] > .hx-icon:first-child {
-  color: var(--hx-danger);
-}
-.hx-cmenu__txt {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-cmenu--switch {
-  width: 248px;
-}
-.hx-cmenu__item--two {
-  height: auto;
-  min-height: 44px;
-  padding-block: 6px;
-  color: inherit;
-  text-decoration: none;
-}
-.hx-cmenu__hint {
-  display: block;
-  overflow: hidden;
-  color: var(--hx-fg-3);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-cmenu__chev {
-  margin-left: auto;
-  color: var(--hx-fg-3);
-}
-.hx-cmenu__check {
-  margin-left: auto;
-  color: var(--hx-accent);
-  opacity: 0;
-}
-.hx-cmenu__item[aria-checked='true'] .hx-cmenu__check,
-.hx-cmenu__item[aria-current='page'] .hx-cmenu__check {
-  opacity: 1;
-}
-/* The machine a chat lives on, at the top of its menu: a quiet line, not a choice. */
-.hx-cmenu__vm {
-  padding: 6px 10px 4px;
-  overflow: hidden;
-  color: var(--hx-fg-3);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-cmenu__sep {
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--hx-border);
-}
-.hx-cmenu__back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  height: 32px;
-  padding: 0 6px;
-  border: 0;
-  background: none;
-  color: var(--hx-fg-2);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: var(--hx-weight-medium);
-  cursor: pointer;
-}
-.hx-cmenu__ask {
-  display: grid;
-  gap: 4px;
-  padding: 8px 10px 4px;
-  font-size: 13px;
-  line-height: 18px;
-}
-.hx-cmenu__ask span {
-  color: var(--hx-fg-2);
-}
-.hx-cmenu__row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 8px 4px 4px;
-}
-.hx-cmenu__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--hx-radius-full);
-  background: var(--hx-bg-hover);
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.hx-cmenu__btn[data-danger='true'] {
-  background: var(--hx-danger);
-  color: #fff;
-}
 @media (hover: none) {
   .hx-item__menu {
     opacity: 1;
@@ -1696,21 +1550,10 @@ button.hx-nav__add {
   }
 }
 
-/* The menu's place comes from Base UI; the highlighted item is the one under the pointer or the keys. */
-.hx-cmenu__item[data-highlighted] {
-  outline: 0;
-}
-
 /* The person's name ends in an ellipsis: a long one does not run under the machine chip. */
 .hx-user__name {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-/* A menu takes the width of its longest item, so «Back to the old interface» reads whole. */
-.hx-cmenu-pos > .hx-cmenu {
-  width: max-content;
-  min-width: 236px;
-  max-width: min(340px, var(--available-width));
 }
 
 /* ── Favorites, groups and the new chat of a project ── */
@@ -1902,17 +1745,6 @@ button.hx-project__add {
   .hx-machine__other,
   .hx-machine__manage {
     min-height: 48px;
-  }
-}
-
-/* A menu that is a bottom sheet on the phone (ui/menu-panel.tsx): its items a finger tall, their words body-sized. */
-@media (max-width: 900px) {
-  .hx-cmenu.hx-sheet-phone {
-    padding: 0 6px 6px;
-  }
-  .hx-cmenu.hx-sheet-phone .hx-cmenu__item {
-    min-height: 48px;
-    font-size: var(--hx-text-md);
   }
 }
 

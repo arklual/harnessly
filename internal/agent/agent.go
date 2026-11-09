@@ -451,7 +451,9 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 		if ok && pending == nil {
 			pending = map[string]string{}
 		}
-		a.replica.start(enabled, cursors, known, pending)
+		// the chats held whole whose steps are not all in the cluster, by their steps cursor; none from an older one.
+		steps, _ := field[map[string]string](req, "steps")
+		a.replica.startWith(enabled, cursors, known, pending, steps)
 		return map[string]bool{"ok": true}, nil, nil
 	case "v2.ack":
 		ch, _ := field[string](req, "ch")

@@ -24,6 +24,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/browser"
+	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/envsetup"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
@@ -133,7 +134,9 @@ type runtimeGate struct {
 	envSetup []*envsetup.Runner
 	// library is the folder of the Sinopia library, store the store it syncs with (nil: none, docs/hub/store.md).
 	library func() string
-	store   *storelink.Link
+	// revisions makes the store's revisions the Sinopia library's history.
+	revisions func(design.Revisions)
+	store     *storelink.Link
 }
 
 // configFileOf is the runtime's config (the pair's secret, the person's settings).
@@ -472,6 +475,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	liveBrowser := newLiveBrowser(d)
 	defer liveBrowser.Close()
 	f.Add(liveBrowserRoutes(d, liveBrowser)...)
+	// Before the JSON routes: the GET stream of the apps' MCP server shares the MCP route's path.
+	f.Add(appToolStreamRoutes(d)...)
 	for _, group := range routeGroups {
 		f.Add(f.AsRoutes(group(d)...)...)
 	}
@@ -492,6 +497,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	self := newSelfUpdater()
 	f.Add(updateRoutes(d, checker, checkOn, self)...)
 	f.Add(machineCheckRoutes(d, self)...)
+	f.Add(moveRoutes(d)...)
 	f.Add(selftestRoutes(d)...)
 	startKeeper(d)
 	f.Add(notifyBotRoutes(d)...)
@@ -519,7 +525,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		f.Add(upstreamGuard(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, previewOf(d).proxy.Matches))
 	}
 	rg := &runtimeGate{Gate: f, terms: terms, browser: remoteBrowser, agentBrowser: agentBrowser, core: ref, tmux: tm, home: home, self: self,
-		envSetup: setupRunners, library: func() string { return designAPI(d).L.Root() }}
+		envSetup: setupRunners, library: func() string { return designAPI(d).L.Root() },
+		revisions: func(r design.Revisions) { designAPI(d).L.UseRevisions(r) }}
 	if checkOn {
 		rg.update = checker
 	}

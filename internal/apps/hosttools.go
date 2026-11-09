@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,11 +39,48 @@ type HostTools struct {
 	Check func(ctx context.Context, app, view string) (LoadCheck, error)
 	// WidgetChanged tells the chat's pages that a widget of the chat was shown or changed; may be nil.
 	WidgetChanged func(conv string)
+	// Live says why an app on in the chat cannot be used by the agent as it runs now ("" when it can): an app turned on
+	// after the agent started that needs what only a launch gives (live.go). nil: every app on can be.
+	Live func(app string) string
+}
+
+// quiet: the chat has no app on, so the server offers nothing (every Claude chat has it, see LiveApps): no tool, no
+// words in the agent's context. Its tools come when an app turns on, and the client hears of it (list_changed).
+// A Sinopia document open beside the chat speaks too: Sinopia is built in and on wherever its document is.
+func (t HostTools) quiet() bool {
+	return t.Enabled != nil && len(t.Enabled()) == 0 && !t.sinopiaOpen()
+}
+
+func (t HostTools) sinopiaOpen() bool {
+	if t.Sinopia == nil || t.Sinopia.State == nil {
+		return false
+	}
+	_, _, ok := t.Sinopia.State.DocumentOf(t.Conv)
+	return ok
+}
+
+// Offering is what the server's tools follow: the apps on in the chat and whether a Sinopia document is open beside
+// it. The GET stream tells the client of a change of it (notifications/tools/list_changed).
+func (t HostTools) Offering() string {
+	var apps []string
+	if t.Enabled != nil {
+		apps = t.Enabled()
+	}
+	return strings.Join(apps, ",") + "|" + strconv.FormatBool(t.sinopiaOpen())
 }
 
 var _ mcpserver.Toolset = HostTools{}
 
-func (HostTools) Instructions() string {
+func (t HostTools) Instructions() string {
+	if t.quiet() {
+		return ""
+	}
+	return HostInstructions()
+}
+
+// HostInstructions are the words of the host's tools, as the server gives them at initialize and as the agent of a
+// chat that turned an app on later gets them on its next turn (live.go).
+func HostInstructions() string {
 	return "Tools of the apps turned on in this chat: app_open shows an app's view to the person in the right pane; " +
 		"app_data_get and app_data_set keep the app's data of this chat; app_ask puts a choice to the person in the app and waits for it. " +
 		"widget_show draws an app's chat view in the feed with the data you give; widget_render draws a widget you write yourself " +
@@ -113,7 +151,10 @@ func str(desc string) *jsvalue.Object {
 	return jsvalue.NewObject("type", "string", "description", desc)
 }
 
-func (HostTools) Tools() []any {
+func (t HostTools) Tools() []any {
+	if t.quiet() {
+		return []any{}
+	}
 	app := str("The app's id; omit when only one app is on in this chat.")
 	tool := func(name, desc string, props *jsvalue.Object, required ...any) any {
 		return jsvalue.NewObject("name", name, "description", desc,
@@ -215,6 +256,11 @@ func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) 
 		app = enabled[0]
 	} else if !slices.Contains(enabled, app) {
 		return refuse(app + " is not on in this chat")
+	}
+	if t.Live != nil {
+		if why := t.Live(app); why != "" {
+			return refuse(why)
+		}
 	}
 	installed, err := t.Registry.Get(app)
 	if err != nil || installed.Manifest == nil {

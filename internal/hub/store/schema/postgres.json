@@ -1414,6 +1414,42 @@
         "team_id"
       ]
     },
+    "doc_comment_mentions": {
+      "columns": [
+        {
+          "name": "comment_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "notified_at",
+          "type": "bigint"
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "comment_id",
+        "email"
+      ],
+      "indexes": [
+        {
+          "name": "doc_comment_mentions_email",
+          "columns": [
+            "email",
+            "notified_at"
+          ]
+        }
+      ]
+    },
     "doc_comments": {
       "columns": [
         {
@@ -1596,6 +1632,121 @@
             "created_at"
           ]
         }
+      ]
+    },
+    "eff_pulse": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "week",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "speed",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "quality",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "friction",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "answered_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "week"
+      ]
+    },
+    "eff_source_facts": {
+      "columns": [
+        {
+          "name": "source",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "fact_key",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "data",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "collected_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "source",
+        "fact_key"
+      ],
+      "indexes": [
+        {
+          "name": "eff_source_facts_at",
+          "columns": [
+            "source",
+            "at"
+          ]
+        }
+      ]
+    },
+    "eff_source_state": {
+      "columns": [
+        {
+          "name": "source",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "collected_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "ok",
+          "type": "boolean",
+          "notNull": true
+        },
+        {
+          "name": "error",
+          "type": "text"
+        },
+        {
+          "name": "ok_at",
+          "type": "bigint"
+        },
+        {
+          "name": "facts",
+          "type": "integer",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "source"
       ]
     },
     "env_entries": {
@@ -3105,6 +3256,128 @@
         }
       ]
     },
+    "migration_objects": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "migration",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "object",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "sha256",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "size",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "error",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "attempts",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "asked",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "changed_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "migration",
+        "kind",
+        "object"
+      ],
+      "indexes": [
+        {
+          "name": "migration_objects_state",
+          "columns": [
+            "machine_id",
+            "migration",
+            "state"
+          ]
+        }
+      ]
+    },
+    "migration_runs": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "migration",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "version",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "total",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "started_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "changed_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "finished_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "migration"
+      ]
+    },
     "offline_prompts": {
       "columns": [
         {
@@ -3665,6 +3938,433 @@
         "code_hash"
       ]
     },
+    "resource_access": {
+      "columns": [
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_email",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "home_team",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "team_level",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "editors_can_share",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "kind",
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "resource_access_owner",
+          "columns": [
+            "owner_email"
+          ]
+        }
+      ]
+    },
+    "resource_access_log": {
+      "columns": [
+        {
+          "name": "log_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "actor",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "subject",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "details",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "log_id"
+      ],
+      "indexes": [
+        {
+          "name": "resource_access_log_res",
+          "columns": [
+            "kind",
+            "id",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "resource_access_people": {
+      "columns": [
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "granted_by",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "granted_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "kind",
+        "id",
+        "email"
+      ],
+      "indexes": [
+        {
+          "name": "resource_access_people_email",
+          "columns": [
+            "email"
+          ]
+        }
+      ]
+    },
+    "resource_access_requests": {
+      "columns": [
+        {
+          "name": "request_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "level",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "decided_by",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "decided_at",
+          "type": "bigint"
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "request_id"
+      ],
+      "indexes": [
+        {
+          "name": "resource_access_requests_res",
+          "columns": [
+            "kind",
+            "id",
+            "status"
+          ]
+        }
+      ]
+    },
+    "resource_access_teams": {
+      "columns": [
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "can_share",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "granted_by",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "granted_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "kind",
+        "id",
+        "team_id"
+      ],
+      "indexes": [
+        {
+          "name": "resource_access_teams_team",
+          "columns": [
+            "team_id"
+          ]
+        }
+      ]
+    },
+    "resource_guest_comments": {
+      "columns": [
+        {
+          "name": "guest_comment_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "link_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "thread_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "guest_name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "guest_comment_id"
+      ],
+      "indexes": [
+        {
+          "name": "resource_guest_comments_link",
+          "columns": [
+            "link_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "resource_guest_links": {
+      "columns": [
+        {
+          "name": "link_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "token_hash",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "rights",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "pinned_version",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "options",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "opens",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "last_opened_at",
+          "type": "bigint"
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "bigint"
+        },
+        {
+          "name": "revoked_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "link_id"
+      ],
+      "indexes": [
+        {
+          "name": "resource_guest_links_res",
+          "columns": [
+            "kind",
+            "id"
+          ]
+        },
+        {
+          "name": "resource_guest_links_token",
+          "unique": true,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
     "role_grants": {
       "columns": [
         {
@@ -3711,6 +4411,50 @@
             "scope_id"
           ]
         }
+      ]
+    },
+    "rollout_switches": {
+      "columns": [
+        {
+          "name": "feature",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "person_email",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "enabled",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "feature",
+        "person_email",
+        "machine_id"
       ]
     },
     "schema_migrations": {

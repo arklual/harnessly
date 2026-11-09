@@ -139,7 +139,7 @@ func TestPublicOnlyIsTheDialersControl(t *testing.T) {
 	for addr, refused := range map[string]bool{
 		"127.0.0.1:443": true, "[::1]:443": true, "100.64.0.1:443": true, "93.184.216.34:443": false, "not-an-address": true,
 	} {
-		if err := dialControl(false)("tcp", addr, nil); (err != nil) != refused {
+		if err := dialControl("h.example", false)("tcp", addr, nil); (err != nil) != refused {
 			t.Errorf("%s: %v", addr, err)
 		}
 	}

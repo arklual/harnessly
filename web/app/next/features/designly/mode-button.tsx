@@ -7,8 +7,32 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import '@/next/styles/mode.css';
 
+/** «Версии» of the project: a round button beside the switch, lit while the panel is open. */
+const VersionsButton = ({ mode }: { mode: ISiteMode }) =>
+  mode.versions ? (
+    <button
+      type="button"
+      className="hx-head-btn hx-tipped"
+      aria-pressed={mode.versions.open}
+      aria-label={t('next.versions.title')}
+      onClick={mode.versions.onToggle}
+    >
+      <Icon name="history" />
+      <span className="hx-tip" data-pos="below">
+        {t('next.versions.title')}
+      </span>
+    </button>
+  ) : null;
+
 /** compact: a phone's bar, each part said by its icon only (the hint says the rest). */
-const ModeButton = ({ mode, compact = false }: { mode: ISiteMode; compact?: boolean }) => {
+const ModeButton = ({ mode, compact = false }: { mode: ISiteMode; compact?: boolean }) => (
+  <>
+    <ModeSwitch mode={mode} compact={compact} />
+    <VersionsButton mode={mode} />
+  </>
+);
+
+const ModeSwitch = ({ mode, compact }: { mode: ISiteMode; compact: boolean }) => {
   const { action } = mode;
   if (!action)
     return (

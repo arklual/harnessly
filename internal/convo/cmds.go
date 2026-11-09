@@ -118,7 +118,7 @@ func (c *conv) do(device string, cmd wire.Command, now time.Time) wire.CmdResult
 		return c.goal(m, now)
 	case wire.LimitCmd:
 		return c.limitCmd(m, now)
-	case wire.ModelCmd, wire.BgStopCmd, wire.TerminalStopCmd, wire.ConversationRetitleCmd:
+	case wire.ModelCmd, wire.BgStopCmd, wire.TerminalStopCmd, wire.ConversationRetitleCmd, wire.ConversationSummarizeCmd:
 		// The runtime routes these to model, bgStop and stopTerminal, which answer when the work is done.
 		return wire.Refused(wire.RefuseUnsupported)
 	}
@@ -173,9 +173,11 @@ func (c *conv) recResult(now time.Time) wire.CmdResult {
 	return r
 }
 
-// setApps turns on the apps of the list and off the others. The agent takes the change when it starts next (see
-// internal/apps), so an agent at rest is stopped at once and the next message brings it back with them; one at work
-// keeps the apps it had until its terminal stops. The record carries the list to the page and to the launch.
+// setApps turns on the apps of the list and off the others. A running agent that can take the change as it runs
+// (AppsLive) keeps running and gets the apps' tools live and their words on its next turn. Otherwise the agent takes
+// the change when it starts next (see internal/apps), so an agent at rest is stopped at once and the next message
+// brings it back with them; one at work keeps the apps it had until its terminal stops. The record carries the list to
+// the page and to the launch.
 func (c *conv) setApps(ids []string, now time.Time) wire.CmdResult {
 	if len(ids) > 0 {
 		if c.d.AppsOK == nil {
@@ -191,7 +193,7 @@ func (c *conv) setApps(ids []string, now time.Time) wire.CmdResult {
 		c.rec.Apps = append([]string(nil), ids...)
 	}
 	res := c.recResult(now)
-	if changed && c.stoppable(false) == "" {
+	if changed && !(c.d.AppsLive != nil && c.d.AppsLive(c.rec, ids)) && c.stoppable(false) == "" {
 		c.stopTerminal(wire.TerminalStopPerson, 0, false, func(wire.CmdResult) {})
 	}
 	return res

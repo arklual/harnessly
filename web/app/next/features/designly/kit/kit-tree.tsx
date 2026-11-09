@@ -2,7 +2,7 @@
 // is open at the start; a long branch is drawn by the rows in view only (fixed-height rows). A click selects the node
 // and the canvas flies to it; a node selected on the canvas opens its branch here and scrolls into view.
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import type { IKitCanvas } from '@/next/features/designly/kit/kit-api';
+import { templatesIn, type IKitCanvas } from '@/next/features/designly/kit/kit-api';
 import type { TSectionTitles } from '@/next/features/designly/kit/kit-world';
 import Icon from '@/next/ui/icon';
 
@@ -71,11 +71,11 @@ export const treeOf = (c: IKitCanvas, titles: TSectionTitles): ITreeNode[] => {
           children: g.components.map((k) => ({ node: k.node, label: k.name })),
         })),
       });
-    } else if (s.id === 'templates') {
+    } else if (s.id === 'templates' || s.id === 'reference') {
       out.push({
-        node: 'section:templates',
-        label: named('templates'),
-        children: (c.templates ?? []).map((t) => ({
+        node: `section:${s.id}`,
+        label: named(s.id),
+        children: templatesIn(c, s.id).map((t) => ({
           node: t.node,
           label: t.title,
           ...counted(t.sections.reduce((n, x) => n + x.layouts.length, 0)),

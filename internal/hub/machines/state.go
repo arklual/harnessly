@@ -241,6 +241,10 @@ func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 		if s.docs != nil {
 			s.docs.Event(l, m, ev)
 		}
+	case hubproto.EventAutomationResult:
+		if s.automations != nil {
+			s.automations.Event(m, ev)
+		}
 	case hubproto.EventHistoryEvents:
 		if s.history != nil {
 			s.history.Live(ctx, m, ev.Raw)

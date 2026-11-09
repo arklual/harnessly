@@ -35,6 +35,8 @@ Checks the package; each problem names its field. --strict: warnings fail too. "
 
 Installs a copy of the package on this machine (later edits do not reach it). With --channel, follows a channel of the
 catalog; with --team an owner installs the catalog's app for the whole team. Rights are shown before they are given.
+A file FILE.hlapp installs with its signature FILE.hlapp.sig (or --sig FILE): where signatures are required, a package
+without one, or signed by a publisher the hub does not trust, is refused in words.
 `,
 	"dev": `harnessly app dev [DIR]
 
@@ -75,7 +77,20 @@ calls, a load that did not finish). --since takes a span, a time or milliseconds
 Opens the view in a headless browser of this machine, waits for its handshake and says how it loaded, with every error; exit 1 when it
 did not load cleanly. Without --open, check is validate.
 `,
-	"publish": `harnessly app publish [DIR] --channel dev|beta|stable [--team]
+	"pack": `harnessly app pack [DIR] [-o FILE.hlapp] [--sign [--publisher NAME]]
+
+Packs the package into a .hlapp, the file that travels through a gateway into a closed network. With --sign it writes
+FILE.hlapp.sig beside it: the publisher's signature, made with the key in the safe:
+  harnessly secret run --env HLAPP_SIGNING_KEY=hlapp-signing-key -- harnessly app pack --sign
+A deployment can accept only signed packages of publishers it trusts (Settings of the hub, «Закрытый контур»).
+`,
+	"key": `harnessly app key --out FILE
+
+Makes a publisher's key pair. Prints the public key (give it to the admin of the hub, who adds it to the trusted
+publishers) and writes the private one into FILE (0600), to put in the safe (harnessly secret ask hlapp-signing-key) and
+delete. The private key is never printed.
+`,
+	"publish": `harnessly app publish [DIR|FILE.hlapp] --channel dev|beta|stable [--team]
 
 Publishes a new, immutable version on a channel. --team: also to the team's catalog.
 `,
@@ -127,7 +142,7 @@ Serves an MCP server from a fixture file, the way an eval mocks the app's own se
 }
 
 // appSubNames lists every subcommand of `harnessly app`, for the usage line of a mistyped one.
-const appSubNames = "docs, catalog, sdk, new, validate (check), install, dev, list, remove, enable, disable, connect, explain, logs, check (--open), " +
+const appSubNames = "docs, catalog, sdk, new, validate (check), install (a folder or a .hlapp), pack, key, dev, list, remove, enable, disable, connect, explain, logs, check (--open), " +
 	"publish, promote, rollback, channels, update, share, shares, unshare, team, public, eval or mock-mcp"
 
 // appHelpAliases are the names that print another subcommand's help.

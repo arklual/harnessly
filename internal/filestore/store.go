@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -136,6 +137,49 @@ func (s *Store) Commit(ctx context.Context, req CommitRequest, machine string) (
 // Changes returns the latest revision of every file changed after since, oldest first, at most limit of them.
 func (s *Store) Changes(ctx context.Context, since int64, limit int) (Changes, error) {
 	return s.meta.Changes(ctx, since, limit)
+}
+
+// HistoryUnder is the revisions under a folder (prefix ends in "/"; "" for the whole room), newest first.
+func (s *Store) HistoryUnder(ctx context.Context, prefix string, limit int) ([]Entry, error) {
+	if prefix != "" && (!strings.HasSuffix(prefix, "/") || !SafeRel(strings.TrimSuffix(prefix, "/"))) {
+		return nil, ErrBadRequest
+	}
+	return s.meta.HistoryUnder(ctx, prefix, limit)
+}
+
+// CountUnder counts the revisions under an ASCII folder in any letter case, up to limit.
+func (s *Store) CountUnder(ctx context.Context, prefix string, limit int) (int, error) {
+	if !strings.HasSuffix(prefix, "/") || !SafeRel(strings.TrimSuffix(prefix, "/")) || !isASCII(prefix) {
+		return 0, ErrBadRequest
+	}
+	return s.meta.CountUnder(ctx, prefix, limit)
+}
+
+func isASCII(v string) bool {
+	for i := 0; i < len(v); i++ {
+		if v[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
+
+// Snapshot is a folder (prefix ends in "/") as it was at revision at, without the paths deleted by then.
+func (s *Store) Snapshot(ctx context.Context, prefix string, at int64) (Snapshot, error) {
+	out := Snapshot{At: at, Entries: []Entry{}}
+	if !strings.HasSuffix(prefix, "/") || !SafeRel(strings.TrimSuffix(prefix, "/")) || at <= 0 {
+		return out, ErrBadRequest
+	}
+	es, err := s.meta.Snapshot(ctx, prefix, at)
+	if err != nil {
+		return out, err
+	}
+	for _, e := range es {
+		if !e.Deleted && s.policy.Synced(e.Path) {
+			out.Entries = append(out.Entries, e)
+		}
+	}
+	return out, nil
 }
 
 // History lists the revisions of one path, newest first.

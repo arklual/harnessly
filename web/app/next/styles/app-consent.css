@@ -119,6 +119,22 @@
 .hx-access__item:focus-visible {
   box-shadow: 0 0 0 2px var(--hx-focus);
 }
+.hx-access__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+}
+.hx-access__revoke {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  flex-shrink: 0;
+}
+.hx-access__fail {
+  color: var(--hx-danger);
+  font-size: var(--hx-text-xs);
+}
 .hx-access__label {
   display: flex;
   align-items: baseline;

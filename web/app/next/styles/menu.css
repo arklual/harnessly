@@ -1,0 +1,244 @@
+/* The one menu of the app (ui/menu-panel.tsx, ui/context-menu.tsx), wherever it opens: the sidebar, the tabs, the
+   feed, the pane. Imported by the menu itself, so a screen without the sidebar's styles draws it whole. */
+.hx-cmenu-pos {
+  z-index: 120;
+  outline: 0;
+}
+.hx-cmenu-pos > .hx-cmenu {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform-origin: var(--transform-origin);
+}
+
+/* The one menu of the app (ui/menu-panel.tsx), after the smart notice's: black in both themes, a large radius, line
+   icons on the left, large words, the item under the pointer or the keys on a soft grey plate, groups apart by air
+   and not by a line. It grows from where it was called and shrinks back there. */
+.hx-cmenu {
+  --cm-fg: #fff;
+  --cm-fg2: rgb(255 255 255 / 0.62);
+  --cm-fg3: rgb(255 255 255 / 0.42);
+  --cm-hl: rgb(255 255 255 / 0.11);
+  --cm-danger: #ff7a70;
+  --cm-spring: linear(
+    0,
+    0.012 1%,
+    0.18 6.5%,
+    0.502 14.4%,
+    0.784 22.8%,
+    0.958 31.6%,
+    1.036 40.2%,
+    1.052 47.6%,
+    1.04 56.2%,
+    1.011 71%,
+    0.999 85%,
+    1
+  );
+  position: fixed;
+  top: var(--my);
+  left: var(--mx);
+  z-index: 120;
+  width: 256px;
+  padding: 6px;
+  border: 0;
+  border-radius: 20px;
+  background: #000;
+  color: var(--cm-fg);
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 0.32),
+    0 2px 6px rgb(0 0 0 / 0.2),
+    0 0 0 1px rgb(255 255 255 / 0.07);
+  color-scheme: dark;
+  transform-origin: 16px 0;
+  animation: hx-cmenu-in 300ms var(--cm-spring) backwards;
+}
+.hx-cmenu[data-ending-style] {
+  animation: hx-cmenu-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-cmenu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@keyframes hx-cmenu-out {
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+.hx-cmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: var(--cm-fg);
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: -0.005em;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.hx-cmenu__item > .hx-icon:first-child {
+  width: 18px;
+  height: 18px;
+  color: var(--cm-fg2);
+}
+.hx-cmenu__item:hover,
+.hx-cmenu__item[data-highlighted] {
+  background: var(--cm-hl);
+}
+.hx-cmenu__item[data-danger='true'],
+.hx-cmenu__item[data-danger='true'] > .hx-icon:first-child {
+  color: var(--cm-danger);
+}
+.hx-cmenu__txt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-cmenu--switch {
+  width: 272px;
+}
+.hx-cmenu__item--two {
+  height: auto;
+  min-height: 48px;
+  padding-block: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.hx-cmenu__hint {
+  display: block;
+  overflow: hidden;
+  color: var(--cm-fg3);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-cmenu__chev {
+  margin-left: auto;
+  color: var(--cm-fg3);
+}
+.hx-cmenu__check {
+  margin-left: auto;
+  color: var(--cm-fg);
+  opacity: 0;
+}
+.hx-cmenu__item[aria-checked='true'] .hx-cmenu__check,
+.hx-cmenu__item[aria-current='page'] .hx-cmenu__check {
+  opacity: 1;
+}
+/* The machine a chat lives on, at the top of its menu: a quiet line, not a choice. */
+.hx-cmenu__vm {
+  padding: 8px 12px 4px;
+  overflow: hidden;
+  color: var(--cm-fg3);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Groups stand apart by air, not by a line. */
+.hx-cmenu__sep {
+  height: 8px;
+  margin: 0;
+  background: none;
+}
+.hx-cmenu__back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--cm-fg2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+}
+.hx-cmenu__ask {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px 4px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.hx-cmenu__ask span {
+  color: var(--cm-fg2);
+}
+.hx-cmenu__row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 4px 4px;
+}
+.hx-cmenu__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: var(--cm-hl);
+  color: var(--cm-fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.hx-cmenu__btn[data-danger='true'] {
+  background: var(--hx-danger);
+  color: #fff;
+}
+
+/* The menu's place comes from Base UI; the highlighted item is the one under the pointer or the keys. */
+.hx-cmenu__item[data-highlighted] {
+  outline: 0;
+}
+
+/* A menu takes the width of its longest item, so «Back to the old interface» reads whole. */
+.hx-cmenu-pos > .hx-cmenu {
+  width: max-content;
+  min-width: 240px;
+  max-width: min(340px, var(--available-width));
+}
+
+/* A menu that is a bottom sheet on the phone (ui/menu-panel.tsx): its items a finger tall, their words body-sized. */
+@media (max-width: 900px) {
+  .hx-cmenu.hx-sheet-phone {
+    padding: 0 10px calc(10px + env(safe-area-inset-bottom));
+    background: #000;
+  }
+  .hx-cmenu.hx-sheet-phone .hx-cmenu__item {
+    min-height: 50px;
+    font-size: 17px;
+  }
+  .hx-cmenu.hx-sheet-phone .hx-cmenu__item > .hx-icon:first-child {
+    width: 20px;
+    height: 20px;
+  }
+  .hx-cmenu.hx-sheet-phone .hx-sheet__grip {
+    background: rgb(255 255 255 / 0.28);
+  }
+}
+
+/* A choice that has nothing to do waits, dimmed. */
+.hx-cmenu__item[data-disabled] {
+  opacity: 0.38;
+  cursor: default;
+  pointer-events: none;
+}

@@ -45,6 +45,9 @@ type Config struct {
 	// up. That is joining a collection whose truth lives on another machine: what only this machine had is kept
 	// aside, not spread.
 	AdoptRemote bool
+	// KeepUnseen: a file the store stops showing this machine stays in the folder (a folder several runtimes share,
+	// where another runtime's person may still have a role in it); otherwise an unedited one is removed.
+	KeepUnseen bool
 	// OnApplied is called after another machine's revision lands (outside the agent's lock).
 	OnApplied func(rel string)
 	// Log is where the sync says what it did (nil: slog's default).
@@ -301,6 +304,9 @@ func (a *Agent) scanFileDepth(ctx context.Context, rel string, fi fs.FileInfo, d
 	}
 	resp, err := a.hub.Commit(ctx, filestore.CommitRequest{Path: rel, Base: base, Sha: sum, Tag: tag, Size: int64(len(canon)),
 		Exec: fi.Mode()&0o100 != 0, Author: a.author(fi)})
+	if errors.Is(err, ErrRefused) {
+		return a.refused(rel, base, tag, fi)
+	}
 	if err != nil {
 		return err
 	}
@@ -313,6 +319,19 @@ func (a *Agent) scanFileDepth(ctx context.Context, rel string, fi fs.FileInfo, d
 	}
 	return a.state.put(rel, known{Rev: resp.Entry.Rev, Sha: tag, Size: fi.Size(), Mtime: mtime(fi)})
 }
+
+// refused remembers a local file the store does not take from this machine (a project none of its people may edit,
+// HRN-880): it is not sent again until it changes, and a newer revision from the store replaces it as usual.
+func (a *Agent) refused(rel string, base int64, tag string, fi fs.FileInfo) error {
+	a.log.Info("not sent: none of this machine's people may edit it", "path", rel)
+	return a.state.put(rel, known{Rev: base, Sha: refusedPrefix + tag, Size: fi.Size(), Mtime: mtime(fi)})
+}
+
+// refusedPrefix marks what the agent knows of a file the store did not take: it is not the store's revision, so it is
+// never treated as an unedited copy (a newer revision keeps it aside, a lost role does not delete it).
+const refusedPrefix = "refused:"
+
+func isRefused(k *known) bool { return k != nil && strings.HasPrefix(k.Sha, refusedPrefix) }
 
 // keepBase remembers the last synced canonical contents of a file the codec merges: the base of a three-way merge.
 func (a *Agent) keepBase(rel string, canon []byte) error {
@@ -405,6 +424,10 @@ func (a *Agent) pushDelete(ctx context.Context, rel string) error {
 		return err
 	}
 	resp, err := a.hub.Commit(ctx, filestore.CommitRequest{Path: rel, Base: k.Rev, Deleted: true})
+	if errors.Is(err, ErrRefused) {
+		a.log.Info("delete not taken: none of this machine's people may edit it", "path", rel)
+		return a.state.forget(rel)
+	}
 	if err != nil {
 		return err
 	}
@@ -647,7 +670,7 @@ func (a *Agent) applyRemote(ctx context.Context, e filestore.Entry) error {
 		a.log.Warn("not a regular file locally, skipped", "path", e.Path)
 		return nil
 	}
-	clean := k != nil && !k.Deleted && k.Size == fi.Size() && k.Mtime == mtime(fi)
+	clean := k != nil && !k.Deleted && k.Size == fi.Size() && k.Mtime == mtime(fi) && !isRefused(k)
 	if !clean {
 		data, _, err := a.readRegular(e.Path)
 		if err != nil {
@@ -755,6 +778,11 @@ func (a *Agent) Pull(ctx context.Context, wait time.Duration) (bool, error) {
 		a.log.Warn("hub is behind the agent's cursor, catching up from the start", "cursor", since, "hub", ch.Rev)
 		return true, a.state.setCursor(0)
 	}
+	if was, err := a.state.scope(); err != nil {
+		return false, err
+	} else if was != ch.Scope {
+		return true, a.rescope(ctx, was, ch.Scope)
+	}
 	for _, e := range ch.Entries {
 		if err := a.Apply(ctx, e); err != nil {
 			// Keep the cursor before this entry: the next pull tries it again.
@@ -766,6 +794,75 @@ func (a *Agent) Pull(ctx context.Context, wait time.Duration) (bool, error) {
 		}
 	}
 	return ch.More, a.state.setCursor(ch.Rev)
+}
+
+// rescope follows a change of what the store shows this machine (a role given or taken on a project): the
+// room is read again from the start, so a project that became visible arrives whole, and a file the agent knew that
+// the store no longer shows it is removed when it was not edited here (an edit stays, unsynced). The first scope a
+// store names (was "") only reads the room again.
+func (a *Agent) rescope(ctx context.Context, was, now string) error {
+	seen := map[string]bool{}
+	var since int64
+	for {
+		ch, err := a.hub.Changes(ctx, since, 0)
+		if err != nil {
+			return err
+		}
+		if ch.Scope != now {
+			// It moved again while it was read: the next pull starts over.
+			return nil
+		}
+		for _, e := range ch.Entries {
+			seen[e.Path] = true
+			if err := a.Apply(ctx, e); err != nil {
+				a.log.Warn("apply", "path", e.Path, "rev", e.Rev, "err", err)
+			}
+		}
+		if !ch.More || ch.Rev <= since {
+			since = ch.Rev
+			break
+		}
+		since = ch.Rev
+	}
+	if was != "" && !a.cfg.KeepUnseen {
+		if err := a.dropUnseen(seen); err != nil {
+			return err
+		}
+	}
+	a.log.Info("what the store shows this machine changed, read again", "rev", since)
+	if err := a.state.setCursor(since); err != nil {
+		return err
+	}
+	return a.state.setScope(now)
+}
+
+// dropUnseen removes the files the agent knew that the store no longer shows this machine.
+func (a *Agent) dropUnseen(seen map[string]bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	paths, err := a.state.live("")
+	if err != nil {
+		return err
+	}
+	for _, p := range paths {
+		if seen[p] {
+			continue
+		}
+		k, err := a.state.get(p)
+		if err != nil || k == nil {
+			continue
+		}
+		if fi, err := a.root.Lstat(p); err == nil && fi.Mode().IsRegular() && k.Size == fi.Size() && k.Mtime == mtime(fi) && !isRefused(k) {
+			if err := a.root.Remove(p); err == nil {
+				a.pruneEmpty(path.Dir(p))
+			}
+		}
+		if err := a.state.forget(p); err != nil {
+			return err
+		}
+		a.log.Info("no longer shown to this machine, removed", "path", p)
+	}
+	return nil
 }
 
 // ScanAll walks the whole folder and every file the agent believes in: catches edits made while it was not running

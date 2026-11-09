@@ -11,7 +11,7 @@ export type { TLang };
 let override: TLang | null = null;
 
 /** The page's language; the development galleries may pin another one for their screenshots. */
-export const locale = (): TLang => override ?? (appConfig().locale === 'ru' ? 'ru' : 'en');
+export const locale = (): TLang => override ?? appConfig().locale;
 
 /** Only the development galleries call this, before they render. */
 export const pinLocale = (lang: TLang | null) => {

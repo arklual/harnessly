@@ -30,7 +30,6 @@
   "hooks.useSlashCommands.blockedWithNote": "/{name} недоступна в вебе: {note}",
   "hooks.useSlashCommands.blocked": "/{name} недоступна в вебе",
   "hooks.useSlashCommands.failed": "Команда не выполнилась",
-  "hooks.useHlOrganizer.machineDown": "Основная машина не отвечает — закрепы и проекты поменяются, когда она вернётся.",
   "hooks.useHlOrganizer.unreadable": "Файл проектов и закрепов на основной машине повреждён. Его не трогаем — нужна ручная проверка.",
   "hooks.useHlOrganizer.projectNotFound": "Проект уже удалён.",
   "hooks.useHlOrganizer.projectExists": "Проект с таким идентификатором уже есть. Обнови страницу.",

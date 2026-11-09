@@ -1,0 +1,22 @@
+/* ?dev=notifsettings: the settings page alone, as the app shows it. */
+.hx-nsg {
+  height: 100dvh;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+}
+.hx-nsg__set,
+.hx-nsg__page {
+  position: relative;
+  height: 100%;
+}
+.hx-nsg__set {
+  display: block;
+}
+.hx-nsg__page .hx-set__page-in {
+  margin: 0 auto;
+}
+@media (max-width: 900px) {
+  .hx-nsg__page .hx-set__page-in {
+    padding: 20px 16px 64px;
+  }
+}

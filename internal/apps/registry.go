@@ -68,7 +68,7 @@ type Registry struct {
 
 	mu sync.Mutex
 	// onTeamChange is told, without blocking, that the team's catalog or installs changed here.
-	onTeamChange func()
+	onTeamChange []func()
 	// onPublicChange is told, without blocking, that this machine put an app in the public catalog.
 	onPublicChange func()
 	// consentPolicy says whether the organization's rule gives apps their rights without asking (consent.go).
@@ -82,19 +82,20 @@ func (r *Registry) OnPublicChange(f func()) {
 	r.onPublicChange = f
 }
 
-// OnTeamChange sets what is called after the team's catalog or installs change on this machine (an owner's install
-// or uninstall, a publish to the team, a rollback of the catalog). It is not called for a snapshot applied from the
-// platform, nor for a person muting an app. The function must not block.
+// OnTeamChange adds what is called after the team's catalog or installs change on this machine (an owner's install
+// or uninstall, a publish to the team, a rollback of the catalog): the cluster's event and the hub's store
+// each have one. It is not called for a snapshot applied from the platform or the store, nor for a person muting an
+// app. The function must not block.
 func (r *Registry) OnTeamChange(f func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.onTeamChange = f
+	r.onTeamChange = append(r.onTeamChange, f)
 }
 
-// teamChanged tells the hook; r.mu is held by the caller.
+// teamChanged tells the hooks; r.mu is held by the caller.
 func (r *Registry) teamChanged() {
-	if r.onTeamChange != nil {
-		r.onTeamChange()
+	for _, f := range r.onTeamChange {
+		f()
 	}
 }
 
@@ -238,6 +239,9 @@ type InstallOptions struct {
 	Granted []string
 	// AskedIn is the chat the install was made from; "" keeps the chat an earlier install was made from.
 	AskedIn string
+	// Signed: the package's signature was checked and is a trusted publisher's (VerifyArchive). Only the paths that hold a
+	// signature set it; where the deployment requires signatures an install without it is refused unless it is Dev.
+	Signed bool
 }
 
 // Install checks the package in dir and installs it, replacing an installed version of the same app. The problems are
@@ -258,6 +262,11 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 	m := pkg.Manifest
 	if rng, err := ParseRange(m.Harnessly); err == nil && !rng.Allows(opt.HostVersion) {
 		return Installed{}, ps, fmt.Errorf("%w: %s wants harnessly %s, this is %s", ErrHostVersion, m.ID, m.Harnessly, opt.HostVersion)
+	}
+	// Where signatures are required nothing unsigned is installed here, whichever path brought it; a development install
+	// (the author's own folder) is the one exception, and the caller writes it in the journal.
+	if SignaturesRequired() && !opt.Dev && !opt.Signed {
+		return Installed{}, ps, refuseUnsigned(m.ID)
 	}
 	now := time.Now
 	if opt.Now != nil {

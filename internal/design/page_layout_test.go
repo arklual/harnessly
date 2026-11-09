@@ -40,11 +40,17 @@ func TestAPageCanStartFromALayoutOfAnInstalledKit(t *testing.T) {
 	if !strings.Contains(body, `data-layout="closing"`) {
 		t.Fatalf("the page is not the layout: %s", body)
 	}
-	if got := readFileT(t, filepath.Join(g.l.ProjectDir("admin"), "ds", "plain", "components", "bundle.js")); got != "window.Plain={}" {
-		t.Fatalf("the theme is not in the project: %q", got)
+	// The theme is not copied: the project is pinned to the kit's version and ds/plain/ is answered from it.
+	if _, err := os.Stat(filepath.Join(g.l.ProjectDir("admin"), "ds")); err == nil {
+		t.Fatal("the theme was copied into the project")
 	}
-	if _, err := os.Stat(filepath.Join(g.l.ProjectDir("admin"), "ds", "plain", "_harnessly")); err == nil {
-		t.Fatal("the kit's own files went into the project")
+	pin, ok := g.l.KitPinOf("admin")
+	if !ok || pin.ID != "acme-ds" || pin.Version != "1.0.0" || len(pin.Mounts) != 1 || pin.Mounts[0] != "plain" {
+		t.Fatalf("pin: %+v %v", pin, ok)
+	}
+	file := g.l.ResolveProjectFile("admin", []string{"ds", "plain", "components", "bundle.js"})
+	if file == "" || readFileT(t, file) != "window.Plain={}" {
+		t.Fatalf("the theme is not served from the kit: %q", file)
 	}
 	for _, bad := range []string{"acme-ds/plain/nope", "nope/plain/closing", "acme-ds/plain", "acme-ds@9.9.9/plain/closing"} {
 		if _, err := g.l.CreatePage("admin", PageSpec{Title: "x", Layout: bad}); err == nil {
@@ -63,8 +69,8 @@ func TestALayoutNeverWritesThroughALinkedDsFolder(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(g.l.ProjectDir("admin"), "ds")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := g.l.CreatePage("admin", PageSpec{Title: "Linked", Layout: "acme-ds/plain/closing"}); err == nil {
-		t.Fatal("a linked ds folder must be refused")
+	if _, err := g.l.CreatePage("admin", PageSpec{Title: "Linked", Layout: "acme-ds/plain/closing"}); err != nil {
+		t.Fatal(err)
 	}
 	if entries, _ := os.ReadDir(outside); len(entries) != 0 {
 		t.Fatalf("something was written outside the project: %v", entries)

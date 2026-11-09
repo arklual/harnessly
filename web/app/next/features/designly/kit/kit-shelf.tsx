@@ -1,12 +1,13 @@
-// The library's row of kits: every installed kit as a card with its picture; a click opens the kit screen.
-import type { IKitCard } from '@/next/features/designly/kit/kit-api';
+// The library's row of kits: a card per theme of a kit (a kit of several brands shows each with its own
+// cover), or per kit when it is one theme; a click opens the kit screen on that theme.
+import type { IKitShelfCard } from '@/next/features/designly/kit/kit-api';
 import { plural, t } from '@/next/i18n';
 
 export interface IKitShelf {
-  cards: readonly IKitCard[];
-  /** The card's picture, '' when the kit has none. */
-  cover: (card: IKitCard) => string;
-  onOpen: (id: string) => void;
+  cards: readonly IKitShelfCard[];
+  /** The card's picture, '' when it has none. */
+  cover: (card: IKitShelfCard) => string;
+  onOpen: (card: IKitShelfCard) => void;
 }
 
 const KitShelf = ({ cards, cover, onOpen }: IKitShelf) => {
@@ -18,19 +19,20 @@ const KitShelf = ({ cards, cover, onOpen }: IKitShelf) => {
         {cards.map((card) => {
           const src = cover(card);
           return (
-            <li key={card.id}>
+            <li key={card.key}>
               <button
                 type="button"
                 className="hx-kit-shelf__card"
-                aria-label={`${t('next.kit.card.open')}: ${card.title}`}
-                onClick={() => onOpen(card.id)}
+                aria-label={`${t('next.kit.card.open')}: ${card.kitTitle ? `${card.kitTitle} · ` : ''}${card.title}`}
+                onClick={() => onOpen(card)}
               >
                 <span className="hx-kit-shelf__shot">{src && <img src={src} alt="" loading="lazy" />}</span>
                 <span className="hx-kit-shelf__title">{card.title}</span>
                 <span className="hx-kit-shelf__meta">
-                  {card.layouts > 0
-                    ? plural(card.layouts, 'next.kit.panel.layouts', { n: card.layouts })
-                    : `v${card.version}`}
+                  {card.kitTitle && <span>{card.kitTitle}</span>}
+                  {card.layouts > 0 && (
+                    <span>{plural(card.layouts, 'next.kit.card.templates', { n: card.layouts })}</span>
+                  )}
                 </span>
               </button>
             </li>

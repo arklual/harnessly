@@ -123,11 +123,13 @@ func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 		// One message on its way at a time: the rest wait for it, and that is no new reason — the head keeps the one
 		// the agent's state gives it, so a queued message never swings between «agent busy» and «behind» (position 1
 		// is the head; «behind» is only for those with a message of the queue ahead of them).
+		head.settleDueTry(now)
 		b.positions(&ch, p.reason, now)
 		return nil, ch
 	case !p.typing:
 		// The agent's own state holds the head, not the box: a block by someone's text, if any, starts over.
 		head.BlockedSince = 0
+		head.settleDueTry(now)
 		b.positions(&ch, p.reason, now)
 		return nil, ch
 	case head.NextTry > ms(now):
@@ -831,6 +833,15 @@ func (r *Record) handed() *wire.MessageHanded {
 	return h
 }
 
+// settleDueTry forgets a retry's time that is due already when something else than the clock holds the head (the
+// agent's state, a message on its way): the try goes when that lets it, as a fresh message's does (NextTry 0), and Wake
+// does not name a time past over and over — the actor would turn without a pause until the agent moved.
+func (r *Record) settleDueTry(now time.Time) {
+	if r.NextTry != 0 && r.NextTry <= ms(now) {
+		r.NextTry = 0
+	}
+}
+
 // Wake is when the box next needs a look of its own: a retry's time or the end of a wait; zero when nothing waits on
 // the clock.
 func (b *Box) Wake() time.Time {
@@ -853,7 +864,11 @@ func (b *Box) Wake() time.Time {
 		}
 	}
 	if len(b.items) > 0 {
-		soon(b.recs[b.items[0]].NextTry)
+		// A stalled head waits for the person, not the clock: its last try's time would be due forever, and the actor
+		// would turn without a pause (30 000 turns a second, a CPU of the runtime, for one chat).
+		if head := b.recs[b.items[0]]; !head.Stalled {
+			soon(head.NextTry)
+		}
 	}
 	for _, r := range b.recs {
 		if (r.Message.ClientID == b.flight || r.Steered && b.flight == "") && r.Message.State.K == wire.MsgInInput &&

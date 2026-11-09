@@ -754,6 +754,7 @@ const AppFrame = ({
       )}
       {state.k === 'failed' && (
         <AppFail
+          machine={machine}
           app={app}
           failure={state.failure}
           logKey={logKey(app.id, chat)}

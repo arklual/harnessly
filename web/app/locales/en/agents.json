@@ -174,8 +174,6 @@
   "agents.conversationSidebar.listLabel": "Chats and agents",
   "agents.conversationSidebar.loadingConversations": "Loading conversations",
   "agents.conversationSidebar.loadingOrganizer": "Loading projects and pins",
-  "agents.conversationSidebar.organizerDownMain": "Pins and projects are kept on the main machine. It is not answering now: they will show up as soon as it is back.",
-  "agents.conversationSidebar.organizerDownNamed": "Pins and projects are kept on the machine “{machine}”. It is not answering now: they will show up as soon as it is back.",
   "agents.conversationSidebar.organizerStale": "Projects and pins are not updating: {error}",
   "agents.conversationSidebar.retry": "Retry",
   "agents.conversationSidebar.themeLabel": "{theme}. Switch",

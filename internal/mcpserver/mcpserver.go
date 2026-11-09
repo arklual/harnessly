@@ -39,6 +39,14 @@ type Server struct {
 	// Name is the name the server announces.
 	Name string
 	Sets []Toolset
+	// ListChanged says the server tells its clients when its tools change (notifications/tools/list_changed on the GET
+	// stream of Streamable HTTP, which the server's route keeps), so they ask tools/list again.
+	ListChanged bool
+}
+
+// ToolsListChanged is the notification a server with ListChanged sends when its tools change.
+func ToolsListChanged() []byte {
+	return jsvalue.Stringify(jsvalue.NewObject("jsonrpc", "2.0", "method", "notifications/tools/list_changed"), "")
 }
 
 func success(id, result any) *jsvalue.Object {
@@ -167,9 +175,13 @@ func (s *Server) call(ctx context.Context, id any, method string, params any) *j
 				negotiated = v
 			}
 		}
+		tools := jsvalue.NewObject()
+		if s.ListChanged {
+			tools.Set("listChanged", true)
+		}
 		return success(id, jsvalue.NewObject(
 			"protocolVersion", negotiated,
-			"capabilities", jsvalue.NewObject("tools", jsvalue.NewObject()),
+			"capabilities", jsvalue.NewObject("tools", tools),
 			"serverInfo", jsvalue.NewObject("name", s.Name, "version", serverVersion),
 			"instructions", s.instructions()))
 	case "ping":

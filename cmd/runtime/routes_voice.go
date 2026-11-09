@@ -45,8 +45,11 @@ func newVoice(dataDir string) *voice.Server {
 
 func voiceRoutes(d deps) []gate.Route {
 	dictation := newVoice(d.DataDir)
-	assets := &voice.Assets{CacheDir: filepath.Join(d.DataDir, "voice-assets"), ModelHost: "https://huggingface.co",
-		RuntimeHost: "https://cdn.jsdelivr.net", Log: voiceLog}
+	// A closed network serves the same paths from its own mirror: RUNTIME_VOICE_MODEL_HOST (the whisper model files,
+	// huggingface.co's layout) and RUNTIME_VOICE_RUNTIME_HOST (the browser engine, jsDelivr's layout).
+	assets := &voice.Assets{CacheDir: filepath.Join(d.DataDir, "voice-assets"),
+		ModelHost:   env("RUNTIME_VOICE_MODEL_HOST", "https://huggingface.co"),
+		RuntimeHost: env("RUNTIME_VOICE_RUNTIME_HOST", "https://cdn.jsdelivr.net"), Log: voiceLog}
 	return append([]gate.Route{
 		{
 			Slice: "voice",

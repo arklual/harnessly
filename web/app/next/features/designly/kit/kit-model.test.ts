@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import type { IKitCanvas } from '@/next/features/designly/kit/kit-api';
+import { shelfCards, type IIndexEntry, type IKitCanvas } from '@/next/features/designly/kit/kit-api';
 import { callOf, findNode, NODE } from '@/next/features/designly/kit/kit-node';
 import { groupResults, searchIndex } from '@/next/features/designly/kit/kit-search';
 import { pathTo, treeOf, visibleRows } from '@/next/features/designly/kit/kit-tree';
@@ -27,6 +29,7 @@ const canvas: IKitCanvas = {
     { id: 'foundation', title: '' },
     { id: 'components', title: '' },
     { id: 'templates', title: '' },
+    { id: 'reference', title: '' },
     { id: 'assets', title: '' },
   ],
   modes: null,
@@ -46,6 +49,7 @@ const canvas: IKitCanvas = {
           props: [{ name: 'text', type: 'string', required: true }],
           variants: [],
           sample: { text: 'New' },
+          cell: -1,
         },
       ],
     },
@@ -96,6 +100,22 @@ const canvas: IKitCanvas = {
         },
       ],
     },
+    {
+      id: 'guide',
+      node: 'template:guide',
+      section: 'reference',
+      title: 'How to use',
+      kind: 'slides',
+      aspect: [16, 9],
+      sections: [
+        {
+          id: 'how',
+          node: 'tsection:guide/how',
+          title: 'How',
+          layouts: [{ id: 'how1', node: 'layout:guide/how1', name: 'Guides', slots: [], cell: -1 }],
+        },
+      ],
+    },
   ],
   index: [
     { node: 'component:Badge', kind: 'component', title: 'Badge', path: 'Basics', words: 'badge label' },
@@ -116,6 +136,7 @@ const titles = {
   components: 'Components',
   templates: 'Templates',
   assets: 'Assets',
+  reference: 'Guide',
   colors: 'Colours',
   type: 'Typography',
   tokens: 'Tokens',
@@ -146,6 +167,39 @@ describe('the kit canvas model', () => {
     expect(viewOfNode('layout:deck/list')).toEqual({ kind: VIEW.template, id: 'deck' });
     const deck = buildWorld(canvas, { kind: VIEW.template, id: 'deck' }, titles, null);
     expect(rectOf(deck, 'layout:deck/list')).not.toBeNull();
+  });
+
+  it("keeps a template's guide in its own section, apart from the templates", () => {
+    const tree = treeOf(canvas, titles);
+    const templates = tree.find((n) => n.node === 'section:templates');
+    const guide = tree.find((n) => n.node === 'section:reference');
+    expect(templates?.children?.map((c) => c.node)).toEqual(['template:deck']);
+    expect(guide?.children?.map((c) => c.node)).toEqual(['template:guide']);
+    const main = buildWorld(canvas, MAIN_VIEW, titles, null);
+    expect(rectOf(main, 'template:guide')).not.toBeNull();
+  });
+
+  it('shows a kit of several themes on the shelf as a card per theme', () => {
+    const base = { id: 'acme-cards', title: 'Acme Cards', version: '1.2.0', versions: ['1.2.0'], themes: [] };
+    const one = shelfCards([{ ...base, cover: 'sun/c.jpg', coverTheme: 'sun', layouts: 3, assets: 2 }]);
+    expect(one.map((c) => [c.title, c.theme])).toEqual([['Acme Cards', null]]);
+    const many = shelfCards([
+      {
+        ...base,
+        cover: '',
+        coverTheme: 'sun',
+        layouts: 5,
+        assets: 0,
+        themeCards: [
+          { id: 'sun', title: 'Sun', cover: 'sun/c.jpg', layouts: 3 },
+          { id: 'moon', title: 'Moon', cover: 'moon/c.jpg', layouts: 2 },
+        ],
+      },
+    ]);
+    expect(many.map((c) => [c.title, c.theme, c.kitTitle, c.layouts])).toEqual([
+      ['Sun', 'sun', 'Acme Cards', 3],
+      ['Moon', 'moon', 'Acme Cards', 2],
+    ]);
   });
 
   it('builds a tree that opens down to a picked node', () => {
@@ -179,4 +233,21 @@ describe('the kit search groups', () => {
     const groups = groupResults(searchIndex(canvas.index ?? [], 'star'));
     expect(groups[0]?.kind).toBe('asset');
   });
+});
+
+// The same cases the agent's search runs (internal/designkit/index_test.go): the two searches never drift apart.
+describe('kit search cases shared with the runtime', () => {
+  const raw = readFileSync(
+    fileURLToPath(
+      new URL('../../../../../../internal/designkit/testdata/search-cases.json', import.meta.url),
+    ),
+    'utf8',
+  );
+  const file = JSON.parse(raw) as { index: IIndexEntry[]; cases: { q: string; want: string[] }[] };
+  for (const c of file.cases)
+    it(`finds «${c.q}»`, () => {
+      const got = searchIndex(file.index, c.q, 0).map((e) => e.node);
+      if (c.want.length === 0) expect(got).toEqual([]);
+      else expect(got.slice(0, c.want.length)).toEqual(c.want);
+    });
 });

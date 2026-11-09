@@ -143,6 +143,10 @@ func (r *Registry) InstallForEnv(dir string, opt EnvInstallOptions) (EnvInstall,
 	if rng, err := ParseRange(m.Harnessly); err == nil && !rng.Allows(opt.HostVersion) {
 		return EnvInstall{}, false, fmt.Errorf("%w: %s wants harnessly %s, this is %s", ErrHostVersion, m.ID, m.Harnessly, opt.HostVersion)
 	}
+	if SignaturesRequired() {
+		// An environment item is a folder of the hub's list and carries no signature.
+		return EnvInstall{}, false, refuseUnsigned(m.ID)
+	}
 	sum, err := dirSum(pkg.Dir)
 	if err != nil {
 		return EnvInstall{}, false, err

@@ -13,6 +13,8 @@ describe('parseBeta', () => {
       retitle: true,
       multiModel: false,
       hubFirst: false,
+      chatNav: false,
+      chatShare: false,
     });
   });
 });

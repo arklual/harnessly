@@ -6,6 +6,7 @@ import AppsSection from '@/next/features/settings/apps-section';
 import BetaSection from '@/next/features/settings/beta-section';
 import GeneralSection from '@/next/features/settings/general-section';
 import UpdateGroup from '@/next/features/settings/update-group';
+import MachineMoveCard from '@/next/bindings/machine-move-card';
 import ChecksGroup from '@/next/features/settings/checks-group';
 import BaseSkipped from '@/next/features/settings/base-skipped';
 import { askBaseSkip, loadBase, type IBaseItem } from '@/next/features/setup/api';
@@ -32,6 +33,7 @@ import {
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { bootNext, shutdownNext } from '@/next/boot';
 import { appConfig, saveLanguage, type TLanguage } from '@/platform/config';
+import { offeredLanguages } from '@/platform/languages';
 import { hasFeature, useMachines } from '@/next/stores/machines';
 import { useDeadline } from '@/next/ui/use-deadline';
 import {
@@ -278,6 +280,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
       }
       feedKinds={feedKinds}
       language={locale()}
+      languages={offeredLanguages(appConfig().features.languages)}
       onLanguage={changeLanguage}
       account={{ name, hint, canSignOut: password || hubUrl !== null }}
       idleStop={runtime.value?.idleStop ?? null}
@@ -364,6 +367,7 @@ export const MachinesPage = ({ now, pending }: IMachinesPageProps) => {
         failed={failed}
         busy={new Set(waiting.keys())}
         onMakeMain={(id) => void run(id, t('next.settings.failed'), () => savePerson({ defaultMachine: id }))}
+        below={(row) => <MachineMoveCard machine={row.id} name={row.name} online={row.online} />}
       />
       {(rows ?? []).map((row) => (
         <ObjectActions

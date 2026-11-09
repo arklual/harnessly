@@ -130,6 +130,10 @@ func (c *Client) GetBlob(ctx context.Context, sha string, w io.Writer) error {
 	return err
 }
 
+// ErrRefused is a write the store does not take from this machine: the path is in a project none of the machine's
+// people may edit.
+var ErrRefused = errors.New("the store refuses this machine's write")
+
 // Commit asks for a new revision; a stale base answers Conflict with the current revision.
 func (c *Client) Commit(ctx context.Context, req filestore.CommitRequest) (filestore.CommitResponse, error) {
 	var out filestore.CommitResponse
@@ -139,6 +143,9 @@ func (c *Client) Commit(ctx context.Context, req filestore.CommitRequest) (files
 		return out, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusForbidden {
+		return out, fmt.Errorf("%w: %s", ErrRefused, req.Path)
+	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
 		return out, failure(resp)
 	}
@@ -208,4 +215,71 @@ func (c *Client) Put(ctx context.Context, path string, data []byte, author strin
 		base = resp.Entry.Rev
 	}
 	return filestore.Entry{}, fmt.Errorf("store: %s keeps changing under the write", path)
+}
+
+// History is the revisions of a path, newest first; empty when the path never existed or is not this machine's to see.
+func (c *Client) History(ctx context.Context, path string) ([]filestore.Entry, error) {
+	resp, err := c.do(ctx, http.MethodGet, "/history?"+url.Values{"path": {path}}.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return []filestore.Entry{}, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, failure(resp)
+	}
+	var out []filestore.Entry
+	return out, json.NewDecoder(resp.Body).Decode(&out)
+}
+
+// HistoryUnder is the newest revisions of the paths under a folder (prefix ends in "/"; "" for the whole collection).
+func (c *Client) HistoryUnder(ctx context.Context, prefix string, limit int) ([]filestore.Entry, error) {
+	q := url.Values{"prefix": {prefix}, "limit": {strconv.Itoa(limit)}}
+	resp, err := c.do(ctx, http.MethodGet, "/history?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, failure(resp)
+	}
+	var out []filestore.Entry
+	return out, json.NewDecoder(resp.Body).Decode(&out)
+}
+
+// Snapshot is a folder (prefix ends in "/") as it was at a revision.
+func (c *Client) Snapshot(ctx context.Context, prefix string, at int64) (filestore.Snapshot, error) {
+	var out filestore.Snapshot
+	q := url.Values{"prefix": {prefix}, "at": {strconv.FormatInt(at, 10)}}
+	resp, err := c.do(ctx, http.MethodGet, "/snapshot?"+q.Encode(), nil)
+	if err != nil {
+		return out, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return out, failure(resp)
+	}
+	return out, json.NewDecoder(resp.Body).Decode(&out)
+}
+
+// TakeLease takes the lease on req.Key for this machine's req.Chat, or refreshes it; Held says someone else's live
+// lease is there (then Lease is theirs).
+func (c *Client) TakeLease(ctx context.Context, req filestore.LeaseRequest) (filestore.LeaseResponse, error) {
+	var out filestore.LeaseResponse
+	body, _ := json.Marshal(req)
+	resp, err := c.do(ctx, http.MethodPost, "/leases", body)
+	if err != nil {
+		return out, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
+		return out, failure(resp)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return out, err
+	}
+	out.Held = out.Held || resp.StatusCode == http.StatusConflict
+	return out, nil
 }

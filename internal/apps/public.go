@@ -203,13 +203,14 @@ func (r *Registry) PublishPublic(id, version, by string, now time.Time) (PublicE
 	if failed := publishChecks(pkg, ps); len(failed) > 0 {
 		return PublicEntry{}, fmt.Errorf("%w: %s", ErrPublishChecks, strings.Join(failed, "; "))
 	}
-	raw, sum, err := Pack(pkg.Dir)
+	raw, sum, err := r.publishedArchive(id, version, pkg.Dir)
 	if err != nil {
 		return PublicEntry{}, err
 	}
 	if err := writeFileAtomic(r.publicArchive(id, version), raw); err != nil {
 		return PublicEntry{}, err
 	}
+	keepSig(r.publicArchive(id, version), raw, r.versionSig(id, version))
 	m := pkg.Manifest
 	e := PublicEntry{CatalogEntry: CatalogEntry{
 		ID: id, Channel: string(ChannelStable), Version: version, Name: m.Name, Description: m.Description, Trust: m.Trust,
@@ -368,7 +369,12 @@ func (r *Registry) InstallFromPublic(id string, opt PublicInstallOptions) (Insta
 		}
 	}
 	defer os.RemoveAll(work)
-	pkg, err := unpackArchive(raw, id, e.Version, e.Sum, opt.HostVersion, filepath.Join(work, "pkg"))
+	// The signature is checked whatever the host version says (an empty one skips only the host's range check).
+	verified, err := VerifyArchive(raw, sigOf(r.publicArchive(id, e.Version)), currentNetwork())
+	if err != nil {
+		return Installed{}, nil, fmt.Errorf("%s %s: %w", id, e.Version, err)
+	}
+	pkg, err := unpackArchive(raw, id, e.Version, e.Sum, opt.HostVersion, filepath.Join(work, "pkg"), sigOf(r.publicArchive(id, e.Version)))
 	if errors.Is(err, ErrTrustedTeam) {
 		return Installed{}, nil, ErrTrustedPublic
 	}
@@ -379,7 +385,7 @@ func (r *Registry) InstallFromPublic(id string, opt PublicInstallOptions) (Insta
 	if pkg.Manifest.Trust != e.Trust || !sameSet(pkg.Manifest.Permissions, e.Permissions) {
 		return Installed{}, nil, fmt.Errorf("%w: %s asks for other rights than were shown", ErrPublicChanged, id)
 	}
-	return r.Install(pkg.Dir, InstallOptions{HostVersion: opt.HostVersion, Source: r.publicPackageDir(id, e.Version), Consent: opt.Consent, Granted: opt.Granted})
+	return r.Install(pkg.Dir, InstallOptions{HostVersion: opt.HostVersion, Source: r.publicPackageDir(id, e.Version), Consent: opt.Consent, Granted: opt.Granted, Signed: verified.Signed})
 }
 
 // PublicSnapshot is what the platform sends a machine: the reviewed list with the archives, or what a machine sends the
@@ -393,6 +399,8 @@ type PublicSnapshot struct {
 type PublicSnapshotEntry struct {
 	PublicEntry
 	Archive []byte `json:"archive,omitempty"`
+	// Signature is the publisher's signature of the archive, when it has one.
+	Signature *Signature `json:"signature,omitempty"`
 }
 
 // Snapshot is this machine's public entries with their archives, for the platform to review and send on.
@@ -409,7 +417,7 @@ func (r *Registry) PublicSnapshot() (PublicSnapshot, error) {
 		if err != nil {
 			return PublicSnapshot{}, err
 		}
-		out.Entries = append(out.Entries, PublicSnapshotEntry{PublicEntry: e, Archive: raw})
+		out.Entries = append(out.Entries, PublicSnapshotEntry{PublicEntry: e, Archive: raw, Signature: sigOf(r.publicArchive(e.ID, e.Version))})
 	}
 	return out, nil
 }
@@ -475,7 +483,7 @@ func (r *Registry) ApplyPublic(s PublicSnapshot, host string, now time.Time) ([]
 		// The archive is judged by what is in it, not by what the entry says it is: the manifest decides the tier.
 		// Every field the person is shown comes from the verified archive, never from the snapshot's entry. The host is not
 		// asked here: an entry this host cannot run is still listed, and the install says so.
-		pkg, err := unpackArchive(raw, e.ID, e.Version, e.Sum, "", r.publicPackageDir(e.ID, e.Version))
+		pkg, err := unpackArchive(raw, e.ID, e.Version, e.Sum, "", r.publicPackageDir(e.ID, e.Version), nil)
 		if err != nil {
 			fail("%v", err)
 			continue
@@ -485,6 +493,9 @@ func (r *Registry) ApplyPublic(s PublicSnapshot, host string, now time.Time) ([]
 		if err := writeFileAtomic(r.publicArchive(e.ID, e.Version), raw); err != nil {
 			fail("%v", err)
 			continue
+		}
+		if se.Archive != nil {
+			keepSig(r.publicArchive(e.ID, e.Version), raw, se.Signature)
 		}
 		next.Entries = append(next.Entries, e)
 	}

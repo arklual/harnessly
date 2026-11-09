@@ -32,6 +32,26 @@ var (
 type Access struct {
 	Member string
 	Room   string
+	// Sees, when set, is which paths of the room the caller may read: the others are left out of its changes and
+	// answer 404 (a machine gets only the design projects its people have a role in). Nil: the whole room.
+	Sees func(path string) bool
+	// Writes, when set, is which paths the caller may change; a commit outside them is 403. Nil: whatever it sees.
+	Writes func(path string) bool
+	// Scope names what Sees lets through and changes whenever that does, so the caller knows to read the room again.
+	Scope string
+	// Committed, when set, hears every revision the caller's commit made, before the answer goes back.
+	Committed func(ctx context.Context, e Entry)
+	// Admits, when set, judges a commit whole (its path and size) after Writes; an error refuses it with 403.
+	Admits func(req CommitRequest) error
+}
+
+func (a Access) sees(p string) bool { return a.Sees == nil || a.Sees(p) }
+
+func (a Access) writes(p string) bool {
+	if a.Writes != nil {
+		return a.Writes(p)
+	}
+	return a.sees(p)
 }
 
 // Authorizer decides who a request comes from and which room the collection it names is for that caller. It returns
@@ -110,6 +130,7 @@ type caller struct {
 	member string
 	room   string
 	store  *Store
+	acc    Access
 }
 
 // Handler routes the API: /v1/collections/{collection}/… for every collection kind.
@@ -126,6 +147,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+prefix+"/changes", s.room(s.changes))
 	mux.HandleFunc("GET "+prefix+"/current", s.room(s.current))
 	mux.HandleFunc("GET "+prefix+"/history", s.room(s.history))
+	mux.HandleFunc("GET "+prefix+"/snapshot", s.room(s.snapshot))
 	mux.HandleFunc("GET "+prefix+"/leases", s.room(s.leases))
 	mux.HandleFunc("POST "+prefix+"/leases", s.room(s.leaseTake))
 	mux.HandleFunc("POST "+prefix+"/leases/release", s.room(s.leaseRelease))
@@ -169,7 +191,7 @@ func (s *Server) room(h func(http.ResponseWriter, *http.Request, caller)) http.H
 			http.Error(w, "cannot open the collection", http.StatusInternalServerError)
 			return
 		}
-		h(w, r, caller{member: acc.Member, room: acc.Room, store: st})
+		h(w, r, caller{member: acc.Member, room: acc.Room, store: st, acc: acc})
 	}
 }
 
@@ -238,6 +260,16 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request, c caller) {
 		http.Error(w, "bad json", http.StatusBadRequest)
 		return
 	}
+	if !c.acc.writes(req.Path) {
+		http.Error(w, "this caller may not change "+req.Path, http.StatusForbidden)
+		return
+	}
+	if c.acc.Admits != nil {
+		if err := c.acc.Admits(req); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+	}
 	e, conflict, err := c.store.Commit(r.Context(), req, c.member)
 	switch {
 	case errors.Is(err, ErrBadRequest):
@@ -253,6 +285,9 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request, c caller) {
 	default:
 		if e.Rev > req.Base {
 			slog.Debug("store commit", "room", c.room, "path", e.Path, "rev", e.Rev, "deleted", e.Deleted, "member", c.member)
+			if c.acc.Committed != nil {
+				c.acc.Committed(r.Context(), *e)
+			}
 		}
 		writeJSON(w, http.StatusOK, CommitResponse{Entry: e})
 	}
@@ -276,14 +311,16 @@ func (s *Server) changes(w http.ResponseWriter, r *http.Request, c caller) {
 			http.Error(w, "cannot read", http.StatusInternalServerError)
 			return
 		}
-		if len(out.Entries) > 0 || wait == 0 || out.Rev < since {
+		seen := len(out.Entries) > 0
+		out = c.acc.filter(out)
+		if seen || wait == 0 || out.Rev < since {
 			writeJSON(w, http.StatusOK, out)
 			return
 		}
 		select {
 		case <-wake:
 		case <-deadline.C:
-			writeJSON(w, http.StatusOK, out)
+			writeJSON(w, http.StatusOK, c.acc.filter(out))
 			return
 		case <-r.Context().Done():
 			return
@@ -291,11 +328,31 @@ func (s *Server) changes(w http.ResponseWriter, r *http.Request, c caller) {
 	}
 }
 
+// filter leaves out of changes what the caller does not see; the cursor still moves past it.
+func (a Access) filter(out Changes) Changes {
+	out.Scope = a.Scope
+	if a.Sees == nil {
+		return out
+	}
+	kept := out.Entries[:0:0]
+	for _, e := range out.Entries {
+		if a.Sees(e.Path) {
+			kept = append(kept, e)
+		}
+	}
+	out.Entries = kept
+	return out
+}
+
 // current is the latest revision of one path: 404 when the path never existed.
 func (s *Server) current(w http.ResponseWriter, r *http.Request, c caller) {
 	p := r.URL.Query().Get("path")
 	if !c.store.policy.Synced(p) {
 		http.Error(w, "bad path", http.StatusBadRequest)
+		return
+	}
+	if !c.acc.sees(p) {
+		http.NotFound(w, r)
 		return
 	}
 	e, err := c.store.Current(r.Context(), p)
@@ -311,9 +368,17 @@ func (s *Server) current(w http.ResponseWriter, r *http.Request, c caller) {
 }
 
 func (s *Server) history(w http.ResponseWriter, r *http.Request, c caller) {
+	if q := r.URL.Query(); q.Has("prefix") {
+		s.historyUnder(w, r, c, q.Get("prefix"))
+		return
+	}
 	p := r.URL.Query().Get("path")
 	if !c.store.policy.Synced(p) {
 		http.Error(w, "bad path", http.StatusBadRequest)
+		return
+	}
+	if !c.acc.sees(p) {
+		http.NotFound(w, r)
 		return
 	}
 	out, err := c.store.History(r.Context(), p, 200)
@@ -321,6 +386,55 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request, c caller) {
 		http.Error(w, "cannot read", http.StatusInternalServerError)
 		return
 	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// historyUnder is ?prefix=<folder>/ (or "" for the room): the newest revisions of the paths under it, up to ?limit.
+func (s *Server) historyUnder(w http.ResponseWriter, r *http.Request, c caller, prefix string) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	out, err := c.store.HistoryUnder(r.Context(), prefix, limit)
+	if errors.Is(err, ErrBadRequest) {
+		http.Error(w, "prefix must be a folder ending in /", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, "cannot read", http.StatusInternalServerError)
+		return
+	}
+	kept := out[:0:0]
+	for _, e := range out {
+		if c.acc.sees(e.Path) {
+			kept = append(kept, e)
+		}
+	}
+	writeJSON(w, http.StatusOK, kept)
+}
+
+// snapshot is a folder as it was at a revision (?prefix=<folder>/&at=<rev>): what a design's history shows and what
+// a link pinned to a version serves.
+func (s *Server) snapshot(w http.ResponseWriter, r *http.Request, c caller) {
+	prefix := r.URL.Query().Get("prefix")
+	at, _ := strconv.ParseInt(r.URL.Query().Get("at"), 10, 64)
+	out, err := c.store.Snapshot(r.Context(), prefix, at)
+	if errors.Is(err, ErrBadRequest) {
+		http.Error(w, "prefix (a folder ending in /) and at are required", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		slog.Error("snapshot", "prefix", prefix, "err", err)
+		http.Error(w, "cannot read", http.StatusInternalServerError)
+		return
+	}
+	kept := out.Entries[:0:0]
+	for _, e := range out.Entries {
+		if c.acc.sees(e.Path) {
+			kept = append(kept, e)
+		}
+	}
+	out.Entries = kept
 	writeJSON(w, http.StatusOK, out)
 }
 

@@ -216,7 +216,7 @@ func WriteSidebar(ctx context.Context, db *store.DB, userID string, baseRev int6
 	return baseRev + 1, nil
 }
 
-// The shape of a sidebar document, as the gateway checks it (its sidebar data module): the projects of the
+// The shape of a sidebar document, as the gateway checks it: the projects of the
 // profile with the machine projects each stands for, the favorites' layout by chat id, the machines already merged in.
 type sidebarDoc struct {
 	Projects []struct {

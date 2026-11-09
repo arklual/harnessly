@@ -275,11 +275,14 @@ func (c *cli) hook(args []string) error {
 	if len(args) == 3 && args[0] == "app-context" && args[1] == "--policy" {
 		return c.appContext(args[2])
 	}
+	if len(args) == 2 && args[0] == "app-context" && args[1] == "--live" {
+		return c.appContextLive()
+	}
 	if len(args) == 5 && args[0] == "app-validate" && args[1] == "--policy" && args[3] == "--event" {
 		return c.appValidateHook(args[2], args[4])
 	}
 	if len(args) != 1 || (args[0] != "design-guard" && args[0] != "design-release") {
-		return usageErr("hook design-guard|design-release|app-guard --policy <file> [--agent codex]|app-context --policy <file>|app-validate --policy <file> --event PostToolUse|Stop")
+		return usageErr("hook design-guard|design-release|app-guard --policy <file> [--agent codex]|app-context --policy <file>|app-context --live|app-validate --policy <file> --event PostToolUse|Stop")
 	}
 	if args[0] == "design-release" {
 		c.releaseLeases()

@@ -36,7 +36,7 @@ type check struct {
 
 // runDoctor is `hub doctor`: it reads the configuration like the hub does and asks what the hub depends on whether it is
 // well: the database and its migrations, the S3 bucket of the sites, the OpenID providers, the public address, the proxy
-// in front of the hub, the clock, and the extension adapters (docs/hub/extensions.md). Every warning and failure carries a
+// in front of the hub, the clock, the machines' move of their data into the store (docs/migrations), and the extension adapters (docs/hub/extensions.md). Every warning and failure carries a
 // code, what to do and a link into docs/hub/doctor.md. `--offline` skips what needs the public address to answer.
 //
 // It exits 0 when nothing failed (warnings do not fail it), 1 when a check failed, 2 when the configuration cannot be read.
@@ -67,6 +67,11 @@ func runDoctor(ctx context.Context, args []string, lookup func(string) (string, 
 	for _, c := range checks {
 		printCheck(stdout, c)
 		failed = failed || c.verdict == vFail
+	}
+	move := checkMove(ctx, cfg)
+	printCheck(stdout, move.check)
+	for _, l := range move.lines {
+		fmt.Fprintf(stdout, "               %s\n", l)
 	}
 
 	code, extFailed, err := doctorExtensions(ctx, cfg, stdout)

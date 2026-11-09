@@ -13,7 +13,16 @@ import '@/next/styles/header.css';
 import '@/next/styles/tabs.css';
 
 import { createPortal } from 'react-dom';
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from 'react';
 import { appConfig } from '@/platform/config';
 import { useTheme } from '@/platform/theme';
 import { useAgentTerminal } from '@/next/bindings/agent-terminal';
@@ -39,16 +48,15 @@ import type { IHeaderGoal } from '@/next/features/header/goal-dialog';
 import { settled } from '@/next/bindings/outcome';
 import { BackgroundButton, TerminalButton } from '@/next/features/header/header-buttons';
 import { ChatTerminalContext, ChatTerminalSlotContext } from '@/next/features/terminal/chat-terminal';
-import { notificationsFromChats } from '@/next/features/notifications/from-chats';
-import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
-import { notificationsFromHistory } from '@/next/features/notifications/from-history';
 import NotificationCenter from '@/next/features/notifications/notification-center';
+import { readOpened, useNotificationCenter } from '@/next/bindings/notification-center';
 import { BrowserProfileAskHost } from '@/next/bindings/browser-profile-asks';
 import { BrowserLoginAskHost } from '@/next/bindings/browser-login-asks';
 import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { useNotices } from '@/next/bindings/notices';
+import { useTurnSummaries } from '@/next/bindings/turn-summary';
 import SmartNoticeHost from '@/next/bindings/smart-notice';
-import { setHistoryPerson, useHistory } from '@/next/stores/notice-history';
+import { setHistoryPerson } from '@/next/stores/notice-history';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
 import { useInstalledApps } from '@/next/features/app-views/api';
@@ -86,6 +94,7 @@ import { usePhone } from '@/next/ui/use-media';
 import Sidebar from '@/next/features/sidebar/sidebar';
 import { useSidebarApps } from '@/next/bindings/use-sidebar-apps';
 import AppMainPage from '@/next/bindings/app-main';
+import AppAboutPage from '@/next/bindings/app-page';
 import AppDocPage from '@/next/bindings/app-doc';
 import AppsListPage from '@/next/bindings/apps-list';
 import HelpPage from '@/next/bindings/help';
@@ -165,6 +174,7 @@ const useLeaving = (value: string | null, ms: number): string | null => {
 };
 /** Longer than the search dialog's slowest exit (styles/shell.css: the scrim 180 ms, the box 160 ms). */
 const SEARCH_EXIT_MS = 260;
+const ChatNavigator = lazy(() => import('@/next/bindings/chat-navigator'));
 const loadSearchDialog = () => import('@/next/features/search/search-dialog');
 
 /** A chat named by the address that the list does not have yet (a tab started a second ago) is waited for this long. */
@@ -462,6 +472,7 @@ const Shell = ({ owner }: IShellProps) => {
     () => (model.chats === null ? null : withoutTestChats(model.chats, showTests, currentId)),
     [model.chats, showTests, currentId],
   );
+  const [navigatorOpen, setNavigatorOpen] = useState(false);
   const keysHelp = useShellKeys({
     chats: shownChats,
     currentId,
@@ -469,6 +480,7 @@ const Shell = ({ owner }: IShellProps) => {
     openChat,
     toggleSearch: () => setSearchOpen((current) => !current),
     toggleRail,
+    toggleNavigator: () => setNavigatorOpen((current) => !current && currentId !== null),
   });
 
   // The chat in sight, the open one or the one beside an app's page: its replies are no news.
@@ -477,8 +489,8 @@ const Shell = ({ owner }: IShellProps) => {
     currentId: besideId ?? currentId,
     onOpenChat: openChat,
   });
+  useTurnSummaries();
   setHistoryPerson(owner || 'local');
-  const history = useHistory();
 
   const chat = useMemo(
     () => (currentId === null ? null : (model.chats?.find((item) => item.id === currentId) ?? null)),
@@ -488,16 +500,16 @@ const Shell = ({ owner }: IShellProps) => {
     () => (chat?.parentId ? (model.chats?.find((item) => item.id === chat.parentId) ?? null) : null),
     [chat, model.chats],
   );
-  const notificationItems = useMemo(() => {
-    const fromChats = notificationsFromChats(model.chats);
-    return (
-      fromChats && [
-        ...notificationsFromMachines(model.machineNotices),
-        ...fromChats,
-        ...notificationsFromHistory(history),
-      ]
-    );
-  }, [model.chats, model.machineNotices, history]);
+  const center = useNotificationCenter({
+    person: owner || 'local',
+    chats: model.chats,
+    machineNotices: model.machineNotices,
+    onOpenChat: (id) => {
+      setNotifications(null);
+      openChat(id);
+    },
+  });
+  const notificationItems = center.items;
   const [machineReveal, setMachineReveal] = useState(0);
   const unread = notificationItems?.some((item) => item.unread) ?? false;
   const messages = useMessageSearch(model.active, query, searchOpen);
@@ -850,12 +862,22 @@ const Shell = ({ owner }: IShellProps) => {
         failed={listFailed}
         now={now}
         onClose={() => setNotifications(null)}
+        onRead={center.onRead}
+        onRemove={center.onRemove}
+        onReadAll={center.onReadAll}
+        renderWait={center.renderWait}
         onOpenItem={(item) => {
+          readOpened(item);
           setNotifications(null);
           if (item.chatId) openChat(item.chatId);
           else setMachineReveal((n) => n + 1);
         }}
       />
+      {navigatorOpen && currentId && isConvId(currentId) && (
+        <Suspense fallback={null}>
+          <ChatNavigator open conv={currentId} onClose={() => setNavigatorOpen(false)} />
+        </Suspense>
+      )}
       {search.mounted && (
         <LazyView
           load={loadSearchDialog}
@@ -958,6 +980,9 @@ const Shell = ({ owner }: IShellProps) => {
         }
       : null;
 
+  const { chatShare } = useBeta();
+  const headerShare = chatShare && record ? { machine: record.machineId, tabId: record.id } : null;
+
   const headerMachine = {
     card: model.machine,
     // Every other machine of the person, also where the chats of all machines are one list: the header's
@@ -990,6 +1015,7 @@ const Shell = ({ owner }: IShellProps) => {
         route.kind !== ROUTE.help &&
         route.kind !== ROUTE.learn &&
         route.kind !== ROUTE.app &&
+        route.kind !== ROUTE.appAbout &&
         route.kind !== ROUTE.appDoc &&
         route.kind !== ROUTE.kit &&
         route.kind !== ROUTE.settings && (
@@ -1005,6 +1031,7 @@ const Shell = ({ owner }: IShellProps) => {
             terminal={term.header}
             background={bg.header}
             goal={headerGoal}
+            share={headerShare}
             parent={
               parentChat
                 ? { title: parentChat.title, onOpen: () => navigate({ kind: ROUTE.chat, id: parentChat.id }) }
@@ -1115,6 +1142,14 @@ const Shell = ({ owner }: IShellProps) => {
         />
       )}
       {route.kind === ROUTE.learn && <LearnPage onOpenDrawer={() => setDrawerOpen(true)} />}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.appAbout && model.active && (
+        <AppAboutPage
+          key={`${model.active}/${route.id}`}
+          machine={model.active}
+          id={route.id}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
+      )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
         <AppMainPage
           key={`${route.id}/${route.chat ?? ''}/${tabs.activeId}`}

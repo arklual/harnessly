@@ -152,6 +152,8 @@ export interface IDeckViewProps {
   kit?: ReactNode;
   /** The kit's nodes on the deck's slides: «Из кита», «Открыть в ките», «Показать макет» over the slide on screen. */
   kitLink?: IKitLink | null;
+  /** «Править в ките» on a slide's kit node; absent when the kit is not edited from here. */
+  onEditInKit?: (node: string) => void;
   /** The deck is looked at, as a guest of its link sees it (the `link` screen), until the editing is asked for. */
   viewing?: boolean;
   /** A board's error card sends its error to the design's chat (switching to editing); absent: it only copies. */
@@ -1006,6 +1008,7 @@ const DeckView = (props: IDeckViewProps) => {
                     path,
                   )
                 }
+                {...(props.onEditInKit ? { onEdit: props.onEditInKit } : {})}
                 onOpen={(node) => {
                   const link = props.kitLink;
                   if (!link) return;

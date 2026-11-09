@@ -21,17 +21,21 @@ import (
 	"time"
 )
 
-const prepSchema = 1
+const prepSchema = 2
 
 // The atlases' cells: icons are small squares, other pictures larger ones, a template's layouts keep its aspect.
 const (
-	iconCell     = 48
-	imageCell    = 192
-	layoutCellW  = 192
-	iconCols     = 32
-	imageCols    = 8
-	layoutCols   = 12
-	maxSourceLen = 24 << 20
+	iconCell    = 48
+	imageCell   = 192
+	layoutCellW = 192
+	iconCols    = 32
+	imageCols   = 8
+	layoutCols  = 12
+	// A component's picture keeps the canvas tile's aspect (560×340 in kit-world.ts) at half its size.
+	componentCellW = 280
+	componentCellH = 170
+	componentCols  = 12
+	maxSourceLen   = 24 << 20
 )
 
 type prepAtlas struct {
@@ -44,6 +48,8 @@ type prepIndex struct {
 	At        int64                `json:"at"`
 	Assets    map[string]prepAtlas `json:"assets"`
 	Templates map[string]prepAtlas `json:"templates"`
+	// Components holds an atlas per component group, by the group's id.
+	Components map[string]prepAtlas `json:"components,omitempty"`
 }
 
 var prepLocks sync.Map
@@ -54,7 +60,7 @@ func prepDir(dir, id, version, theme string) string {
 
 // PreparedFile is a prepared file of a version's theme as a real path, or "" when there is none by that name.
 func PreparedFile(dir, id, version, theme, name string) string {
-	if !ValidID(id) || !ValidVersion(version) || !ValidID(theme) || name == "" || strings.ContainsAny(name, "/\\\x00") ||
+	if !ValidID(id) || !validRef(version) || !ValidID(theme) || name == "" || strings.ContainsAny(name, "/\\\x00") ||
 		strings.HasPrefix(name, ".") {
 		return ""
 	}
@@ -69,10 +75,21 @@ func PreparedFile(dir, id, version, theme, name string) string {
 // into the canvas: each asset group's and template's Atlas, each item's Cell.
 func Prepare(dir string, c *Canvas) error {
 	key := c.Kit + "@" + c.Version + "/" + c.Theme
+	out := prepDir(dir, c.Kit, c.Version, c.Theme)
+	// The draft changes under the screen: once a file of it is newer than its atlases they are made again behind the
+	// screen, which meanwhile gets the ones there are (making them takes long for a large kit).
+	if c.Version == DraftVersion {
+		if idx, err := readPrep(out); err == nil {
+			if newestUnder(themeRoot(dir, c), idx.At) {
+				remakeLater(dir, c.Kit, c.Theme, key, out)
+			}
+			applyPrep(c, idx)
+			return nil
+		}
+	}
 	mu, _ := prepLocks.LoadOrStore(key, &sync.Mutex{})
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
-	out := prepDir(dir, c.Kit, c.Version, c.Theme)
 	idx, err := readPrep(out)
 	if err != nil {
 		if idx, err = makePrep(dir, c, out); err != nil {
@@ -81,6 +98,101 @@ func Prepare(dir string, c *Canvas) error {
 	}
 	applyPrep(c, idx)
 	return nil
+}
+
+// themeRoot is the folder of the canvas's theme, "" when the version is not there: its atlases are of its files only.
+func themeRoot(dir string, c *Canvas) string {
+	root := Resolve(dir, c.Kit, c.Version, nil)
+	if root == "" || c.Base == "" {
+		return root
+	}
+	return filepath.Join(root, filepath.FromSlash(c.Base))
+}
+
+// remaking: the draft's atlases being made again, by key; one at a time for each.
+var remaking sync.Map
+
+// remakeLater makes the draft theme's atlases again in the background, unless that is under way.
+func remakeLater(dir, id, theme, key, out string) {
+	if _, busy := remaking.LoadOrStore(key, true); busy {
+		return
+	}
+	go func() {
+		defer remaking.Delete(key)
+		mu, _ := prepLocks.LoadOrStore(key, &sync.Mutex{})
+		mu.(*sync.Mutex).Lock()
+		defer mu.(*sync.Mutex).Unlock()
+		if c, err := ReadCanvas(dir, id, DraftVersion, theme); err == nil {
+			_, _ = makePrep(dir, c, out)
+		}
+	}()
+}
+
+// SeedVersionPrep gives a version published from the draft the draft's atlases of each theme that are not older than
+// the theme's files (the version keeps the draft files' times), so its first open does not make them again.
+func SeedVersionPrep(dir, id, version string) {
+	root := Resolve(dir, id, version, nil)
+	if root == "" {
+		return
+	}
+	for _, th := range Themes(dir, id, version) {
+		from := prepDir(dir, id, DraftVersion, th.ID)
+		idx, err := readPrep(from)
+		if err != nil {
+			continue
+		}
+		folder := root
+		if th.Folder != "" {
+			folder = filepath.Join(root, filepath.FromSlash(th.Folder))
+		}
+		to := prepDir(dir, id, version, th.ID)
+		if _, err := os.Stat(to); err == nil || newestUnder(folder, idx.At) {
+			continue
+		}
+		_, _, _ = CopyTree(from, to, nil)
+	}
+}
+
+// SeedDraftPrep gives a new draft the atlases of the version it was copied from: the copy keeps the files' times, so
+// they stand until a file of the draft is edited.
+func SeedDraftPrep(dir, id, base string) error {
+	if !ValidID(id) || !ValidVersion(base) {
+		return os.ErrInvalid
+	}
+	from := filepath.Join(dir, id, "."+base+".prep")
+	to := filepath.Join(dir, id, "."+DraftVersion+".prep")
+	if err := os.RemoveAll(to); err != nil {
+		return err
+	}
+	if st, err := os.Stat(from); err != nil || !st.IsDir() {
+		return nil
+	}
+	_, _, err := CopyTree(from, to, nil)
+	return err
+}
+
+// newestUnder is whether a file under root was modified after at (ms).
+func newestUnder(root string, at int64) bool {
+	if root == "" {
+		return false
+	}
+	newer := false
+	_ = filepath.WalkDir(root, func(p string, e os.DirEntry, err error) error {
+		if newer {
+			return filepath.SkipAll
+		}
+		if err != nil {
+			return nil
+		}
+		if e.IsDir() && p != root && (strings.HasPrefix(e.Name(), ".") || e.Name() == "node_modules") {
+			return filepath.SkipDir
+		}
+		if st, err := e.Info(); err == nil && !e.IsDir() && st.ModTime().UnixMilli() > at {
+			newer = true
+		}
+		return nil
+	})
+	return newer
 }
 
 func readPrep(out string) (*prepIndex, error) {
@@ -108,6 +220,20 @@ func applyPrep(c *Canvas, idx *prepIndex) {
 		for i := range g.Items {
 			if cell, ok := pa.Cells[g.Items[i].Name]; ok {
 				g.Items[i].Cell = cell
+			}
+		}
+	}
+	for gi := range c.Groups {
+		g := &c.Groups[gi]
+		pa, ok := idx.Components[g.ID]
+		if !ok {
+			continue
+		}
+		a := pa.Atlas
+		g.Atlas = &a
+		for i := range g.Components {
+			if cell, ok := pa.Cells[g.Components[i].ID]; ok {
+				g.Components[i].Cell = cell
 			}
 		}
 	}
@@ -332,6 +458,28 @@ func makePrep(dir string, c *Canvas, out string) (*prepIndex, error) {
 			return nil, err
 		}
 		idx.Templates[t.ID] = prepAtlas{Atlas{File: name, CellW: cw, CellH: ch, Cols: min(layoutCols, len(cells)), Count: len(cells)}, cells}
+	}
+	idx.Components = map[string]prepAtlas{}
+	for gi, g := range c.Groups {
+		var src []cellSource
+		for _, k := range g.Components {
+			if k.Thumb != "" {
+				src = append(src, cellSource{k.ID, themeFile(dir, c, k.Thumb)})
+			}
+		}
+		if len(src) == 0 {
+			continue
+		}
+		img, cells := drawAtlas(src, componentCellW, componentCellH, componentCols, false)
+		if img == nil {
+			continue
+		}
+		name := fmt.Sprintf("components-%d.png", gi)
+		if err := writeImage(filepath.Join(tmp, name), img, false); err != nil {
+			return nil, err
+		}
+		idx.Components[g.ID] = prepAtlas{Atlas{File: name, CellW: componentCellW, CellH: componentCellH,
+			Cols: min(componentCols, len(cells)), Count: len(cells)}, cells}
 	}
 	raw, _ := json.Marshal(idx)
 	if err := os.WriteFile(filepath.Join(tmp, "prep.json"), raw, 0o644); err != nil {

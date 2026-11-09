@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,6 +44,8 @@ type Texts struct {
 // Config is what the deployment names.
 type Config struct {
 	DataDir string
+	// Passive is a library a hub reads or edits for a moment: no keepers, no history, no PDF builds.
+	Passive bool
 	// ShareProbe stands in for ProbeShareFS (a test of a runtime that fails it); it runs on every call, uncached.
 	ShareProbe func(dir string) ShareFSReport
 	// AgentTokenHeader carries the token of agent.json to the machine agent's loopback routes.
@@ -94,24 +97,27 @@ type Library struct {
 	// shareFS is the share filesystem probe's last result (sharefs.go).
 	shareFS shareFSCache
 
-	mu        sync.Mutex
-	locks     map[string]*sync.Mutex
-	listing   listingCache
-	srv       *server
-	bg        background
-	bgStarts  sync.WaitGroup
-	live      liveState
-	timeline  timelineState
-	tabs      func() ([]Chat, bool)
-	identity  identityCache
-	hist      historyState
-	modes     modesState
-	sources   sourcesState
-	texts     sync.Map
-	releases  releasesState
-	osUser    func() string
-	hashed    *hashIndex
-	pinned    pinnedState
+	mu       sync.Mutex
+	locks    map[string]*sync.Mutex
+	listing  listingCache
+	srv      *server
+	bg       background
+	bgStarts sync.WaitGroup
+	live     liveState
+	timeline timelineState
+	tabs     func() ([]Chat, bool)
+	identity identityCache
+	hist     historyState
+	modes    modesState
+	sources  sourcesState
+	texts    sync.Map
+	releases releasesState
+	osUser   func() string
+	hashed   *hashIndex
+	pinned   pinnedState
+	kitPins  kitPinState
+	// revs is the store's history when the library syncs with one (revisions.go); nil keeps the git history.
+	revs      atomic.Pointer[revisionsBox]
 	pinMu     sync.Mutex
 	lastPin   string
 	lastPinAt time.Time
@@ -265,7 +271,8 @@ func (l *Library) ResolveProjectFile(ref string, segments []string) string {
 	}
 	real, err := filepath.EvalSymlinks(requested)
 	if err != nil {
-		return ""
+		// ds/<mount>/... of a project pinned to a kit comes from the kit's version (kitpin.go).
+		return l.kitFile(ref, segments)
 	}
 	realDir, err := filepath.EvalSymlinks(dir)
 	if err != nil {

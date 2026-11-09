@@ -70,6 +70,6 @@ func runtimeCapabilities(getenv func(string) string) capabilities.Document {
 	// Parts that only a gateway serves: nothing the runtime is set up with changes that.
 	set.Absent("history", "the conversation history is "+gatewayReason)
 	set.Absent("voice-cloud", "cloud voice takes are "+gatewayReason)
-	set.Absent("disk", "the disk screen's file routes (/api/fs/*) are not in the public runtime")
+	set.Switch("disk", has("RUNTIME_DISK_ROOTS"), "no folders are named for the disk screen", "RUNTIME_DISK_ROOTS=Label=/abs/path")
 	return set.Document()
 }

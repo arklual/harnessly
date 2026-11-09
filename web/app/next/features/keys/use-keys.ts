@@ -68,6 +68,15 @@ export const runChord = (chord: string, typing: boolean, scopes?: readonly TKeyS
   return false;
 };
 
+/** Runs an action by its id, as its shortcut would (a menu item that does what a key does); true when one ran. */
+export const runKeyAction = (id: string): boolean => {
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const run = stack[i].handlers()[id];
+    if (run !== undefined && run('') !== false) return true;
+  }
+  return false;
+};
+
 const onKeyDown = (event: KeyboardEvent) => {
   if (event.defaultPrevented || event.isComposing) return;
   const chord = chordOf(event);

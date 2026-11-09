@@ -350,3 +350,31 @@ func TestEnvPluginDirsFlag(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// hostApps is an app launcher that gives a chat without apps the host's quiet app server.
+type hostApps struct {
+	fakeApps
+	host string
+}
+
+func (h *hostApps) HostMCP() (string, error) { return h.host, nil }
+
+// A chat that starts with no app on has the apps' server all the same, so an app turned on later reaches its running
+// agent; a chat with apps has the launch's own config instead.
+func TestHostMCPWithoutApps(t *testing.T) {
+	c := testConfig(t)
+	c.WorkspacePrompt = nil
+	c.Apps = &hostApps{host: "/data/app-mcp.json"}
+	got, err := c.Flags("", launch("opus", ""), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "--mcp-config /tmp/preview-mcp.json --mcp-config '/data/app-mcp.json'") {
+		t.Fatalf("without apps: %q", got)
+	}
+	l := launch("opus", "")
+	l.Apps = []string{"acme.a"}
+	if got, err = c.Flags("", l, nil); err != nil || strings.Contains(got, "app-mcp.json") {
+		t.Fatalf("with apps: %v %q", err, got)
+	}
+}

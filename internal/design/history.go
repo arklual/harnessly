@@ -567,6 +567,9 @@ type scopeHistory struct {
 }
 
 func (l *Library) readHistory(project string, file *string, limit float64) (scopeHistory, error) {
+	if r := l.revisions(); r != nil {
+		return l.storeHistory(r, project, file, limit)
+	}
 	target, err := ScopePath(project, file)
 	if err != nil {
 		return scopeHistory{}, err
@@ -681,6 +684,11 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 			return restoreResult{}, historyErr(locale.Pick("The board \""+board+"\" is being edited by "+c.Owner.User+" (chat \""+c.Owner.ChatTitle+"\"): a version can be restored when they finish", "Доску «"+board+"» сейчас правит "+c.Owner.User+" (чат «"+c.Owner.ChatTitle+"»): вернуть версию можно, когда он закончит"))
 		}
 		break
+	}
+	if r := l.revisions(); r != nil {
+		if _, isStore := storeRevOf(wanted.Revision); isStore || wanted.Revision == "" {
+			return l.storeRestore(r, project, file, wanted, now)
+		}
 	}
 	repo, err := l.ensureRepo()
 	if err != nil {
@@ -831,7 +839,8 @@ func (l *Library) runSnapshot() {
 	h := &l.hist
 	h.mu.Lock()
 	h.timer = nil
-	if !h.started {
+	// The store keeps every revision (revisions.go): no git snapshot beside it.
+	if !h.started || l.revisions() != nil {
 		h.mu.Unlock()
 		return
 	}
@@ -890,7 +899,7 @@ func (l *Library) runSnapshot() {
 func (l *Library) pollHistory() {
 	h := &l.hist
 	h.mu.Lock()
-	busy := h.running || h.timer != nil || !h.started
+	busy := h.running || h.timer != nil || !h.started || l.revisions() != nil
 	h.mu.Unlock()
 	if busy {
 		return

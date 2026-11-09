@@ -2,6 +2,8 @@
 // page is the app's view in a sandboxed frame and this script, which does the little of the bridge a guest is given:
 // the handshake, the link's own storage (read-only unless the owner made the link writable), links out, the theme.
 // Everything else a view may ask of a host (chat, tools, panes, flows, documents) is refused with permission_denied.
+// The same page serves a member of a space at the hub with every machine off (/apps/space/<space>/<app>/, cfg.member):
+// the storage is then the person's own area and the space's, by the scope the view names.
 //
 // Written like the page's bridge (web/app/next/features/app-views/bridge.ts) so a view cannot tell the two apart: the
 // view's shim sends ui/initialize with the nonce the page carries, the answer hands over one end of a MessageChannel,
@@ -49,7 +51,7 @@
         locale: cfg.locale || 'en',
         chat: null,
         user: null,
-        guest: true,
+        guest: !cfg.member,
       },
     };
   };
@@ -94,7 +96,7 @@
     fetch('__guest/storage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: op, key: params.key || '', value: params.value, ifVersion: params.ifVersion }),
+      body: JSON.stringify({ op: op, scope: cfg.member ? params.scope : undefined, key: params.key || '', value: params.value, ifVersion: params.ifVersion }),
     })
       .then(function (res) {
         return res.json().then(function (body) {
@@ -140,7 +142,7 @@
       if (id === undefined) return;
       return storage(id, STORAGE[m.method], params);
     }
-    deny('permission_denied', 'a guest of a shared app has no chat, no agent and no tools');
+    deny('permission_denied', cfg.member ? 'with every machine off the app has no chat, no agent and no tools here' : 'a guest of a shared app has no chat, no agent and no tools');
   };
 
   window.addEventListener('message', function (event) {
@@ -160,7 +162,7 @@
         id: m.id,
         result: {
           protocolVersion: PROTOCOL,
-          hostInfo: { name: 'harnessly', version: 'guest' },
+          hostInfo: { name: 'harnessly', version: cfg.member ? 'hub' : 'guest' },
           hostCapabilities: { openLinks: {} },
           hostContext: context(),
         },

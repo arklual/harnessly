@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { KEY_SCOPE, type TKeyScope } from '@/next/features/keys/commands';
 import KeysHelp from '@/next/features/keys/keys-help';
 import { keyScopesStore, useKeyOverrides, useKeys } from '@/next/features/keys/use-keys';
+import { useBeta } from '@/next/stores/beta';
 import { HOME, ROUTE, type TRoute } from '@/next/routes/routes';
 
 interface IShellKeysChat {
@@ -18,6 +19,8 @@ interface IShellKeys {
   openChat: (id: string) => void;
   toggleSearch: () => void;
   toggleRail: () => void;
+  /** ⌘⌥J: the navigator of the open chat (beta «chatNav»). */
+  toggleNavigator?: () => void;
 }
 
 /** The chat next to the open one by its last activity: `dir` -1 is newer, 1 older; the newest when none is open. */
@@ -32,6 +35,10 @@ export const chatBeside = (
   return order[at + dir]?.id ?? null;
 };
 
+/** The n-th (1-based) chat of the list by last activity, newest first; null when the list is shorter. */
+export const chatAt = (chats: readonly IShellKeysChat[], n: number): string | null =>
+  [...chats].sort((a, b) => b.lastActivityAt - a.lastActivityAt)[n - 1]?.id ?? null;
+
 export const useShellKeys = ({
   chats,
   currentId,
@@ -39,7 +46,9 @@ export const useShellKeys = ({
   openChat,
   toggleSearch,
   toggleRail,
+  toggleNavigator,
 }: IShellKeys) => {
+  const { chatNav } = useBeta();
   const overrides = useKeyOverrides();
   const [help, setHelp] = useState<{ open: boolean; scopes: readonly TKeyScope[] }>({
     open: false,
@@ -58,6 +67,21 @@ export const useShellKeys = ({
     'global.settings': () => navigate({ kind: ROUTE.settings, section: null }),
     'global.newerChat': () => step(-1),
     'global.olderChat': () => step(1),
+    ...(chatNav
+      ? {
+          ...(toggleNavigator ? { 'global.navigator': () => toggleNavigator() } : {}),
+          ...Object.fromEntries(
+            Array.from({ length: 9 }, (_, i) => [
+              `global.chat${i + 1}`,
+              () => {
+                const id = chats && chatAt(chats, i + 1);
+                if (!id) return false;
+                openChat(id);
+              },
+            ]),
+          ),
+        }
+      : {}),
   });
   const close = () => setHelp((h) => ({ ...h, open: false }));
   return (

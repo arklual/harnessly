@@ -470,3 +470,29 @@ func TestAppsChangeStopsAnAgentAtRest(t *testing.T) {
 		t.Fatalf("codex takes apps too: %+v", res)
 	}
 }
+
+// An agent that takes the apps as it runs (AppsLive) is left running: its tools come live, its words on the
+// next turn. One that cannot is stopped at rest as before.
+func TestAppsChangeLiveKeepsTheAgent(t *testing.T) {
+	r := newReapRig(t)
+	live := true
+	var asked []string
+	r.poke(func(c *conv) {
+		c.d.AppsOK = func([]string) string { return "" }
+		c.d.AppsLive = func(rec wire.Conversation, ids []string) bool { asked = ids; return live }
+	})
+	r.settle(wire.StateReady)
+	if res := r.do(wire.ConversationAppsCmd{OpID: "a1", ID: r.id, Apps: []string{"acme.cashback"}}); res.R != wire.ResultAccepted {
+		t.Fatalf("live: %+v", res)
+	}
+	if len(r.terms.stopped) != 0 || r.record().State.K == wire.StateStopped || !slices.Equal(asked, []string{"acme.cashback"}) {
+		t.Fatalf("a live change stopped the agent: %v %s %v", r.terms.stopped, r.record().State.K, asked)
+	}
+	live = false
+	if res := r.do(wire.ConversationAppsCmd{OpID: "a2", ID: r.id, Apps: []string{"acme.review"}}); res.R != wire.ResultAccepted {
+		t.Fatalf("not live: %+v", res)
+	}
+	if !slices.Equal(r.terms.stopped, []string{"s1"}) {
+		t.Fatalf("a change that needs a start must stop the agent at rest: %v", r.terms.stopped)
+	}
+}

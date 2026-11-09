@@ -43,6 +43,11 @@ vi.mock('@/next/features/designly/access/api', async (original) => ({
   ...(await original<typeof import('@/next/features/designly/access/api')>()),
   fetchAccess: () => Promise.resolve(gateway),
 }));
+// A project without a kit: the kit's band asks nothing of the runtime the slot calls are counted on.
+vi.mock('@/next/features/designly/versions/versions-api', async (original) => ({
+  ...(await original<typeof import('@/next/features/designly/versions/versions-api')>()),
+  fetchProjectKit: () => Promise.resolve({ pin: null, update: null }),
+}));
 vi.mock('@/next/features/designly/site-view', () => ({
   default: (props: {
     src: string | null;
@@ -318,9 +323,10 @@ describe('DesignlySite project not in the library', () => {
     expect(screen.getByTestId('src').textContent).toBe('');
   });
 
-  // after about fifteen seconds the project is somewhere the library does not reach: a card says so, with
-  // a new look and a way back, instead of leaving or staying empty.
-  it('says the project is away after about fifteen seconds and looks again on demand', async () => {
+  // After about fifteen seconds the project is still on its way to the store: a card says so, with the way back, and
+  // the page keeps looking on its own and opens the project when it arrives.
+  it('says the project is on its way after fifteen seconds and opens it when it arrives', async () => {
+    const away = () => document.querySelector('.hx-acc-card[role="status"]');
     kept = null;
     shown = { ...library, designs: [] };
     gateway = granted;
@@ -328,16 +334,13 @@ describe('DesignlySite project not in the library', () => {
     mount(missing);
     await act(async () => {});
     await pass(10_000);
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(away()).toBeNull();
     await pass(10_000);
     expect(missing).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toContain('K');
+    expect(away()?.textContent).toContain('K');
     shown = library;
-    await act(async () => {
-      screen.getAllByRole('button')[0].click();
-    });
-    await pass(1000);
-    expect(screen.queryByRole('alert')).toBeNull();
+    await pass(16_000);
+    expect(away()).toBeNull();
     expect(src()).toBe(`${ORIGIN}/enter?t=1`);
   });
 

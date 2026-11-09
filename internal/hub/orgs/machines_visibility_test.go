@@ -9,7 +9,7 @@ import (
 )
 
 // seen says whether any list the person can read names the machine: the tenant's list, the organization's inventory and
-// the fleet.
+// the fleet. Every member reads the first two (the organization's list refused people without a role).
 func (ac accessCase) seen(t *testing.T, p *hubtest.Person) (inList, inOrg, inFleet bool) {
 	t.Helper()
 	r := p.Do("GET", "/api/spaces/"+ac.tenant+"/machines", nil)
@@ -17,9 +17,10 @@ func (ac accessCase) seen(t *testing.T, p *hubtest.Person) (inList, inOrg, inFle
 		t.Fatalf("list: %s", r)
 	}
 	inList = strings.Contains(string(r.Body), ac.machine)
-	if r = p.Do("GET", ac.url("/machines"), nil); r.Code == http.StatusOK {
-		inOrg = strings.Contains(string(r.Body), ac.machine)
+	if r = p.Do("GET", ac.url("/machines"), nil); r.Code != http.StatusOK {
+		t.Fatalf("organization's list: %s", r)
 	}
+	inOrg = strings.Contains(string(r.Body), ac.machine)
 	if r = p.Do("GET", "/api/me/machines", nil); r.Code == http.StatusOK {
 		inFleet = strings.Contains(string(r.Body), ac.machine)
 	}

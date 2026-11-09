@@ -17,6 +17,13 @@ import (
 
 // Service is what the protocol asks of the conversations: convo.Service, which imports this package, has exactly
 // these methods (see its comments). NotFound and UnknownCursor on Server tell its errors apart.
+// StepsPager is a Service that gives a page of turns with the steps of every turn in it (`…/turns?steps=all`): the
+// agent backfills the cluster's copy from it, so a folded turn of a backfilled chat opens from the copy. A
+// Service without it answers the plain page.
+type StepsPager interface {
+	TurnsWithSteps(ctx context.Context, id, beforeTurnID string, limit int) (TurnsPage, error)
+}
+
 type Service interface {
 	Conversations(ctx context.Context) (ConvsSnapshot, error)
 	Conversation(ctx context.Context, id string) (ConvSnapshot, error)

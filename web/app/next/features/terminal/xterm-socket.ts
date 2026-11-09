@@ -1,7 +1,10 @@
 // xterm over the runtime's terminal socket (README §39): the shared body of the agent's terminal and the own shells
 // of the right pane. The socket comes back after a drop while the terminal is shown.
 import { useEffect } from 'react';
+import { ClipboardAddon } from '@xterm/addon-clipboard';
 import { FitAddon } from '@xterm/addon-fit';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import { isCopyKey, isPasteKey, isReservedKey, mappedBytes } from '@/next/features/terminal/keys';
 import { skipIdleSelectionRedraws } from '@/next/features/terminal/selection-redraw';
@@ -79,6 +82,8 @@ export const useTerminalSocket = (
       cursorBlink: true,
       // The scrollbar's colours carry alpha, as the page's own scrollbars.
       allowTransparency: true,
+      // The Unicode 11 addon uses a proposed API.
+      allowProposedApi: true,
       scrollback: SCROLLBACK,
       smoothScrollDuration: SMOOTH_SCROLL_MS,
       overviewRuler: { width: SCROLLBAR_W },
@@ -86,6 +91,11 @@ export const useTerminalSocket = (
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
+    // Right widths for emoji and box drawing, links that open on a click, and OSC 52 writes to the clipboard.
+    term.loadAddon(new Unicode11Addon());
+    term.unicode.activeVersion = '11';
+    term.loadAddon(new WebLinksAddon());
+    term.loadAddon(new ClipboardAddon());
     term.open(el);
     skipIdleSelectionRedraws(term);
     if (canFit(el)) fit.fit();

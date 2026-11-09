@@ -1,6 +1,7 @@
 // The typed client of the hub's HTTP API (docs/hub/api.md). One function per endpoint; every call answers the JSON
 // the contract names or throws an ApiError carrying the contract's error code. The screens decide by `code`, never by
 // the message.
+import type { NetworkPolicy } from './network';
 import type {
   AgentStatus,
   CLIStatus,
@@ -26,6 +27,7 @@ import type {
   SiteDeploy,
   SiteToken,
   Space,
+  SpaceApp,
   SpaceRef,
   User,
   Login,
@@ -183,6 +185,14 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
   return {
     config: () => get<Config>('/api/config'),
 
+    /** The administrator's: the closed network's policy the machines take from the hub (docs/self-host/closed-network.md). */
+    admin: {
+      network: {
+        get: () => get<NetworkPolicy>('/api/admin/network'),
+        put: (policy: NetworkPolicy) => put<NetworkPolicy>('/api/admin/network', policy),
+      },
+    },
+
     sites: {
       list: (space: string) => get<{ sites: Site[] }>(`/api/sites/${enc(space)}`),
       create: (space: string, req: { name: string; access: Site['access'] }) =>
@@ -249,12 +259,14 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
       update: (id: string, patchBody: { name?: string; onboardingStep?: OnboardingStep }) =>
         patch<{ space: Space }>(`/api/spaces/${enc(id)}`, patchBody),
       members: (id: string) => get<{ members: Member[] }>(`/api/spaces/${enc(id)}/members`),
+      /** The apps installed for the space, from the hub's store: they open at the hub with every machine off. */
+      apps: (id: string) => get<{ apps: SpaceApp[] }>(`/api/spaces/${enc(id)}/apps`),
       setRole: (id: string, userId: string, role: Role) =>
         patch<{ member: Member }>(`/api/spaces/${enc(id)}/members/${enc(userId)}`, { role }),
       removeMember: (id: string, userId: string) => del(`/api/spaces/${enc(id)}/members/${enc(userId)}`),
       /** A role other than member (a co-owner) goes only when asked, so the old body stays as it was. */
       invite: (id: string, emails: string[], role: Role = 'member', teamId?: string) =>
-        post<{ invites: Invite[] }>(`/api/spaces/${enc(id)}/invites`, {
+        post<{ invites: Invite[]; joined?: string[] }>(`/api/spaces/${enc(id)}/invites`, {
           emails,
           ...(role === 'member' ? {} : { role }),
           ...(teamId ? { teamId } : {}),

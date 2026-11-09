@@ -59,6 +59,10 @@ func teamRole(level string) Role {
 //  5. a project the snapshot has no row for and whose owner file is not v2 "private": edit (what existed before);
 //  6. nothing.
 func (l *Library) RoleOf(id string, who Identity, now time.Time) Role {
+	return l.capReadOnlyKit(id, l.roleOf(id, who, now))
+}
+
+func (l *Library) roleOf(id string, who Identity, now time.Time) Role {
 	snap, ok := l.Access()
 	if !ok || !snap.Enforce {
 		return RoleEdit

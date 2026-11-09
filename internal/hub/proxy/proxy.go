@@ -31,6 +31,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
+	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
@@ -94,6 +95,7 @@ type Service struct {
 	web     fs.FS
 	history bool
 	uploads Uploads
+	vault   *vaultsvc.Service
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport

@@ -17,6 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
 )
 
 // The workspace is the runtime's own page served by the hub at /agents/ (flag runtime.fleet): one interface for every
@@ -137,6 +138,10 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	if uploadsPath.MatchString(rest) && s.uploadsStore() != nil {
 		s.serveUploads(w, r, p, rest)
+		return
+	}
+	if v := s.vaultService(); v != nil && vaultPath.MatchString(rest) {
+		v.Serve(w, r, vaultsvc.Person{ID: p.User.ID, Email: p.User.Email}, vaultPath.ReplaceAllString(rest, ""))
 		return
 	}
 	if outboxPath.MatchString(rest) {

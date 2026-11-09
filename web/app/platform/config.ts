@@ -1,3 +1,5 @@
+import { parseLanguage, type TLanguage } from '@/platform/languages';
+
 // Where the page lives and what the runtime it talks to calls things. The runtime writes these into
 // <meta name="hl-config"> when it serves index.html; development falls back to the defaults.
 export interface IAppConfig {
@@ -34,9 +36,9 @@ export interface IAppConfig {
   people: Record<string, string>;
   /** Optional parts of the page (RUNTIME_WEB_FEATURES): plain chats through an OpenWebUI, the team efficiency report,
    *  the password safe, Claude Design boards. */
-  features: { chats: boolean; efficiency: boolean; vault: boolean; design: boolean };
+  features: { chats: boolean; efficiency: boolean; vault: boolean; design: boolean; languages: boolean };
   /** The language of the page (RUNTIME_LOCALE): `en` or `ru`. */
-  locale: 'en' | 'ru';
+  locale: TLanguage;
   /** Product copy the installation overrides (RUNTIME_WEB_COPY_FILE), by key; see lib/copy.ts. */
   copy: Record<string, unknown>;
   /** The GitHub whose issues and pull requests the page shows (RUNTIME_GITHUB_HOST). */
@@ -77,7 +79,7 @@ const DEFAULTS: IAppConfig = {
   paneHosts: [],
   defaultPins: [],
   people: {},
-  features: { chats: false, efficiency: false, vault: false, design: false },
+  features: { chats: false, efficiency: false, vault: false, design: false, languages: false },
   locale: 'en',
   copy: {},
   uploadHeaderPrefix: 'x-harnessly-',
@@ -128,13 +130,16 @@ export const appConfig = (): IAppConfig => {
     if (value === null && fallback !== null) delete read[key];
     else if (Array.isArray(fallback) && !Array.isArray(value)) delete read[key];
   }
+  const extraLanguages = read.features?.languages === true;
   cached = {
     ...DEFAULTS,
     ...read,
     features: { ...DEFAULTS.features, ...(read.features ?? {}) },
     // The person's own choice (Settings → General) wins over the installation's language.
     locale:
-      (typeof document !== 'undefined' ? savedLanguage() : null) ?? (read.locale === 'ru' ? 'ru' : 'en'),
+      (typeof document !== 'undefined' ? savedLanguage(extraLanguages) : null) ??
+      parseLanguage(read.locale, extraLanguages) ??
+      'en',
     copy: read.copy ?? {},
     basePath: (read.basePath ?? baseHref ?? DEFAULTS.basePath).replace(/\/+$/, ''),
     platformApi: (read.platformApi ?? platformMeta ?? DEFAULTS.platformApi).replace(/\/+$/, ''),
@@ -154,15 +159,14 @@ export const savedLayoutOf = <T>(config: Record<string, unknown> | null | undefi
 
 // The language the person chose for the interface in Settings → General: this browser's, as the theme is. Until one is
 // chosen the installation's language (RUNTIME_LOCALE) holds.
-export type TLanguage = 'ru' | 'en';
+export type { TLanguage };
 
 const KEY = 'hl:language';
 
 /** The language chosen in this browser, or null while none is (or the storage cannot be read). */
-export const savedLanguage = (): TLanguage | null => {
+export const savedLanguage = (extra = appConfig().features.languages): TLanguage | null => {
   try {
-    const value = window.localStorage.getItem(KEY);
-    return value === 'ru' || value === 'en' ? value : null;
+    return parseLanguage(window.localStorage.getItem(KEY), extra);
   } catch {
     return null;
   }

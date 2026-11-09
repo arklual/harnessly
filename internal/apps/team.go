@@ -196,6 +196,33 @@ func (r *Registry) catalogArchive(id, version string) string {
 	return filepath.Join(r.Root, "catalog", id, version+".tgz")
 }
 
+// sigOf reads the signature kept beside an archive (<archive>.sig); nil when there is none.
+func sigOf(archive string) *Signature {
+	raw, err := os.ReadFile(archive + SigSuffix)
+	if err != nil {
+		return nil
+	}
+	sig, err := ParseSignature(raw)
+	if err != nil {
+		return nil
+	}
+	return sig
+}
+
+// keepSig keeps sig beside the archive when it is the archive's own; a sig of another archive is dropped.
+func keepSig(archive string, raw []byte, sig *Signature) {
+	if sig != nil && sig.SHA256 == ArchiveSum(raw) {
+		_ = writeFileAtomic(archive+SigSuffix, sig.Marshal())
+	} else {
+		_ = os.Remove(archive + SigSuffix)
+	}
+}
+
+// versionSig is the signature an installed version came with (kept by InstallSigned); nil: it was not signed.
+func (r *Registry) versionSig(id, version string) *Signature {
+	return sigOf(r.VersionDir(id, version) + ".hlapp")
+}
+
 func (r *Registry) teamPackageDir(id, version string) string {
 	return filepath.Join(r.Root, "team", id, version)
 }
@@ -234,13 +261,14 @@ func (r *Registry) PublishToTeam(id, version string, ch Channel, by, host string
 	if pkg == nil || len(ps.Errors()) > 0 {
 		return CatalogEntry{}, ErrInvalid
 	}
-	raw, sum, err := Pack(pkg.Dir)
+	raw, sum, err := r.publishedArchive(id, version, pkg.Dir)
 	if err != nil {
 		return CatalogEntry{}, err
 	}
 	if err := writeFileAtomic(r.catalogArchive(id, version), raw); err != nil {
 		return CatalogEntry{}, err
 	}
+	keepSig(r.catalogArchive(id, version), raw, r.versionSig(id, version))
 	m := pkg.Manifest
 	e := CatalogEntry{
 		ID: id, Channel: string(ch), Version: version, Name: m.Name, Description: m.Description, Trust: m.Trust,
@@ -324,15 +352,27 @@ func (r *Registry) unpackVerified(id, version, sum, host string) (*Package, erro
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s %s is not in this machine's catalog", ErrNotInCatalog, id, version)
 	}
-	return unpackArchive(raw, id, version, sum, host, r.teamPackageDir(id, version))
+	// An install from the catalog is checked whatever the host version says (an empty one skips only the range check).
+	if _, err := VerifyArchive(raw, sigOf(r.catalogArchive(id, version)), currentNetwork()); err != nil {
+		return nil, fmt.Errorf("%s %s: %w", id, version, err)
+	}
+	return unpackArchive(raw, id, version, sum, host, r.teamPackageDir(id, version), sigOf(r.catalogArchive(id, version)))
 }
 
 // unpackArchive is what every catalog (the team's, the public one) does with the bytes of a package before it is
 // installed: the sum is the one the catalog names, the archive unpacks into dst without leaving it, the package passes
 // the check and is the app and version asked for, it is not of the trusted tier, and this host runs it.
-func unpackArchive(raw []byte, id, version, sum, host, dst string) (*Package, error) {
+//
+// When the deployment requires signed packages (egress.Policy.RequireSigned), an install (host given) needs the archive's
+// signature from a trusted publisher; sig is the one kept beside it, nil when there is none.
+func unpackArchive(raw []byte, id, version, sum, host, dst string, sig *Signature) (*Package, error) {
 	if ArchiveSum(raw) != sum {
 		return nil, fmt.Errorf("%w: the archive of %s %s is not the one the catalog names", ErrArchive, id, version)
+	}
+	if host != "" {
+		if _, err := VerifyArchive(raw, sig, currentNetwork()); err != nil {
+			return nil, fmt.Errorf("%s %s: %w", id, version, err)
+		}
 	}
 	// A folder unpacked before is reused only when it came from this very archive (its sum is kept beside it); a folder
 	// whose origin is not known, or is another archive's, is unpacked afresh.
@@ -554,6 +594,9 @@ type SnapshotEntry struct {
 	CatalogEntry
 	Archive         []byte `json:"archive,omitempty"`
 	PreviousArchive []byte `json:"previousArchive,omitempty"`
+	// Signature and PreviousSignature are the publisher's signatures of those archives, when they have them.
+	Signature         *Signature `json:"signature,omitempty"`
+	PreviousSignature *Signature `json:"previousSignature,omitempty"`
 }
 
 // SnapshotInstall says that the team has an app on a channel installed.
@@ -564,9 +607,10 @@ type SnapshotInstall struct {
 	Version string `json:"version"`
 	Sum     string `json:"sum"`
 	// Archive is the pinned version's bytes (the catalog may have moved on from it).
-	Archive []byte `json:"archive,omitempty"`
-	By      string `json:"by"`
-	At      int64  `json:"at"`
+	Archive   []byte     `json:"archive,omitempty"`
+	Signature *Signature `json:"signature,omitempty"`
+	By        string     `json:"by"`
+	At        int64      `json:"at"`
 }
 
 // Snapshot is this machine's team as a snapshot, for the platform to send the other machines of the team. The archives
@@ -584,9 +628,11 @@ func (r *Registry) Snapshot() (TeamSnapshot, error) {
 		if se.Archive, err = os.ReadFile(r.catalogArchive(e.ID, e.Version)); err != nil {
 			return TeamSnapshot{}, err
 		}
+		se.Signature = sigOf(r.catalogArchive(e.ID, e.Version))
 		if e.Previous != "" {
 			if raw, err := os.ReadFile(r.catalogArchive(e.ID, e.Previous)); err == nil {
 				se.PreviousArchive = raw
+				se.PreviousSignature = sigOf(r.catalogArchive(e.ID, e.Previous))
 			}
 		}
 		out.Catalog = append(out.Catalog, se)
@@ -596,7 +642,7 @@ func (r *Registry) Snapshot() (TeamSnapshot, error) {
 		if err != nil {
 			return TeamSnapshot{}, err
 		}
-		out.Installs = append(out.Installs, SnapshotInstall{ID: i.ID, Channel: i.Channel, Version: i.Version, Sum: i.Sum, Archive: raw, By: i.By, At: i.At})
+		out.Installs = append(out.Installs, SnapshotInstall{ID: i.ID, Channel: i.Channel, Version: i.Version, Sum: i.Sum, Archive: raw, Signature: sigOf(r.catalogArchive(i.ID, i.Version)), By: i.By, At: i.At})
 	}
 	return out, nil
 }
@@ -663,7 +709,7 @@ func (r *Registry) ApplyTeam(s TeamSnapshot, host string, now time.Time) ([]stri
 	next := teamFile{Space: s.Space, Role: s.Role, At: s.At, Catalog: []CatalogEntry{}, Installs: []TeamInstall{}, Muted: t.Muted}
 	for _, se := range s.Catalog {
 		e := se.CatalogEntry
-		keep := func(version, sum string, raw []byte) bool {
+		keep := func(version, sum string, raw []byte, sig *Signature) bool {
 			if raw == nil {
 				// No bytes came: the entry stands only if this machine already holds that version.
 				return statErr(r.catalogArchive(e.ID, version)) == nil
@@ -676,12 +722,13 @@ func (r *Registry) ApplyTeam(s TeamSnapshot, host string, now time.Time) ([]stri
 				problems = append(problems, fmt.Sprintf("%s %s: %v", e.ID, version, err))
 				return false
 			}
+			keepSig(r.catalogArchive(e.ID, version), raw, sig)
 			return true
 		}
-		if !keep(e.Version, e.Sum, se.Archive) {
+		if !keep(e.Version, e.Sum, se.Archive, se.Signature) {
 			continue
 		}
-		if e.Previous != "" && !keep(e.Previous, e.PreviousSum, se.PreviousArchive) {
+		if e.Previous != "" && !keep(e.Previous, e.PreviousSum, se.PreviousArchive, se.PreviousSignature) {
 			e.Previous, e.PreviousSum = "", ""
 		}
 		next.Catalog = append(next.Catalog, e)
@@ -697,6 +744,7 @@ func (r *Registry) ApplyTeam(s TeamSnapshot, host string, now time.Time) ([]stri
 				problems = append(problems, fmt.Sprintf("%s %s: %v", si.ID, si.Version, err))
 				continue
 			}
+			keepSig(r.catalogArchive(si.ID, si.Version), si.Archive, si.Signature)
 		}
 		pkg, err := r.unpackVerified(si.ID, si.Version, si.Sum, host)
 		if err != nil {

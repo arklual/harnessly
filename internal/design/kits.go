@@ -79,6 +79,9 @@ func (l *Library) serveKit(w http.ResponseWriter, r *http.Request, segments []st
 		sendHTML(w, 404, l.notFoundPage(), head)
 		return
 	}
+	if l.refuseKitDraft(w, segments[0], segments[1], head) {
+		return
+	}
 	file := designkit.Resolve(l.KitsDir(), segments[0], segments[1], segments[2:])
 	ext := strings.ToLower(extname(file))
 	typ := ""
@@ -96,7 +99,7 @@ func (l *Library) serveKit(w http.ResponseWriter, r *http.Request, segments []st
 	if origin := r.Header.Get("Origin"); l.kitOriginAllowed(origin, port) {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 	}
-	l.serveStatic(w, r, file, st, typ, ext, kitImmutable, head)
+	l.serveStatic(w, r, file, st, typ, ext, l.kitCache(file), head)
 }
 
 // serveKitList answers /__lib/kits: every installed kit with its versions; with ?kit=<id>&version=<v> that version's

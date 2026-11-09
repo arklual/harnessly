@@ -181,6 +181,9 @@ type Config struct {
 	// Store (internal/filestore, docs/hub/store.md): the revisions and contents of the spaces' collections, which the
 	// machines sync with. On unless HUB_STORE=off.
 	Store StoreConfig
+	// DesignImport moves the designs' access from a cluster's gateway into the hub at start (HRN-880,
+	// docs/hub/design-access.md): HUB_DESIGN_IMPORT_GATEWAY=dry-run|apply.
+	DesignImport DesignImportConfig
 	// FleetSites lets a fleet gateway mint narrow publishing sessions without registering its machines in the hub.
 	FleetSitesSecret string
 	FleetSitesSpace  string
@@ -221,6 +224,16 @@ type Config struct {
 	// Docs (HUB_DOCS=on) switches on the documents and boards side: the hub answers <platform api>/docs and the agents'
 	// doc.publish / doc.acl (docs/hub/docs.md). Off: nothing of it is served and the page says so.
 	Docs bool
+	// Automations (HUB_AUTOMATIONS=on) switches on the automations: rules that turn an outside event into a conversation on
+	// the owner's machine (docs/hub/automations.md). AutomationsSecret (HUB_AUTOMATIONS_SECRET) is what the sender of an
+	// event puts in X-Automation-Secret; without it the event door stays shut. AutomationsPortEnv (HUB_AUTOMATIONS_PORT_ENV,
+	// default AGENT_REPORT_PORT) is the variable the started conversation finds its machine agent's port in.
+	Automations        bool
+	AutomationsSecret  string
+	AutomationsPortEnv string
+	// ResourceAccess (HUB_RESOURCE_ACCESS=on) puts access to documents on the shared model of access to a resource
+	// (docs/hub/resource-access.md): people, teams, guest links, requests and a log. Off: doc_meta.team_level as before.
+	ResourceAccess bool
 	// ArtifactsURL and ArtifactsToken (HUB_ARTIFACTS_URL, HUB_ARTIFACTS_TOKEN) reach the documents service with an editor
 	// token. BoardsURL and BoardsToken (HUB_BOARDS_URL, HUB_BOARDS_TOKEN) reach the boards service. A document needs the
 	// first pair, boards need the second; either may be missing and the page then says which one.
@@ -232,6 +245,11 @@ type Config struct {
 	// History (HUB_HISTORY, on by default) keeps the people's chats in the hub (docs/hub/history.md): the machines'
 	// agents send their runtime's chat list and feeds, and the workspace reads them from here while a machine is off.
 	History bool
+	// VaultKeys (HUB_VAULT_KEYS="v2:<base64 32 bytes>,v1:<base64>", the first one current) turns on the hub's central
+	// password safe (docs/hub/vault.md); empty: the safe is off. VaultSharedMembers and VaultSharedEditors
+	// (HUB_VAULT_SHARED_MEMBERS, HUB_VAULT_SHARED_EDITORS, comma-separated emails) say who sees and who changes the
+	// shared entries.
+	VaultKeys, VaultSharedMembers, VaultSharedEditors string
 	// Peers (HUB_PEERS=on) lets the machines' agents exchange messages between their chats through the hub
 	// (docs/hub/peers.md); off: POST /agent/peers/* answer 404.
 	Peers bool
@@ -241,6 +259,10 @@ type Config struct {
 	// DesignShareURL (HUB_DESIGN_SHARE_URL) is the origin of the guest links to designs (docs/hub/design-access.md); it
 	// must be an origin of its own, not the hub's and not a machine's. Empty: links to designs are off.
 	DesignShareURL string
+	// AppsGuestURL (HUB_APPS_GUEST_URL) is the origin of the guest links to apps (docs/hub/apps-guest-host.md): it serves
+	// /apps/guest/<token>/ and nothing else, so a guest's view never runs next to the hub's session. Empty: the links
+	// are served on the hub's own origin, as before.
+	AppsGuestURL string
 	// DesignPlatformAPI (HUB_DESIGN_PLATFORM_API) is the runtime's platform prefix the design page calls, /api/platform
 	// by default; the hub learns a machine's own prefix from its page's first request.
 	DesignPlatformAPI string
@@ -283,6 +305,25 @@ type Features struct {
 type SitesS3 struct{ Endpoint, Region, Bucket, Prefix, AccessKey, SecretKey string }
 
 // StoreConfig is where the store keeps its revisions and contents.
+// DesignImportConfig is the move of the designs' access from the gateway, run as a release step at start.
+type DesignImportConfig struct {
+	// Mode: "" (off), dry-run (the report only) or apply.
+	Mode string
+	// URL is the gateway's Postgres (HUB_DESIGN_IMPORT_GATEWAY_URL).
+	URL string
+	// Space is the slug of the space whose library holds the designs (HUB_DESIGN_IMPORT_SPACE, else HUB_STORE_LEGACY_SPACE).
+	Space string
+	// Teams map a gateway team to a hub team id (HUB_DESIGN_IMPORT_TEAMS=team=<id>,other=<id>).
+	Teams map[string]string
+	// Machines name the hub machine of a gateway pair (HUB_DESIGN_IMPORT_MACHINES=person@example.org@vm-1=<id>,…).
+	Machines map[string]string
+	// MachinePrefix is what the names of the hub's machines put before a gateway machine's
+	// (HUB_DESIGN_IMPORT_MACHINE_PREFIX): a pair's hub machine is <prefix><machine>, or starts with it and «-» or «.».
+	MachinePrefix string
+	// DefaultMachine holds a project whose owner has no machine in the space (HUB_DESIGN_IMPORT_DEFAULT_MACHINE).
+	DefaultMachine string
+}
+
 type StoreConfig struct {
 	Off bool
 	// DatabaseURL is the store's metadata: sqlite:///folder or postgres://… . Set by HUB_STORE_DATABASE_URL, it is a
@@ -292,9 +333,9 @@ type StoreConfig struct {
 	PGPrefix    string
 	// Dir is the store's folder: its SQLite and, without a bucket, its blobs (HUB_STORE_DIR, default <data>/store).
 	Dir string
-	// S3 is the bucket of the contents when the hub keeps its files in one (HUB_STORAGE=s3): the hub's bucket under
-	// the prefix store/, or HUB_STORE_S3_BUCKET and HUB_STORE_S3_PREFIX for a bucket that holds a design-sync
-	// center's blobs already. Endpoint empty: blobs in Dir.
+	// S3 is the bucket of the contents: a bucket of the store's own (HUB_STORE_S3_ENDPOINT and its keys, a design-sync
+	// center's), else the hub's bucket when it keeps its files in one (HUB_STORAGE=s3) under the prefix store/ or
+	// HUB_STORE_S3_BUCKET and HUB_STORE_S3_PREFIX. Endpoint empty: blobs in Dir.
 	S3 SitesS3
 	// LegacySpace (HUB_STORE_LEGACY_SPACE, a space's slug) is the space whose collections are the rooms of a store
 	// that served one place (`design`, not `design-<space>`): how a design-sync center's library becomes a space's.
@@ -576,6 +617,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	default:
 		bad("HUB_ORGS must be off, shadow or on, got %q", c.Orgs)
 	}
+	switch strings.ToLower(def("HUB_RESOURCE_ACCESS", "off")) {
+	case "on", "true", "1", "yes":
+		c.ResourceAccess = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_RESOURCE_ACCESS must be on or off")
+	}
 	switch strings.ToLower(def("HUB_DOCS", "off")) {
 	case "on", "true", "1", "yes":
 		c.Docs = true
@@ -583,6 +631,14 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	default:
 		bad("HUB_DOCS must be on or off")
 	}
+	switch strings.ToLower(def("HUB_AUTOMATIONS", "off")) {
+	case "on", "true", "1", "yes":
+		c.Automations = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_AUTOMATIONS must be on or off")
+	}
+	c.AutomationsSecret, c.AutomationsPortEnv = get("HUB_AUTOMATIONS_SECRET"), def("HUB_AUTOMATIONS_PORT_ENV", "AGENT_REPORT_PORT")
 	c.ArtifactsURL, c.ArtifactsToken = strings.TrimRight(get("HUB_ARTIFACTS_URL"), "/"), get("HUB_ARTIFACTS_TOKEN")
 	c.BoardsURL, c.BoardsToken = strings.TrimRight(get("HUB_BOARDS_URL"), "/"), get("HUB_BOARDS_TOKEN")
 	for _, u := range []struct{ name, v string }{{"HUB_ARTIFACTS_URL", c.ArtifactsURL}, {"HUB_BOARDS_URL", c.BoardsURL}} {
@@ -644,6 +700,17 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		}
 		c.DesignShareURL = strings.TrimRight(u, "/")
 	}
+	if u := get("HUB_APPS_GUEST_URL"); u != "" {
+		pu, err := url.Parse(u)
+		if err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Host == "" || (pu.Path != "" && pu.Path != "/") {
+			bad("HUB_APPS_GUEST_URL must be an http(s) origin")
+		} else if hu, err := url.Parse(c.PublicURL); err == nil && strings.EqualFold(hu.Host, pu.Host) {
+			bad("HUB_APPS_GUEST_URL must not be the hub's own origin")
+		} else if du, err := url.Parse(c.DesignShareURL); c.DesignShareURL != "" && err == nil && strings.EqualFold(du.Host, pu.Host) {
+			bad("HUB_APPS_GUEST_URL must not be the design share origin")
+		}
+		c.AppsGuestURL = strings.TrimRight(u, "/")
+	}
 	c.DesignPlatformAPI = "/api/platform"
 	if p := get("HUB_DESIGN_PLATFORM_API"); p != "" {
 		if !regexp.MustCompile(`^/api/[A-Za-z0-9_-]+$`).MatchString(p) {
@@ -684,6 +751,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	default:
 		bad("HUB_SSH_ALLOW_PRIVATE must be on or off")
 	}
+	c.VaultKeys, c.VaultSharedMembers, c.VaultSharedEditors = get("HUB_VAULT_KEYS"), get("HUB_VAULT_SHARED_MEMBERS"), get("HUB_VAULT_SHARED_EDITORS")
 	if c.SecretKey = get("HUB_SECRET_KEY"); c.SecretKey != "" && len(c.SecretKey) < 32 {
 		bad("HUB_SECRET_KEY must be at least 32 characters (openssl rand -base64 32)")
 	}
@@ -965,6 +1033,57 @@ func (c *Config) loadSafe(lookup func(string) (string, bool), bad func(string, .
 	c.SafeRefPrefixes = vaultkv.SplitPrefixes(plain("HUB_SECRETS_REF_PREFIXES"))
 }
 
+// loadDesignImport reads HUB_DESIGN_IMPORT_*.
+func (c *Config) loadDesignImport(get func(string) string, bad func(string, ...any)) {
+	d := &c.DesignImport
+	switch mode := strings.ToLower(strings.TrimSpace(get("HUB_DESIGN_IMPORT_GATEWAY"))); mode {
+	case "", "off":
+		return
+	case "dry-run", "apply":
+		d.Mode = mode
+	default:
+		bad("HUB_DESIGN_IMPORT_GATEWAY must be off, dry-run or apply")
+		return
+	}
+	d.URL = strings.TrimSpace(get("HUB_DESIGN_IMPORT_GATEWAY_URL"))
+	if u, err := url.Parse(d.URL); d.URL == "" || err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
+		bad("HUB_DESIGN_IMPORT_GATEWAY_URL must be the gateway's postgres://… when HUB_DESIGN_IMPORT_GATEWAY is on")
+	}
+	d.Space = strings.TrimSpace(get("HUB_DESIGN_IMPORT_SPACE"))
+	if d.Space == "" {
+		d.Space = c.Store.LegacySpace
+	}
+	if d.Space == "" {
+		bad("HUB_DESIGN_IMPORT_SPACE (or HUB_STORE_LEGACY_SPACE) names the space the designs go to")
+	}
+	var err error
+	if d.Teams, err = ParsePairs(get("HUB_DESIGN_IMPORT_TEAMS")); err != nil {
+		bad("HUB_DESIGN_IMPORT_TEAMS: %v", err)
+	}
+	if d.Machines, err = ParsePairs(get("HUB_DESIGN_IMPORT_MACHINES")); err != nil {
+		bad("HUB_DESIGN_IMPORT_MACHINES: %v", err)
+	}
+	d.DefaultMachine = strings.TrimSpace(get("HUB_DESIGN_IMPORT_DEFAULT_MACHINE"))
+	d.MachinePrefix = strings.ToLower(strings.TrimSpace(get("HUB_DESIGN_IMPORT_MACHINE_PREFIX")))
+}
+
+// ParsePairs reads «a=b,c=d»: the key is everything before the last «=».
+func ParsePairs(raw string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		i := strings.LastIndexByte(part, '=')
+		if i <= 0 || i == len(part)-1 {
+			return nil, fmt.Errorf("%q is not key=value", part)
+		}
+		out[strings.TrimSpace(part[:i])] = strings.TrimSpace(part[i+1:])
+	}
+	return out, nil
+}
+
 // loadStore reads HUB_STORE_*: the store reuses the hub's database and bucket unless told otherwise.
 func (c *Config) loadStore(get func(string) string, def func(string, string) string, bad func(string, ...any)) {
 	switch strings.ToLower(def("HUB_STORE", "on")) {
@@ -993,12 +1112,24 @@ func (c *Config) loadStore(get func(string) string, def func(string, string) str
 	default:
 		c.Store.DatabaseURL = "sqlite://" + c.Store.Dir
 	}
-	if c.StorageS3() {
+	switch {
+	case get("HUB_STORE_S3_ENDPOINT") != "":
+		// A bucket of the store's own (a design-sync center's), with its own keys: the hub's other files stay where
+		// HUB_STORAGE keeps them.
+		c.Store.S3 = SitesS3{Endpoint: get("HUB_STORE_S3_ENDPOINT"), Region: get("HUB_STORE_S3_REGION"), Bucket: get("HUB_STORE_S3_BUCKET"),
+			Prefix: get("HUB_STORE_S3_PREFIX"), AccessKey: get("HUB_STORE_S3_ACCESS_KEY"), SecretKey: get("HUB_STORE_S3_SECRET_KEY")}
+		if c.Store.S3.Bucket == "" || c.Store.S3.AccessKey == "" || c.Store.S3.SecretKey == "" {
+			bad("HUB_STORE_S3_ENDPOINT needs HUB_STORE_S3_BUCKET, HUB_STORE_S3_ACCESS_KEY and HUB_STORE_S3_SECRET_KEY")
+		}
+		if u, err := url.Parse(c.Store.S3.Endpoint); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			bad("HUB_STORE_S3_ENDPOINT must be http(s)://host[:port]")
+		}
+	case c.StorageS3():
 		c.Store.S3 = c.S3
 		c.Store.S3.Prefix = def("HUB_STORE_S3_PREFIX", c.S3.Prefix+"store/")
 		c.Store.S3.Bucket = def("HUB_STORE_S3_BUCKET", c.S3.Bucket)
-	} else if get("HUB_STORE_S3_PREFIX") != "" || get("HUB_STORE_S3_BUCKET") != "" {
-		bad("HUB_STORE_S3_PREFIX and HUB_STORE_S3_BUCKET need HUB_STORAGE=s3: the store uses the hub's bucket and keys")
+	case get("HUB_STORE_S3_PREFIX") != "" || get("HUB_STORE_S3_BUCKET") != "":
+		bad("HUB_STORE_S3_PREFIX and HUB_STORE_S3_BUCKET need HUB_STORE_S3_ENDPOINT or HUB_STORAGE=s3")
 	}
 }
 
@@ -1042,6 +1173,7 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 		c.SitesS3.Prefix = c.S3.Prefix + "sites/"
 	}
 	c.loadStore(get, def, bad)
+	c.loadDesignImport(get, bad)
 	c.loadAppToken(get, def, bad)
 	if c.SitesAbuseURL != "" {
 		if u, err := url.Parse(c.SitesAbuseURL); err != nil || (u.Scheme != "https" && u.Scheme != "http" && u.Scheme != "mailto") {

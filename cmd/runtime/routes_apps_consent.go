@@ -38,6 +38,8 @@ func appConsentRoutes(d deps, reg *apps.Registry) []gate.Route {
 		switch {
 		case errors.Is(err, apps.ErrNotInstalled):
 			secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
+		case errors.Is(err, apps.ErrNotGranted):
+			secretJSON(w, http.StatusConflict, map[string]string{"error": "not-granted"})
 		case errors.Is(err, apps.ErrNoConsentWaiting):
 			secretJSON(w, http.StatusConflict, map[string]string{"error": "nothing-waits"})
 		case errors.Is(err, apps.ErrConsentChanged):
@@ -70,6 +72,29 @@ func appConsentRoutes(d deps, reg *apps.Registry) []gate.Route {
 		}
 		_ = reg.Journal(b.ID, apps.JournalEntry{What: "consent", Class: apps.ClassHigh, OK: true, Detail: got.Version})
 		agent.Log("info", "apps: consent", agent.F{K: "id", V: got.ID}, agent.F{K: "version", V: got.Version})
+		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, false)})
+	}
+
+	// revoke: takes one access back; the app then waits for the person's word again.
+	revoke := func(w http.ResponseWriter, r *http.Request) {
+		if !pageOK(w, r, http.MethodPost) {
+			return
+		}
+		var b struct {
+			ID  string `json:"id"`
+			Key string `json:"key"`
+		}
+		if !readSecretBody(r, &b) || b.ID == "" || b.Key == "" {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		got, err := reg.Revoke(b.ID, b.Key, time.Now())
+		if err != nil {
+			failed(w, err)
+			return
+		}
+		_ = reg.Journal(b.ID, apps.JournalEntry{What: "consent.revoke", Class: apps.ClassHigh, OK: true, Detail: b.Key})
+		agent.Log("info", "apps: revoke", agent.F{K: "id", V: got.ID}, agent.F{K: "key", V: b.Key})
 		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, false)})
 	}
 
@@ -168,6 +193,8 @@ func appConsentRoutes(d deps, reg *apps.Registry) []gate.Route {
 	return []gate.Route{
 		{Match: is(platformAPI + "/apps/consent"), Handler: http.HandlerFunc(consent)},
 		{Match: is("/agents" + platformAPI + "/apps/consent"), Handler: http.HandlerFunc(consent)},
+		{Match: is(platformAPI + "/apps/revoke"), Handler: http.HandlerFunc(revoke)},
+		{Match: is("/agents" + platformAPI + "/apps/revoke"), Handler: http.HandlerFunc(revoke)},
 		{Match: is(platformAPI + "/apps/decline"), Handler: http.HandlerFunc(decline)},
 		{Match: is("/agents" + platformAPI + "/apps/decline"), Handler: http.HandlerFunc(decline)},
 		{Match: is(platformAPI + "/apps/switch"), Handler: http.HandlerFunc(toggle)},

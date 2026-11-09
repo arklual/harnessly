@@ -15,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/egress"
 )
 
 // maxBody caps what is read of one answer.
@@ -43,27 +45,32 @@ func mustCIDR(s string) *net.IPNet {
 // addresses). Self-hosted instances on private addresses are allowed: the runtime runs next to them.
 func NewHTTP(transport http.RoundTripper) *HTTP {
 	if transport == nil {
-		dialer := &net.Dialer{
-			Timeout: 8 * time.Second,
-			Control: func(_, address string, _ syscall.RawConn) error {
-				host, _, err := net.SplitHostPort(address)
-				if err != nil {
-					return err
-				}
-				if ip := net.ParseIP(host); ip != nil && metadataNet.Contains(ip) {
-					return fmt.Errorf("refused address %s", host)
-				}
-				return nil
-			},
-		}
-		transport = &http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			DialContext:           dialer.DialContext,
-			TLSHandshakeTimeout:   8 * time.Second,
-			ResponseHeaderTimeout: 15 * time.Second,
-			MaxIdleConnsPerHost:   4,
-			IdleConnTimeout:       60 * time.Second,
-		}
+		// The company's CA, proxy and client certificate (internal/egress) are read when a request goes, so a client made
+		// before the runtime knew the policy follows it. Self-hosted instances on private addresses stay allowed.
+		transport = egress.Follow(func(p *egress.Policy) *http.Transport {
+			dialer := &net.Dialer{
+				Timeout: 8 * time.Second,
+				Control: func(_, address string, _ syscall.RawConn) error {
+					host, _, err := net.SplitHostPort(address)
+					if err != nil {
+						return err
+					}
+					if ip := net.ParseIP(host); ip != nil && metadataNet.Contains(ip) {
+						return fmt.Errorf("refused address %s", host)
+					}
+					return nil
+				},
+			}
+			return &http.Transport{
+				Proxy:                 p.ProxyFunc(),
+				TLSClientConfig:       p.TLSConfig(),
+				DialContext:           dialer.DialContext,
+				TLSHandshakeTimeout:   8 * time.Second,
+				ResponseHeaderTimeout: 15 * time.Second,
+				MaxIdleConnsPerHost:   4,
+				IdleConnTimeout:       60 * time.Second,
+			}
+		})
 	}
 	return &HTTP{
 		Client: &http.Client{

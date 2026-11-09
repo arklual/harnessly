@@ -181,3 +181,23 @@ func TestReleaseManifestIsServedOnlyWhenTheFolderHoldsIt(t *testing.T) {
 		t.Errorf("manifest.json changed: %s", m)
 	}
 }
+
+// The deployment's network policy: served as it is when valid, 404 without a file, refused when broken.
+func TestNetworkPolicyIsServedWhenValid(t *testing.T) {
+	good := `{"internalHosts":["*.example.corp"],"proxy":"http://proxy.example.corp:3128","noProxy":["localhost"]}`
+	srv, _ := newServer(t, map[string]string{"network.json": good})
+	res, body := get(t, srv.URL+"/dl/network.json")
+	if res.StatusCode != 200 || body != good || res.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("%d %q", res.StatusCode, body)
+	}
+	srv, _ = newServer(t, nil)
+	if res, _ := get(t, srv.URL+"/dl/network.json"); res.StatusCode != 404 {
+		t.Fatalf("no file: %d", res.StatusCode)
+	}
+	for _, bad := range []string{`{`, `{"proxy":"ftp://x"}`, `{"caPem":"not a certificate"}`} {
+		srv, _ = newServer(t, map[string]string{"network.json": bad})
+		if res, _ := get(t, srv.URL+"/dl/network.json"); res.StatusCode != 500 {
+			t.Fatalf("%s: %d", bad, res.StatusCode)
+		}
+	}
+}

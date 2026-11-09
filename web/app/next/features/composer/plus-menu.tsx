@@ -15,6 +15,7 @@ import StashList, { type IStash } from '@/next/features/composer/stash-list';
 import TakesList, { type ITakeRow } from '@/next/features/composer/takes-list';
 import { stashHint } from '@/next/features/composer/keys';
 import type { ComposerContext } from '@/next/features/composer/types';
+import { onMenuKeys } from '@/next/ui/context-menu';
 import Icon from '@/next/ui/icon';
 import Popover from '@/next/ui/popover';
 import Sheet from '@/next/ui/sheet';
@@ -423,7 +424,7 @@ const PlusMenu = ({
   }
 
   const menu = (
-    <div className="hx-plus__pane" role="menu">
+    <div className="hx-plus__pane" role="menu" onKeyDown={onMenuKeys}>
       {attach && <div className="hx-plus__label">{t('next.attach.computer')}</div>}
       <button
         type="button"

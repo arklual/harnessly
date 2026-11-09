@@ -187,6 +187,7 @@ func (c *conv) metaApply(info sessionmeta.Info, now time.Time) {
 	if !c.recapStands(recap) {
 		recap = nil // the person wrote after it: it is the recap of an earlier absence, not of what happens now
 	}
+	recap = c.summaryOver(recap)
 	if (recap == nil) != (c.rec.Recap == nil) || recap != nil && *recap != *c.rec.Recap {
 		c.rec.Recap = recap
 		changed = true

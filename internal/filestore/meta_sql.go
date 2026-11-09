@@ -314,6 +314,52 @@ func (s *sqlRoom) History(ctx context.Context, path string, limit int) ([]Entry,
 	return out, rows.Err()
 }
 
+// HistoryUnder is the newest revisions of the paths under a prefix.
+func (s *sqlRoom) HistoryUnder(ctx context.Context, prefix string, limit int) ([]Entry, error) {
+	rows, err := s.db.QueryContext(ctx, s.q(`SELECT `+entryColumns+` FROM history h WHERE substr(h.path, 1, ?) = ? ORDER BY h.rev DESC LIMIT ?`), len(prefix), prefix, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Entry{}
+	for rows.Next() {
+		e, err := scanEntry(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *e)
+	}
+	return out, rows.Err()
+}
+
+// CountUnder counts the revisions under a prefix whatever the ASCII case of its path, up to limit. SQL's lower() folds
+// ASCII only, so the prefix must be ASCII for the count to be whole.
+func (s *sqlRoom) CountUnder(ctx context.Context, prefix string, limit int) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, s.q(`SELECT COUNT(*) FROM (SELECT 1 FROM history WHERE lower(substr(path, 1, ?)) = ? LIMIT ?) c`),
+		len(prefix), strings.ToLower(prefix), limit).Scan(&n)
+	return n, err
+}
+
+// Snapshot reads the folder as it was at a revision: per path, the newest revision not newer than at.
+func (s *sqlRoom) Snapshot(ctx context.Context, prefix string, at int64) ([]Entry, error) {
+	rows, err := s.db.QueryContext(ctx, s.q(`SELECT `+entryColumns+` FROM history h WHERE substr(h.path, 1, ?) = ?
+  AND h.rev = (SELECT MAX(h2.rev) FROM history h2 WHERE h2.path = h.path AND h2.rev <= ?) ORDER BY h.path`), len(prefix), prefix, at)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Entry{}
+	for rows.Next() {
+		e, err := scanEntry(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *e)
+	}
+	return out, rows.Err()
+}
+
 // inRoomTx runs fn in a transaction that holds the room's write lock.
 func (s *sqlRoom) inRoomTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	if err := s.mu.lock(ctx); err != nil {

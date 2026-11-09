@@ -70,7 +70,7 @@ const useLater = () =>
   );
 
 /** «Разрешить»: agrees to exactly what the card showed, then every screen reads the list again. */
-const agree = async (machine: MachineId, ask: IConsentAsk) => {
+export const agreeAsk = async (machine: MachineId, ask: IConsentAsk) => {
   await consentApp(
     machine,
     ask.app.id,
@@ -136,7 +136,7 @@ export const ConsentAskCard = ({ machine, ask, variant, onLater, closing = false
     setBusy(true);
     setFailure(null);
     try {
-      await agree(machine, ask);
+      await agreeAsk(machine, ask);
       setDetails(false);
     } catch (e) {
       setFailure(e instanceof Error ? e.message : String(e));
@@ -199,7 +199,7 @@ export const ConsentAskCard = ({ machine, ask, variant, onLater, closing = false
         }}
         access={ask.access}
         update={ask.update}
-        onConfirm={() => agree(machine, ask)}
+        onConfirm={() => agreeAsk(machine, ask)}
         onCancel={() => setDetails(false)}
       />
     </section>

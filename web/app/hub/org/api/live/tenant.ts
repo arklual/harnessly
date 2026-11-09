@@ -59,8 +59,9 @@ export const liveTenant = (fetcher?: Fetcher): TenantApi => {
     tenantInvites: (spaceId) => wrap(async () => (await api.spaces.invites(spaceId)).invites.map(inviteOf)),
     inviteByEmail: (spaceId, email, role = 'member', teamId) =>
       wrap(async () => {
-        const { invites } = await api.spaces.invite(spaceId, [email], role, teamId);
+        const { invites, joined } = await api.spaces.invite(spaceId, [email], role, teamId);
         const first = invites[0];
+        if (!first && (joined?.length ?? 0) > 0) return null;
         if (!first) throw new OrgApiError('invalid_request', 'Проверьте адрес почты.');
         return inviteOf(first);
       }),

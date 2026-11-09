@@ -30,7 +30,6 @@
   "hooks.useSlashCommands.blockedWithNote": "/{name} is not available on the web: {note}",
   "hooks.useSlashCommands.blocked": "/{name} is not available on the web",
   "hooks.useSlashCommands.failed": "The command failed",
-  "hooks.useHlOrganizer.machineDown": "The main machine is not answering. Pins and projects will change when it is back.",
   "hooks.useHlOrganizer.unreadable": "The projects and pins file on the main machine is damaged. It is left untouched: it needs a manual check.",
   "hooks.useHlOrganizer.projectNotFound": "The project has already been deleted.",
   "hooks.useHlOrganizer.projectExists": "A project with this ID already exists. Refresh the page.",

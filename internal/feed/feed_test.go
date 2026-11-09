@@ -279,6 +279,31 @@ func TestAfterAnEntry(t *testing.T) {
 	}
 }
 
+// after the newest entry nothing is new, yet the newest turn comes as it is now: a page drawn from the
+// cluster's copy saw it running and has to learn it ended.
+func TestAfterTheNewestEntryTheTurnStillComes(t *testing.T) {
+	path := write(t, conversation(3))
+	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})
+	f.Load()
+	last := f.b.entries[len(f.b.entries)-1]
+	ts, es, ok := f.After(last.ID)
+	if !ok || len(es) != 0 || len(ts) != 1 || last.TurnID == nil || ts[0].ID != *last.TurnID {
+		t.Fatalf("after the newest entry: ok=%v %d entries %v turns", ok, len(es), ts)
+	}
+	// From the middle: the cursor's own turn and every later one, oldest first.
+	var mid wire.Entry
+	for _, e := range f.b.entries {
+		if e.TurnID != nil && *e.TurnID == f.b.turns[1].rec.ID {
+			mid = e
+			break
+		}
+	}
+	ts, _, _ = f.After(mid.ID)
+	if len(ts) != 2 || ts[0].ID != f.b.turns[1].rec.ID || ts[1].ID != f.b.turns[2].rec.ID {
+		t.Fatalf("after an entry of the second turn: %v", ts)
+	}
+}
+
 // A poll reports the entries it added with their turn's counters, the turn it opened and the tool entry its result
 // updated.
 func TestPollReportsWhatChanged(t *testing.T) {
@@ -550,5 +575,110 @@ func TestAToolCallLoggedTwiceIsOneStep(t *testing.T) {
 	}
 	if len(tools) != 1 || tools[0].OK == nil || !*tools[0].OK {
 		t.Fatalf("tool entries: %+v\n%s", tools, shape(f))
+	}
+}
+
+// a page asked before a turn older than the tail the feed holds (the cluster's cursor of a walk, kept across a
+// restart of the runtime) reads the transcript back to that turn instead of answering that there is no such turn.
+func TestAPageBeforeATurnOlderThanTheTailIsRead(t *testing.T) {
+	path := write(t, conversation(40))
+	whole := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})
+	whole.tail = 1000
+	whole.Load()
+	all, ok := whole.Turns("", 100)
+	if !ok || len(all.Turns) != 40 {
+		t.Fatalf("whole: %d %v", len(all.Turns), ok)
+	}
+	cursor := all.Turns[10].ID
+
+	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})
+	f.tail = 8
+	f.Load()
+	if _, held := f.b.byTurn[cursor]; held {
+		t.Fatal("the tail already holds the cursor: the test proves nothing")
+	}
+	page, ok := f.Turns(cursor, 100)
+	if !ok || len(page.Turns) != 10 || page.Turns[0].ID != all.Turns[0].ID || page.Turns[9].ID != all.Turns[9].ID || page.BeforeTurnID != nil {
+		t.Fatalf("page before %s: ok %v, %d turns, before %v", cursor, ok, len(page.Turns), page.BeforeTurnID)
+	}
+	if _, ok := f.Turns("x:999999#0", 100); ok {
+		t.Error("a turn the transcript has not got is found")
+	}
+}
+
+// The walk to a cursor deep in the transcript builds the feed again only when what it holds has doubled, not once per
+// window read: with a build per window, 200 windows were 200 builds over a growing feed, on the chat's actor.
+func TestTheWalkToAnOldCursorBuildsTheFeedFewTimes(t *testing.T) {
+	path := write(t, conversation(400))
+	whole := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})
+	whole.tail = 100_000
+	whole.Load()
+	all, ok := whole.Turns("", 100)
+	if !ok || all.BeforeTurnID == nil {
+		t.Fatalf("whole: %v", ok)
+	}
+	first, _ := whole.Turns(*all.BeforeTurnID, 100)
+	second, _ := whole.Turns(*first.BeforeTurnID, 100)
+	third, _ := whole.Turns(*second.BeforeTurnID, 100)
+	if len(third.Turns) != 100 || third.BeforeTurnID != nil {
+		t.Fatalf("whole: the oldest page has %d turns", len(third.Turns))
+	}
+	cursor := third.Turns[10].ID
+
+	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})
+	f.tail = 8
+	f.Load()
+	if _, held := f.b.byTurn[cursor]; held {
+		t.Fatal("the tail already holds the cursor: the test proves nothing")
+	}
+	builds := f.builds
+	page, ok := f.Turns(cursor, 100)
+	if !ok || len(page.Turns) != 10 || page.Turns[0].ID != third.Turns[0].ID || page.Turns[9].ID != third.Turns[9].ID || page.BeforeTurnID != nil {
+		t.Fatalf("page before %s: ok %v, %d turns, before %v", cursor, ok, len(page.Turns), page.BeforeTurnID)
+	}
+	// 1600 entries read 8 at a time: 200 windows, and the feed doubles about 8 times.
+	if n := f.builds - builds; n > 12 {
+		t.Errorf("the walk built the feed %d times", n)
+	}
+	if _, ok := f.Turns("x:999999#0", 100); ok {
+		t.Error("a turn the transcript has not got is found")
+	}
+}
+
+// A page with steps carries the steps of every turn in it; the plain page only those of its newest.
+func TestAPageWithStepsCarriesTheStepsOfEveryTurn(t *testing.T) {
+	path := write(t, conversation(5))
+	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})
+	f.Load()
+	plain, ok := f.Turns("", 100)
+	if !ok || len(plain.Turns) != 5 {
+		t.Fatalf("plain: %d %v", len(plain.Turns), ok)
+	}
+	with, ok := f.TurnsWithSteps("", 100)
+	if !ok || len(with.Turns) != 5 {
+		t.Fatalf("with steps: %d %v", len(with.Turns), ok)
+	}
+	perTurn := func(p wire.TurnsPage) map[string]int {
+		n := map[string]int{}
+		for _, e := range p.Entries {
+			if e.TurnID != nil {
+				n[*e.TurnID]++
+			}
+		}
+		return n
+	}
+	full := perTurn(with)[with.Turns[0].ID]
+	if full < 3 {
+		t.Fatalf("the oldest turn with its steps has %d entries", full)
+	}
+	for i, n := range perTurn(with) {
+		if n != full {
+			t.Errorf("turn %s of the page with steps has %d entries, not %d", i, n, full)
+		}
+	}
+	for i, n := range perTurn(plain) {
+		if n >= full {
+			t.Errorf("turn %s of the plain page has %d entries: the test proves nothing", i, n)
+		}
 	}
 }

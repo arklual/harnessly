@@ -94,7 +94,11 @@ func bridgeRefused(err error) (int, any) {
 		if be.SignIn != nil {
 			return status, map[string]any{"error": be.Code, "message": be.Message, "signIn": be.SignIn}
 		}
-		return status, map[string]string{"error": be.Code, "message": be.Message}
+		body := map[string]string{"error": be.Code, "message": be.Message}
+		if be.Hint != "" {
+			body["hint"] = be.Hint
+		}
+		return status, body
 	case errors.Is(err, apps.ErrNotInstalled):
 		return http.StatusNotFound, map[string]string{"error": "not-found"}
 	case errors.Is(err, apps.ErrUnknownMethod), errors.Is(err, apps.ErrStorageArgs):
@@ -695,6 +699,20 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 }
 
 // revealApp is the values of an app's secrets by their names; one with no value is left out.
+// withClientCert puts the app's own client certificate (network.clientCert) on srv when the manifest names one for its
+// host; the secret is read from the safe here and goes no further than the call's TLS.
+func withClientCert(store *secrets.Store, app string, m apps.Manifest, srv apps.MCPServer) (apps.MCPServer, error) {
+	cert, err := apps.ClientCertFor(m, srv, func(name string) (string, error) {
+		v, err := store.RevealApp(app, []string{name})
+		return v[name], err
+	})
+	if err != nil {
+		return srv, err
+	}
+	srv.ClientCert = cert
+	return srv, nil
+}
+
 func revealApp(store *secrets.Store, app string, names []string) map[string]string {
 	out := map[string]string{}
 	for _, n := range names {
@@ -743,6 +761,9 @@ func callAppToolRaw(ctx context.Context, d deps, reg *apps.Registry, appID, tool
 	srv, missing := decl.Filled(revealApp(safeFor(d).store.Local, appID, decl.Secrets()))
 	if len(missing) > 0 {
 		return nil, &apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a secret"}
+	}
+	if srv, err = withClientCert(safeFor(d).store.Local, appID, *pkg.Manifest, srv); err != nil {
+		return nil, err
 	}
 	if decl.Auth != nil && decl.Auth.Type == apps.AuthOAuth {
 		return callAppOAuthTool(ctx, mcpFor(d), appID, server, decl, srv, name, args)

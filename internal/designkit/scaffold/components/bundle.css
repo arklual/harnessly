@@ -1,0 +1,12 @@
+@layer kit-__ID__ {
+  .__ID__-root { font: 15px/22px var(--__ID__-font-sans); color: var(--__ID__-text); background: var(--__ID__-surface-0); }
+  .__ID__-btn { font: inherit; border: 1px solid transparent; border-radius: var(--__ID__-radius-m); padding: 8px 16px; cursor: pointer; }
+  .__ID__-btn--primary { background: var(--__ID__-accent); color: var(--__ID__-on-accent); }
+  .__ID__-btn--secondary { background: var(--__ID__-surface-1); border-color: var(--__ID__-border); color: var(--__ID__-text); }
+  .__ID__-btn--ghost { background: transparent; color: var(--__ID__-accent); }
+  .__ID__-btn:disabled { opacity: .5; cursor: default; }
+  .__ID__-card { background: var(--__ID__-surface-1); border: 1px solid var(--__ID__-border); border-radius: var(--__ID__-radius-l); max-width: 360px; }
+  .__ID__-card__header { padding: var(--__ID__-space-4) var(--__ID__-space-4) 0; }
+  .__ID__-card__header h3 { margin: 0; font-size: 17px; line-height: 24px; }
+  .__ID__-card__body { padding: var(--__ID__-space-2) var(--__ID__-space-4) var(--__ID__-space-4); }
+}

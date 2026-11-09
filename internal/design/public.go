@@ -392,6 +392,36 @@ func (a *API) Public(w http.ResponseWriter, r *http.Request) {
 		publicText(w, 404, "Not found")
 		return
 	}
+	a.servePublic(w, r, project, segments, scope)
+}
+
+// ServeSnapshot answers a public read of a project from the library as it is, with no token: the hub's own read of a
+// store revision it put into a folder and judged itself (the link, its pages; HRN-881). A pinned read says its version
+// in rev, as the runtime's answer to a pinned token does; pages nil opens every board.
+func (a *API) ServeSnapshot(w http.ResponseWriter, r *http.Request, project string, segments []string, rev string, pages []string) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		publicText(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	if !IsLibraryID(project) {
+		publicText(w, 404, "Not found")
+		return
+	}
+	scope := publicScope{}
+	if pages != nil {
+		scope.limited, scope.pages = true, map[string]bool{}
+		for _, p := range pages {
+			scope.pages[p] = true
+		}
+	}
+	if rev != "" {
+		w.Header().Set(PublicRevHeader, rev)
+	}
+	a.servePublic(w, r, project, segments, scope)
+}
+
+func (a *API) servePublic(w http.ResponseWriter, r *http.Request, project string, segments []string, scope publicScope) {
 	// Fail closed: while the filesystem does not keep the guarantees a guest read relies on, nothing is served and no
 	// link is made (sharefs.go).
 	if a.refuseUnsafeFS(w, r, scope.pin) {
@@ -576,7 +606,7 @@ func (a *API) Public(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		prefix := strings.Repeat("../", len(segments)-1)
-		versioned := withAssetVersions(jscompat.DecodeUTF8(src), filepath.Dir(file), root, lib.engineSwap(project), nil)
+		versioned := withAssetVersionsOf(jscompat.DecodeUTF8(src), filepath.Dir(file), root, lib.engineSwap(project), lib.kitMissing(project, root), nil)
 		body := []byte(withGuestClient(versioned, project, prefix+PublicGuestDir+"/client.js", prefix+PublicVendorDir+"/"))
 		if len(body) > PublicFileLimit {
 			publicText(w, 404, "Not found")
@@ -629,6 +659,11 @@ func (a *API) openPublic(lib *Library, project string, segments []string) (*os.F
 	rel := filepath.Join(append([]string{project, ProjectDirname}, segments...)...)
 	f, err := openBeneath(library, rel)
 	if err != nil {
+		// a kit's file of a project pinned to a kit (kitpin.go)
+		if kit := lib.kitFile(project, segments); kit != "" {
+			f, st, ok := openRegular(kit)
+			return f, st, kit, ok
+		}
 		return nil, nil, "", false
 	}
 	st, err := f.Stat()

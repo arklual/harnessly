@@ -1,79 +1,54 @@
 package apps
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
-	"io/fs"
-	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
+	"strings"
 	"sync"
+	"time"
+
+	"github.com/ly-solutions/harnessly/internal/appstore"
 )
 
-// The storage of an app's views (hl.storage.<scope>): key-value areas under <data>/apps/storage/<app id>/<scope>/.
-// Install, user and space are one area each (a machine has one person; a team's space lives where its runtime does);
-// chat and doc are one area per chat or document, named by the owner the page gives. Removing an install leaves the
-// folder, so a reinstall finds its data (the 30-day purge of the spec is not built yet).
+// The storage of an app's views (hl.storage.<scope>): key-value areas, one file each (internal/appstore). Install,
+// user and space are one area each; chat and doc are one area per chat or document, named by the owner the page gives.
+// On a machine of its own they are all under <data>/apps/storage/<app id>/<scope>/. Under a hub only the
+// install's area is there: user, space, chat and doc are in the space's apps collection of the hub's store, the same on
+// every machine of the space and there with the machines off, the user's area named by the person
+// (storage/<app>/user/<person>.json, which only the person's machines see). Removing an install leaves the data, so a
+// reinstall finds it (the 30-day purge of the spec is not built yet).
 
 // Scope is an area of the storage.
-type Scope string
+type Scope = appstore.Scope
 
 const (
-	ScopeInstall Scope = "install"
-	ScopeUser    Scope = "user"
-	ScopeChat    Scope = "chat"
-	ScopeSpace   Scope = "space"
-	ScopeDoc     Scope = "doc"
+	ScopeInstall = appstore.ScopeInstall
+	ScopeUser    = appstore.ScopeUser
+	ScopeChat    = appstore.ScopeChat
+	ScopeSpace   = appstore.ScopeSpace
+	ScopeDoc     = appstore.ScopeDoc
 )
 
-// scopeLimit is the most one area may hold, in bytes of its JSON file.
-var scopeLimit = map[Scope]int{
-	ScopeInstall: 5 << 20,
-	ScopeUser:    1 << 20,
-	ScopeChat:    256 << 10,
-	ScopeSpace:   10 << 20,
-	ScopeDoc:     100 << 10,
-}
-
-// scopeTotal is the most all the areas of one scope of one app may hold together, so many chats or documents cannot
-// add up past what the scope is meant to cost.
-var scopeTotal = map[Scope]int64{
-	ScopeInstall: 5 << 20,
-	ScopeUser:    1 << 20,
-	ScopeChat:    20 << 20,
-	ScopeSpace:   10 << 20,
-	ScopeDoc:     20 << 20,
-}
-
-// perOwner are the scopes whose area belongs to a chat or a document.
-func (s Scope) perOwner() bool { return s == ScopeChat || s == ScopeDoc }
-
-const maxKeyBytes = 256
+// scopeLimit and scopeTotal are the limits of an area and of all the areas of a scope of an app (appstore).
+var (
+	scopeLimit = appstore.Limit
+	scopeTotal = appstore.Total
+)
 
 var (
 	// ErrQuota: the write would take the area past its limit.
-	ErrQuota = errors.New("apps: the storage area is full")
+	ErrQuota = appstore.ErrQuota
 	// ErrStorageArgs: a scope, owner or key that is not one.
-	ErrStorageArgs = errors.New("apps: bad storage arguments")
+	ErrStorageArgs = appstore.ErrArgs
 	// ErrConflict: a write that named the version it read (ifVersion) found the key moved on. The error is a
 	// *ConflictError, which carries the version the key has now.
-	ErrConflict = errors.New("apps: the key changed since it was read")
-
-	ownerRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+	ErrConflict = appstore.ErrConflict
 )
 
 // ConflictError is the refusal of a write whose ifVersion is not the key's version; Current is the version it has.
-type ConflictError struct{ Current int64 }
-
-func (e *ConflictError) Error() string        { return ErrConflict.Error() }
-func (e *ConflictError) Is(target error) bool { return target == ErrConflict }
-
-// versionsKey is where an area's file keeps the version of each key, next to the values. A key's version is a counter
-// that only grows: a write adds one, a delete adds one too and keeps the number, so a key made anew never repeats a
-// version a reader holds. A key with no version (data written before versions) is at 0. The name is not a key a
-// caller can use.
-const versionsKey = "__hl_versions"
+type ConflictError = appstore.ConflictError
 
 // Change is a key of an area that was written or deleted; it carries no value.
 type Change struct {
@@ -88,6 +63,12 @@ type Change struct {
 type Storage struct {
 	Root string
 	mu   sync.Mutex
+
+	centerMu sync.Mutex
+	center   *Center
+	// seen is the version of every key of the center's areas as this machine last knew them: a change another machine
+	// made is told to the views (OnChange) key by key.
+	seen map[string]map[string]int64
 
 	subMu sync.Mutex
 	subs  map[int]func(Change)
@@ -145,76 +126,63 @@ func OpenStorage(dataDir string) *Storage {
 	return s
 }
 
-func (s *Storage) file(app string, scope Scope, owner string) (string, error) {
-	if !idRe.MatchString(app) {
-		return "", ErrStorageArgs
-	}
-	if _, ok := scopeLimit[scope]; !ok {
-		return "", ErrStorageArgs
-	}
+// Center is the hub's store as the storage keeps its areas there: Files in the space's apps collection, Person the
+// name of the person's user area ("" keeps the user area on the machine, as with a hub that names nobody).
+type Center struct {
+	Files  appstore.Files
+	Person string
+}
+
+// UseCenter keeps the user, space, chat and doc areas in the hub's store from now on; nil puts them back on the
+// machine. The runtime sets it when it links to a hub's store (cmd/runtime).
+func (s *Storage) UseCenter(c *Center) {
+	s.centerMu.Lock()
+	defer s.centerMu.Unlock()
+	s.center = c
+	s.seen = map[string]map[string]int64{}
+}
+
+func (s *Storage) centerOf() *Center {
+	s.centerMu.Lock()
+	defer s.centerMu.Unlock()
+	return s.center
+}
+
+// centerTimeout bounds one call of a view to the hub's store.
+const centerTimeout = 15 * time.Second
+
+// where is the files and the path of an area, and the unlock of what a read and its write hold.
+func (s *Storage) where(app string, scope Scope, owner string) (appstore.Files, string, func(), error) {
 	name := "area"
-	if scope.perOwner() {
-		if !ownerRe.MatchString(owner) {
-			return "", ErrStorageArgs
+	if scope.PerOwner() {
+		if !appstore.ValidOwner(owner) {
+			return nil, "", nil, ErrStorageArgs
 		}
 		name = owner
 	}
-	return filepath.Join(s.Root, app, string(scope), name+".json"), nil
-}
-
-func checkKey(key string) error {
-	if key == "" || len(key) > maxKeyBytes || key == versionsKey {
-		return ErrStorageArgs
+	c := s.centerOf()
+	personal := scope == ScopeUser || scope == ScopeChat
+	if c != nil && scope != ScopeInstall && (!personal || c.Person != "") {
+		switch scope {
+		case ScopeUser:
+			name = c.Person
+		case ScopeChat:
+			name = c.Person + "." + owner
+		}
+		rel, err := appstore.Path(app, scope, name)
+		// The store's revisions keep two machines' writes apart; a lock of this process would only queue the views.
+		return c.Files, rel, func() {}, err
 	}
-	return nil
-}
-
-// area is an area as its file holds it: the values and the version of each key.
-type area struct {
-	values   map[string]json.RawMessage
-	versions map[string]int64
-}
-
-func (s *Storage) read(file string) (*area, error) {
-	a := &area{values: map[string]json.RawMessage{}, versions: map[string]int64{}}
-	raw, err := os.ReadFile(file)
-	if errors.Is(err, fs.ErrNotExist) {
-		return a, nil
-	}
+	rel, err := appstore.Path(app, scope, name)
 	if err != nil {
-		return nil, err
+		return nil, "", nil, err
 	}
-	var all map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &all); err != nil {
-		return nil, err
-	}
-	for k, v := range all {
-		if k == versionsKey {
-			// A damaged versions record is the same as none: every key is back at 0.
-			_ = json.Unmarshal(v, &a.versions)
-			if a.versions == nil {
-				a.versions = map[string]int64{}
-			}
-			continue
-		}
-		a.values[k] = v
-	}
-	return a, nil
+	s.mu.Lock()
+	return appstore.Folder(s.Root), rel, s.mu.Unlock, nil
 }
 
-func (a *area) marshal() ([]byte, error) {
-	out := make(map[string]json.RawMessage, len(a.values)+1)
-	for k, v := range a.values {
-		out[k] = v
-	}
-	if len(a.versions) > 0 {
-		raw, err := json.Marshal(a.versions)
-		if err != nil {
-			return nil, err
-		}
-		out[versionsKey] = raw
-	}
-	return json.Marshal(out)
+func (s *Storage) ctx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), centerTimeout)
 }
 
 // Get is the value under a key; ok is false when there is none.
@@ -225,21 +193,22 @@ func (s *Storage) Get(app string, scope Scope, owner, key string) (value json.Ra
 
 // GetVersioned is Get with the key's version (0 for data kept before versions, or a key never written).
 func (s *Storage) GetVersioned(app string, scope Scope, owner, key string) (value json.RawMessage, version int64, ok bool, err error) {
-	file, err := s.file(app, scope, owner)
+	if err := appstore.CheckKey(key); err != nil {
+		return nil, 0, false, err
+	}
+	files, rel, unlock, err := s.where(app, scope, owner)
 	if err != nil {
 		return nil, 0, false, err
 	}
-	if err := checkKey(key); err != nil {
-		return nil, 0, false, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	a, err := s.read(file)
+	defer unlock()
+	ctx, cancel := s.ctx()
+	defer cancel()
+	a, err := appstore.Read(ctx, files, rel)
 	if err != nil {
 		return nil, 0, false, err
 	}
-	value, ok = a.values[key]
-	return value, a.versions[key], ok, nil
+	value, ok = a.Values[key]
+	return value, a.Versions[key], ok, nil
 }
 
 // Set stores a value; a write that takes the area past its limit is refused whole.
@@ -252,30 +221,22 @@ func (s *Storage) Set(app string, scope Scope, owner, key string, value json.Raw
 // version (0 is a key never written or kept before versions): otherwise it is refused with a *ConflictError and
 // nothing changes.
 func (s *Storage) SetIf(app string, scope Scope, owner, key string, value json.RawMessage, ifVersion *int64) (int64, error) {
-	file, err := s.file(app, scope, owner)
-	if err != nil {
-		return 0, err
-	}
-	if err := checkKey(key); err != nil {
+	if err := appstore.CheckKey(key); err != nil {
 		return 0, err
 	}
 	if !json.Valid(value) {
 		return 0, ErrStorageArgs
 	}
-	version, err := func() (int64, error) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		a, err := s.read(file)
-		if err != nil {
-			return 0, err
+	var version int64
+	err := s.update(app, scope, owner, true, func(a *appstore.Area) (bool, error) {
+		if ifVersion != nil && *ifVersion != a.Versions[key] {
+			return false, &ConflictError{Current: a.Versions[key]}
 		}
-		if ifVersion != nil && *ifVersion != a.versions[key] {
-			return 0, &ConflictError{Current: a.versions[key]}
-		}
-		a.values[key] = value
-		a.versions[key]++
-		return a.versions[key], s.write(app, scope, file, a)
-	}()
+		a.Values[key] = value
+		a.Versions[key]++
+		version = a.Versions[key]
+		return true, nil
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -283,53 +244,42 @@ func (s *Storage) SetIf(app string, scope Scope, owner, key string, value json.R
 	return version, nil
 }
 
-// write saves an area if it stays inside the limits of its scope.
-func (s *Storage) write(app string, scope Scope, file string, a *area) error {
-	raw, err := a.marshal()
+// update changes an area where it is kept, and remembers what a center's area is now.
+func (s *Storage) update(app string, scope Scope, owner string, quota bool, change func(*appstore.Area) (bool, error)) error {
+	files, rel, unlock, err := s.where(app, scope, owner)
 	if err != nil {
 		return err
 	}
-	if len(raw) > scopeLimit[scope] {
-		return ErrQuota
+	defer unlock()
+	ctx, cancel := s.ctx()
+	defer cancel()
+	a, err := appstore.Update(ctx, files, scope, rel, quota, change)
+	if err != nil {
+		return err
 	}
-	// The scope's other areas, and this one as it was, are on disk: the write adds the difference.
-	var before int64
-	if info, err := os.Stat(file); err == nil {
-		before = info.Size()
+	if _, local := files.(appstore.Folder); !local {
+		s.remember(rel, a)
 	}
-	if s.scopeBytes(app, scope)-before+int64(len(raw)) > scopeTotal[scope] {
-		return ErrQuota
-	}
-	return writeFileAtomic(file, raw)
+	return nil
 }
 
 // SetMany stores several keys of one area in a single write: all of them or, when the area would pass its limit, none.
 func (s *Storage) SetMany(app string, scope Scope, owner string, values map[string]json.RawMessage) error {
-	file, err := s.file(app, scope, owner)
-	if err != nil {
-		return err
-	}
 	for k, v := range values {
-		if err := checkKey(k); err != nil {
+		if err := appstore.CheckKey(k); err != nil {
 			return err
 		}
 		if !json.Valid(v) {
 			return ErrStorageArgs
 		}
 	}
-	err = func() error {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		a, err := s.read(file)
-		if err != nil {
-			return err
-		}
+	err := s.update(app, scope, owner, true, func(a *appstore.Area) (bool, error) {
 		for k, v := range values {
-			a.values[k] = v
-			a.versions[k]++
+			a.Values[k] = v
+			a.Versions[k]++
 		}
-		return s.write(app, scope, file, a)
-	}()
+		return true, nil
+	})
 	if err != nil {
 		return err
 	}
@@ -346,47 +296,21 @@ func (s *Storage) SetMany(app string, scope Scope, owner string, values map[stri
 	return nil
 }
 
-// scopeBytes is what the areas of a scope of an app weigh on disk.
-func (s *Storage) scopeBytes(app string, scope Scope) int64 {
-	var total int64
-	_ = filepath.WalkDir(filepath.Join(s.Root, app, string(scope)), func(_ string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			if info, err := d.Info(); err == nil {
-				total += info.Size()
-			}
-		}
-		return nil
-	})
-	return total
-}
-
 // Delete removes a key; a key that is not there is not an error. The key's version goes up by one and is kept.
 func (s *Storage) Delete(app string, scope Scope, owner, key string) error {
-	file, err := s.file(app, scope, owner)
-	if err != nil {
+	if err := appstore.CheckKey(key); err != nil {
 		return err
 	}
-	if err := checkKey(key); err != nil {
-		return err
-	}
-	changed, err := func() (bool, error) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		a, err := s.read(file)
-		if err != nil {
-			return false, err
-		}
-		if _, ok := a.values[key]; !ok {
+	changed := false
+	err := s.update(app, scope, owner, false, func(a *appstore.Area) (bool, error) {
+		if _, ok := a.Values[key]; !ok {
 			return false, nil
 		}
-		delete(a.values, key)
-		a.versions[key]++
-		raw, err := a.marshal()
-		if err != nil {
-			return false, err
-		}
-		return true, writeFileAtomic(file, raw)
-	}()
+		delete(a.Values, key)
+		a.Versions[key]++
+		changed = true
+		return true, nil
+	})
 	if err != nil || !changed {
 		return err
 	}
@@ -396,23 +320,92 @@ func (s *Storage) Delete(app string, scope Scope, owner, key string) error {
 
 // Keys lists an area's keys, sorted.
 func (s *Storage) Keys(app string, scope Scope, owner string) ([]string, error) {
-	file, err := s.file(app, scope, owner)
+	files, rel, unlock, err := s.where(app, scope, owner)
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	a, err := s.read(file)
+	defer unlock()
+	ctx, cancel := s.ctx()
+	defer cancel()
+	a, err := appstore.Read(ctx, files, rel)
 	if err != nil {
 		return nil, err
 	}
-	keys := make([]string, 0, len(a.values))
-	for k := range a.values {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys, nil
+	return a.Keys(), nil
 }
 
 // ValidOwner says whether a text can name the chat or document an area belongs to.
-func ValidOwner(owner string) bool { return ownerRe.MatchString(owner) }
+func ValidOwner(owner string) bool { return appstore.ValidOwner(owner) }
+
+func (s *Storage) remember(rel string, a *appstore.Area) {
+	s.centerMu.Lock()
+	defer s.centerMu.Unlock()
+	if s.seen == nil {
+		s.seen = map[string]map[string]int64{}
+	}
+	v := make(map[string]int64, len(a.Versions))
+	for k, n := range a.Versions {
+		v[k] = n
+	}
+	s.seen[rel] = v
+}
+
+// NoticeCenter is an area of the center as the store has it now (rel under storage/; nil raw for one deleted),
+// whoever wrote it: the views hear of every key whose version moved since this machine last knew the area. quiet only
+// learns the area, for the catch-up when the storage first links.
+func (s *Storage) NoticeCenter(rel string, raw []byte, quiet bool) {
+	parts := strings.Split(rel, "/")
+	if len(parts) != 3 || !strings.HasSuffix(parts[2], ".json") {
+		return
+	}
+	app, scope, name := parts[0], Scope(parts[1]), strings.TrimSuffix(parts[2], ".json")
+	if _, err := appstore.Path(app, scope, name); err != nil || scope == ScopeInstall {
+		return
+	}
+	a, err := appstore.Parse(raw)
+	if err != nil {
+		return
+	}
+	s.centerMu.Lock()
+	c := s.center
+	owner := ""
+	switch {
+	case c == nil, scope == ScopeUser && name != c.Person:
+		s.centerMu.Unlock()
+		return
+	case scope == ScopeChat:
+		var mine bool
+		owner, mine = strings.CutPrefix(name, c.Person+".")
+		if !mine || c.Person == "" {
+			s.centerMu.Unlock()
+			return
+		}
+	case scope == ScopeDoc:
+		owner = name
+	}
+	if s.seen == nil {
+		s.seen = map[string]map[string]int64{}
+	}
+	before := s.seen[rel]
+	now := make(map[string]int64, len(a.Versions))
+	for k, n := range a.Versions {
+		now[k] = n
+	}
+	s.seen[rel] = now
+	s.centerMu.Unlock()
+	if quiet {
+		return
+	}
+	var keys []string
+	for k, n := range now {
+		if before[k] != n {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	changes := make([]Change, len(keys))
+	for i, k := range keys {
+		changes[i] = Change{App: app, Scope: scope, Owner: owner, Key: k}
+	}
+	s.emit(changes...)
+}

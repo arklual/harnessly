@@ -57,6 +57,9 @@ func (l *Library) PinRevision() (string, error) {
 }
 
 func (l *Library) pinRevision() (string, error) {
+	if r := l.revisions(); r != nil {
+		return l.storePin(r)
+	}
 	h := &l.hist
 	h.mu.Lock()
 	runtime := h.runtime
@@ -94,13 +97,20 @@ func (l *Library) pinnedLibrary(project, rev string) (*Library, bool) {
 	if lib := p.libs[key]; lib != nil {
 		return lib, true
 	}
-	repo, err := l.historyRepo()
-	if err != nil {
-		return nil, false
-	}
 	base := filepath.Join(l.pinnedBase(), rev)
-	if err := l.extractPinned(repo, rev, project, base); err != nil {
-		return nil, false
+	if at, isStore := storeRevOf(rev); isStore {
+		r := l.revisions()
+		if r == nil || l.extractStorePinned(r, at, project, base) != nil {
+			return nil, false
+		}
+	} else {
+		repo, err := l.historyRepo()
+		if err != nil {
+			return nil, false
+		}
+		if err := l.extractPinned(repo, rev, project, base); err != nil {
+			return nil, false
+		}
 	}
 	cfg := l.cfg
 	cfg.LibraryDir, cfg.WorkspaceDir, cfg.AltWorkspaceDir, cfg.WorkspaceConfig = base, "", "", ""

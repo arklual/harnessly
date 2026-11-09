@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -28,6 +27,9 @@ func CallTool(ctx context.Context, srv MCPServer, tool string, args map[string]a
 		return nil, &BridgeError{Code: CodeHostNotAllowed, Message: ToolRefused, Detail: "the MCP server has no address"}
 	}
 	network := currentNetwork()
+	if srv.ClientCert != nil {
+		network = network.WithClientCert(srv.ClientCert)
+	}
 	internal := network.IsInternal(u.Hostname())
 	if u.Scheme != "https" && (u.Scheme != "http" || !internal) {
 		return nil, &BridgeError{Code: CodeHostNotAllowed, Message: ToolRefused,
@@ -36,8 +38,7 @@ func CallTool(ctx context.Context, srv MCPServer, tool string, args map[string]a
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	c := &mcpConn{url: srv.URL, headers: srv.Headers, credentialed: srv.Credentialed, http: &http.Client{
-		Transport: &http.Transport{Proxy: nil, TLSClientConfig: network.tlsConfig(),
-			DialContext: (&net.Dialer{Timeout: 10 * time.Second, Control: dialControl(internal)}).DialContext},
+		Transport:     network.Transport(u.Hostname(), dialControl(u.Hostname(), internal)),
 		CheckRedirect: noRedirects,
 	}}
 	if _, err := c.rpc(ctx, 1, "initialize", map[string]any{
@@ -82,7 +83,7 @@ func transportFailure(ctx context.Context, err error) *BridgeError {
 	var be *BridgeError
 	switch {
 	case errors.As(err, &be):
-		return &BridgeError{Code: be.Code, Message: ToolRefused, Detail: err.Error()}
+		return &BridgeError{Code: be.Code, Message: ToolRefused, Detail: err.Error(), Hint: be.Hint}
 	case untrustedTLS(err):
 		return &BridgeError{Code: CodeTLSUntrusted, Message: ToolUnreachable, Detail: err.Error()}
 	case errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded):
@@ -256,4 +257,13 @@ func readAnswer(resp *http.Response, id int) ([]byte, error) {
 		}
 	}
 	return nil, &BridgeError{Code: CodeHostUnavailable, Message: ToolUnreachable, Detail: "the MCP server sent no answer"}
+}
+
+// mcpHost is the host name of an address; "" when it has none.
+func mcpHost(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }

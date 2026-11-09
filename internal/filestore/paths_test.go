@@ -53,3 +53,30 @@ func TestSyncedFolderLayouts(t *testing.T) {
 		t.Error("SkippedDir: .folders is walked, other hidden folders are not")
 	}
 }
+
+// of a project's hidden media folder only the published files and the PDF mark sync.
+func TestPublishedMediaSyncs(t *testing.T) {
+	for rel, want := range map[string]bool{
+		"deck/.media/published/deck.pdf":     true,
+		"deck/.media/published/deck.pdf.rev": true,
+		"deck/.media/pdf-auto":               true,
+		"deck/.media/published/.hidden":      false,
+		"deck/.media/published/CLAUDE.md":    false,
+		"deck/.media/published/x.html":       false,
+		"deck/.media/published/video.mp4":    true,
+		"deck/.media/published/a/b.pdf":      false,
+		"deck/.media/rec/x.webm":             false,
+		"deck/.media/exports/x.pdf":          false,
+		".media/published/deck.pdf":          false,
+		"deck/project/.media/published/x":    false,
+	} {
+		if got := Synced(rel); got != want {
+			t.Errorf("Synced(%q) = %v, want %v", rel, got, want)
+		}
+	}
+	for rel, want := range map[string]bool{"deck/.media": false, "deck/.media/published": false, "deck/.media/rec": true, "deck/.claims": true} {
+		if got := SkippedDir(rel); got != want {
+			t.Errorf("SkippedDir(%q) = %v, want %v", rel, got, want)
+		}
+	}
+}

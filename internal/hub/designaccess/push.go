@@ -2,7 +2,9 @@ package designaccess
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -64,21 +66,8 @@ func (s *Service) build(ctx context.Context, m store.Machine) (snapshot, error) 
 		people[e] = snapPerson{Projects: map[string]snapGrant{}, Team: map[string]string{}}
 	}
 
-	rows, err := t.q.Query(ctx, `SELECT `+projectCols+` FROM design_projects WHERE machine_id = ? ORDER BY project_id`, m.ID)
+	projects, err := t.projects()
 	if err != nil {
-		return snapshot{}, err
-	}
-	var projects []project
-	for rows.Next() {
-		p, err := scanProject(rows)
-		if err != nil {
-			rows.Close()
-			return snapshot{}, err
-		}
-		projects = append(projects, p)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
 		return snapshot{}, err
 	}
 	for _, p := range projects {
@@ -124,6 +113,61 @@ func (s *Service) build(ctx context.Context, m store.Machine) (snapshot, error) 
 		}
 	}
 	return snap, nil
+}
+
+// projects are the rows that count on the machine: its own, and with a shared library those of every machine of its
+// space (one row per project, the one key picks).
+func (t *txn) projects() ([]project, error) {
+	q, args := `SELECT machine_id, `+projectCols+` FROM design_projects WHERE machine_id = ? ORDER BY project_id`, []any{t.m.ID}
+	if t.shared && t.m.SpaceID != "" {
+		q = `SELECT p.machine_id, ` + prefixed(projectCols, "p.") + ` FROM design_projects p JOIN machines m ON m.id = p.machine_id
+			WHERE m.space_id = ? AND m.revoked_at IS NULL ORDER BY p.project_id, p.updated_at DESC, p.machine_id`
+		args = []any{t.m.SpaceID}
+	}
+	rows, err := t.q.Query(t.ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	type row struct {
+		machine string
+		p       project
+	}
+	var all []row
+	for rows.Next() {
+		var r row
+		var owner, home sql.NullString
+		var share, legacy int
+		if err := rows.Scan(&r.machine, &r.p.ID, &owner, &r.p.OwnerName, &home, &r.p.TeamLevel, &share, &legacy); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		r.p.Owner, r.p.HomeTeam, r.p.EditorsCanShare, r.p.Legacy = owner.String, home.String, share != 0, legacy != 0
+		all = append(all, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var out []project
+	for _, r := range all {
+		if len(out) > 0 && out[len(out)-1].ID == r.p.ID {
+			continue
+		}
+		// The machine's own row wins; otherwise the newest, as key picks it.
+		if home := t.key(r.p.ID); home != r.machine {
+			continue
+		}
+		out = append(out, r.p)
+	}
+	return out, nil
+}
+
+func prefixed(cols, prefix string) string {
+	parts := strings.Split(cols, ", ")
+	for i, c := range parts {
+		parts[i] = prefix + c
+	}
+	return strings.Join(parts, ", ")
 }
 
 // push sends the machine its snapshot; a machine offline gets it when its link comes back.

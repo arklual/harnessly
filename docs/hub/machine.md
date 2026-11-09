@@ -500,6 +500,8 @@ machine answers `ownerId` in `GET /api/machines/{id}`.
   Updates shows the state and has «Update now». `RUNTIME_AUTO_UPDATE=0` in `runtime.env` leaves it to the button. The
   `dir` profile (`/usr/local/bin`, read-only to the services) and a container cannot update themselves: Settings shows
   the command below.
+- **Fleet mode** (`RUNTIME_UPDATE_MODE=fleet`, off by default): a machine that takes whole releases from a rollout
+  (stage, switch with a health check, rollback, deltas) instead of the hourly pull: [fleet-rollout.md](fleet-rollout.md).
 - **Upgrade by hand**: `curl -fsSL https://hub.example.com/install | sh -s -- --update` (`sudo sh` for `dir`): no code,
   the profile it was installed with, the same machine. Running the install command again works too. It
   replaces the programs, keeps the policy, the ports and the machine, and restarts the services. A machine that is
@@ -564,3 +566,9 @@ for `~/.local/bin` in the shell's start file, and the hub's update of the machin
 
 Only the voice checks reach the network, and only when the model or the server binary is still to be downloaded: a
 `HEAD` request to `huggingface.co` and `github.com`, kept for ten minutes.
+
+## Disk tab (`/api/fs/*`)
+
+Off by default. Set `RUNTIME_DISK_ROOTS="Label=/abs/path;Other=/abs/other"` on the runtime to turn it on; GET `/api/capabilities` then reports `disk` as on. The id of a root is its label as a slug. Routes: `roots`, `list` (paged, 500 per page), `favorites` (GET/POST/DELETE, kept in `<data>/disk-favorites.json`), `download` (ranges supported), `mkdir`, and resumable `uploads` (create, `HEAD`/`PUT` with `Upload-Offset`, `complete`, `DELETE`; unfinished uploads sit in `<data>/disk-uploads/`).
+
+Only the named roots are reachable: a path with `..`, an absolute path, or a symbolic link that leads out of its root is refused with 403 (`internal/diskfs`).

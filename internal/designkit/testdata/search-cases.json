@@ -1,0 +1,25 @@
+{
+  "about": "The kit search rule (index.go, kit-search.ts): every case is run by both. index: entries as the runtime builds them; cases: a query and the nodes it must return, best first (want), or must not return (not).",
+  "index": [
+    { "node": "component:ConfirmDialog", "kind": "component", "title": "ConfirmDialog", "path": "Overlays", "words": "confirmdialog confirmdialog окно подтверждения опасного действия: удалить мероприятие, отменить заказ. overlays" },
+    { "node": "component:Dialog", "kind": "component", "title": "Dialog", "path": "Overlays", "words": "dialog dialog модальное окно поверх страницы для формы или подробностей. overlays" },
+    { "node": "component:DatePicker", "kind": "component", "title": "DatePicker", "path": "Inputs", "words": "datepicker datepicker выбор даты в календаре дата день inputs" },
+    { "node": "component:Table", "kind": "component", "title": "Table", "path": "Data", "words": "table table таблица записей со столбцами и сортировкой data" },
+    { "node": "component:ToggleGroup", "kind": "component", "title": "ToggleGroup", "path": "Inputs", "words": "togglegroup togglegroup переключатель вида: таблица или карточки inputs" },
+    { "node": "component:Alert", "kind": "component", "title": "Alert", "path": "Feedback", "words": "alert alert сообщение об ошибке или предупреждение на странице error warning booking failed feedback" },
+    { "node": "component:BookingCard", "kind": "component", "title": "BookingCard", "path": "Data", "words": "bookingcard bookingcard a booked meeting room with time and attendees; cancel or edit it data" },
+    { "node": "color:accent", "kind": "color", "title": "accent", "path": "#3b82f6 3b82f6", "words": "accent #3b82f6 3b82f6 primary buttons, links." }
+  ],
+  "cases": [
+    { "q": "подтверждение удаления", "want": ["component:ConfirmDialog"] },
+    { "q": "выбор даты", "want": ["component:DatePicker"] },
+    { "q": "таблица", "want": ["component:Table", "component:ToggleGroup"] },
+    { "q": "уведомление об ошибке", "want": ["component:Alert"] },
+    { "q": "confirm cancel booking", "want": ["component:BookingCard"] },
+    { "q": "#3b82f6", "want": ["color:accent"] },
+    { "q": "dialog", "want": ["component:Dialog", "component:ConfirmDialog"] },
+    { "q": "окно", "want": ["component:ConfirmDialog", "component:Dialog"] },
+    { "q": "календарь платежей", "want": ["component:DatePicker"] },
+    { "q": "зебра", "want": [] }
+  ]
+}

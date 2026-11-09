@@ -92,3 +92,52 @@ func TestAppsConsentPolicyOverTheCLI(t *testing.T) {
 		t.Fatalf("with the rule the install gets its rights at once: %d %s", code, body)
 	}
 }
+
+// A dev install where signatures are required goes through, says so in words and writes it in the app's journal.
+func TestAppsDevInstallWarnsWhereSignaturesAreRequired(t *testing.T) {
+	call, _ := appRig(t)
+	reg := apps.Open(decRigDir)
+	cli := map[string]string{"x-cli-token": "tok"}
+	code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkgDir(t, "storage", "notify")+`","dev":true}`, cli)
+	if code != http.StatusOK || !strings.Contains(body, `"warning":""`) {
+		t.Fatalf("no rule, no warning: %d %s", code, body)
+	}
+	if err := reg.Remove("acme.demo"); err != nil {
+		t.Fatal(err)
+	}
+	apps.SetNetwork(apps.DeployNetwork{RequireSigned: true})
+	t.Cleanup(func() { apps.SetNetwork(apps.DeployNetwork{}) })
+	code, body = call("POST", "/api/cli/apps/install", `{"dir":"`+pkgDir(t, "storage", "notify")+`","dev":true}`, cli)
+	if code != http.StatusOK || !strings.Contains(body, "подпись не проверяет") {
+		t.Fatalf("the dev install warns: %d %s", code, body)
+	}
+	lines, _ := reg.ReadJournal("acme.demo", 10)
+	var found bool
+	for _, l := range lines {
+		found = found || l.What == "install.dev-unsigned"
+	}
+	if !found {
+		t.Fatalf("the journal remembers the exception: %+v", lines)
+	}
+}
+
+// Where signatures are required a folder install over the CLI is refused in words (the fail-open of HRN-966); only the
+// explicit dev install passes.
+func TestAppsFolderInstallRefusedWhereSignaturesAreRequired(t *testing.T) {
+	call, _ := appRig(t)
+	reg := apps.Open(decRigDir)
+	cli := map[string]string{"x-cli-token": "tok"}
+	apps.SetNetwork(apps.DeployNetwork{RequireSigned: true})
+	t.Cleanup(func() { apps.SetNetwork(apps.DeployNetwork{}) })
+	code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkgDir(t, "storage", "notify")+`"}`, cli)
+	if code != http.StatusForbidden || !strings.Contains(body, `"error":"signature"`) || !strings.Contains(body, "подпис") {
+		t.Fatalf("a folder install is refused: %d %s", code, body)
+	}
+	if list, _ := reg.List(); len(list) != 0 {
+		t.Fatalf("nothing installed: %+v", list)
+	}
+	code, body = call("POST", "/api/cli/apps/install", `{"dir":"`+pkgDir(t, "storage", "notify")+`","dev":true}`, cli)
+	if code != http.StatusOK {
+		t.Fatalf("the dev install is the exception: %d %s", code, body)
+	}
+}

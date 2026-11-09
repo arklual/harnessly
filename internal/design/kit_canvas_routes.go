@@ -29,6 +29,36 @@ type KitCard struct {
 	CoverTheme string `json:"coverTheme"`
 	Layouts    int    `json:"layouts"`
 	Assets     int    `json:"assets"`
+	// ThemeCards is a card per theme (a kit of several brands shows each on the shelf), in the kit's order.
+	ThemeCards []KitThemeCard `json:"themeCards"`
+}
+
+// KitThemeCard is a theme of a kit on the shelf: its cover (a path in the version) and how many templates it holds.
+type KitThemeCard struct {
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Cover   string `json:"cover"`
+	Layouts int    `json:"layouts"`
+}
+
+// themeCard counts a theme's templates (its guide and its empty master layouts are not) and takes the first template's
+// cover.
+func themeCard(c *designkit.Canvas, title string) KitThemeCard {
+	tc := KitThemeCard{ID: c.Theme, Title: title}
+	for _, t := range c.Templates {
+		if t.Section != designkit.SectionTemplates || t.Blank {
+			continue
+		}
+		for _, s := range t.Sections {
+			for _, l := range s.Layouts {
+				tc.Layouts++
+				if tc.Cover == "" && l.ID == t.Cover && l.Thumb != "" {
+					tc.Cover = joinBase(c.Base, l.Thumb)
+				}
+			}
+		}
+	}
+	return tc
 }
 
 func (a *API) kitGet(r *http.Request) (Answer, bool) {
@@ -72,6 +102,16 @@ func KitCards(dir string) []KitCard {
 		for _, g := range c.Assets {
 			card.Assets += len(g.Items)
 		}
+		card.ThemeCards = []KitThemeCard{}
+		for _, th := range c.Themes {
+			tc := c
+			if th.ID != c.Theme {
+				if tc, err = designkit.ReadCanvas(dir, k.ID, v, th.ID); err != nil {
+					continue
+				}
+			}
+			card.ThemeCards = append(card.ThemeCards, themeCard(tc, th.Title))
+		}
 		out = append(out, card)
 	}
 	return out
@@ -109,6 +149,9 @@ func (a *API) KitCanvas(r *http.Request) Answer {
 	dir := a.L.KitsDir()
 	id := QueryString(r, "kit")
 	version := newestVersion(dir, id, QueryString(r, "version"))
+	if !a.draftGate(r, id, version) {
+		return JSON(r, http.StatusNotFound, errorBody(locale.Pick("The kit has no draft", "У кита нет черновика")), noStore())
+	}
 	c, err := designkit.ReadCanvas(dir, id, version, QueryString(r, "theme"))
 	if errors.Is(err, designkit.ErrNoCanvas) {
 		return JSON(r, http.StatusNotFound, errorBody(locale.Pick("The kit has no canvas", "У кита нет холста")), noStore())
@@ -131,6 +174,9 @@ func (a *API) KitFile(w http.ResponseWriter, r *http.Request) {
 	dir := a.L.KitsDir()
 	id, version := QueryString(r, "kit"), QueryString(r, "version")
 	var file string
+	if !a.draftGate(r, id, version) {
+		version = ""
+	}
 	if prep := QueryString(r, "prep"); prep != "" {
 		file = designkit.PreparedFile(dir, id, version, QueryString(r, "theme"), prep)
 	} else if rel := QueryString(r, "path"); rel != "" && !strings.Contains(rel, "\\") {
@@ -151,7 +197,7 @@ func (a *API) KitFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
-	a.L.serveStatic(w, r, file, st, typ, ext, kitImmutable, r.Method == http.MethodHead)
+	a.L.serveStatic(w, r, file, st, typ, ext, a.L.kitCache(file), r.Method == http.MethodHead)
 }
 
 // KitProject is POST {kit, version, theme, template} (a session): the template as a project of boards, one page per

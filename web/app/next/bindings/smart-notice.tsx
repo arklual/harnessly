@@ -5,13 +5,15 @@
 // ⌘J opens and folds it (with nothing waiting it opens the notification centre); Esc folds it and gives the field back
 // its focus. What was done from it goes to the history the notification centre lists. A machine in the red (its
 // health, as the machine's banner has it) is an item too: what weighs on it comes from the Machine tool's figures, read
-// while its card is open, and a program can be stopped from there. Swept aside or put away, an item is hidden until its
-// next event; a toast gives it back.
+// while its card is open, and a program can be stopped from there. Put away, what waits goes into a drop in the chat's
+// right column (stores/smart-drops.ts) and stays there, the only reminder of it, until it is answered or pressed back;
+// put away by hand (not thrown), the black shape flows into the drop, and pressed, out of it back into the card.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useCodeAsks } from '@/next/bindings/code-asks';
 import { firstToPing, soundOn } from '@/next/bindings/notices';
 import { settled } from '@/next/bindings/outcome';
-import { answerQuestion, decidePermission } from '@/next/commands';
+import { answerQuestion, decidePermission, sendMessage } from '@/next/commands';
+import { useVoice } from '@/next/bindings/use-voice';
 import { useConversationChannel } from '@/next/core/realtime/hub';
 import { useKeys } from '@/next/features/keys/use-keys';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
@@ -34,10 +36,26 @@ import { openGates, useGates } from '@/next/stores/conversation';
 import { useConversationList } from '@/next/stores/conversations';
 import { addHistory, setHistoryPerson } from '@/next/stores/notice-history';
 import { SAMPLE_CHAT, setNotify, useNotify, type INotice } from '@/next/stores/notices';
+import { setDrops, takeDropBack, useDropBack, type IDrop } from '@/next/stores/smart-drops';
+import { fly, snap } from '@/next/features/smart-notice/fly';
 import { toast } from '@/next/ui/toast';
 
-/** A finished or broken turn, and the newest of what waits, tell what came this long in two lines. */
-export const ANNOUNCE_MS = 4000;
+/** The newest of what waits tells what came this long in two lines, then folds into the line. */
+export const ANNOUNCE_MS = 5000;
+/** A finished or broken turn stays this long (longer while the pointer is on it); what waits stays until answered. */
+export const NEWS_MS = 7000;
+/** A finished chat written to shows «sent» this long, then goes. */
+const SENT_SHOW_MS = 1800;
+/** News the pointer has just left stays this much longer, so it does not vanish from under the eye. */
+const HOLD_GRACE_MS = 2500;
+/** What waits for the person: put away, it stays as a drop. News put away is gone. */
+const WAITS: ReadonlySet<TSmartKind> = new Set([
+  SMART_KIND.code,
+  SMART_KIND.permission,
+  SMART_KIND.question,
+  SMART_KIND.plan,
+  SMART_KIND.machine,
+]);
 /** How far over the field of the chat the plate stands, px. */
 const OVER_FIELD_PX = 12;
 const TICK_MS = 1000;
@@ -76,16 +94,24 @@ const NOTICE_KIND_OF: Record<Exclude<INotice['kind'], 'waiting'>, TSmartKind> = 
   limit: SMART_KIND.limit,
 };
 
-/** The notices as items: what waits while its chat's gate is open, the rest while it is news (or the card is open). */
+/** A finished chat's recap the machine wrote for its notice (the notification centre's chat adds it; none before). */
+const summaryOf = (n: INotice): string | null => {
+  const said = (n as { summary?: unknown }).summary;
+  return typeof said === 'string' && said.trim() !== '' ? said : null;
+};
+
+/** The notices as items: what waits while its chat's gate is open, the rest while it is news, or while `keep` (the card
+ *  is open or the plate is held). */
 export const itemsOfNotices = (
   notices: readonly INotice[],
   convs: ReadonlyMap<string, Conversation>,
   now: number,
-  open: boolean,
+  keep: boolean,
 ): ISmartItem[] =>
   notices.flatMap((n): ISmartItem[] => {
     const base = {
       key: n.key,
+      summary: summaryOf(n),
       chatId: n.chatId,
       icon: n.icon,
       title: n.title,
@@ -94,12 +120,12 @@ export const itemsOfNotices = (
       until: null,
     };
     if (n.chatId === SAMPLE_CHAT)
-      return now - n.at < ANNOUNCE_MS ? [{ ...base, kind: SMART_KIND.done, chatId: null }] : [];
+      return keep || now - n.at < NEWS_MS ? [{ ...base, kind: SMART_KIND.done, chatId: null }] : [];
     if (n.kind === 'waiting') {
       const gate = convs.get(n.chatId)?.gate;
       return gate ? [{ ...base, kind: GATE_KIND[gate.kind] }] : [];
     }
-    return open || now - n.at < ANNOUNCE_MS ? [{ ...base, kind: NOTICE_KIND_OF[n.kind] }] : [];
+    return keep || now - n.at < NEWS_MS ? [{ ...base, kind: NOTICE_KIND_OF[n.kind] }] : [];
   });
 
 /** The machine's codes as items; `skew` is the machine's clock minus this page's. */
@@ -295,19 +321,86 @@ const SmartNoticeHost = ({
   const [byKeys, setByKeys] = useState(false);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const now = useTick(notices.length > 0 || codes.asks.length > 0 || machineNotices.length > 0);
+  // Held: the pointer or the focus is on the plate; then a little longer after it leaves.
+  const [held, setHeld] = useState(false);
+  const [graceUntil, setGraceUntil] = useState(0);
+  const onHold = useCallback((on: boolean) => {
+    setHeld(on);
+    if (!on) setGraceUntil(Date.now() + HOLD_GRACE_MS);
+  }, []);
+  const keep = open || held || now < graceUntil;
 
   const byId = useMemo(() => new Map<string, Conversation>((convs ?? []).map((c) => [c.id, c])), [convs]);
-  const items = useMemo(
+  const all = useMemo(
     () =>
       settings.cards
         ? orderItems([
             ...itemsOfCodes(codes.asks, codes.skew),
             ...itemsOfMachines(machineNotices),
-            ...itemsOfNotices(notices, byId, now, open),
-          ]).filter((item) => !hidden.has(item.key))
+            ...itemsOfNotices(notices, byId, now, keep),
+          ])
         : [],
-    [settings.cards, codes.asks, codes.skew, machineNotices, notices, byId, now, open, hidden],
+    [settings.cards, codes.asks, codes.skew, machineNotices, notices, byId, now, keep],
   );
+  const items = useMemo(() => all.filter((item) => !hidden.has(item.key)), [all, hidden]);
+
+  // What waits and was put away is in the drops (a code of the chat on screen is in its column already).
+  const drops = useMemo(
+    (): IDrop[] =>
+      all
+        .filter((item) => hidden.has(item.key) && WAITS.has(item.kind))
+        .filter(
+          (item) => !(item.kind === SMART_KIND.code && item.chatId !== null && item.chatId === currentId),
+        )
+        .map((item) => ({
+          item,
+          what:
+            item.kind === SMART_KIND.code
+              ? (codes.asks.find((a) => `code:${a.id}` === item.key)?.why ?? null)
+              : item.text || null,
+        })),
+    [all, hidden, currentId, codes.asks],
+  );
+  useEffect(() => setDrops(drops), [drops]);
+  useEffect(() => () => setDrops([]), []);
+
+  // A drop pressed: the card grows out of it, open (adjusted while rendering, as React advises).
+  const back = useDropBack();
+  const [arrive, setArrive] = useState<{
+    key: string;
+    from: DOMRect | null;
+    view: HTMLElement | null;
+  } | null>(null);
+  if (back !== null && arrive?.key !== back.key) {
+    setArrive({ key: back.key, from: back.from, view: back.view });
+    setHidden((was) => {
+      const next = new Set(was);
+      next.delete(back.key);
+      return next;
+    });
+    setMainKey(back.key);
+    setOpen(true);
+  }
+  useEffect(() => {
+    if (back !== null) takeDropBack();
+  }, [back]);
+  useEffect(() => {
+    if (arrive === null) return;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const body = document.querySelector<HTMLElement>('.hx-sn .hx-sn__body:not([data-ghost])');
+        if (!arrive.from || !body) {
+          setArrive(null);
+          return;
+        }
+        void fly(
+          { rect: arrive.from, radius: 22, view: arrive.view },
+          { rect: body.getBoundingClientRect(), radius: 28, view: snap(body) },
+        ).then(() => setArrive(null));
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [arrive]);
   const main = items.find((item) => item.key === mainKey) ?? items[0] ?? null;
   const conv = main?.chatId ? (byId.get(main.chatId) ?? null) : null;
   const sick =
@@ -375,8 +468,10 @@ const SmartNoticeHost = ({
       return { k: 'permission', command: permission.command ?? permission.tool ?? '' };
     }
     if (sick) return machineDetail(sick.alert.metric, stats);
+    if (main.kind === SMART_KIND.done)
+      return { k: 'done', summary: main.summary ?? null, canReply: conv !== null };
     return { k: 'plain' };
-  }, [main, codes.asks, question, permission, sick, stats]);
+  }, [main, codes.asks, question, permission, sick, stats, conv]);
 
   const anchor = useFieldAnchor(settings.place === 'bottom-center' && items.length > 0, currentId ?? '');
 
@@ -392,6 +487,26 @@ const SmartNoticeHost = ({
       }),
     [],
   );
+
+  // The card's field: a question's own answer, or words to a finished chat; dictated as in the chat's field.
+  const [replyText, setReplyText] = useState('');
+  const voice = useVoice(conv?.machineId ?? machine, replyText, setReplyText);
+  const reply = {
+    text: replyText,
+    setText: setReplyText,
+    recording: voice.recording,
+    onMic: voice.onMic ? () => voice.onMic?.() : undefined,
+    onCancelRecording: voice.onCancelRecording,
+    onFinishRecording: voice.onFinishRecording,
+  };
+  const onReply = async (item: ISmartItem, text: string) => {
+    if (!conv || conv.id !== item.chatId) return;
+    sendMessage(conv.machineId, { conversationId: conv.id, text });
+    remember(item, t('next.smart.history.reply', { text }), 'arrow-up');
+    // It folds into «sent» for a moment, then goes.
+    setGraceUntil(Date.now() + SENT_SHOW_MS);
+    window.setTimeout(() => setHidden((was) => new Set(was).add(item.key)), SENT_SHOW_MS);
+  };
 
   const onAnswer = async (item: ISmartItem, answer: { choice: number } | { text: string }) => {
     if (!conv || !question) return;
@@ -458,20 +573,26 @@ const SmartNoticeHost = ({
     remember(item, t('next.smart.history.stopped', { name: proc.name }), 'circle-stop');
   };
 
-  const onHide = (item: ISmartItem) => {
+  const onHide = (item: ISmartItem, from: DOMRect | null) => {
+    // What it shows now, before it goes: the flight carries it into the drop.
+    const view = from ? snap(document.querySelector('.hx-sn .hx-sn__body:not([data-ghost])')) : null;
     setHidden((was) => new Set(was).add(item.key));
-    toast(t('next.smart.hidden'), {
-      description: t(item.kind === SMART_KIND.machine ? 'next.smart.hiddenMachine' : 'next.smart.hiddenText'),
-      action: {
-        label: t('next.smart.unhide'),
-        onClick: () =>
-          setHidden((was) => {
-            const next = new Set(was);
-            next.delete(item.key);
-            return next;
-          }),
-      },
-    });
+    // News put away is gone; what waits goes into its drop, flowing there when it was put away by hand.
+    if (!from || !WAITS.has(item.kind)) return;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const drop = document.querySelector<HTMLElement>(`[data-drop-key="${CSS.escape(item.key)}"]`);
+        if (!drop) return;
+        const to = snap(drop);
+        drop.dataset.arriving = '';
+        void fly(
+          { rect: from, radius: 24, view },
+          { rect: drop.getBoundingClientRect(), radius: 22, view: to },
+        ).then(() => {
+          delete drop.dataset.arriving;
+        });
+      }),
+    );
   };
 
   useKeys(KEY_SCOPE.global, {
@@ -530,6 +651,10 @@ const SmartNoticeHost = ({
       announceMs={ANNOUNCE_MS}
       returnFocus={focusField}
       focusOnOpen={byKeys}
+      onHold={onHold}
+      arriving={arrive !== null}
+      reply={reply}
+      onReply={onReply}
     />
   );
 };

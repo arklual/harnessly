@@ -121,19 +121,27 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 	if err != nil {
 		return err
 	}
-	isMember := map[string]bool{}
+	memberID := map[string]string{}
 	for _, m := range members {
-		isMember[m.Email] = true
+		memberID[m.Email] = m.UserID
 	}
 	inviter, err := st.InviterLabel(ctx, p.User.ID)
 	if err != nil {
 		return err
 	}
 
-	out := []InviteView{}
+	out, joined := []InviteView{}, []string{}
 	for _, email := range emails {
-		if isMember[email] {
-			continue // already in: nothing to send, nothing to show
+		if uid, ok := memberID[email]; ok {
+			// Already in the tenant: no letter, but the team the owner named takes them at once (before, the
+			// address was dropped silently and the person never reached the team or its machines).
+			if req.TeamID != "" {
+				if err := st.AddTeamMember(ctx, req.TeamID, uid, false, now); err != nil {
+					return err
+				}
+			}
+			joined = append(joined, email)
+			continue
 		}
 		token := newToken()
 		one := 1
@@ -171,7 +179,7 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 	}
 	s.auth.Audit(ctx, p.User.ID, "invite_created", r, spaceID+" email x"+strconv.Itoa(len(out)))
 	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"invites": out})
+	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"invites": out, "joined": joined})
 	return nil
 }
 
@@ -420,10 +428,13 @@ func (s *Service) acceptInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 		return map[string]any{"space": auth.SpaceRef{ID: sp.ID, Slug: sp.Slug, Name: sp.Name, Role: role}}
 	}
 
-	// Someone who is in the space already is not an error: the link just takes them there.
+	// Someone who is in the space already is not an error: the link takes them there, and into its team.
 	if role, err := st.Role(ctx, sp.ID, p.User.ID); err != nil {
 		return err
 	} else if role != "" {
+		if err := s.joinInviteTeam(r, p, iv, sp.ID, now); err != nil {
+			return err
+		}
 		httpx.WriteJSON(w, http.StatusOK, ref(role))
 		return nil
 	}
@@ -449,17 +460,7 @@ func (s *Service) acceptInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 		if err := tx.AddMember(ctx, sp.ID, p.User.ID, iv.Role); err != nil {
 			return err
 		}
-		// The team of the invitation, if it still exists in the space: a team deleted since is no reason to refuse.
-		teamID, err := tx.InviteTeam(ctx, iv.ID)
-		if err != nil || teamID == "" {
-			return err
-		}
-		if t, err := tx.TeamByID(ctx, teamID); err == nil && t.SpaceID == sp.ID {
-			return tx.AddTeamMember(ctx, t.ID, p.User.ID, false, now)
-		} else if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return err
-		}
-		return nil
+		return addToInviteTeam(ctx, tx, iv.ID, sp.ID, p.User.ID, now)
 	})
 	if store.IsUnique(err) {
 		// Accepted twice at once: the other request won, the person is in.
@@ -472,6 +473,48 @@ func (s *Service) acceptInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 	s.auth.Audit(ctx, p.User.ID, "invite_accepted", r, sp.ID+" "+iv.ID)
 	s.events.PublishJSON(sp.ID, "members", struct{}{}, false)
 	httpx.WriteJSON(w, http.StatusOK, ref(iv.Role))
+	return nil
+}
+
+// addToInviteTeam puts the person in the team of the invitation, if it still exists in the space: a team deleted
+// since is no reason to refuse.
+func addToInviteTeam(ctx context.Context, tx store.Store, inviteID, spaceID, userID string, now time.Time) error {
+	teamID, err := tx.InviteTeam(ctx, inviteID)
+	if err != nil || teamID == "" {
+		return err
+	}
+	if t, err := tx.TeamByID(ctx, teamID); err == nil && t.SpaceID == spaceID {
+		return tx.AddTeamMember(ctx, t.ID, userID, false, now)
+	} else if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	return nil
+}
+
+// joinInviteTeam handles a live invitation opened by someone already in its space: they go into its team, and an
+// email invitation meant for them is spent so it leaves "awaiting". One for another address changes nothing.
+func (s *Service) joinInviteTeam(r *http.Request, p *auth.Principal, iv store.Invite, spaceID string, now time.Time) error {
+	if !valid(iv, now) {
+		return nil
+	}
+	if iv.Kind == "email" {
+		if ok, err := s.ownsEmail(r, p, iv.Email); err != nil || !ok {
+			return err
+		}
+	}
+	ctx := r.Context()
+	err := s.db.Tx(ctx, func(tx store.Store) error {
+		if iv.Kind == "email" {
+			if _, err := tx.UseInvite(ctx, iv.ID, p.User.ID, now); err != nil {
+				return err
+			}
+		}
+		return addToInviteTeam(ctx, tx, iv.ID, spaceID, p.User.ID, now)
+	})
+	if err != nil {
+		return err
+	}
+	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
 	return nil
 }
 

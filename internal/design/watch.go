@@ -23,11 +23,14 @@ const maxWatchedDirs = 20000
 type rootWatch struct {
 	// asked is the root as the library names it; root is the folder it resolves to, which the watches are on: a walk
 	// does not enter a link, so a root reached through one would otherwise be watched not at all.
-	asked    string
-	root     string
-	w        *fsnotify.Watcher
-	mu       sync.Mutex
-	dirs     int
+	asked string
+	root  string
+	w     *fsnotify.Watcher
+	mu    sync.Mutex
+	dirs  int
+	// watched are the folders already watched, so a walk again (after an overflow, or of a folder just filled) adds
+	// only the ones missed.
+	watched  map[string]bool
 	done     chan struct{}
 	stopping bool
 	// overflow carries "the kernel dropped events" from drainErrors to loop; one pending note is all that is needed.
@@ -163,13 +166,21 @@ func (rw *rootWatch) addTree(dir string) error {
 			return filepath.SkipDir
 		}
 		rw.mu.Lock()
-		full := rw.dirs >= maxWatchedDirs
-		if !full {
+		if rw.watched == nil {
+			rw.watched = map[string]bool{}
+		}
+		known := rw.watched[p]
+		full := !known && rw.dirs >= maxWatchedDirs
+		if !known && !full {
 			rw.dirs++
+			rw.watched[p] = true
 		}
 		rw.mu.Unlock()
 		if full {
 			return filepath.SkipAll
+		}
+		if known {
+			return nil
 		}
 		if err := rw.w.Add(p); err != nil && p == dir {
 			first = err
@@ -177,6 +188,38 @@ func (rw *rootWatch) addTree(dir string) error {
 		return nil
 	})
 	return first
+}
+
+// forget drops a folder that went away (and the folders under it) from the watched ones, so one made again at the
+// same path is watched again.
+func (rw *rootWatch) forget(dir string) {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
+	if !rw.watched[dir] {
+		return
+	}
+	prefix := dir + string(filepath.Separator)
+	for p := range rw.watched {
+		if p == dir || strings.HasPrefix(p, prefix) {
+			delete(rw.watched, p)
+			rw.dirs--
+		}
+	}
+}
+
+// watchTree watches a folder of the library just filled in one go (a kit's draft), whose many writes may have run
+// past the kernel's queue before the watcher saw the folders made.
+func (l *Library) watchTree(dir string) {
+	ws := &l.listing.watch
+	ws.mu.Lock()
+	rw := ws.cur
+	ws.mu.Unlock()
+	if rw == nil {
+		return
+	}
+	if real, err := filepath.EvalSymlinks(dir); err == nil {
+		_ = rw.addTree(real)
+	}
 }
 
 func (rw *rootWatch) close() {
@@ -214,8 +257,13 @@ func (rw *rootWatch) loop(l *Library) {
 					_ = rw.addTree(ev.Name)
 				}
 			}
+			if ev.Has(fsnotify.Remove | fsnotify.Rename) {
+				rw.forget(ev.Name)
+			}
 			l.notify(rel)
 		case <-rw.overflow:
+			// The kernel dropped events, the creation of folders among them: walk again for the folders missed.
+			_ = rw.addTree(rw.root)
 			l.listing.invalidateAll()
 			l.notify(".")
 		}

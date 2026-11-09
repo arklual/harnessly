@@ -39,18 +39,21 @@ func fixtureKit(t *testing.T) string {
      "variants": [{"id": "quiet", "name": "Quiet", "props": {"tone": "quiet"}}]}
   ]}],
   "assetGroups": {"icons": {"title": "Icons", "kind": "icon", "component": "Icon", "prop": "name", "items": [
-    {"name": "star", "file": "icons/star.png"}, {"name": "moon", "file": "icons/moon.png"}
+    {"name": "star", "file": "icons/star.png", "bg": "#333333"}, {"name": "moon", "file": "icons/moon.png", "bg": "url(x)"}
   ]}},
   "templates": [{"id": "deck", "title": "Deck", "kind": "slides", "aspect": [16, 9], "component": "Slide", "cover": "cover",
     "sections": [
       {"id": "covers", "title": "Covers", "layouts": [
         {"id": "cover", "name": "Cover", "purpose": "The first slide", "props": {"layout": "c1"},
          "board": "_harnessly/layouts/cover.dc.html", "thumb": "_harnessly/thumbs/cover.jpg",
-         "slots": [{"key": "title", "kind": "text", "sample": "Hello"}]}
+         "slots": [{"key": "title", "kind": "text", "label": "Title", "sample": "Hello"}]}
       ]},
       {"id": "content", "title": "Content", "layouts": [
         {"id": "list", "name": "List of points", "props": {"layout": "l2"}, "slots": []}
       ]}
+    ]},
+    {"id": "guide", "section": "reference", "title": "How to use", "sections": [
+      {"id": "how", "title": "How", "layouts": [{"id": "how1", "name": "Guides", "slots": []}]}
     ]}]
 }`))
 	write("sun/icons/star.png", pngOf(t, 64, 64, color.NRGBA{200, 120, 0, 255}))
@@ -97,8 +100,24 @@ func TestReadCanvasLaysOutTheKitByItsFields(t *testing.T) {
 	if len(c.Assets) != 1 || len(c.Assets[0].Items) != 2 || c.Assets[0].Items[0].NodeID != "asset:icons/star" {
 		t.Fatalf("assets = %+v", c.Assets)
 	}
-	if len(c.Templates) != 1 || len(c.Templates[0].Sections) != 2 {
+	if len(c.Templates) != 2 || len(c.Templates[0].Sections) != 2 {
 		t.Fatalf("templates = %+v", c.Templates)
+	}
+	if c.Templates[0].Section != SectionTemplates || c.Templates[1].Section != SectionReference {
+		t.Fatalf("a template's guide lives apart: %q %q", c.Templates[0].Section, c.Templates[1].Section)
+	}
+	var secs []string
+	for _, s := range c.Sections {
+		secs = append(secs, s.ID)
+	}
+	if strings.Join(secs, ",") != "components,templates,assets,reference" {
+		t.Fatalf("sections = %v", secs)
+	}
+	if a := c.Assets[0].Items; a[0].Bg != "#333333" || a[1].Bg != "" {
+		t.Fatalf("an asset's background is a hex colour or nothing: %+v", a)
+	}
+	if sl := c.Templates[0].Sections[0].Layouts[0].Slots[0]; sl.Label != "Title" {
+		t.Fatalf("slot = %+v", sl)
 	}
 	cover := c.Templates[0].Sections[0].Layouts[0]
 	if cover.NodeID != "layout:deck/cover" || cover.Address != "acme-cards/sun/cover" {

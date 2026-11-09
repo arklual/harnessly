@@ -339,7 +339,11 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 			return
 		}
 		var page TurnsPage
-		page, err = s.Service.Turns(ctx, id, before, limit)
+		if sp, ok := s.Service.(StepsPager); ok && q.Get("steps") == "all" {
+			page, err = sp.TurnsWithSteps(ctx, id, before, limit)
+		} else {
+			page, err = s.Service.Turns(ctx, id, before, limit)
+		}
 		page.Entries = trimOutputs(page.Entries, ToolOutputMax)
 		v = page
 	case len(parts) == 2 && parts[1] == "rewind" && s.Rewind != nil:

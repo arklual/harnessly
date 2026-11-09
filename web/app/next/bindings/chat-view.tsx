@@ -32,7 +32,7 @@ import { useChatHandoff } from '@/next/bindings/chat-handoff';
 import { useChatMove } from '@/next/bindings/chat-move';
 import MovedNote from '@/next/features/chat-move/moved-note';
 import { ChatLinks } from '@/next/features/chat/handoff';
-import { terminalStopText } from '@/next/bindings/shell-model';
+import { chatUrl, terminalStopText } from '@/next/bindings/shell-model';
 import { modelName, pickerAgentOf } from '@/next/features/composer/agents';
 import Feed from '@/next/features/chat/feed';
 import FileShare from '@/next/features/filedoc/file-share';
@@ -68,6 +68,7 @@ import { useMe } from '@/next/stores/me';
 import { messagesStore } from '@/next/stores/messages';
 import { doneReveal, useReveal } from '@/next/stores/reveal';
 import { t } from '@/next/i18n';
+import { copyLink } from '@/next/features/chat/link-menu';
 import { toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
 import { requestContinue } from '@/next/stores/ui-requests';
@@ -359,6 +360,7 @@ const ChatView = ({
                       <WorkflowRuns value={workflowRuns}>
                         <Feed
                           items={items}
+                          onCopyChatLink={() => copyLink(chatUrl(conv))}
                           failed={notFound || wait.expired}
                           failedReason={notFound ? null : failedReason}
                           onRetryLoad={() => {

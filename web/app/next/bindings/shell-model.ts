@@ -278,7 +278,7 @@ export const terminalStopText = (c: Pick<Conversation, 'state' | 'terminalStop'>
 };
 
 /** The chat's address in the new interface, for «Скопировать ссылку». */
-const chatUrl = (id: string) =>
+export const chatUrl = (id: string) =>
   `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.chat, id })}`;
 
 /** A chat's status and what it waits for: the one reading of a conversation that the sidebar's row, the tab over the

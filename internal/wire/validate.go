@@ -1027,8 +1027,11 @@ func byID(opID, id string) error { return errors.Join(need("opId", opID), convID
 func (c ConversationRenameCmd) Validate() error { return byID(c.OpID, c.ID) }
 
 func (c ConversationRetitleCmd) Validate() error { return byID(c.OpID, c.ID) }
-func (c ConversationPinCmd) Validate() error     { return byID(c.OpID, c.ID) }
-func (c ConversationTestCmd) Validate() error    { return byID(c.OpID, c.ID) }
+func (c ConversationSummarizeCmd) Validate() error {
+	return errors.Join(byID(c.OpID, c.ID), turnID("turnId", c.TurnID))
+}
+func (c ConversationPinCmd) Validate() error  { return byID(c.OpID, c.ID) }
+func (c ConversationTestCmd) Validate() error { return byID(c.OpID, c.ID) }
 
 // MaxConversationApps is how many apps one chat may have on at once.
 const MaxConversationApps = 8

@@ -5,9 +5,13 @@ package docs
 import "embed"
 
 // Guide holds the whole built-in library (library.go): the sections (each folder with a section.json: start, agents,
-// inside, self-host, build-apps), the repository's own pages they list (*.md, hub/), their pictures, the example packages
+// inside, self-host, build-apps), the repository's own pages they list (*.md, hub/, migrations/), their pictures, the example packages
 // of the apps guide, and the Russian translations under ru/ with the same file names. A page with no translation is read
 // in English.
 //
-//go:embed *.md all:hub all:build-apps all:apps all:ru all:start all:agents all:inside all:self-host
+//go:embed *.md all:hub all:migrations all:build-apps all:apps all:ru all:start all:agents all:inside all:self-host
 var Guide embed.FS
+
+// Migration is the page of a move of the machines' data (docs/migrations/<id>.md), as this version carries it:
+// `hub doctor` and `harnessly migrate` show it with the version that moves.
+func Migration(id string) ([]byte, error) { return Guide.ReadFile("migrations/" + id + ".md") }

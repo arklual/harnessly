@@ -49,10 +49,13 @@ export const setVoicePrefs = (patch: Partial<IVoicePrefs>): void => {
 /** What a dictation asks the machine to hear. */
 export type TDictationLang = 'ru' | 'en' | 'auto';
 
+/** The dictation language of an interface language: the machine hears Russian and English by name, the rest it detects. */
+export const dictationLangOf = (ui: string): TDictationLang => (ui === 'ru' || ui === 'en' ? ui : 'auto');
+
 /** The language a dictation asks the machine for. */
 export const dictationLang = (): TDictationLang => {
   const { lang } = voicePrefs();
-  return lang === 'ui' ? locale() : lang;
+  return lang === 'ui' ? dictationLangOf(locale()) : lang;
 };
 
 export const useVoicePrefs = (): IVoicePrefs =>

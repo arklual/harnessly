@@ -36,6 +36,7 @@ export const FEATURES = [
   'auto-continue',
   'made',
   'agent-browser',
+  'snapshot-after',
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 export const REACHES = ['online', 'unreachable', 'unknown'] as const;
@@ -348,6 +349,7 @@ export const OPS = [
   'favorites.place',
   'goal',
   'conversation.retitle',
+  'conversation.summarize',
   'draft.set',
   'queue.move',
   'terminal.stop',
@@ -1923,6 +1925,8 @@ export interface CommandBodies {
   } & ({ projectId: string } | { cwd: string });
   'conversation.rename': OpBody & { id: ConvId; title: string };
   'conversation.retitle': OpBody & { id: ConvId };
+  /** A few lines on what the agent did in the last turn, from the cheap model; they come on the record as its recap. */
+  'conversation.summarize': OpBody & { id: ConvId; turnId: TurnId };
   'conversation.pin': OpBody & { id: ConvId; pinned: boolean };
   'conversation.apps': OpBody & { id: ConvId; apps: string[] };
   'conversation.test': OpBody & { id: ConvId; test: boolean };
@@ -3296,6 +3300,7 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   ),
   'conversation.rename': object({ opId: id, id: convId, title: str }),
   'conversation.retitle': object({ opId: id, id: convId }),
+  'conversation.summarize': object({ opId: id, id: convId, turnId }),
   'conversation.pin': object({ opId: id, id: convId, pinned: bool }),
   'conversation.apps': object({ opId: id, id: convId, apps: array(id) }),
   'conversation.test': object({ opId: id, id: convId, test: bool }),

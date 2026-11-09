@@ -143,6 +143,8 @@ type Feed struct {
 	// rel is what the feed keeps while released (release.go); uses counts its reads beyond a look's summary.
 	rel  *releasedFeed
 	uses int
+	// builds counts the builds over all raws (rebuild): each costs the whole feed read.
+	builds int
 }
 
 type raw struct {
@@ -231,6 +233,7 @@ func (f *Feed) Poll() Update {
 
 // rebuild builds the feed over the raws read, with what the runtime set on it.
 func (f *Feed) rebuild() Update {
+	f.builds++
 	f.b = newBuilder(f.conv, f.provider)
 	f.b.vendor = f.vendor
 	var u Update
@@ -598,37 +601,63 @@ func (f *Feed) page(end, limit, full int) ([]wire.Turn, []wire.Entry, *string) {
 	return ts, es, before
 }
 
-// After is what follows an entry: the entries after it and the turns they touch. ok is false when the feed does not
-// have the entry.
+// After is what follows an entry: the entries after it, and every turn from the entry's own on, as they are now. The
+// turns go along whether or not an entry after the cursor touches them: a page that had the chat from elsewhere (the
+// cluster's copy) saw the entry's turn running, and has to learn that it ended, or that a new turn began
+// with nothing in it yet. ok is false when the feed does not have the entry.
 func (f *Feed) After(entryID string) (ts []wire.Turn, es []wire.Entry, ok bool) {
 	f.ensure()
 	i, has := f.b.byID[entryID]
 	if !has {
 		return nil, nil, false
 	}
-	ts, es = []wire.Turn{}, []wire.Entry{}
-	seen := map[string]bool{}
-	for _, e := range f.b.entries[i+1:] {
-		es = append(es, e)
-		if e.TurnID != nil && !seen[*e.TurnID] {
-			seen[*e.TurnID] = true
-			ts = append(ts, f.b.turns[f.b.byTurn[*e.TurnID]].rec)
+	es = append([]wire.Entry{}, f.b.entries[i+1:]...)
+	from := len(f.b.turns)
+	if id := f.b.entries[i].TurnID; id != nil {
+		if at, ok := f.b.byTurn[*id]; ok {
+			from = at
 		}
+	}
+	for _, e := range es {
+		if e.TurnID != nil {
+			if at, ok := f.b.byTurn[*e.TurnID]; ok && at < from {
+				from = at
+			}
+		}
+	}
+	// A loose entry with nothing after it: the newest turn still says whether the chat is at work.
+	if from == len(f.b.turns) && from > 0 {
+		from--
+	}
+	ts = make([]wire.Turn, 0, len(f.b.turns)-from)
+	for _, t := range f.b.turns[from:] {
+		ts = append(ts, t.rec)
 	}
 	return ts, es, true
 }
 
 // Turns is the page of turns before a turn ("" from the end), at most limit, oldest first, with their answer
-// entries. Older turns than the feed holds are read from the transcript first.
+// entries. Older turns than the feed holds are read from the transcript first: a turn named that the feed does not
+// hold now (a cursor kept from before the runtime restarted, older than the tail it read) is looked for there too,
+// so a walk through the chat goes on from where it stopped.
 func (f *Feed) Turns(before string, limit int) (wire.TurnsPage, bool) {
+	return f.turns(before, limit, false)
+}
+
+// TurnsWithSteps is the page Turns gives with the steps of every turn in it, not only of the newest: what the
+// cluster's copy is backfilled from, so a folded turn opens from the copy too.
+func (f *Feed) TurnsWithSteps(before string, limit int) (wire.TurnsPage, bool) {
+	return f.turns(before, limit, true)
+}
+
+func (f *Feed) turns(before string, limit int, steps bool) (wire.TurnsPage, bool) {
 	f.ensure()
 	end := len(f.b.turns)
 	if before != "" {
-		i, ok := f.b.byTurn[before]
-		if !ok {
+		if _, ok := f.b.byTurn[before]; !ok && !f.reach(before) {
 			return wire.TurnsPage{}, false
 		}
-		end = i
+		end = f.b.byTurn[before]
 	}
 	for end < limit && f.more {
 		if f.older() == 0 && !f.more {
@@ -639,8 +668,56 @@ func (f *Feed) Turns(before string, limit int) (wire.TurnsPage, bool) {
 			end = f.b.byTurn[before]
 		}
 	}
-	ts, es, cursor := f.page(end, limit, 0)
+	full := 0
+	if steps {
+		full = limit
+	}
+	ts, es, cursor := f.page(end, limit, full)
 	return wire.TurnsPage{Turns: ts, Entries: es, BeforeTurnID: cursor}, true
+}
+
+// reach reads what precedes the feed until it holds the turn; whether it does. The older windows are gathered as read
+// and the feed is built again only when what it holds has doubled: a build per window made the walk to a cursor deep
+// in a transcript of 100 MB quadratic, on the chat's actor.
+func (f *Feed) reach(turn string) bool {
+	var read [][]raw // newest window first
+	n, built := 0, len(f.raws)
+	add := func() {
+		if n == 0 {
+			return
+		}
+		raws := make([]raw, 0, n+len(f.raws))
+		for i := len(read) - 1; i >= 0; i-- {
+			raws = append(raws, read[i]...)
+		}
+		f.raws = append(raws, f.raws...)
+		read, n = nil, 0
+		f.rebuild()
+		built = len(f.raws)
+	}
+	for f.more {
+		c := f.before()
+		if len(c.Entries) == 0 {
+			f.more = false
+			break
+		}
+		window := make([]raw, len(c.Entries))
+		for i, o := range c.Entries {
+			window[i] = raw{o, -1}
+		}
+		read, n = append(read, window), n+len(window)
+		f.start, f.more = c.StartByteOffset, c.HasMore
+		if n < built && f.more {
+			continue
+		}
+		add()
+		if _, ok := f.b.byTurn[turn]; ok {
+			return true
+		}
+	}
+	add()
+	_, ok := f.b.byTurn[turn]
+	return ok
 }
 
 // older reads the page of the transcript before what the feed holds and builds the feed again over both; the

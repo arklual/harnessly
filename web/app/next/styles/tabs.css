@@ -245,14 +245,9 @@
   }
 }
 
-/* The tab's menu is the sidebar's (sidebar.css); a choice that has nothing to do waits, dimmed. */
+/* The tab's menu is the one menu of the app (menu.css). */
 .hx-cmenu-pos > .hx-cmenu[data-menu='tab'] {
   min-width: 208px;
-}
-.hx-cmenu__item[data-disabled] {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
 }
 
 .hx-gtabs__add {

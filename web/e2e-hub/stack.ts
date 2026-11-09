@@ -104,7 +104,14 @@ export interface Stack {
   /** The newest sign-in code the hub wrote to its log for this address. */
   emailCode: (email: string) => string;
   /** Registers the machine with a one-time code (the owner asked the hub for it in the browser's session) and runs it. */
-  registerMachine: (o: { code: string; name: string }) => Promise<{ machineId: string; basePath: string }>;
+  registerMachine: (o: {
+    code: string;
+    name: string;
+    /** Lays out the machine's data folder before its runtime starts: an older install's files (move.spec.ts). */
+    seed?: (dataDir: string) => void;
+    /** The runtime's settings beyond the common ones. */
+    runtimeEnv?: Record<string, string>;
+  }) => Promise<{ machineId: string; basePath: string; dataDir: string }>;
   /** Switches the machine off: its agent and runtime go, the hub and its copy stay. */
   stopMachine: () => Promise<void>;
   /** Freezes the machine's runtime (SIGSTOP) or lets it go on: a machine whose agent is on but answers nothing. */
@@ -238,7 +245,7 @@ export async function startStack(name: CellName, extraEnv: Record<string, string
   };
 
   // 3. the machine: registered with a code, then the runtime and the agent
-  const registerMachine: Stack['registerMachine'] = async ({ code, name: machineName }) => {
+  const registerMachine: Stack['registerMachine'] = async ({ code, name: machineName, seed, runtimeEnv }) => {
     const direct = hub;
     const home = join(root, 'machine');
     const work = join(home, 'work');
@@ -285,6 +292,8 @@ export async function startStack(name: CellName, extraEnv: Record<string, string
       machineId: string;
       runtimeBasePath: string;
     };
+    const dataDir = join(home, '.harnessly');
+    seed?.(dataDir);
     const [rt, ag] = [await freePort(), await freePort()];
     machineTmux.push({ dir: tmux, socket: tmuxSocket(rt) });
     machineProcs.push(
@@ -303,6 +312,7 @@ export async function startStack(name: CellName, extraEnv: Record<string, string
           RUNTIME_CLAUDE_LAUNCHER: join(home, 'bin', 'claude'),
           RUNTIME_LOCALE: 'en',
           RUNTIME_TMUX_SOCKET: tmuxSocket(rt),
+          ...runtimeEnv,
         },
         logs.runtime,
       ),
@@ -310,7 +320,7 @@ export async function startStack(name: CellName, extraEnv: Record<string, string
     machineProcs.push(
       spawnLogged(agentBin, [], { ...menv, AGENT_PORT: String(ag), RUNTIME_PORT: String(rt) }, logs.agent),
     );
-    return { machineId: mf.machineId, basePath: mf.runtimeBasePath };
+    return { machineId: mf.machineId, basePath: mf.runtimeBasePath, dataDir };
   };
 
   const hangRuntime = (hung: boolean) => {

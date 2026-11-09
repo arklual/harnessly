@@ -34,9 +34,16 @@ type Owner struct {
 }
 
 // Mine: the project was made by the person asking; for a file that names no person, by the runtime asking.
+//
+// In a library that is the store's (Identity.Shared) every machine's runtime may run as the same Unix user, so a file
+// without a person makes no one its owner by the user: the hub's record of the project (by the person's address)
+// decides.
 func (o Owner) Mine(id Identity) bool {
 	if o.Person != "" {
 		return o.Person == id.PersonID
+	}
+	if id.Shared {
+		return false
 	}
 	return o.User != "" && o.User == id.Runtime
 }

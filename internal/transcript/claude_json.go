@@ -216,7 +216,9 @@ func (p *jsonParser) text() (s string, sliced bool, err error) {
 	for p.i < len(p.s) {
 		c := p.s[p.i]
 		if c == '"' {
-			s := p.s[start:p.i]
+			// A copy, not a slice of the line: a slice would keep the whole read (megabytes of the transcript) alive
+			// for as long as the feed keeps any id or key of it.
+			s := strings.Clone(p.s[start:p.i])
 			p.i++
 			return s, true, nil
 		}

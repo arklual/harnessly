@@ -153,7 +153,7 @@ func chatOf(o ClaimOwner) string            { return o.Runtime + "/" + o.TabID }
 // claimOfLease reads a lease of the center as a claim; ok false for what is not a board lease (or is untrusted junk).
 func claimOfLease(h hubLease) (Claim, bool) {
 	project, board, ok := strings.Cut(h.Key, "/")
-	if !ok || !IsLibraryID(project) || board == "" || strings.HasPrefix(h.Key, leaseAskKey) {
+	if !ok || !IsLibraryID(project) || board == "" || strings.HasPrefix(h.Key, leaseAskKey) || strings.HasPrefix(h.Key, deckPdfLeaseKey) {
 		return Claim{}, false
 	}
 	board, okBoard := CleanText(board, 120)

@@ -65,6 +65,9 @@ INSTALLING A RELEASE
   harnessly upgrade plan|apply|rollback
                                     a signed release as one set: what changes and which extensions break (plan), replace,
                                     check and roll back the programs (apply). harnessly upgrade --help
+  harnessly fleet stage|activate|rollback|status|delta
+                                    a runtime release rolled out to this machine, off unless RUNTIME_UPDATE_MODE=fleet
+                                    (stage, switch with a health check and rollback, delta). harnessly fleet --help
 
 MACHINE
   harnessly selftest [--agent] [--claude PATH]
@@ -178,6 +181,12 @@ ASK A PERSON (through the same bots; the person sets who and where in Settings â
                                     an approval with buttons: exit 0 approved, 3 changes requested or only a comment
   harnessly ask wait|status|cancel ask_â€¦   wait again, show the replies (new ones marked), call it off
 
+THIS MACHINE'S DATA IN THE HUB
+  harnessly migrate status [--json]           the move of this machine's data into the hub: how far, what failed
+  harnessly migrate retry [KIND/OBJECT...]    try the failed objects again ("help migrate")
+  harnessly migrate skip KIND/OBJECT...       leave objects on the machine only
+  harnessly migrate verify                    ask the hub again for every moved object
+
 DESIGN PROJECTS
   harnessly doctor render [--json]            draw a real picture and a 2 s video here and read them back ("help doctor")
   harnessly design page list <project>        the pages of a design project: id, title, board file
@@ -193,6 +202,9 @@ DESIGN PROJECTS
                                     save a slide's speaker notes (the text from a file or stdin)
   harnessly design kit install ID VERSION TARBALL|URL    install a UI kit version for boards ("help design kit")
   harnessly design kit list                              the installed kits
+  harnessly design kit init FOLDER --id ID --namespace NS  start a kit that already passes the check
+  harnessly design kit check FOLDER [--render]           check a kit before packing it ("design kit --help"; contract: docs read agents/design-kits)
+  harnessly design kit render FOLDER [--shots]           draw every component in Chrome; --shots writes the canvas pictures
   harnessly design timeline DESIGN [--from T] [--to T] [--around T --window 30s]
                                     what happened in the person's preview of the design: pages, clicks, scrolling,
                                     tweaks, console, slow requests, long tasks, dropped frames (default: last 5 minutes)
@@ -203,6 +215,9 @@ DESIGN PROJECTS
                                     give every project of a library its meta/ (pages with ids); board files untouched
   harnessly design kit install ID VERSION TARBALL|URL    install a UI kit version for boards ("design kit --help")
   harnessly design kit list                              the installed kits
+  harnessly design kit init FOLDER --id ID --namespace NS  start a kit that already passes the check
+  harnessly design kit check FOLDER [--render]           check a kit before packing it ("design kit --help"; contract: docs read agents/design-kits)
+  harnessly design kit render FOLDER [--shots]           draw every component in Chrome; --shots writes the canvas pictures
   harnessly design engine fetch     fetch the board engine with your own Claude account ("design engine --help")
   harnessly design engine status    what this machine has for designs: engine, browser, ffmpeg
   harnessly design video get <project>        a video: scenes with start, length, transition, moments, open comments
@@ -244,6 +259,7 @@ counts towards the person's limit of delegated chats until it goes. Only a chat 
 	"docs":         docsUsage,
 	"browser":      browserHelp,
 	"upgrade":      upgradeHelp,
+	"fleet":        fleetHelp,
 	"design video": videoHelp,
 	"open": `harnessly open <target>
 
@@ -401,6 +417,7 @@ Show or hide the whole right pane for the person.
 What you asked the pane for in the last day (and whether the person has seen it) and, when their page is open, which
 tabs the pane has and which is in front.
 `,
+	"migrate": migrateHelp,
 	"design": `harnessly design page list|create|rename|remove, harnessly design notes get|set, harnessly design migrate
 
 A design project with meta/ keeps one file per page, meta/pages/<id>.json, under a permanent id (a ULID); its

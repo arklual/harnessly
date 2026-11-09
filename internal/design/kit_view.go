@@ -14,16 +14,34 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/designkit"
 )
 
 var (
-	propNameRe  = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9-]{0,40}$`)
-	plainPropRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]{0,40}$`)
-	compNameRe  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,62}$`)
+	propNameRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9-]{0,40}$`)
+	compNameRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,62}$`)
 )
+
+// withResources puts the runtime's React, ReactDOM and Babel map (vendor.go) before a kit page's engine, the way a
+// project's board gets it: the kit screen then draws without unpkg.com, on a machine that cannot reach it too.
+func withResources(source string) string {
+	if m := headTag.FindString(source); m != "" {
+		return strings.Replace(source, m, m+resourcesScript(), 1)
+	}
+	return resourcesScript() + source
+}
+
+// kitThemeFolder is the folder name a theme has on a board, ds/<name>/: its own folder's name, or the kit's id for a
+// kit that is one theme at the root of its version (path.Base("") would give "." and ds/./ addresses no file).
+func kitThemeFolder(folder, kitID string) string {
+	if folder == "" {
+		return kitID
+	}
+	return path.Base(folder)
+}
 
 // serveKitView answers /kitv/<id>/<version>/<theme>/<path>; segments are ["<id>", "<version>", "<theme>", path...].
 func (l *Library) serveKitView(w http.ResponseWriter, r *http.Request, q url.Values, segments []string, head bool) {
@@ -33,6 +51,9 @@ func (l *Library) serveKitView(w http.ResponseWriter, r *http.Request, q url.Val
 	}
 	dir := l.KitsDir()
 	id, version, theme, rest := segments[0], segments[1], segments[2], segments[3:]
+	if l.refuseKitDraft(w, id, version, head) {
+		return
+	}
 	var folder string
 	found := false
 	for _, t := range designkit.Themes(dir, id, version) {
@@ -65,12 +86,22 @@ func (l *Library) serveKitView(w http.ResponseWriter, r *http.Request, q url.Val
 			sendHTML(w, 400, l.notFoundPage(), head)
 			return
 		}
-		send(w, 200, "text/html; charset=utf-8", []byte(board), head, "Cache-Control", kitImmutable)
+		cache := kitImmutable
+		if version == designkit.DraftVersion {
+			cache = "no-cache"
+		}
+		send(w, 200, "text/html; charset=utf-8", []byte(withResources(board)), head, "Cache-Control", cache)
 		return
 	case len(rest) == 1 && strings.HasSuffix(rest[0], ".dc.html"):
-		l.serveKitFile(w, r, designkit.Resolve(dir, id, version, themeSegs("_harnessly", "layouts", rest[0])), head)
+		file := designkit.Resolve(dir, id, version, themeSegs("_harnessly", "layouts", rest[0]))
+		src, err := readFileLimited(file, 16<<20)
+		if file == "" || err != nil {
+			sendHTML(w, 404, l.notFoundPage(), head)
+			return
+		}
+		send(w, 200, "text/html; charset=utf-8", []byte(withResources(string(src))), head, "Cache-Control", kitImmutable)
 		return
-	case len(rest) >= 3 && rest[0] == "ds" && rest[1] == path.Base(folder):
+	case len(rest) >= 3 && rest[0] == "ds" && rest[1] == kitThemeFolder(folder, id):
 		l.serveKitFile(w, r, designkit.Resolve(dir, id, version, themeSegs(rest[2:]...)), head)
 		return
 	}
@@ -88,7 +119,7 @@ func (l *Library) serveKitFile(w http.ResponseWriter, r *http.Request, file stri
 		sendHTML(w, 404, l.notFoundPage(), head)
 		return
 	}
-	l.serveStatic(w, r, file, st, typ, ext, kitImmutable, head)
+	l.serveStatic(w, r, file, st, typ, ext, l.kitCache(file), head)
 }
 
 // declaredProps are the prop names the kit declares for component comp: its own props and those its templates' layouts
@@ -125,22 +156,10 @@ func declaredProps(c *designkit.Canvas, comp string) map[string]bool {
 	return out
 }
 
-// propAllowed is a prop the board may write as an attribute: one the kit declares, of a plain name (letters and digits,
-// no dash the engine would turn into another name), never a handler or a loader whatever the kit says.
+// propAllowed is a prop the board may write as an attribute: one the kit declares and designkit.PreviewProp allows
+// (a plain name, never a handler or a loader whatever the kit says).
 func propAllowed(k string, declared map[string]bool) bool {
-	if !declared[k] || !plainPropRe.MatchString(k) {
-		return false
-	}
-	l := strings.ToLower(k)
-	if strings.HasPrefix(l, "on") || strings.HasPrefix(l, "style") || strings.HasPrefix(l, "sc") {
-		return false
-	}
-	switch l {
-	case "from", "ref", "key", "class", "classname", "is", "slot", "src", "srcdoc", "href", "action", "formaction",
-		"autofocus", "tabindex", "dangerouslysetinnerhtml":
-		return false
-	}
-	return true
+	return declared[k] && designkit.PreviewProp(k)
 }
 
 // playBoard is a board that draws component c of the canvas with props p (JSON): plain values as attributes, the rest
@@ -156,7 +175,7 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 			return "", false
 		}
 	}
-	ds := "ds/" + path.Base(folder) + "/"
+	ds := "ds/" + kitThemeFolder(folder, c.Kit) + "/"
 	exists := func(rel string) bool {
 		segs := strings.Split(rel, "/")
 		if folder != "" {
@@ -167,7 +186,9 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 	var b strings.Builder
 	b.WriteString("<!doctype html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
 	b.WriteString("<script src=\"./support.js\"></script>\n")
-	for _, css := range []string{"fonts.css", "components/bundle.css"} {
+	// The theme's tokens first (components and the board's own markup read their variables), then its fonts and the
+	// components' styles: the same files, in the same order, a board on the kit loads.
+	for _, css := range []string{"tokens.css", "fonts.css", "components/bundle.css"} {
 		if exists(css) {
 			b.WriteString("<link rel=\"stylesheet\" href=\"" + html.EscapeString(ds+css) + "\">\n")
 		}
@@ -180,7 +201,16 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 			b.WriteString("<script src=\"" + html.EscapeString(ds+rel) + "\"></script>\n")
 		}
 	}
-	b.WriteString("</head>\n<body>\n<x-dc>\n<helmet>\n<style>html,body{margin:0;background:transparent}.board{margin:0}</style>\n</helmet>\n<main class=\"board\">")
+	b.WriteString("</head>\n<body>\n<x-dc>\n<helmet>\n<style>html,body{margin:0;background:transparent}.board{margin:0}.kit-subject{display:contents}</style>\n</helmet>\n<main class=\"board\">")
+	// A kit whose components need its provider (kit.root: theme, tokens, portals) gets the component inside it, the way
+	// every board on the kit wraps its content.
+	root := c.Root != "" && c.Root != comp && compNameRe.MatchString(c.Root)
+	if root {
+		b.WriteString("<x-import component-from-global-scope=\"" + c.Namespace + "." + c.Root + "\">")
+	}
+	// The component sits in a marker of no box of its own: `kit render` measures what is drawn without the root's
+	// wrappers around it (their background spans the page), portals included.
+	b.WriteString("<div class=\"kit-subject\" data-kit-subject=\"\">")
 	b.WriteString("<x-import component-from-global-scope=\"" + c.Namespace + "." + comp + "\"")
 	vals := map[string]any{}
 	declared := declaredProps(c, comp)
@@ -193,7 +223,7 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 		if !propAllowed(k, declared) || !safePropName(k) {
 			continue
 		}
-		switch v := props[k].(type) {
+		switch v := c.CleanValue(props[k]).(type) {
 		case string:
 			b.WriteString(" " + k + "=\"" + html.EscapeString(v) + "\"")
 		case nil:
@@ -202,12 +232,31 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 			b.WriteString(" " + k + "=\"{{" + k + "}}\"")
 		}
 	}
-	b.WriteString("></x-import></main>\n</x-dc>\n")
+	b.WriteString("></x-import></div>")
+	if root {
+		b.WriteString("</x-import>")
+	}
+	b.WriteString("</main>\n</x-dc>\n")
 	// json.Marshal escapes <, > and &: the values cannot close the script.
 	data, _ := json.Marshal(vals)
-	b.WriteString("<script type=\"text/x-dc\" data-dc-script data-props='{}'>\nclass Component extends DCLogic {\n  renderVals() { return " + string(data) + "; }\n}\n</script>\n</body>\n</html>\n")
+	b.WriteString("<script type=\"text/x-dc\" data-dc-script data-props='{}'>\nclass Component extends DCLogic {\n  renderVals() {\n    const ns = window[" + strconv.Quote(c.Namespace) + "];\n" + elementReviver + "    return h(" + string(data) + ");\n  }\n}\n</script>\n</body>\n</html>\n")
 	return b.String(), true
 }
+
+// elementReviver is the play page's h(v): designkit.ElementKey values become React elements of the namespace's
+// components (CleanValue let through only the kit's own), each in a list keyed by its place so React stays quiet.
+const elementReviver = `    const h = (v, key) => {
+      if (Array.isArray(v)) return v.map((x, i) => h(x, i));
+      if (!v || typeof v !== "object") return v;
+      if (typeof v.$fn === "string") return v.$fn ? (x) => (x == null ? undefined : x[v.$fn]) : () => undefined;
+      if (typeof v.$c !== "string") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, h(x)]));
+      const C = v.$c.split(".").reduce((o, k) => (o ? o[k] : undefined), ns);
+      if (!C) return null;
+      const props = Object.assign({}, h(v.props || {}), key === undefined ? {} : { key });
+      const kids = v.children === undefined ? [] : Array.isArray(v.children) ? v.children.map((x) => h(x)) : [h(v.children)];
+      return React.createElement(C, props, ...kids);
+    };
+`
 
 // safePropName keeps a prop that can only be data: never an event handler (on…), a style or focus attribute, or
 // the component's own address — the query string must not be able to run script on the page.

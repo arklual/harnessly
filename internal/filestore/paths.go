@@ -29,6 +29,28 @@ const FoldersDir = ".folders"
 
 var layoutFile = regexp.MustCompile(`^\.folders/[0-9a-f]{32}\.json$`)
 
+// MediaDir is a project's hidden folder of machine state (recordings, exports, thumbnails). Two things in it are the
+// design's and sync: the folder guests read the published files from (`<project>/.media/published/<file>`:
+// the deck's PDF, a video's MP4, its chapters — files the runtime made, plain data no tool loads, one level deep), and
+// the mark that a deck's PDF is kept for guests (`<project>/.media/pdf-auto`), so any machine of the space may build it.
+const MediaDir = ".media"
+
+// publishedNames are the files a runtime publishes for guests: only these sync, never another name put there.
+var publishedNames = map[string]bool{
+	"deck.pdf": true, "deck.pdf.rev": true, "chapters.json": true, "video.json": true, "video.mp4": true, "video-9x16.mp4": true,
+}
+
+// publishedFile: a published file or the PDF mark of a project (parts of a path that passed the general checks).
+func publishedFile(parts []string) bool {
+	switch {
+	case len(parts) == 3 && parts[1] == MediaDir && parts[2] == "pdf-auto":
+		return true
+	case len(parts) == 4 && parts[1] == MediaDir && parts[2] == "published":
+		return publishedNames[parts[3]]
+	}
+	return false
+}
+
 // Folders that belong to the machine, not to the design, that do not start with a dot. Everything hidden is the
 // machine's too (see Synced).
 var skipped = map[string]bool{
@@ -68,6 +90,9 @@ func Synced(rel string) bool {
 	if len(parts) == 2 && parts[1] == OwnerFile {
 		return true
 	}
+	if publishedFile(parts) && !skipped[parts[0]] && parts[0] != "" {
+		return true
+	}
 	for _, part := range parts {
 		// Hidden entries are machine state or tool settings, never design: claims, trash, thumbnails, check
 		// screenshots, our staging folder, .git, and settings that make a tool run commands (.claude/ hooks,
@@ -89,6 +114,10 @@ func SkippedDir(rel string) bool {
 	parts := strings.Split(rel, "/")
 	if strings.HasPrefix(parts[0], ".") || strings.Contains(parts[0], ".before-tck-") {
 		return true
+	}
+	// The way to the published files: the media folder and its published folder, nothing else of it.
+	if len(parts) == 2 && parts[1] == MediaDir || len(parts) == 3 && parts[1] == MediaDir && parts[2] == "published" {
+		return skipped[parts[0]]
 	}
 	for _, part := range parts {
 		if strings.HasPrefix(part, ".") || skipped[part] {

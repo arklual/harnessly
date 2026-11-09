@@ -21,6 +21,10 @@ const (
 	// EventDocReply is {threadId, body, resolve}: the agent answered in a thread of a document of this machine.
 	EventDocReply = "docs.reply"
 
+	// EventAutomationResult is {runId, resultToken, summary, bugIssueId?, mrUrl?}: a conversation the hub started for an
+	// automation run reports what it did (docs/hub/automations.md).
+	EventAutomationResult = "automations.result"
+
 	// OpDocResult is the hub's answer to a doc.publish or doc.acl: {requestId, status, body}.
 	OpDocResult = "doc.result"
 	// OpDocsDeliver hands a comment to the conversation a document is bound to: {tabId, sessionName, agentSessionId,

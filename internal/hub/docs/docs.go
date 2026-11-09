@@ -17,6 +17,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/resaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
@@ -31,6 +32,8 @@ type Deps struct {
 	Links Linker
 	// HTTP reaches the documents and boards services; nil: a client with a 30 second timeout.
 	HTTP *http.Client
+	// Notice tells a person by mail that they were mentioned; nil: nobody is told.
+	Notice Notice
 }
 
 // Service serves documents and boards.
@@ -45,12 +48,26 @@ type Service struct {
 	prefix string
 	links  Linker
 	flight inflight
+	// access is the shared model of access to a resource (HUB_RESOURCE_ACCESS); nil keeps doc_meta.team_level.
+	access *resaccess.Service
+	notice Notice
 }
 
+// Notice mails a short notice to a person (a mention); nil keeps the hub silent.
+type Notice func(ctx context.Context, to, subject, body, link string) error
+
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links, notice: d.Notice}
 	if s.now == nil {
 		s.now = time.Now
+	}
+	if d.Config.ResourceAccess {
+		s.access = resaccess.New(d.DB, s.now, d.Config.PublicURL)
+		s.access.Notify = func(ctx context.Context, to, subject, body string) {
+			if s.notice != nil {
+				_ = s.notice(ctx, to, subject, body, "")
+			}
+		}
 	}
 	if s.log == nil {
 		s.log = slog.Default()
@@ -107,7 +124,10 @@ const (
 	rankManage = 4
 )
 
-func (s *Service) rank(m *meta, p *auth.Principal) int {
+func (s *Service) rank(ctx context.Context, m *meta, p *auth.Principal) int {
+	if s.access != nil {
+		return s.accessRank(ctx, m, p)
+	}
 	if p.Admin || (m != nil && m.OwnerEmail != "" && strings.EqualFold(m.OwnerEmail, p.User.Email)) {
 		return rankManage
 	}

@@ -35,6 +35,9 @@
   "next.kit.section.components": "Компоненты",
   "next.kit.section.templates": "Шаблоны",
   "next.kit.section.assets": "Ассеты",
+  "next.kit.section.reference": "Справка",
+  "next.kit.section.providers": "Служебные",
+  "next.kit.panel.parts": "Части",
   "next.kit.section.colors": "Цвета",
   "next.kit.section.type": "Типографика",
   "next.kit.section.tokens": "Токены",
@@ -66,8 +69,7 @@
   "next.kit.panel.insertWhere": "В какую презентацию",
   "next.kit.panel.noDecks": "Презентаций пока нет",
   "next.kit.panel.toChat": "Отправить в чат",
-  "next.kit.slot.image": "картинка",
-  "next.kit.slot.chart": "график",
+  "next.kit.slot.chart": "график из шаблона",
   "next.kit.single.prev": "Предыдущий",
   "next.kit.single.next": "Следующий",
   "next.kit.single.grid": "К сетке",
@@ -79,5 +81,12 @@
   "next.kit.link.from": "Из кита: {name}",
   "next.kit.link.openNode": "Открыть в ките",
   "next.kit.link.showLayout": "Показать макет",
-  "next.kit.link.hideLayout": "Скрыть макет"
+  "next.kit.link.hideLayout": "Скрыть макет",
+  "next.kit.card.templates": {
+    "one": "{n} шаблон",
+    "few": "{n} шаблона",
+    "many": "{n} шаблонов",
+    "other": "{n} шаблона"
+  },
+  "next.kit.slot.imageHint": "Имя картинки из ассетов или адрес"
 }

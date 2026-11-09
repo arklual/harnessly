@@ -285,14 +285,21 @@ func (s *Service) ConversationAfter(ctx context.Context, id, afterEntryID string
 		return wire.ConvSnapshot{}, convo.ErrUnknownCursor
 	}
 	snap := clone(c.snap)
-	snap.Entries = snap.Entries[at+1:]
-	touched := map[string]bool{}
-	for _, e := range snap.Entries {
-		if e.TurnID != nil {
-			touched[*e.TurnID] = true
+	// Every turn from the cursor's own on, as feed.After gives them.
+	from := len(snap.Turns)
+	for _, e := range snap.Entries[at:] {
+		if e.TurnID == nil {
+			continue
+		}
+		if i := slices.IndexFunc(snap.Turns, func(t wire.Turn) bool { return t.ID == *e.TurnID }); i >= 0 && i < from {
+			from = i
 		}
 	}
-	snap.Turns = slices.DeleteFunc(snap.Turns, func(t wire.Turn) bool { return !touched[t.ID] })
+	if from == len(snap.Turns) && from > 0 {
+		from--
+	}
+	snap.Entries = snap.Entries[at+1:]
+	snap.Turns = snap.Turns[from:]
 	snap.BeforeTurnID = nil
 	return snap, nil
 }

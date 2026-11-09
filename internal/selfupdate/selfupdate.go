@@ -61,6 +61,8 @@ type Status struct {
 	Error string `json:"error,omitempty"`
 	// Command updates this machine from its shell (run where it was installed).
 	Command string `json:"command"`
+	// Fleet is the state of the releases on this machine, in fleet mode only (fleet.go).
+	Fleet *FleetStatus `json:"fleet,omitempty"`
 }
 
 // Updater checks and applies. Set HubURL, Files, GOOS and GOARCH.
@@ -81,6 +83,9 @@ type Updater struct {
 	Applied func(names []string)
 	// Log gets one line per failure; may be nil.
 	Log func(msg string, err error)
+	// Fleet switches to fleet mode (fleet.go): releases are rolled out to this machine from outside, so it neither
+	// compares its programs with the hub's nor replaces them by itself. Nil keeps the behaviour above.
+	Fleet *Fleet
 
 	mu       sync.Mutex
 	st       Status
@@ -129,6 +134,9 @@ func (u *Updater) Writable() bool {
 }
 
 func (u *Updater) mode() string {
+	if u.Fleet != nil {
+		return "fleet"
+	}
 	if u.Writable() {
 		return "auto"
 	}
@@ -142,8 +150,16 @@ func (u *Updater) Status() Status {
 	s := u.st
 	s.Applying = u.applying
 	s.Command = u.Command()
-	if s.Mode == "" {
+	if s.Mode == "" || u.Fleet != nil {
 		s.Mode = u.mode()
+	}
+	if u.Fleet != nil {
+		fs := u.Fleet.Status()
+		s.Fleet = &fs
+		s.Checked, s.UpToDate = true, true
+		if fs.Version != "" {
+			s.Version = fs.Version
+		}
 	}
 	return s
 }
@@ -241,8 +257,11 @@ func (u *Updater) record(version string, upToDate bool, err error) {
 	}
 }
 
-// Check compares the installed files with the hub's and records the answer.
+// Check compares the installed files with the hub's and records the answer. In fleet mode there is nothing to compare.
 func (u *Updater) Check(ctx context.Context) (Status, error) {
+	if u.Fleet != nil {
+		return u.Status(), nil
+	}
 	version, out, err := u.check(ctx)
 	u.record(version, err == nil && len(out) == 0, err)
 	return u.Status(), err
@@ -254,8 +273,14 @@ var ErrBusy = errors.New("an update is already going on")
 // ErrManual: this machine cannot replace its own programs; the command is needed.
 var ErrManual = errors.New("this machine cannot replace its own programs: run the update command")
 
+// ErrFleet: this machine takes its releases from the rollout, not from the hub.
+var ErrFleet = errors.New("this machine is updated by its rollout: stage and activate a release")
+
 // Apply checks and replaces what differs; Applied runs when something was replaced.
 func (u *Updater) Apply(ctx context.Context) error {
+	if u.Fleet != nil {
+		return ErrFleet
+	}
 	u.mu.Lock()
 	if u.applying {
 		u.mu.Unlock()
@@ -352,6 +377,9 @@ func (u *Updater) download(ctx context.Context, s stale) (string, error) {
 
 // Run checks after FirstDelay and then every Interval until ctx ends, applying what it finds when Auto. Start it with go.
 func (u *Updater) Run(ctx context.Context) {
+	if u.Fleet != nil {
+		return
+	}
 	every := u.Interval
 	if every <= 0 {
 		every = DefaultInterval

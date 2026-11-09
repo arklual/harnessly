@@ -70,8 +70,16 @@ type Kit struct {
 	Versions []Version `json:"versions"`
 }
 
-func versionDir(dir, id, version string) string { return filepath.Join(dir, id, version) }
-func metaFile(dir, id, version string) string   { return filepath.Join(dir, id, "."+version+".json") }
+func versionDir(dir, id, version string) string {
+	if version == DraftVersion {
+		if d, ok := ReadDraft(dir, id); ok && d.Dir != "" {
+			return d.Dir
+		}
+		return filepath.Join(dir, id, ".no-draft")
+	}
+	return filepath.Join(dir, id, version)
+}
+func metaFile(dir, id, version string) string { return filepath.Join(dir, id, "."+version+".json") }
 
 // List is every installed kit, by id; an empty or missing folder lists nothing.
 func List(dir string) []Kit {
@@ -165,7 +173,7 @@ func Files(dir, id, version string) []string {
 // kit, the version or the file is not there, the path escapes (.., a link) or is not a regular file. With no segments
 // it is the version's folder itself.
 func Resolve(dir, id, version string, segments []string) string {
-	if dir == "" || !ValidID(id) || !ValidVersion(version) {
+	if dir == "" || !ValidID(id) || !validRef(version) {
 		return ""
 	}
 	for _, s := range segments {

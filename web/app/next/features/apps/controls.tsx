@@ -2,6 +2,7 @@
 // under its button on a computer and as a sheet from the bottom on a phone; a long list gets a field to narrow it.
 import { useDeferredValue, useState, type ReactNode } from 'react';
 import { t } from '@/next/i18n';
+import { onMenuKeys } from '@/next/ui/context-menu';
 import Icon from '@/next/ui/icon';
 import Popover from '@/next/ui/popover';
 import Segmented from '@/next/ui/segmented';
@@ -84,7 +85,7 @@ const Panel = <V extends string>({ label, choices, isOn, onPick, onClear, role }
   const shown =
     query === '' ? choices : choices.filter((choice) => choice.label.toLowerCase().includes(query));
   return (
-    <div className="hx-hubmenu__in">
+    <div className="hx-hubmenu__in" onKeyDown={onMenuKeys}>
       {choices.length >= NARROW_FROM && (
         <label className="hx-hubmenu__find">
           <Icon name="search" size="sm" />

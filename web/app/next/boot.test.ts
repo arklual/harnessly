@@ -282,7 +282,7 @@ describe('whose data the page keeps', () => {
 
 describe('the machine the page opens on (#57)', () => {
   const m = (id: string, mine?: boolean) => ({ id, mine }) as unknown as Machine;
-  it('is the person\'s pick, else their first own machine, not one they only administer', () => {
+  it("is the person's pick, else their first own machine, not one they only administer", () => {
     expect(pickActive([m('theirs', false), m('mine', true)], null)).toBe('mine');
     expect(pickActive([m('theirs', false), m('mine', true)], 'theirs')).toBe('theirs');
     expect(pickActive([m('a'), m('b')], null)).toBe('a');

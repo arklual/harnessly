@@ -11,11 +11,13 @@ interface IKitOriginProps {
   /** The node's picture by its path in the version. */
   shotUrl: (path: string) => string;
   onOpen: (node: string) => void;
+  /** «Править в ките»: the kit's draft opens on that node with its chat; absent when the kit is not edited. */
+  onEdit?: (node: string) => void;
 }
 
 const EXIT_MS = 160;
 
-const KitOrigin = ({ link, node, shotUrl, onOpen }: IKitOriginProps) => {
+const KitOrigin = ({ link, node, shotUrl, onOpen, onEdit }: IKitOriginProps) => {
   const [shown, setShown] = useState<string | null>(null);
   const info = link.nodes[node];
   const shot = info?.shot && node.startsWith('layout:') ? shotUrl(info.shot) : null;
@@ -36,6 +38,11 @@ const KitOrigin = ({ link, node, shotUrl, onOpen }: IKitOriginProps) => {
         <button type="button" className="hx-kit-origin__btn" onClick={() => onOpen(node)}>
           {t('next.kit.link.openNode')}
         </button>
+        {onEdit && (
+          <button type="button" className="hx-kit-origin__btn" onClick={() => onEdit(node)}>
+            {t('next.versions.editInKit')}
+          </button>
+        )}
         {shot && (
           <button
             type="button"

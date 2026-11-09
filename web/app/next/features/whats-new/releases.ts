@@ -13,6 +13,60 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-09za',
+    items: [
+      { key: 'kitChat', icon: 'message-square' },
+      { key: 'kitEdit', icon: 'pencil' },
+      { key: 'kitVersion', icon: 'layers' },
+      { key: 'projectVersions', icon: 'history' },
+      { key: 'signedEverywhere', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-09z',
+    items: [
+      { key: 'oneMenu', icon: 'menu' },
+      { key: 'rightClick', icon: 'square-mouse-pointer' },
+    ],
+  },
+  {
+    id: '2026-11-09y',
+    items: [
+      { key: 'appConsentHere', icon: 'shield-check' },
+      { key: 'appRevoke', icon: 'ban' },
+    ],
+  },
+  {
+    id: '2026-11-09x',
+    items: [
+      { key: 'perimeter', icon: 'lock' },
+      { key: 'signedApps', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-09w',
+    items: [
+      { key: 'island', icon: 'layers' },
+      { key: 'center', icon: 'bell' },
+      { key: 'summary', icon: 'sparkles' },
+    ],
+  },
+  {
+    id: '2026-11-09v',
+    items: [
+      { key: 'kitThemes', icon: 'palette' },
+      { key: 'kitFields', icon: 'presentation' },
+    ],
+  },
+  {
+    id: '2026-11-09u',
+    items: [
+      { key: 'appsGrid', icon: 'layout-grid' },
+      { key: 'appsCreate', icon: 'sparkles' },
+      { key: 'appPage', icon: 'app-window' },
+    ],
+  },
+  {
     id: '2026-11-09t',
     items: [
       { key: 'appLog', icon: 'file-text' },

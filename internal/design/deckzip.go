@@ -66,6 +66,7 @@ func zipProject(ctx context.Context, run DeckExportRun, whole bool) error {
 	defer out.Close()
 	zw := zip.NewWriter(out)
 	done := int64(0)
+	written := map[string]bool{}
 	for _, p := range paths {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -75,10 +76,42 @@ func zipProject(ctx context.Context, run DeckExportRun, whole bool) error {
 		if err != nil {
 			return err
 		}
+		written[filepath.ToSlash(rel)] = true
 		done += n
 		if total > 0 {
 			run.Progress(float64(done) / float64(total))
 		}
+	}
+	// The kit the project is pinned to goes with it, where its boards look for it (ds/<mount>/).
+	prefix := "ds/"
+	if whole {
+		prefix = ProjectDirname + "/ds/"
+	}
+	for mount, dir := range run.L.KitMountDirs(run.Artifact) {
+		kitDir, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			continue
+		}
+		list, _, err := deckZipList(ctx, kitDir, kitDir)
+		if err != nil {
+			continue
+		}
+		kitRoot, err := os.OpenRoot(kitDir)
+		if err != nil {
+			return err
+		}
+		for _, p := range list {
+			rel, _ := filepath.Rel(kitDir, p.name)
+			rel = filepath.ToSlash(rel)
+			if rel == "_harnessly" || strings.HasPrefix(rel, "_harnessly/") || written[prefix+mount+"/"+rel] {
+				continue
+			}
+			if _, err := deckZipFile(zw, kitRoot, p, prefix+mount+"/"+rel); err != nil {
+				kitRoot.Close()
+				return err
+			}
+		}
+		kitRoot.Close()
 	}
 	if err := zw.Close(); err != nil {
 		return err

@@ -6,7 +6,7 @@ import { isMachineOff, keepsHistory, loadCentralChat } from '@/next/stores/centr
 import { getPage, sendBody, sendPage, type PageOutcome } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { batch } from '@/next/core/store';
-import { applyOlderTurns, applyTurnEntries, entryStore, key } from '@/next/stores/conversation';
+import { applyOlderTurns, applyTurnEntries, entryStore, key, turnStore } from '@/next/stores/conversation';
 import { limitsOf } from '@/next/stores/machines';
 import {
   parsePage,
@@ -60,15 +60,17 @@ export async function loadOlderTurns(
 }
 
 export async function loadEntries(m: MachineId, conv: ConvId, turn: TurnId): Promise<PageOutcome<true>> {
-  // a turn's steps from the cluster's copy first; a turn the copy has no steps of yet (the one under way) is
-  // the machine's to tell, when it is there.
+  // a turn's steps from the cluster's copy first; a turn the copy has no steps of yet (the one under way), or
+  // fewer than the turn counts (a chat backfilled by pages without them), is the machine's to tell, when it is there.
   if (keepsHistory(m)) {
     const central = await getPage(
       gatewayPath(`/history/conversations/${enc(conv)}/turns/${enc(turn)}/entries`),
       parsePage.entries,
       limitsOf(m).cmdTimeoutMs,
     );
-    if ('ok' in central && (central.value.entries.length > 0 || isMachineOff(m))) {
+    const steps = turnStore.get(key(conv, turn))?.turn?.stepCount ?? 0;
+    const held = 'ok' in central && central.value.entries.length > 0 && central.value.entries.length >= steps;
+    if ('ok' in central && (held || isMachineOff(m))) {
       batch(() => applyTurnEntries(conv, central.value.turnId, central.value.entries));
       return { ok: true, value: true };
     }

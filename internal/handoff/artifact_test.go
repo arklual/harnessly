@@ -279,3 +279,28 @@ func TestArtifactSnapshotCanonicalizesClaudeAndCodexWithoutSourceIdentity(t *tes
 		})
 	}
 }
+
+// every write is told, so that under a hub the runtime moves the note into the store at once; a failed one
+// is not.
+func TestArtifactWritesAreTold(t *testing.T) {
+	root := t.TempDir()
+	store := newTestArtifactStore(t, root)
+	told := 0
+	store.Written = func() { told++ }
+	artifact, err := store.Snapshot(artifactSource, writeTranscript(t, root, sourceMessage(t, "user", "one")), artifactTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Claim(artifactSource, artifact.ID, artifactTarget); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Claim(artifactSource, artifact.ID, artifactTarget); err == nil {
+		t.Fatal("second claim succeeded")
+	}
+	if _, _, err := store.PutText(artifactTarget, "carry on"); err != nil {
+		t.Fatal(err)
+	}
+	if told != 3 {
+		t.Fatalf("told %d times, want 3", told)
+	}
+}

@@ -81,6 +81,14 @@ func TestMachinesList(t *testing.T) {
 	if ts := v.machinesList(t, v.anna, "?scope=tenant:"+v.tenant); len(ts) != 1 || ts[0].Name != "Рабочая" {
 		t.Errorf("tenant scope: %+v", ts)
 	}
+	// A lead's screen is their team, and a machine of the whole tenant is one they may open too (the lead's
+	// «Машины» said «0 машин» while a member of the same tenant saw the machine). The admin's team view stays the team.
+	if ts := v.machinesList(t, v.boris, "?scope=team:"+v.team.ID); len(ts) != 1 || ts[0].Name != "Рабочая" || ts[0].TeamID != nil {
+		t.Errorf("lead, tenant machine in the team scope: %+v", ts)
+	}
+	if ts := v.machinesList(t, v.anna, "?scope=team:"+v.team.ID); len(ts) != 0 {
+		t.Errorf("admin, team scope without the team's machines: %+v", ts)
+	}
 	if err := st.SetMachineTeam(ctx, a.MachineID, v.team.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -97,13 +105,12 @@ func TestMachinesList(t *testing.T) {
 		t.Errorf("idle = %+v", w)
 	}
 
-	// Who sees what: a plain member sees nothing of the organization's machines; the lead sees the organization only
-	// through their team.
-	if r := v.vera.Do("GET", v.url("/machines"), nil); r.Code != http.StatusForbidden {
-		t.Errorf("member: %s", r)
-	}
-	if r := v.boris.Do("GET", v.url("/machines"), nil); r.Code != http.StatusForbidden {
-		t.Errorf("lead on the organization: %s", r)
+	// Who sees what: a member and a lead without an organization role see the machines of their own tenants only,
+	// never the other tenant's (a person put in a team saw no machine until they were made a lead).
+	for _, p := range []*hubtest.Person{v.vera, v.boris} {
+		if ms := v.machinesList(t, p, ""); len(ms) != 1 || ms[0].Name != "Рабочая" {
+			t.Errorf("%s on the organization: %+v", p.Email, ms)
+		}
 	}
 	if r := v.anna.Do("GET", v.url("/machines?problems=2"), nil); r.Code != http.StatusBadRequest {
 		t.Errorf("bad problems: %s", r)

@@ -981,8 +981,52 @@
   min-height: 64px;
   padding: 10px 16px;
 }
-.hx-mrow + .hx-mrow {
+.hx-mrow + .hx-mrow,
+.hx-mrow-wrap + .hx-mrow-wrap {
   border-top: 1px solid var(--hx-border);
+}
+/* the move of the machine's data into the hub, under its row. */
+.hx-mmove {
+  display: grid;
+  gap: 6px;
+  margin: 0 16px 12px 64px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  animation: hx-set-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-mmove[data-stopped='true'] {
+  background: color-mix(in oklch, var(--hx-danger) 8%, transparent);
+}
+.hx-mmove__line {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+.hx-mmove__codes,
+.hx-mmove__obj {
+  font-family: var(--hx-font-mono);
+}
+.hx-mmove__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--hx-fg-3);
+  overflow-wrap: anywhere;
+}
+.hx-mmove__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+@media (max-width: 640px) {
+  .hx-mmove {
+    margin-left: 16px;
+  }
 }
 .hx-mrow__ic {
   position: relative;
@@ -2062,67 +2106,205 @@
   }
 }
 
-/* ── Notifications: the window in miniature with its six places, the chosen one a card ── */
-.hx-place {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 6px 4px;
-  width: 148px;
-  height: 92px;
+/* ── Notifications: the window in miniature (the left column, the field) with its six places; the chosen one is the
+   black pill the smart notice is. Beside it, the same choice in three words. ── */
+.hx-nplace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 22px;
+  padding: 16px;
+}
+.hx-nplace + .hx-set__row {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-nplace__scheme {
+  position: relative;
   flex: none;
-  padding: 8px;
+  width: min(300px, 100%);
+  aspect-ratio: 300 / 188;
   border-radius: 12px;
-  background: var(--hx-bg-stage);
+  background: var(--hx-bg-app);
   box-shadow: inset 0 0 0 1px var(--hx-border-strong);
+  overflow: hidden;
 }
-.hx-place[aria-disabled='true'] {
-  opacity: 0.5;
+.hx-nplace__rail {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 19.3%;
+  background: var(--hx-bg-rail);
+  border-right: 1px solid var(--hx-border);
 }
-.hx-place__spot {
-  width: 30px;
-  height: 14px;
+.hx-nplace__field {
+  position: absolute;
+  left: 28%;
+  right: 8.7%;
+  bottom: 6.4%;
+  height: 12.8%;
+  border-radius: 9px;
+  background: var(--hx-bg-raised);
+  box-shadow: 0 0 0 1px var(--hx-border-strong);
+}
+.hx-nplace__spot {
+  position: absolute;
+  width: 46px;
+  height: 10px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
-  background: var(--hx-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--hx-border-strong);
+  transform: translate(-50%, -50%);
   cursor: pointer;
   transition:
-    background 200ms var(--hx-ease-out),
-    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 200ms var(--hx-ease-out),
-    width 260ms var(--hx-ease-out);
+    width 320ms var(--hx-ease-out),
+    height 320ms var(--hx-ease-out),
+    background-color 200ms ease,
+    box-shadow 200ms ease;
 }
-.hx-place__spot[data-at^='top'] {
-  align-self: start;
+/* A spot by its middle line; the corner ones keep their outer edge, so the chosen pill grows inwards. */
+.hx-nplace__spot[data-at^='top'] {
+  top: 8%;
 }
-.hx-place__spot[data-at^='bottom'] {
-  align-self: end;
+.hx-nplace__spot[data-at^='bottom'] {
+  top: 72.3%;
 }
-.hx-place__spot[data-at$='left'] {
-  justify-self: start;
+.hx-nplace__spot[data-at$='left'] {
+  left: 23.3%;
+  transform: translate(0, -50%);
 }
-.hx-place__spot[data-at$='center'] {
-  justify-self: center;
+.hx-nplace__spot[data-at$='center'] {
+  left: 59.7%;
 }
-.hx-place__spot[data-at$='right'] {
-  justify-self: end;
+.hx-nplace__spot[data-at$='right'] {
+  right: 4%;
+  transform: translate(0, -50%);
 }
-.hx-place__spot:hover:not(:disabled) {
-  background: var(--hx-fg-3);
+.hx-nplace__spot:hover {
+  box-shadow: inset 0 0 0 1.5px var(--hx-fg-2);
 }
-.hx-place__spot[aria-checked='true'] {
-  width: 40px;
-  background: var(--hx-accent);
-  box-shadow: 0 2px 6px var(--hx-accent-soft);
-  transform: scale(1.04);
+.hx-nplace__spot[aria-checked='true'] {
+  width: 70px;
+  height: 14px;
+  background: #000;
+  box-shadow:
+    0 3px 8px rgb(0 0 0 / 0.25),
+    inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  cursor: default;
 }
-.hx-place__spot:focus-visible {
+/* On a dark window the black pill keeps a light edge, or it is lost in the dark. */
+html[data-theme='dark'] .hx-nplace__spot[aria-checked='true'] {
+  box-shadow:
+    0 3px 8px rgb(0 0 0 / 0.5),
+    inset 0 0 0 1.5px rgb(255 255 255 / 0.4);
+}
+.hx-nplace__spot:focus-visible,
+.hx-nplace__opt:focus-visible,
+.hx-nplace__play:focus-visible {
   outline: 2px solid var(--hx-focus);
   outline-offset: 2px;
 }
-.hx-place__spot:disabled {
+.hx-nplace__list {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hx-nplace__opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+.hx-nplace__opt:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-nplace__opt[aria-checked='true'] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
   cursor: default;
+}
+.hx-nplace__opt-label {
+  flex: 1;
+  min-width: 0;
+}
+.hx-nplace__radio {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1.5px var(--hx-border-strong);
+  transition: box-shadow 200ms var(--hx-ease-out);
+}
+.hx-nplace__opt[aria-checked='true'] .hx-nplace__radio {
+  box-shadow: inset 0 0 0 5px var(--hx-fg-1);
+}
+.hx-nplace__play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms var(--hx-ease-out);
+}
+.hx-nplace__play:hover:not(:disabled) {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-nplace__play:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.hx-nplace__play:disabled {
+  cursor: default;
+}
+.hx-nplace__key {
+  min-width: 26px;
+  height: 26px;
+  font-size: 13px;
+  font-weight: 600;
+}
+@media (hover: none) and (pointer: coarse) {
+  .hx-nplace__keys {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .hx-nplace__opt,
+  .hx-nplace__play {
+    min-height: 44px;
+  }
+  .hx-nplace__play {
+    width: 40px;
+    height: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-nplace__spot,
+  .hx-nplace__radio,
+  .hx-nplace__opt,
+  .hx-nplace__play {
+    transition: none;
+  }
 }
 
 /* Голосовой ввод: свои слова */

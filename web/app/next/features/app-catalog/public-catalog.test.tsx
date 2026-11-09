@@ -27,9 +27,16 @@ const entry = (over: Partial<IPublicEntry> = {}): IPublicEntry => ({
   ...over,
 });
 
-const Page = ({ installed = [], onChanged = vi.fn() }: { installed?: string[]; onChanged?: () => void }) => (
-  <PublicCatalog catalog={usePublicCatalog(M, onChanged)} installed={installed} />
-);
+// The search is the apps page's header; the page here has a field that stands for it.
+const Page = ({ installed = [], onChanged = vi.fn() }: { installed?: string[]; onChanged?: () => void }) => {
+  const catalog = usePublicCatalog(M, onChanged);
+  return (
+    <>
+      <input type="search" onChange={(e) => catalog.setQuery(e.target.value)} />
+      <PublicCatalog catalog={catalog} installed={installed} />
+    </>
+  );
+};
 
 beforeEach(() => {
   asked.mockReset();

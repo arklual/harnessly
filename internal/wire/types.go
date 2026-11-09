@@ -1783,6 +1783,16 @@ type ConversationRetitleCmd struct {
 	ID   string `json:"id"`
 }
 
+// ConversationSummarizeCmd asks the cheap model for a few lines on what the agent did in the conversation's last turn,
+// for the notification that the turn is done. They come back on the record as its recap — unless Claude wrote a recap
+// of its own after the turn ended — and stand, as a recap does, until the person writes again. The model is called once
+// a turn, however many pages ask.
+type ConversationSummarizeCmd struct {
+	OpID   string `json:"opId"`
+	ID     string `json:"id"`
+	TurnID string `json:"turnId"`
+}
+
 // ConversationPinCmd pins or unpins a conversation.
 type ConversationPinCmd struct {
 	OpID   string `json:"opId"`
@@ -2005,83 +2015,85 @@ type FavPlaceCmd struct {
 	BeforeID *string `json:"beforeId"`
 }
 
-func (SendCmd) Op() Op                { return OpSend }
-func (CancelCmd) Op() Op              { return OpCancel }
-func (RetryCmd) Op() Op               { return OpRetry }
-func (PromoteCmd) Op() Op             { return OpPromote }
-func (QueueMoveCmd) Op() Op           { return OpQueueMove }
-func (AnswerCmd) Op() Op              { return OpAnswer }
-func (DecideCmd) Op() Op              { return OpDecide }
-func (InterruptCmd) Op() Op           { return OpInterrupt }
-func (QueueResumeCmd) Op() Op         { return OpQueueResume }
-func (SeenCmd) Op() Op                { return OpSeen }
-func (ConversationCreateCmd) Op() Op  { return OpConversationCreate }
-func (ConversationRenameCmd) Op() Op  { return OpConversationRename }
-func (ConversationPinCmd) Op() Op     { return OpConversationPin }
-func (ConversationAppsCmd) Op() Op    { return OpConversationApps }
-func (ConversationTestCmd) Op() Op    { return OpConversationTest }
-func (ConversationRetitleCmd) Op() Op { return OpConversationRetitle }
-func (ConversationMoveCmd) Op() Op    { return OpConversationMove }
-func (ConversationDeleteCmd) Op() Op  { return OpConversationDelete }
-func (TerminalStopCmd) Op() Op        { return OpTerminalStop }
-func (RewindCmd) Op() Op              { return OpRewind }
-func (RewindUndoCmd) Op() Op          { return OpRewindUndo }
-func (LimitCmd) Op() Op               { return OpLimit }
-func (ConversationRestoreCmd) Op() Op { return OpConversationRestore }
-func (ConversationResumeCmd) Op() Op  { return OpConversationResume }
-func (ModelCmd) Op() Op               { return OpModel }
-func (ConversationForkCmd) Op() Op    { return OpConversationFork }
-func (ConversationHandoffCmd) Op() Op { return OpConversationHandoff }
-func (ConversationMergeCmd) Op() Op   { return OpConversationMerge }
-func (BgStopCmd) Op() Op              { return OpBgStop }
-func (ProjectCreateCmd) Op() Op       { return OpProjectCreate }
-func (ProjectUpdateCmd) Op() Op       { return OpProjectUpdate }
-func (FavGroupCreateCmd) Op() Op      { return OpFavGroupCreate }
-func (FavGroupRenameCmd) Op() Op      { return OpFavGroupRename }
-func (FavGroupDeleteCmd) Op() Op      { return OpFavGroupDelete }
-func (FavGroupMoveCmd) Op() Op        { return OpFavGroupMove }
-func (FavPlaceCmd) Op() Op            { return OpFavPlace }
-func (GoalCmd) Op() Op                { return OpGoal }
-func (DraftSetCmd) Op() Op            { return OpDraftSet }
+func (SendCmd) Op() Op                  { return OpSend }
+func (CancelCmd) Op() Op                { return OpCancel }
+func (RetryCmd) Op() Op                 { return OpRetry }
+func (PromoteCmd) Op() Op               { return OpPromote }
+func (QueueMoveCmd) Op() Op             { return OpQueueMove }
+func (AnswerCmd) Op() Op                { return OpAnswer }
+func (DecideCmd) Op() Op                { return OpDecide }
+func (InterruptCmd) Op() Op             { return OpInterrupt }
+func (QueueResumeCmd) Op() Op           { return OpQueueResume }
+func (SeenCmd) Op() Op                  { return OpSeen }
+func (ConversationCreateCmd) Op() Op    { return OpConversationCreate }
+func (ConversationRenameCmd) Op() Op    { return OpConversationRename }
+func (ConversationPinCmd) Op() Op       { return OpConversationPin }
+func (ConversationAppsCmd) Op() Op      { return OpConversationApps }
+func (ConversationTestCmd) Op() Op      { return OpConversationTest }
+func (ConversationRetitleCmd) Op() Op   { return OpConversationRetitle }
+func (ConversationSummarizeCmd) Op() Op { return OpConversationSummarize }
+func (ConversationMoveCmd) Op() Op      { return OpConversationMove }
+func (ConversationDeleteCmd) Op() Op    { return OpConversationDelete }
+func (TerminalStopCmd) Op() Op          { return OpTerminalStop }
+func (RewindCmd) Op() Op                { return OpRewind }
+func (RewindUndoCmd) Op() Op            { return OpRewindUndo }
+func (LimitCmd) Op() Op                 { return OpLimit }
+func (ConversationRestoreCmd) Op() Op   { return OpConversationRestore }
+func (ConversationResumeCmd) Op() Op    { return OpConversationResume }
+func (ModelCmd) Op() Op                 { return OpModel }
+func (ConversationForkCmd) Op() Op      { return OpConversationFork }
+func (ConversationHandoffCmd) Op() Op   { return OpConversationHandoff }
+func (ConversationMergeCmd) Op() Op     { return OpConversationMerge }
+func (BgStopCmd) Op() Op                { return OpBgStop }
+func (ProjectCreateCmd) Op() Op         { return OpProjectCreate }
+func (ProjectUpdateCmd) Op() Op         { return OpProjectUpdate }
+func (FavGroupCreateCmd) Op() Op        { return OpFavGroupCreate }
+func (FavGroupRenameCmd) Op() Op        { return OpFavGroupRename }
+func (FavGroupDeleteCmd) Op() Op        { return OpFavGroupDelete }
+func (FavGroupMoveCmd) Op() Op          { return OpFavGroupMove }
+func (FavPlaceCmd) Op() Op              { return OpFavPlace }
+func (GoalCmd) Op() Op                  { return OpGoal }
+func (DraftSetCmd) Op() Op              { return OpDraftSet }
 
-func (c SendCmd) OpKey() string                { return c.OpID }
-func (c CancelCmd) OpKey() string              { return c.OpID }
-func (c RetryCmd) OpKey() string               { return c.OpID }
-func (c PromoteCmd) OpKey() string             { return c.OpID }
-func (c QueueMoveCmd) OpKey() string           { return c.OpID }
-func (c AnswerCmd) OpKey() string              { return c.OpID }
-func (c DecideCmd) OpKey() string              { return c.OpID }
-func (c InterruptCmd) OpKey() string           { return c.OpID }
-func (c QueueResumeCmd) OpKey() string         { return c.OpID }
-func (c SeenCmd) OpKey() string                { return c.OpID }
-func (c ConversationCreateCmd) OpKey() string  { return c.OpID }
-func (c ConversationRenameCmd) OpKey() string  { return c.OpID }
-func (c ConversationPinCmd) OpKey() string     { return c.OpID }
-func (c ConversationAppsCmd) OpKey() string    { return c.OpID }
-func (c ConversationTestCmd) OpKey() string    { return c.OpID }
-func (c ConversationRetitleCmd) OpKey() string { return c.OpID }
-func (c ConversationMoveCmd) OpKey() string    { return c.OpID }
-func (c ConversationDeleteCmd) OpKey() string  { return c.OpID }
-func (c TerminalStopCmd) OpKey() string        { return c.OpID }
-func (c RewindCmd) OpKey() string              { return c.OpID }
-func (c RewindUndoCmd) OpKey() string          { return c.OpID }
-func (c LimitCmd) OpKey() string               { return c.OpID }
-func (c ConversationRestoreCmd) OpKey() string { return c.OpID }
-func (c ConversationResumeCmd) OpKey() string  { return c.OpID }
-func (c ModelCmd) OpKey() string               { return c.OpID }
-func (c ConversationForkCmd) OpKey() string    { return c.OpID }
-func (c ConversationHandoffCmd) OpKey() string { return c.OpID }
-func (c ConversationMergeCmd) OpKey() string   { return c.OpID }
-func (c BgStopCmd) OpKey() string              { return c.OpID }
-func (c ProjectCreateCmd) OpKey() string       { return c.OpID }
-func (c ProjectUpdateCmd) OpKey() string       { return c.OpID }
-func (c FavGroupCreateCmd) OpKey() string      { return c.OpID }
-func (c FavGroupRenameCmd) OpKey() string      { return c.OpID }
-func (c FavGroupDeleteCmd) OpKey() string      { return c.OpID }
-func (c FavGroupMoveCmd) OpKey() string        { return c.OpID }
-func (c FavPlaceCmd) OpKey() string            { return c.OpID }
-func (c GoalCmd) OpKey() string                { return c.OpID }
-func (c DraftSetCmd) OpKey() string            { return c.OpID }
+func (c SendCmd) OpKey() string                  { return c.OpID }
+func (c CancelCmd) OpKey() string                { return c.OpID }
+func (c RetryCmd) OpKey() string                 { return c.OpID }
+func (c PromoteCmd) OpKey() string               { return c.OpID }
+func (c QueueMoveCmd) OpKey() string             { return c.OpID }
+func (c AnswerCmd) OpKey() string                { return c.OpID }
+func (c DecideCmd) OpKey() string                { return c.OpID }
+func (c InterruptCmd) OpKey() string             { return c.OpID }
+func (c QueueResumeCmd) OpKey() string           { return c.OpID }
+func (c SeenCmd) OpKey() string                  { return c.OpID }
+func (c ConversationCreateCmd) OpKey() string    { return c.OpID }
+func (c ConversationRenameCmd) OpKey() string    { return c.OpID }
+func (c ConversationPinCmd) OpKey() string       { return c.OpID }
+func (c ConversationAppsCmd) OpKey() string      { return c.OpID }
+func (c ConversationTestCmd) OpKey() string      { return c.OpID }
+func (c ConversationRetitleCmd) OpKey() string   { return c.OpID }
+func (c ConversationSummarizeCmd) OpKey() string { return c.OpID }
+func (c ConversationMoveCmd) OpKey() string      { return c.OpID }
+func (c ConversationDeleteCmd) OpKey() string    { return c.OpID }
+func (c TerminalStopCmd) OpKey() string          { return c.OpID }
+func (c RewindCmd) OpKey() string                { return c.OpID }
+func (c RewindUndoCmd) OpKey() string            { return c.OpID }
+func (c LimitCmd) OpKey() string                 { return c.OpID }
+func (c ConversationRestoreCmd) OpKey() string   { return c.OpID }
+func (c ConversationResumeCmd) OpKey() string    { return c.OpID }
+func (c ModelCmd) OpKey() string                 { return c.OpID }
+func (c ConversationForkCmd) OpKey() string      { return c.OpID }
+func (c ConversationHandoffCmd) OpKey() string   { return c.OpID }
+func (c ConversationMergeCmd) OpKey() string     { return c.OpID }
+func (c BgStopCmd) OpKey() string                { return c.OpID }
+func (c ProjectCreateCmd) OpKey() string         { return c.OpID }
+func (c ProjectUpdateCmd) OpKey() string         { return c.OpID }
+func (c FavGroupCreateCmd) OpKey() string        { return c.OpID }
+func (c FavGroupRenameCmd) OpKey() string        { return c.OpID }
+func (c FavGroupDeleteCmd) OpKey() string        { return c.OpID }
+func (c FavGroupMoveCmd) OpKey() string          { return c.OpID }
+func (c FavPlaceCmd) OpKey() string              { return c.OpID }
+func (c GoalCmd) OpKey() string                  { return c.OpID }
+func (c DraftSetCmd) OpKey() string              { return c.OpID }
 
 // CmdResult is the answer of a command. Accepted and queued carry the channel and seq from which the effect shows
 // on the socket — the page waits for that seq, not for a timer — and Rev or ID when the command made one;
@@ -2161,10 +2173,13 @@ const (
 	FeatureMade Feature = "made"
 	// FeatureAgentBrowser exposes the conversation browser socket; it does not imply agent tools are installed.
 	FeatureAgentBrowser Feature = "agent-browser"
+	// FeatureSnapshotAfter: a conversation's snapshot after an entry (SubFrame.AfterEntryID) carries every turn from that
+	// entry's own on as it is now, so a page drawn from elsewhere learns the turn's state.
+	FeatureSnapshotAfter Feature = "snapshot-after"
 )
 
 // Features is every Feature, in the schema's order.
-var Features = []Feature{FeatureQueue, FeatureSteer, FeatureQuestions, FeaturePermissions, FeatureBackground, FeatureModel, FeatureVoice, FeatureFiles, FeatureCheckpoints, FeatureDesignly, FeatureSearch, FeatureVault, FeaturePush, FeatureTerminal, FeatureMachine, FeatureApps, FeatureSettings, FeatureDrafts, FeatureQueueMove, FeatureAppsHub, FeatureTerminalStop, FeatureRewind, FeatureFork, FeatureHandoff, FeatureAutoContinue, FeatureMade, FeatureAgentBrowser}
+var Features = []Feature{FeatureQueue, FeatureSteer, FeatureQuestions, FeaturePermissions, FeatureBackground, FeatureModel, FeatureVoice, FeatureFiles, FeatureCheckpoints, FeatureDesignly, FeatureSearch, FeatureVault, FeaturePush, FeatureTerminal, FeatureMachine, FeatureApps, FeatureSettings, FeatureDrafts, FeatureQueueMove, FeatureAppsHub, FeatureTerminalStop, FeatureRewind, FeatureFork, FeatureHandoff, FeatureAutoContinue, FeatureMade, FeatureAgentBrowser, FeatureSnapshotAfter}
 
 // Reach is whether the cluster hears a machine; standalone it is always online.
 type Reach string
@@ -2773,48 +2788,49 @@ var CompactionPhases = []CompactionPhase{CompactionStarted, CompactionFinished}
 type Op string
 
 const (
-	OpSend                Op = "send"
-	OpCancel              Op = "cancel"
-	OpRetry               Op = "retry"
-	OpPromote             Op = "promote"
-	OpAnswer              Op = "answer"
-	OpDecide              Op = "decide"
-	OpInterrupt           Op = "interrupt"
-	OpQueueResume         Op = "queue.resume"
-	OpSeen                Op = "seen"
-	OpConversationCreate  Op = "conversation.create"
-	OpConversationRename  Op = "conversation.rename"
-	OpConversationPin     Op = "conversation.pin"
-	OpConversationApps    Op = "conversation.apps"
-	OpConversationTest    Op = "conversation.test"
-	OpConversationRetitle Op = "conversation.retitle"
-	OpConversationMove    Op = "conversation.move"
-	OpConversationDelete  Op = "conversation.delete"
-	OpConversationRestore Op = "conversation.restore"
-	OpConversationResume  Op = "conversation.resume"
-	OpModel               Op = "model"
-	OpBgStop              Op = "bg.stop"
-	OpProjectCreate       Op = "project.create"
-	OpProjectUpdate       Op = "project.update"
-	OpFavGroupCreate      Op = "favorites.group.create"
-	OpFavGroupRename      Op = "favorites.group.rename"
-	OpFavGroupDelete      Op = "favorites.group.delete"
-	OpFavGroupMove        Op = "favorites.group.move"
-	OpFavPlace            Op = "favorites.place"
-	OpGoal                Op = "goal"
-	OpDraftSet            Op = "draft.set"
-	OpQueueMove           Op = "queue.move"
-	OpTerminalStop        Op = "terminal.stop"
-	OpRewind              Op = "rewind"
-	OpRewindUndo          Op = "rewind.undo"
-	OpConversationFork    Op = "conversation.fork"
-	OpConversationHandoff Op = "conversation.handoff"
-	OpConversationMerge   Op = "conversation.merge"
-	OpLimit               Op = "limit"
+	OpSend                  Op = "send"
+	OpCancel                Op = "cancel"
+	OpRetry                 Op = "retry"
+	OpPromote               Op = "promote"
+	OpAnswer                Op = "answer"
+	OpDecide                Op = "decide"
+	OpInterrupt             Op = "interrupt"
+	OpQueueResume           Op = "queue.resume"
+	OpSeen                  Op = "seen"
+	OpConversationCreate    Op = "conversation.create"
+	OpConversationRename    Op = "conversation.rename"
+	OpConversationPin       Op = "conversation.pin"
+	OpConversationApps      Op = "conversation.apps"
+	OpConversationTest      Op = "conversation.test"
+	OpConversationRetitle   Op = "conversation.retitle"
+	OpConversationSummarize Op = "conversation.summarize"
+	OpConversationMove      Op = "conversation.move"
+	OpConversationDelete    Op = "conversation.delete"
+	OpConversationRestore   Op = "conversation.restore"
+	OpConversationResume    Op = "conversation.resume"
+	OpModel                 Op = "model"
+	OpBgStop                Op = "bg.stop"
+	OpProjectCreate         Op = "project.create"
+	OpProjectUpdate         Op = "project.update"
+	OpFavGroupCreate        Op = "favorites.group.create"
+	OpFavGroupRename        Op = "favorites.group.rename"
+	OpFavGroupDelete        Op = "favorites.group.delete"
+	OpFavGroupMove          Op = "favorites.group.move"
+	OpFavPlace              Op = "favorites.place"
+	OpGoal                  Op = "goal"
+	OpDraftSet              Op = "draft.set"
+	OpQueueMove             Op = "queue.move"
+	OpTerminalStop          Op = "terminal.stop"
+	OpRewind                Op = "rewind"
+	OpRewindUndo            Op = "rewind.undo"
+	OpConversationFork      Op = "conversation.fork"
+	OpConversationHandoff   Op = "conversation.handoff"
+	OpConversationMerge     Op = "conversation.merge"
+	OpLimit                 Op = "limit"
 )
 
 // Ops is every Op, in the schema's order.
-var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationApps, OpConversationTest, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpProjectUpdate, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
+var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationApps, OpConversationTest, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpProjectUpdate, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpConversationSummarize, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
 
 // PromoteTo is where promote moves a queued message.
 type PromoteTo string

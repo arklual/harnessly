@@ -1,0 +1,22 @@
+{
+  "next.chatShare.title": "Share the chat",
+  "next.chatShare.lead": "A snapshot of the chat without secrets: keys and paths are hidden, the link is read-only",
+  "next.chatShare.opt.tools": "Show tool calls in short",
+  "next.chatShare.opt.thinking": "Include the agent's thinking",
+  "next.chatShare.opt.diffs": "Include the diffs of edits",
+  "next.chatShare.opt.economics": "Include token spend",
+  "next.chatShare.capture": "Capture a snapshot",
+  "next.chatShare.recapture": "Capture again",
+  "next.chatShare.publish": "Create a link",
+  "next.chatShare.close": "Close",
+  "next.chatShare.report": "Secrets hidden: {hidden}, paths shortened: {shortened}",
+  "next.chatShare.preview": "Preview the snapshot",
+  "next.chatShare.days": "Link lifetime",
+  "next.chatShare.daysN": "{n} days",
+  "next.chatShare.link": "Snapshot link",
+  "next.chatShare.copy": "Copy",
+  "next.chatShare.copied": "Link copied",
+  "next.chatShare.unavailable": "Sharing chats is not set up on this machine",
+  "next.chatShare.failed": "Did not work: {why}",
+  "next.rowMenu.share": "Share…"
+}

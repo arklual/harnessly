@@ -57,6 +57,13 @@ type AppLauncher interface {
 	Codex(conversation string, ids []string) (CodexApps, error)
 }
 
+// HostMCPLauncher is an AppLauncher that gives a Claude Code chat without apps the host's app server all the same
+// quiet until an app turns on in the chat, then the app's tools come to the running agent.
+type HostMCPLauncher interface {
+	// HostMCP is the server's --mcp-config file; "" for none.
+	HostMCP() (string, error)
+}
+
 // CodexApps is what the apps of a Codex chat add to its launch.
 type CodexApps struct {
 	// Guard is the PreToolUse hook command line (`harnessly hook app-guard --policy <file> --agent codex`); it goes first

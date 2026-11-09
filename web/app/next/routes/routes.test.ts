@@ -52,6 +52,8 @@ describe('routes', () => {
       '/apps/acme.cashback?chat=tab-1',
     );
     expect(routePath({ kind: ROUTE.app, id: 'acme.cashback' })).toBe('/apps/acme.cashback');
+    expect(parseRoute('/apps/acme.cashback/about')).toEqual({ kind: ROUTE.appAbout, id: 'acme.cashback' });
+    expect(routePath({ kind: ROUTE.appAbout, id: 'acme.cashback' })).toBe('/apps/acme.cashback/about');
     // An id is publisher.name; anything else is not an app.
     expect(parseRoute('/apps/extra')).toEqual(HOME);
     expect(placeKeyOf('/apps/acme.cashback?chat=a')).toBe('app:acme.cashback');

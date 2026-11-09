@@ -184,8 +184,6 @@
   "agents.conversationSidebar.listLabel": "Чаты и агенты",
   "agents.conversationSidebar.loadingConversations": "Загружаем диалоги",
   "agents.conversationSidebar.loadingOrganizer": "Загружаем проекты и закрепы",
-  "agents.conversationSidebar.organizerDownMain": "Закрепы и проекты хранятся на основной машине. Сейчас она не отвечает — покажу их, как только она вернётся.",
-  "agents.conversationSidebar.organizerDownNamed": "Закрепы и проекты хранятся на машине «{machine}». Сейчас она не отвечает — покажу их, как только она вернётся.",
   "agents.conversationSidebar.organizerStale": "Проекты и закрепы не обновляются: {error}",
   "agents.conversationSidebar.retry": "Повторить",
   "agents.conversationSidebar.themeLabel": "{theme}. Переключить",

@@ -52,7 +52,7 @@ describe('the switches', () => {
 
   it('keep a place only from its list, and the sounds one by one', () => {
     expect(
-      parseNotify(JSON.stringify({ v: 2, place: 'bottom-left', cards: false, sounds: { done: true, x: 1 } })),
+      parseNotify(JSON.stringify({ v: 3, place: 'bottom-left', cards: false, sounds: { done: true, x: 1 } })),
     ).toEqual({
       ...DEFAULT_NOTIFY,
       place: 'bottom-left',
@@ -66,5 +66,11 @@ describe('the switches', () => {
     expect(parseNotify(JSON.stringify({ place: 'top-right' })).place).toBe('bottom-center');
     expect(parseNotify(JSON.stringify({ place: 'top-left' })).place).toBe('top-left');
     expect(parseNotify(JSON.stringify({ v: 2, place: 'top-right' })).place).toBe('top-right');
+    expect(parseNotify(JSON.stringify({ v: 3, place: 'top-right' })).place).toBe('top-right');
+  });
+
+  it('bring back the smart notice turned off before its switch was taken away', () => {
+    expect(parseNotify(JSON.stringify({ v: 2, cards: false })).cards).toBe(true);
+    expect(parseNotify(JSON.stringify({ cards: false })).cards).toBe(true);
   });
 });

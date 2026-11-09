@@ -105,6 +105,11 @@ export const markSeen = (m: MachineId, conversationId: ConvId | 'all', upTo: Ms)
 export const retitleConversation = (m: MachineId, id: ConvId) =>
   runCommand(m, 'conversation.retitle', { id });
 
+/** A few lines on what the agent did in the chat's last turn: the record's recap carries them when they come;
+ *  a machine that cannot make them refuses, and the notice keeps the answer's start. */
+export const summarizeTurn = (m: MachineId, id: ConvId, turnId: TurnId) =>
+  runCommand(m, 'conversation.summarize', { id, turnId });
+
 export const renameConversation = (m: MachineId, id: ConvId, title: string) =>
   runCommand(m, 'conversation.rename', { id, title });
 export const pinConversation = (m: MachineId, id: ConvId, pinned: boolean) =>

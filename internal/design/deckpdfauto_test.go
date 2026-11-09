@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -156,4 +158,90 @@ func TestDeckPdfIsBuiltOnlyByTheRuntimeThatKeepsIt(t *testing.T) {
 	if runs.Load() != 0 {
 		t.Errorf("another runtime's deck was built here")
 	}
+}
+
+// fakePdfStore is a store with leases for the keeper: the deck's newest revision, and one lease holder at a time.
+type fakePdfStore struct {
+	mu     sync.Mutex
+	rev    int64
+	holder string
+}
+
+func (f *fakePdfStore) History(context.Context, string) ([]Revision, error) { return nil, nil }
+func (f *fakePdfStore) HistoryUnder(_ context.Context, prefix string, _ int) ([]Revision, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if strings.HasSuffix(prefix, "/"+ProjectDirname+"/") {
+		return []Revision{{Rev: f.rev, Path: prefix + "Main.dc.html", At: time.Now().Add(-time.Minute).UnixMilli()}}, nil
+	}
+	return nil, nil
+}
+func (f *fakePdfStore) Snapshot(context.Context, string, int64) ([]Revision, error) { return nil, nil }
+func (f *fakePdfStore) Read(context.Context, string) ([]byte, error)                { return nil, nil }
+func (f *fakePdfStore) TakeLease(_ context.Context, _, chat string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.holder != "" && f.holder != chat {
+		return false, nil
+	}
+	f.holder = chat
+	return true, nil
+}
+
+// through a store with leases, any machine that may edit a marked deck builds its PDF, but only the one
+// holding the lease; whether it is behind is the store's revision against the one written beside the PDF.
+func TestDeckPdfThroughTheStoreIsBuiltByTheLeaseHolderByRevision(t *testing.T) {
+	g := newDeckRig(t)
+	pdfKnobs(t, 0, 0, 0)
+	was := deckPdfStoreFor
+	deckPdfStoreFor = 0
+	t.Cleanup(func() { deckPdfStoreFor = was })
+	var runs atomic.Int32
+	fakeExporter(t, DeckExportPDF, DeckExporter{Ext: "pdf", Run: func(_ context.Context, run DeckExportRun) error {
+		runs.Add(1)
+		return os.WriteFile(run.Out, []byte("%PDF-1.4 fake"), 0o644)
+	}})
+	marker := filepath.Join(g.root, "admin", filepath.FromSlash(DeckPdfAutoFile))
+	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Another machine's runtime turned it on: through the store that does not matter.
+	if err := os.WriteFile(marker, []byte("someone-else\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st := &fakePdfStore{rev: 7, holder: "other-machine/pdf"}
+	g.l.UseRevisions(st)
+
+	g.l.keepDeckPdfsOnce(time.Now())
+	time.Sleep(50 * time.Millisecond)
+	if runs.Load() != 0 {
+		t.Fatal("built while another machine holds the lease")
+	}
+
+	st.mu.Lock()
+	st.holder = ""
+	st.mu.Unlock()
+	revFile := g.l.deckFile("admin", deckPdfRevFile)
+	waitFor(t, "the PDF built and its revision written", func() bool {
+		g.l.keepDeckPdfsOnce(time.Now())
+		raw, err := os.ReadFile(revFile)
+		return err == nil && strings.TrimSpace(string(raw)) == "7"
+	})
+	if runs.Load() != 1 {
+		t.Fatalf("builds: %d", runs.Load())
+	}
+	g.l.keepDeckPdfsOnce(time.Now())
+	time.Sleep(50 * time.Millisecond)
+	if runs.Load() != 1 {
+		t.Fatalf("built again with nothing new in the store: %d", runs.Load())
+	}
+
+	st.mu.Lock()
+	st.rev = 9
+	st.mu.Unlock()
+	waitFor(t, "the PDF built again from the new revision", func() bool {
+		g.l.keepDeckPdfsOnce(time.Now())
+		raw, err := os.ReadFile(revFile)
+		return err == nil && strings.TrimSpace(string(raw)) == "9"
+	})
 }

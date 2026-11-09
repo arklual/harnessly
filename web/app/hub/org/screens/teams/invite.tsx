@@ -63,7 +63,7 @@ const Body = ({ tenant, onClose }: { tenant: TenantRef; onClose: () => void }) =
       const made = await api.inviteByEmail(tenant.id, address);
       setEmail('');
       // A letter the hub could not send: the person passes the link on by hand.
-      setFresh(made.sent === false && made.url ? [made] : []);
+      setFresh(made && made.sent === false && made.url ? [made] : []);
     });
   };
   const makeLink = () =>

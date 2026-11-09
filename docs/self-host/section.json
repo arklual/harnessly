@@ -4,6 +4,7 @@
   "order": 60,
   "pages": [
     "README.md",
+    "closed-network.md",
     "own-docs.md",
     "../getting-started.md",
     "../deploy.md",
@@ -11,6 +12,7 @@
     "../hub/deploy.md",
     "../hub/machine.md",
     "../hub/store.md",
+    "../migrations/0001-data-to-hub.md",
     "../hub/environment.md",
     "../safe.md",
     "../connections.md",

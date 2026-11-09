@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -23,9 +24,15 @@ const (
 	SectionComponents = "components"
 	SectionTemplates  = "templates"
 	SectionAssets     = "assets"
+	// SectionReference holds a template's own guide (how to use it, palettes, icon libraries): shown apart from the
+	// templates so they stay clean.
+	SectionReference = "reference"
 )
 
-var sectionOrder = []string{SectionFoundation, SectionComponents, SectionTemplates, SectionAssets}
+// hexColor is the only form of colour a kit may give an asset's background.
+var hexColor = regexp.MustCompile(`^#[0-9A-Fa-f]{3,8}$`)
+
+var sectionOrder = []string{SectionFoundation, SectionComponents, SectionTemplates, SectionAssets, SectionReference}
 
 // ErrNoCanvas: the theme does not describe a canvas (an older kit), or the kit, version or theme is not there.
 var ErrNoCanvas = errors.New("the kit has no canvas")
@@ -103,13 +110,26 @@ type Component struct {
 	Variants    []Variant      `json:"variants"`
 	Sample      map[string]any `json:"sample,omitempty"`
 	Preview     string         `json:"preview,omitempty"`
+	// Thumb is the component's picture (a path in the theme), drawn on the canvas when it is not live; Cell is its place
+	// in the group's atlas, -1 without one.
+	Thumb string `json:"thumb,omitempty"`
+	Cell  int    `json:"cell"`
+	// Part is what the component is a part of: another component's id (TableRow of Table), or PartProvider for a
+	// provider that draws nothing itself. A part is not a tile of the canvas; it shows in its parent's panel.
+	Part string `json:"part,omitempty"`
+	// Keywords are the words people look for it by besides its name and description (synonyms, tasks).
+	Keywords []string `json:"keywords,omitempty"`
 }
+
+// PartProvider marks a component that only provides context (a theme, a store) and draws nothing.
+const PartProvider = "provider"
 
 // ComponentGroup is a group of components.
 type ComponentGroup struct {
 	ID         string      `json:"id"`
 	Title      string      `json:"title"`
 	Components []Component `json:"components"`
+	Atlas      *Atlas      `json:"atlas,omitempty"`
 }
 
 // Asset is a named file of an asset group, relative to the theme's folder; Dark is its variant for the dark mode.
@@ -118,6 +138,8 @@ type Asset struct {
 	Name   string `json:"name"`
 	File   string `json:"file"`
 	Dark   string `json:"dark,omitempty"`
+	// Bg is the colour the asset is meant to sit on (a white logo on a dark one), "" for any.
+	Bg string `json:"bg,omitempty"`
 	// Cell is the asset's place in its group's atlas, -1 when the atlas does not hold it (a vector file).
 	Cell int `json:"cell"`
 }
@@ -146,8 +168,10 @@ type AssetGroup struct {
 
 // Slot is what an agent fills in a layout: a text (with the sample the template shows), an image, a chart.
 type Slot struct {
-	Key    string `json:"key"`
-	Kind   string `json:"kind"`
+	Key  string `json:"key"`
+	Kind string `json:"kind"`
+	// Label is what the field is called to a person («Заголовок», «Картинка 2»); "" falls back to the key.
+	Label  string `json:"label,omitempty"`
 	Sample string `json:"sample,omitempty"`
 }
 
@@ -179,8 +203,12 @@ type TemplateSection struct {
 
 // Template is a template (a deck's master): its sections of layouts.
 type Template struct {
-	ID          string            `json:"id"`
-	NodeID      string            `json:"node"`
+	ID     string `json:"id"`
+	NodeID string `json:"node"`
+	// Section is the tree section the template lives in: templates, or reference for a template's guide.
+	Section string `json:"section"`
+	// Blank: its layouts are a master's empty layouts (background and placeholders), not counted as templates.
+	Blank       bool              `json:"blank,omitempty"`
 	Title       string            `json:"title"`
 	Kind        string            `json:"kind"`
 	Aspect      [2]int            `json:"aspect"`
@@ -200,6 +228,8 @@ type Canvas struct {
 	Theme     string        `json:"theme"`
 	Themes    []CanvasTheme `json:"themes"`
 	Namespace string        `json:"namespace"`
+	// Root is the provider component every board on the kit wraps its content in (the kit record's root), "" for none.
+	Root string `json:"root,omitempty"`
 	// Base is the theme's folder in the version (slash path, "" for a kit that is one theme).
 	Base       string           `json:"base"`
 	Sections   []CanvasSection  `json:"sections"`
@@ -237,13 +267,16 @@ type rawManifest struct {
 		ID         string `json:"id"`
 		Title      string `json:"title"`
 		Components []struct {
-			ID          string         `json:"id"`
-			Name        string         `json:"name"`
-			Description string         `json:"description"`
-			Props       []Prop         `json:"props"`
-			Variants    []Variant      `json:"variants"`
-			Sample      map[string]any `json:"sample"`
-			Preview     string         `json:"preview"`
+			ID          string          `json:"id"`
+			Name        string          `json:"name"`
+			Description string          `json:"description"`
+			Props       []Prop          `json:"props"`
+			Variants    []Variant       `json:"variants"`
+			Sample      map[string]any  `json:"sample"`
+			Preview     string          `json:"preview"`
+			Thumb       string          `json:"thumb"`
+			Part        json.RawMessage `json:"part"`
+			Keywords    []string        `json:"keywords"`
 		} `json:"components"`
 	} `json:"groups"`
 	AssetGroups map[string]struct {
@@ -256,6 +289,8 @@ type rawManifest struct {
 	} `json:"assetGroups"`
 	Templates []struct {
 		ID          string `json:"id"`
+		Section     string `json:"section"`
+		Blank       bool   `json:"blank"`
 		Title       string `json:"title"`
 		Kind        string `json:"kind"`
 		Aspect      []int  `json:"aspect"`
@@ -371,6 +406,7 @@ func ReadCanvas(dir, id, version, theme string) (*Canvas, error) {
 		}
 		c.Themes = append(c.Themes, CanvasTheme{ID: t.ID, Title: firstNonEmpty(title, t.ID)})
 	}
+	c.Root = kitRoot(raw)
 	if tokens, err := readThemeFile(dir, id, version, th.Folder, "tokens.json"); err == nil {
 		readFoundation(c, tokens)
 	}
@@ -386,8 +422,10 @@ func readSections(c *Canvas, m *rawManifest) {
 	has := map[string]bool{
 		SectionFoundation: len(c.Colors)+len(c.Type)+len(c.Tokens) > 0,
 		SectionComponents: len(c.Groups) > 0,
-		SectionTemplates:  len(c.Templates) > 0,
 		SectionAssets:     len(c.Assets) > 0,
+	}
+	for _, t := range c.Templates {
+		has[t.Section] = true
 	}
 	for _, id := range sectionOrder {
 		if !has[id] {
@@ -540,7 +578,8 @@ func readComponents(c *Canvas, m *rawManifest) {
 				continue
 			}
 			comp := Component{ID: id, NodeID: "component:" + id, Name: firstNonEmpty(k.Name, id), Description: k.Description,
-				Props: k.Props, Variants: k.Variants, Sample: k.Sample, Preview: cleanRel(k.Preview)}
+				Props: k.Props, Variants: k.Variants, Sample: k.Sample, Preview: cleanRel(k.Preview), Thumb: cleanRel(k.Thumb),
+				Cell: -1, Part: partOf(k.Part), Keywords: k.Keywords}
 			if comp.Props == nil {
 				comp.Props = []Prop{}
 			}
@@ -575,6 +614,9 @@ func readAssets(c *Canvas, m *rawManifest) {
 			Component: g.Component, Prop: g.Prop}
 		for _, a := range g.Items {
 			a.File, a.Dark = cleanRel(a.File), cleanRel(a.Dark)
+			if !hexColor.MatchString(a.Bg) {
+				a.Bg = ""
+			}
 			if a.Name == "" || a.File == "" {
 				continue
 			}
@@ -605,8 +647,11 @@ func readTemplates(c *Canvas, m *rawManifest, dir, id, version string) {
 		if t.ID == "" {
 			continue
 		}
-		out := Template{ID: t.ID, NodeID: "template:" + t.ID, Title: firstNonEmpty(t.Title, t.ID), Kind: firstNonEmpty(t.Kind, "slides"),
-			Aspect: [2]int{16, 9}, Component: t.Component, Cover: t.Cover, Description: t.Description}
+		out := Template{ID: t.ID, NodeID: "template:" + t.ID, Section: SectionTemplates, Blank: t.Blank, Title: firstNonEmpty(t.Title, t.ID),
+			Kind: firstNonEmpty(t.Kind, "slides"), Aspect: [2]int{16, 9}, Component: t.Component, Cover: t.Cover, Description: t.Description}
+		if t.Section == SectionReference {
+			out.Section = SectionReference
+		}
 		if len(t.Aspect) == 2 && t.Aspect[0] > 0 && t.Aspect[1] > 0 {
 			out.Aspect = [2]int{t.Aspect[0], t.Aspect[1]}
 		}
@@ -650,4 +695,58 @@ func readTemplates(c *Canvas, m *rawManifest, dir, id, version string) {
 		}
 		c.Templates = append(c.Templates, out)
 	}
+}
+
+// kitRoot is the root component the kit's own record names: the top-level member with an id and a version (the one
+// install checks), its "root". A namespaced value (Acme.AcmeRoot) is taken by its last part.
+func kitRoot(manifest []byte) string {
+	var all map[string]json.RawMessage
+	if json.Unmarshal(manifest, &all) != nil {
+		return ""
+	}
+	names := make([]string, 0, len(all))
+	for name := range all {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		var own struct {
+			ID      string `json:"id"`
+			Version string `json:"version"`
+			Root    any    `json:"root"`
+		}
+		if json.Unmarshal(all[name], &own) != nil || own.ID == "" || own.Version == "" {
+			continue
+		}
+		root := ""
+		switch v := own.Root.(type) {
+		case string:
+			root = v
+		case map[string]any:
+			root, _ = v["component"].(string)
+		}
+		if i := strings.LastIndex(root, "."); i >= 0 {
+			root = root[i+1:]
+		}
+		return root
+	}
+	return ""
+}
+
+// partOf reads a component's part: "provider", a parent's id, or {"of": "<id>"}; "" when it is a component of its own.
+func partOf(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return strings.TrimSpace(s)
+	}
+	var o struct {
+		Of string `json:"of"`
+	}
+	if json.Unmarshal(raw, &o) == nil {
+		return strings.TrimSpace(o.Of)
+	}
+	return ""
 }

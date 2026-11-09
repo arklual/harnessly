@@ -36,6 +36,9 @@ func TestNetworkSettingsReachEveryComponent(t *testing.T) {
 			"SSL_CERT_FILE="+ca+"\n", "NODE_EXTRA_CA_CERTS="+ca+"\n", "HTTPS_PROXY=http://proxy.example.com:3128\n",
 			"https_proxy=http://proxy.example.com:3128\n", "NO_PROXY=127.0.0.1,localhost,::1,127.0.0.1,.example.com\n")
 	}
+	// The apps' calls and Connections take them by their own names (internal/egress).
+	mustContain(t, "runtime.env", e.read(e.path("/etc/harnessly/runtime.env")), "RUNTIME_APPS_CA_FILE="+ca+"\n",
+		"RUNTIME_APPS_PROXY=http://proxy.example.com:3128\n", "RUNTIME_APPS_NO_PROXY=127.0.0.1,localhost,::1,127.0.0.1,.example.com\n")
 
 	// Running again changes nothing: the same files, no doubled lines.
 	before := e.read(e.path("/etc/harnessly/runtime.env"))

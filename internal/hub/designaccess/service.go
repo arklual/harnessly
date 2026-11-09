@@ -51,6 +51,13 @@ type Deps struct {
 	LinkKey []byte
 	// Notice mails a person about access to a project (a request, a decision); nil sends nothing.
 	Notice Notice
+	// Shared: the hub's store keeps every space's design library, so a project is the space's, not one
+	// machine's: its access rows are found under whichever machine of the space recorded it first, and a change of
+	// them reaches the snapshot of every machine of the space.
+	Shared bool
+	// View reads a project from the hub's store for a guest link (internal/hub/designview); nil asks the
+	// machine as before.
+	View Viewer
 }
 
 type Service struct {
@@ -65,6 +72,8 @@ type Service struct {
 	transport   func(id string) http.RoundTripper
 	seal        *sealer
 	notice      Notice
+	shared      bool
+	view        Viewer
 
 	mu       sync.Mutex
 	serving  map[string]bool   // machines whose agent serves design-access
@@ -84,7 +93,7 @@ type dayCount struct {
 func New(d Deps) *Service {
 	s := &Service{
 		db: d.DB, reg: d.Reg, log: d.Log, now: d.Now, hubURL: strings.TrimRight(d.HubURL, "/"), platformAPI: d.PlatformAPI,
-		transport: d.Transport, seal: newSealer(d.LinkKey), notice: d.Notice,
+		transport: d.Transport, seal: newSealer(d.LinkKey), notice: d.Notice, shared: d.Shared, view: d.View,
 		serving: map[string]bool{}, prefixes: map[string]string{}, timers: map[string]*time.Timer{},
 		events: map[string]*dayCount{}, tokens: map[string]cachedToken{}, budget: newBudget(),
 	}
@@ -150,7 +159,37 @@ func (s *Service) Event(m store.Machine, e hubproto.DesignEvent) {
 	if err != nil {
 		s.log.Warn("design event not recorded", "machine", m.ID, "kind", e.Kind, "error", err)
 	}
-	s.kick(m.ID)
+	s.kickSpace(ctx, m)
+}
+
+// kickSpace sends the new snapshot to the machine, and with a shared library to every machine of its space: the
+// project's rows count on each of them.
+func (s *Service) kickSpace(ctx context.Context, m store.Machine) {
+	if !s.shared || m.SpaceID == "" {
+		s.kick(m.ID)
+		return
+	}
+	for _, id := range s.spaceMachines(ctx, m.SpaceID) {
+		s.kick(id)
+	}
+}
+
+// spaceMachines are the machines of a space that are not revoked.
+func (s *Service) spaceMachines(ctx context.Context, spaceID string) []string {
+	rows, err := s.db.S().Q().Query(ctx, `SELECT id FROM machines WHERE space_id = ? AND revoked_at IS NULL ORDER BY id`, spaceID)
+	if err != nil {
+		s.log.Warn("design: the space's machines not read", "space", spaceID, "error", err)
+		return nil
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // eventPerson: the address the owner file names, when that person may open the machine; otherwise the machine's
@@ -243,12 +282,15 @@ func (s *Service) Run(ctx context.Context) {
 
 // ---- the page's API ---------------------------------------------------------------------------------------------
 
-// apiPath: <prefix>/design/access[/...], <prefix>/docs/people or the one access API <prefix>/access/{design/...,me,
+// apiPath: <prefix>/design/access[/...], <prefix>/design/store/<project>/... (team.go), <prefix>/docs/people or the one access API <prefix>/access/{design/...,me,
 // directory} under a platform prefix /api/<name>.
-var apiPath = regexp.MustCompile(`^(/api/[A-Za-z0-9_-]+)(/design/access(?:/.*)?|/docs/people|/access/(?:design(?:/.*)?|me|directory))$`)
+var apiPath = regexp.MustCompile(`^(/api/[A-Za-z0-9_-]+)(/design/access(?:/.*)?|/design/store/.+|/docs/people|/access/(?:design(?:/.*)?|me|directory))$`)
 
 // ServeMachine answers the design access API of a machine the person may open; anything else goes to the machine.
 func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) bool {
+	if s.serveEdit(w, r, u, m) {
+		return true
+	}
 	p := r.URL.EscapedPath()
 	p = strings.TrimPrefix(p, "/m/"+m.ID)
 	match := apiPath.FindStringSubmatch(p)
@@ -264,6 +306,10 @@ func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.U
 			return false
 		}
 		s.people(w, r, m)
+		return true
+	}
+	if sub, ok := strings.CutPrefix(rest, "/design/store/"); ok {
+		s.serveStore(w, r, u, m, sub)
 		return true
 	}
 	if strings.HasPrefix(rest, "/access/") {

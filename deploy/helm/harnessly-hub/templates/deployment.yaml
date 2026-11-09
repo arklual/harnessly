@@ -60,6 +60,9 @@ spec:
               containerPort: 8040
               protocol: TCP
           env:
+            # The release the hub says it is: the image's tag (internal/hub/buildinfo).
+            - name: HUB_VERSION
+              value: {{ include "hub.imageTag" . | quote }}
             - name: HUB_PUBLIC_URL
               value: {{ include "hub.publicUrl" . | quote }}
             - name: HUB_LISTEN

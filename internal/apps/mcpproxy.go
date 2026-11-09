@@ -4,19 +4,16 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
-	"time"
 )
 
-// mcpProxyTransport is the transport of the proxy's calls to host: no proxy, the address checked at the dial — a public
+// mcpProxyTransport is the transport of the proxy's calls to host: the proxy of the deployment if it has one, else the address checked at the dial — a public
 // one, or any but link-local for an internal host the deployment lists (netpolicy.go) — and the organization's roots.
 // A test swaps it.
 var mcpProxyTransport = func(host string) http.RoundTripper {
 	network := currentNetwork()
-	return &http.Transport{Proxy: nil, TLSClientConfig: network.tlsConfig(), ResponseHeaderTimeout: 60 * time.Second,
-		DialContext: (&net.Dialer{Timeout: 10 * time.Second, Control: dialControl(network.IsInternal(host))}).DialContext}
+	return network.Transport(host, dialControl(host, network.IsInternal(host)))
 }
 
 // ProxyMCP forwards one request of an agent's MCP client to the app's real remote server, with the headers of the package
@@ -49,7 +46,13 @@ func ProxyMCP(w http.ResponseWriter, r *http.Request, srv MCPServer, values map[
 	for k, v := range filled.Headers {
 		req.Header.Set(k, v)
 	}
-	client := &http.Client{Transport: mcpProxyTransport(u.Hostname()), CheckRedirect: noRedirects}
+	transport := mcpProxyTransport(u.Hostname())
+	if filled.ClientCert != nil {
+		// The app's own certificate, to this server only (network.clientCert).
+		network := currentNetwork().WithClientCert(filled.ClientCert)
+		transport = network.Transport(u.Hostname(), dialControl(u.Hostname(), network.IsInternal(u.Hostname())))
+	}
+	client := &http.Client{Transport: transport, CheckRedirect: noRedirects}
 	resp, err := client.Do(req)
 	if err != nil {
 		status := http.StatusBadGateway

@@ -1,6 +1,9 @@
 // The dock over the bottom of the feed, on the stores: the connection strip, the open question, the limit notice,
 // the queue and the composer. Every action goes through a command and ends in the UI (spec §12): the control is busy
 // at once, the draft goes only once the machine has the message, a refusal says why.
+import { continueMoveWithAgent } from '@/next/bindings/machine-move';
+import { moveCodes, moveLine, moveStopped } from '@/next/features/settings/machine-move';
+import { retryMove, useMachineMove } from '@/next/stores/machine-move';
 import {
   clearQuotes,
   quoteLabel,
@@ -244,6 +247,22 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
             },
     [longOff, machineName, goneVendor, handoff, conv],
   );
+
+  // the move of the machine's data into the hub stopped on errors: the bar says so with «Повторить» and
+  // «Продолжить с агентом» (a chat on that machine with the brief).
+  const move = useMachineMove(machine, !machineOff);
+  const moveNotice = useMemo<DockNotice | null>(() => {
+    if (!move || !moveStopped(move)) return null;
+    return {
+      kind: 'move',
+      line: moveLine(move, machineName) ?? '',
+      codes: moveCodes(move),
+      onRetry: async () => {
+        if (!(await retryMove(machine))) throw new Error('the machine did not take the retry');
+      },
+      onAgent: () => continueMoveWithAgent(machine, machineName, move),
+    };
+  }, [move, machine, machineName]);
 
   // Held on the usage limit: the queue waits for the reset by itself, so it is not a pause to resume. The card in the
   // feed is the control; here the field and the rows only say what a message written now waits for.
@@ -541,6 +560,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       />
       <ConsentAsks machine={machine} conversation={conv} variant="dock" watch />
       <DockBar notice={keyNotice} />
+      <DockBar notice={moveNotice} />
       <DockBar notice={voiceNotice} />
       <DockStatus pending={status.pending} steps={status.steps} />
       <GoalBar

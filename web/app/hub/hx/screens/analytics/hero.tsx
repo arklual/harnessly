@@ -3,7 +3,7 @@
 import { lazy, Suspense } from 'react';
 
 import type { Kpi, KpiChart } from '../../../org/api/analytics';
-import { orgErrorText } from '../../../org/api/errors';
+import { OrgApiError, orgErrorText } from '../../../org/api/errors';
 import { Btn } from '../../ui';
 import type { ChartMode } from './chart';
 
@@ -44,7 +44,9 @@ export const Hero = ({
   shownKpi,
   teamOrder,
 }: HeroProps) => {
-  const failed = error != null && !fresh;
+  // A person of no team role has no daily series yet: that is a note, not a failure.
+  const personal = error instanceof OrgApiError && error.code === 'not_ready';
+  const failed = error != null && !fresh && !personal;
   const picture = chart !== null && shownKpi !== null;
   return (
     <section className="dash-hero anx-hero">
@@ -74,7 +76,7 @@ export const Hero = ({
         <div
           className="anx-viz"
           data-viz-mount="1"
-          data-wait={picture || failed ? undefined : '1'}
+          data-wait={picture || failed || personal ? undefined : '1'}
           data-stale={picture && !fresh && !failed ? '1' : undefined}
         >
           {picture && (
@@ -83,6 +85,11 @@ export const Hero = ({
             </Suspense>
           )}
         </div>
+        {personal && (
+          <p className="md-note">
+            График по дням считается для команды и тенанта, по одному человеку его пока нет.
+          </p>
+        )}
         {failed && (
           <p className="an-err" role="alert">
             <b>Не удалось загрузить график</b>

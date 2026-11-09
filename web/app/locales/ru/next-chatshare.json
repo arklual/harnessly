@@ -1,0 +1,22 @@
+{
+  "next.chatShare.title": "Поделиться диалогом",
+  "next.chatShare.lead": "Снимок диалога без секретов: ключи и пути скрываются, ссылка открывается только на чтение",
+  "next.chatShare.opt.tools": "Показать вызовы инструментов кратко",
+  "next.chatShare.opt.thinking": "Включить размышления агента",
+  "next.chatShare.opt.diffs": "Включить диффы правок",
+  "next.chatShare.opt.economics": "Включить расход токенов",
+  "next.chatShare.capture": "Собрать снимок",
+  "next.chatShare.recapture": "Собрать заново",
+  "next.chatShare.publish": "Создать ссылку",
+  "next.chatShare.close": "Закрыть",
+  "next.chatShare.report": "Скрыто секретов: {hidden}, укорочено путей: {shortened}",
+  "next.chatShare.preview": "Посмотреть снимок",
+  "next.chatShare.days": "Срок ссылки",
+  "next.chatShare.daysN": "{n} дн.",
+  "next.chatShare.link": "Ссылка на снимок",
+  "next.chatShare.copy": "Копировать",
+  "next.chatShare.copied": "Ссылка скопирована",
+  "next.chatShare.unavailable": "На этой машине шеринг диалогов не настроен",
+  "next.chatShare.failed": "Не получилось: {why}",
+  "next.rowMenu.share": "Поделиться…"
+}

@@ -69,7 +69,7 @@ describe('AppsCatalog', () => {
     const changed = vi.fn();
     render(<Page onChanged={changed} />);
     const install = await screen.findByRole('button', {
-      name: /Установить для команды|Install for the team/,
+      name: /^(Поставить|Install)$/,
     });
     expect(screen.getByText('Демо')).toBeTruthy();
 
@@ -83,41 +83,36 @@ describe('AppsCatalog', () => {
     });
     fireEvent.click(install);
     await waitFor(() => expect(screen.getByRole('button').getAttribute('aria-busy')).toBe('true'));
-    expect(screen.queryByRole('button', { name: /Убрать у команды|Remove from the team/ })).toBeNull();
+    expect(screen.getByText('Демо')).toBeTruthy();
     expect(changed).not.toHaveBeenCalled();
 
+    // The team has the app now: it is among the person's apps, not in the catalog.
     await act(async () => release());
-    await screen.findByRole('button', { name: /Убрать у команды|Remove from the team/ });
+    await waitFor(() => expect(screen.queryByText('Демо')).toBeNull());
     expect(posts).toEqual([
       { path: expect.stringContaining('/apps/team/install'), body: { id: 'acme.demo', channel: 'stable' } },
     ]);
     expect(changed).toHaveBeenCalledTimes(1);
   });
 
-  it('gives a member no install, and a switch for themselves once the team has the app', async () => {
-    const posts = machine({
+  it('gives a member no install, and keeps what the team has out of the catalog', async () => {
+    machine({
       space: 'sp1',
       role: 'member',
       catalog: [entry(), entry({ id: 'acme.two', name: 'Два', installed: true })],
       muted: [],
     });
     render(<Page onChanged={vi.fn()} />);
-    await screen.findByText('Два');
-    expect(screen.queryByRole('button', { name: /Установить для команды|Install for the team/ })).toBeNull();
-    const off = screen.getByRole('button', { name: /Выключить у меня|Turn off for me/ });
-    fireEvent.click(off);
-    await screen.findByRole('button', { name: /Включить у меня|Turn on for me/ });
-    expect(posts[0]).toEqual({
-      path: expect.stringContaining('/apps/team/mute'),
-      body: { id: 'acme.two', mute: true },
-    });
+    await screen.findByText('Демо');
+    expect(screen.queryByText('Два')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
   it('says why a change was refused and leaves the row as it was', async () => {
     machine({ space: 'sp1', role: 'owner', catalog: [entry()], muted: [] });
     render(<Page onChanged={vi.fn()} />);
     const install = await screen.findByRole('button', {
-      name: /Установить для команды|Install for the team/,
+      name: /^(Поставить|Install)$/,
     });
     const was = asked.getMockImplementation()!;
     asked.mockImplementation(async (m, path, init) => {
@@ -126,6 +121,6 @@ describe('AppsCatalog', () => {
     });
     fireEvent.click(install);
     expect((await screen.findByRole('alert')).textContent).toBe('trusted');
-    expect(screen.getByRole('button', { name: /Установить для команды|Install for the team/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^(Поставить|Install)$/ })).toBeTruthy();
   });
 });

@@ -531,5 +531,22 @@
   "next.settings.hubEnv.status.pending": "ожидает машину",
   "next.settings.hubEnv.foot": "Закреплённое выключить нельзя. Остальное вы выключаете для себя: другим участникам команды оно остаётся.",
   "next.settings.hubEnv.footFixed": "Это выдали в организации. Агент берёт список на этой машине сам; изменить его можно в хабе.",
-  "next.settings.hubEnv.failed": "Не удалось переключить"
+  "next.settings.hubEnv.failed": "Не удалось переключить",
+  "next.move.moving": "Переносим данные с машины {machine} в хаб: {moved} из {total}",
+  "next.move.stopped": {
+    "one": "Перенос с машины {machine} остановился: {n} объект с ошибкой ({moved} из {total} в хабе)",
+    "few": "Перенос с машины {machine} остановился: {n} объекта с ошибками ({moved} из {total} в хабе)",
+    "many": "Перенос с машины {machine} остановился: {n} объектов с ошибками ({moved} из {total} в хабе)",
+    "other": "Перенос с машины {machine} остановился: {n} объекта с ошибками ({moved} из {total} в хабе)"
+  },
+  "next.move.more": "и ещё {n}",
+  "next.move.retry": "Повторить",
+  "next.move.agent": "Продолжить с агентом",
+  "next.move.retryFailed": "Машина не приняла повтор: проверьте, что она на связи",
+  "next.move.brief": "Перенос данных машины {machine} в хаб остановился: {n} из {total} объектов с ошибками. Разберись и доведи перенос до конца. Ниже объекты с кодами ошибок:",
+  "next.move.briefSteps": "Что сделать:\n1. harnessly migrate status --json — текущее состояние.\n2. harnessly docs read {page} — страница переноса ({doc}): причина и исправление для каждого кода, и чего делать нельзя.\n3. Исправь причину, затем harnessly migrate retry; то, что переносить не нужно, — harnessly migrate skip KIND/OBJECT.\n4. harnessly migrate verify — проверь, что всё перенесённое есть в хабе.\nНичего не удаляй на машине и не правь базу хаба руками.",
+  "next.settings.beta.chatNav": "Навигатор по диалогу и ⌘1..9",
+  "next.settings.beta.chatNav.hint": "⌘⌥J открывает список промптов и субагентов чата, ⌘1..9 открывают чаты списка по номеру",
+  "next.settings.beta.chatShare": "Поделиться диалогом",
+  "next.settings.beta.chatShare.hint": "В меню чата появится «Поделиться»: снимок без секретов, ссылка, выгрузка в Markdown и HTML"
 }

@@ -33,6 +33,7 @@ import { WordedError } from '@/next/core/net/worded';
 import { locale, t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { hasFeature } from '@/next/stores/machines';
+import { dictationLangOf } from '@/next/stores/voice';
 import Icon from '@/next/ui/icon';
 import { toast } from '@/next/features/designly/sdk/toast';
 
@@ -193,7 +194,7 @@ const DeckRec = ({ host, machine, artifact, onFinished, onExit, onPaused }: IDec
           audio: new MediaStream(capture.stream.getAudioTracks()),
           mime: audioMime,
           makeRecorder,
-          open: (events) => openDictation(machine, locale(), voiceSettings(), events),
+          open: (events) => openDictation(machine, dictationLangOf(locale()), voiceSettings(), events),
           now: () => created.ms(),
           onPartial: (text) => setPrompter((p) => advance(p, text)),
           onFinal: (text, t0) => created.event({ k: 'asr', t0, text }),

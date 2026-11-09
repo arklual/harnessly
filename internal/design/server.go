@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"container/list"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/designkit"
 	"io"
 	"math"
 	"net"
@@ -409,6 +410,18 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 		l.serveFile(w, r, q, ref, segments[3:], head)
 		return
 	}
+	// /a/<id>/r/<revision>/<path>: the project as it was at a version of its history, read only, with its kit then.
+	if kind == "r" && len(segments) > 4 && fullSHA.MatchString(segments[3]) {
+		if lib, ok := l.pinnedLibrary(ref, segments[3]); ok {
+			lib.serveFileAs(w, r, q, ref, segments[4:], head, true, "")
+			return
+		}
+	}
+	// /a/<id>/k/<version>/<path>: the project's pages on another version of its kit, to look before taking it.
+	if kind == "k" && len(segments) > 4 && designkit.ValidVersion(segments[3]) {
+		l.serveFileAs(w, r, q, ref, segments[4:], head, true, segments[3])
+		return
+	}
 	sendHTML(w, 404, l.notFoundPage(), head)
 }
 
@@ -519,6 +532,11 @@ func assetMatches(src string) []assetMatch {
 // the browser, so opening a board again asks only for the page; an edited file gets a new address. served maps a
 // file to the one actually answered for it (the release's engine for the project's support.js).
 func withAssetVersions(source, dir, projectRoot string, served func(real string) string, hx *hashIndex) string {
+	return withAssetVersionsOf(source, dir, projectRoot, served, nil, hx)
+}
+
+// withAssetVersionsOf is withAssetVersions that asks missing for a file the project folder does not have (a kit's).
+func withAssetVersionsOf(source, dir, projectRoot string, served, missing func(string) string, hx *hashIndex) string {
 	matches := assetMatches(source)
 	if len(matches) == 0 {
 		return source
@@ -543,7 +561,14 @@ func withAssetVersions(source, dir, projectRoot string, served func(real string)
 			target = filepath.Join(dir, decoded)
 		}
 		real, err := filepath.EvalSymlinks(target)
-		if err != nil || !strings.HasPrefix(real, projectRoot+string(filepath.Separator)) {
+		if err != nil && missing != nil {
+			if real = missing(target); real != "" {
+				err = nil
+			}
+		} else if err == nil && !strings.HasPrefix(real, projectRoot+string(filepath.Separator)) {
+			continue
+		}
+		if err != nil {
 			continue
 		}
 		if served != nil {
@@ -634,7 +659,18 @@ func (l *Library) engineSwap(id string) func(string) string {
 }
 
 func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values, id string, segments []string, head bool) {
+	l.serveFileAs(w, r, q, id, segments, head, false, "")
+}
+
+// serveFileAs is serveFile for a page that only shows (readOnly: the board script comes in guest mode, so it neither
+// follows the live project nor edits it) and, with kitVersion, on that version of the project's kit.
+func (l *Library) serveFileAs(w http.ResponseWriter, r *http.Request, q url.Values, id string, segments []string, head, readOnly bool, kitVersion string) {
 	file := l.ResolveProjectFile(id, segments)
+	if kitVersion != "" {
+		if kf := l.kitFileAt(id, kitVersion, segments); kf != "" {
+			file = kf
+		}
+	}
 	// A project on a release gets the release's engine as its support.js, whether or not it keeps a copy of its own.
 	if len(segments) == 1 && segments[0] == EngineFile {
 		if engine := l.EngineFor(id); engine != "" {
@@ -657,7 +693,16 @@ func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values
 			sendHTML(w, 404, l.notFoundPage(), head)
 			return
 		}
-		send(w, 200, typ, []byte(withClientOf(withAssetVersions(jscompat.DecodeUTF8(src), filepath.Dir(file), root, l.engineSwap(id), l.hashed), id, l.IsVideo(id))), head)
+		missing := l.kitMissing(id, root)
+		if kitVersion != "" {
+			missing = l.kitMissingAt(id, kitVersion, root)
+		}
+		versioned := withAssetVersionsOf(jscompat.DecodeUTF8(src), filepath.Dir(file), root, l.engineSwap(id), missing, l.hashed)
+		if readOnly {
+			send(w, 200, typ, []byte(withReadOnlyClient(versioned, id)), head)
+			return
+		}
+		send(w, 200, typ, []byte(withClientOf(versioned, id, l.IsVideo(id))), head)
 		return
 	}
 	st, err := os.Stat(file)
@@ -665,7 +710,21 @@ func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values
 		sendHTML(w, 404, l.notFoundPage(), head)
 		return
 	}
-	l.serveStatic(w, r, file, st, typ, ext, cachePolicy(q, ext, FileVersion(st)), head)
+	policy := cachePolicy(q, ext, FileVersion(st))
+	if readOnly {
+		policy = "no-cache"
+	}
+	l.serveStatic(w, r, file, st, typ, ext, policy, head)
+}
+
+// withReadOnlyClient is withClient with the board script in guest mode: the page shows, follows nothing and edits
+// nothing.
+func withReadOnlyClient(source, id string) string {
+	tag := resourcesScript() + `<script data-artifact="` + id + `" data-guest="1" src="` + scriptPath + `"></script>`
+	if m := headTag.FindString(source); m != "" {
+		return strings.Replace(source, m, m+tag, 1)
+	}
+	return tag + source
 }
 
 // serveStatic sends a file with its version as the ETag and the given Cache-Control, gzipped when it is text a browser

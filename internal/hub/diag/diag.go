@@ -73,6 +73,8 @@ const (
 	OIDCUnreachable = "HUB-O001"
 	// Extensions.
 	ExtensionDown = "HUB-E001"
+	// The move of the machines' data into the store (docs/migrations).
+	MoveFailed = "HUB-M001" // a machine's move stopped on objects with errors
 	// Start.
 	StartFailed  = "HUB-X001" // any other error that stopped the hub
 	PortBusy     = "HUB-X002" // HUB_LISTEN is taken or not allowed

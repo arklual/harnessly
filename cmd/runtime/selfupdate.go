@@ -32,6 +32,13 @@ const exitRestart = 75
 
 // newSelfUpdater is the updater of a runtime a hub carries and install.sh installed; nil for any other runtime.
 func newSelfUpdater() *selfupdate.Updater {
+	// Fleet mode (RUNTIME_UPDATE_MODE=fleet, off unless asked for): the machine takes whole releases from its rollout
+	// (`harnessly fleet`), so it neither pulls binaries from the hub nor replaces them by itself.
+	if selfupdate.FleetOn(os.Getenv) {
+		if fl := selfupdate.FleetFromEnv(os.Getenv, nil); fl != nil {
+			return &selfupdate.Updater{HubURL: strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_HUB_URL")), "/"), Fleet: fl}
+		}
+	}
 	hub := strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_HUB_URL")), "/")
 	if hub == "" {
 		return nil

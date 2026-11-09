@@ -216,12 +216,16 @@ func (c *cli) run(args []string) error {
 		return c.apiGuide()
 	case "design":
 		return c.design(rest)
+	case "migrate", "migration":
+		return c.migrate(rest)
 	case "doctor":
 		return c.doctor(rest)
 	case "hook":
 		return c.hook(rest)
 	case "upgrade":
 		return c.upgrade(rest)
+	case "fleet":
+		return c.fleet(rest)
 	case "notify":
 		return c.notify(rest)
 	case "selftest":

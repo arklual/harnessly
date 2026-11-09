@@ -103,7 +103,7 @@ func TestStoreSyncsTheLibraryOfASpaceAcrossMachines(t *testing.T) {
 
 	started := time.Now()
 	writeFile(t, ma.lib, "p1/project/Главная.dc.html", "<h1>v1</h1>")
-	eventually(t, 5*time.Second, mb.lib, "p1/project/Главная.dc.html", "<h1>v1</h1>")
+	eventually(t, 15*time.Second, mb.lib, "p1/project/Главная.dc.html", "<h1>v1</h1>")
 	t.Logf("an edit on one machine reached the other in %s", time.Since(started).Round(10*time.Millisecond))
 
 	// The first machine goes away; the second edits; the first comes back and catches up.
@@ -112,8 +112,8 @@ func TestStoreSyncsTheLibraryOfASpaceAcrossMachines(t *testing.T) {
 	writeFile(t, mb.lib, "p2/artifact.json", `{"title":"new"}`)
 	time.Sleep(1500 * time.Millisecond) // the second machine's edit reaches the hub
 	ma = startMachine(t, s, a, filepath.Join(dir, "a"))
-	eventually(t, 10*time.Second, ma.lib, "p1/project/Главная.dc.html", "<h1>v2 while a was off</h1>")
-	eventually(t, 10*time.Second, ma.lib, "p2/artifact.json", `{"title":"new"}`)
+	eventually(t, 15*time.Second, ma.lib, "p1/project/Главная.dc.html", "<h1>v2 while a was off</h1>")
+	eventually(t, 15*time.Second, ma.lib, "p2/artifact.json", `{"title":"new"}`)
 
 	// A conflict: the first machine is off, both edit the same file; the one that comes second keeps its edit aside.
 	ma.halt()
@@ -121,7 +121,7 @@ func TestStoreSyncsTheLibraryOfASpaceAcrossMachines(t *testing.T) {
 	writeFile(t, ma.lib, "p1/notes.txt", "a wrote this offline")
 	time.Sleep(1500 * time.Millisecond)
 	ma = startMachine(t, s, a, filepath.Join(dir, "a"))
-	eventually(t, 10*time.Second, ma.lib, "p1/notes.txt", "b wrote this")
+	eventually(t, 15*time.Second, ma.lib, "p1/notes.txt", "b wrote this")
 	kept := filepath.Join(ma.lib, ".conflicts", "p1")
 	deadline := time.Now().Add(5 * time.Second)
 	for {

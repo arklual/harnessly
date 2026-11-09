@@ -1,0 +1,6 @@
+:root { --acme-accent: oklch(0.55 0.15 250); }
+@layer kit-acme-ui {
+  .acme-btn { border-radius: 8px; padding: 8px 16px; }
+  .acme-btn > * { pointer-events: none; }
+  .acme-link { color: var(--acme-accent); }
+}

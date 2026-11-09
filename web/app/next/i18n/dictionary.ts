@@ -3,14 +3,25 @@
 // development galleries (`?dev=`) and the tests switch languages, so they get both.
 import { appConfig } from '@/platform/config';
 
-export type TLang = 'en' | 'ru';
+import { ALL_LANGUAGES, type TLanguage } from '@/platform/languages';
+
+export type TLang = TLanguage;
 type TEntry = string | Partial<Record<Intl.LDMLPluralRule, string>>;
 export type TDictionary = Record<string, TEntry>;
 
-const LOADERS: Record<TLang, () => Promise<{ default: TDictionary }>> = {
+const LOADERS = {
   en: () => import('virtual:dictionary/en'),
   ru: () => import('virtual:dictionary/ru'),
-};
+  ko: () => import('virtual:dictionary/ko'),
+  ja: () => import('virtual:dictionary/ja'),
+  'zh-CN': () => import('virtual:dictionary/zh-CN'),
+  'zh-TW': () => import('virtual:dictionary/zh-TW'),
+  es: () => import('virtual:dictionary/es'),
+  de: () => import('virtual:dictionary/de'),
+  fr: () => import('virtual:dictionary/fr'),
+  'pt-BR': () => import('virtual:dictionary/pt-BR'),
+  tr: () => import('virtual:dictionary/tr'),
+} satisfies Record<TLang, () => Promise<{ default: TDictionary }>>;
 
 const loaded: Partial<Record<TLang, TDictionary>> = {};
 
@@ -25,4 +36,4 @@ const both =
   import.meta.env.MODE === 'test' ||
   (typeof location !== 'undefined' && new URLSearchParams(location.search).has('dev'));
 
-await (both ? Promise.all([load('en'), load('ru')]) : load(appConfig().locale === 'ru' ? 'ru' : 'en'));
+await (both ? Promise.all(ALL_LANGUAGES.map(load)) : load(appConfig().locale));

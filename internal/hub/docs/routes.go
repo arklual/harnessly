@@ -109,6 +109,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET "+p+"/{slug}/diff", s.guard(s.diffRoute))
 	mux.Handle("GET "+p+"/{slug}/access", s.guard(s.getAccess))
 	mux.Handle("POST "+p+"/{slug}/access", s.guard(s.postAccess))
+	s.mountAccess(mux)
 	mux.Handle("GET "+p+"/{slug}/source", s.guard(s.source))
 	mux.Handle("PUT "+p+"/{slug}/source", s.guard(s.saveSource))
 	mux.Handle("PUT "+p+"/{slug}/source/block", s.guard(func(http.ResponseWriter, *http.Request, *auth.Principal) error {
@@ -237,7 +238,7 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 		if m, ok := metas[it.slug]; ok {
 			mp = &m
 		}
-		if s.rank(mp, p) < levelRank[levelView] {
+		if s.rank(ctx, mp, p) < levelRank[levelView] {
 			continue
 		}
 		sm := summary{Slug: it.slug, Kind: it.kind, Title: it.title, URL: it.url, OpenThreads: open[it.slug], Unread: unread[it.slug], LastActivityAt: it.updated}
@@ -291,8 +292,8 @@ func (s *Service) open(r *http.Request, p *auth.Principal, need int) (summary, *
 	if err != nil {
 		return summary{}, nil, err
 	}
-	if s.rank(m, p) < need {
-		if s.rank(m, p) < levelRank[levelView] {
+	if s.rank(r.Context(), m, p) < need {
+		if s.rank(r.Context(), m, p) < levelRank[levelView] {
 			return summary{}, nil, errNoAccess
 		}
 		return summary{}, nil, errNoComment
@@ -353,6 +354,7 @@ func (s *Service) newThread(w http.ResponseWriter, r *http.Request, p *auth.Prin
 		return err
 	}
 	s.Deliver(cid)
+	s.mention(r.Context(), doc, cid, body, p)
 	return s.threadAnswer(w, r, doc.Slug, id, http.StatusCreated)
 }
 
@@ -394,6 +396,7 @@ func (s *Service) reply(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		return err
 	}
 	s.Deliver(cid)
+	s.mention(r.Context(), doc, cid, body, p)
 	return s.threadAnswer(w, r, doc.Slug, id, http.StatusOK)
 }
 
@@ -590,7 +593,7 @@ func (s *Service) source(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	if err != nil {
 		return err
 	}
-	can := s.rank(m, p) >= levelRank[levelEdit]
+	can := s.rank(r.Context(), m, p) >= levelRank[levelEdit]
 	if doc.Kind == "board" {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"mode": nil, "markdown": nil, "version": 0, "canEdit": false})
 		return nil

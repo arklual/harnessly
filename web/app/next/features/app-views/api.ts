@@ -115,6 +115,8 @@ export interface IInstalledApp {
   branding?: IBranding;
   /** Everything the app reaches, from the most dangerous, in words; absent from an older machine. */
   access?: IAccess[];
+  /** The keys of `access` the app is given now; each can be taken back alone. */
+  granted?: string[];
   /** The install waits for the person to agree to all of `access`. */
   consent?: boolean;
   /** The chat whose agent installed what waits for consent: its card shows there. */
@@ -171,6 +173,10 @@ export const consentApp = (
   version: string,
   access: readonly string[],
 ): Promise<unknown> => runtimeJson(m, platformPath('/apps/consent'), postJson({ id, version, access }));
+
+/** Takes one access back: the app then waits for the person's word like a first install. */
+export const revokeAccess = (m: MachineId, id: string, key: string): Promise<unknown> =>
+  runtimeJson(m, platformPath('/apps/revoke'), postJson({ id, key }));
 
 /** «Отмена»: a waiting update is dropped (the running version stays); a first install that waited is removed. */
 export const declineApp = (m: MachineId, id: string): Promise<{ removed: boolean }> =>

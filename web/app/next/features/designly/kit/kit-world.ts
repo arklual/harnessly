@@ -2,7 +2,31 @@
 // cells laid out by itself (nothing is moved by hand). The main view shows the kit with each template as a stack; a
 // template's own view is its grid of layouts by its sections. Pure: the screen draws what this answers, and finds a
 // node's place, the cells a viewport sees, and the tree's rows here.
-import type { IKitCanvas, IKitLayout, IKitTemplate } from '@/next/features/designly/kit/kit-api';
+import {
+  TEMPLATE_SECTIONS,
+  templatesIn,
+  type IKitCanvas,
+  type IKitComponent,
+  type IKitLayout,
+  type IKitTemplate,
+  type TPropValue,
+} from '@/next/features/designly/kit/kit-api';
+
+/** A component's part that only provides context and draws nothing (designkit.PartProvider). */
+export const PART_PROVIDER = 'provider';
+
+/** Whether the live preview can draw a component: it has a sample or a variant and is not a provider (`preview` is
+ * an optional hint of older kits). The same props `harnessly design kit render` draws its picture with. */
+export function drawsLive(c: IKitComponent): boolean {
+  return (
+    c.part !== PART_PROVIDER && (c.preview !== undefined || c.sample !== undefined || c.variants.length > 0)
+  );
+}
+
+/** The props a component is drawn with by default: its sample with the first variant over it. */
+export function liveProps(c: IKitComponent): Record<string, TPropValue> {
+  return { ...(c.sample ?? {}), ...(c.variants[0]?.props ?? {}) };
+}
 
 export const ITEM = {
   color: 'color',
@@ -36,6 +60,10 @@ export interface IWorldItem {
   cell?: number;
   /** A colour's fill. */
   fill?: string;
+  /** The colour a picture is meant to sit on (a white logo on a dark one). */
+  bg?: string;
+  /** A component that takes an asset by name (Icon) shows a few of them: cells of that group's atlas. */
+  samples?: { atlas: string; cells: number[] };
   /** A text style's sample: its family, size in pixels and weight. */
   font?: { family: string; px: number; weight: string };
 }
@@ -79,6 +107,8 @@ export const MAIN_VIEW: TView = { kind: VIEW.main };
 
 const PAD = 72;
 const SECTION_GAP = 200;
+/** How many of its assets a component's card shows (a grid of 6 × 3). */
+const SAMPLE_CELLS = 18;
 const GROUP_GAP = 96;
 const GROUP_TITLE = 56;
 const SECTION_TITLE = 0;
@@ -239,45 +269,74 @@ const mainSections = (c: IKitCanvas, titles: TSectionTitles, mode: string | null
     if (groups.length > 0) out.push({ node: 'section:foundation', title: named('foundation'), groups });
   }
   if (has('components')) {
-    const groups = (c.groups ?? []).map<IGroupSpec>((g) => ({
-      node: `cgroup:${g.id}`,
-      title: g.title,
+    // A part of another component (TableRow of Table) is no tile of its own: its parent's panel lists it. A provider
+    // draws nothing, so the providers go together into one group at the end instead of empty tiles among the rest.
+    // A component that draws the items of an asset group (Icon over the icons) shows a few of them as its samples.
+    const samplesOf = (k: IKitComponent): Pick<IWorldItem, 'samples'> => {
+      const source = (c.assets ?? []).find((a) => a.component === k.name || a.component === k.id);
+      const cells = (source?.items ?? [])
+        .map((a) => a.cell)
+        .filter((n) => n >= 0)
+        .slice(0, SAMPLE_CELLS);
+      return source && cells.length > 0 ? { samples: { atlas: `a:${source.id}`, cells } } : {};
+    };
+    const tile = (k: IKitComponent): IWorldItem => ({
+      node: k.node,
       kind: ITEM.component,
-      items: g.components.map((k) => ({
-        node: k.node,
+      label: k.name,
+      ...(k.variants.length > 0 ? { sub: k.variants.map((v) => v.name).join(' · ') } : {}),
+      ...(k.thumb ? { file: k.thumb } : {}),
+      ...samplesOf(k),
+    });
+    const groups = (c.groups ?? [])
+      .map<IGroupSpec>((g) => ({
+        node: `cgroup:${g.id}`,
+        title: g.title,
         kind: ITEM.component,
-        label: k.name,
-        ...(k.variants.length > 0 ? { sub: k.variants.map((v) => v.name).join(' · ') } : {}),
-      })),
-    }));
+        items: g.components
+          .filter((k) => !k.part)
+          .map((k) => ({
+            ...tile(k),
+            ...(g.atlas && k.cell >= 0 ? { atlas: `c:${g.id}`, cell: k.cell } : {}),
+          })),
+      }))
+      .filter((g) => g.items.length > 0);
+    const providers = (c.groups ?? []).flatMap((g) => g.components.filter((k) => k.part === PART_PROVIDER));
+    if (providers.length > 0)
+      groups.push({
+        node: 'cgroup:_providers',
+        title: titles.providers ?? 'providers',
+        kind: ITEM.component,
+        items: providers.map(tile),
+      });
     if (groups.length > 0) out.push({ node: 'section:components', title: named('components'), groups });
   }
-  if (has('templates')) {
-    const templates = c.templates ?? [];
-    if (templates.length > 0)
-      out.push({
-        node: 'section:templates',
-        title: named('templates'),
-        groups: [
-          {
-            node: 'group:templates',
-            title: '',
-            kind: ITEM.stack,
-            template: templates[0],
-            items: templates.map((tp) => {
-              const cover = coverOf(tp);
-              return {
-                node: tp.node,
-                kind: ITEM.stack,
-                label: tp.title,
-                sub: String(layoutCount(tp)),
-                ...(cover?.thumb ? { file: cover.thumb } : {}),
-                ...(cover && cover.cell >= 0 ? { atlas: `t:${tp.id}`, cell: cover.cell } : {}),
-              };
-            }),
-          },
-        ],
-      });
+  for (const sid of TEMPLATE_SECTIONS) {
+    const templates = templatesIn(c, sid);
+    if (!has(sid) || templates.length === 0) continue;
+    out.push({
+      node: `section:${sid}`,
+      title: named(sid),
+      groups: [
+        {
+          node: `group:${sid}`,
+          title: '',
+          kind: ITEM.stack,
+          template: templates[0],
+          items: templates.map((tp) => {
+            const cover = coverOf(tp);
+            return {
+              node: tp.node,
+              kind: ITEM.stack,
+              label: tp.title,
+              sub: String(layoutCount(tp)),
+              ...(cover?.thumb ? { file: cover.thumb } : {}),
+              ...(cover && cover.cell >= 0 ? { atlas: `t:${tp.id}`, cell: cover.cell } : {}),
+            };
+          }),
+        },
+      ],
+    });
   }
   if (has('assets')) {
     const groups = (c.assets ?? []).map<IGroupSpec>((g) => {
@@ -292,6 +351,7 @@ const mainSections = (c: IKitCanvas, titles: TSectionTitles, mode: string | null
           kind,
           label: a.name,
           file: a.file,
+          ...(a.bg ? { bg: a.bg } : {}),
           ...(a.cell >= 0 ? { atlas: `a:${g.id}`, cell: a.cell } : {}),
         })),
       };

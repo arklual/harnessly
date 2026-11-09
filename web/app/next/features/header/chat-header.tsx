@@ -3,6 +3,7 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import usePendingList, { PENDING } from '@/next/ui/use-pending-list';
 import { UI_REQUEST, useUiRequest } from '@/next/stores/ui-requests';
+import ChatShareDialog, { type IChatShare } from '@/next/features/chat-share/share-dialog';
 import GoalDialog, { type IHeaderGoal } from '@/next/features/header/goal-dialog';
 import ChatMenu from '@/next/features/sidebar/chat-menu';
 import {
@@ -52,6 +53,8 @@ export interface IChatHeaderProps {
   background: IHeaderBackground | null;
   /** The chat's /goal and how to set it; null for an agent that has no such command. */
   goal?: IHeaderGoal | null;
+  /** Where the chat's snapshot is taken; null when sharing is off (beta «chatShare») or the chat has no machine. */
+  share?: IChatShare | null;
   /** The chat whose agent delegated this one, before the title as the way back to it; null for any other chat. */
   parent?: { title: string; onOpen: () => void } | null;
   bell: { unread: boolean; open: boolean; onToggle: (anchor: HTMLElement) => void };
@@ -74,12 +77,14 @@ const ChatHeader = ({
   terminal,
   background,
   goal = null,
+  share = null,
   parent = null,
   bell,
 }: IChatHeaderProps) => {
   const { pending, run } = usePendingList();
   const [rename, setRename] = useState<{ value: string; saving: boolean } | null>(null);
   const [goalOpen, setGoalOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   // «/goal» in the field opens the same dialog as the menu's item.
   useUiRequest(UI_REQUEST.goal, () => {
     if (goal) setGoalOpen(true);
@@ -230,6 +235,7 @@ const ChatHeader = ({
             }
             onMoveVm={actions.onMoveVm && chat.canMoveVm ? () => actions.onMoveVm?.(chat.id) : undefined}
             onGoal={goal ? () => setGoalOpen(true) : undefined}
+            onShare={share ? () => setShareOpen(true) : undefined}
             trigger={
               <button
                 type="button"
@@ -313,6 +319,7 @@ const ChatHeader = ({
           {bell.unread && <span className="hx-header__dot" />}
         </button>
       </div>
+      {share && <ChatShareDialog open={shareOpen} share={share} onClose={() => setShareOpen(false)} />}
       {goal && <GoalDialog open={goalOpen} goal={goal} onClose={() => setGoalOpen(false)} />}
     </header>
   );

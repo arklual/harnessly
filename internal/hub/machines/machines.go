@@ -53,6 +53,8 @@ type Deps struct {
 	Design DesignSink
 	// Docs answers the machines' doc.publish and doc.acl (internal/hub/docs); nil: nobody answers.
 	Docs DocsSink
+	// Automations takes the reports of automation conversations (internal/hub/automations); nil: nobody does.
+	Automations AutomationsSink
 	// History keeps the machines' chats (internal/hub/history); nil: the hub takes none.
 	History HistorySink
 	// Provider runs the machines' virtual servers (docs/hub/provider.md); nil means provider.None.
@@ -78,6 +80,11 @@ type HistorySink interface {
 	Connected(m store.Machine, features []string)
 	Live(ctx context.Context, m store.Machine, raw json.RawMessage)
 	Backfill(ctx context.Context, m store.Machine, raw json.RawMessage)
+}
+
+// AutomationsSink takes the automations.result event of a machine's agent.
+type AutomationsSink interface {
+	Event(m store.Machine, ev link.Event)
 }
 
 // DocsSink answers the document events of a machine's agent.
@@ -120,11 +127,13 @@ type Service struct {
 	env     EnvSink
 	design  DesignSink
 	docs    DocsSink
-	history HistorySink
-	prov    provider.Provider
-	pub     Publisher
-	gate    FeatureGate
-	acc     *machaccess.Checker
+	// automations takes the report of a conversation an automation run started (nil: automations are off).
+	automations AutomationsSink
+	history     HistorySink
+	prov        provider.Provider
+	pub         Publisher
+	gate        FeatureGate
+	acc         *machaccess.Checker
 
 	// res is the state of the resources and operations side (resources.go).
 	res resState
@@ -138,7 +147,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now

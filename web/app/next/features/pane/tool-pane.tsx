@@ -3,6 +3,7 @@
 // always there and never closed (icon only); what is opened from them opens beside it. On the phone the strip begins
 // with «Чат», which takes the person back.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { MenuGap, MenuItem, PointMenu, useContextMenu } from '@/next/ui/context-menu';
 import Icon from '@/next/ui/icon';
 import Tooltip from '@/next/ui/tooltip';
 import { useHScroll } from '@/next/ui/use-h-scroll';
@@ -86,10 +87,16 @@ const ToolPane = ({
     }, TAB_OUT_MS);
   };
   const maxLabel = maxed ? t('next.pane.unmax') : t('next.pane.max');
+  // A right click or a held finger on the strip: the tab's menu (close it, the others), the pane's width, the pane.
+  const stripMenu = useContextMenu();
+  const menuTab = tabs.find(
+    (x) => x.id === stripMenu.target?.closest<HTMLElement>('.hx-tab[data-tab]')?.dataset.tab,
+  );
+  const others = tabs.filter((x) => !x.pinned && x.id !== menuTab?.id);
 
   return (
     <div className="hx-browser hx-toolpane">
-      <div className="hx-strip">
+      <div className="hx-strip" {...stripMenu.handlers}>
         <button type="button" className="hx-tochat" aria-label={t('next.pane.toChat')} onClick={onClose}>
           <Icon name="message-square" size="sm" />
           <span>{t('next.pane.chat')}</span>
@@ -120,12 +127,13 @@ const ToolPane = ({
                   role="tab"
                   tabIndex={0}
                   aria-selected={x.id === tab}
+                  data-tab={x.id}
                   data-state={closing === x.id ? 'closing' : 'open'}
                   data-still={still.has(x.id) || undefined}
                   data-unread={x.unread || undefined}
                   data-dirty={x.dirty || undefined}
                   onClick={(event) => {
-                    if ((event.target as Element).closest('.hx-tab__x')) return;
+                    if (stripMenu.held() || (event.target as Element).closest('.hx-tab__x')) return;
                     onPick(x.id);
                   }}
                   onKeyDown={(event) => {
@@ -186,6 +194,29 @@ const ToolPane = ({
         </div>
       )}
       <div className="hx-pane__body">{children}</div>
+      <PointMenu menu={stripMenu} label={t('next.pane.tabs')} kind="pane">
+        {menuTab && !menuTab.pinned && (
+          <MenuItem icon="x" onClick={() => closeTab(menuTab.id)}>
+            {t('next.tabs.menuClose')}
+          </MenuItem>
+        )}
+        {menuTab && (
+          <MenuItem
+            icon="list-x"
+            disabled={others.length === 0}
+            onClick={() => others.forEach((x) => onCloseTab(x.id))}
+          >
+            {t('next.tabs.menuCloseOthers')}
+          </MenuItem>
+        )}
+        {menuTab && <MenuGap />}
+        <MenuItem icon={maxed ? 'minimize-2' : 'maximize-2'} onClick={onToggleMax}>
+          {maxLabel}
+        </MenuItem>
+        <MenuItem icon="panel-right" hint="Esc" onClick={onClose}>
+          {t('next.pane.close')}
+        </MenuItem>
+      </PointMenu>
     </div>
   );
 };

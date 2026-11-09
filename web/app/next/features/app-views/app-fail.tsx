@@ -1,12 +1,14 @@
 // What stands in the place of a view that did not start: the reason in words, and three ways on: try again,
 // read the window's log, hand it to the agent. The frame itself is hidden then, so no blank page is left.
 import { useState } from 'react';
-import { APP_REASON, type IInstalledApp } from '@/next/features/app-views/api';
+import ConsentBlock from '@/next/features/app-consent/consent-block';
+import { agreeAsk, consentAskOf } from '@/next/features/app-consent/consent-ask';
+import { APP_REASON, useConsentApps, type IInstalledApp } from '@/next/features/app-views/api';
 import { useBridgeLog } from '@/next/features/app-views/bridge-log';
 import type { IBridgeLogEntry } from '@/next/features/app-views/bridge';
 import { setAppsDebug } from '@/next/features/app-views/debug-mode';
 import { FAIL_REASON, type IFailure } from '@/next/features/app-views/frame-health';
-import type { ConvId } from '@/next/protocol/v2';
+import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { draftText, setDraftText } from '@/next/stores/drafts';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
@@ -51,6 +53,7 @@ export const handoffText = (
 };
 
 interface IAppFailProps {
+  machine: MachineId;
   app: IInstalledApp;
   failure: IFailure;
   /** The key of the app's bridge log in this chat. */
@@ -59,10 +62,28 @@ interface IAppFailProps {
   onRetry: () => void;
 }
 
-const AppFail = ({ app, failure, logKey, conversation, onRetry }: IAppFailProps) => {
+const AppFail = ({ machine, app, failure, logKey, conversation, onRetry }: IAppFailProps) => {
   const [journal, setJournal] = useState(false);
   const [handed, setHanded] = useState(false);
   const log = useBridgeLog(logKey);
+  // Waiting for consent: the real waiting access is read where the runtime checks it, and «Разрешить» is here.
+  const askable = failure.reason === FAIL_REASON.waiting && failure.detail === APP_REASON.consent;
+  const asked = useConsentApps(machine, askable);
+  const ask = askable ? consentAskOf(asked?.find((a) => a.id === app.id) ?? app) : null;
+  const [allowing, setAllowing] = useState(false);
+  const [allowFail, setAllowFail] = useState<string | null>(null);
+  const allow = async () => {
+    if (ask === null) return;
+    setAllowing(true);
+    setAllowFail(null);
+    try {
+      await agreeAsk(machine, ask);
+    } catch (e) {
+      setAllowFail(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAllowing(false);
+    }
+  };
   const failed = log.filter((e) => !e.ok).slice(-LOG_LINES);
   const hand = () => {
     if (conversation === null) return;
@@ -80,9 +101,19 @@ const AppFail = ({ app, failure, logKey, conversation, onRetry }: IAppFailProps)
           <p className="hx-appfail__why">{failureText(failure)}</p>
         </div>
       </div>
-      {/* HRN-915: when the app waits for permission, its «Разрешить» goes here. */}
+      {ask !== null && <ConsentBlock app={ask.app} />}
+      {allowFail && (
+        <p className="hx-appfail__none" role="alert">
+          {allowFail}
+        </p>
+      )}
       <div className="hx-appfail__acts">
-        <Button size="sm" variant="primary" icon="refresh-cw" onClick={onRetry}>
+        {ask !== null && (
+          <Button size="sm" variant="primary" icon="check" busy={allowing} onClick={() => void allow()}>
+            {t('next.consentAsk.allow')}
+          </Button>
+        )}
+        <Button size="sm" variant={ask === null ? 'primary' : 'ghost'} icon="refresh-cw" onClick={onRetry}>
           {t('next.appfail.retry')}
         </Button>
         <Button

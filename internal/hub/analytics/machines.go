@@ -35,6 +35,11 @@ func (s *Service) machinesList(w http.ResponseWriter, r *http.Request, p *auth.P
 	ctx := r.Context()
 	st := s.db.S()
 	x, err := s.orgScope(ctx, st, p, r, authz.View)
+	if isForbiddenScope(err) {
+		// A member without a role sees the machines of the tenants they are in that are open to them: the list of
+		// the member's own screen (the access list below still hides the rest).
+		x, err = s.memberScope(ctx, st, p, r)
+	}
 	if err != nil {
 		return err
 	}
@@ -52,8 +57,18 @@ func (s *Service) machinesList(w http.ResponseWriter, r *http.Request, p *auth.P
 		if err != nil {
 			return err
 		}
+		// A lead's screen is their team: its machines and, unless they see the whole tenant, the tenant's other
+		// machines open to them (a member without a role sees those too, so a lead must not lose them).
+		ownOnly := true
+		if x.sc.Kind == store.ScopeTeam {
+			ownOnly, err = authz.New(st).Allowed(ctx, orgs.Principal(p),
+				authz.Check{Action: authz.View, Scope: authz.Scope{Kind: store.ScopeTenant, ID: id}})
+			if err != nil {
+				return err
+			}
+		}
 		for _, m := range list {
-			if x.sc.Kind == store.ScopeTeam && m.TeamID != x.sc.ID {
+			if x.sc.Kind == store.ScopeTeam && m.TeamID != x.sc.ID && ownOnly {
 				continue
 			}
 			if !s.machines.Visible(ctx, p.User.ID, m) {

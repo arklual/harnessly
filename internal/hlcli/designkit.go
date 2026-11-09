@@ -8,10 +8,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/designkit"
 )
 
@@ -25,6 +27,8 @@ harnessly design kit export <id> [--version V] [--out FILE] [--with-sources] [--
 harnessly design kit import <file-or-url> [--as-id ID] [--as-version V] [--dry-run] [--dir DIR] [--header 'Name: value']
 harnessly design kit search <id> <words…> [--theme T] [--version V] [--dir DIR]
 harnessly design kit show <id> <node> [--theme T] [--version V] [--dir DIR]
+harnessly design kit check <folder> [--render] [--json]
+harnessly design kit render <folder> [--shots] [--only ID,ID] [--json]
 
 A UI kit is installed once by version and boards load it from /kit/<id>/<version>/... instead of carrying a copy.
 
@@ -48,6 +52,19 @@ A UI kit is installed once by version and boards load it from /kit/<id>/<version
   search    find layouts, components, icons, colours of a kit's canvas by name, description, purpose, a colour's hex
             or a layout's number: the same index the kit screen's search (⌘K) uses. Prints node, kind, title, place.
   show      one node of the canvas (from search): its description, props, variants, slots, and how to call it.
+  init      start a kit in an empty <folder>: --id acme-ui --namespace Acme [--title "Acme UI"] [--source draft|library].
+            It writes every file a kit needs — design-system.json, README.md with the Consuming section, tokens.json
+            and tokens.css (light and dark), components/bundle.js and bundle.css, a card per component — with a
+            provider (Root), a plain component (Button) and a compound one (Card with its parts). It passes check;
+            replace the components with yours and check after each change.
+  check     check a kit folder before packing it (or a project's ds/<folder>/): its identity, the canvas fields,
+            tokens.json's shape, a card and a purpose for every component, the bundle's place and styles. Errors
+            make it exit 1. --render also draws every component and layout (see render). The contract:
+            harnessly docs read agents/design-kits.
+  render    draw every component (its sample and first variant) and every layout of a kit folder in this machine's
+            headless Chrome through the pages the kit screen uses, and report script errors, files that do not load
+            and components that draw nothing. --shots writes the canvas's pictures (_harnessly/thumbs/…) and their
+            "thumb" fields into design-system.json: run it as the last step of a build.
 
 The kits folder is --dir, else $RUNTIME_DESIGN_KITS_DIR, else design-kits in the runtime's data folder (the same
 default the runtime serves from).
@@ -56,7 +73,7 @@ default the runtime serves from).
 // designKit is "design kit ..."; args are what follows "kit".
 func (c *cli) designKit(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design kit takes: install|list|export|import|search|show")
+		return usageErr("design kit takes: init|check|render|install|list|export|import|search|show")
 	}
 	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
 		c.out("%s", kitHelp)
@@ -78,6 +95,12 @@ func (c *cli) designKit(args []string) error {
 		return c.kitSearch(opt, pos)
 	case "show":
 		return c.kitShow(opt, pos)
+	case "init":
+		return c.kitInit(opt, pos)
+	case "check":
+		return c.kitCheck(opt, pos)
+	case "render":
+		return c.kitRender(opt, pos)
 	case "list", "ls":
 		if len(pos) != 0 {
 			return usageErr("design kit list takes no arguments, got %q", pos[0])
@@ -96,6 +119,10 @@ type kitOptions struct {
 	theme                         string
 	withSources, acceptRestricted bool
 	dryRun                        bool
+	json                          bool
+	render, shots                 bool
+	only                          string
+	id, namespace, title, source  string
 }
 
 func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
@@ -128,6 +155,22 @@ func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
 			o.acceptRestricted = true
 		case "dry-run":
 			o.dryRun = true
+		case "json":
+			o.json = true
+		case "render":
+			o.render = true
+		case "shots":
+			o.shots = true
+		case "only":
+			o.only, err = value()
+		case "id":
+			o.id, err = value()
+		case "namespace":
+			o.namespace, err = value()
+		case "title":
+			o.title, err = value()
+		case "source":
+			o.source, err = value()
 		case "version":
 			o.version, err = value()
 		case "out", "o":
@@ -443,5 +486,125 @@ func (c *cli) designLayouts(args []string) error {
 	for _, l := range list {
 		c.out("%s\t%s\t%s\t%s\n", l.Address(), l.Mode, l.Purpose, l.Name)
 	}
+	return nil
+}
+
+// kitCheck is "design kit check <folder>": designkit.Check, printed one problem a line, errors first.
+func (c *cli) kitCheck(opt kitOptions, pos []string) error {
+	if len(pos) != 1 {
+		return usageErr("design kit check takes one folder: harnessly design kit check ./dist/kit")
+	}
+	rep, err := designkit.Check(pos[0])
+	if err != nil {
+		return fail("%v", err)
+	}
+	if opt.render && rep.Errors() == 0 {
+		items, err := design.RenderKit(pos[0], design.KitRenderOptions{Only: onlySet(opt.only)})
+		if err != nil {
+			return fail("render: %v", err)
+		}
+		rep.Problems = append(rep.Problems, renderProblems(items)...)
+	} else if opt.render {
+		c.out("the render is skipped until the errors above are fixed\n")
+	}
+	if opt.json {
+		raw, _ := json.MarshalIndent(rep, "", "  ")
+		c.out("%s\n", raw)
+	} else {
+		probs := append([]designkit.Problem(nil), rep.Problems...)
+		sort.SliceStable(probs, func(i, j int) bool {
+			return probs[i].Level == designkit.LevelError && probs[j].Level != designkit.LevelError
+		})
+		for _, p := range probs {
+			c.out("%-7s [%s] %s: %s\n", p.Level, p.Rule, p.File, p.Message)
+		}
+		c.out("%d themes, %d components: %d errors, %d warnings\n", len(rep.Themes), rep.Components, rep.Errors(), len(rep.Problems)-rep.Errors())
+	}
+	if rep.Errors() > 0 {
+		return fail("the kit has %d errors", rep.Errors())
+	}
+	return nil
+}
+
+// kitRender is "design kit render <folder>": design.RenderKit, one line per component or layout that is not ok.
+func (c *cli) kitRender(opt kitOptions, pos []string) error {
+	if len(pos) != 1 {
+		return usageErr("design kit render takes one folder: harnessly design kit render ./dist/kit --shots")
+	}
+	items, err := design.RenderKit(pos[0], design.KitRenderOptions{Shots: opt.shots, Only: onlySet(opt.only)})
+	if err != nil {
+		return fail("%v", err)
+	}
+	if opt.json {
+		raw, _ := json.MarshalIndent(items, "", "  ")
+		c.out("%s\n", raw)
+	}
+	bad, shots := 0, 0
+	for _, it := range items {
+		if it.Shot != "" {
+			shots++
+		}
+		if it.Status == "ok" {
+			continue
+		}
+		bad++
+		if !opt.json {
+			c.out("%-6s %s %s\n", it.Status, it.Node, strings.Join(it.Errors, " | "))
+		}
+	}
+	if !opt.json {
+		c.out("%d rendered: %d ok, %d not; %d pictures written\n", len(items), len(items)-bad, bad, shots)
+	}
+	if bad > 0 {
+		return fail("%d of %d did not render", bad, len(items))
+	}
+	return nil
+}
+
+func onlySet(list string) map[string]bool {
+	out := map[string]bool{}
+	for _, s := range strings.Split(list, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out[s] = true
+		}
+	}
+	return out
+}
+
+// renderProblems turns what did not render into check problems: a script error or a missing file is an error; a
+// component that draws nothing standalone is an error too unless the kit marks it a part or a provider.
+func renderProblems(items []design.KitRenderItem) []designkit.Problem {
+	var out []designkit.Problem
+	for _, it := range items {
+		switch it.Status {
+		case "ok":
+		case "blank":
+			out = append(out, designkit.Problem{Rule: "render.blank", Level: designkit.LevelError, File: it.Theme + " " + it.Node,
+				Message: "draws nothing with its sample and first variant: give it a sample that shows it, or mark it \"part\" (of its parent) or \"provider\""})
+		default:
+			out = append(out, designkit.Problem{Rule: "render.error", Level: designkit.LevelError, File: it.Theme + " " + it.Node,
+				Message: "does not render: " + strings.Join(it.Errors, " | ")})
+		}
+	}
+	return out
+}
+
+// kitInit is "design kit init <folder>": a new kit that passes the check, to replace piece by piece.
+func (c *cli) kitInit(opt kitOptions, pos []string) error {
+	if len(pos) != 1 || opt.id == "" || opt.namespace == "" {
+		return usageErr("design kit init <folder> --id <id> --namespace <Namespace> [--title <title>] [--source draft|library]")
+	}
+	source := opt.source
+	if source == "" {
+		source = "draft"
+	}
+	wrote, err := designkit.Init(pos[0], designkit.InitOptions{ID: opt.id, Namespace: opt.namespace, Title: opt.title, Source: source})
+	if err != nil {
+		return err
+	}
+	for _, f := range wrote {
+		c.out("%s\n", filepath.Join(pos[0], f))
+	}
+	c.out("\nA %s kit %s in %s. Next: harnessly docs read agents/design-kits; replace the components; harnessly design kit check %s --render\n", source, opt.id, pos[0], pos[0])
 	return nil
 }

@@ -44,7 +44,7 @@ func TestPageConfigFromEnv(t *testing.T) {
 	if c.TrackerIssueURL == nil || *c.TrackerIssueURL != "https://tracker.example.com/issue/{key}" || c.TaskKeyPattern != "(ABC|DEF)-[0-9]{1,6}" {
 		t.Fatalf("tracker %v %q", c.TrackerIssueURL, c.TaskKeyPattern)
 	}
-	if !c.Features["efficiency"] || !c.Features["vault"] || c.Features["next-ui"] || c.Features["chats"] || c.Features["design"] || len(c.Features) != 4 {
+	if !c.Features["efficiency"] || !c.Features["vault"] || c.Features["next-ui"] || c.Features["chats"] || c.Features["design"] || c.Features["languages"] || len(c.Features) != 5 {
 		t.Fatalf("features %v", c.Features)
 	}
 	if c.People["ada"] != "Ada" || len(c.GitlabHosts) != 2 || c.SpeedPosthogHost != nil {

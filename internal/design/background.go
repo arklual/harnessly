@@ -33,6 +33,9 @@ func (l *Library) keeperMissing() map[string]int64 {
 // StartBackground starts the claim keeper and the history; again while running it only retries the history (the
 // library folder may have appeared since).
 func (l *Library) StartBackground() {
+	if l.cfg.Passive {
+		return
+	}
 	warn := l.warn
 	b := &l.bg
 	b.mu.Lock()

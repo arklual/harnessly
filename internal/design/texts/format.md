@@ -172,8 +172,12 @@ quotes become `&quot;`, or wrap the attribute in single quotes.
 
 ### Working with the design system's components
 
-- Before drawing anything, look for it in the kit: `{{kit}}` on `window`, documented in `project/_ds/*/README.md`. A real
-  component looks right in every theme and shows what the product will really get.
+- Before drawing anything, look for it in the kit: `{{kit}}` on `window`, documented in `project/_ds/*/README.md` (a newer
+  project: `project/ds/*/README.md`). A real component looks right in every theme and shows what the product will really get.
+- Choose from the README's index, then read the card of each component you consider, `components/<Comp>/README.md` next
+  to the README: its first sentence says what it is for, «When not to use» names the one to take instead, its example is
+  the markup to copy. For a kit installed on the machine, `harnessly design kit search <kit> <words>` finds components,
+  templates and icons by purpose, and `harnessly design kit show <kit> <node>` prints one with its props.
 - Connect the kit in `<helmet>`: its stylesheet, then its script, as in a neighbouring board. A kit that needs React expects
   the runtime's copy, so do not add your own.
 - Pass the component's documented props and nothing else. Copy prop names from the README: a wrong name fails silently. Booleans

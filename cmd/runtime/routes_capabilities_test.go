@@ -23,12 +23,12 @@ func capsOf(t *testing.T, env map[string]string) map[string]capabilities.Capabil
 
 func TestRuntimeCapabilitiesOnABareRuntime(t *testing.T) {
 	c := capsOf(t, nil)
-	for _, id := range []string{"gitlab", "tracker", "link-meta", "docs", "chats", "hub-link"} {
+	for _, id := range []string{"gitlab", "tracker", "link-meta", "docs", "chats", "hub-link", "disk"} {
 		if c[id].Status != capabilities.NeedsConfig || c[id].Configure == "" || c[id].Reason == "" {
 			t.Errorf("%s = %+v: a service nobody named needs config and says which", id, c[id])
 		}
 	}
-	for _, id := range []string{"efficiency", "vault", "history", "voice-cloud", "disk"} {
+	for _, id := range []string{"efficiency", "vault", "history", "voice-cloud"} {
 		if c[id].Status != capabilities.Off || c[id].Reason == "" {
 			t.Errorf("%s = %+v: a gateway part is off with a reason", id, c[id])
 		}

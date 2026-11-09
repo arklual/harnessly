@@ -1,0 +1,22 @@
+/* __TITLE__ tokens: light by default, dark under [data-theme="dark"] (Root sets it). Same values as tokens.json. */
+:root, [data-theme="light"] {
+  --__ID__-surface-0: #f6f7f9;
+  --__ID__-surface-1: #ffffff;
+  --__ID__-text: #16181d;
+  --__ID__-border: #dfe2e8;
+  --__ID__-accent: #3b5bdb;
+  --__ID__-on-accent: #ffffff;
+  --__ID__-space-2: 8px;
+  --__ID__-space-4: 16px;
+  --__ID__-radius-m: 8px;
+  --__ID__-radius-l: 12px;
+  --__ID__-font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+[data-theme="dark"] {
+  --__ID__-surface-0: #0f1115;
+  --__ID__-surface-1: #181b21;
+  --__ID__-text: #eceef2;
+  --__ID__-border: #2b2f38;
+  --__ID__-accent: #7c94f5;
+  --__ID__-on-accent: #0f1115;
+}

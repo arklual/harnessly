@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/filestore"
@@ -52,6 +53,9 @@ type Options struct {
 	Paired bool
 	// Name is the machine's name in what a lost write leaves behind.
 	Name string
+	// Shared names folders several runtimes of the machine read (a team's library): one runtime syncs such a folder at
+	// a time, and a file the store stops showing this machine stays there for the others.
+	Shared func(dir string) bool
 	// HTTP is the client to the hub; nil for a plain one.
 	HTTP *http.Client
 	Log  *slog.Logger
@@ -71,7 +75,10 @@ type Link struct {
 	log      *slog.Logger
 
 	machine  *Machine
+	sess     *sessions
 	embedded *filestore.Server
+	shared   func(dir string) bool
+	told     sync.Map
 }
 
 // Decide is the kind of link the options call for, "" for none, and why.
@@ -116,7 +123,7 @@ func Open(o Options) (*Link, error) {
 	if name == "" {
 		name, _ = os.Hostname()
 	}
-	l := &Link{kind: kind, name: sanitize(name), dataDir: o.DataDir, log: log, hc: hc}
+	l := &Link{kind: kind, name: sanitize(name), dataDir: o.DataDir, log: log, hc: hc, shared: o.Shared}
 	now := o.Now
 	if now == nil {
 		now = time.Now
@@ -130,6 +137,7 @@ func Open(o Options) (*Link, error) {
 		l.machine = o.Machine
 		l.base = base + "/store"
 		s := &sessions{hc: hc, machine: *o.Machine, now: now}
+		l.sess = s
 		l.token = s.token
 		l.stateKey = "hub-" + short(base+"\x00"+o.Machine.ID)
 	case KindEmbedded:
@@ -146,6 +154,20 @@ func Open(o Options) (*Link, error) {
 	}
 	log.Info("store: linked", "kind", kind, "why", why)
 	return l, nil
+}
+
+// Person is the name the hub gives this machine's person in the apps collection (hubproto.StoreSession.Person); ""
+// for a store inside the runtime or a hub that names nobody.
+func (l *Link) Person(ctx context.Context) (string, error) {
+	if l.sess == nil {
+		return "", nil
+	}
+	if _, err := l.sess.token(ctx, false); err != nil {
+		return "", err
+	}
+	l.sess.mu.Lock()
+	defer l.sess.mu.Unlock()
+	return l.sess.cur.Person, nil
 }
 
 // Kind is KindHub or KindEmbedded.
@@ -242,6 +264,10 @@ func (l *Link) follow(ctx context.Context, collection string, root func() string
 			}
 			return false
 		case err := <-done:
+			if errors.Is(err, errBusy) {
+				// Another runtime of this machine syncs the folder; it is asked again in a while.
+				return sleep(ctx, time.Minute)
+			}
 			if err != nil && ctx.Err() == nil {
 				l.log.Warn("store: sync stopped, starting again", "dir", dir, "err", err)
 				return sleep(ctx, 10*time.Second)
@@ -260,15 +286,42 @@ func (l *Link) follow(ctx context.Context, collection string, root func() string
 	}
 }
 
+// lockName is the folder's sync lock (hidden: it never syncs).
+const lockName = ".store-sync.lock"
+
+// errBusy: another runtime of this machine syncs the folder.
+var errBusy = errors.New("another runtime of this machine syncs the folder")
+
 func (l *Link) syncOnce(ctx context.Context, collection, dir string) error {
+	// A library several people's runtimes share (a team machine's /srv) is synced by each of them, every one with its
+	// person's projects: the folder holds what any of them has a role in, and nothing is removed from it. The lock then
+	// only keeps one runtime from syncing it twice. Any other folder is synced by one runtime of the machine at a time.
+	shared := l.shared != nil && l.shared(dir)
+	name := lockName
+	if shared {
+		name = ".store-sync-" + short(l.stateKey) + ".lock"
+	}
+	unlock, err := lockFolder(dir, name)
+	if err != nil {
+		l.busyOnce(dir)
+		return err
+	}
+	defer unlock()
 	state := filepath.Join(l.dataDir, "store-sync", l.stateKey, collection+"-"+short(dir))
 	a, err := filesync.New(filesync.Config{Root: dir, StateDir: state, Store: l.Client(collection), Machine: l.name,
-		Policy: filestore.PolicyFor(collection), Log: l.log})
+		Policy: filestore.PolicyFor(collection), Log: l.log, KeepUnseen: shared})
 	if err != nil {
 		return err
 	}
 	defer a.Close()
 	return a.Run(ctx)
+}
+
+// busyOnce says once per folder that another runtime syncs it.
+func (l *Link) busyOnce(dir string) {
+	if _, told := l.told.LoadOrStore(dir, true); !told {
+		l.log.Info("store: another runtime of this machine syncs the folder", "dir", dir)
+	}
 }
 
 func short(s string) string {

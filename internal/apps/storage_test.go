@@ -1,6 +1,8 @@
 package apps
 
 import (
+	"github.com/ly-solutions/harnessly/internal/appstore"
+
 	"encoding/json"
 	"errors"
 	"os"
@@ -42,7 +44,7 @@ func TestStorageVersionsCount(t *testing.T) {
 	if strings.Join(keys, ",") != "k,other" {
 		t.Fatalf("keys: %v", keys)
 	}
-	if err := s.Set("a.b", ScopeUser, "", versionsKey, json.RawMessage(`1`)); !errors.Is(err, ErrStorageArgs) {
+	if err := s.Set("a.b", ScopeUser, "", appstore.VersionsKey, json.RawMessage(`1`)); !errors.Is(err, ErrStorageArgs) {
 		t.Fatalf("reserved key: %v", err)
 	}
 }

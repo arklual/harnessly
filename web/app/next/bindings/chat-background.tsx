@@ -19,6 +19,9 @@ import { useBackground, useShots } from '@/next/stores/conversation';
 import { useConversation } from '@/next/stores/conversations';
 import { usePresentFlag } from '@/next/ui/presence';
 import { toast } from '@/next/ui/toast';
+import { usePhone } from '@/next/ui/use-media';
+import Drops from '@/next/features/smart-notice/drops';
+import { askDropBack, useDrops } from '@/next/stores/smart-drops';
 import { t } from '@/next/i18n';
 
 export const useChatBackground = (
@@ -39,7 +42,11 @@ export const useChatBackground = (
   const codes = conv ? codeAsks.asks.filter((a) => a.conv === conv) : [];
   // The column stays while the last card folds away, then leaves with it.
   const codesMounted = usePresentFlag(codes.length > 0, CODE_EXIT_MS * 2).mounted;
-  const has = tasks.length > 0 || recap !== null || (shots?.length ?? 0) > 0 || codesMounted;
+  // What waits and was put away from the smart notice stands here as drops, whichever chat it is of.
+  const drops = useDrops();
+  const phone = usePhone();
+  const has =
+    tasks.length > 0 || recap !== null || (shots?.length ?? 0) > 0 || codesMounted || drops.length > 0;
   // The pane opening takes back a column the person had opened (a fold they made stays); this runs in render, once per change.
   const [paneWas, setPaneWas] = useState(pane);
   if (pane !== paneWas) {
@@ -48,7 +55,8 @@ export const useChatBackground = (
   }
   const override = asked && asked.conv === conv ? asked.shown : null;
   // On its own the column is open when it has room and the pane is shut, and whenever a command waits for a code.
-  const auto = (room && !pane) || codes.length > 0;
+  // A drop opens it too, but not on a phone, where the column is a sheet over the chat: there the header's button says it.
+  const auto = (room && !pane) || codes.length > 0 || (drops.length > 0 && !phone);
   const shown = has && (override ?? auto);
 
   // What the button asks for: what the room already says is no ask at all, so the column keeps following the room.
@@ -82,6 +90,7 @@ export const useChatBackground = (
           running: tasks.filter((x) => x.status === 'running').length,
           total: tasks.length,
           recap: recap !== null,
+          waits: drops.length > 0,
           open: shown,
           onToggle: toggle,
         }
@@ -109,16 +118,19 @@ export const useChatBackground = (
       onStop={onStop}
       onHide={shown ? toggle : undefined}
       codes={
-        <CodeAsks
-          asks={codes}
-          now={now}
-          skew={codeAsks.skew}
-          onPut={putOne}
-          onCancel={async (ask) => {
-            if (machine) await cancelCode(machine, ask.id);
-          }}
-          onDone={(ask) => codeAsks.drop(ask.id)}
-        />
+        <>
+          <Drops drops={drops} now={now} onBack={askDropBack} />
+          <CodeAsks
+            asks={codes}
+            now={now}
+            skew={codeAsks.skew}
+            onPut={putOne}
+            onCancel={async (ask) => {
+              if (machine) await cancelCode(machine, ask.id);
+            }}
+            onDone={(ask) => codeAsks.drop(ask.id)}
+          />
+        </>
       }
     />
   ) : null;

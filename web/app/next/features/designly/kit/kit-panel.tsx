@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { IKitCanvas, IKitLink, TPropValue } from '@/next/features/designly/kit/kit-api';
 import { callOf, nameOf, NODE, placeOf, type TNode } from '@/next/features/designly/kit/kit-node';
-import { layoutCount } from '@/next/features/designly/kit/kit-world';
+import { drawsLive, layoutCount } from '@/next/features/designly/kit/kit-world';
 import { Button } from '@/next/ui/button';
 import Popover from '@/next/ui/popover';
 import Segmented from '@/next/ui/segmented';
@@ -43,6 +43,10 @@ interface IKitPanelProps {
 
 const DEBOUNCE_MS = 400;
 
+/** The components that are parts of this one (TableRow of Table): they have no tile, the parent's panel names them. */
+const partsOf = (canvas: IKitCanvas, id: string): string[] =>
+  (canvas.groups ?? []).flatMap((g) => g.components.filter((k) => k.part === id).map((k) => k.name));
+
 const useDebounced = <T,>(value: T, ms: number): T => {
   const [v, setV] = useState(value);
   useEffect(() => {
@@ -58,6 +62,15 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
     {children}
   </section>
 );
+
+/** Whether a background is dark or light: the panel lays a logo on the same kind of plate the kit asks for. */
+const toneOf = (hex: string): 'dark' | 'light' => {
+  const v = hex.replace('#', '');
+  const full = v.length === 3 ? [...v].map((c) => c + c).join('') : v.slice(0, 6);
+  const n = Number.parseInt(full, 16);
+  const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+  return lum < 128 ? 'dark' : 'light';
+};
 
 const KitPanel = (p: IKitPanelProps) => {
   const { canvas, node } = p;
@@ -78,8 +91,15 @@ const KitPanel = (p: IKitPanelProps) => {
   const props = useMemo<Record<string, TPropValue>>(() => {
     if (!node) return {};
     if (node.kind === NODE.layout) {
-      const changed = Object.fromEntries(Object.entries(texts).filter(([, v]) => v !== ''));
-      return Object.keys(changed).length > 0 ? { ...extra, texts: changed } : extra;
+      const kinds = new Map(node.layout.slots.map((s) => [s.key, s.kind]));
+      const changed = Object.entries(texts).filter(([, v]) => v.trim() !== '');
+      const textsOut = Object.fromEntries(changed.filter(([k]) => kinds.get(k) === 'text'));
+      const imagesOut = Object.fromEntries(changed.filter(([k]) => kinds.get(k) === 'image'));
+      return {
+        ...extra,
+        ...(Object.keys(textsOut).length > 0 ? { texts: textsOut } : {}),
+        ...(Object.keys(imagesOut).length > 0 ? { images: imagesOut } : {}),
+      };
     }
     if (node.kind === NODE.asset && node.asset.dark && mode === 'dark') return { mode: 'dark' };
     return extra;
@@ -101,7 +121,8 @@ const KitPanel = (p: IKitPanelProps) => {
     );
   }
 
-  const call = callOf(canvas, node, props);
+  // A template's slide is filled in its fields and taken by «Вставить в доску»: its markup is not shown.
+  const call = node.kind === NODE.layout ? null : callOf(canvas, node, props);
   const uses = (p.usage ?? []).flatMap((link) =>
     link.boards
       .filter((b) => b.nodes.includes(nodeId(node)))
@@ -109,7 +130,7 @@ const KitPanel = (p: IKitPanelProps) => {
   );
 
   let preview: string | null = null;
-  if (node.kind === NODE.component && node.component.preview !== undefined)
+  if (node.kind === NODE.component && drawsLive(node.component))
     preview = p.playSrc(node.component.id, { ...(node.component.sample ?? {}), ...shownProps });
   if (node.kind === NODE.layout && node.template.component)
     preview = p.playSrc(
@@ -133,6 +154,11 @@ const KitPanel = (p: IKitPanelProps) => {
       <Section title={t('next.kit.panel.overview')}>
         {node.kind === NODE.component && node.component.description && (
           <p className="hx-kit-panel__text">{node.component.description}</p>
+        )}
+        {node.kind === NODE.component && partsOf(p.canvas, node.component.id).length > 0 && (
+          <p className="hx-kit-panel__text">
+            {t('next.kit.panel.parts')}: {partsOf(p.canvas, node.component.id).join(' · ')}
+          </p>
         )}
         {node.kind === NODE.layout && (
           <>
@@ -197,6 +223,7 @@ const KitPanel = (p: IKitPanelProps) => {
           <div
             className="hx-kit-panel__asset"
             data-dark={(mode === 'dark' && node.asset.dark !== undefined) || undefined}
+            data-tone={node.asset.bg ? toneOf(node.asset.bg) : undefined}
           >
             <img
               src={p.fileUrl(mode === 'dark' && node.asset.dark ? node.asset.dark : node.asset.file)}
@@ -264,30 +291,23 @@ const KitPanel = (p: IKitPanelProps) => {
             </dl>
           )}
           {node.kind === NODE.layout && node.layout.slots.length > 0 && (
-            <dl className="hx-kit-props">
+            <div className="hx-kit-fields">
               {node.layout.slots.map((slot) => (
-                <div key={slot.key} className="hx-kit-props__row">
-                  <dt>
-                    <code>{slot.key}</code>
-                  </dt>
-                  <dd>
-                    {slot.kind === 'text' ? (
-                      <input
-                        className="hx-kit-input"
-                        placeholder={slot.sample ?? ''}
-                        value={texts[slot.key] ?? ''}
-                        onChange={(e) => setTexts((prev) => ({ ...prev, [slot.key]: e.target.value }))}
-                        aria-label={slot.key}
-                      />
-                    ) : (
-                      <span className="hx-kit-props__type">
-                        {t(`next.kit.slot.${slot.kind === 'image' ? 'image' : 'chart'}`)}
-                      </span>
-                    )}
-                  </dd>
-                </div>
+                <label key={slot.key} className="hx-kit-field">
+                  <span className="hx-kit-field__label">{slot.label || slot.key}</span>
+                  {slot.kind === 'chart' ? (
+                    <span className="hx-kit-field__note">{t('next.kit.slot.chart')}</span>
+                  ) : (
+                    <input
+                      className="hx-kit-input"
+                      placeholder={slot.kind === 'image' ? t('next.kit.slot.imageHint') : (slot.sample ?? '')}
+                      value={texts[slot.key] ?? ''}
+                      onChange={(e) => setTexts((prev) => ({ ...prev, [slot.key]: e.target.value }))}
+                    />
+                  )}
+                </label>
               ))}
-            </dl>
+            </div>
           )}
           {preview && (
             <div className="hx-kit-preview" data-wide={node.kind === NODE.layout || undefined}>

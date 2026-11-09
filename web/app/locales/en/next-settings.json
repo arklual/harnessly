@@ -529,5 +529,20 @@
   "next.settings.hubEnv.status.pending": "waiting for the machine",
   "next.settings.hubEnv.foot": "A pinned item cannot be switched off. You switch off the rest for yourself; the team keeps it.",
   "next.settings.hubEnv.footFixed": "These were given by your organization. The agent takes the list on this machine by itself; change it in the hub.",
-  "next.settings.hubEnv.failed": "Could not switch it"
+  "next.settings.hubEnv.failed": "Could not switch it",
+  "next.move.moving": "Moving the data of {machine} into the hub: {moved} of {total}",
+  "next.move.stopped": {
+    "one": "The move from {machine} stopped: {n} object failed ({moved} of {total} in the hub)",
+    "other": "The move from {machine} stopped: {n} objects failed ({moved} of {total} in the hub)"
+  },
+  "next.move.more": "and {n} more",
+  "next.move.retry": "Retry",
+  "next.move.agent": "Continue with an agent",
+  "next.move.retryFailed": "The machine did not take the retry: check that it is online",
+  "next.move.brief": "The move of the data of {machine} into the hub stopped: {n} of {total} objects failed. Find out why and finish the move. The objects with their error codes:",
+  "next.move.briefSteps": "What to do:\n1. harnessly migrate status --json: where it stands.\n2. harnessly docs read {page}: the page of the move ({doc}), the cause and fix of every code, and what not to do.\n3. Fix the cause, then harnessly migrate retry; what need not move: harnessly migrate skip KIND/OBJECT.\n4. harnessly migrate verify: check everything moved is in the hub.\nDo not delete anything on the machine and do not edit the hub's database by hand.",
+  "next.settings.beta.chatNav": "Chat navigator and ⌘1..9",
+  "next.settings.beta.chatNav.hint": "⌘⌥J lists the prompts and subagents of the chat, ⌘1..9 open the chats of the list by number",
+  "next.settings.beta.chatShare": "Share a chat",
+  "next.settings.beta.chatShare.hint": "The chat menu gets «Share»: a snapshot without secrets, a link, a Markdown or HTML download"
 }

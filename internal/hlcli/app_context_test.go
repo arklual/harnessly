@@ -91,3 +91,51 @@ func TestAppValidateStrictCountsContextWeight(t *testing.T) {
 		t.Errorf("the weight is the strict check's: %q", r.out)
 	}
 }
+
+// The live hook asks the runtime for the chat's session and hands its words to the agent; an empty answer, a
+// failed one or another event prints nothing.
+func TestAppContextLiveHook(t *testing.T) {
+	text := atomic.Value{}
+	text.Store("# Apps turned on in this chat")
+	status := atomic.Int32{}
+	status.Store(200)
+	var asked atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var b map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		asked.Store(r.URL.Path + " " + b["session"])
+		w.WriteHeader(int(status.Load()))
+		_ = json.NewEncoder(w).Encode(map[string]string{"text": text.Load().(string)})
+	}))
+	t.Cleanup(srv.Close)
+	env := map[string]string{"HARNESSLY_URL": srv.URL, "HARNESSLY_CLI_TOKEN": "tok", "HARNESSLY_SESSION": "tab-1"}
+	run := func(stdin string) string {
+		var out bytes.Buffer
+		code := Run([]string{"hook", "app-context", "--live"}, Env{Getenv: func(k string) string { return env[k] },
+			Home: t.TempDir(), Stdin: strings.NewReader(stdin), Stdout: &out})
+		if code != 0 {
+			t.Fatalf("exit %d", code)
+		}
+		return out.String()
+	}
+	prompt := `{"hook_event_name":"UserPromptSubmit"}`
+	got := run(prompt)
+	if !strings.Contains(got, `"additionalContext":"# Apps turned on in this chat"`) || !strings.Contains(got, `"hookEventName":"UserPromptSubmit"`) {
+		t.Fatalf("live words: %q", got)
+	}
+	if a, _ := asked.Load().(string); a != "/api/cli/apps/live-context tab-1" {
+		t.Fatalf("asked %q", a)
+	}
+	if got := run(`{"hook_event_name":"SessionStart"}`); got != "" {
+		t.Fatalf("another event: %q", got)
+	}
+	text.Store("")
+	if got := run(prompt); got != "" {
+		t.Fatalf("nothing changed: %q", got)
+	}
+	text.Store("x")
+	status.Store(500)
+	if got := run(prompt); got != "" {
+		t.Fatalf("a failed answer: %q", got)
+	}
+}

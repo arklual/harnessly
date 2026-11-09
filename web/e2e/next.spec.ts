@@ -8,6 +8,7 @@ import { join } from 'node:path';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
+import { RELEASES } from '../app/next/features/whats-new/releases';
 import { freePort, type Runtime, startRuntime } from './runtime';
 
 // The interface (app/next over /api/v2) as one person's session on a machine of its own: the person signs in, starts a
@@ -163,6 +164,8 @@ test.beforeAll(async ({ browser }) => {
   });
   await new Promise<void>((ok) => site.listen(sitePort, '127.0.0.1', ok));
   page = await browser.newPage();
+  // «Что нового» is its own test's business: here it would stand over the field the steps press.
+  await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
 });
 
 test.afterAll(async () => {

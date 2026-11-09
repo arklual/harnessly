@@ -6,24 +6,50 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The machine's own projects and favorites go into its person's sidebar on the hub by the move (kind
+  `sidebar`, `POST /store/migration/v1/sidebar`): merged as the page merges a machine, without the page open; the
+  journal counts it verified once the sidebar lists the machine. A hub with its history off keeps it skipped
+  (`MIG-NOT-KEPT`) and is asked again each pass.
+- A runtime under a hub with a store moves by itself what an older version kept only on its disk (HRN-883,
+  `docs/migrations/0001-data-to-hub.md`): the pictures of its chats, the files its agents handed over (found by their
+  records in the transcripts, read at most 32 MB/s) and the handoff notes go into the store by sha256, each checked
+  there after the upload. The journal is kept on the disk (`<data>/migrations/`) and in the hub; a restart goes on
+  where it stopped, nothing on the disk is deleted. A failed upload is tried again by itself; a file that cannot be
+  read waits for `harnessly migrate retry|skip`. `harnessly migrate status|retry|skip|verify [--json]` read and steer
+  it; `RUNTIME_DATA_MOVE=off` turns it off.
+- The hub keeps the journal of the move of the machines' own data into its store (`docs/migrations`): one row
+  per machine × kind × object with its state, error code and attempts (migration 0034). A machine reports with its
+  store session (`POST /store/migration/v1/report`); a person who may open the machine reads how far it is and asks to
+  retry or skip the failed objects (`/api/machines/<id>/migration`, `…/retry`, `…/skip`). A verified upload becomes its
+  person's in the hub, as one the page put there. `hub doctor` lists every machine's move and, for each failed code,
+  its cause and fix from `docs/migrations/0001-data-to-hub.md`, which the binary carries (`harnessly docs`, self-host).
+  The capability `migration` says the hub has the journal.
+
 ### Fixed
 
-- Personal settings (`/api/v2/me`, `/api/v2/me/settings`) are kept by the hub per signed-in user, with their own
-  revision and the account's e-mail and name; they were forwarded to one runtime's single settings file, so users who
-  shared a runtime overwrote each other's settings, including the main machine. The hub answers them on every route
-  (the fleet, the workspace, a machine's own address), also with the machines off, and refuses a main machine the user
-  may not open. A runtime's old settings file is not copied into any account; a runtime on its own is unchanged
-  (GitHub #61).
-- The home screen's machine setup card takes clicks again: it sat in the greeting, which lets the pointer through to
-  the composer, and inherited that, so its stages, «Подробнее», «Повторить» and the safe step did nothing. The card and
-  the into-project chip take the pointer while shown; a card fading out lets it through again. A browser test presses
-  each with the mouse (GitHub #59).
+- The hub says its release instead of `dev`: the image of a merge request, promoted to the release without a rebuild, carries `dev-<commit>`, and `HUB_VERSION` (the Helm chart sets it from the image's tag) names the release.
+- A space owner's sidebar no longer merges the chats of every machine of the space: the list, the search and the page's
+  first machine are the person's own machines; an administered machine is named under `others` and shows its own list
+  only when picked. `POST /api/machines/{id}/owner` hands a machine registered by an admin to the member it is for,
+  with its copied chats (#57).
 - A link of a connection or of the documents provider opens natively before the remote browser is considered: an issue
   in the task tab through its own connection (two trackers with one key on different hosts no longer mix; the key keeps
   its case and hyphens), a wiki page in a safe reader, a document or board by the provider's embed address. A
   documents adapter may declare the new `resolve` capability to tell documents from boards; one without it behaves as
   before. A refused sign-in shows a "Connect" action and an unembeddable provider "Open original link", never a
   silently started Chrome. Click, context menu and `harnessly open` agree (GitHub #60).
+- The home screen's machine setup card takes clicks again: it sat in the greeting, which lets the pointer through to
+  the composer, and inherited that, so its stages, «Подробнее», «Повторить» and the safe step did nothing. The card and
+  the into-project chip take the pointer while shown; a card fading out lets it through again. A browser test presses
+  each with the mouse (GitHub #59).
+- Personal settings (`/api/v2/me`, `/api/v2/me/settings`) are kept by the hub per signed-in user, with their own
+  revision and the account's e-mail and name; they were forwarded to one runtime's single settings file, so users who
+  shared a runtime overwrote each other's settings, including the main machine. The hub answers them on every route
+  (the fleet, the workspace, a machine's own address), also with the machines off, and refuses a main machine the user
+  may not open. A runtime's old settings file is not copied into any account; a runtime on its own is unchanged
+  (GitHub #61).
 - The agent asks the runtime for its chat list again (after 30 s, doubling up to 5 min) while none came: a runtime
   too busy to make the list in its budget answered nothing, and the backfill to the cluster waited for the next link
   — chats stayed not caught up for an hour and more on a loaded machine.
@@ -35,6 +61,11 @@ All notable changes to this project are documented here. The format follows
 - The hub's store waits out a bucket busy with the same blob (409 OperationAborted, «a conflicting conditional
   operation is currently in progress»: two machines putting the same file at once) and finds the blob there or puts it
   again; it answered 500, and the machine's sync of that file failed.
+- A chat opened on a machine that is on, whose chats the cluster keeps, is drawn from the cluster's copy, and the
+  machine's channel is asked after it from the copy's newest entry (a snapshot "after"), not for its whole tail; past
+  3 s without the copy it is asked as before. The copy's newest page is asked once for the feed and the channel.
+  The snapshot after an entry carries every turn from that entry's own on, as it is now, so the turn's state (running or
+  idle) reaches the page whatever the cursor; only a runtime that says so (feature `snapshot-after`) is asked that way.
 - A chat backfilled to the cluster brings the steps of every turn, not only of its newest three: a walk reads pages
   of 20 turns with their steps (`…/turns?steps=all`). A folded turn the copy holds fewer steps of than the turn counts
   (chats backfilled before) is asked from the machine when it is there; it opened with its answer only.
@@ -47,10 +78,6 @@ All notable changes to this project are documented here. The format follows
 - The runtime's read back to an old backfill cursor builds the chat's feed again only when what it read has doubled,
   not after each 4 MB of the transcript: a walk deep into a transcript of 100 MB was quadratic and held the chat's
   actor for minutes.
-- A space owner's sidebar no longer merges the chats of every machine of the space: the list, the search and the page's
-  first machine are the person's own machines; an administered machine is named under `others` and shows its own list
-  only when picked. `POST /api/machines/{id}/owner` hands a machine registered by an admin to the member it is for,
-  with its copied chats (#57).
 
 ### Added
 

@@ -27,7 +27,7 @@ func newReplicaRig(t *testing.T) *replicaRig {
 		pause:     time.Millisecond,
 		chans:     map[string]*replicaChan{},
 	}
-	g.r.pages = func(conv, before string, limit int) (json.RawMessage, error) {
+	g.r.pages = func(conv, before string, limit int, steps bool) (json.RawMessage, error) {
 		list := g.pages[conv]
 		if len(list) == 0 {
 			return nil, fmt.Errorf("no such chat")
@@ -383,5 +383,154 @@ func TestReplicaStopsAWalkWhenTheLinkGoes(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if len(g.backfills()) != n || n >= 50 {
 		t.Fatalf("the walk went on with no link: %d then %d", n, len(g.backfills()))
+	}
+}
+
+// a runtime that could not make its chat list in its budget answers nothing; the agent asks again, waiting
+// longer each time, until the list comes, and stops then: the backfill no longer waits for the next link.
+func TestReplicaAsksForTheChatListAgainUntilItComes(t *testing.T) {
+	g := newReplicaRig(t)
+	g.r.convsWait = 5 * time.Millisecond
+	asked := 0
+	g.r.askConvs = func() { g.mu.Lock(); asked++; g.mu.Unlock() }
+	count := func() int { g.mu.Lock(); defer g.mu.Unlock(); return asked }
+	g.r.hello("ep-1")
+	g.r.start(true, nil, map[string]int64{}, map[string]string{})
+	g.until(func() bool { return count() >= 3 })
+	g.r.convs([]json.RawMessage{raw(`{"id":"tab-1","rev":1}`)})
+	time.Sleep(200 * time.Millisecond) // the waits doubled past 5 ms: one more ask may have been under way
+	settled := count()
+	time.Sleep(400 * time.Millisecond)
+	if n := count(); n != settled {
+		t.Errorf("asked %d more times after the list came", n-settled)
+	}
+}
+
+// a walk the runtime cut (a busy answer) goes on a while later from the page it stopped at, while the link
+// stays: it waited for the next link before.
+func TestReplicaGoesOnWithAWalkAPageStopped(t *testing.T) {
+	g := newReplicaRig(t)
+	g.r.retryWait = 5 * time.Millisecond
+	g.r.hello("ep-1")
+	g.pages["tab-1"] = []string{
+		`{"turns":[{"id":"c:a0#0"}],"entries":[],"beforeTurnId":"b1"}`,
+		`{"turns":[{"id":"c:a1#0"}],"entries":[],"beforeTurnId":"b2"}`,
+		`{"turns":[{"id":"c:a2#0"}],"entries":[],"beforeTurnId":null}`,
+	}
+	plain := g.r.pages
+	failures := 2
+	var asked []string
+	g.r.pages = func(conv, before string, limit int, steps bool) (json.RawMessage, error) {
+		g.mu.Lock()
+		asked = append(asked, before)
+		fail := before == "b1" && failures > 0
+		if fail {
+			failures--
+		}
+		g.mu.Unlock()
+		if fail {
+			return nil, fmt.Errorf("runtime answered 503")
+		}
+		return plain(conv, before, limit, steps)
+	}
+	g.r.start(true, nil, map[string]int64{}, map[string]string{})
+	g.r.convs([]json.RawMessage{raw(`{"id":"tab-1","rev":1}`)})
+	g.until(func() bool {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		return len(asked) > 0 && asked[len(asked)-1] == "b2"
+	})
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if want := []string{"", "b1", "b1", "b1", "b2"}; fmt.Sprint(asked) != fmt.Sprint(want) {
+		t.Errorf("pages asked %q, want %q", asked, want)
+	}
+}
+
+// a walk reads pages of replicaWalkTurns turns with the steps of each (`steps=all`), so the copy opens a
+// folded turn of a backfilled chat without the machine; the newest page of a changed chat stays the plain page.
+func TestReplicaWalksAskForTheStepsOfEveryTurn(t *testing.T) {
+	g := newReplicaRig(t)
+	g.r.hello("ep-1")
+	g.pages["tab-walk"] = []string{`{"turns":[{"id":"c:a#0"}],"entries":[],"beforeTurnId":null}`}
+	g.pages["tab-changed"] = []string{`{"turns":[{"id":"c:b#0"}],"entries":[],"beforeTurnId":null}`}
+	type ask struct {
+		limit int
+		steps bool
+	}
+	asked := map[string][]ask{}
+	plain := g.r.pages
+	g.r.pages = func(conv, before string, limit int, steps bool) (json.RawMessage, error) {
+		g.mu.Lock()
+		asked[conv] = append(asked[conv], ask{limit, steps})
+		g.mu.Unlock()
+		return plain(conv, before, limit, steps)
+	}
+	g.r.start(true, nil, map[string]int64{"tab-changed": 1}, map[string]string{})
+	g.r.convs([]json.RawMessage{raw(`{"id":"tab-walk","rev":1}`), raw(`{"id":"tab-changed","rev":2}`)})
+	g.until(func() bool {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		return len(asked["tab-walk"]) > 0 && len(asked["tab-changed"]) > 0
+	})
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if a := asked["tab-walk"][0]; a.limit != replicaWalkTurns || !a.steps {
+		t.Errorf("a walk asks %+v", a)
+	}
+	if a := asked["tab-changed"][0]; a.limit != 100 || a.steps {
+		t.Errorf("the newest page of a changed chat asks %+v", a)
+	}
+}
+
+// a chat the cluster holds whole without the steps of every turn (`v2.start.steps`) is walked again from its
+// steps cursor with the steps of every turn, after the other walks, and its pages move the steps cursor, not the
+// history's; a chat still walked for its history is not walked for its steps apart.
+func TestReplicaWalksTheStepsOfAChatHeldWholeByTheirCursor(t *testing.T) {
+	g := newReplicaRig(t)
+	g.r.hello("ep-1")
+	g.pages["tab-whole"] = []string{
+		`{"turns":[{"id":"c:w0#0"}],"entries":[],"beforeTurnId":"b1"}`,
+		`{"turns":[{"id":"c:w1#0"}],"entries":[],"beforeTurnId":null}`,
+	}
+	g.pages["tab-open"] = []string{`{"turns":[{"id":"c:o0#0"}],"entries":[],"beforeTurnId":null}`}
+	type ask struct {
+		conv, before string
+		steps        bool
+	}
+	var asked []ask
+	plain := g.r.pages
+	g.r.pages = func(conv, before string, limit int, steps bool) (json.RawMessage, error) {
+		g.mu.Lock()
+		asked = append(asked, ask{conv, before, steps})
+		g.mu.Unlock()
+		return plain(conv, before, limit, steps)
+	}
+	g.r.startWith(true, nil, map[string]int64{"tab-whole": 3, "tab-open": 2},
+		map[string]string{"tab-open": ""}, map[string]string{"tab-whole": "b1", "tab-open": ""})
+	g.r.convs([]json.RawMessage{raw(`{"id":"tab-whole","rev":3}`), raw(`{"id":"tab-open","rev":2}`)})
+	g.until(func() bool { g.mu.Lock(); defer g.mu.Unlock(); return len(asked) >= 2 })
+	time.Sleep(50 * time.Millisecond)
+	g.mu.Lock()
+	got := fmt.Sprint(asked)
+	g.mu.Unlock()
+	if want := fmt.Sprint([]ask{{"tab-open", "", true}, {"tab-whole", "b1", true}}); got != want {
+		t.Fatalf("pages asked %s, want %s", got, want)
+	}
+	var marks []string
+	for _, b := range g.backfills() {
+		for _, e := range b.Events {
+			var m map[string]json.RawMessage
+			if json.Unmarshal(e, &m) == nil && string(m["type"]) == `"feed_reset"` && len(m["turns"]) > 2 {
+				marks = append(marks, b.Ch+" history="+string(m["history"])+" steps="+string(m["steps"]))
+			}
+		}
+	}
+	want := []string{
+		`conv:tab-open history={"from":""} steps=`,
+		`conv:tab-whole history= steps={"from":"b1"}`,
+	}
+	if fmt.Sprint(marks) != fmt.Sprint(want) {
+		t.Errorf("marks %q, want %q", marks, want)
 	}
 }

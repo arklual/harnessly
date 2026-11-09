@@ -202,6 +202,16 @@ func (l *Library) usageThemes(only string) []usageTheme {
 
 // themeOfProject is the installed theme a project is built on and its version, or nil.
 func (l *Library) themeOfProject(id string, themes []usageTheme, boards [][]byte) (*usageTheme, string) {
+	// A project pinned to a kit's version is on the pinned theme and version; its ds/<theme>/ comes from the
+	// kit and may not be in its folder at all.
+	if pin, ok := l.KitPinOf(id); ok {
+		for i := range themes {
+			t := &themes[i]
+			if t.kit == pin.ID && t.folder != "" && t.folder != "." && pin.mounts(t.folder) {
+				return t, pin.Version
+			}
+		}
+	}
 	dir := l.ProjectDir(id)
 	for i := range themes {
 		t := &themes[i]

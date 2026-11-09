@@ -51,7 +51,13 @@ type HookSettingsConfig struct {
 	BudgetHook string
 	// HookTimeout is each hook's timeout in seconds (3 when 0); the script returns at once, so it hardly matters.
 	HookTimeout int
+	// AppsLiveHook is the command line of the live hook of the apps (`harnessly hook app-context --live`): on
+	// UserPromptSubmit it tells the agent of the apps turned on or off in its chat since it started. "" adds none.
+	AppsLiveHook string
 }
+
+// AppsLiveHookTimeout is how long Claude waits for the live hook: one call to the runtime on loopback.
+const AppsLiveHookTimeout = 10
 
 type hookCommand struct {
 	Type    string `json:"type"`
@@ -117,6 +123,9 @@ func HookSettings(c HookSettingsConfig) []byte {
 		cmds := []hookCommand{{Type: "command", Command: `sh "` + c.StatusHook + `" ` + e.Event, Timeout: timeout}}
 		if c.BudgetHook != "" && e.Hook == "UserPromptSubmit" {
 			cmds = append(cmds, budgetCommand(c.BudgetHook, e.Hook, timeout))
+		}
+		if c.AppsLiveHook != "" && e.Hook == "UserPromptSubmit" {
+			cmds = append(cmds, hookCommand{Type: "command", Command: c.AppsLiveHook, Timeout: AppsLiveHookTimeout})
 		}
 		hooks = append(hooks, struct {
 			name  string

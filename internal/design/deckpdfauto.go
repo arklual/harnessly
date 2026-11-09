@@ -1,9 +1,11 @@
 package design
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +37,7 @@ var (
 // deckPdfDeck is the keeper's memory of one deck.
 type deckPdfDeck struct {
 	staleSince time.Time
+	beat       time.Time // the last refresh of the store's lease while a build runs
 	started    time.Time
 	job        string
 	jobRev     int64
@@ -45,6 +48,143 @@ type deckPdfDeck struct {
 type deckPdfKeep struct {
 	mu    sync.Mutex
 	decks map[string]*deckPdfDeck
+	// revs is the store's word on each deck for a moment (deckStoreRev), under revMu.
+	revMu sync.Mutex
+	revs  map[string]deckStoreRevAt
+}
+
+type deckStoreRevAt struct {
+	rev     int64
+	at      time.Time
+	checked time.Time
+}
+
+// A library synced with a store that keeps leases builds the PDF of a marked deck on any machine of the space
+// whose person may edit it, one machine at a time: the one holding the store's lease "pdf/<deck>". Whether the PDF is
+// behind is told by the store's revisions (the newest of what the PDF is made of, against the one written beside the
+// published PDF, deckPdfRevFile), not by the files' times: a file another machine wrote has the time it arrived.
+
+// deckPdfRevFile holds the store revision the published PDF was built from.
+const deckPdfRevFile = DeckPublishedDir + "/deck.pdf.rev"
+
+// deckPdfLeaseKey leads the lease of a deck's PDF: ":" is in no project id, so no board's lease ("<project>/<board>")
+// is ever this one, and the board leases' list skips it.
+const deckPdfLeaseKey = "task:pdf/"
+
+// deckPdfLeaseRefresh is how often a machine building a PDF says it still does (the lease lapses after two minutes).
+const deckPdfLeaseRefresh = 30 * time.Second
+
+// deckPdfStoreFor says how long the store's word on a deck is taken as it is.
+var deckPdfStoreFor = 5 * time.Second
+
+// deckPdfStore is the store whose leases decide who builds; nil without one (the runtime named in the mark builds).
+func (l *Library) deckPdfStore() (Revisions, RevisionLeases) {
+	r := l.revisions()
+	if r == nil {
+		return nil, nil
+	}
+	ls, ok := r.(RevisionLeases)
+	if !ok {
+		return nil, nil
+	}
+	return r, ls
+}
+
+// deckStoreRev is the newest store revision of what the PDF is made of — the project folder, the files of meta/ and
+// of meta/pages/, as deckContentRev has it — and when it was made.
+func (l *Library) deckStoreRev(r Revisions, id string) (int64, time.Time, error) {
+	keep := l.deckPdfs()
+	keep.revMu.Lock()
+	c, ok := keep.revs[id]
+	keep.revMu.Unlock()
+	if ok && time.Since(c.checked) < deckPdfStoreFor {
+		return c.rev, c.at, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var rev, at int64
+	es, err := r.HistoryUnder(ctx, id+"/"+ProjectDirname+"/", 1)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	if len(es) > 0 {
+		rev, at = es[0].Rev, es[0].At
+	}
+	meta := id + "/" + MetaDirname + "/"
+	es, err = r.HistoryUnder(ctx, meta, 200)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	for _, e := range es {
+		rel := strings.TrimPrefix(e.Path, meta)
+		page, inPages := strings.CutPrefix(rel, MetaPagesDirname+"/")
+		if !strings.Contains(rel, "/") || inPages && !strings.Contains(page, "/") {
+			if e.Rev > rev {
+				rev, at = e.Rev, e.At
+			}
+			break
+		}
+	}
+	keep.revMu.Lock()
+	if keep.revs == nil {
+		keep.revs = map[string]deckStoreRevAt{}
+	}
+	keep.revs[id] = deckStoreRevAt{rev: rev, at: time.UnixMilli(at), checked: time.Now()}
+	keep.revMu.Unlock()
+	return rev, time.UnixMilli(at), nil
+}
+
+// deckPdfFromRev is the store revision the published PDF was built from, 0 when there is none.
+func (l *Library) deckPdfFromRev(id string) int64 {
+	if l.deckPdfFrom(id) == 0 {
+		return 0
+	}
+	raw, err := readFileLimited(l.deckFile(id, deckPdfRevFile), 64)
+	if err != nil {
+		return 0
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// deckPdfShared: the PDFs are kept through the store, by whichever machine holds the lease.
+func (l *Library) deckPdfShared() bool {
+	r, _ := l.deckPdfStore()
+	return r != nil
+}
+
+// deckPdfRevs is what the PDF is made of now (rev, and when it was made) and what the published one was built from:
+// the store's revisions when the library keeps its PDFs through the store, the files' times otherwise. A store that
+// does not answer leaves nothing behind.
+func (l *Library) deckPdfRevs(id string) (rev int64, at time.Time, from int64) {
+	if r, _ := l.deckPdfStore(); r != nil {
+		rev, at, err := l.deckStoreRev(r, id)
+		if err != nil {
+			return 0, time.Time{}, 0
+		}
+		return rev, at, l.deckPdfFromRev(id)
+	}
+	rev = l.deckContentRev(id)
+	return rev, time.UnixMilli(rev), l.deckPdfFrom(id)
+}
+
+// deckPdfLease takes or refreshes this machine's lease on building the deck's PDF; true without a store's leases.
+func (l *Library) deckPdfLease(id string) bool {
+	_, ls := l.deckPdfStore()
+	if ls == nil {
+		return true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	me := l.deckPdfMe()
+	if me == "" {
+		return false
+	}
+	got, err := ls.TakeLease(ctx, deckPdfLeaseKey+id, me+"/pdf")
+	return err == nil && got
 }
 
 var deckPdfStates sync.Map
@@ -161,6 +301,9 @@ func (l *Library) deckPdfFrom(id string) int64 {
 // keepDeckPdf looks at one marked deck and starts its build when the PDF is behind the deck: at once when there is no
 // PDF yet, else once the deck has been quiet for deckPdfQuiet (or has kept changing for deckPdfMaxWait).
 func (l *Library) keepDeckPdf(id string, now time.Time) {
+	if l.cfg.Passive {
+		return
+	}
 	keep := l.deckPdfs()
 	keep.mu.Lock()
 	defer keep.mu.Unlock()
@@ -172,7 +315,17 @@ func (l *Library) keepDeckPdf(id string, now time.Time) {
 	if d.job != "" {
 		j, _, ok := l.DeckExportJobOf(id, d.job)
 		if ok && (j.State == DeckJobQueued || j.State == DeckJobRunning) {
+			if now.Sub(d.beat) >= deckPdfLeaseRefresh {
+				d.beat = now
+				l.deckPdfLease(id)
+			}
 			return
+		}
+		if ok && j.State == DeckJobDone {
+			if r, _ := l.deckPdfStore(); r != nil {
+				// What the PDF was built from, beside it: the other machines see it is not behind.
+				_ = writeFileAtomic(l.deckFile(id, deckPdfRevFile), []byte(strconv.FormatInt(d.jobRev, 10)+"\n"))
+			}
 		}
 		if ok && j.State == DeckJobFailed {
 			d.failedRev, d.failed = d.jobRev, j.Error
@@ -181,7 +334,7 @@ func (l *Library) keepDeckPdf(id string, now time.Time) {
 		}
 		d.job = ""
 	}
-	rev, from := l.deckContentRev(id), l.deckPdfFrom(id)
+	rev, at, from := l.deckPdfRevs(id)
 	if rev <= from {
 		d.staleSince = time.Time{}
 		return
@@ -192,7 +345,7 @@ func (l *Library) keepDeckPdf(id string, now time.Time) {
 	if d.staleSince.IsZero() {
 		d.staleSince = now
 	}
-	quiet := now.Sub(time.UnixMilli(rev)) >= deckPdfQuiet
+	quiet := now.Sub(at) >= deckPdfQuiet
 	waited := now.Sub(d.staleSince) >= deckPdfMaxWait
 	if from != 0 && !quiet && !waited {
 		return
@@ -203,6 +356,11 @@ func (l *Library) keepDeckPdf(id string, now time.Time) {
 	if len(l.DeckSlides(id)) == 0 {
 		return
 	}
+	// One machine of the space builds it: the one that holds the store's lease.
+	if !l.deckPdfLease(id) {
+		return
+	}
+	d.beat = now
 	j, err := l.StartDeckExport(id, DeckExportPDF, "", true)
 	if err != nil {
 		msg := line(err.Error())
@@ -242,8 +400,8 @@ func (l *Library) deckPdfStatus(id string, p *DeckPublished) {
 			return
 		}
 	}
-	rev := l.deckContentRev(id)
-	p.PDFBuilding = rev > l.deckPdfFrom(id) && rev != failedRev && len(l.DeckSlides(id)) > 0
+	rev, _, from := l.deckPdfRevs(id)
+	p.PDFBuilding = rev > from && rev != failedRev && len(l.DeckSlides(id)) > 0
 	if p.PDFBuilding {
 		p.PDFError = nil
 	}
@@ -275,7 +433,8 @@ func (l *Library) keepDeckPdfsOnce(now time.Time) {
 		if !IsLibraryID(id) {
 			continue
 		}
-		if owner, on := l.deckPdfOwner(id); on && owner == me {
+		// Through a store with leases any machine whose person may edit the deck keeps it; else the one named.
+		if owner, on := l.deckPdfOwner(id); on && (owner == me || l.deckPdfShared() && l.Can(id, RoleEdit)) {
 			kept[id] = true
 			l.keepDeckPdf(id, now)
 		}

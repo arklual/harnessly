@@ -45,6 +45,10 @@ func (c *cli) app(args []string) error {
 			return c.appInstallShared(args)
 		}
 		return c.appInstall(args, false)
+	case "pack":
+		return c.appPack(args)
+	case "key":
+		return c.appKey(args)
 	case "publish":
 		return c.appPublish(args)
 	case "promote":
@@ -230,19 +234,31 @@ type cliApp struct {
 }
 
 func (c *cli) appInstall(args []string, dev bool) error {
-	dir := ""
-	for _, a := range args {
+	dir, sigFile := "", ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
 		switch {
+		case a == "--sig":
+			if i+1 >= len(args) {
+				return usageErr("--sig needs a file")
+			}
+			i++
+			sigFile = c.absPath(args[i])
 		case strings.HasPrefix(a, "-"):
 			return usageErr("unknown flag %s", a)
 		case dir == "":
 			dir = a
 		default:
-			return usageErr("install takes one folder")
+			return usageErr("install takes one folder or one .hlapp")
 		}
 	}
 	dir = c.appDir(dir)
-	status, raw, err := c.call("POST", "/api/cli/apps/install", nil, map[string]any{"dir": dir, "dev": dev, "session": c.hookSession()})
+	body := map[string]any{"dir": dir, "dev": dev, "session": c.hookSession()}
+	if strings.HasSuffix(dir, ".hlapp") {
+		// A package file: the runtime checks its signature (<file>.sig, or --sig) under the deployment's policy.
+		body = map[string]any{"archive": dir, "sig": sigFile, "dev": dev, "session": c.hookSession()}
+	}
+	status, raw, err := c.call("POST", "/api/cli/apps/install", nil, body)
 	if err != nil {
 		return err
 	}
@@ -255,8 +271,13 @@ func (c *cli) appInstall(args []string, dev bool) error {
 		WaitsConsent bool `json:"waitsConsent"`
 		// ConsentPolicy: the organization's rule «Не спрашивать разрешений» gave the app its rights.
 		ConsentPolicy bool `json:"consentPolicy"`
+		// Warning: said in words, e.g. a dev install where signatures are required.
+		Warning string `json:"warning"`
 	}
 	_ = json.Unmarshal(raw, &out)
+	if out.Warning != "" && !c.json {
+		fmt.Fprintf(c.env.Stderr, "warning: %s\n", out.Warning)
+	}
 	if c.json {
 		c.printRaw(raw)
 	} else {
@@ -268,6 +289,8 @@ func (c *cli) appInstall(args []string, dev bool) error {
 	case status == 422:
 		return fail("not installed: the package has errors (harnessly app validate %s)", dir)
 	case status == 409:
+		return fail("not installed: %s", out.Message)
+	case status == 403 && out.Error == "signature":
 		return fail("not installed: %s", out.Message)
 	case status >= 300:
 		return apiError(status, raw)
@@ -898,6 +921,46 @@ func (c *cli) appContext(policyPath string) error {
 	}
 	out, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
 		"hookEventName": ev.Event, "additionalContext": strings.Join(blocks, "\n\n"),
+	}})
+	_, _ = c.env.Stdout.Write(append(out, '\n'))
+	return nil
+}
+
+// appContextLive is the UserPromptSubmit hook of every Claude Code chat: when apps were turned on or off in
+// the chat since its agent started (or was last told), the runtime answers what the agent should know of them (their
+// tools, instructions and skills, or why one waits for the agent's next start), and it goes out as additionalContext.
+// Mostly the answer is empty and the hook prints nothing. It never blocks: a runtime that does not answer adds nothing.
+func (c *cli) appContextLive() error {
+	in := c.env.Stdin
+	if in == nil {
+		in = os.Stdin
+	}
+	raw, err := io.ReadAll(io.LimitReader(in, 4<<20))
+	if err != nil {
+		return nil
+	}
+	var ev struct {
+		Event string `json:"hook_event_name"`
+	}
+	if json.Unmarshal(raw, &ev) != nil || ev.Event != "UserPromptSubmit" {
+		return nil
+	}
+	session := c.session()
+	if session == "" {
+		return nil
+	}
+	status, body, err := c.call("POST", "/api/cli/apps/live-context", nil, map[string]any{"session": session})
+	if err != nil || status != 200 {
+		return nil
+	}
+	var r struct {
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(body, &r) != nil || strings.TrimSpace(r.Text) == "" {
+		return nil
+	}
+	out, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
+		"hookEventName": ev.Event, "additionalContext": r.Text,
 	}})
 	_, _ = c.env.Stdout.Write(append(out, '\n'))
 	return nil

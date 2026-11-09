@@ -99,3 +99,6 @@ func (f *Gate) AsRoutes(routes ...JSONRoute) []Route {
 	}
 	return out
 }
+
+// WriteJSON writes a computed answer as a JSON route does (the hub answers some of the runtime's routes itself).
+func WriteJSON(w http.ResponseWriter, status int, v any, h http.Header) { writeJSON(w, status, v, h) }

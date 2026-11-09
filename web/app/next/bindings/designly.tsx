@@ -30,7 +30,7 @@ import { designKey } from '@/next/features/designly/design-conv';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { toast } from '@/next/ui/toast';
-import { fetchKitCards, kitCover, type IKitCard } from '@/next/features/designly/kit/kit-api';
+import { fetchKitCards, kitCover, shelfCards, type IKitCard } from '@/next/features/designly/kit/kit-api';
 import { useStartChoice } from '@/next/bindings/use-start-choice';
 import { rememberChoice } from '@/next/features/composer/start-choice';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
@@ -356,9 +356,9 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
         kits={
           kitCards
             ? {
-                cards: kitCards,
-                cover: (k) => kitCover(machine, k),
-                onOpen: (id) => goTo({ kind: ROUTE.kit, id }),
+                cards: shelfCards(kitCards),
+                cover: (k) => kitCover(machine, { id: k.kit, version: k.version, cover: k.cover }),
+                onOpen: (k) => goTo({ kind: ROUTE.kit, id: k.kit, ...(k.theme ? { theme: k.theme } : {}) }),
               }
             : undefined
         }

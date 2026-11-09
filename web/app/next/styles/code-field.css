@@ -11,9 +11,14 @@
   position: relative;
   display: grid;
 }
-/* The dash sits in the gap before the second half. */
-.hx-otp__slot[data-dash] {
-  margin-left: 10px;
+/* The dash sits in the gap before the second half: the second half moves over by the dash's room, which the row keeps
+   at its end, so every cell is as wide as the others. */
+.hx-otp:has(.hx-otp__slot[data-dash]) {
+  padding-right: 10px;
+}
+.hx-otp__slot[data-dash],
+.hx-otp__slot[data-dash] ~ .hx-otp__slot {
+  translate: 10px 0;
 }
 .hx-otp__slot[data-dash]::before {
   content: '';

@@ -7,10 +7,11 @@
 //   t('timeline.toolGroup.errors', { n: 3 })                → "{n} with an error" with {n} filled in
 //   plural(3, 'timeline.toolGroup.actions')                 → picks one/few/many/other by the language's plural rules
 import { appConfig } from '@/platform/config';
+import type { TLanguage } from '@/platform/languages';
 
 import { dictionary } from '@/next/i18n/dictionary';
 
-export const locale = (): 'en' | 'ru' => appConfig().locale;
+export const locale = (): TLanguage => appConfig().locale;
 const current = dictionary(locale());
 
 const fill = (text: string, params?: Record<string, string | number>): string =>

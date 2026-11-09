@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/egress"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/mcpconn"
@@ -520,27 +521,31 @@ type mcpProxy struct {
 // followed (credentials stay with the server they are for), and no link-local (cloud metadata) addresses.
 func mcpProxyClient(transport http.RoundTripper) *http.Client {
 	if transport == nil {
-		_, metadata, _ := net.ParseCIDR("169.254.0.0/16")
-		dialer := &net.Dialer{
-			Timeout: 10 * time.Second,
-			Control: func(_, address string, _ syscall.RawConn) error {
-				host, _, err := net.SplitHostPort(address)
-				if err != nil {
-					return err
-				}
-				if ip := net.ParseIP(host); ip != nil && metadata.Contains(ip) {
-					return errors.New("refused address " + host)
-				}
-				return nil
-			},
-		}
-		transport = &http.Transport{
-			Proxy:               http.ProxyFromEnvironment,
-			DialContext:         dialer.DialContext,
-			TLSHandshakeTimeout: 10 * time.Second,
-			MaxIdleConnsPerHost: 8,
-			IdleConnTimeout:     90 * time.Second,
-		}
+		// The company's CA, proxy and client certificate (internal/egress), read when a request goes.
+		transport = egress.Follow(func(p *egress.Policy) *http.Transport {
+			_, metadata, _ := net.ParseCIDR("169.254.0.0/16")
+			dialer := &net.Dialer{
+				Timeout: 10 * time.Second,
+				Control: func(_, address string, _ syscall.RawConn) error {
+					host, _, err := net.SplitHostPort(address)
+					if err != nil {
+						return err
+					}
+					if ip := net.ParseIP(host); ip != nil && metadata.Contains(ip) {
+						return errors.New("refused address " + host)
+					}
+					return nil
+				},
+			}
+			return &http.Transport{
+				Proxy:               p.ProxyFunc(),
+				TLSClientConfig:     p.TLSConfig(),
+				DialContext:         dialer.DialContext,
+				TLSHandshakeTimeout: 10 * time.Second,
+				MaxIdleConnsPerHost: 8,
+				IdleConnTimeout:     90 * time.Second,
+			}
+		})
 	}
 	return &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }

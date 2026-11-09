@@ -111,6 +111,16 @@ type Network struct {
 	Resources []string `json:"resources,omitempty"`
 	Frames    []string `json:"frames,omitempty"`
 	Reason    string   `json:"reason,omitempty"`
+	// ClientCert is the app's own certificate for mutual TLS to its own backend: the name of one of its secrets,
+	// which holds the certificate and its key as PEM. The key is in the machine's safe, never in the manifest.
+	ClientCert *ClientCert `json:"clientCert,omitempty"`
+}
+
+// ClientCert names the secret with an app's client certificate and, when the app has several backends, which of the hosts
+// of its own MCP servers (.mcp.json) it is for; none listed: every one. It is never sent to another host.
+type ClientCert struct {
+	Secret string   `json:"secret"`
+	Hosts  []string `json:"hosts,omitempty"`
 }
 
 // Secret is a secret the app asks for at install; the person types its value, the app never reads it.
@@ -532,6 +542,16 @@ func (m *Manifest) Check() Problems {
 				}
 				if !hostRe.MatchString(strings.TrimPrefix(strings.TrimPrefix(h, "https://"), "wss://")) {
 					add(path, "%q is not a host name", h)
+				}
+			}
+		}
+		if cc := n.ClientCert; cc != nil {
+			if !m.hasSecret(cc.Secret) {
+				add("network.clientCert.secret", "%q is not one of the app's secrets: declare it in secrets (the certificate and its key as PEM) and ask for it in permissions", cc.Secret)
+			}
+			for i, h := range cc.Hosts {
+				if !hostRe.MatchString(h) {
+					add(fmt.Sprintf("network.clientCert.hosts[%d]", i), "%q is not a host name", h)
 				}
 			}
 		}

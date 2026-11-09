@@ -47,7 +47,7 @@ const paceOf = (status: string): TPace | null => {
 };
 
 const FIXED: Record<
-  Exclude<TRoute['kind'], 'chat' | 'site' | 'app' | 'appDoc' | 'kit'>,
+  Exclude<TRoute['kind'], 'chat' | 'site' | 'app' | 'appAbout' | 'appDoc' | 'kit'>,
   { icon: string; title: () => string }
 > = {
   [ROUTE.home]: { icon: 'house', title: () => t('next.tabs.home') },
@@ -81,7 +81,7 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
       attention: WAITING.has(status),
     };
   }
-  if (route.kind === ROUTE.app)
+  if (route.kind === ROUTE.app || route.kind === ROUTE.appAbout)
     return { id: tab.id, title: tab.title ?? route.id, icon: 'layout-grid', busy: null, attention: false };
   if (route.kind === ROUTE.appDoc)
     return { id: tab.id, title: tab.title ?? route.id, icon: 'blocks', busy: null, attention: false };

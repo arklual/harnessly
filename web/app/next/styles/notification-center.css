@@ -1,0 +1,699 @@
+/* The notification centre (features/notifications/notification-center.tsx). Black in both themes, the same shape and
+   palette as the smart notice (smart-notice.css): one row per chat, the name whole, the gist under it, the action in
+   the row. Motion on transform and opacity only: the panel grows from the bell with a spring, rows come in one after
+   another, neighbours spring to their places (motion.ts), a row leaves sideways. */
+
+.hx-nc,
+.hx-nc-sheet {
+  --nc-bg: #000;
+  --nc-fg: #fff;
+  --nc-fg2: rgba(255, 255, 255, 0.64);
+  --nc-fg3: rgba(255, 255, 255, 0.44);
+  --nc-fill: rgba(255, 255, 255, 0.07);
+  --nc-fill2: rgba(255, 255, 255, 0.14);
+  --nc-line: rgba(255, 255, 255, 0.08);
+  /* Response 0.45 s, bounce 0.18, as the smart notice; 580 ms until it settles (motion.ts: SPRING_MS). */
+  --nc-spring: linear(
+    0,
+    0.0356,
+    0.1213,
+    0.2327,
+    0.3526,
+    0.47,
+    0.5781,
+    0.6732,
+    0.754,
+    0.8206,
+    0.8739,
+    0.9154,
+    0.9468,
+    0.9699,
+    0.9862,
+    0.9973,
+    1.0044,
+    1.0085,
+    1.0105,
+    1.0111,
+    1.0107,
+    1.0098,
+    1.0085,
+    1.0072,
+    1.0059,
+    1.0047,
+    1.0036,
+    1.0027,
+    1
+  );
+  color: var(--nc-fg);
+  font-family: var(--hx-font-ui);
+  color-scheme: dark;
+}
+
+/* ── The panel ─────────────────────────────────────── */
+.hx-nc {
+  z-index: 60;
+  width: 400px;
+  max-width: calc(100vw - 16px);
+  max-height: min(640px, calc(100dvh - 24px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 26px;
+  background: var(--nc-bg);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.36),
+    0 2px 8px rgba(0, 0, 0, 0.22),
+    0 0 0 1px var(--nc-line);
+  overflow: hidden;
+  outline: none;
+  transform-origin: var(--transform-origin, 0 100%);
+  transition:
+    transform 580ms var(--nc-spring),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-nc[data-starting-style] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.hx-nc[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.98);
+  transition:
+    transform 200ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+  pointer-events: none;
+}
+
+/* The phone: the same list in a black sheet. */
+.hx-sheet.hx-nc-sheet {
+  background: var(--nc-bg);
+  border-color: var(--nc-line);
+  padding: 6px 4px 8px;
+}
+.hx-sheet.hx-nc-sheet .hx-sheet__grip {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.hx-nc__pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.hx-nc__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 14px 4px 20px;
+}
+.hx-nc-sheet .hx-nc__head {
+  padding-top: 4px;
+}
+.hx-nc__title {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.hx-nc__link,
+.hx-nc__clear,
+.hx-nc__more {
+  border: 0;
+  background: transparent;
+  color: var(--nc-fg2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  padding: 5px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-nc__link:hover,
+.hx-nc__clear:hover,
+.hx-nc__more:hover {
+  color: var(--nc-fg);
+  background: var(--nc-fill);
+}
+.hx-nc__link[data-busy] {
+  opacity: 0.5;
+}
+.hx-nc :focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.hx-nc__body {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 8px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* ── Sections ─────────────────────────────────────── */
+.hx-nc__label {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 10px 4px 2px 12px;
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--nc-fg3);
+}
+.hx-nc__label > span {
+  flex: 1;
+}
+.hx-nc__clear {
+  font-size: var(--hx-text-xs);
+  padding: 3px 8px;
+  color: var(--nc-fg3);
+}
+.hx-nc__more {
+  display: block;
+  margin: 2px 0 0 4px;
+  font-size: var(--hx-text-xs);
+}
+
+/* ── A row: one chat ─────────────────────────────────── */
+.hx-nc__g {
+  /* motion.ts moves it with transform; the entrance uses translate, so the two never fight. */
+  animation: hx-nc-in 420ms var(--nc-spring) backwards;
+}
+.hx-nc__g + .hx-nc__g {
+  margin-top: 2px;
+}
+.hx-nc__sec:nth-child(1) .hx-nc__g:nth-child(2) {
+  animation-delay: 30ms;
+}
+.hx-nc__sec:nth-child(1) .hx-nc__g:nth-child(3) {
+  animation-delay: 60ms;
+}
+.hx-nc__sec:nth-child(1) .hx-nc__g:nth-child(4) {
+  animation-delay: 90ms;
+}
+.hx-nc__sec:nth-child(2) .hx-nc__g {
+  animation-delay: 90ms;
+}
+.hx-nc__sec:nth-child(2) .hx-nc__g:nth-child(n + 3) {
+  animation-delay: 120ms;
+}
+.hx-nc__sec:nth-child(n + 3) .hx-nc__g {
+  animation-delay: 150ms;
+}
+.hx-nc__sec:nth-child(n + 3) .hx-nc__g:nth-child(n + 3) {
+  animation-delay: 180ms;
+}
+@keyframes hx-nc-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+.hx-nc__row {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 18px;
+  touch-action: pan-y;
+  transition: background-color 160ms var(--hx-ease-out);
+}
+.hx-nc__row:hover,
+.hx-nc__row:focus-within,
+.hx-nc__row[data-open] {
+  background: var(--nc-fill);
+}
+/* «Убрать»: off to the side, as a swipe. */
+.hx-nc__row[data-leaving] {
+  transform: translateX(48px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 220ms var(--hx-ease-out),
+    opacity 220ms var(--hx-ease-out);
+}
+/* The whole row opens its chat; what is inside it (actions, the answer) stands above. */
+.hx-nc__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.hx-nc__ic {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--nc-fill);
+  color: var(--nc-fg);
+  transition:
+    background-color 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+/* What waits wears white, as on the smart notice: the eye finds it first. */
+.hx-nc__row[data-kind='waiting'] .hx-nc__ic,
+.hx-nc__row[data-kind='machine'] .hx-nc__ic {
+  background: #fff;
+  color: #000;
+}
+.hx-nc__tx {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-nc__t1 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+/* The chat's name whole: two lines before it is cut, never «Приложения: загрузк…». */
+.hx-nc__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hx-nc__when {
+  flex: none;
+  font-size: var(--hx-text-xs);
+  color: var(--nc-fg3);
+  font-variant-numeric: tabular-nums;
+  transition: opacity 160ms var(--hx-ease-out);
+}
+.hx-nc__gist {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--nc-fg2);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hx-nc__note {
+  color: var(--nc-fg3);
+}
+.hx-nc__sk-line {
+  display: block;
+  width: 70%;
+  height: 12px;
+  margin: 4px 0 3px;
+  border-radius: 6px;
+  background: var(--nc-fill2);
+}
+.hx-nc__older {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+.hx-nc__older > span {
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+  color: var(--nc-fg3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-nc__older em {
+  display: inline-block;
+  min-width: 46px;
+  font-style: normal;
+}
+
+/* Read: the row dims to grey, no dots and no counts. */
+.hx-nc__row[data-unread='false'] .hx-nc__name {
+  color: var(--nc-fg2);
+  font-weight: 500;
+}
+.hx-nc__row[data-unread='false'] .hx-nc__gist {
+  color: var(--nc-fg3);
+}
+.hx-nc__row[data-unread='false'] .hx-nc__ic {
+  color: var(--nc-fg2);
+}
+
+/* «Прочитано» and «Убрать»: under the pointer, over the time. */
+.hx-nc__hover {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  translate: 4px 0;
+  pointer-events: none;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    translate 160ms var(--hx-ease-out);
+}
+.hx-nc__row:hover .hx-nc__hover,
+.hx-nc__row:focus-within .hx-nc__hover {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+}
+.hx-nc__row:has(.hx-nc__hover):hover .hx-nc__when,
+.hx-nc__row:has(.hx-nc__hover):focus-within .hx-nc__when {
+  opacity: 0;
+}
+.hx-nc__round {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--nc-fill2);
+  color: var(--nc-fg);
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--hx-ease-out),
+    transform 140ms var(--hx-ease-out);
+}
+.hx-nc__round:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.hx-nc__round:active {
+  transform: scale(0.92);
+}
+@media (hover: none) {
+  .hx-nc__hover {
+    display: none;
+  }
+}
+
+/* ── What waits: the answer in the row ───────────────── */
+.hx-nc__acts,
+.hx-nc__wait,
+.hx-nc__cmd {
+  pointer-events: auto;
+}
+.hx-nc__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.hx-nc__btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 140ms var(--hx-ease-out),
+    opacity 140ms var(--hx-ease-out);
+}
+.hx-nc__btn[data-soft] {
+  background: var(--nc-fill2);
+  color: var(--nc-fg);
+  font-weight: 500;
+}
+.hx-nc__btn:active {
+  transform: scale(0.96);
+}
+.hx-nc__btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.hx-nc__btn[data-busy] {
+  opacity: 0.7;
+}
+.hx-nc__cmd-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hx-nc__cmd {
+  display: block;
+  width: 100%;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--nc-fill);
+  font-family: var(--hx-font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--nc-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.hx-nc__wait {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* Opened: the whole command, scrolled inside when it is long. */
+.hx-nc__cmd[data-full] {
+  max-height: 240px;
+  overflow: auto;
+}
+.hx-nc__cmd[data-full] .hx-nc__cmd-text {
+  display: block;
+  overflow: visible;
+}
+.hx-nc__cmd-hint {
+  margin-top: 4px;
+  font-size: var(--hx-text-xs);
+  color: var(--nc-fg3);
+}
+/* The open question comes in from below out of a light blur, line after line. */
+.hx-nc__wait > * {
+  animation: hx-nc-reveal 320ms var(--hx-ease-out) backwards;
+}
+.hx-nc__wait > :nth-child(2) {
+  animation-delay: 30ms;
+}
+.hx-nc__wait > :nth-child(3) {
+  animation-delay: 60ms;
+}
+.hx-nc__wait > :nth-child(4) {
+  animation-delay: 90ms;
+}
+.hx-nc__wait > :nth-child(n + 5) {
+  animation-delay: 120ms;
+}
+@keyframes hx-nc-reveal {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+    filter: blur(3px);
+  }
+}
+.hx-nc__q {
+  margin: 0 0 4px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--nc-fg);
+  overflow-wrap: anywhere;
+}
+.hx-nc__opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--nc-fill);
+  color: var(--nc-fg);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--hx-ease-out),
+    transform 140ms var(--hx-ease-out);
+}
+.hx-nc__opt:hover {
+  background: var(--nc-fill2);
+}
+.hx-nc__opt:active {
+  transform: scale(0.98);
+}
+.hx-nc__opt:disabled {
+  cursor: default;
+}
+.hx-nc__opt[data-busy] {
+  background: var(--nc-fill2);
+}
+.hx-nc__opt kbd {
+  flex: none;
+  width: 14px;
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  color: var(--nc-fg3);
+}
+.hx-nc__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  margin: 0;
+  padding: 0 4px 0 12px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px var(--nc-line);
+}
+.hx-nc__field:focus-within {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+.hx-nc__field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--nc-fg);
+  font: inherit;
+  font-size: 14px;
+}
+.hx-nc__field input::placeholder {
+  color: var(--nc-fg3);
+}
+.hx-nc__send {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+  transition:
+    opacity 140ms var(--hx-ease-out),
+    transform 140ms var(--hx-ease-out);
+}
+.hx-nc__send:disabled {
+  background: var(--nc-fill2);
+  color: var(--nc-fg3);
+  cursor: default;
+}
+
+/* ── Loading, empty ─────────────────────────────────── */
+.hx-nc__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+}
+.hx-nc__skeleton .hx-sk {
+  height: 44px;
+  border-radius: 14px;
+  background: var(--nc-fill);
+}
+.hx-nc__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 20px 40px;
+  text-align: center;
+  animation: hx-nc-in 420ms var(--nc-spring) backwards;
+}
+.hx-nc__empty-ic {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--nc-fill);
+  color: var(--nc-fg2);
+}
+.hx-nc__empty b {
+  font-size: 17px;
+  font-weight: 600;
+}
+.hx-nc__empty span:last-child {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--nc-fg2);
+}
+
+/* ── The phone: finger-sized ─────────────────────────── */
+@media (max-width: 900px) {
+  .hx-nc__row {
+    padding: 13px 12px;
+  }
+  .hx-nc__btn {
+    height: 40px;
+    padding: 0 18px;
+  }
+  .hx-nc__opt {
+    min-height: 44px;
+  }
+  .hx-nc__field {
+    height: 44px;
+  }
+  .hx-nc__send {
+    width: 36px;
+    height: 36px;
+  }
+  .hx-nc__link,
+  .hx-nc__clear {
+    min-height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-nc,
+  .hx-nc[data-ending-style] {
+    transition: opacity 150ms linear;
+    transform: none;
+  }
+  .hx-nc__g,
+  .hx-nc__wait > *,
+  .hx-nc__empty {
+    animation: hx-nc-fade 150ms linear backwards;
+  }
+  @keyframes hx-nc-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/* Base UI's positioner: as tall as the room it has. */
+.hx-notif-pos > .hx-nc {
+  max-height: min(640px, var(--available-height));
+}

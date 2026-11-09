@@ -119,11 +119,11 @@ export const placeOf = (n: TNode, titles: Record<string, string>): string[] => {
     case NODE.component:
       return [titles.components ?? '', n.group.title];
     case NODE.layout:
-      return [titles.templates ?? '', n.template.title, n.section.title];
+      return [titles[n.template.section || 'templates'] ?? '', n.template.title, n.section.title];
     case NODE.template:
-      return [titles.templates ?? ''];
+      return [titles[n.template.section || 'templates'] ?? ''];
     case NODE.tsection:
-      return [titles.templates ?? '', n.template.title];
+      return [titles[n.template.section || 'templates'] ?? '', n.template.title];
     case NODE.asset:
       return [titles.assets ?? '', n.group.title];
     case NODE.color:

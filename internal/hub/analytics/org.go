@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 	"math"
 	"net/http"
@@ -241,6 +242,35 @@ func (s *Service) orgScope(ctx context.Context, st store.Store, p *auth.Principa
 		return nil, err
 	}
 	return s.loadScope(ctx, st, o, sc)
+}
+
+// memberScope is orgScope for a person who only belongs (orgs.MemberScopeIn): the scope cut to the tenants they are in.
+func (s *Service) memberScope(ctx context.Context, st store.Store, p *auth.Principal, r *http.Request) (*orgScope, error) {
+	o, sc, in, err := orgs.MemberScopeIn(ctx, st, p, r.PathValue("org"), r.URL.Query().Get("scope"))
+	if err != nil {
+		return nil, err
+	}
+	x, err := s.loadScope(ctx, st, o, sc)
+	if err != nil {
+		return nil, err
+	}
+	for id := range x.tenants {
+		if !in[id] {
+			delete(x.tenants, id)
+		}
+	}
+	for id, t := range x.teams {
+		if !in[t.SpaceID] {
+			delete(x.teams, id)
+		}
+	}
+	return x, nil
+}
+
+// isForbiddenScope is the refusal of a role the person does not have (authz.ErrForbiddenScope).
+func isForbiddenScope(err error) bool {
+	var he *httpx.Error
+	return errors.As(err, &he) && he.Code == authz.ErrForbiddenScope.Code
 }
 
 // loadScope is a scope of the organization with what its screens are cut in, the person's right to it checked already.

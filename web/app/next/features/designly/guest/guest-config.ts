@@ -93,6 +93,10 @@ const readDeck = (v: unknown): IGuestDeck | null => {
 export const mediaBaseOf = (filesBase: string): string =>
   filesBase.endsWith('/f/') ? `${filesBase.slice(0, -2)}m/` : './m/';
 
+/** The live link's stream of the project's revisions, beside the files (`/s/<token>/f/` → `/s/<token>/events`). */
+export const eventsUrlOf = (filesBase: string): string =>
+  filesBase.endsWith('/f/') ? `${filesBase.slice(0, -2)}events` : './events';
+
 /** The address views are reported to, beside the comments' (`…/comments` → `…/seen`). */
 export const seenUrlOf = (commentsUrl: string): string =>
   commentsUrl.endsWith('/comments') ? `${commentsUrl.slice(0, -'comments'.length)}seen` : './seen';

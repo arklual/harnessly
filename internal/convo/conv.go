@@ -202,6 +202,10 @@ type conv struct {
 	titleDueAt time.Time
 	titling    bool
 	titleTried bool
+	// summarized is the turn whose summary was asked of the model (one call a turn, whoever asks again); summary is
+	// the recap it made, which the transcript's own recaps do not push out while it is the newer.
+	summarized string
+	summary    *wire.Recap
 
 	deletedAt wire.Ms
 
@@ -257,6 +261,8 @@ func ms(t time.Time) wire.Ms { return t.UnixMilli() }
 
 func newConv(d *Deps, rec wire.Conversation) *conv {
 	c := &conv{d: d, rec: rec, gates: map[string]*gate{}}
+	// A recap the record kept may be a turn's summary: the transcript's older recaps do not push it out after a restart.
+	c.summary = rec.Recap
 	c.box = outbox.New(rec.ID, d.Limits, d.Log)
 	c.box.Transcript = func(offset int64, at wire.Ms, text string) (string, bool) { return c.fd.FindUserText(offset, at, text) }
 	c.openFeed()
@@ -1705,11 +1711,17 @@ func (c *conv) wake(now time.Time) time.Time {
 			next = t
 		}
 	}
-	consider(c.box.Wake())
+	if c.deletedAt == 0 {
+		// A deleted chat's queue is not pumped (pump returns at once): a time of its box past would turn the actor
+		// without a pause.
+		consider(c.box.Wake())
+	}
 	consider(c.throttle.Wake())
 	consider(c.limitWake())
 	consider(c.restartWake())
-	if c.rec.PendingModel != nil {
+	if c.rec.PendingModel != nil && c.pendingAt.After(now) {
+		// Once past, the change waits for the agent to be at its prompt (canSwitchNow), not for the clock: every tick
+		// asks again, and a past time here would make those ticks back to back.
 		consider(c.pendingAt)
 	}
 	if w := c.rec.State.Wait; w != nil {
@@ -1723,7 +1735,8 @@ func (c *conv) wake(now time.Time) time.Time {
 	if c.recDirty || c.stateDirty {
 		consider(c.flushedAt.Add(StateCoalesce))
 	}
-	if !c.titling {
+	if !c.titling && c.deletedAt == 0 {
+		// watchTitle names no deleted chat, and its due time stays: past, it would be due at every turn.
 		consider(c.titleDueAt)
 	}
 	if next.Before(now) {

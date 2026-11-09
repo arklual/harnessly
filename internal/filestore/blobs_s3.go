@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -118,11 +119,39 @@ func notFound(err error) bool {
 	return resp.StatusCode == http.StatusNotFound || resp.Code == "NoSuchKey" || resp.Code == "NotFound"
 }
 
+// busy is the bucket saying another write of the same key is under way (409 OperationAborted / "A conflicting
+// conditional operation is currently in progress"): two machines putting the same blob at once. A blob is its sha256,
+// so the other write puts the same bytes; the answer is to wait and look again, not a 500 (Selectel S3).
+func busy(err error) bool {
+	resp := minio.ToErrorResponse(err)
+	return resp.StatusCode == http.StatusConflict || resp.Code == "OperationAborted" || resp.Code == "ConditionalRequestConflict"
+}
+
+// busyWaits are the pauses before each new try while the bucket is busy with the same key.
+var busyWaits = []time.Duration{200 * time.Millisecond, 500 * time.Millisecond, time.Second, 2 * time.Second}
+
+func pause(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
 func (s *s3Blobs) Has(ctx context.Context, room, sha string) (bool, error) {
 	if !ValidSha(sha) {
 		return false, nil
 	}
 	_, err := s.c.StatObject(ctx, s.bucket, s.key(room, sha), minio.StatObjectOptions{})
+	for i := 0; err != nil && busy(err) && i < len(busyWaits); i++ {
+		if perr := pause(ctx, busyWaits[i]); perr != nil {
+			return false, perr
+		}
+		_, err = s.c.StatObject(ctx, s.bucket, s.key(room, sha), minio.StatObjectOptions{})
+	}
 	if err != nil && notFound(err) {
 		return false, nil
 	}
@@ -171,12 +200,26 @@ func (s *s3Blobs) Put(ctx context.Context, room, sha string, r io.Reader) error 
 	if err != nil {
 		return err
 	}
-	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+	put := func() error {
+		if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		_, err := s.c.PutObject(ctx, s.bucket, s.key(room, sha), tmp, size, minio.PutObjectOptions{
+			ContentType: "application/octet-stream",
+		})
 		return err
 	}
-	_, err = s.c.PutObject(ctx, s.bucket, s.key(room, sha), tmp, size, minio.PutObjectOptions{
-		ContentType: "application/octet-stream",
-	})
+	err = put()
+	// Another write of the same blob is under way: once it is there, this one is done too; else it goes again.
+	for i := 0; err != nil && busy(err) && i < len(busyWaits); i++ {
+		if perr := pause(ctx, busyWaits[i]); perr != nil {
+			return perr
+		}
+		if ok, herr := s.Has(ctx, room, sha); herr == nil && ok {
+			return nil
+		}
+		err = put()
+	}
 	return err
 }
 

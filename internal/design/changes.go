@@ -53,6 +53,19 @@ func (l *Library) changedSince(ref string, since float64) []string {
 		return true
 	}
 	walk(dir)
+	// a project on its kit's draft also sees the draft's changes, as ds/<mount>/...
+	if pin, ok := l.KitPinOf(ref); ok && pin.Draft {
+		for mount, mdir := range l.KitMountDirs(ref) {
+			base := dir
+			dir = mdir
+			prefixLen := len(found)
+			walk(mdir)
+			for i := prefixLen; i < len(found); i++ {
+				found[i] = "ds/" + mount + "/" + found[i]
+			}
+			dir = base
+		}
+	}
 	return found
 }
 
@@ -69,10 +82,12 @@ func (l *Library) watchDesign(ref string, fn func(paths []string)) func() {
 	var timer *time.Timer
 	stop, ok := l.Subscribe(func(rel string) {
 		rel = filepath.ToSlash(rel)
-		if !strings.HasPrefix(rel, prefix) {
+		var file string
+		if strings.HasPrefix(rel, prefix) {
+			file = rel[len(prefix):]
+		} else if file = l.draftPathFor(ref, rel); file == "" {
 			return
 		}
-		file := rel[len(prefix):]
 		for _, part := range strings.Split(file, "/") {
 			if changesSkipped[part] {
 				return

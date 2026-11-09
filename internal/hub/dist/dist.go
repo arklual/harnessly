@@ -6,6 +6,7 @@ package dist
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/egress"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 )
 
@@ -55,6 +57,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /dl/manifest.json", httpx.Handler(h.manifest))
 	mux.Handle("GET /dl/release.json", httpx.Handler(h.releaseFile("release.json", "application/json")))
 	mux.Handle("GET /dl/release.json.sig", httpx.Handler(h.releaseFile("release.json.sig", "application/json")))
+	mux.Handle("GET /dl/network.json", httpx.Handler(h.network))
 	mux.Handle("GET /dl/{name}", httpx.Handler(h.binary))
 }
 
@@ -177,6 +180,28 @@ func (h *Handler) binary(w http.ResponseWriter, r *http.Request) error {
 
 // releaseFile serves the signed release manifest (internal/release) and its signature when the folder holds them: the
 // files are made and signed by the release, never by the hub. /dl/manifest.json is unchanged.
+// network serves the deployment's network policy (network.json of the folder: internal hosts, the company's roots, the
+// proxy; internal/egress.Wire) to the machines, which take it on their own. No file, no policy (404): a hub of the open
+// internet has none. A file that is not a valid policy is refused at once, not passed to the machines.
+func (h *Handler) network(w http.ResponseWriter, r *http.Request) error {
+	body, err := os.ReadFile(filepath.Join(h.Dir, "network.json"))
+	if err != nil {
+		return httpx.New(http.StatusNotFound, "not_found", "На этом хабе нет политики контура")
+	}
+	var wire egress.Wire
+	if err := json.Unmarshal(body, &wire); err != nil {
+		return httpx.New(http.StatusInternalServerError, "bad_network_policy", "network.json не читается: "+err.Error())
+	}
+	if err := wire.Validate(); err != nil {
+		return httpx.New(http.StatusInternalServerError, "bad_network_policy", "network.json: "+err.Error())
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(body)
+	return nil
+}
+
 func (h *Handler) releaseFile(name, ctype string) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		body, err := os.ReadFile(filepath.Join(h.Dir, name))
@@ -189,4 +214,85 @@ func (h *Handler) releaseFile(name, ctype string) func(http.ResponseWriter, *htt
 		_, _ = w.Write(body)
 		return nil
 	}
+}
+
+// NetworkFile is the file of the deployment's network policy in the hub's dist folder.
+const NetworkFile = "network.json"
+
+// ReadNetwork is the policy the hub serves now; the zero one when there is none.
+func (h *Handler) ReadNetwork() (egress.Wire, error) {
+	var w egress.Wire
+	body, err := os.ReadFile(filepath.Join(h.Dir, NetworkFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return w, nil
+	}
+	if err != nil {
+		return w, err
+	}
+	return w, json.Unmarshal(body, &w)
+}
+
+// WriteNetwork replaces the policy the hub serves; the machines take it at their next visit. A policy with problems is
+// not written (the caller has told the admin which).
+func (h *Handler) WriteNetwork(w egress.Wire) error {
+	if ps := w.Problems(); len(ps) > 0 {
+		return errors.New(ps[0].Message)
+	}
+	body, err := json.MarshalIndent(w, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(h.Dir, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(h.Dir, ".network-*.json")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(append(body, '\n')); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), filepath.Join(h.Dir, NetworkFile))
+}
+
+// MountAdmin registers the admin's side of the network policy: GET and PUT /api/admin/network, for an administrator of
+// the installation only (admin: whether the signed-in person is one; nil person: not signed in).
+func (h *Handler) MountAdmin(mux *http.ServeMux, require func(func(http.ResponseWriter, *http.Request, bool) error) httpx.Handler) {
+	mux.Handle("GET /api/admin/network", require(func(w http.ResponseWriter, r *http.Request, admin bool) error {
+		if !admin {
+			return httpx.ErrForbidden
+		}
+		wire, err := h.ReadNetwork()
+		if err != nil {
+			return httpx.New(http.StatusInternalServerError, "bad_network_policy", "network.json не читается: "+err.Error())
+		}
+		httpx.WriteJSON(w, http.StatusOK, wire)
+		return nil
+	}))
+	mux.Handle("PUT /api/admin/network", require(func(w http.ResponseWriter, r *http.Request, admin bool) error {
+		if !admin {
+			return httpx.ErrForbidden
+		}
+		var wire egress.Wire
+		if err := httpx.Decode(r, &wire); err != nil {
+			return err
+		}
+		if ps := wire.Problems(); len(ps) > 0 {
+			e := httpx.New(http.StatusUnprocessableEntity, "invalid_request", ps[0].Message)
+			return e.With("problems", ps)
+		}
+		if err := h.WriteNetwork(wire); err != nil {
+			return httpx.New(http.StatusInternalServerError, "network_not_saved", "Политику не удалось сохранить: "+err.Error())
+		}
+		httpx.WriteJSON(w, http.StatusOK, wire)
+		return nil
+	}))
 }

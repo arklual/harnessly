@@ -2,7 +2,7 @@
 // with the kit's sections laid out by themselves, the panel of what is selected on the right, the search on ⌘K. A
 // template is a stack on the canvas; «Раскрыть» goes inside it to its grid of layouts by sections, a layout opens
 // alone and large with ← →. The screen knows nothing of the machine: the binding gives it the canvas and the ways out.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
   IAtlas,
   IKitCanvas,
@@ -19,7 +19,9 @@ import KitSingle from '@/next/features/designly/kit/kit-single';
 import KitTree, { treeOf } from '@/next/features/designly/kit/kit-tree';
 import {
   buildWorld,
+  drawsLive,
   ITEM,
+  liveProps,
   MAIN_VIEW,
   sameView,
   VIEW,
@@ -49,7 +51,14 @@ export interface IKitScreenProps {
   onInsert: (deck: string, layout: IKitLayout) => Promise<void>;
   onOpenAsProject: (template: string) => Promise<void>;
   onOpenBoard: (project: string, board: string) => void;
+  /** The head's tools of the editing mode: «Редактировать», «Опубликовать версию», «Только просмотр». */
+  tools?: ReactNode;
+  /** The draft's chat, docked on the left while the kit is edited. */
+  chat?: ReactNode;
 }
+
+/** The kit's draft stands where a version goes: its live pages carry the canvas's moment, so an edit shows. */
+const DRAFT_VERSION = 'draft';
 
 /** The default names of the canvas's sections and foundation groups. */
 export const sectionTitles = (): Record<string, string> => ({
@@ -57,9 +66,11 @@ export const sectionTitles = (): Record<string, string> => ({
   components: t('next.kit.section.components'),
   templates: t('next.kit.section.templates'),
   assets: t('next.kit.section.assets'),
+  reference: t('next.kit.section.reference'),
   colors: t('next.kit.section.colors'),
   type: t('next.kit.section.type'),
   tokens: t('next.kit.section.tokens'),
+  providers: t('next.kit.section.providers'),
 });
 
 const LIVE_W = { layout: 1280, component: 800 } as const;
@@ -90,6 +101,8 @@ const KitScreen = (p: IKitScreenProps) => {
       if (g.atlas) m.set(`a:${g.id}`, { atlas: g.atlas, url: p.prepUrl(g.atlas.file) });
     for (const tp of canvas.templates ?? [])
       if (tp.atlas) m.set(`t:${tp.id}`, { atlas: tp.atlas, url: p.prepUrl(tp.atlas.file) });
+    for (const g of canvas.groups ?? [])
+      if (g.atlas) m.set(`c:${g.id}`, { atlas: g.atlas, url: p.prepUrl(g.atlas.file) });
     return m;
   }, [canvas, p]);
 
@@ -171,16 +184,23 @@ const KitScreen = (p: IKitScreenProps) => {
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
+  const fresh = useCallback(
+    (src: string) =>
+      canvas.version === DRAFT_VERSION
+        ? `${src}${src.includes('?') ? '&' : '?'}at=${canvas.preparedAt}`
+        : src,
+    [canvas],
+  );
   const layoutLive = useCallback(
     (l: IKitLayout, component: string | undefined): string | null => {
       if (!p.liveOrigin) return null;
       const base = p.liveOrigin.replace(/\/+$/, '');
       if (l.board?.startsWith('_harnessly/layouts/') && l.board.endsWith('.dc.html'))
-        return base + kitViewPath(canvas, l.board.slice('_harnessly/layouts/'.length));
-      if (component) return base + kitPlayPath(canvas, component, l.props ?? {}, l.scripts ?? []);
+        return fresh(base + kitViewPath(canvas, l.board.slice('_harnessly/layouts/'.length)));
+      if (component) return fresh(base + kitPlayPath(canvas, component, l.props ?? {}, l.scripts ?? []));
       return null;
     },
-    [p.liveOrigin, canvas],
+    [p.liveOrigin, canvas, fresh],
   );
 
   const liveSrc = useCallback(
@@ -192,20 +212,13 @@ const KitScreen = (p: IKitScreenProps) => {
         const cover = n.template.sections.flatMap((s) => s.layouts).find((l) => l.id === n.template.cover);
         return cover ? layoutLive(cover, n.template.component) : null;
       }
-      if (
-        n.kind === NODE.component &&
-        (n.component.preview !== undefined || n.component.sample !== undefined)
-      )
-        return (
-          p.liveOrigin.replace(/\/+$/, '') +
-          kitPlayPath(canvas, n.component.id, {
-            ...(n.component.sample ?? {}),
-            ...(n.component.variants[0]?.props ?? {}),
-          })
+      if (n.kind === NODE.component && drawsLive(n.component))
+        return fresh(
+          p.liveOrigin.replace(/\/+$/, '') + kitPlayPath(canvas, n.component.id, liveProps(n.component)),
         );
       return null;
     },
-    [canvas, p.liveOrigin, layoutLive],
+    [canvas, p.liveOrigin, layoutLive, fresh],
   );
 
   const liveWidth = useCallback(
@@ -215,8 +228,10 @@ const KitScreen = (p: IKitScreenProps) => {
 
   const playSrc = useCallback(
     (component: string, props: Record<string, TPropValue>, scripts: readonly string[] = []) =>
-      p.liveOrigin ? p.liveOrigin.replace(/\/+$/, '') + kitPlayPath(canvas, component, props, scripts) : null,
-    [p.liveOrigin, canvas],
+      p.liveOrigin
+        ? fresh(p.liveOrigin.replace(/\/+$/, '') + kitPlayPath(canvas, component, props, scripts))
+        : null,
+    [p.liveOrigin, canvas, fresh],
   );
 
   const node = selected ? findNode(canvas, selected) : null;
@@ -229,7 +244,7 @@ const KitScreen = (p: IKitScreenProps) => {
   const themes = canvas.themes;
 
   return (
-    <div className="hx-kit" data-side={sideOpen || undefined}>
+    <div className="hx-kit" data-side={sideOpen || undefined} data-chat={p.chat ? '' : undefined}>
       <header className="hx-kit__head">
         <RoundButton
           icon="arrow-left"
@@ -250,7 +265,9 @@ const KitScreen = (p: IKitScreenProps) => {
           <button type="button" className="hx-kit__crumb" data-root onClick={backToMain}>
             {canvas.title}
           </button>
-          <span className="hx-kit__ver">{canvas.version}</span>
+          <span className="hx-kit__ver">
+            {canvas.version === DRAFT_VERSION ? t('next.versions.kit.draft') : canvas.version}
+          </span>
           {viewTemplate && (
             <>
               <span className="hx-kit__sep">›</span>
@@ -273,12 +290,14 @@ const KitScreen = (p: IKitScreenProps) => {
             onChange={p.onTheme}
           />
         )}
+        {p.tools}
         <button type="button" className="hx-kit__search" onClick={() => setSearchOpen(true)}>
           <span>{t('next.kit.search.open')}</span>
           <kbd>⌘K</kbd>
         </button>
       </header>
       <div className="hx-kit__body">
+        {p.chat}
         <nav className="hx-kit__side" aria-label={t('next.kit.tree')}>
           <KitTree
             tree={tree}

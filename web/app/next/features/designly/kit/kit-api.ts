@@ -21,6 +21,16 @@ export interface IKitCard {
   coverTheme: string;
   layouts: number;
   assets: number;
+  /** A card per theme (a kit of several brands shows each on the shelf), in the kit's order. */
+  themeCards?: IKitThemeCard[];
+}
+
+export interface IKitThemeCard {
+  id: string;
+  title: string;
+  /** The theme's cover (a path in the version), '' when none. */
+  cover: string;
+  layouts: number;
 }
 
 export interface IColorToken {
@@ -74,12 +84,20 @@ export interface IKitComponent {
   variants: IKitVariant[];
   sample?: Record<string, TPropValue>;
   preview?: string;
+  /** Its picture in the theme, drawn when it is not live; `cell` is its place in the group's atlas, -1 without one. */
+  thumb?: string;
+  cell: number;
+  /** What it is a part of: a parent component's id, or 'provider' for one that draws nothing itself. */
+  part?: string;
+  keywords?: string[];
 }
 
 export interface IKitComponentGroup {
   id: string;
   title: string;
   components: IKitComponent[];
+  /** The components' pictures, one sheet per group. */
+  atlas?: IAtlas;
 }
 
 export interface IAtlas {
@@ -95,6 +113,8 @@ export interface IKitAsset {
   name: string;
   file: string;
   dark?: string;
+  /** The colour it is meant to sit on (a white logo on a dark one), absent for any. */
+  bg?: string;
   /** Its cell in the group's atlas, -1 when the atlas does not hold it. */
   cell: number;
 }
@@ -113,6 +133,8 @@ export interface IKitAssetGroup {
 export interface IKitSlot {
   key: string;
   kind: string;
+  /** What the field is called to a person («Заголовок», «Картинка 2»), absent in an older kit. */
+  label?: string;
   sample?: string;
 }
 
@@ -141,6 +163,8 @@ export interface IKitTemplateSection {
 export interface IKitTemplate {
   id: string;
   node: string;
+  /** The tree section it lives in: templates, or reference for a template's guide (absent in an older kit). */
+  section?: string;
   title: string;
   kind: string;
   aspect: [number, number];
@@ -205,6 +229,9 @@ export interface IKitLink {
 export const fetchKitCards = async (m: MachineId, signal?: AbortSignal): Promise<IKitCard[]> =>
   (await runtimeJson<{ kits: IKitCard[] }>(m, platformPath('/design/kit/canvases'), { signal })).kits;
 
+/** The first open of a theme makes its atlases inside the request, which a busy machine may take a minute over. */
+const KIT_CANVAS_TIMEOUT_MS = 120_000;
+
 export const fetchKitCanvas = (
   m: MachineId,
   kit: string,
@@ -215,7 +242,12 @@ export const fetchKitCanvas = (
   const q = new URLSearchParams({ kit });
   if (version) q.set('version', version);
   if (theme) q.set('theme', theme);
-  return runtimeJson<IKitCanvas>(m, platformPath(`/design/kit/canvas?${q.toString()}`), { signal });
+  return runtimeJson<IKitCanvas>(
+    m,
+    platformPath(`/design/kit/canvas?${q.toString()}`),
+    { signal },
+    KIT_CANVAS_TIMEOUT_MS,
+  );
 };
 
 /** A file of the version, by its path in the version (the theme's base joined in by the caller). */
@@ -228,8 +260,58 @@ export const kitFileUrl = (m: MachineId, kit: string, version: string, path: str
   );
 
 /** A kit card's picture, '' when the kit has none. */
+/** The sections a template can live in, in the tree's order. */
+export const TEMPLATE_SECTIONS = ['templates', 'reference'] as const;
+
+/** The templates of a tree section: a template without one is in «Шаблоны». */
+export const templatesIn = (c: Pick<IKitCanvas, 'templates'>, section: string): IKitTemplate[] =>
+  (c.templates ?? []).filter((t) => (t.section || 'templates') === section);
+
 export const kitCover = (m: MachineId, card: Pick<IKitCard, 'id' | 'version' | 'cover'>) =>
   card.cover ? kitFileUrl(m, card.id, card.version, card.cover) : '';
+
+/** One card of the shelf: a theme of a kit, or the whole kit when it is one theme. */
+export interface IKitShelfCard {
+  key: string;
+  kit: string;
+  version: string;
+  /** The theme to open, null for the kit's first. */
+  theme: string | null;
+  title: string;
+  /** The kit's title under a theme's (a kit of several themes), '' otherwise. */
+  kitTitle: string;
+  cover: string;
+  layouts: number;
+}
+
+/** The shelf's cards: a kit of several themes shows each theme with its own cover, so what it holds is seen at once. */
+export const shelfCards = (cards: readonly IKitCard[]): IKitShelfCard[] =>
+  cards.flatMap((c): IKitShelfCard[] => {
+    const themes = c.themeCards ?? [];
+    if (themes.length < 2)
+      return [
+        {
+          key: c.id,
+          kit: c.id,
+          version: c.version,
+          theme: null,
+          title: c.title,
+          kitTitle: '',
+          cover: c.cover,
+          layouts: c.layouts,
+        },
+      ];
+    return themes.map((th) => ({
+      key: `${c.id}/${th.id}`,
+      kit: c.id,
+      version: c.version,
+      theme: th.id,
+      title: th.title,
+      kitTitle: c.title,
+      cover: th.cover,
+      layouts: th.layouts,
+    }));
+  });
 
 /** A file of the canvas's theme (a path relative to the theme's folder). */
 export const themeFileUrl = (m: MachineId, c: Pick<IKitCanvas, 'kit' | 'version' | 'base'>, rel: string) =>

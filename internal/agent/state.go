@@ -32,9 +32,21 @@ func IsLayoutStateName(name string) bool {
 	return name == "workspaces.json" || layoutStateName.MatchString(name)
 }
 
+// OrganizerFile is the person's pins and projects: the cluster's too, changed while the machine is off. A
+// deployment may name it with a prefix of its own (<brand>-organizer.json); IsOrganizerName takes both.
+const OrganizerFile = "organizer.json"
+
+// organizerName is the organizer's file name: plain, or with a deployment's prefix of letters and digits; one path
+// component only.
+var organizerName = regexp.MustCompile(`^([A-Za-z0-9_]+-)?organizer\.json$`)
+
+// IsOrganizerName: the organizer's file, under its plain name or a deployment's prefixed one.
+func IsOrganizerName(name string) bool { return organizerName.MatchString(name) }
+
 // IsClusterOwnedName: files nothing on the machine writes but the cluster's own routes.
 func IsClusterOwnedName(name string) bool {
-	return name == "quick-prompts.json" || name == "sidebar-items.json" || name == "keybindings.json" || messageHistoryName.MatchString(name)
+	return name == "quick-prompts.json" || name == "sidebar-items.json" || name == "keybindings.json" || IsOrganizerName(name) ||
+		messageHistoryName.MatchString(name)
 }
 
 const stateDebounce = 30 * time.Millisecond

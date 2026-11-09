@@ -17,6 +17,39 @@ export interface IEfficiencyResource<T> {
 }
 
 const BASE = '/api/platform/efficiency';
+/** What the hub answers itself: the summary and the weekly pulse, per organization, behind the `efficiency` flag. */
+const HUB_PATHS = ['/summary', '/pulse'];
+const isHubPath = (path: string): boolean => HUB_PATHS.some((p) => path === p || path.startsWith(`${p}?`));
+const hubOrigin = (): string => appConfig().hubUrl ?? '';
+
+let orgPromise: Promise<string | null> | null = null;
+/** The organization the viewer's figures belong to: the first one the hub lists for them. */
+const hubOrg = (): Promise<string | null> => {
+  orgPromise ??= fetch(`${hubOrigin()}/api/orgs`, { credentials: 'include' })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(String(res.status));
+      const list = (await res.json()) as { orgs?: { slug?: string; id: string }[] };
+      return list.orgs?.[0] ? (list.orgs[0].slug ?? list.orgs[0].id) : null;
+    })
+    .catch(() => {
+      orgPromise = null;
+      return null;
+    });
+  return orgPromise;
+};
+
+/** One request of the screen: the hub's endpoint for the summary and the pulse, the machine's gateway for the rest. */
+const request = async (path: string, init?: RequestInit): Promise<Response> => {
+  if (!isHubPath(path)) return appFetch(`${BASE}${path}`, init);
+  const org = await hubOrg();
+  // No organization or no hub to ask: the same «not there yet» the gateway gave before the scanner was deployed.
+  if (!org) return new Response(null, { status: 404 });
+  const hubPath = path.replace(/\?.*$/, '');
+  return fetch(`${hubOrigin()}/api/orgs/${encodeURIComponent(org)}/efficiency${hubPath}`, {
+    credentials: 'include',
+    ...init,
+  });
+};
 /** The backend answers these until the efficiency scanner is deployed: not a failure, the data is just not there yet. */
 const NOT_DEPLOYED = new Set([404, 501]);
 const ALERTS_POLL_MS = 300_000;
@@ -40,7 +73,7 @@ export const useEfficiency = <T>(path: string | null): IEfficiencyResource<T> =>
     if (!path) return;
     const controller = new AbortController();
     const done = (next: Omit<IState<T>, 'path' | 'round'>) => setState({ path, round, ...next });
-    appFetch(`${BASE}${path}`, { signal: controller.signal })
+    request(path, { signal: controller.signal })
       .then(async (res) => {
         if (NOT_DEPLOYED.has(res.status)) return done({ data: null, status: 'pending', error: '' });
         if (!res.ok)
@@ -73,7 +106,7 @@ export const useEfficiency = <T>(path: string | null): IEfficiencyResource<T> =>
 /** POST a change (a manual batch, a schedule switch, an alert state). Resolves to an error text, or null on success. */
 export const postEfficiency = async (path: string, body: unknown): Promise<string | null> => {
   try {
-    const res = await appFetch(`${BASE}${path}`, {
+    const res = await request(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

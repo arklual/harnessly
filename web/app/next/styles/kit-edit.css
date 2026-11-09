@@ -1,0 +1,88 @@
+/* The kit screen's editing mode: the draft's chat docked on the left of the tree, the head's «Только
+   просмотр», settings and «Редактировать» / «Опубликовать версию». */
+.hx-kit[data-chat] {
+  --kit-chat-w: 372px;
+}
+.hx-kit[data-chat] .hx-kit__body {
+  grid-template-columns: var(--kit-chat-w) var(--kit-side-w) minmax(0, 1fr) var(--kit-panel-w);
+}
+.hx-kitchat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--hx-border);
+  background: var(--hx-bg-window);
+  animation: hx-kitchat-in var(--hx-dur-md) var(--kit-ease) both;
+}
+@keyframes hx-kitchat-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+.hx-kitedit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+.hx-kitedit__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--hx-space-2);
+  border-radius: var(--hx-radius-pill, 999px);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+}
+.hx-kitedit__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: transparent;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-kitedit__icon:hover {
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+}
+.hx-kitedit__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+}
+.hx-kitedit__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (max-width: 1200px) {
+  .hx-kit[data-chat] {
+    --kit-chat-w: 320px;
+  }
+}
+/* Narrow: the chat lies over the canvas on the left, the tree is a drawer as before. */
+@media (max-width: 900px) {
+  .hx-kit[data-chat] .hx-kit__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hx-kitchat {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 5;
+    width: min(var(--kit-chat-w), 100%);
+    box-shadow: var(--hx-shadow-overlay);
+  }
+}

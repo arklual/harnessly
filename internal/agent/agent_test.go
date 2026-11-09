@@ -196,6 +196,22 @@ func TestStatePut(t *testing.T) {
 	if res, err := s.Put("keybindings.json", `{"k":1}`, nil, "", false); err != nil || !res.Written {
 		t.Fatalf("owned file: %+v %v", res, err)
 	}
+	// the pins and projects are the cluster's: its copy lands where the runtime reads them.
+	if res, err := s.Put(OrganizerFile, `{"version":1,"pins":["chat:abcdefgh"]}`, nil, "", false); err != nil || !res.Written {
+		t.Fatalf("the organizer: %+v %v", res, err)
+	}
+	if raw, err := os.ReadFile(filepath.Join(dir, OrganizerFile)); err != nil || !strings.Contains(string(raw), "chat:abcdefgh") {
+		t.Fatalf("the organizer on disk: %s %v", raw, err)
+	}
+	// A deployment's own name for it (<brand>-organizer.json) is the cluster's as well.
+	if res, err := s.Put("acme-"+OrganizerFile, `{"version":1}`, nil, "", false); err != nil || !res.Written {
+		t.Fatalf("the prefixed organizer: %+v %v", res, err)
+	}
+	for _, name := range []string{"../x-organizer.json", "a/b-organizer.json", "x-organizer.json.bak"} {
+		if IsOrganizerName(name) {
+			t.Fatalf("%q taken for the organizer", name)
+		}
+	}
 	if res := put(`{"stateVersion":5}`, 5, "", false); !res.Written {
 		t.Fatal("first copy of a layout not written")
 	}

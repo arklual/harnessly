@@ -85,9 +85,9 @@ func optional(v string) *string {
 
 // pageFeatures are the optional parts of the page (RUNTIME_WEB_FEATURES, comma separated): chats (an OpenWebUI next to
 // the runtime), efficiency (the team report), vault (the password safe), design (the design library tab of the old
-// panel). Other names, next-ui among them (the switch to the new interface, which is the only interface now), are ignored.
+// panel), languages (the nine more interface languages next to Russian and English). Other names, next-ui among them (the switch to the new interface, which is the only interface now), are ignored.
 func pageFeatures(list string) map[string]bool {
-	out := map[string]bool{"chats": false, "efficiency": false, "vault": false, "design": false}
+	out := map[string]bool{"chats": false, "efficiency": false, "vault": false, "design": false, "languages": false}
 	for _, name := range splitList(list) {
 		if _, known := out[name]; known {
 			out[name] = true

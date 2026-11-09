@@ -1,0 +1,52 @@
+{
+  "v": 3,
+  "title": "__TITLE__",
+  "namespace": "__NS__",
+  "libraries": [],
+  "kit": { "id": "__ID__", "version": "0.1.0", "source": "__SOURCE__", "root": "Root", "cssLayer": "kit-__ID__", "tokenPrefix": "--__ID__-" },
+  "sections": { "foundation": { "title": "Foundation" }, "components": { "title": "Components" },
+                "templates": { "title": "Page templates" }, "assets": { "title": "Assets" } },
+  "groups": [
+    { "id": "actions", "title": "Actions",
+      "components": [
+        { "id": "Button", "name": "Button",
+          "description": "The main way to act on a page: submits a form or starts a flow; one primary button per area.",
+          "keywords": ["submit", "action", "call to action", "кнопка"],
+          "props": [
+            { "name": "variant", "type": "enum", "values": ["primary", "secondary", "ghost"], "description": "visual weight; primary once per area" },
+            { "name": "disabled", "type": "boolean", "description": "greys it out and ignores clicks" },
+            { "name": "children", "type": "node", "required": true, "description": "the label, a verb: Save, Create event" }
+          ],
+          "variants": [
+            { "id": "primary", "name": "Primary", "props": { "variant": "primary", "children": "Save" } },
+            { "id": "secondary", "name": "Secondary", "props": { "variant": "secondary", "children": "Cancel" } },
+            { "id": "ghost", "name": "Ghost", "props": { "variant": "ghost", "children": "More" } }
+          ],
+          "sample": { "children": "Save" } }
+      ] },
+    { "id": "layout", "title": "Layout",
+      "components": [
+        { "id": "Card", "name": "Card",
+          "description": "A raised surface that groups one record or one topic: a header with its title, then the content.",
+          "keywords": ["panel", "tile", "box", "карточка"],
+          "props": [ { "name": "children", "type": "node", "required": true, "description": "CardHeader, then CardBody" } ],
+          "sample": { "children": [
+            { "$c": "CardHeader", "props": { "title": "Spring concert" } },
+            { "$c": "CardBody", "children": [ "May 14, 8 pm. 412 tickets sold. ",
+                                              { "$c": "Button", "props": { "variant": "secondary" }, "children": "Open" } ] }
+          ] } },
+        { "id": "CardHeader", "name": "CardHeader", "part": "Card",
+          "description": "The top row of a Card: its title, set apart from the content.",
+          "props": [ { "name": "title", "type": "string", "required": true, "description": "the card's title, a noun" } ] },
+        { "id": "CardBody", "name": "CardBody", "part": "Card",
+          "description": "The content of a Card under its header, with the card's padding.",
+          "props": [ { "name": "children", "type": "node", "required": true, "description": "text and components" } ] },
+        { "id": "Root", "name": "Root", "part": "provider",
+          "description": "Wraps every board on the kit: sets the font, the colours and light or dark mode.",
+          "props": [
+            { "name": "theme", "type": "enum", "values": ["light", "dark"], "description": "light or dark mode of the tokens" },
+            { "name": "children", "type": "node", "required": true, "description": "the board's content" }
+          ] }
+      ] }
+  ]
+}

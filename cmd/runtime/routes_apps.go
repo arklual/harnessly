@@ -15,6 +15,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/egress"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
 	"github.com/ly-solutions/harnessly/internal/mcpconn"
@@ -89,6 +90,8 @@ type appView struct {
 	UpdatedAt   int64  `json:"updatedAt"`
 	// Access is everything the app reaches, from the most dangerous, in the person's words.
 	Access []apps.Access `json:"access"`
+	// Granted are the keys of Access the app is given now: each of them can be taken back alone.
+	Granted []string `json:"granted"`
 	// Consent: the install waits for the person to agree to all of Access (a first install nobody clicked through).
 	Consent bool `json:"consent,omitempty"`
 	// AskedIn is the chat whose agent installed what waits for consent: its card shows there.
@@ -196,6 +199,7 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 	v.InstructionsBytes = apps.InstructionsBytes(a)
 	// What the install reaches now: a dev install's folder as it is, where its consent is read from too.
 	v.Access = a.AccessNow()
+	v.Granted = a.GrantedKeys()
 	v.Consent, v.Off, v.Source = a.NeedsConsent(), a.Off, a.Source
 	if a.WaitsConsent() {
 		v.AskedIn = a.AskedIn
@@ -222,7 +226,12 @@ func appRoutes(d deps, c *core) []gate.Route {
 	if err != nil {
 		jsonlog.Log("warn", "apps: the network of the apps' calls", jsonlog.F{K: "error", V: err.Error()})
 	}
+	// The hub carries the deployment's policy (internal hosts, roots, proxy); what this machine's environment names wins.
+	// The hub's part is kept in the data folder, so a restart without the hub has it (internal/egress).
 	apps.SetNetwork(network)
+	egress.Keep(context.Background(), os.Getenv("RUNTIME_HUB_URL"), d.DataDir, network, func(msg string, err error) {
+		jsonlog.Log("warn", "apps: "+msg, jsonlog.F{K: "error", V: err.Error()})
+	})
 	version := env("AGENT_VERSION", agent.BuildVersion)
 	chats := appChats{
 		ofSession: func(session string) string { id, _ := convOf(c, session); return id },
@@ -243,6 +252,7 @@ func appRoutes(d deps, c *core) []gate.Route {
 	}
 	installLock(d, reg)
 	installShareGate(d, reg)
+	liveAppsOf.init(reg, c)
 	return append(appRouteList(d, reg, version, chats), chatRoutes(d, chats)...)
 }
 
@@ -432,11 +442,15 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		}
 		var b struct {
 			Dir string `json:"dir"`
-			Dev bool   `json:"dev"`
+			// Archive is a .hlapp to install instead of a folder (absolute path); Sig the path of its signature, none:
+			// <archive>.sig when that file is there.
+			Archive string `json:"archive"`
+			Sig     string `json:"sig"`
+			Dev     bool   `json:"dev"`
 			// Session is the CLI's tab: the chat whose agent installs, where the consent card shows.
 			Session string `json:"session"`
 		}
-		if !readSecretBody(r, &b) || !strings.HasPrefix(b.Dir, "/") {
+		if !readSecretBody(r, &b) || !strings.HasPrefix(b.Dir, "/") && !strings.HasPrefix(b.Archive, "/") {
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
@@ -445,7 +459,24 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		if b.Session != "" && chats.ofSession != nil {
 			askedIn = chats.ofSession(b.Session)
 		}
-		got, problems, err := reg.Install(b.Dir, apps.InstallOptions{Dev: b.Dev, HostVersion: version, Consent: apps.ConsentAsk, AskedIn: askedIn})
+		opt := apps.InstallOptions{Dev: b.Dev, HostVersion: version, Consent: apps.ConsentAsk, AskedIn: askedIn}
+		var got apps.Installed
+		var problems apps.Problems
+		var err error
+		if b.Archive != "" {
+			var signed apps.Verified
+			got, problems, signed, err = installHlapp(reg, b.Archive, b.Sig, opt)
+			if err == nil && signed.Signed {
+				_ = reg.Journal(got.ID, apps.JournalEntry{What: "install.signed", Class: apps.ClassHigh, OK: true, Detail: signed.Publisher})
+			}
+		} else {
+			got, problems, err = reg.Install(b.Dir, opt)
+		}
+		if errors.Is(err, apps.ErrUnsigned) || errors.Is(err, apps.ErrUntrustedKey) || errors.Is(err, apps.ErrBadSignature) {
+			agent.Log("warn", "apps: install refused by the signature rule", agent.F{K: "error", V: err.Error()})
+			secretJSON(w, http.StatusForbidden, map[string]any{"error": "signature", "message": err.Error()})
+			return
+		}
 		if problems == nil {
 			problems = apps.Problems{}
 		}
@@ -477,8 +508,13 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			}
 			_ = reg.Journal(got.ID, apps.JournalEntry{What: "consent.waits", Class: apps.ClassHigh, OK: true, Detail: detail})
 		}
+		warning := ""
+		if b.Dev && b.Archive == "" && apps.SignaturesRequired() {
+			warning = apps.DevUnsignedWarning
+			_ = reg.Journal(got.ID, apps.JournalEntry{What: "install.dev-unsigned", Class: apps.ClassHigh, OK: true, Detail: "signature not checked: " + got.Version})
+		}
 		byPolicy := !got.WaitsConsent() && got.Grant != nil && got.Grant.Policy
-		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, true), "problems": problems, "waitsConsent": got.WaitsConsent(), "consentPolicy": byPolicy})
+		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, true), "problems": problems, "waitsConsent": got.WaitsConsent(), "consentPolicy": byPolicy, "warning": warning})
 	}
 
 	remove := func(w http.ResponseWriter, r *http.Request) {
@@ -804,6 +840,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	routes = append(routes, appViewLogRoutes(d, reg)...)
 	routes = append(routes, appMentionRoutes(d, reg, chats)...)
 	routes = append(routes, appHookRoutes(d, reg, chats)...)
+	routes = append(routes, appLiveRoutes(d, reg, chats)...)
 	routes = append(routes, []gate.Route{
 		{Match: is(platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
 		{Match: is("/agents" + platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},

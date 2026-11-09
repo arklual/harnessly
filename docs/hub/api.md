@@ -196,6 +196,7 @@ The person's numbers are described in [analytics.md](analytics.md#the-person-api
 | `GET /api/spaces/by-slug/{slug}` | member | | `{ space: Space }` |
 | `PATCH /api/spaces/{spaceId}` | owner | `{ name?, onboardingStep? }` | `{ space: Space }` |
 | `GET /api/spaces/{spaceId}/members` | member | | `{ members: { userId, email, name, role, joinedAt }[] }` |
+| `GET /api/spaces/{spaceId}/apps` | member | | `{ apps: { id, name, version, targets, path? }[] }`: the apps installed for the space, from the store; `path` is the app's page at the hub (`/apps/space/{spaceId}/{appId}/`, a member's session; without one a GET leads to the sign-in), served with every machine off (docs/apps.md) |
 | `PATCH /api/spaces/{spaceId}/members/{userId}` | owner | `{ role }` | `{ member }`; 409 `last_owner` |
 | `DELETE /api/spaces/{spaceId}/members/{userId}` | owner, or self | | 204; 409 `last_owner` |
 | `POST /api/spaces/{spaceId}/invites` | owner | `{ emails: string[], role?: "member" \| "owner", teamId?: string }` (≤ 20; `role` is what the invitee becomes, member by default; `teamId` is a team of this space the invitee joins on accepting, else 400 `invalid_request`; `GET /api/invites/{token}` then also says `teamName`) | 201 `{ invites: Invite[] }` |
@@ -247,6 +248,7 @@ off. A choice made by this process is seen at once, one made by another replica 
 | `machine.resources` | editing a machine's resources and showing their price |
 | `runtime.fleet` | one runtime for all of a person's machines, «Fleet» below |
 | `secrets.vault` | the hub's safe: the machines keep their secrets on the hub's Vault-compatible server ([../safe.md](../safe.md#the-hubs-safe)) |
+| `efficiency` | the «Эффективность» figures: `GET /api/orgs/{org}/efficiency/summary` (merged requests per day from the code host, money per merged request from `usage_rollup_hour` at list prices, state of each source; the body also carries `metrics` in the shape of the screen's `IEffSummary`) and the person's own weekly pulse, `GET`/`POST /api/orgs/{org}/efficiency/pulse` (`speed`, `quality`, `friction` 1..5, one row per person and week, read only by the author). The collector reads the merge request source (`HUB_MR_SOURCE_GITLAB_*`) hourly and runs when the instance turns the flag on for everyone (`HUB_FEATURES_DEFAULT=efficiency`) or forces it. Money per request divides by every request the host reports merged, not by those sessions mention |
 
 | Method, path | Who | Request | Response |
 | --- | --- | --- | --- |
@@ -932,6 +934,7 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_TERMS_URL` | | shown under the sign-up |
 | `HUB_WEB_DIR` | | serve the UI from this folder instead of the embedded files (development) |
 | `HUB_LOG_LEVEL` | `info` | |
+| `HUB_VERSION` | none | The release the hub says it is (`/healthz`, `/api/config`, the machines' manifest) when the binary was linked as a development build (`dev`, `dev-<commit>`): the deployment sets it from the image's tag |
 
 Secrets (`*_SECRET`, `HUB_SMTP_URL`, `HUB_DATABASE_URL`, `HUB_SECRET_KEY`) may also be given as `<NAME>_FILE` pointing to a file.
 

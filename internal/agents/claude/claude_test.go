@@ -587,3 +587,28 @@ func TestSessionIDsOfThePaneClaude(t *testing.T) {
 		t.Fatalf("no Claude: %v", got)
 	}
 }
+
+// The live hook of the apps runs on UserPromptSubmit only, after the status hook.
+func TestHookSettingsWithTheAppsLiveHook(t *testing.T) {
+	c := HookSettingsConfig{StatusHook: "/h/s.sh", Statusline: "/h/l.sh", AppsLiveHook: "'/bin/harnessly' hook app-context --live"}
+	var got struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string
+				Timeout int
+			}
+		}
+	}
+	if err := json.Unmarshal(HookSettings(c), &got); err != nil {
+		t.Fatal(err)
+	}
+	prompt := got.Hooks["UserPromptSubmit"][0].Hooks
+	if len(prompt) != 2 || prompt[1].Command != c.AppsLiveHook || prompt[1].Timeout != AppsLiveHookTimeout {
+		t.Fatalf("%+v", prompt)
+	}
+	for _, event := range []string{"SessionStart", "Stop", "Notification"} {
+		if hooks := got.Hooks[event][0].Hooks; len(hooks) != 1 {
+			t.Fatalf("%s: %+v", event, hooks)
+		}
+	}
+}

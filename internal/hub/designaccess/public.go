@@ -21,6 +21,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/storerev"
 )
 
 // The guest links: /s/<token> on the share host. The hub judges the link by its row, asks the machine for a short
@@ -48,7 +49,7 @@ const (
 )
 
 var (
-	guestRoute = regexp.MustCompile(`^/s/([^/]+)(?:/(index\.json|comments|seen|m/(video\.mp4|video-9x16\.mp4|deck\.pdf)|f/(.+)|app/(.+))|/)?$`)
+	guestRoute = regexp.MustCompile(`^/s/([^/]+)(?:/(index\.json|comments|seen|version|events|m/(video\.mp4|video-9x16\.mp4|deck\.pdf)|f/(.+)|app/(.+))|/)?$`)
 	rangeRe    = regexp.MustCompile(`^bytes=\d*-\d*(?:\s*,\s*\d*-\d*){0,7}$`)
 	scriptRe   = regexp.MustCompile(`(?is)<script\b([^>]*)>(.*?)</script\s*>`)
 	srcAttrRe  = regexp.MustCompile(`(?i)(?:^|\s)src\s*=`)
@@ -142,8 +143,17 @@ func (s *Service) guestToken(ctx context.Context, machine string, req hubproto.D
 // errRuntime is the machine answering what the hub did not ask for: a guest gets «the owner's machine is unavailable».
 var errRuntime = errors.New("machine answer out of scope")
 
-// fetch reads design-public/<project>/<sub> of the machine with a token of the given scope.
+// fetch reads design-public/<project>/<sub>: from the hub's store when it has the project, else from the
+// machine with a token of the given scope.
 func (s *Service) fetch(ctx context.Context, machine string, req hubproto.DesignPublicTokenRequest, segs []string, r *http.Request, pass ...string) (*http.Response, error) {
+	if res, done, err := s.fromStore(ctx, machine, req, segs, r, pass); done {
+		return res, err
+	}
+	return s.machineFetch(ctx, machine, req, segs, r, pass...)
+}
+
+// machineFetch reads design-public/<project>/<sub> of the machine through its tunnel.
+func (s *Service) machineFetch(ctx context.Context, machine string, req hubproto.DesignPublicTokenRequest, segs []string, r *http.Request, pass ...string) (*http.Response, error) {
 	tok, err := s.guestToken(ctx, machine, req)
 	if err != nil {
 		return nil, err
@@ -358,7 +368,7 @@ func (s *Service) serveGuest(w http.ResponseWriter, r *http.Request) {
 	case g.app != "":
 		g.section = "app"
 	}
-	g.asJSON = g.section == "comments" || g.section == "seen" || g.section == "index.json"
+	g.asJSON = g.section == "comments" || g.section == "seen" || g.section == "index.json" || g.section == "version" || g.section == "events"
 	allow := "GET"
 	switch g.section {
 	case "comments":
@@ -462,6 +472,10 @@ func (s *Service) serveGuest(w http.ResponseWriter, r *http.Request) {
 		err = s.guestApp(w, r, g)
 	case "m":
 		err = s.guestMedia(w, r, g)
+	case "version":
+		err = s.guestVersion(w, r, g)
+	case "events":
+		err = s.guestEvents(w, r, g)
 	case "comments":
 		err = s.guestComments(w, r, g, t)
 	case "seen":
@@ -735,9 +749,20 @@ func (s *Service) guestFile(w http.ResponseWriter, r *http.Request, g guestReq) 
 	h.Set("Content-Type", safeType(res.Header.Get("Content-Type")))
 	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors "+s.shareURL)
 	h.Set("Access-Control-Allow-Origin", "*")
-	h.Set("Cache-Control", "private, max-age=30")
+	h.Set("Cache-Control", guestCache(g, "private, max-age=30"))
 	passEncoding(h, res)
 	return copyBody(w, res, maxFile, false)
+}
+
+// guestCache is how long a guest's browser keeps a file of the link: a link pinned to a store revision reads contents
+// that never change, so they are kept for good; anything else for a moment, as before.
+func guestCache(g guestReq, other string) string {
+	if g.l.Version == "pinned" {
+		if _, ok := storerev.Of(g.scope().Rev); ok {
+			return "private, max-age=31536000, immutable"
+		}
+	}
+	return other
 }
 
 func (s *Service) guestApp(w http.ResponseWriter, r *http.Request, g guestReq) error {
@@ -803,7 +828,7 @@ func (s *Service) guestMedia(w http.ResponseWriter, r *http.Request, g guestReq)
 	h.Set("Accept-Ranges", "bytes")
 	h.Set("Cross-Origin-Resource-Policy", "same-origin")
 	h.Set("Content-Security-Policy", "default-src 'none'")
-	h.Set("Cache-Control", "private, max-age=60")
+	h.Set("Cache-Control", guestCache(g, "private, max-age=60"))
 	if g.media == "deck.pdf" {
 		h.Set("Content-Disposition", `inline; filename="deck.pdf"`)
 	}

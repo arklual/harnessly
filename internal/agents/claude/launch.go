@@ -395,6 +395,12 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	}
 	if apps.MCPConfig != "" {
 		parts = append(parts, "--mcp-config "+agents.ShellQuote(apps.MCPConfig))
+	} else if host, ok := c.Apps.(agents.HostMCPLauncher); ok && (launch == nil || len(launch.Apps) == 0) {
+		// A chat without apps has their server too, quiet until one turns on (internal/apps live.go). One that cannot be
+		// written leaves the chat without it: apps then come with the agent's next start.
+		if path, err := host.HostMCP(); err == nil && path != "" {
+			parts = append(parts, "--mcp-config "+agents.ShellQuote(path))
+		}
 	}
 	if extraMCP != "" && apps.Retoken != nil {
 		// Under the apps' wall the file with the person's token reads as nothing: the agent gets a copy with its own.

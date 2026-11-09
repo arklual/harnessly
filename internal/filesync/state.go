@@ -102,6 +102,21 @@ func (s *state) setCursor(rev int64) error {
 	return err
 }
 
+// scope / setScope keep what the store last said the machine sees (filestore.Changes.Scope).
+func (s *state) scope() (string, error) {
+	var v string
+	err := s.db.QueryRow(`SELECT value FROM meta WHERE key = 'scope'`).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return v, err
+}
+
+func (s *state) setScope(v string) error {
+	_, err := s.db.Exec(`INSERT INTO meta (key, value) VALUES ('scope', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, v)
+	return err
+}
+
 // putBase / getBase keep the last synced canonical contents of a file that merges (settings.json).
 func (s *state) putBase(path string, contents []byte) error {
 	_, err := s.db.Exec(`INSERT INTO base (path, contents) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET contents = excluded.contents`, path, contents)

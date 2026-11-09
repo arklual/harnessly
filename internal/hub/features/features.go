@@ -35,10 +35,12 @@ const (
 	// SecretsVault is the hub's safe: the machines of the organization keep their secrets on the hub's server
 	// (HUB_SECRETS_VAULT_*, docs/safe.md).
 	SecretsVault = "secrets.vault"
+	// Efficiency is the «Эффективность» screen's figures: GET /api/orgs/{org}/efficiency/summary.
+	Efficiency = "efficiency"
 )
 
 // Known are the flag names in the order they are shown.
-var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents, UIHXLive, RuntimeFleet, SecretsVault}
+var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents, UIHXLive, RuntimeFleet, SecretsVault, Efficiency}
 
 // IsKnown says that name is a flag of the hub.
 func IsKnown(name string) bool { return slices.Contains(Known, name) }

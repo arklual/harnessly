@@ -27,3 +27,150 @@
 .hx-ng__settings {
   max-width: 640px;
 }
+
+/* ?dev=notifs: a mock window of the app, so the places can be compared where they will stand. */
+.hx-ng:has(.hx-ng__side) {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  gap: 0;
+  height: 100vh;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.hx-ng__side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 16px;
+  border-right: 1px solid var(--hx-border);
+  background: var(--hx-bg-raised);
+  overflow-y: auto;
+}
+.hx-ng__label {
+  margin-top: 8px;
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+.hx-ng__col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hx-ng__col .hx-ng__btn {
+  text-align: left;
+}
+.hx-ng__btn[data-on] {
+  border-color: var(--hx-fg-1);
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-raised);
+}
+.hx-ng__chats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.hx-ng__chats li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--hx-fg-2);
+}
+.hx-ng__chats li[data-on] {
+  background: var(--hx-bg-stage);
+  color: var(--hx-fg-1);
+}
+.hx-ng__chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.hx-ng__head {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--hx-border);
+  font-size: 14px;
+  font-weight: 600;
+}
+.hx-ng__feed {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 32px 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+.hx-ng__msg {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.hx-ng__msg[data-me] {
+  align-self: flex-end;
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: var(--hx-bg-raised);
+}
+.hx-ng__composer {
+  width: min(720px, calc(100% - 48px));
+  margin: 0 auto 24px;
+  padding: 16px 18px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 20px;
+  box-sizing: border-box;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-3);
+  font-size: 14px;
+}
+.hx-ng__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-left: 1px solid var(--hx-border);
+  overflow-y: auto;
+}
+.hx-ng__card {
+  padding: 12px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  font-size: 13px;
+}
+.hx-ng__card p {
+  margin: 4px 0 0;
+  color: var(--hx-fg-2);
+}
+@media (max-width: 1080px) {
+  .hx-ng:has(.hx-ng__side) {
+    grid-template-columns: 220px 1fr 260px;
+  }
+}
+@media (max-width: 720px) {
+  .hx-ng:has(.hx-ng__side) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+  .hx-ng__rail {
+    max-height: 30vh;
+    border-top: 1px solid var(--hx-border);
+    border-left: 0;
+  }
+  .hx-ng__rail .hx-ng__card {
+    display: none;
+  }
+  .hx-ng__side {
+    max-height: 30vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--hx-border);
+  }
+  .hx-ng__chats {
+    display: none;
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "v": 3,
+  "title": "Acme UI",
+  "namespace": "Acme",
+  "libraries": [],
+  "kit": { "id": "acme-ui", "version": "1.0.0", "source": "draft", "cssLayer": "kit-acme-ui", "tokenPrefix": "--acme-" },
+  "sections": { "foundation": { "title": "Foundation" }, "components": { "title": "Components" } },
+  "groups": [
+    { "id": "actions", "title": "Actions",
+      "components": [
+        { "id": "Button", "name": "Button",
+          "description": "The main way to act on a page: submits a form or starts a flow.",
+          "props": [
+            { "name": "variant", "type": "enum", "values": ["primary", "secondary"], "description": "visual weight; primary once per area" },
+            { "name": "disabled", "type": "boolean", "description": "greys it out and ignores clicks" },
+            { "name": "children", "type": "node", "required": true }
+          ],
+          "variants": [ { "id": "primary", "name": "Primary", "props": { "variant": "primary", "children": "Save" } } ],
+          "sample": { "children": "Save" },
+          "preview": "components/Button/preview.html",
+          "keywords": ["submit", "action", "cta"] },
+        { "id": "Link", "name": "Link",
+          "description": "Text that leads to another page or place; it navigates, it does not act.",
+          "props": [ { "name": "href", "type": "string", "required": true, "description": "where it leads" },
+                     { "name": "children", "type": "node", "required": true } ],
+          "sample": { "href": "#", "children": "Open the event" } }
+      ] }
+  ]
+}

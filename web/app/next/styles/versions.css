@@ -1,0 +1,290 @@
+/* The versions of a project's kit and of the project: the band over the view, its popovers, the «Версии»
+   panel. The panel takes the look and the exit of the apps' panel (.hx-sinopia__panel, sinopia.css). */
+
+/* With a band or a side panel the stage is a column: the band, then the view filling the rest. */
+.hx-sinopia[data-aside] > .hx-sinopia__main > :not(.hx-kitband) {
+  flex: 1;
+  min-height: 0;
+}
+
+.hx-kitband {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: 40px;
+  padding: var(--hx-space-1) var(--hx-space-3) var(--hx-space-1) var(--hx-space-4);
+  border-bottom: 1px solid var(--hx-border);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  animation: hx-kitband-in var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+.hx-kitband[data-tone='draft'] {
+  background: var(--hx-warning-soft);
+}
+.hx-kitband[data-tone='quiet'] {
+  justify-content: flex-end;
+  min-height: 36px;
+  border-bottom-color: transparent;
+  background: transparent;
+}
+.hx-kitband__text {
+  display: flex;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-kitband__muted {
+  color: var(--hx-fg-3);
+}
+.hx-kitband__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-1);
+  margin-left: auto;
+}
+.hx-kitband__chip {
+  padding: 4px 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-kitband__chip:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-kitband__error {
+  color: var(--hx-danger);
+}
+
+.hx-kitpop {
+  width: 320px;
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  outline: 0;
+}
+.hx-kitpop__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+}
+.hx-kitpop__title {
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-kitpop__text {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+.hx-kitpop__muted {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-kitpop__notes {
+  width: 100%;
+  padding: var(--hx-space-2);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-window);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  resize: vertical;
+}
+.hx-kitpop__changes {
+  max-height: 160px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  list-style: none;
+}
+.hx-kitpop__changes li {
+  overflow: hidden;
+  padding: 2px 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-kitpop__changes li[data-kind='removed'] {
+  text-decoration: line-through;
+}
+.hx-kitpop__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-1);
+  color: var(--hx-accent);
+  font-size: var(--hx-text-sm);
+  text-decoration: none;
+}
+.hx-kitpop__error {
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+}
+.hx-kitpop__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--hx-space-1);
+}
+
+.hx-versions {
+  overflow-y: auto;
+}
+.hx-versions__save {
+  display: flex;
+  gap: var(--hx-space-1);
+  padding: 0 var(--hx-space-3) var(--hx-space-3) var(--hx-space-4);
+}
+.hx-versions__name {
+  flex: 1;
+  min-width: 0;
+  padding: 6px var(--hx-space-2);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-window);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+.hx-versions__list {
+  margin: 0;
+  padding: 0 var(--hx-space-2) var(--hx-space-4);
+  list-style: none;
+}
+.hx-versions__point {
+  padding: var(--hx-space-2);
+  border-radius: var(--hx-radius-md);
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-versions__point:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-versions__point[data-named] .hx-versions__what {
+  font-weight: var(--hx-weight-medium);
+}
+.hx-versions__line {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+.hx-versions__what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-versions__meta,
+.hx-versions__muted {
+  padding-left: 24px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-versions__muted {
+  padding: var(--hx-space-2) var(--hx-space-4);
+}
+.hx-versions__error {
+  padding: 0 var(--hx-space-4) var(--hx-space-2);
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+}
+.hx-versions__acts {
+  display: flex;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-1) 0 0 24px;
+  opacity: 0;
+  transition: opacity var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-versions__point:hover .hx-versions__acts,
+.hx-versions__point:focus-within .hx-versions__acts {
+  opacity: 1;
+}
+.hx-versions__act {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  text-decoration: none;
+  cursor: pointer;
+}
+.hx-versions__act:disabled {
+  color: var(--hx-fg-3);
+  cursor: default;
+}
+.hx-versions__compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-2) 0 0 24px;
+}
+.hx-versions__boards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-versions__board {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+  width: 100%;
+  padding: 4px var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-versions__board[aria-pressed='true'] {
+  background: var(--hx-bg-active);
+}
+.hx-versions__board:disabled {
+  cursor: default;
+}
+.hx-versions__kind {
+  color: var(--hx-fg-3);
+}
+.hx-versions__board[data-kind='changed'] .hx-versions__kind {
+  color: var(--hx-warning);
+}
+.hx-versions__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--hx-space-1);
+}
+.hx-versions__pair figure {
+  margin: 0;
+}
+.hx-versions__pair figcaption {
+  padding-bottom: 2px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-versions__pair iframe {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-canvas);
+}
+
+@keyframes hx-kitband-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

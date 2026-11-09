@@ -620,6 +620,11 @@ runtime_env() {
 	if [ "$PROFILE" = dir ]; then printf 'HARNESSLY_BASEPKG_STATE=%s\n' "$BASEPKG_STATE"; fi
 	if [ -n "${TMUX_DIR:-}" ]; then printf 'TMUX_TMPDIR=%s\n' "$TMUX_DIR"; fi
 	net_lines
+	# The apps' calls and the Connections take the company's CA and proxy by their own names too (internal/egress).
+	if [ "$PROFILE" != container ]; then
+		if [ -n "$CA_FILE" ]; then printf 'RUNTIME_APPS_CA_FILE=%s\n' "$CA_FILE"; fi
+		if [ -n "$PROXY" ]; then printf 'RUNTIME_APPS_PROXY=%s\nRUNTIME_APPS_NO_PROXY=%s\n' "$PROXY" "$NO_PROXY_ALL"; fi
+	fi
 }
 
 agent_env() {

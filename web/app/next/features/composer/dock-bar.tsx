@@ -40,7 +40,15 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
   /** The notice runs something of its own: every action waits for it. */
   let held = false;
   let actions: IAction[] = [];
-  if (value.kind === 'off') {
+  if (value.kind === 'move') {
+    title = value.line;
+    sub = value.codes || null;
+    const onAgent = value.onAgent;
+    actions = [
+      { key: 'retry', label: t('next.move.retry'), run: value.onRetry },
+      { key: 'agent', label: t('next.move.agent'), variant: 'ghost', run: async () => onAgent() },
+    ];
+  } else if (value.kind === 'off') {
     title = t('next.dockBar.off', { machine: value.machine });
     sub = t('next.dockBar.offSub');
     quiet = true;

@@ -262,6 +262,10 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 					deny(w, http.StatusBadGateway, "unavailable")
 					return
 				}
+				if signed, err = withClientCert(store, id, *pkg.Manifest, signed); err != nil {
+					deny(w, http.StatusConflict, "waiting-certificate")
+					return
+				}
 				_ = reg.Journal(id, apps.JournalEntry{What: "token.call", Class: apps.ClassHigh, OK: true, Detail: server + ": " + srv.Auth.Type})
 				apps.ProxyMCP(w, r, signed, values)
 				return
@@ -275,6 +279,10 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 				if v, err := store.RevealApp(id, []string{n}); err == nil {
 					values[n] = v[n]
 				}
+			}
+			if srv, err = withClientCert(store, id, *pkg.Manifest, srv); err != nil {
+				deny(w, http.StatusConflict, "waiting-certificate")
+				return
 			}
 			names := slices.Sorted(maps.Keys(values))
 			_ = reg.Journal(id, apps.JournalEntry{What: "secret.call", Class: apps.ClassHigh, OK: true, Detail: server + ": " + strings.Join(names, ", ")})

@@ -20,11 +20,16 @@ export class RuntimeError extends Error {
 /** How long a route may take before it is given up. */
 export const RUNTIME_TIMEOUT_MS = 20_000;
 
-export const runtimeJson = async <T>(m: MachineId, path: `/${string}`, init?: RequestInit): Promise<T> => {
+export const runtimeJson = async <T>(
+  m: MachineId,
+  path: `/${string}`,
+  init?: RequestInit,
+  timeoutMs = RUNTIME_TIMEOUT_MS,
+): Promise<T> => {
   const ctl = new AbortController();
   init?.signal?.addEventListener('abort', () => ctl.abort());
   const clock = pageClock();
-  const timer = clock.setTimeout(() => ctl.abort(), RUNTIME_TIMEOUT_MS);
+  const timer = clock.setTimeout(() => ctl.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(runtimePath(path, m), { credentials: 'same-origin', ...init, signal: ctl.signal });

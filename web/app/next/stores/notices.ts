@@ -30,6 +30,12 @@ export interface INotice {
   /** What happened, in a line: the question waits, the answer's start, why it failed. */
   text: string;
   at: number;
+  /**
+   * A finished turn's summary: 2–4 lines of plain text, one per line («\n» between them), on what the agent
+   * did — the cheap model's, or Claude's own recap written after the turn. Absent until it comes, and when Settings
+   * turn summaries off; `text` stays the answer's start either way.
+   */
+  summary?: string;
 }
 
 /** The chat of the sample notice Settings → Notifications shows: it has no chat to open. */
@@ -50,6 +56,7 @@ const isNotice = (raw: unknown): raw is INotice => {
     typeof n.text === 'string' &&
     typeof n.icon === 'string' &&
     typeof n.at === 'number' &&
+    (n.summary === undefined || typeof n.summary === 'string') &&
     (NOTICE_KINDS as readonly unknown[]).includes(n.kind)
   );
 };
@@ -121,6 +128,13 @@ export const dropNotices = (drop: (notice: INotice) => boolean): void => {
   if (kept.length !== current.length) write(kept);
 };
 
+/** Puts a finished turn's summary on its notice, if the notice is still there. */
+export const setNoticeSummary = (key: string, summary: string): void => {
+  const current = noticesSnapshot();
+  if (!current.some((n) => n.key === key && n.summary !== summary)) return;
+  write(current.map((n) => (n.key === key ? { ...n, summary } : n)));
+};
+
 export const dismissNotice = (key: string): void => dropNotices((n) => n.key === key);
 export const clearChatNotices = (chatId: string): void => dropNotices((n) => n.chatId === chatId);
 export const dismissAllNotices = (): void => write([]);
@@ -162,8 +176,11 @@ export type TNoticePlace = (typeof NOTICE_PLACES)[number];
 export const NOTICE_SOUNDS = ['wait', 'urgent', 'done'] as const;
 export type TNoticeSound = (typeof NOTICE_SOUNDS)[number];
 
-/** The version of the saved switches: before 2 the default place was the top right corner, saved with everything. */
-const NOTIFY_VERSION = 2;
+/** The version of the saved switches: before 2 the default place was the top right corner, saved with everything;
+ *  before 3 the smart notice could be turned off in Settings (the switch is gone: «Что показывать» says what comes). */
+const NOTIFY_VERSION = 3;
+
+const versionOf = (s: Record<string, unknown>): number => (typeof s.v === 'number' ? s.v : 1);
 
 export interface INotifySettings {
   /** Which events make a notice. */
@@ -176,6 +193,8 @@ export interface INotifySettings {
   /** The smart notice in the window; off, a notice only counts in the tab's title and sounds. */
   cards: boolean;
   place: TNoticePlace;
+  /** A finished turn comes with a few lines on what was done, from the cheapest model. */
+  summary: boolean;
 }
 
 export const DEFAULT_NOTIFY: INotifySettings = {
@@ -185,12 +204,13 @@ export const DEFAULT_NOTIFY: INotifySettings = {
   system: false,
   cards: true,
   place: 'bottom-center',
+  summary: true,
 } as const;
 
 const savedPlace = (s: Record<string, unknown>): TNoticePlace => {
   const place = NOTICE_PLACES.find((one) => one === s.place);
   // The old default was saved as if chosen: it moves to the new one; a place picked by hand stays.
-  if (!place || (s.v !== NOTIFY_VERSION && place === 'top-right')) return DEFAULT_NOTIFY.place;
+  if (!place || (versionOf(s) < 2 && place === 'top-right')) return DEFAULT_NOTIFY.place;
   return place;
 };
 
@@ -218,8 +238,10 @@ export const parseNotify = (raw: string | null): INotifySettings => {
       sound: typeof s.sound === 'boolean' ? s.sound : DEFAULT_NOTIFY.sound,
       sounds,
       system: typeof s.system === 'boolean' ? s.system : DEFAULT_NOTIFY.system,
-      cards: typeof s.cards === 'boolean' ? s.cards : DEFAULT_NOTIFY.cards,
+      // Settings no longer turn the smart notice off: one turned off before comes back, or it could never be turned on.
+      cards: versionOf(s) >= 3 && typeof s.cards === 'boolean' ? s.cards : DEFAULT_NOTIFY.cards,
       place: savedPlace(s),
+      summary: typeof s.summary === 'boolean' ? s.summary : DEFAULT_NOTIFY.summary,
     };
   } catch {
     return DEFAULT_NOTIFY;

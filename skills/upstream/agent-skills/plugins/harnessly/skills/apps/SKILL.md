@@ -82,9 +82,9 @@ With `harnessly.connect({protocol: 2})`, a refusal comes back as a value (`hl.re
 
 1. **Work in a chat with no apps on.** In a chat with any app on, the source of every installed app is read-only, and `app dev`, `install` and `enable` are refused. If
    `HARNESSLY_CLI_TOKEN_FILE` is set in your environment, you are in one: say so to the person.
-2. **Views are classic scripts** in a sandbox with an opaque origin: no modules, no `localStorage`, no `fetch` of your own files. Load `/__hl/app-sdk.js`, then use `harnessly.connect()`.
+2. **Views run in a sandbox with an opaque origin**: no `localStorage`, no cookies. Module scripts and `fetch` of the view's own files work (the session token is in the path, so a bundler's output loads). Load `/__hl/app-sdk.js` (or `import` `@harnessly/app-sdk`), then use `harnessly.connect()`.
 3. **There is no server run by the host.** `hl.tools.call` reaches only a public `https://` MCP server. A local `command` server needs `trust: trusted`, serves the agent only, and shares data with a view through workspace files. Read the page `backend` before choosing.
 4. **`allow` rules grant nothing** and `Edit` does not cover `Write`. Manifest `secrets` are for the app's server: the person types
    them in «О приложении» and the machine fills `${secret:name}` into `.mcp.json` headers; nothing reads them back.
 
-Say what you checked and what you could not. A view's look needs a browser: ask the person to look, or use a guest link with Playwright (page `debugging`).
+Say what you checked and what you could not. Check that a view loads with `harnessly app check <id> --open` (a headless browser of the machine: it waits for the handshake and prints every error; exit 1 on failure) and read what went wrong with `harnessly app logs <id>` (`--follow`, `--since 10m`). Its look still needs a person's eyes; a guest link with your own Playwright is only for driving it (page `debugging`).

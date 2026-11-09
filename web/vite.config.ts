@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
@@ -29,12 +29,16 @@ const dictionaries = (): Plugin => ({
           this.addWatchFile(LOCALES + dir + '/' + file);
           return JSON.parse(readFileSync(LOCALES + dir + '/' + file, 'utf8')) as Record<string, unknown>;
         });
-    const merged = Object.assign({}, ...read('en'), ...(lang === 'en' ? [] : read(lang)));
+    const merged = Object.assign(
+      {},
+      ...read('en'),
+      ...(lang === 'en' || !existsSync(LOCALES + lang) ? [] : read(lang)),
+    );
     return `export default JSON.parse(${JSON.stringify(JSON.stringify(merged))});`;
   },
   handleHotUpdate({ file, server }) {
     if (!file.startsWith(LOCALES)) return undefined;
-    for (const lang of ['en', 'ru']) {
+    for (const lang of readdirSync(LOCALES)) {
       const module = server.moduleGraph.getModuleById(`\0${DICTIONARY}${lang}`);
       if (module) server.moduleGraph.invalidateModule(module);
     }

@@ -2,6 +2,7 @@
 // point it opened from on a wide window, a bottom sheet on the phone (ui/sheet.tsx) with its grip, scrim and swipe down.
 // The menu's Root passes `actionsRef` (useMenuActions) so the swipe can close it.
 import { Menu } from '@base-ui/react/menu';
+import '@/next/styles/menu.css';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { usePortalContainer } from '@/next/ui/portal';
 import { SheetGrip, useSheetDrag } from '@/next/ui/sheet';
@@ -45,7 +46,8 @@ const MenuPanel = ({
   const [popup, setPopup] = useState<HTMLDivElement | null>(null);
   useSheetDrag(popup, () => actions.current?.close(), phone);
   return (
-    <Menu.Portal container={container}>
+    // Outside the interface's root (a gallery, a page of its own) there is no container: the menu goes to the body.
+    <Menu.Portal container={container ?? undefined}>
       {phone && <Menu.Backdrop className="hx-sheet-scrim hx-menu-scrim" />}
       <Menu.Positioner
         className={phone ? 'hx-cmenu-pos hx-sheet-pos' : 'hx-cmenu-pos'}

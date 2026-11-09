@@ -71,7 +71,11 @@ func (l *Library) agentChats() map[string]Chat {
 // Identity tells the runtimes of a shared folder apart (Runtime, the Unix user) and names the person behind it.
 // PersonID is the stable key of that person across machines: the owner's whole address, lower case (the local part alone repeats across tenants);
 // empty when the runtime knows no address (the Unix name is no person: self-hosted machines share one).
-type Identity struct{ Runtime, Person, PersonID string }
+type Identity struct {
+	Runtime, Person, PersonID string
+	// Shared: the library is the store's, synced between machines, so a Unix user names no one there.
+	Shared bool
+}
 
 type identityCache struct {
 	mu sync.Mutex
@@ -100,7 +104,9 @@ func (l *Library) Identity() (Identity, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.at.IsZero() && time.Since(c.at) < time.Minute {
-		return c.v, nil
+		v := c.v
+		v.Shared = l.revisions() != nil
+		return v, nil
 	}
 	name0 := ""
 	if l.osUser != nil {
@@ -127,7 +133,9 @@ func (l *Library) Identity() (Identity, error) {
 	}
 	personID, _ := CleanText(strings.ToLower(strings.TrimSpace(l.ownerEmail())), 128)
 	c.v, c.at = Identity{Runtime: u.Username, Person: person, PersonID: personID}, time.Now()
-	return c.v, nil
+	v := c.v
+	v.Shared = l.revisions() != nil
+	return v, nil
 }
 
 // IdentityOf is the runtime's identity with another person behind it: the one whose page session or chat asked. The
@@ -152,7 +160,7 @@ func (l *Library) IdentityOf(person string) (Identity, error) {
 	} else {
 		name = local
 	}
-	return Identity{Runtime: who.Runtime, Person: name, PersonID: id}, nil
+	return Identity{Runtime: who.Runtime, Person: name, PersonID: id, Shared: who.Shared}, nil
 }
 
 // Caller is the chat a command was typed in.

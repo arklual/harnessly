@@ -35,6 +35,7 @@ import {
 import type { TurnOutput } from '@/next/features/chat/types';
 import NowBlock from '@/next/features/chat/now';
 import WaitingLine from '@/next/features/chat/waiting';
+import FeedMenu from '@/next/features/chat/feed-menu';
 import TurnView, { openByDefault, type ITurnHandlers } from '@/next/features/chat/turn';
 import type { FeedDensity, FeedItem, Ms, RefInfo, RefKind } from '@/next/features/chat/types';
 import AutoLine from '@/next/features/chat/auto-line';
@@ -49,6 +50,7 @@ import UserMessage from '@/next/features/chat/user-message';
 import type { BackgroundTask } from '@/next/protocol/v2';
 import { boxOf, claimOrigin, flyCopy, hasOrigin, retargetFlights, slideFrom } from '@/next/ui/flight';
 import Icon from '@/next/ui/icon';
+import { useContextMenu } from '@/next/ui/context-menu';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import { CatchingUp, FeedLoading, FeedStart, OlderLoading } from '@/next/features/chat/feed-status';
 import { t } from '@/next/i18n';
@@ -91,6 +93,8 @@ type THandlers = Omit<ITurnHandlers, 'onToggle'>;
 export interface IFeedProps extends THandlers {
   /** The turns and outgoing messages, oldest first; null while the conversation loads. */
   items: FeedItem[] | null;
+  /** «Скопировать ссылку на чат» of the feed's menu. */
+  onCopyChatLink?: () => void;
   /** The first load failed: the feed says so and offers to try again. */
   failed?: boolean;
   /** Why it did not load, in words. */
@@ -308,6 +312,8 @@ const Feed = (props: IFeedProps) => {
               () => toast(t('next.shellData.noClipboard'), { tone: 'error' }),
             ),
   });
+  // A right click in the chat: our menu, not the browser's (a held finger selects text here).
+  const feedMenu = useContextMenu({ hold: false });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -654,7 +660,13 @@ const Feed = (props: IFeedProps) => {
   return (
     <div className="hx-chat">
       <CatchingUp on={catchingUp && items !== null} />
-      <div ref={scrollerRef} className="hx-feed" onScroll={onScroll} data-virtual={virtual || undefined}>
+      <div
+        ref={scrollerRef}
+        className="hx-feed"
+        onScroll={onScroll}
+        data-virtual={virtual || undefined}
+        {...feedMenu.handlers}
+      >
         <div ref={innerRef} className="hx-feed__inner">
           {items === null && !failed && <FeedLoading />}
           {items === null && failed && onRetryLoad && (
@@ -744,6 +756,13 @@ const Feed = (props: IFeedProps) => {
           {props.dock}
         </div>
       </div>
+      <FeedMenu
+        menu={feedMenu}
+        items={items ?? []}
+        lastAnswer={lastAnswer}
+        onFork={props.onForkTurn}
+        onCopyLink={props.onCopyChatLink}
+      />
     </div>
   );
 };

@@ -234,6 +234,7 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 | `HUB_TERMS_URL` | none | A link shown at sign-in, when set |
 | `HUB_WEB_DIR` | built in | A built `dist-hub` folder to serve instead of the embedded page (development) |
 | `HUB_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `HUB_VERSION` | none | The release the hub says it is, when its binary was built as a development build (`dev`, `dev-<commit>`; the image of a merge request is promoted to the release without a rebuild): set it from the image's tag |
 
 `hub healthcheck` asks the hub on this host for `/healthz` (the container's health check). `/healthz` says the process
 is up; `/readyz` also asks the database.

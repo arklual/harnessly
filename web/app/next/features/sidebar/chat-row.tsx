@@ -1,6 +1,7 @@
 import { memo, useState, type KeyboardEvent } from 'react';
 import Icon from '@/next/ui/icon';
 import Tooltip from '@/next/ui/tooltip';
+import { menuPointOf, wantsSystemMenu, type IMenuPoint } from '@/next/ui/context-menu';
 import { SIDE } from '@/next/ui/hover-intent';
 import { t } from '@/next/i18n';
 import { PENDING, type TPending } from '@/next/ui/use-pending-list';
@@ -154,6 +155,8 @@ const ChatRow = ({
 }: IChatRowProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMount, setMenuMount] = useState<TMenuMount>(MENU_MOUNT.none);
+  /** A right click opened the menu at this point; null when «…» did. */
+  const [menuAt, setMenuAt] = useState<IMenuPoint | null>(null);
   /** The title is cut short in the row: the pointer on it shows it whole, over the row. */
   const [cut, setCut] = useState(false);
   const look = chat.status === CHAT_STATUS.none ? null : STATUS_LOOK[chat.status];
@@ -185,6 +188,15 @@ const ChatRow = ({
       aria-busy={busy || undefined}
       onPointerEnter={(event) => {
         if (event.pointerType === 'mouse' && menuMount === MENU_MOUNT.none) setMenuMount(MENU_MOUNT.ready);
+      }}
+      onContextMenu={(event) => {
+        // A held finger is the list's (it carries the row, or opens the menu when let go where it was).
+        if (!showMenu || event.defaultPrevented || wantsSystemMenu(event.target, false)) return;
+        event.preventDefault();
+        if ((event.nativeEvent as Partial<PointerEvent>).pointerType === 'touch') return;
+        setMenuAt(menuPointOf(event));
+        setMenuMount(MENU_MOUNT.open);
+        setMenuOpen(true);
       }}
     >
       {/* The folded rail shows this mark at the title's place: same row, same height, so a chat never moves on fold. */}
@@ -252,6 +264,9 @@ const ChatRow = ({
         )}
         {showMenu && menuMount !== MENU_MOUNT.none && (
           <ChatMenu
+            key={menuAt ? `at:${menuAt.x}:${menuAt.y}` : 'more'}
+            at={menuAt}
+            onClosed={() => setMenuAt(null)}
             defaultOpen={menuMount === MENU_MOUNT.open}
             title={chat.title}
             pinned={chat.pinned}
@@ -266,6 +281,7 @@ const ChatRow = ({
               // open, nor leave its row marked as holding a menu, when the field is done.
               setMenuMount(MENU_MOUNT.none);
               setMenuOpen(false);
+              setMenuAt(null);
               handlers.renameStart(chat.id);
             }}
             onPin={() => handlers.pin(chat)}

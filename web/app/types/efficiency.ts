@@ -395,7 +395,8 @@ export interface IEffSummary {
   from: string;
   to: string;
   totals: {
-    costUsd: number;
+    /** Null while the hub has no spend for the period. */
+    costUsd: number | null;
     sessions: number;
     mrs: number;
     usdPerMr: number | null;

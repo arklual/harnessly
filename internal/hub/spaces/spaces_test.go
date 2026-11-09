@@ -910,6 +910,34 @@ func TestInviteCarriesATeam(t *testing.T) {
 	if inTeam(t, e, team.ID, third.id) {
 		t.Error("a link without a team put the guest in one")
 	}
+
+	// Someone already in the tenant: an email naming a team puts them in it at once, no letter; a team link
+	// they open does the same. Before, both were dropped silently and the person never reached the team's machines.
+	second2 := store.Team{SpaceID: sp.ID, Slug: "ops", Name: "Опс"}
+	if err := e.db.S().CreateTeam(ctx, &second2); err != nil {
+		t.Fatal(err)
+	}
+	r = owner.do("POST", "/api/spaces/"+sp.ID+"/invites", map[string]any{"emails": []string{"plain@example.com"}, "teamId": second2.ID})
+	var again struct {
+		Invites []InviteView
+		Joined  []string
+	}
+	r.into(&again)
+	if r.Code != 201 || len(again.Invites) != 0 || len(again.Joined) != 1 || again.Joined[0] != "plain@example.com" {
+		t.Fatalf("email invite of a member: %d %s", r.Code, r.Body)
+	}
+	if !inTeam(t, e, second2.ID, third.id) {
+		t.Error("an email invite naming a team left a tenant member out of it")
+	}
+	r = owner.do("POST", "/api/spaces/"+sp.ID+"/invites/link", map[string]any{"teamId": second2.ID})
+	var opsLink struct{ Invite InviteView }
+	r.into(&opsLink)
+	if r := guest.do("POST", "/api/invites/"+tokenOf(opsLink.Invite.URL)+"/accept", map[string]any{}); r.Code != 200 {
+		t.Fatalf("a member opens a team link: %d %s", r.Code, r.Body)
+	}
+	if !inTeam(t, e, second2.ID, guest.id) {
+		t.Error("a team link opened by a tenant member did not put them in the team")
+	}
 }
 
 func inTeam(t *testing.T, e *env, teamID, userID string) bool {

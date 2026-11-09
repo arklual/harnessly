@@ -34,6 +34,7 @@ import {
   type IGuestComment,
 } from '@/next/features/designly/guest/guest-comments';
 import { useComments } from '@/next/features/designly/guest/use-guest-comments';
+import { useGuestRevision } from '@/next/features/designly/guest/use-guest-revision';
 import GuestDeck from '@/next/features/designly/guest/guest-deck';
 import GuestVideo from '@/next/features/designly/guest/guest-video';
 import GuestNameDialog from '@/next/features/designly/guest/guest-name-dialog';
@@ -247,6 +248,7 @@ const GuestBody = ({
     return (tabs[Math.max(0, at)] ?? { id: '' }).id;
   });
   const [reloadKey, setReloadKey] = useState(0);
+  useGuestRevision(config.filesBase, () => setReloadKey((k) => k + 1));
   const current = tabs.find((x) => x.id === tab) ?? tabs[0];
   const path = current ? current.hist[current.hi] : null;
   const src = path === null ? null : boardUrl(config.filesBase, path);

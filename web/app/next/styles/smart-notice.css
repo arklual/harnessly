@@ -1,7 +1,9 @@
-/* The smart notice (features/smart-notice/smart-notice.tsx). .hx-sn is a point at the chosen place; the black shape
-   hangs from it (down from a top place, up from a bottom one) and is as big as --sn-w × --sn-h, the size of what it
-   holds, so one shape grows from a strip into the line and into the card and back. Opening springs; folding and
-   leaving ease out. Black in both themes, as Apple's. */
+/* The smart notice (features/smart-notice/smart-notice.tsx). .hx-sn is a point at the chosen place. The black shape is
+   a fixed box hanging from it (down from a top place, up from a bottom one) that shows only a window of
+   --sn-cw × --sn-ch through clip-path, the size of what it holds; the window springs from a dot into the line, into
+   the card and back. Nothing changes the layout while it moves: only clip-path, transform and opacity, which the
+   compositor plays on its own even when the page is busy. The springs are real ones (SwiftUI's response and damping,
+   sampled into linear()); opening bounces a little, folding and leaving do not. Black in both themes, as Apple's. */
 
 .hx-sn {
   --sn-bg: #000;
@@ -11,12 +13,131 @@
   --sn-fill: rgba(255, 255, 255, 0.08);
   --sn-fill2: rgba(255, 255, 255, 0.14);
   --sn-line: rgba(255, 255, 255, 0.08);
-  --sn-spring: cubic-bezier(0.34, 1.26, 0.64, 1);
-  --sn-open-ms: 460ms;
-  --sn-fold-ms: 300ms;
-  --sn-exit-ms: 240ms;
+  /* response 0.52 s, damping 0.66: 6 % over, settles in 825 ms. */
+  --sn-spring: linear(
+    0,
+    0.0302,
+    0.1049,
+    0.202,
+    0.318,
+    0.4381,
+    0.5493,
+    0.6573,
+    0.7489,
+    0.8315,
+    0.8997,
+    0.9515,
+    0.9932,
+    1.0234,
+    1.0429,
+    1.0552,
+    1.0609,
+    1.0619,
+    1.0592,
+    1.0544,
+    1.0478,
+    1.0405,
+    1.0334,
+    1.0262,
+    1.02,
+    1.0142,
+    1.0093,
+    1.0055,
+    1.0023,
+    0.9999,
+    0.9982,
+    0.9971,
+    0.9965,
+    0.9962,
+    0.9962,
+    0.9964,
+    0.9967,
+    0.9971,
+    0.9976,
+    0.998,
+    1
+  );
+  --sn-open-ms: 825ms;
+  /* response 0.42 s, critically damped: no bounce, 594 ms. */
+  --sn-settle: linear(
+    0,
+    0.0459,
+    0.1402,
+    0.2531,
+    0.3677,
+    0.4795,
+    0.574,
+    0.6553,
+    0.7235,
+    0.7799,
+    0.8278,
+    0.8645,
+    0.8938,
+    0.9171,
+    0.9355,
+    0.9506,
+    0.9618,
+    0.9705,
+    0.9773,
+    0.9827,
+    0.9867,
+    0.9898,
+    0.9922,
+    0.994,
+    0.9955,
+    0.9966,
+    0.9974,
+    0.998,
+    1
+  );
+  --sn-fold-ms: 594ms;
+  /* response 0.36 s, critically damped: 520 ms. */
+  --sn-leave: linear(
+    0,
+    0.0604,
+    0.1847,
+    0.319,
+    0.4534,
+    0.5711,
+    0.6651,
+    0.7448,
+    0.8075,
+    0.8541,
+    0.8915,
+    0.9198,
+    0.9402,
+    0.9562,
+    0.968,
+    0.9764,
+    0.9828,
+    0.9876,
+    0.9909,
+    0.9934,
+    0.9952,
+    0.9965,
+    0.9975,
+    0.9982,
+    1
+  );
+  --sn-exit-ms: 520ms;
   --sn-edge: 12px;
   --sn-max: calc(100vw - 16px);
+  /* The box the window moves in: as big as the widest and tallest thing the shape holds. */
+  --sn-bw: min(520px, var(--sn-max));
+  --sn-bh: calc(70vh + 8px);
+  /* The window: what the shape holds, or a dot before it comes and after it leaves. */
+  --sn-cw: var(--sn-w, 40px);
+  --sn-ch: var(--sn-h, 40px);
+  --sn-r: min(24px, calc(var(--sn-ch) / 2));
+  /* Where the window sits in the box, by the place. */
+  --sn-il: calc((var(--sn-bw) - var(--sn-cw)) / 2);
+  --sn-ir: var(--sn-il);
+  --sn-it: calc(var(--sn-bh) - var(--sn-ch));
+  --sn-ib: 0px;
+  /* The point the stack scales and the plate grows from: the middle of the window's edge at the place's edge. */
+  --sn-ox: 50%;
+  --sn-oy: 100%;
+  --sn-away: -1;
   position: fixed;
   z-index: 190;
   width: 0;
@@ -26,149 +147,180 @@
 }
 .hx-sn[data-v='top'] {
   top: calc(var(--sn-edge) + env(safe-area-inset-top, 0px));
+  --sn-it: 0px;
+  --sn-ib: calc(var(--sn-bh) - var(--sn-ch));
+  --sn-oy: 0%;
+  --sn-away: 1;
 }
 .hx-sn[data-v='bottom'] {
   bottom: calc(var(--sn-edge) + 8px + env(safe-area-inset-bottom, 0px));
 }
 .hx-sn[data-h='left'] {
   left: var(--sn-edge);
+  --sn-il: 0px;
+  --sn-ir: calc(var(--sn-bw) - var(--sn-cw));
+  --sn-ox: calc(var(--sn-cw) / 2);
 }
 .hx-sn[data-h='center'] {
   left: 50%;
 }
 .hx-sn[data-h='right'] {
   right: var(--sn-edge);
+  --sn-il: calc(var(--sn-bw) - var(--sn-cw));
+  --sn-ir: 0px;
+  --sn-ox: calc(100% - var(--sn-cw) / 2);
 }
 /* Over the field of the chat: its middle, a little above it. */
 .hx-sn[data-anchored] {
   left: var(--sn-x, 50%);
   bottom: var(--sn-bottom, 24px);
 }
+.hx-sn[data-open] {
+  --sn-r: 28px;
+}
+/* Before it comes and as it leaves: a dot at the edge. */
+.hx-sn[data-phase='out'] {
+  --sn-cw: 40px;
+  --sn-ch: 40px;
+}
+
+/* ── The lift: the shape and the stack, with their shadow; it comes and goes as one ── */
+.hx-sn__lift {
+  position: absolute;
+  width: var(--sn-bw);
+  height: var(--sn-bh);
+  pointer-events: none;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.26)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+  transform-origin: var(--sn-ox) var(--sn-oy);
+  transition:
+    scale var(--sn-open-ms) var(--sn-spring),
+    translate var(--sn-open-ms) var(--sn-spring),
+    opacity 240ms var(--hx-ease-out);
+}
+.hx-sn[data-v='top'] .hx-sn__lift {
+  top: 0;
+}
+.hx-sn[data-v='bottom'] .hx-sn__lift {
+  bottom: 0;
+}
+.hx-sn[data-h='left'] .hx-sn__lift {
+  left: 0;
+}
+.hx-sn[data-h='right'] .hx-sn__lift {
+  right: 0;
+}
+.hx-sn[data-h='center'] .hx-sn__lift {
+  left: calc(var(--sn-bw) / -2);
+}
+.hx-sn[data-phase='out'] .hx-sn__lift {
+  opacity: 0;
+  scale: 0.6;
+  translate: 0 calc(var(--sn-away) * -10px);
+  transition:
+    scale var(--sn-exit-ms) var(--sn-leave),
+    translate var(--sn-exit-ms) var(--sn-leave),
+    opacity 300ms var(--hx-ease-out) 120ms;
+}
 
 /* ── The shape ─────────────────────────────────────── */
 .hx-sn__shape {
   position: absolute;
+  inset: 0;
   z-index: 3;
-  width: var(--sn-w, 120px);
-  height: var(--sn-h, 6px);
-  max-width: var(--sn-max);
-  border-radius: min(26px, calc(var(--sn-h, 6px) / 2));
-  overflow: hidden;
   background: var(--sn-bg);
-  box-shadow:
-    0 14px 40px rgba(0, 0, 0, 0.3),
-    0 2px 6px rgba(0, 0, 0, 0.2),
-    0 0 0 1px var(--sn-line);
-  transition:
-    width var(--sn-open-ms) var(--sn-spring),
-    height var(--sn-open-ms) var(--sn-spring),
-    border-radius var(--sn-open-ms) var(--sn-spring),
-    opacity 200ms var(--hx-ease-out);
+  clip-path: inset(var(--sn-it) var(--sn-ir) var(--sn-ib) var(--sn-il) round var(--sn-r));
+  pointer-events: auto;
+  /* Its transitions are with the gestures below: one list for the window and the shift. */
 }
-.hx-sn[data-open] .hx-sn__shape {
-  border-radius: 26px;
+
+/* What the shape holds keeps its own size in the window; a new one comes in out of a blur, the one before goes into
+   one (a ghost: the old content's own nodes, kept for its fade). */
+.hx-sn__body,
+.hx-sn__ghosts {
+  position: absolute;
 }
-.hx-sn[data-folding] .hx-sn__shape {
-  transition:
-    width var(--sn-fold-ms) var(--hx-ease-out),
-    height var(--sn-fold-ms) var(--hx-ease-out),
-    border-radius var(--sn-fold-ms) var(--hx-ease-out);
+.hx-sn__ghosts {
+  inset: 0;
+  pointer-events: none;
 }
-/* Before it comes in and as it leaves: a thin strip that fades. */
-.hx-sn[data-phase='out'] .hx-sn__shape {
-  width: 120px;
-  height: 6px;
-  border-radius: 3px;
+.hx-sn__body {
+  width: max-content;
+  max-width: var(--sn-max);
+  transform-origin: var(--sn-ox) var(--sn-oy);
+  animation: hx-sn-in 380ms var(--hx-ease-out) 60ms backwards;
+}
+.hx-sn__body[data-ghost] {
+  animation: hx-sn-out 200ms var(--hx-ease-out) forwards;
+}
+.hx-sn[data-phase='out'] .hx-sn__body {
   opacity: 0;
+  filter: blur(6px);
   transition:
-    width var(--sn-exit-ms) var(--hx-ease-out),
-    height var(--sn-exit-ms) var(--hx-ease-out),
-    opacity var(--sn-exit-ms) var(--hx-ease-out);
+    opacity 180ms var(--hx-ease-out),
+    filter 180ms var(--hx-ease-out);
 }
-.hx-sn[data-v='top'] .hx-sn__shape,
 .hx-sn[data-v='top'] .hx-sn__body {
   top: 0;
 }
-.hx-sn[data-v='bottom'] .hx-sn__shape,
 .hx-sn[data-v='bottom'] .hx-sn__body {
   bottom: 0;
 }
-.hx-sn[data-h='left'] .hx-sn__shape,
 .hx-sn[data-h='left'] .hx-sn__body {
   left: 0;
 }
-.hx-sn[data-h='right'] .hx-sn__shape,
 .hx-sn[data-h='right'] .hx-sn__body {
   right: 0;
 }
-.hx-sn[data-h='center'] .hx-sn__shape {
-  left: 0;
-  transform: translateX(-50%);
-}
 .hx-sn[data-h='center'] .hx-sn__body {
   left: 50%;
-  transform: translateX(-50%);
-}
-
-/* What the shape holds keeps its own size; the shape clips it while it grows. */
-.hx-sn__body {
-  position: absolute;
-  width: max-content;
-  max-width: var(--sn-max);
-  animation: hx-sn-in 260ms var(--hx-ease-out) 90ms backwards;
+  translate: -50% 0;
 }
 @keyframes hx-sn-in {
   from {
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(8px);
+    scale: 0.94;
+  }
+}
+@keyframes hx-sn-out {
+  to {
+    opacity: 0;
+    filter: blur(6px);
+    scale: 1.03;
   }
 }
 
-/* The plates of what else waits peek from under the line, on the side away from its edge. No numbers. */
+/* ── The stack: what else waits stands behind the line, smaller and lighter the further back, peeking out on the
+   side away from the edge, as notifications stack on a phone. No numbers. ── */
 .hx-sn__plate {
   position: absolute;
-  height: 40px;
-  border-radius: 20px;
-  background: var(--sn-bg);
-  pointer-events: none;
+  inset: 0;
+  clip-path: inset(var(--sn-it) var(--sn-ir) var(--sn-ib) var(--sn-il) round var(--sn-r));
+  transform-origin: var(--sn-ox) var(--sn-oy);
   transition:
-    width var(--sn-open-ms) var(--sn-spring),
-    opacity 200ms var(--hx-ease-out);
+    clip-path var(--sn-open-ms) var(--sn-spring),
+    scale var(--sn-open-ms) var(--sn-spring),
+    translate var(--sn-open-ms) var(--sn-spring),
+    opacity 260ms var(--hx-ease-out);
 }
 .hx-sn__plate[data-depth='1'] {
   z-index: 2;
-  width: calc(var(--sn-w, 120px) - 28px);
-  opacity: 0.6;
+  background: #2c2c2e;
+  scale: 0.93;
+  translate: 0 calc(var(--sn-away) * (var(--sn-ch) * 0.07 + 9px));
 }
 .hx-sn__plate[data-depth='2'] {
   z-index: 1;
-  width: calc(var(--sn-w, 120px) - 56px);
-  opacity: 0.32;
+  background: #48484a;
+  scale: 0.86;
+  translate: 0 calc(var(--sn-away) * (var(--sn-ch) * 0.14 + 17px));
 }
-.hx-sn[data-v='top'] .hx-sn__plate[data-depth='1'] {
-  top: calc(var(--sn-h, 40px) - 33px);
-}
-.hx-sn[data-v='top'] .hx-sn__plate[data-depth='2'] {
-  top: calc(var(--sn-h, 40px) - 26px);
-}
-.hx-sn[data-v='bottom'] .hx-sn__plate[data-depth='1'] {
-  bottom: calc(var(--sn-h, 40px) - 33px);
-}
-.hx-sn[data-v='bottom'] .hx-sn__plate[data-depth='2'] {
-  bottom: calc(var(--sn-h, 40px) - 26px);
-}
-.hx-sn[data-h='left'] .hx-sn__plate {
-  left: 14px;
-}
-.hx-sn[data-h='right'] .hx-sn__plate {
-  right: 14px;
-}
-.hx-sn[data-h='center'] .hx-sn__plate {
-  left: 0;
-  transform: translateX(-50%);
-}
+/* The open card and a leaving plate take the stack under them. */
+.hx-sn[data-open] .hx-sn__plate,
 .hx-sn[data-phase='out'] .hx-sn__plate {
   opacity: 0;
+  scale: 0.8;
+  translate: 0 0;
 }
 
 /* ── The line and the announcement ─────────────────── */
@@ -355,6 +507,9 @@
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.05);
   box-shadow: inset 0 0 0 1px var(--sn-line);
+  transition:
+    background 180ms var(--hx-ease-out),
+    box-shadow 180ms var(--hx-ease-out);
 }
 .hx-sn__input {
   flex: 1;
@@ -499,33 +654,98 @@
   background: var(--sn-fg);
 }
 
+/* The code's one real input lies over all its cells: the active cell shows the focus, the input never does. */
+.hx-sn .hx-otp__input:focus,
+.hx-sn .hx-otp__input:focus-visible,
+.hx-sn .hx-sn__input:focus,
+.hx-sn .hx-sn__input:focus-visible {
+  outline: none;
+}
+/* The card's field shows the focus as a whole, softly: a brighter edge and fill, never a ring around the text. */
+.hx-sn__field:focus-within {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
 .hx-sn :focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.85);
   outline-offset: 2px;
 }
 
 /* ── Gestures (features/smart-notice/use-gestures.ts) ─ */
-/* The whole plate follows the finger: --sn-dx/--sn-dy while it leads, no delay; let go, it springs back or flies off. */
-.hx-sn {
+/* Only the front plate follows the finger, one to one (--sn-dx/--sn-dy, no delay); let go, it springs back, or is
+   thrown off with its own speed (--sn-fling-ms) while the next one rises from the stack into its place. */
+.hx-sn__shape {
   translate: var(--sn-dx, 0px) var(--sn-dy, 0px);
   transition:
-    translate 380ms var(--sn-spring),
+    clip-path var(--sn-open-ms) var(--sn-spring),
+    translate var(--sn-open-ms) var(--sn-spring),
     opacity 200ms var(--hx-ease-out);
 }
-.hx-sn[data-drag] {
-  transition: none;
-}
-.hx-sn[data-fling] {
-  opacity: 0;
+.hx-sn[data-folding] .hx-sn__shape {
   transition:
-    translate 220ms var(--hx-ease-out),
-    opacity 220ms var(--hx-ease-out);
+    clip-path var(--sn-fold-ms) var(--sn-settle),
+    translate var(--sn-open-ms) var(--sn-spring);
 }
-.hx-sn[data-fling='left'] {
-  translate: calc(var(--sn-dx, 0px) - 50vw) 0;
+.hx-sn[data-phase='out'] .hx-sn__shape {
+  transition: clip-path var(--sn-exit-ms) var(--sn-leave);
 }
-.hx-sn[data-fling='right'] {
-  translate: calc(var(--sn-dx, 0px) + 50vw) 0;
+.hx-sn[data-drag] .hx-sn__shape {
+  transition: clip-path var(--sn-open-ms) var(--sn-spring);
+}
+.hx-sn[data-fling] .hx-sn__shape {
+  opacity: 0;
+  rotate: calc(var(--sn-dx, 0px) / 60px * 1deg);
+  transition:
+    translate var(--sn-fling-ms, 300ms) cubic-bezier(0.2, 0.7, 0.35, 1),
+    rotate var(--sn-fling-ms, 300ms) cubic-bezier(0.2, 0.7, 0.35, 1),
+    opacity var(--sn-fling-ms, 300ms) cubic-bezier(0.5, 0, 0.75, 0);
+}
+/* The next plate comes to the front out of the stack: from where the first plate behind stood (or, paging back, from
+   in front and above), springing. */
+.hx-sn[data-rise] .hx-sn__shape {
+  transition: clip-path var(--sn-open-ms) var(--sn-spring);
+  animation: hx-sn-rise 620ms var(--sn-spring) both;
+}
+.hx-sn[data-rise] .hx-sn__ghosts {
+  display: none;
+}
+@keyframes hx-sn-rise {
+  from {
+    opacity: 0.6;
+    scale: 0.93;
+    translate: 0 calc(var(--sn-away) * (var(--sn-ch) * 0.07 + 9px));
+  }
+}
+.hx-sn[data-rise='prev'] .hx-sn__shape {
+  animation-name: hx-sn-drop;
+}
+@keyframes hx-sn-drop {
+  from {
+    opacity: 0;
+    scale: 1.06;
+    translate: 0 calc(var(--sn-away) * -14px);
+  }
+}
+/* A plate that has just gone behind (paged away) sinks from the front into its place in the stack. */
+.hx-sn[data-rise='next'] .hx-sn__plate:last-of-type,
+.hx-sn[data-rise='prev'] .hx-sn__plate:first-of-type {
+  animation: hx-sn-sink 620ms var(--sn-spring) backwards;
+}
+@keyframes hx-sn-sink {
+  from {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+    background: var(--sn-bg);
+  }
+}
+/* The stack's plates are pressed too: the one pressed comes to the front. */
+.hx-sn__plate {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.hx-sn[data-open] .hx-sn__plate {
+  pointer-events: none;
 }
 .hx-sn__shape {
   touch-action: none;
@@ -664,9 +884,6 @@
   .hx-sn__pill {
     height: 44px;
   }
-  .hx-sn__plate {
-    height: 44px;
-  }
   .hx-sn__opt,
   .hx-sn__field,
   .hx-sn__btn,
@@ -680,9 +897,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hx-sn,
-  .hx-sn[data-fling] {
+  .hx-sn[data-fling] .hx-sn__shape {
+    rotate: none;
     transition: opacity 150ms linear;
+  }
+  .hx-sn[data-rise] .hx-sn__shape,
+  .hx-sn[data-rise] .hx-sn__plate {
+    animation: none;
   }
   .hx-sn__menu,
   .hx-sn__menu[data-state='closing'] {
@@ -691,13 +912,339 @@
   .hx-sn__shape,
   .hx-sn[data-folding] .hx-sn__shape,
   .hx-sn[data-phase='out'] .hx-sn__shape,
-  .hx-sn__plate {
+  .hx-sn__plate,
+  .hx-sn__lift,
+  .hx-sn[data-phase='out'] .hx-sn__lift {
     transition: opacity 150ms linear;
   }
-  .hx-sn__body {
+  .hx-sn[data-phase='out'] .hx-sn__lift {
+    scale: none;
+    translate: none;
+  }
+  .hx-sn__body,
+  .hx-sn__body[data-ghost] {
     animation: none;
+  }
+  .hx-sn__body[data-ghost] {
+    display: none;
   }
   .hx-sn__ring-fg {
     transition: none;
   }
+}
+
+/* The black shape flying between the notice and a drop (features/smart-notice/fly.ts). */
+.hx-sn-fly {
+  --sn-bg: #000;
+  --sn-fg: #fff;
+  --sn-fg2: rgba(255, 255, 255, 0.64);
+  --sn-fg3: rgba(255, 255, 255, 0.44);
+  --sn-fill: rgba(255, 255, 255, 0.08);
+  --sn-fill2: rgba(255, 255, 255, 0.14);
+  --sn-line: rgba(255, 255, 255, 0.08);
+  position: fixed;
+  z-index: 191;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  pointer-events: none;
+}
+/* The notice coming out of a drop: the flight draws it, the plate shows when it lands (where it already stands, so
+   the flight knows where to go). Put away into a drop by hand: the flight takes it, the plate goes at once. */
+.hx-sn[data-arrive] .hx-sn__lift,
+.hx-sn[data-arrive][data-phase='out'] .hx-sn__lift,
+.hx-sn[data-gone] .hx-sn__lift {
+  opacity: 0;
+  scale: 1;
+  translate: 0 0;
+  transition: none;
+}
+.hx-sn[data-arrive] .hx-sn__shape,
+.hx-sn[data-arrive] .hx-sn__body {
+  transition: none;
+  animation: none;
+}
+
+/* ── The drops in the chat's right column (features/smart-notice/drops.tsx) ── */
+.hx-drops {
+  --sn-bg: var(--hx-ink-bg);
+  --sn-fg: var(--hx-ink-fg);
+  --sn-fg2: var(--hx-ink-fg2);
+  --sn-fg3: var(--hx-ink-fg3);
+  --sn-fill: var(--hx-ink-fill);
+  --sn-fill2: var(--hx-ink-fill2);
+  margin: 4px 0 12px;
+}
+.hx-drops__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-drop {
+  border-radius: 22px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  animation: hx-drop-in 620ms
+    linear(
+      0,
+      0.0302,
+      0.1049,
+      0.202,
+      0.318,
+      0.4381,
+      0.5493,
+      0.6573,
+      0.7489,
+      0.8315,
+      0.8997,
+      0.9515,
+      0.9932,
+      1.0234,
+      1.0429,
+      1.0552,
+      1.0609,
+      1.0619,
+      1.0592,
+      1.0544,
+      1.0478,
+      1.0405,
+      1.0334,
+      1.0262,
+      1.02,
+      1.0142,
+      1.0093,
+      1.0055,
+      1.0023,
+      0.9999,
+      0.9982,
+      0.9971,
+      0.9965,
+      0.9962,
+      0.9962,
+      0.9964,
+      0.9967,
+      0.9971,
+      0.9976,
+      0.998,
+      1
+    )
+    backwards;
+  transform-origin: 50% 0;
+}
+/* Arriving from the notice: the flight draws it until it lands. */
+.hx-drop[data-arriving] {
+  visibility: hidden;
+  animation: none;
+}
+@keyframes hx-drop-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+/* A drop on the 8pt grid: a 56px capsule, the 32px chip set in it concentrically (12px on every side), 12px from the chip
+   to the text, and the chevron as far from the right edge as the chip is from the left. */
+.hx-drop__line {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+.hx-drop__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  align-self: stretch;
+  min-width: 0;
+  padding: 0 0 0 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-drop__lines {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.hx-drop .hx-sn__chip {
+  width: 32px;
+  height: 32px;
+}
+/* The timer ring stays inside the chip here, so it keeps the same 12px from the capsule's edge. */
+.hx-drop .hx-sn__ring {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hx-drop__title,
+.hx-drop__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-drop__title {
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  line-height: 18px;
+}
+.hx-drop__text {
+  color: var(--sn-fg2);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+}
+.hx-drop__more {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 0 12px 0 8px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sn-fg2);
+  cursor: pointer;
+}
+.hx-drop__more .hx-icon {
+  transition: rotate 420ms var(--hx-ease-out);
+}
+.hx-drop[data-open] .hx-drop__more .hx-icon {
+  rotate: 180deg;
+}
+.hx-drop__more:hover,
+.hx-drop__main:hover .hx-drop__title {
+  color: var(--sn-fg);
+}
+/* Opened in place: it grows to what is asked, springing; folding settles. */
+.hx-drop__fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 360ms var(--hx-ease-out);
+}
+.hx-drop[data-open] .hx-drop__fold {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 520ms cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+.hx-drop__inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-drop__what {
+  margin: 0;
+  padding: 0 16px 12px 56px;
+  color: var(--sn-fg2);
+  font-size: var(--hx-text-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  transition: opacity 200ms var(--hx-ease-out);
+}
+.hx-drop[data-open] .hx-drop__what {
+  opacity: 1;
+  transition-delay: 80ms;
+}
+.hx-drop__answer {
+  margin: 0 12px 12px 56px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sn-fg);
+  color: var(--sn-bg);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.hx-sn :focus-visible,
+.hx-drop :focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-drop {
+    animation: none;
+  }
+  .hx-drop__fold,
+  .hx-drop[data-open] .hx-drop__fold {
+    transition: none;
+  }
+}
+/* The column's button while a drop waits in a folded column: a black dot. */
+.hx-bgwrap {
+  position: relative;
+}
+.hx-bg-btn__wait {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hx-ink-bg);
+  box-shadow: 0 0 0 2px var(--hx-bg-raised, #fff);
+  pointer-events: none;
+  animation: hx-drop-in 520ms var(--hx-ease-out) backwards;
+}
+
+/* A finished chat's recap in its card, and the field under it. */
+.hx-sn__summary {
+  display: -webkit-box;
+  margin: 0 0 12px;
+  overflow: hidden;
+  color: var(--sn-fg2);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.hx-sn__reply[data-rec] {
+  gap: 8px;
+}
+.hx-sn__round {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sn-fg2);
+  cursor: pointer;
+}
+.hx-sn__round:hover {
+  background: var(--sn-fill2);
+  color: var(--sn-fg);
+}
+.hx-sn__rec,
+.hx-sn__rec .hx-recbar__time {
+  flex: none;
+  color: var(--sn-fg2);
+  font-size: var(--hx-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.hx-sn__reply .hx-wave {
+  flex: 1;
+  min-width: 0;
+  color: var(--sn-fg);
+}
+/* The words just sent, flying off the field (smart-notice.tsx flyAway). */
+.hx-sn-sent {
+  position: fixed;
+  z-index: 192;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  color: #fff;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }

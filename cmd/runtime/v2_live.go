@@ -88,6 +88,8 @@ func newV2Live(d deps, c *core) *v2Live {
 	handoffs, err := handoff.NewArtifactStore(d.DataDir)
 	if err != nil {
 		agent.Log("warn", "v2: handoff artifacts are unavailable", agent.F{K: "error", V: err.Error()})
+	} else {
+		handoffs.Written = wakeMove
 	}
 	version := env("AGENT_VERSION", agent.BuildVersion)
 	features := slices.Clone(v2Features)
@@ -124,6 +126,8 @@ func newV2Live(d deps, c *core) *v2Live {
 	features = append(features, wire.FeatureAutoContinue)
 	// What a chat made (docs, boards, designs) is read off its transcript: GET .../made.
 	features = append(features, wire.FeatureMade)
+	// A snapshot after an entry carries the turns from that entry's on: the page may open a chat from the cluster's copy.
+	features = append(features, wire.FeatureSnapshotAfter)
 	// Dictation is announced when this machine is set up for it at start: ffmpeg and the recognition service's socket.
 	var dictation *voice.Server
 	if dv := newVoice(d.DataDir); dv.Available() {
@@ -169,11 +173,13 @@ func newV2Live(d deps, c *core) *v2Live {
 		}
 	}
 	moveStore := openMoveStore(d)
+	titler := newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"), agentEnvDir(d.DataDir))
 	v.rt = convo.New(convo.Deps{Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Handoffs: handoffs,
-		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), codexImagesDir(d)}, Titler: newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"), agentEnvDir(d.DataDir)).Title, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
+		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: newV2Summarizer(titler, filepath.Join(d.DataDir, "v2", "turn-summaries")).Summarize, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		TerminalOff: chatGuard.Off,
 		AppsOK:      appsOK(apps.Open(d.DataDir)),
+		AppsLive:    liveAppsOf.changeIsLive,
 		AlwaysApps:  alwaysApps(apps.Open(d.DataDir)),
 		Rewinder:    v2Rewinder{c},
 		Window:      v2Window(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),

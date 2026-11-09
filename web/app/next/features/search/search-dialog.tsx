@@ -45,6 +45,10 @@ export interface ISearchDialogProps {
   results: readonly ISearchGroup[] | null;
   /** What shows before anything is typed. */
   recent: readonly ISearchRow[];
+  /** Other words for the field and the box (the chat navigator uses this dialog); the search's own when absent. */
+  words?: { title: string; placeholder: string };
+  /** What shows before anything is typed instead of the recent (grouped as the results are). */
+  idle?: readonly ISearchGroup[];
   onPick: (row: ISearchRow) => void;
   /** The machine is still reading its older chats, so the messages found may not be all there are. */
   indexing?: boolean;
@@ -56,8 +60,10 @@ const groupsShown = (
   typed: boolean,
   results: readonly ISearchGroup[] | null,
   recent: readonly ISearchRow[],
+  idle?: readonly ISearchGroup[],
 ): readonly ISearchGroup[] => {
   if (typed) return results ?? [];
+  if (idle) return idle;
   if (recent.length === 0) return [];
   return [{ id: 'recent', label: t('next.search.recent'), rows: recent }];
 };
@@ -86,6 +92,8 @@ const SearchDialog = ({
   onScope,
   results,
   recent,
+  words,
+  idle,
   onPick,
   failed = null,
   indexing = false,
@@ -96,7 +104,7 @@ const SearchDialog = ({
   const listRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState(0);
   const typed = query.trim() !== '';
-  const groups = groupsShown(typed, results, recent);
+  const groups = groupsShown(typed, results, recent, idle);
   const starts = groups.map((_, i) => groups.slice(0, i).reduce((sum, group) => sum + group.rows.length, 0));
   const rows = groups.flatMap((group) => group.rows);
   const at = Math.min(selected, Math.max(0, rows.length - 1));
@@ -140,13 +148,17 @@ const SearchDialog = ({
       <Dialog.Portal container={container}>
         <div className="hx-srch">
           <Dialog.Backdrop className="hx-srch__scrim" />
-          <Dialog.Popup className="hx-srch__box" aria-label={t('next.search.title')} initialFocus={inputRef}>
+          <Dialog.Popup
+            className="hx-srch__box"
+            aria-label={words?.title ?? t('next.search.title')}
+            initialFocus={inputRef}
+          >
             <label className="hx-srch__field">
               <Icon name="search" />
               <input
                 ref={inputRef}
                 type="search"
-                placeholder={t('next.search.placeholder')}
+                placeholder={words?.placeholder ?? t('next.search.placeholder')}
                 autoComplete="off"
                 enterKeyHint="search"
                 value={query}
@@ -255,7 +267,7 @@ const SearchDialog = ({
                   onRetry={failed.onRetry}
                 />
               )}
-              {!typed && recent.length === 0 && !unavailable && (
+              {!typed && recent.length === 0 && !idle && !unavailable && (
                 <div className="hx-srch__none">
                   <span>{t('next.search.start')}</span>
                 </div>

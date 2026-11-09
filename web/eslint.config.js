@@ -18,8 +18,9 @@ const newInterfaceImports = {
   ].map((name) => ({ name, message: 'The new interface does not use this library (spec §6).' })),
   patterns: [
     {
-      regex: '^@/(?!next(/|$)|platform/(config|router|theme|head)$)',
-      message: 'The new interface imports only @/next/* and @/platform/{config,router,theme,head} (spec §6).',
+      regex: '^@/(?!next(/|$)|platform/(config|router|theme|head|languages)$)',
+      message:
+        'The new interface imports only @/next/* and @/platform/{config,router,theme,head,languages} (spec §6).',
     },
     {
       group: ['@kit', '@kit/*'],
@@ -74,7 +75,7 @@ export default tseslint.config(
     },
   },
   {
-    // The new interface stands on its own (spec §6): from the current one only @/platform/{config,router,theme,head},
+    // The new interface stands on its own (spec §6): from the current one only @/platform/{config,router,theme,head,languages},
     // and none of the libraries it replaces. app/next/legacy is the one bridge to the current interface's pane tools,
     // and goes when they are written for the new one.
     files: ['app/next/**/*.{ts,tsx}'],

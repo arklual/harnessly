@@ -45,6 +45,8 @@ export const KEY_COMMANDS = [
   cmd('global', 'sideChat', 'Mod+Alt+KeyS'),
   cmd('global', 'settings', 'Mod+Comma'),
   cmd('global', 'notice', 'Mod+KeyJ'),
+  cmd('global', 'navigator', 'Mod+Alt+KeyJ'),
+  ...Array.from({ length: 9 }, (_, n) => cmd('global', `chat${n + 1}`, `Mod+Digit${n + 1}`)),
   cmd('global', 'stepBack', 'Alt+ArrowLeft'),
   cmd('global', 'stepOn', 'Alt+ArrowRight'),
 

@@ -115,6 +115,52 @@ func (l *Library) PublishSnapshot(project string, pages []string) (title string,
 	if walkErr != nil {
 		return "", nil, walkErr
 	}
+	// The kit the project is pinned to goes with it, under the ds/<mount>/ its boards address.
+	have := map[string]bool{}
+	for _, f := range files {
+		have[f.Path] = true
+	}
+	for mount, dir := range l.KitMountDirs(project) {
+		kitRoot, err := os.OpenRoot(dir)
+		if err != nil {
+			return "", nil, err
+		}
+		err = fs.WalkDir(kitRoot.FS(), ".", func(rel string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if rel == "." {
+				return nil
+			}
+			if publishSkipped(rel) || rel == "_harnessly" {
+				if d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			name := "ds/" + mount + "/" + rel
+			if d.IsDir() || !d.Type().IsRegular() || ContentType(extname(rel)) == "" || have[name] {
+				return nil
+			}
+			data, err := kitRoot.ReadFile(rel)
+			if err != nil {
+				return err
+			}
+			if len(data) > PublicFileLimit {
+				return nil
+			}
+			total += int64(len(data))
+			if len(files) >= publishMaxFiles || total > publishMaxBytes {
+				return fmt.Errorf("the project is too big to publish (up to %d files, %d MB)", publishMaxFiles, publishMaxBytes>>20)
+			}
+			files = append(files, sitesclient.DeployFile{Path: name, Data: data})
+			return nil
+		})
+		kitRoot.Close()
+		if err != nil {
+			return "", nil, err
+		}
+	}
 	if len(shown) == 0 {
 		return "", nil, ErrPublishEmpty
 	}
@@ -167,6 +213,8 @@ func PublishOrigin(project string) string { return "sinopia:" + project }
 type publishRequest struct {
 	project, name, access string
 	pages                 []string
+	// revision is a version of the project's history to publish instead of what it has now.
+	revision string
 }
 
 func readPublish(body any) (publishRequest, bool) {
@@ -179,6 +227,10 @@ func readPublish(body any) (publishRequest, bool) {
 		return req, false
 	}
 	req.access, _ = strField(o, "access")
+	req.revision, _ = strField(o, "revision")
+	if req.revision != "" && !fullSHA.MatchString(req.revision) {
+		return req, false
+	}
 	if req.access != "team" && req.access != "link" {
 		req.access = "team"
 	}
@@ -199,8 +251,9 @@ func readPublish(body any) (publishRequest, bool) {
 	return req, true
 }
 
-// Publish is POST <platform>/design/publish {project, name, access, pages?}: the project's pages go to the machine's hub
-// as the next version of the site `name` and the answer is the site's address.
+// Publish is POST <platform>/design/publish {project, name, access, pages?, revision?}: the project's pages (as they
+// were at revision, when one is named) go to the machine's hub as the next version of the site `name` and the answer
+// is the site's address.
 func (a *API) Publish(r *http.Request) Answer {
 	body, no := a.Guard(r, http.MethodPost)
 	if no != nil {
@@ -214,7 +267,15 @@ func (a *API) Publish(r *http.Request) Answer {
 	if no := a.gate(r, req.project, RoleManage); no != nil {
 		return *no
 	}
-	title, files, err := a.L.PublishSnapshot(req.project, req.pages)
+	lib := a.L
+	if req.revision != "" {
+		pinned, ok := a.L.pinnedLibrary(req.project, req.revision)
+		if !ok {
+			return JSON(r, 404, errorBody(locale.Pick("No such version of the project", "Такой версии проекта нет")), h)
+		}
+		lib = pinned
+	}
+	title, files, err := lib.PublishSnapshot(req.project, req.pages)
 	switch {
 	case errors.Is(err, ErrPublishEmpty):
 		return JSON(r, 422, errorBody(locale.Pick("There are no pages to publish", "Нет страниц для публикации")), h)

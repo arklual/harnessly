@@ -2,6 +2,7 @@ import { Menu } from '@base-ui/react/menu';
 import { useState, type ReactElement } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
+import { pointAnchor, type IMenuPoint } from '@/next/ui/context-menu';
 import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
 import type { IChatActions, ISidebarProject } from '@/next/features/sidebar/types';
 
@@ -51,11 +52,17 @@ export interface IChatMenuProps {
   machine?: string;
   /** «Цель…»: the header's menu of a Claude chat opens the goal's dialog. */
   onGoal?: () => void;
+  /** «Поделиться…» (beta «chatShare»): the header's menu opens the sharing dialog. */
+  onShare?: () => void;
   onOpenChange?: (open: boolean) => void;
   /** Mounted already open: a row mounts its menu on the first press of «…». */
   defaultOpen?: boolean;
   side?: 'bottom' | 'top' | 'right';
   align?: 'start' | 'end';
+  /** Opened by a right click: the menu stands at that point, not at «…». */
+  at?: IMenuPoint | null;
+  /** The menu has gone (its exit played). */
+  onClosed?: () => void;
 }
 
 /**
@@ -87,11 +94,14 @@ const ChatMenu = ({
   onMoveVm,
   machine,
   onGoal,
+  onShare,
   onRetitle,
   onOpenChange,
   defaultOpen = false,
   side = 'bottom',
   align = 'start',
+  at = null,
+  onClosed,
 }: IChatMenuProps) => {
   const [view, setView] = useState<TView>(VIEW.root);
   const menuActions = useMenuActions();
@@ -104,7 +114,9 @@ const ChatMenu = ({
       defaultOpen={defaultOpen}
       onOpenChange={(open) => onOpenChange?.(open)}
       onOpenChangeComplete={(open) => {
-        if (!open) setView(VIEW.root);
+        if (open) return;
+        setView(VIEW.root);
+        onClosed?.();
       }}
     >
       <Menu.Trigger render={trigger} />
@@ -113,9 +125,10 @@ const ChatMenu = ({
         className="hx-cmenu"
         label={t('next.rowMenu.label')}
         view={view}
-        side={side}
-        align={align}
-        sideOffset={6}
+        side={at ? 'bottom' : side}
+        align={at ? 'start' : align}
+        sideOffset={at ? 2 : 6}
+        anchor={at ? pointAnchor(at) : undefined}
       >
         {view === VIEW.root && (
           <>
@@ -178,6 +191,12 @@ const ChatMenu = ({
                 <span className="hx-cmenu__txt">{t('next.rowMenu.goal')}</span>
               </Menu.Item>
             )}
+            {onShare && (
+              <Menu.Item className="hx-cmenu__item" onClick={onShare}>
+                <Icon name="share" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.share')}</span>
+              </Menu.Item>
+            )}
             {actions.onPin && !grouping && (
               <Menu.Item className="hx-cmenu__item" onClick={onPin}>
                 <Icon name={pinned ? 'pin-off' : 'pin'} size="sm" />
@@ -223,7 +242,7 @@ const ChatMenu = ({
             )}
             {onCopyLink && (
               <Menu.Item className="hx-cmenu__item" onClick={onCopyLink}>
-                <Icon name="link" size="sm" />
+                <Icon name="share" size="sm" />
                 <span className="hx-cmenu__txt">{t('next.rowMenu.copyLink')}</span>
               </Menu.Item>
             )}

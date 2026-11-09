@@ -16,7 +16,10 @@ interface IReply {
   error?: { code: number; message: string; data: { code: string } };
 }
 
-const guestPage = (fetchImpl: (url: string, init: { body: string }) => Promise<unknown>) => {
+const guestPage = (
+  fetchImpl: (url: string, init: { body: string }) => Promise<unknown>,
+  extra: Record<string, unknown> = {},
+) => {
   const cfg = JSON.stringify({
     nonce: NONCE,
     app: 'acme.demo',
@@ -24,6 +27,7 @@ const guestPage = (fetchImpl: (url: string, init: { body: string }) => Promise<u
     view: 'main',
     write: false,
     locale: 'ru',
+    ...extra,
   });
   const dom = new JSDOM(
     `<!doctype html><html><head><meta name="hl-guest" content='${cfg}'></head><body><iframe id="view"></iframe></body></html>`,
@@ -174,6 +178,35 @@ describe('guest host', () => {
     expect((await rpc.call(4, 'harnessly/storage.get', { scope: 'user' })).error?.data.code).toBe(
       'invalid_params',
     );
+  });
+
+  // the same page serves a member of a space at the hub with every machine off: the scope the view names goes
+  // to the hub, which keeps the person's own area and the space's; the view is told it is not a guest.
+  it("sends a member's scope to the hub and says what needs a machine", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const fetchImpl = vi.fn(async (_url: string, init: { body: string }) => {
+      calls.push(JSON.parse(init.body) as Record<string, unknown>);
+      return { ok: true, json: async () => ({ value: 1, version: 2 }) };
+    });
+    const page = guestPage(fetchImpl, { member: true, write: true });
+    page.hello();
+    await settle();
+    const first = page.posted[0] as (typeof page.posted)[number];
+    const result = first.data.result as {
+      hostInfo: { version: string };
+      hostContext: { harnessly: { guest: boolean } };
+    };
+    expect(result.hostInfo.version).toBe('hub');
+    expect(result.hostContext.harnessly.guest).toBe(false);
+    const rpc = over(first.port as MessagePort);
+    expect((await rpc.call(1, 'harnessly/storage.get', { scope: 'space', key: 'a' })).result).toEqual({
+      value: 1,
+      version: 2,
+    });
+    expect(calls[0]).toEqual({ op: 'get', scope: 'space', key: 'a' });
+    const denied = await rpc.call(2, 'harnessly/chat.prompt', { text: 'x' });
+    expect(denied.error?.data.code).toBe('permission_denied');
+    expect(denied.error?.message).toContain('machine');
   });
 
   it('opens an https link in a new window without the opener, and no other', async () => {

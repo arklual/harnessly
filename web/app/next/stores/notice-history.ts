@@ -72,6 +72,20 @@ export const addHistory = (entry: IHistoryEntry): void => {
   for (const listener of [...listeners]) listener();
 };
 
+/** Takes entries away (the notification centre's «Убрать» and «Очистить»). */
+export const dropHistory = (keys: readonly string[]): void => {
+  const set = new Set(keys);
+  const before = historySnapshot();
+  if (!before.some((e) => set.has(e.key))) return;
+  list = before.filter((e) => !set.has(e.key));
+  try {
+    window.localStorage.setItem(key(), JSON.stringify(list));
+  } catch {
+    // Private mode or a full storage: the history holds for this page.
+  }
+  for (const listener of [...listeners]) listener();
+};
+
 const NONE: readonly IHistoryEntry[] = [];
 
 export const useHistory = (): readonly IHistoryEntry[] =>

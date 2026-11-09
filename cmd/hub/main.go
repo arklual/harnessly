@@ -28,8 +28,10 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/api"
+	"github.com/ly-solutions/harnessly/internal/hub/appsview"
 	"github.com/ly-solutions/harnessly/internal/hub/buildinfo"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/designview"
 	"github.com/ly-solutions/harnessly/internal/hub/diag"
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
 	"github.com/ly-solutions/harnessly/web"
@@ -89,6 +91,8 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 		return runStore(ctx, args, lookup, stdout, stderr)
 	case "seed":
 		return runSeed(ctx, args, lookup, stdout, stderr)
+	case "design":
+		return runDesign(ctx, args, lookup, stdout, stderr)
 	case "env-seed":
 		return runEnvSeed(ctx, args, lookup, stdout, stderr)
 	case "doctor":
@@ -104,7 +108,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 }
 
-const usage = `usage: hub [serve | check-config | healthcheck | sites | storage migrate [--dry-run] [--remove-source] | store backup|gc|migrate | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | doctor | schema snapshot [--dir d] [--postgres url] | machine-code --space <slug> --owner <email> [--profile p] | version]
+const usage = `usage: hub [serve | check-config | healthcheck | sites | storage migrate [--dry-run] [--remove-source] | store backup|gc|migrate | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | design import-gateway [--dry-run] | doctor | schema snapshot [--dir d] [--postgres url] | machine-code --space <slug> --owner <email> [--profile p] | version]
 
 The hub is configured by HUB_* environment variables; see docs/hub/deploy.md.
 `
@@ -159,6 +163,9 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 		}
 		mailer = mail.Log{Logger: log}
 	}
+	// design projects are read and edited through the hub's store (the API does not import the view).
+	api.DesignView = designview.Hub
+	api.AppsView = appsview.Hub
 	hub, err := api.New(api.Options{Config: cfg, DB: db, Mailer: mailer, Log: log, UI: web.HubDist(), Workspace: web.Dist()})
 	if err != nil {
 		return err
@@ -179,6 +186,7 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 	bg, stopBackground := context.WithCancel(ctx)
 	defer stopBackground()
 	go hub.Run(bg)
+	go importDesignsAtStart(bg, cfg, hub.Design, log)
 
 	log.Info("hub started", "version", buildinfo.Version, "listen", ln.Addr().String(), "publicUrl", cfg.PublicURL,
 		"edition", cfg.Edition, "database", dbKind(cfg), "mail", mailer.Mode(), "runtime", runtimeMode(cfg))

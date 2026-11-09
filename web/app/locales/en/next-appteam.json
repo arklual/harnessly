@@ -1,7 +1,7 @@
 {
   "next.appteam.title": "Team catalog",
   "next.appteam.none": "Nothing here yet. Publish an app for the team: harnessly app publish --team",
-  "next.appteam.install": "Install for the team",
+  "next.appteam.install": "Install",
   "next.appteam.uninstall": "Remove from the team",
   "next.appteam.mute": "Turn off for me",
   "next.appteam.unmute": "Turn on for me",

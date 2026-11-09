@@ -59,8 +59,18 @@ A target with nothing of the app in it is an error, and so is a contribution to 
 ## In a chat
 
 `harnessly app enable <id>` (or the chat's app list) turns an app on in a Claude Code chat; Codex chats get apps
-later. An agent at rest is stopped at once and the next message brings it back with the app; an agent at work keeps
-what it had until its terminal stops. The launch then gets:
+later.
+
+An app turned on while the chat's agent runs reaches it live when it needs nothing a launch alone gives:
+every Claude Code chat has the `harnessly-app` server from its start, quiet (no tools, no words) while no app is on;
+when one turns on, the server tells the client over its GET stream (`notifications/tools/list_changed`) and the agent's
+next turn has the app's tools, and its instructions and skill files from the live hook (`harnessly hook app-context
+--live` on UserPromptSubmit). Its slash commands come with the next start. An app that needs a launch (rules for the
+agent's tools, agent hooks, validators, context on activation, its own MCP servers, plugin parts such as `hooks/`), or
+any app where the deployment requires the wall (`RUNTIME_APPS_REQUIRE_WALL`) and the agent started without it, and
+turning off an app the agent started with: an agent at rest is stopped at once and the next message brings it back
+with the apps; an agent at work keeps what it had until its terminal stops, and the app's tools refuse with the reason
+meanwhile. A Codex chat always takes apps at its next start. A launch with apps gets:
 
 - the package as a Claude Code plugin (`--plugin-dir`): its skills, commands and `.mcp.json` servers;
 - the instructions files of all its apps in the system prompt, under `# Apps on in this chat` (at most 16 KB each; the chat's budget for all of them is 48 KB, about 12k tokens: an app that goes past it is still turned on, with a warning);
@@ -167,10 +177,18 @@ themselves (`form-action 'self'`) and nowhere else.
 
 ### Storage
 
-Per app, under `<data>/apps/storage/<id>/<scope>/`. An area of scope `chat` is the chat the view is mounted in (the
+On a machine of its own, per app, under `<data>/apps/storage/<id>/<scope>/`. Under a hub only `install` stays there:
+`user`, `space`, `chat` and `doc` (a guest link's area too) are in the space's `apps` collection of the hub's store, at
+`storage/<id>/<scope>/<name>.json` (`internal/appstore`; a chat's area is `<person>.<chat>`, a document's goes as its design project), the same on every machine of the space and there with the
+machines off. The user and chat areas are named by the person (the hub's store session names them), and only that person's
+machines see it. When the runtime first links to the hub it moves its local areas there: every key the store's area
+has never had goes in, a key both have keeps the store's value, nothing on the disk is deleted, and
+`<data>/apps/storage/.moved-to-hub.json` records per area what happened (`moved`, `same`, `skipped` for a user area
+when the hub names nobody, `failed` with the error, tried again at the next start). Another machine's write reaches the
+views as a change of the key, as a write on this machine does. An area of scope `chat` is the chat the view is mounted in (the
 runtime reads it from the view's session, a call cannot name another); `doc` is refused until a view is bound to a
 document. Limits: `install` 5 MB, `user` 1 MB, `chat` 256 KB per chat and 20 MB over all chats, `space` 10 MB, `doc` 100
-KB per document and 20 MB in all. A write past a limit is refused whole, with the code `quota_exceeded`.
+KB per document and 20 MB in all (under a hub, all of the space's chats and documents). A write past a limit is refused whole, with the code `quota_exceeded`.
 
 Each key has a version, kept beside its value in the area's file under the reserved key `__hl_versions` (a key cannot have that name): a counter that goes up with every
 write or delete and never repeats, 0 for a key never written or kept before versions. `get` answers the value and its version; a `set` with `ifVersion` is made only if the key is
@@ -497,6 +515,25 @@ installs) to `<apps>/team.json`, the way `design.access` does for the design lib
 from a machine (the one an owner installed on) for the platform to send to the others. A machine without the platform
 is told by hand: `harnessly app team set <space> owner|member`.
 
+Under a hub the team also travels through the space's `apps` collection of the hub's store, with or without
+the platform: a machine whose team changed writes it to `team/state.json` (the catalog and the installs, no role) and
+the packages' archives to `team/archives/<id>/<version>.tgz`; every machine of the space applies the team it reads there
+as it applies the platform's snapshot (the newer `at` wins, every archive checked against its sum), with its own
+person's role, and only if it was told it is in that space (the store carries the apps, never the membership; a team
+dated more than five minutes ahead is refused). An app installed for the space thus reaches a machine that was off or
+joins later, whichever machine installed it. Only the machines of the space's owners (the hub's roles) may write the
+team's files; a team older than the store's is not written over it.
+
+With every machine of the space off, an app installed for the space still opens for its members at the hub:
+`<hub>/apps/space/<space id>/<app id>/` (`internal/hub/appsview`, `apps.Members`). The hub checks the session and the
+person's role in the space, unpacks the pinned package from `team/archives/` (checked against its sum) and serves the
+view the way a guest link is served: a page of its own with the view in a sandboxed frame (the app's CSP, an opaque
+origin, never the hub's), and of the bridge only the storage: `hl.storage.user` (the person's own area, the same one
+their machines use) and `hl.storage.space`, both in the store; a write of the space's area needs
+`storage.space.write`, as on a machine. The chat, the agent, the app's tools and its MCP backend need a machine and
+are refused with `permission_denied`. `<hub>/apps/<id>` leads there when none of the person's machines in the space
+is online; `GET /api/spaces/{spaceId}/apps` lists the space's apps and their page at the hub.
+
 - `harnessly app publish --team` (or `app team publish <id> <version> --channel C`) puts a published version in the
   catalog, one entry per app and channel, with the version before it kept for a rollback. Any member may; there is no review,
   the owner who installs an app answers for it.
@@ -557,7 +594,12 @@ when the app is uninstalled. Only the token's hash is kept. The page itself carr
 
 The runtime answers these routes without a session (the token is the authority); how far a guest can reach the machine is
 the deployment's: through the hub's proxy a guest would need the hub session, so a public link is for a machine the
-guest can reach directly, or for the platform's gateway to relay. Data a guest sees beyond the link's storage comes from
+guest can reach directly, or for the platform's gateway to relay. Under a hub the link also opens at
+`<hub>/apps/guest/<token>/` with the machine off (`internal/hub/appsview`): the machine puts each live link
+into the space's `apps` collection (`guests/<person>/<hash>.json`, the token's hash, never the token) with the app's
+package (`bundles/<app>/<sum>.tgz`), every 15 seconds that the links changed, and takes out the ones that ended; the hub
+finds the link by the token's hash, checks the archive against its sum (never the trusted tier), and answers with the
+same guest code, the link's area being in the store already. Data a guest sees beyond the link's storage comes from
 the app's own server, through `network.connect` or a framed view.
 
 ### Evals

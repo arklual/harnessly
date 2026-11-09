@@ -277,22 +277,35 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
     const c = ctx();
     const found = (await list()).find((m) => m.id === id);
     if (!found) throw new OrgApiError('not_found', 'machine not in this scope');
-    const members = await http
-      .get<{ members: Member[] }>(orgPath(c.org, `/scopes/tenant/${found.tenantId}/members`))
-      .then((r) => r.members)
-      .catch((e: unknown) => {
-        // A lead may read only their team; the people to pick from are then the team's.
-        if (e instanceof OrgApiError && e.code === 'forbidden' && found.teamId) {
-          return http
-            .get<{ members: Member[] }>(orgPath(c.org, `/scopes/team/${found.teamId}/members`))
-            .then((r) => r.members);
-        }
-        throw e;
-      });
+    // Ask only what the person may read, as the hub decides it (viewMachine): the tenant's people for its
+    // admin, the team's for its lead. A tenant machine outside a lead's team is one they only use: no people
+    // to pick, no load charts, no sizes.
+    const can = (key: string) => c.view.me.scopes[key as keyof typeof c.view.me.scopes]?.view === true;
+    const tenantView = can(`tenant:${found.tenantId}`);
+    const teamView = !!found.teamId && can(`team:${found.teamId}`);
+    const peopleOf = (path: string) =>
+      http
+        .get<{ members: Member[] }>(orgPath(c.org, path))
+        .then((r) => r.members)
+        .catch((e: unknown) => {
+          if (e instanceof OrgApiError && e.code === 'forbidden') return [];
+          throw e;
+        });
+    const members: Member[] = tenantView
+      ? await peopleOf(`/scopes/tenant/${found.tenantId}/members`)
+      : teamView
+        ? await peopleOf(`/scopes/team/${found.teamId}/members`)
+        : [];
     const candidates: PersonRef[] = members.map((m) => ({ id: m.userId, name: m.name || m.email }));
     const team = c.view.teams.find((t) => t.id === found.teamId);
     const machine = orgMachineOf(found, c.view);
-    const [series, res] = await Promise.all([seriesOf(id), resourcesOf(id, machine)]);
+    const [series, res] =
+      tenantView || teamView
+        ? await Promise.all([seriesOf(id), resourcesOf(id, machine)])
+        : [
+            { cpu: [], ram: [], disk: [] },
+            { plan: null, consoleUrl: null, providerError: null },
+          ];
     return {
       machine,
       series,

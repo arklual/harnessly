@@ -71,7 +71,7 @@ func TestInternalSuffixAndLinkLocal(t *testing.T) {
 	// A listed host is still never dialed at the cloud's metadata address.
 	for addr, refused := range map[string]bool{"10.0.0.5:443": false, "127.0.0.1:80": false, "169.254.169.254:80": true,
 		"[fe80::1]:443": true, "0.0.0.0:80": true} {
-		if err := dialControl(true)("tcp", addr, nil); (err != nil) != refused {
+		if err := dialControl("h.example", true)("tcp", addr, nil); (err != nil) != refused {
 			t.Errorf("%s: %v", addr, err)
 		}
 	}
@@ -113,5 +113,25 @@ func TestNetworkFromEnv(t *testing.T) {
 		return map[string]string{"RUNTIME_APPS_CA_FILE": "/nonexistent.pem"}[k]
 	}); err == nil {
 		t.Fatal("a missing CA file is an error")
+	}
+}
+
+// A refused address says which name was refused and who can open it.
+func TestDialRefusalSaysWhichHostIsOutsideThePolicy(t *testing.T) {
+	err := dialControl("crm.example.corp", false)("tcp", "10.0.0.5:443", nil)
+	var be *BridgeError
+	if !errors.As(err, &be) || be.Code != CodeNetworkDenied || !strings.Contains(be.Hint, "«crm.example.corp»") || !strings.Contains(be.Hint, "администратор") {
+		t.Fatalf("%v", err)
+	}
+	if err := dialControl("crm.example.corp", true)("tcp", "10.0.0.5:443", nil); err != nil {
+		t.Fatalf("listed host: %v", err)
+	}
+	err = dialControl("crm.example.corp", true)("tcp", "169.254.169.254:80", nil)
+	if !errors.As(err, &be) || strings.Contains(be.Hint, "политике") {
+		t.Fatalf("metadata is closed even to listed hosts: %v", err)
+	}
+	// The hint travels with a failed tool call.
+	if got := transportFailure(context.Background(), err); got.Hint == "" || got.Code != CodeNetworkDenied {
+		t.Fatalf("%+v", got)
 	}
 }

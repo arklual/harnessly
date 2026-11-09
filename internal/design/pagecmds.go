@@ -218,19 +218,26 @@ func (l *Library) CreatePage(id string, s PageSpec) (Page, error) {
 		return Page{}, err
 	}
 	var layoutBoard []byte
-	var layoutRoot, layoutTheme string
+	var layoutRoot, layoutTheme, layoutKit, layoutVersion string
 	if s.Layout != "" {
 		if s.VariantOf != "" || s.File != "" {
 			return Page{}, pageErr(400, locale.Pick("A layout comes with its own file: leave out --file and --variant-of", "Макет приносит свой файл: уберите --file и --variant-of"))
 		}
-		lay, root, err := designkit.FindLayout(l.KitsDir(), s.Layout)
+		addr := s.Layout
+		// a project pinned to the kit takes the layout from its own version
+		if kit, version, theme, layout, err := designkit.ParseLayoutAddress(addr); err == nil && version == "" {
+			if pin, ok := l.KitPinOf(id); ok && pin.ID == kit {
+				addr = kit + "@" + pin.Version + "/" + theme + "/" + layout
+			}
+		}
+		lay, root, err := designkit.FindLayout(l.KitsDir(), addr)
 		if err != nil {
 			return Page{}, pageErr(404, err.Error())
 		}
 		if layoutBoard, err = designkit.LayoutBoard(root, lay); err != nil {
 			return Page{}, pageErr(404, err.Error())
 		}
-		layoutRoot, layoutTheme = root, lay.Theme
+		layoutRoot, layoutTheme, layoutKit, layoutVersion = root, lay.Theme, lay.Kit, lay.Version
 	}
 	var base *Page
 	if s.VariantOf != "" {
@@ -273,7 +280,7 @@ func (l *Library) CreatePage(id string, s PageSpec) (Page, error) {
 		}
 	}
 	if layoutBoard != nil {
-		if _, err := designkit.InstallTheme(layoutRoot, layoutTheme, l.ProjectDir(id)); err != nil {
+		if err := l.mountLayoutTheme(id, layoutRoot, layoutKit, layoutVersion, layoutTheme); err != nil {
 			return Page{}, err
 		}
 	}

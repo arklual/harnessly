@@ -320,18 +320,56 @@ func (e ErrWallRequired) Error() string {
 
 func (e ErrWallRequired) Unwrap() error { return e.Cause }
 
+// HostMCPFile is the name, in the runtime's data folder, of the harnessly-app config a chat without apps starts with.
+const HostMCPFile = "app-mcp.json"
+
+// HostMCP is the --mcp-config of the harnessly-app server for a Claude Code chat that starts with no app on:
+// the server is quiet until an app turns on in the chat, then its tools come live (live.go). It holds the person's token,
+// as the runtime's own config beside it does, so it lives in the data folder, which the wall of a launch with apps
+// leaves unreadable (seal.go). "" when the runtime has no MCP config.
+func (l *Launcher) HostMCP() (string, error) {
+	if l.MCPConfigPath == "" {
+		return "", nil
+	}
+	return l.hostMCPAt(filepath.Join(filepath.Dir(l.Registry.Root), HostMCPFile))
+}
+
+func (l *Launcher) hostMCPAt(path string) (string, error) {
+	body, err := l.hostMCPBody("")
+	if err != nil {
+		return "", err
+	}
+	if have, err := os.ReadFile(path); err == nil && string(have) == string(body) {
+		return path, nil
+	}
+	if err := writeFileAtomic(path, body); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // hostMCP writes the config of the harnessly-app server: the runtime's own MCP endpoint and token (read from its config
 // file), selected by ?server=harnessly-app, so the app tools come under that name and not the runtime's.
 func (l *Launcher) hostMCP(dir, token string) (string, error) {
-	raw, err := os.ReadFile(l.MCPConfigPath)
+	body, err := l.hostMCPBody(token)
 	if err != nil {
 		return "", err
+	}
+	// The file holds the runtime's token; writeFileAtomic keeps it 0600.
+	return writeByContent(dir, "hmcp", ".json", body)
+}
+
+// hostMCPBody is the config of the harnessly-app server with token in its headers ("" keeps the runtime's own).
+func (l *Launcher) hostMCPBody(token string) ([]byte, error) {
+	raw, err := os.ReadFile(l.MCPConfigPath)
+	if err != nil {
+		return nil, err
 	}
 	var cfg struct {
 		Servers map[string]map[string]any `json:"mcpServers"`
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return "", fmt.Errorf("%s: %w", l.MCPConfigPath, err)
+		return nil, fmt.Errorf("%s: %w", l.MCPConfigPath, err)
 	}
 	for _, srv := range cfg.Servers {
 		url, _ := srv["url"].(string)
@@ -344,14 +382,9 @@ func (l *Launcher) hostMCP(dir, token string) (string, error) {
 		}
 		srv["url"] = url + sep + "server=" + HostServer
 		withToken(srv, token)
-		body, err := json.MarshalIndent(map[string]any{"mcpServers": map[string]any{HostServer: srv}}, "", "  ")
-		if err != nil {
-			return "", err
-		}
-		// The file holds the runtime's token; writeFileAtomic keeps it 0600.
-		return writeByContent(dir, "hmcp", ".json", body)
+		return json.MarshalIndent(map[string]any{"mcpServers": map[string]any{HostServer: srv}}, "", "  ")
 	}
-	return "", fmt.Errorf("%s names no server with an address", l.MCPConfigPath)
+	return nil, fmt.Errorf("%s names no server with an address", l.MCPConfigPath)
 }
 
 func (l *Launcher) guardCommand() string {

@@ -1,6 +1,7 @@
 // «General»: the window, how the field sends, the work of the machine, and the account. The look (theme, palette, text
 // size) is «Оформление» (appearance-section.tsx); the Enter key is the person's setting and follows them to every
 // device.
+import { LANGUAGE_NAMES, parseLanguage, type TLanguage } from '@/platform/languages';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Group, LinkRow, MenuRow, SegRow, SwitchRow } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
@@ -45,8 +46,10 @@ export interface IGeneralSectionProps {
   /** Which things a turn made get a card under its answer (this browser's). */
   feedKinds: TShownKinds;
   /** The language of the page: the one chosen in this browser, else the installation's. */
-  language: 'ru' | 'en';
-  onLanguage: (language: 'ru' | 'en') => void;
+  language: TLanguage;
+  /** The languages offered: Russian and English, and with the `languages` feature the nine others. */
+  languages: readonly TLanguage[];
+  onLanguage: (language: TLanguage) => void;
   account: {
     name: string;
     /** The line under the name: the e-mail, or how the person gets in. */
@@ -115,6 +118,7 @@ const GeneralSection = ({
   paneAuto,
   feedKinds,
   language,
+  languages,
   onLanguage,
   account,
   idleStop,
@@ -155,11 +159,8 @@ const GeneralSection = ({
         label={t('next.settings.general.language')}
         hint={t('next.settings.general.language.hint')}
         value={language}
-        choices={[
-          { value: 'ru', label: 'Русский', sub: null },
-          { value: 'en', label: 'English', sub: null },
-        ]}
-        onPick={(value) => onLanguage(value === 'ru' ? 'ru' : 'en')}
+        choices={languages.map((lang) => ({ value: lang, label: LANGUAGE_NAMES[lang], sub: null }))}
+        onPick={(value) => onLanguage(parseLanguage(value, true) ?? 'en')}
       />
     </Group>
     <Group title={t('next.settings.general.work')}>

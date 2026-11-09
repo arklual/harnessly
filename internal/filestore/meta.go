@@ -33,6 +33,13 @@ type RoomMeta interface {
 	Apply(ctx context.Context, req CommitRequest, machine string, now int64, verify func(context.Context) error) (e *Entry, conflict bool, err error)
 	Changes(ctx context.Context, since int64, limit int) (Changes, error)
 	History(ctx context.Context, path string, limit int) ([]Entry, error)
+	// HistoryUnder is the revisions of every path under prefix ("" for the whole room), newest first.
+	HistoryUnder(ctx context.Context, prefix string, limit int) ([]Entry, error)
+	// CountUnder counts the revisions under an ASCII prefix in any letter case, up to limit.
+	CountUnder(ctx context.Context, prefix string, limit int) (int, error)
+	// Snapshot is the newest revision not newer than at of every path under prefix (a folder, ending in "/"),
+	// deleted ones included, by path.
+	Snapshot(ctx context.Context, prefix string, at int64) ([]Entry, error)
 
 	RegisterMember(ctx context.Context, name, recipient string, now int64) error
 	Members(ctx context.Context) ([]Member, error)

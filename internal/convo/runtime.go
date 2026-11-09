@@ -272,7 +272,7 @@ func (c *conv) restarted(now time.Time) {
 		c.input(agentstate.Input{K: agentstate.Restart}, now)
 	}
 	c.cutAtRestart(was, now)
-	c.feedUpdate(c.fd.Load(), false, now)
+	c.feedUpdate(c.fd.Load(), false, now) // bounded with the others by r.restartLoads around restarted (HRN-901)
 	for _, m := range c.box.Messages(now) {
 		if m.State.EntryID != nil {
 			c.fd.SetClientID(*m.State.EntryID, m.ClientID)
@@ -329,6 +329,7 @@ func (r *Runtime) loop(a *actor) {
 	// and a look before it would take the history for news (a turn a resumed session left open would be running).
 	told := false
 	looked := next // when the clock last looked
+	spun := false  // the last turn left its clock due: said once in the log, not at every slowed turn
 	for {
 		now := r.d.Clock.Now()
 		wake := c.wake(now)
@@ -355,6 +356,22 @@ func (r *Runtime) loop(a *actor) {
 			c.tick(now)
 			c.save(now, false)
 			a.publish()
+			if w := c.wake(r.d.Clock.Now()); !w.After(now) {
+				// The turn did not move the time it woke for: something holds it that the clock does not. The
+				// next turn waits a little rather than none — a time of the actor that never moves would be a core.
+				if !spun {
+					r.d.Log.Warn("conversation clock due again right after its turn; slowed", "conv", c.rec.ID)
+				}
+				spun = true
+				select {
+				case <-r.d.Clock.After(spinPause):
+				case <-a.stop:
+					c.save(r.d.Clock.Now(), true)
+					return
+				}
+			} else {
+				spun = false
+			}
 		case <-a.stop:
 			c.save(r.d.Clock.Now(), true)
 			return
@@ -386,6 +403,10 @@ func (r *Runtime) on(a *actor, f func(c *conv, now time.Time)) error {
 		return ErrBusy
 	}
 }
+
+// spinPause is how long an actor waits when its clock is due again right after a turn: a deadline nothing moves
+// costs four turns a second, not a core.
+const spinPause = 250 * time.Millisecond
 
 // MailWait is how long a message that needs no answer waits for room in a full mailbox before it is dropped.
 var MailWait = 5 * time.Second
@@ -788,6 +809,21 @@ func (r *Runtime) Turns(ctx context.Context, id, beforeTurnID string, limit int)
 	})
 }
 
+// TurnsWithSteps is Turns with the steps of every turn of the page (wire.StepsPager).
+func (r *Runtime) TurnsWithSteps(ctx context.Context, id, beforeTurnID string, limit int) (wire.TurnsPage, error) {
+	if limit < 1 {
+		limit = wire.TurnsPageDefault
+	}
+	limit = min(limit, wire.TurnsPageMax)
+	return live(r, ctx, id, func(c *conv, now time.Time) (wire.TurnsPage, error) {
+		p, ok := c.fd.TurnsWithSteps(beforeTurnID, limit)
+		if !ok {
+			return wire.TurnsPage{}, ErrNotFound
+		}
+		return p, nil
+	})
+}
+
 func (r *Runtime) TurnEntries(ctx context.Context, id, turnID string) (wire.EntriesPage, error) {
 	return live(r, ctx, id, func(c *conv, now time.Time) (wire.EntriesPage, error) {
 		p, ok := c.fd.TurnEntries(turnID)
@@ -1051,6 +1087,8 @@ func (r *Runtime) route(device string, cmd wire.Command, finish func(wire.CmdRes
 		return r.on(a, func(c *conv, now time.Time) { c.bgStop(m, finish, now) })
 	case wire.ConversationRetitleCmd:
 		return r.on(a, func(c *conv, now time.Time) { c.retitle(finish, now) })
+	case wire.ConversationSummarizeCmd:
+		return r.on(a, func(c *conv, now time.Time) { finish(c.summarize(m.TurnID, now)) })
 	case wire.TerminalStopCmd:
 		return r.on(a, func(c *conv, now time.Time) {
 			if c.deletedAt != 0 {
@@ -1128,6 +1166,8 @@ func convOf(cmd wire.Command) string {
 	case wire.GoalCmd:
 		return m.ID
 	case wire.ConversationRetitleCmd:
+		return m.ID
+	case wire.ConversationSummarizeCmd:
 		return m.ID
 	case wire.RewindCmd:
 		return m.ID

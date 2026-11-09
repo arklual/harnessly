@@ -13,7 +13,9 @@ import CodeField, { CODE_FIELD, type TCodeFieldState } from '@/next/ui/code-fiel
 import Icon from '@/next/ui/icon';
 import { PRESENCE, usePresence, usePresentFlag } from '@/next/ui/presence';
 import type { TNoticePlace, TNoticeSound } from '@/next/stores/notices';
-import useGestures from './use-gestures';
+import useGestures, { rise } from './use-gestures';
+import { RecordingTime, RecordingWave } from '@/next/features/composer/recording';
+import type { Recording } from '@/next/features/composer/types';
 
 export const SMART_KIND = {
   code: 'code',
@@ -48,6 +50,8 @@ export interface ISmartItem {
   at: number;
   /** A code's deadline by this page's clock; null without one. */
   until: number | null;
+  /** A finished chat's short recap, when the machine made one. */
+  summary?: string | null;
 }
 
 /** What the open card shows for its main item, read by the binding. */
@@ -57,7 +61,20 @@ export type TSmartDetail =
   | { k: 'question'; text: string; options: readonly string[] }
   | { k: 'permission'; command: string }
   | { k: 'code'; why: string; digits: number }
-  | { k: 'machine'; text: string; level: number; heavy: readonly ISmartHeavy[] };
+  | { k: 'machine'; text: string; level: number; heavy: readonly ISmartHeavy[] }
+  /** A finished turn: the chat's short recap (when the machine made one) and a field to write on to the agent. */
+  | { k: 'done'; summary: string | null; canReply: boolean };
+
+/** The words written in the card's field and the voice that dictates into them (the chat field's own dictation). */
+export interface ISmartReply {
+  text: string;
+  setText: (text: string) => void;
+  recording: Recording | null;
+  /** Without it the microphone is not offered. */
+  onMic?: () => void;
+  onCancelRecording: () => void;
+  onFinishRecording: () => void;
+}
 
 /** What weighs on a machine, in words: the agents together, or one program (a build, a browser). */
 export interface ISmartHeavy {
@@ -96,7 +113,8 @@ export interface ISmartNoticeProps {
   /** Opens the machine's card with its figures. */
   onOpenMachine: (item: ISmartItem) => void;
   /** Takes the item off the plate (swept aside, «Скрыть», ⌫): the chat still waits, the centre keeps its row. */
-  onHide: (item: ISmartItem) => void;
+  /** Put away: `from` is where the plate stood when it was put away by hand (null when thrown off by a gesture). */
+  onHide: (item: ISmartItem, from: DOMRect | null) => void;
   onMute: (sound: TNoticeSound) => void;
   onSettings: () => void;
   /** A plate is new for this long: it tells what came in two lines with its main button. */
@@ -105,12 +123,22 @@ export interface ISmartNoticeProps {
   returnFocus: () => void;
   /** The card opened from the keyboard: its first action takes the focus. */
   focusOnOpen: boolean;
+  /** The pointer or the focus is on the plate: news stays while it is read. */
+  onHold?: (held: boolean) => void;
+  /** The card is flowing out of a drop: the flight draws it until it lands. */
+  arriving?: boolean;
+  /** The card's field (a question's own answer, a word to a finished chat) and its dictation. */
+  reply: ISmartReply;
+  /** Words to the agent of a finished chat: sent there as the person's message. */
+  onReply: (item: ISmartItem, text: string) => Promise<void>;
 }
 
-/** How long the plate takes to leave when nothing waits any more, ms (styles/smart-notice.css has the same). */
-export const SMART_EXIT_MS = 240;
-/** How long the card takes to fold back into the line: the shape eases out then, it does not spring. */
-const FOLD_MS = 300;
+/** How long the plate takes to leave when nothing waits any more, ms (--sn-exit-ms in styles/smart-notice.css). */
+export const SMART_EXIT_MS = 520;
+/** How long the card takes to fold back into the line: the shape settles then, it does not bounce (--sn-fold-ms). */
+const FOLD_MS = 600;
+/** The content the shape held before keeps fading this long over the new one (hx-sn-out). */
+const GHOST_MS = 240;
 /** A sent answer shows its check this long at most; the plate leaves sooner, once the agent takes the answer. */
 const SENT_HOLD_MS = 6000;
 /** The folded plate shows this many plates under the front one. */
@@ -154,7 +182,7 @@ const RING_R = 16.5;
 const RING_LEN = 2 * Math.PI * RING_R;
 
 /** The kind's icon in a round chip; a code has a ring around it that runs down to its deadline. */
-const Chip = ({
+export const Chip = ({
   item,
   now,
   large,
@@ -192,6 +220,118 @@ const ago = (now: number, at: number): string => {
   return min < 1 ? t('next.smart.now') : t('next.smart.minutes', { n: min });
 };
 
+/** What was sent leaves the field upwards, as a message going: a copy of its words flies off and fades. */
+const flyAway = (field: HTMLInputElement | null) => {
+  if (!field || field.value.trim() === '') return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = field.getBoundingClientRect();
+  const style = getComputedStyle(field);
+  const words = document.createElement('span');
+  words.className = 'hx-sn-sent';
+  words.textContent = field.value;
+  Object.assign(words.style, {
+    left: `${r.left + parseFloat(style.paddingLeft)}px`,
+    top: `${r.top}px`,
+    height: `${r.height}px`,
+    maxWidth: `${r.width}px`,
+    font: style.font,
+  });
+  document.body.append(words);
+  const run = words.animate(
+    [
+      { translate: '0 0', opacity: 1, scale: '1' },
+      { translate: '0 -36px', opacity: 0, scale: '0.92' },
+    ],
+    { duration: 420, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' },
+  );
+  void run.finished.catch(() => undefined).then(() => words.remove());
+};
+
+/** The card's field: words, or the voice, to the agent; Enter sends. While it listens it is the recording's bar. */
+const ReplyField = ({
+  reply,
+  busy,
+  placeholder,
+  onSend,
+}: {
+  reply: ISmartReply;
+  busy: boolean;
+  placeholder: string;
+  onSend: (text: string) => void;
+}) => {
+  const input = useRef<HTMLInputElement | null>(null);
+  const rec = reply.recording;
+  if (rec)
+    return (
+      <div className="hx-sn__field hx-sn__reply" data-rec="">
+        <button
+          type="button"
+          className="hx-sn__round"
+          aria-label={t('next.composer.cancelRecording')}
+          onClick={reply.onCancelRecording}
+        >
+          <Icon name="x" size="sm" />
+        </button>
+        <span className="hx-sn__rec">
+          {rec.busy ? t('next.voice.recognizing') : <RecordingTime startedAt={rec.startedAt} />}
+        </span>
+        <RecordingWave level={rec.level} listening={!rec.busy} />
+        <button
+          type="button"
+          className="hx-sn__send"
+          disabled={rec.busy}
+          aria-label={t('next.composer.finishRecording')}
+          onClick={reply.onFinishRecording}
+        >
+          <Icon name="square" size="sm" />
+        </button>
+      </div>
+    );
+  return (
+    <form
+      className="hx-sn__field hx-sn__reply"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const text = reply.text.trim();
+        if (!text) return;
+        flyAway(input.current);
+        onSend(text);
+        reply.setText('');
+      }}
+    >
+      <input
+        ref={input}
+        className="hx-sn__input"
+        value={reply.text}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        disabled={busy}
+        enterKeyHint="send"
+        onChange={(event) => reply.setText(event.target.value)}
+      />
+      {reply.onMic && reply.text.trim() === '' && (
+        <button
+          type="button"
+          className="hx-sn__round"
+          disabled={busy}
+          aria-label={t('next.composer.voice')}
+          onClick={reply.onMic}
+        >
+          <Icon name="mic" size="sm" />
+        </button>
+      )}
+      <button
+        type="submit"
+        className="hx-sn__send"
+        disabled={busy || reply.text.trim() === ''}
+        aria-label={t('next.smart.send')}
+      >
+        <Icon name="arrow-up" size="sm" />
+      </button>
+    </form>
+  );
+};
+
 /** The open card's body for its main item. */
 const Body = ({
   item,
@@ -203,13 +343,15 @@ const Body = ({
   onCode,
   onCancelCode,
   onStop,
+  onReply,
+  reply,
 }: {
   item: ISmartItem;
   detail: TSmartDetail;
   busy: boolean;
   run: (work: () => Promise<void>) => void;
-} & Pick<ISmartNoticeProps, 'onAnswer' | 'onDecide' | 'onCode' | 'onCancelCode' | 'onStop'>) => {
-  const [words, setWords] = useState('');
+  reply: ISmartReply;
+} & Pick<ISmartNoticeProps, 'onAnswer' | 'onDecide' | 'onCode' | 'onCancelCode' | 'onStop' | 'onReply'>) => {
   const [code, setCode] = useState('');
   const [codeState, setCodeState] = useState<TCodeFieldState>(CODE_FIELD.idle);
   const [note, setNote] = useState<string | null>(null);
@@ -234,31 +376,12 @@ const Body = ({
             </button>
           ))}
         </div>
-        <form
-          className="hx-sn__field"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const text = words.trim();
-            if (text) run(() => onAnswer(item, { text }));
-          }}
-        >
-          <input
-            className="hx-sn__input"
-            value={words}
-            placeholder={t('next.smart.ownAnswer')}
-            aria-label={t('next.smart.ownAnswer')}
-            disabled={busy}
-            onChange={(event) => setWords(event.target.value)}
-          />
-          <button
-            type="submit"
-            className="hx-sn__send"
-            disabled={busy || words.trim() === ''}
-            aria-label={t('next.smart.send')}
-          >
-            <Icon name="arrow-up" size="sm" />
-          </button>
-        </form>
+        <ReplyField
+          reply={reply}
+          busy={busy}
+          placeholder={t('next.smart.ownAnswer')}
+          onSend={(text) => run(() => onAnswer(item, { text }))}
+        />
       </>
     );
   if (detail.k === 'permission')
@@ -293,6 +416,7 @@ const Body = ({
         <p className="hx-sn__why">{detail.why}</p>
         <div className="hx-sn__code">
           <CodeField
+            fromMessages={false}
             value={code}
             onChange={(value) => {
               setCode(value);
@@ -365,6 +489,20 @@ const Body = ({
         )}
       </>
     );
+  if (detail.k === 'done')
+    return (
+      <>
+        <p className="hx-sn__summary">{detail.summary ?? item.text}</p>
+        {detail.canReply && (
+          <ReplyField
+            reply={reply}
+            busy={busy}
+            placeholder={t('next.smart.reply')}
+            onSend={(text) => run(() => onReply(item, text))}
+          />
+        )}
+      </>
+    );
   return <p className="hx-sn__why">{item.text}</p>;
 };
 
@@ -390,6 +528,30 @@ const useFitShape = (
   }, [frame, body, key]);
 };
 
+/**
+ * When the shape's content changes, the old content does not vanish: its own nodes, which React has just let go of,
+ * are put back into a layer of ghosts that React never renders into, fade there into a blur and are removed.
+ */
+const useGhost = (
+  ghosts: RefObject<HTMLDivElement | null>,
+  body: RefObject<HTMLDivElement | null>,
+  key: string,
+) => {
+  const last = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const before = last.current;
+    const now = body.current;
+    last.current = now;
+    const layer = ghosts.current;
+    if (!before || before === now || before.isConnected || !layer) return;
+    before.dataset.ghost = '';
+    before.setAttribute('aria-hidden', 'true');
+    before.inert = true;
+    layer.append(before);
+    window.setTimeout(() => before.remove(), GHOST_MS);
+  }, [ghosts, body, key]);
+};
+
 const SmartNotice = ({
   items,
   mainKey,
@@ -413,6 +575,10 @@ const SmartNotice = ({
   announceMs,
   returnFocus,
   focusOnOpen,
+  onHold,
+  arriving = false,
+  reply,
+  onReply,
 }: ISmartNoticeProps) => {
   const main = items.find((item) => item.key === mainKey) ?? items[0] ?? null;
   // The last item stays drawn while the plate leaves.
@@ -424,17 +590,24 @@ const SmartNotice = ({
   const folding = opened.mounted && opened.state === PRESENCE.closing;
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
+  /** Announcements folded into the line by hand (a pull back to the edge): they do not come back as announcements. */
+  const [quiet, setQuiet] = useState<ReadonlySet<string>>(new Set());
   const host = useRef<HTMLDivElement | null>(null);
   const shape = useRef<HTMLDivElement | null>(null);
   const body = useRef<HTMLDivElement | null>(null);
+  const ghosts = useRef<HTMLDivElement | null>(null);
   const [menuOn, setMenuOn] = useState(false);
   const menu = usePresentFlag(menuOn && showing, MENU_EXIT_MS);
   const menuEl = useRef<HTMLDivElement | null>(null);
 
   const folded = !open || shown === null;
-  const announcing = folded && shown !== null && now - shown.at < announceMs;
-  const others = shown ? items.filter((item) => item.key !== shown.key) : [];
+  const announcing = folded && shown !== null && !quiet.has(shown.key) && now - shown.at < announceMs;
+  // The stack goes round from the front plate: the one after it is first behind, the one paged away goes to the back.
+  const front = shown ? items.findIndex((item) => item.key === shown.key) : -1;
+  const others = front < 0 ? [] : [...items.slice(front + 1), ...items.slice(0, front)];
   useFitShape(host, body, `${shown?.key ?? ''}:${open}:${announcing}:${detail.k}:${others.length}`);
+  const bodyKey = folded ? `f:${announcing}:${shown?.key ?? ''}` : `o:${shown?.key ?? ''}`;
+  useGhost(ghosts, body, bodyKey);
 
   const step = (dir: 1 | -1) => {
     if (!shown) return;
@@ -442,11 +615,15 @@ const SmartNotice = ({
     const next = items[(at + dir + items.length) % items.length];
     if (next && next.key !== shown.key) onMain(next.key);
   };
-  const hide = () => {
+  const hide = (thrown = false) => {
     if (!shown) return;
     setMenuOn(false);
     onOpen(false);
-    onHide(shown);
+    const from = thrown ? null : (body.current?.getBoundingClientRect() ?? null);
+    // By hand, the plate goes as the shape flows away: the next one rises, the last one goes out at once.
+    if (!thrown && others.length > 0) rise(host.current, 1);
+    if (!thrown && others.length === 0 && host.current) host.current.dataset.gone = '';
+    onHide(shown, from);
   };
   const gestures = useGestures({
     host,
@@ -455,9 +632,12 @@ const SmartNotice = ({
     open,
     off: busy,
     stacked: others.length > 0,
-    onHide: hide,
+    onHide: () => hide(true),
     onOpen: () => onOpen(true),
-    onFold: () => onOpen(false),
+    onFold: () => {
+      if (open) onOpen(false);
+      else if (shown) setQuiet((was) => new Set(was).add(shown.key));
+    },
     onMenu: () => setMenuOn(true),
     onStep: step,
   });
@@ -478,15 +658,40 @@ const SmartNotice = ({
     };
   }, [menuOn]);
 
-  // A new plate grows from the strip on the next frame; a plate that leaves shrinks back into it.
+  // A new plate grows out of a dot once the dot has been drawn (two frames: the first one only lays it out); a plate
+  // that leaves goes back into it.
   useEffect(() => {
     if (!showing) return;
-    const frame = requestAnimationFrame(() => setEntered(true));
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setEntered(true));
+    });
     return () => {
       cancelAnimationFrame(frame);
       setEntered(false);
     };
   }, [showing]);
+
+  // A plate thrown off as the last one leaves still thrown; if another comes before it is gone, it comes back.
+  const shownKey = shown?.key ?? null;
+  useEffect(() => {
+    const el = host.current;
+    if (el && shownKey !== null && el.dataset.fling !== undefined) rise(el, 1);
+    if (el && shownKey !== null) delete el.dataset.gone;
+  }, [shownKey]);
+
+  // While the plate is under the pointer or holds the focus, news does not go away; it lets go when it leaves.
+  const holding = useRef(false);
+  const hold = (on: boolean) => {
+    if (holding.current === on) return;
+    holding.current = on;
+    onHold?.(on);
+  };
+  useEffect(
+    () => () => {
+      if (holding.current) onHold?.(false);
+    },
+    [onHold],
+  );
 
   // The middle of the bottom edge follows the field of the chat.
   useLayoutEffect(() => {
@@ -502,7 +707,6 @@ const SmartNotice = ({
   }, [anchor, showing]);
 
   // Opened from the keyboard, the card's first action takes the focus.
-  const shownKey = shown?.key ?? null;
   useEffect(() => {
     if (!open || !focusOnOpen) return;
     const frame = requestAnimationFrame(() =>
@@ -580,7 +784,9 @@ const SmartNotice = ({
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      step(event.key === 'ArrowDown' ? 1 : -1);
+      const dir = event.key === 'ArrowDown' ? 1 : -1;
+      if (!open && others.length > 0) rise(host.current, dir);
+      step(dir);
       return;
     }
     if (!open || detail.k !== 'question') return;
@@ -611,6 +817,7 @@ const SmartNotice = ({
       data-phase={entered && present.state === PRESENCE.open ? 'in' : 'out'}
       data-open={open || undefined}
       data-folding={folding || undefined}
+      data-arrive={arriving || undefined}
       role="region"
       aria-label={t('next.smart.region')}
       aria-keyshortcuts="Meta+J Control+J"
@@ -621,6 +828,14 @@ const SmartNotice = ({
       onPointerCancel={gestures.onPointerCancel}
       onClickCapture={gestures.onClickCapture}
       onContextMenu={gestures.onContextMenu}
+      onPointerEnter={() => hold(true)}
+      onPointerLeave={(event) => {
+        if (event.pointerType === 'mouse') hold(false);
+      }}
+      onFocus={() => hold(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) hold(false);
+      }}
     >
       {menu.mounted && (
         <div
@@ -652,7 +867,7 @@ const SmartNotice = ({
               {t('next.smart.machine.open')}
             </button>
           )}
-          <button type="button" role="menuitem" className="hx-sn__item" onClick={act(hide)}>
+          <button type="button" role="menuitem" className="hx-sn__item" onClick={() => hide()}>
             <Icon name="eye-off" size="sm" />
             {t('next.smart.menu.hide')}
           </button>
@@ -668,106 +883,122 @@ const SmartNotice = ({
           </button>
         </div>
       )}
-      {folded &&
-        others
-          .slice(0, PEEKS)
-          .map((item, i) => (
-            <span key={item.key} className="hx-sn__plate" data-depth={i + 1} aria-hidden="true" />
-          ))}
-      <div ref={shape} className="hx-sn__shape">
-        <div ref={body} className="hx-sn__body" key={folded ? `f:${announcing}` : `o:${shown.key}`}>
-          {folded && !announcing && (
-            <button type="button" className="hx-sn__pill" aria-expanded={false} onClick={() => onOpen(true)}>
-              <Chip item={shown} now={now} sent={isSent} />
-              <b className="hx-sn__title">{shown.title}</b>
-              <span className="hx-sn__text">{isSent ? t(SENT_TEXT[shown.kind]) : shown.text}</span>
-            </button>
-          )}
-          {folded && announcing && (
-            <div className="hx-sn__ann">
+      <div className="hx-sn__lift">
+        {others.slice(0, PEEKS).map((item, i) => (
+          <span
+            key={item.key}
+            className="hx-sn__plate"
+            data-depth={i + 1}
+            aria-hidden="true"
+            onClick={() => {
+              rise(host.current, 1);
+              onMain(item.key);
+            }}
+          />
+        ))}
+        <div ref={shape} className="hx-sn__shape">
+          <div ref={ghosts} className="hx-sn__ghosts" aria-hidden="true" />
+          <div ref={body} className="hx-sn__body" key={bodyKey}>
+            {folded && !announcing && (
               <button
                 type="button"
-                className="hx-sn__ann-main"
+                className="hx-sn__pill"
                 aria-expanded={false}
                 onClick={() => onOpen(true)}
               >
-                <Chip item={shown} now={now} large sent={isSent} />
-                <span className="hx-sn__lines">
-                  <b className="hx-sn__title">{shown.title}</b>
-                  <span className="hx-sn__text">{shown.text}</span>
-                </span>
+                <Chip item={shown} now={now} sent={isSent} />
+                <b className="hx-sn__title">{shown.title}</b>
+                <span className="hx-sn__text">{isSent ? t(SENT_TEXT[shown.kind]) : shown.text}</span>
               </button>
-              <button
-                type="button"
-                className="hx-sn__btn"
-                onClick={() =>
-                  WAITING_KINDS.has(shown.kind) || shown.kind === SMART_KIND.machine
-                    ? onOpen(true)
-                    : onOpenChat(shown)
-                }
-              >
-                {t(ACTION[shown.kind])}
-              </button>
-            </div>
-          )}
-          {!folded && (
-            <div className="hx-sn__card" role="dialog" aria-label={shown.title}>
-              <div className="hx-sn__head">
-                <Chip item={shown} now={now} large sent={isSent} />
-                <b className="hx-sn__name">{shown.title}</b>
-                <span className="hx-sn__ago">{ago(now, shown.at)}</span>
+            )}
+            {folded && announcing && (
+              <div className="hx-sn__ann">
+                <button
+                  type="button"
+                  className="hx-sn__ann-main"
+                  aria-expanded={false}
+                  onClick={() => onOpen(true)}
+                >
+                  <Chip item={shown} now={now} large sent={isSent} />
+                  <span className="hx-sn__lines">
+                    <b className="hx-sn__title">{shown.title}</b>
+                    <span className="hx-sn__text">{shown.text}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="hx-sn__btn"
+                  onClick={() =>
+                    WAITING_KINDS.has(shown.kind) || shown.kind === SMART_KIND.machine
+                      ? onOpen(true)
+                      : onOpenChat(shown)
+                  }
+                >
+                  {t(ACTION[shown.kind])}
+                </button>
               </div>
-              <Body
-                key={shown.key}
-                item={shown}
-                detail={detail}
-                busy={busy}
-                run={run}
-                onAnswer={onAnswer}
-                onDecide={onDecide}
-                onCode={onCode}
-                onCancelCode={onCancelCode}
-                onStop={onStop}
-              />
-              {shown.kind === SMART_KIND.machine && (
-                <div className="hx-sn__row">
-                  <button type="button" className="hx-sn__link" onClick={hide}>
-                    {t('next.smart.machine.later')}
-                  </button>
-                  <button
-                    type="button"
-                    className="hx-sn__btn"
-                    data-sn-action
-                    onClick={() => onOpenMachine(shown)}
-                  >
-                    {t('next.smart.machine.open')}
-                  </button>
+            )}
+            {!folded && (
+              <div className="hx-sn__card" role="dialog" aria-label={shown.title}>
+                <div className="hx-sn__head">
+                  <Chip item={shown} now={now} large sent={isSent} />
+                  <b className="hx-sn__name">{shown.title}</b>
+                  <span className="hx-sn__ago">{ago(now, shown.at)}</span>
                 </div>
-              )}
-              {shown.chatId !== null && (
-                <div className="hx-sn__foot">
-                  <button type="button" className="hx-sn__link" onClick={() => onOpenChat(shown)}>
-                    {t('next.smart.openChat')}
-                    <Icon name="arrow-up-right" size="sm" />
-                  </button>
-                </div>
-              )}
-              {others.length > 0 && (
-                <ul className="hx-sn__others">
-                  {others.map((item) => (
-                    <li key={item.key}>
-                      <button type="button" className="hx-sn__other" onClick={() => onMain(item.key)}>
-                        <Chip item={item} now={now} sent={sent.has(item.key)} />
-                        <b className="hx-sn__title">{item.title}</b>
-                        <span className="hx-sn__text">{item.text}</span>
-                        <Icon name="chevron-right" size="sm" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+                <Body
+                  key={shown.key}
+                  item={shown}
+                  detail={detail}
+                  busy={busy}
+                  run={run}
+                  onAnswer={onAnswer}
+                  onDecide={onDecide}
+                  onCode={onCode}
+                  onCancelCode={onCancelCode}
+                  onStop={onStop}
+                  onReply={onReply}
+                  reply={reply}
+                />
+                {shown.kind === SMART_KIND.machine && (
+                  <div className="hx-sn__row">
+                    <button type="button" className="hx-sn__link" onClick={() => hide()}>
+                      {t('next.smart.machine.later')}
+                    </button>
+                    <button
+                      type="button"
+                      className="hx-sn__btn"
+                      data-sn-action
+                      onClick={() => onOpenMachine(shown)}
+                    >
+                      {t('next.smart.machine.open')}
+                    </button>
+                  </div>
+                )}
+                {shown.chatId !== null && (
+                  <div className="hx-sn__foot">
+                    <button type="button" className="hx-sn__link" onClick={() => onOpenChat(shown)}>
+                      {t('next.smart.openChat')}
+                      <Icon name="arrow-up-right" size="sm" />
+                    </button>
+                  </div>
+                )}
+                {others.length > 0 && (
+                  <ul className="hx-sn__others">
+                    {others.map((item) => (
+                      <li key={item.key}>
+                        <button type="button" className="hx-sn__other" onClick={() => onMain(item.key)}>
+                          <Chip item={item} now={now} sent={sent.has(item.key)} />
+                          <b className="hx-sn__title">{item.title}</b>
+                          <span className="hx-sn__text">{item.text}</span>
+                          <Icon name="chevron-right" size="sm" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

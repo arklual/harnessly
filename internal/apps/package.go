@@ -1,6 +1,7 @@
 package apps
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,6 +62,9 @@ type MCPServer struct {
 	// Credentialed: the headers carry a credential (a secret the install keeps, a connection's token, the platform's
 	// token). A 401 to such a call is an expired sign-in, not a missing one. Set by the host, never read from a package.
 	Credentialed bool `json:"-"`
+	// ClientCert is the app's certificate for mutual TLS to this server (network.clientCert); set by the host, never read
+	// from a package, and used for this server's calls only.
+	ClientCert *tls.Certificate `json:"-"`
 }
 
 // The kinds of ServerAuth.

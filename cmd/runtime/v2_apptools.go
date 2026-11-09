@@ -34,6 +34,11 @@ func (v *v2Live) serveAppTools(done <-chan struct{}) {
 				return rec.Apps
 			},
 			Open: func(target string) error { return v.openAppTab(conv, target) },
+			// An app turned on after the agent started is used live when it can be (v2_applive.go).
+			Live: func(app string) string {
+				rec, _ := v.rt.Record(conv)
+				return liveAppsOf.hostRefusal(rec.Session)(app)
+			},
 			Check: func(ctx context.Context, app, view string) (apps.LoadCheck, error) {
 				return runAppCheck(ctx, v.d, reg, apps.NewGuests(reg, storage), app, view)
 			},
@@ -85,13 +90,14 @@ func (e paneError) Error() string { return string(e) }
 
 const errNoPane = paneError("the chat has no pane")
 
-// noAppTools lists the tools and refuses every call of an agent the runtime could not place in a chat, with the reason.
+// noAppTools is the server of an agent the runtime could not place in a chat: it offers nothing (every Claude Code chat
+// has the server, HRN-975, and one with no app on must cost nothing), and refuses a call by name with the reason.
 type noAppTools struct{ why string }
 
 var _ mcpserver.Toolset = noAppTools{}
 
-func (noAppTools) Instructions() string { return apps.HostTools{}.Instructions() }
-func (noAppTools) Tools() []any         { return apps.HostTools{}.Tools() }
+func (noAppTools) Instructions() string { return "" }
+func (noAppTools) Tools() []any         { return []any{} }
 func (noAppTools) Has(name string) bool { return apps.HostTools{}.Has(name) }
 func (n noAppTools) Call(context.Context, string, *jsvalue.Object) *jsvalue.Object {
 	return mcpserver.TextResult("refused: "+n.why, true)

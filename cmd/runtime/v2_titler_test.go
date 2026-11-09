@@ -46,3 +46,20 @@ func TestTitlerAsksOnceWithTheFirstExchangeAndCleansTheAnswer(t *testing.T) {
 		t.Fatal("an empty answer is not a title")
 	}
 }
+
+func TestCleanSummaryKeepsFourPlainLinesWithoutCode(t *testing.T) {
+	for in, want := range map[string]string{
+		"Сделал форму.\n\nЖдёт проверки.\n":                 "Сделал форму.\nЖдёт проверки.",
+		"- **Сделал** форму\n- проверил `go test`\n":        "Сделал форму\nпроверил go test",
+		"Готово.\n```\nexport TOKEN=abc\n```\nЖдёт ответа.": "Готово.\nЖдёт ответа.",
+		"раз\nдва\nтри\nчетыре\nпять":                       "раз\nдва\nтри\nчетыре",
+		"   \n": "",
+	} {
+		if got := cleanSummary(in); got != want {
+			t.Errorf("cleanSummary(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if !strings.Contains(summaryPrompt("m", []string{"a", "b"}), "Never quote commands") {
+		t.Error("the prompt forbids commands and secrets")
+	}
+}

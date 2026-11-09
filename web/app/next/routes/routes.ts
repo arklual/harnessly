@@ -18,6 +18,7 @@ export const ROUTE = {
   tasks: 'tasks',
   apps: 'apps',
   app: 'app',
+  appAbout: 'appAbout',
   help: 'help',
   learn: 'learn',
   settings: 'settings',
@@ -86,6 +87,8 @@ export type TRoute =
   | { kind: typeof ROUTE.apps }
   /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it). */
   | { kind: typeof ROUTE.app; id: string; chat?: string }
+  /** The page about an app, installed or not: `/apps/:id/about`. */
+  | { kind: typeof ROUTE.appAbout; id: string }
   /**
    * The documentation: `/help` (its first page), `/help/:section` (the section's first page) and `/help/:section/:page`,
    * `#anchor` a heading of it. An older `/help/:page` of the apps guide comes as a section the page resolves.
@@ -111,6 +114,7 @@ const STATS_RE = /^\/stats\/?$/;
 const EFFICIENCY_RE = /^\/efficiency\/?$/;
 const TASKS_RE = /^\/tasks\/?$/;
 const APPS_RE = /^\/apps\/?$/;
+const APP_ABOUT_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/about\/?$/;
 const APP_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/?$/;
 const HELP_RE = /^\/help(?:\/([a-z0-9][a-z0-9-]{0,62})(?:\/([a-z0-9][a-z0-9-]{0,62}))?)?\/?$/;
 const LEARN_RE = /^\/learn\/?$/;
@@ -165,6 +169,8 @@ export const parseRoute = (path: string): TRoute => {
   if (TASKS_RE.test(pathname)) return { kind: ROUTE.tasks };
   if (APPS_RE.test(pathname)) return { kind: ROUTE.apps };
   if (LEARN_RE.test(pathname)) return { kind: ROUTE.learn };
+  const about = APP_ABOUT_RE.exec(pathname);
+  if (about?.[1]) return { kind: ROUTE.appAbout, id: about[1] };
   const app = APP_RE.exec(pathname);
   if (app?.[1]) {
     const chat = queryParam(path, 'chat');
@@ -269,6 +275,8 @@ export const routePath = (route: TRoute): string => {
       return '/tasks';
     case ROUTE.apps:
       return '/apps';
+    case ROUTE.appAbout:
+      return `/apps/${route.id}/about`;
     case ROUTE.app:
       return route.chat
         ? `/apps/${route.id}?${new URLSearchParams({ chat: route.chat })}`.replace(/%3A/gi, ':')
@@ -320,6 +328,8 @@ export const placeKeyOf = (path: string): string => {
       return `invite:${route.token}`;
     case ROUTE.app:
       return `app:${route.id}`;
+    case ROUTE.appAbout:
+      return `about:${route.id}`;
     case ROUTE.home: {
       const pathname = plainPathname(path);
       return pathname === '/' ? 'home' : pathname;

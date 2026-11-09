@@ -1,0 +1,5 @@
+{
+  "op": "conversation.summarize",
+  "body": {"opId": "op-sm1", "id": "tab-k3Jx9QmZ", "turnId": "c:0f4e9b2a-7d1c-4e3b-9a55-1c2d3e4f5a6b#3"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1845, "rev": 18}
+}

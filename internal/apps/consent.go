@@ -124,6 +124,8 @@ func (r *Registry) GrantWaiting(now time.Time) ([]Installed, error) {
 var (
 	// ErrSameVersionGrew: an update reaches more under the same version; a new right comes with a new version only.
 	ErrSameVersionGrew = errors.New("apps: the package reaches more than the installed one under the same version; raise its version")
+	// ErrNotGranted: the app was not given that access, so there is nothing to take back.
+	ErrNotGranted = errors.New("apps: the access is not granted")
 	// ErrNoConsentWaiting: nothing of the app waits for the person's word (or another version does).
 	ErrNoConsentWaiting = errors.New("apps: nothing waits for consent")
 	// ErrConsentChanged: the package reaches more than the install screen showed (it changed after it was drawn).
@@ -142,6 +144,9 @@ func (a Installed) granted() []string {
 	pkg, _ := CachedPackage(a.Dir)
 	return AccessKeys(AccessOf(a.Manifest, pkg))
 }
+
+// GrantedKeys are the keys the app is given now: each can be taken back alone (Revoke).
+func (a Installed) GrantedKeys() []string { return slices.Clone(a.granted()) }
 
 // wants is what the install reaches now. A dev install runs the author's folder as it is, so it is read from there:
 // an edit that adds a right, a server or a hook takes the app off until the person agrees again. ok is false when the
@@ -262,6 +267,41 @@ func (r *Registry) Consent(id, version string, shown []string, now time.Time) (I
 		return a, r.write(list)
 	}
 	return Installed{}, ErrNoConsentWaiting
+}
+
+// Revoke takes one access back: the key leaves the grant, so the app reaches it no more. What the app
+// still wants is then not covered, and it waits for the person's word like a first install: it is kept off, its
+// views' calls are refused at once (Get), and the card offers «Разрешить» again. It works for every kind of key:
+// perm:, net:, frame:, server:, secret: and part:. A host's install or one from before consent had no grant: it is
+// made from what it reaches now, minus the key. A waiting update is not touched.
+func (r *Registry) Revoke(id, key string, now time.Time) (Installed, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	list, err := r.read()
+	if err != nil {
+		return Installed{}, err
+	}
+	i := slices.IndexFunc(list, func(a Installed) bool { return a.ID == id })
+	if i < 0 {
+		return Installed{}, ErrNotInstalled
+	}
+	a := list[i]
+	have := a.granted()
+	if !slices.Contains(have, key) {
+		return Installed{}, ErrNotGranted
+	}
+	keys := slices.DeleteFunc(slices.Clone(have), func(k string) bool { return k == key })
+	at := now.UnixMilli()
+	if a.Grant != nil {
+		at = a.Grant.At
+	}
+	if a.Wants == nil {
+		// Kept as it was at install, so what the install reaches is told apart from what was agreed to.
+		a.Wants = slices.Clone(have)
+	}
+	a.Grant = &Grant{Keys: keys, At: at}
+	list[i] = a
+	return a, r.write(list)
 }
 
 // Decline is the person's «Отмена»: a pending update is dropped and the running version stays; a first install that

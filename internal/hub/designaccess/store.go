@@ -39,6 +39,35 @@ type txn struct {
 	w    *world
 	now  time.Time
 	seal *sealer // nil: link addresses are not kept
+	// shared: a project's rows may be under another machine of the space (Service.shared).
+	shared bool
+	homes  map[string]string
+}
+
+// key is the machine whose rows hold a project: this one, or with a shared library the machine of the space that
+// recorded it (the most recently changed when several did). A project nobody recorded yet is this machine's.
+func (t *txn) key(id string) string {
+	if !t.shared || t.m.SpaceID == "" {
+		return t.m.ID
+	}
+	if h, ok := t.homes[id]; ok {
+		return h
+	}
+	home := t.m.ID
+	var mine int
+	if err := t.q.QueryRow(t.ctx, `SELECT COUNT(*) FROM design_projects WHERE machine_id = ? AND project_id = ?`, t.m.ID, id).Scan(&mine); err == nil && mine == 0 {
+		var other string
+		err := t.q.QueryRow(t.ctx, `SELECT p.machine_id FROM design_projects p JOIN machines m ON m.id = p.machine_id
+			WHERE p.project_id = ? AND m.space_id = ? AND m.revoked_at IS NULL ORDER BY p.updated_at DESC, p.machine_id LIMIT 1`, id, t.m.SpaceID).Scan(&other)
+		if err == nil && other != "" {
+			home = other
+		}
+	}
+	if t.homes == nil {
+		t.homes = map[string]string{}
+	}
+	t.homes[id] = home
+	return home
 }
 
 func (s *Service) read(ctx context.Context, m store.Machine) (*txn, error) {
@@ -47,7 +76,7 @@ func (s *Service) read(ctx context.Context, m store.Machine) (*txn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal}, nil
+	return &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared}, nil
 }
 
 func (s *Service) write(ctx context.Context, m store.Machine, fn func(t *txn) error) error {
@@ -56,10 +85,10 @@ func (s *Service) write(ctx context.Context, m store.Machine, fn func(t *txn) er
 		if err != nil {
 			return err
 		}
-		return fn(&txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal})
+		return fn(&txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared})
 	})
 	if err == nil {
-		s.kick(m.ID)
+		s.kickSpace(ctx, m)
 	}
 	return err
 }
@@ -90,7 +119,7 @@ func (t *txn) getProject(id string, lock bool) (*project, error) {
 	if lock {
 		q += t.forUpdate()
 	}
-	p, err := scanProject(t.q.QueryRow(t.ctx, q, t.m.ID, id))
+	p, err := scanProject(t.q.QueryRow(t.ctx, q, t.key(id), id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -139,7 +168,7 @@ func scanMember(row interface{ Scan(...any) error }) (member, error) {
 }
 
 func (t *txn) memberOf(id, email string) (*member, error) {
-	m, err := scanMember(t.q.QueryRow(t.ctx, `SELECT `+memberCols+` FROM design_members WHERE machine_id = ? AND project_id = ? AND person_email = ?`, t.m.ID, id, email))
+	m, err := scanMember(t.q.QueryRow(t.ctx, `SELECT `+memberCols+` FROM design_members WHERE machine_id = ? AND project_id = ? AND person_email = ?`, t.key(id), id, email))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -150,7 +179,7 @@ func (t *txn) memberOf(id, email string) (*member, error) {
 }
 
 func (t *txn) members(id string) ([]member, error) {
-	rows, err := t.q.Query(t.ctx, `SELECT `+memberCols+` FROM design_members WHERE machine_id = ? AND project_id = ? ORDER BY granted_at, person_email`, t.m.ID, id)
+	rows, err := t.q.Query(t.ctx, `SELECT `+memberCols+` FROM design_members WHERE machine_id = ? AND project_id = ? ORDER BY granted_at, person_email`, t.key(id), id)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +197,7 @@ func (t *txn) members(id string) ([]member, error) {
 
 func (t *txn) teamGrants(id string) ([]teamGrant, error) {
 	rows, err := t.q.Query(t.ctx, `SELECT team_id, role, can_share, granted_by, granted_at, expires_at FROM design_team_grants
-		WHERE machine_id = ? AND project_id = ? ORDER BY granted_at, team_id`, t.m.ID, id)
+		WHERE machine_id = ? AND project_id = ? ORDER BY granted_at, team_id`, t.key(id), id)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +244,7 @@ func (t *txn) writeLog(projectID, actor, action, subject string, details map[str
 		return err
 	}
 	_, err = t.insertRow(`INSERT INTO design_access_log (id, machine_id, project_id, actor, action, subject, details, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.m.ID, projectID, actor, action, subject, string(raw), ms(t.now))
+		t.key(projectID), projectID, actor, action, subject, string(raw), ms(t.now))
 	return err
 }
 
@@ -230,7 +259,7 @@ type logEntry struct {
 
 func (t *txn) accessLog(id string) ([]logEntry, error) {
 	rows, err := t.q.Query(t.ctx, `SELECT id, actor, action, subject, details, at FROM design_access_log WHERE machine_id = ? AND project_id = ?
-		ORDER BY at DESC, id DESC LIMIT ?`, t.m.ID, id, logLimit)
+		ORDER BY at DESC, id DESC LIMIT ?`, t.key(id), id, logLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +319,7 @@ func (t *txn) insertProject(id, owner, ownerName, level string, legacy bool) (re
 		level = levelNone
 	}
 	_, err = t.q.Exec(t.ctx, `INSERT INTO design_projects (machine_id, project_id, owner_email, owner_name, home_team, team_level, editors_can_share, legacy, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, t.m.ID, id, owner, ownerName, nullStr(home), level, boolInt(home != ""), boolInt(legacy), ms(t.now), ms(t.now))
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, t.key(id), id, owner, ownerName, nullStr(home), level, boolInt(home != ""), boolInt(legacy), ms(t.now), ms(t.now))
 	if store.IsUnique(err) {
 		return regExists, nil
 	}
@@ -356,7 +385,7 @@ func (s *Service) registerDeleted(ctx context.Context, m store.Machine, id, emai
 			return t.writeLog(id, who, "delete_refused", who, map[string]any{"role": nullStr(f.Role)})
 		}
 		for _, table := range []string{"design_members", "design_team_grants", "design_requests", "design_invites", "design_share_links", "design_projects"} {
-			if _, err := t.q.Exec(t.ctx, `DELETE FROM `+table+` WHERE machine_id = ? AND project_id = ?`, t.m.ID, id); err != nil {
+			if _, err := t.q.Exec(t.ctx, `DELETE FROM `+table+` WHERE machine_id = ? AND project_id = ?`, t.key(id), id); err != nil {
 				return err
 			}
 		}
@@ -376,7 +405,7 @@ func (t *txn) setTeam(id, actor, level string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET team_level = ?, updated_at = ? WHERE machine_id = ? AND project_id = ?`, level, ms(t.now), t.m.ID, id); err != nil {
+	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET team_level = ?, updated_at = ? WHERE machine_id = ? AND project_id = ?`, level, ms(t.now), t.key(id), id); err != nil {
 		return err
 	}
 	return t.writeLog(id, actor, "team", level, map[string]any{"from": before.TeamLevel})
@@ -386,7 +415,7 @@ func (t *txn) setEditorsCanShare(id, actor string, value bool) error {
 	if _, err := t.lockProject(id); err != nil {
 		return err
 	}
-	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET editors_can_share = ?, updated_at = ? WHERE machine_id = ? AND project_id = ?`, boolInt(value), ms(t.now), t.m.ID, id); err != nil {
+	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET editors_can_share = ?, updated_at = ? WHERE machine_id = ? AND project_id = ?`, boolInt(value), ms(t.now), t.key(id), id); err != nil {
 		return err
 	}
 	return t.writeLog(id, actor, "settings", "editorsCanShare", map[string]any{"value": value})
@@ -402,7 +431,7 @@ func (t *txn) upsertMember(id, actor, email, role string, expires *time.Time, vi
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (machine_id, project_id, person_email) DO UPDATE SET
 		role = excluded.role, granted_by = excluded.granted_by, granted_at = excluded.granted_at, expires_at = excluded.expires_at, via_invite = excluded.via_invite`,
-		t.m.ID, id, email, role, actor, ms(t.now), nullTime(expires), nullStr(via))
+		t.key(id), id, email, role, actor, ms(t.now), nullTime(expires), nullStr(via))
 	return old != nil, err
 }
 
@@ -474,7 +503,7 @@ func (t *txn) revoke(id, actor, email string, protect bool) error {
 	if err := t.refuseManagerTarget(id, who, protect); err != nil {
 		return err
 	}
-	res, err := t.q.Exec(t.ctx, `DELETE FROM design_members WHERE machine_id = ? AND project_id = ? AND person_email = ?`, t.m.ID, id, who)
+	res, err := t.q.Exec(t.ctx, `DELETE FROM design_members WHERE machine_id = ? AND project_id = ? AND person_email = ?`, t.key(id), id, who)
 	if err != nil {
 		return err
 	}
@@ -484,26 +513,36 @@ func (t *txn) revoke(id, actor, email string, protect bool) error {
 	return t.writeLog(id, actor, "revoke", who, nil)
 }
 
+// machinesOfProject is the condition on machine_id of what every machine made of a project (its invites and links):
+// with a shared library, every machine of the space; otherwise this one.
+func (t *txn) machinesOfProject() (string, []any) {
+	if t.shared && t.m.SpaceID != "" {
+		return `machine_id IN (SELECT id FROM machines WHERE space_id = ?)`, []any{t.m.SpaceID}
+	}
+	return `machine_id = ?`, []any{t.m.ID}
+}
+
 // revokeAll takes back the people, the teams' grants, the team level and every link; requests stay to be decided.
 func (t *txn) revokeAll(id, actor string) error {
 	if _, err := t.lockProject(id); err != nil {
 		return err
 	}
-	people, err := t.q.Exec(t.ctx, `DELETE FROM design_members WHERE machine_id = ? AND project_id = ?`, t.m.ID, id)
+	people, err := t.q.Exec(t.ctx, `DELETE FROM design_members WHERE machine_id = ? AND project_id = ?`, t.key(id), id)
 	if err != nil {
 		return err
 	}
-	if _, err := t.q.Exec(t.ctx, `DELETE FROM design_team_grants WHERE machine_id = ? AND project_id = ?`, t.m.ID, id); err != nil {
+	if _, err := t.q.Exec(t.ctx, `DELETE FROM design_team_grants WHERE machine_id = ? AND project_id = ?`, t.key(id), id); err != nil {
 		return err
 	}
-	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET team_level = 'none', updated_at = ? WHERE machine_id = ? AND project_id = ?`, ms(t.now), t.m.ID, id); err != nil {
+	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET team_level = 'none', updated_at = ? WHERE machine_id = ? AND project_id = ?`, ms(t.now), t.key(id), id); err != nil {
 		return err
 	}
-	invites, err := t.q.Exec(t.ctx, `UPDATE design_invites SET revoked_at = ? WHERE machine_id = ? AND project_id = ? AND revoked_at IS NULL`, ms(t.now), t.m.ID, id)
+	in, args := t.machinesOfProject()
+	invites, err := t.q.Exec(t.ctx, `UPDATE design_invites SET revoked_at = ? WHERE `+in+` AND project_id = ? AND revoked_at IS NULL`, append(append([]any{ms(t.now)}, args...), id)...)
 	if err != nil {
 		return err
 	}
-	shares, err := t.q.Exec(t.ctx, `UPDATE design_share_links SET revoked_at = ? WHERE machine_id = ? AND project_id = ? AND revoked_at IS NULL`, ms(t.now), t.m.ID, id)
+	shares, err := t.q.Exec(t.ctx, `UPDATE design_share_links SET revoked_at = ? WHERE `+in+` AND project_id = ? AND revoked_at IS NULL`, append(append([]any{ms(t.now)}, args...), id)...)
 	if err != nil {
 		return err
 	}
@@ -535,10 +574,10 @@ func (t *txn) transfer(id, actor, email string, strict bool) error {
 		return fail("not_found", "Этот человек ещё ни разу не входил: передать можно тому, кто уже входил")
 	}
 	name := t.w.displayName(next)
-	if _, err := t.q.Exec(t.ctx, `DELETE FROM design_members WHERE machine_id = ? AND project_id = ? AND person_email = ?`, t.m.ID, id, next); err != nil {
+	if _, err := t.q.Exec(t.ctx, `DELETE FROM design_members WHERE machine_id = ? AND project_id = ? AND person_email = ?`, t.key(id), id, next); err != nil {
 		return err
 	}
-	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET owner_email = ?, owner_name = ?, updated_at = ? WHERE machine_id = ? AND project_id = ?`, next, name, ms(t.now), t.m.ID, id); err != nil {
+	if _, err := t.q.Exec(t.ctx, `UPDATE design_projects SET owner_email = ?, owner_name = ?, updated_at = ? WHERE machine_id = ? AND project_id = ?`, next, name, ms(t.now), t.key(id), id); err != nil {
 		return err
 	}
 	var fromRole any
@@ -569,7 +608,7 @@ const requestCols = `id, person_email, level, message, status, decided_by, decid
 
 func (t *txn) requests(id, who, status string) ([]requestRow, error) {
 	q := `SELECT ` + requestCols + ` FROM design_requests WHERE machine_id = ? AND project_id = ? AND status = ?`
-	args := []any{t.m.ID, id, status}
+	args := []any{t.key(id), id, status}
 	if who != "" {
 		q += ` AND person_email = ?`
 		args = append(args, who)
@@ -618,7 +657,7 @@ func (t *txn) request(id, email, level, message string) (requestRow, error) {
 		return requestRow{}, fail("conflict", "Запрос уже отправлен и ждёт ответа")
 	}
 	var deniedAt sql.NullInt64
-	err = t.q.QueryRow(t.ctx, `SELECT MAX(decided_at) FROM design_requests WHERE machine_id = ? AND project_id = ? AND person_email = ? AND status = 'denied'`, t.m.ID, id, who).Scan(&deniedAt)
+	err = t.q.QueryRow(t.ctx, `SELECT MAX(decided_at) FROM design_requests WHERE machine_id = ? AND project_id = ? AND person_email = ? AND status = 'denied'`, t.key(id), id, who).Scan(&deniedAt)
 	if err != nil {
 		return requestRow{}, err
 	}
@@ -627,7 +666,7 @@ func (t *txn) request(id, email, level, message string) (requestRow, error) {
 	}
 	r := requestRow{ID: newUUID(), Email: who, Level: level, Message: clip(message, maxMessage), Status: "open", CreatedAt: t.now}
 	if _, err := t.q.Exec(t.ctx, `INSERT INTO design_requests (id, machine_id, project_id, person_email, level, message, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
-		r.ID, t.m.ID, id, who, level, r.Message, ms(t.now)); err != nil {
+		r.ID, t.key(id), id, who, level, r.Message, ms(t.now)); err != nil {
 		return requestRow{}, err
 	}
 	return r, t.writeLog(id, who, "request", who, map[string]any{"level": level})
@@ -670,7 +709,7 @@ func (t *txn) decide(id, requestID, actor, decision, role string, term ttl) (req
 		return requestRow{}, fail("conflict", "Запрос уже обработан или не найден")
 	}
 	res, err := t.q.Exec(t.ctx, `UPDATE design_requests SET status = ?, decided_by = ?, decided_at = ? WHERE id = ? AND machine_id = ? AND project_id = ? AND status = 'open'`,
-		status, actor, ms(t.now), requestID, t.m.ID, id)
+		status, actor, ms(t.now), requestID, t.key(id), id)
 	if err != nil {
 		return requestRow{}, err
 	}
@@ -723,14 +762,14 @@ func (t *txn) grantTeam(id, actor, team, role string, canShare bool, term ttl) e
 		return fail("not_found", "Команда не найдена")
 	}
 	var existed int
-	if err := t.q.QueryRow(t.ctx, `SELECT COUNT(*) FROM design_team_grants WHERE machine_id = ? AND project_id = ? AND team_id = ?`, t.m.ID, id, team).Scan(&existed); err != nil {
+	if err := t.q.QueryRow(t.ctx, `SELECT COUNT(*) FROM design_team_grants WHERE machine_id = ? AND project_id = ? AND team_id = ?`, t.key(id), id, team).Scan(&existed); err != nil {
 		return err
 	}
 	if _, err := t.q.Exec(t.ctx, `INSERT INTO design_team_grants (machine_id, project_id, team_id, role, can_share, granted_by, granted_at, expires_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (machine_id, project_id, team_id) DO UPDATE SET
 		role = excluded.role, can_share = excluded.can_share, granted_by = excluded.granted_by, granted_at = excluded.granted_at, expires_at = excluded.expires_at`,
-		t.m.ID, id, team, role, boolInt(sharing), actor, ms(t.now), nullTime(expires)); err != nil {
+		t.key(id), id, team, role, boolInt(sharing), actor, ms(t.now), nullTime(expires)); err != nil {
 		return err
 	}
 	action := "team_grant"
@@ -757,7 +796,7 @@ func (t *txn) revokeTeam(id, actor, team string) error {
 	if _, err := t.lockProject(id); err != nil {
 		return err
 	}
-	res, err := t.q.Exec(t.ctx, `DELETE FROM design_team_grants WHERE machine_id = ? AND project_id = ? AND team_id = ?`, t.m.ID, id, team)
+	res, err := t.q.Exec(t.ctx, `DELETE FROM design_team_grants WHERE machine_id = ? AND project_id = ? AND team_id = ?`, t.key(id), id, team)
 	if err != nil {
 		return err
 	}
@@ -876,7 +915,7 @@ func (t *txn) createInvite(id, actor string, in inviteInput) (string, string, ti
 	token := randomToken(32)
 	inviteID := newUUID()
 	if _, err := t.q.Exec(t.ctx, `INSERT INTO design_invites (id, machine_id, project_id, token_hash, title, role, role_ttl_ms, expires_at, max_uses, created_by, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, inviteID, t.m.ID, id, store.HashToken(token), clip(in.Title, maxTitle), in.Role, roleTTL, ms(*expires), maxUses, normEmail(actor), ms(t.now)); err != nil {
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, inviteID, t.key(id), id, store.HashToken(token), clip(in.Title, maxTitle), in.Role, roleTTL, ms(*expires), maxUses, normEmail(actor), ms(t.now)); err != nil {
 		return "", "", time.Time{}, err
 	}
 	return inviteID, token, *expires, t.writeLog(id, actor, "invite", inviteID, map[string]any{"role": in.Role, "until": iso(expires), "maxUses": maxUses})

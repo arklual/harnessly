@@ -34,6 +34,15 @@ var (
 type ArtifactStore struct {
 	root string
 	now  func() time.Time
+	// Written is told when material was written (a draft, a claim, approved text): under a hub the runtime moves it
+	// into the store's `handoff` collection at once (internal/datamove). It must not block.
+	Written func()
+}
+
+func (s *ArtifactStore) written() {
+	if s.Written != nil {
+		s.Written()
+	}
 }
 
 // NewArtifactStore opens the private handoff store below dataDir and removes expired material left by a previous
@@ -159,6 +168,7 @@ func (s *ArtifactStore) Snapshot(sourceID, transcriptPath, targetID string) (wir
 		_ = os.Remove(tmp)
 		return wire.HandoffArtifact{}, err
 	}
+	s.written()
 	return wire.HandoffArtifact{ID: id, Bytes: written}, nil
 }
 
@@ -213,6 +223,7 @@ func (s *ArtifactStore) Claim(sourceID, artifactID, targetID string) (string, in
 	} else if err != nil {
 		return "", 0, err
 	}
+	s.written()
 	return to, info.Size(), nil
 }
 
@@ -238,6 +249,7 @@ func (s *ArtifactStore) PutText(targetID, text string) (string, int64, error) {
 		_ = os.Remove(tmp)
 		return "", 0, err
 	}
+	s.written()
 	return target, int64(len(text)), nil
 }
 

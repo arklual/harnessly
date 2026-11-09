@@ -18,6 +18,9 @@ interface ICodeFieldProps {
   label: string;
   state?: TCodeFieldState;
   disabled?: boolean;
+  /** Offer the code from a message (`one-time-code`). Off where the code is never one sent by message (an
+   *  authenticator's): Safari on a Mac takes such a field for a login one and offers its passwords over it. */
+  fromMessages?: boolean;
   ref?: Ref<HTMLInputElement>;
 }
 
@@ -32,6 +35,7 @@ const CodeField = ({
   label,
   state = CODE_FIELD.idle,
   disabled = false,
+  fromMessages = true,
   ref,
 }: ICodeFieldProps) => {
   const own = useRef<HTMLInputElement | null>(null);
@@ -83,7 +87,12 @@ const CodeField = ({
         type="text"
         inputMode="numeric"
         pattern="[0-9]*"
-        autoComplete="one-time-code"
+        autoComplete={fromMessages ? 'one-time-code' : 'off'}
+        autoCorrect="off"
+        autoCapitalize="off"
+        data-1p-ignore
+        data-lpignore="true"
+        data-form-type="other"
         enterKeyHint="done"
         spellCheck={false}
         maxLength={length}

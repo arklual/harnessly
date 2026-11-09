@@ -6,7 +6,6 @@
     { "path": "/api/platform/history/search", "capability": "history", "task": "HRN-879", "note": "the search over the cluster's copy (commands/pages.ts searchMessages); a gateway route, and the hub's own with its copy on (internal/hub/proxy/history.go)." },
     { "path": "/api/platform/history/conversations", "capability": "history", "task": "HRN-737", "note": "central conversation history (gatewayPath in next/stores/central.ts): a gateway route." },
     { "path": "/api/platform/voice/takes", "capability": "voice-cloud", "task": "HRN-737", "note": "cloud voice takes: a gateway route." },
-    { "path": "/api/fs", "capability": "disk", "task": "HRN-737", "note": "the disk screen (hl-disk-api.ts, hl-disk-uploader.ts): /api/fs/* has no route in the public runtime." },
     { "path": "/api/platform/uploads/files", "capability": "history", "task": "HRN-879", "note": "uploads mirrored on the gateway; called only with centralUploads, which the public hub and runtime keep off." },
     { "path": "/api/platform/uploads/blobs", "capability": "history", "task": "HRN-879", "note": "the bytes of a mirrored upload on the gateway; only with centralUploads." },
     { "path": "/api/platform/uploads/refs", "capability": "history", "task": "HRN-879", "note": "an upload's reference to its hash on the gateway; only with centralUploads." },

@@ -9,7 +9,6 @@ import {
   useState,
   type ChangeEvent,
   type DragEvent,
-  type MouseEvent,
   type PointerEvent,
   type ReactElement,
   type ReactNode,
@@ -18,7 +17,7 @@ import Segmented from '@/next/ui/segmented';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import { useKeys } from '@/next/features/keys/use-keys';
-import ListMenu from '@/next/features/pane/list-menu';
+import { MenuItem, PointMenu, useContextMenu } from '@/next/ui/context-menu';
 import QuickOpen from '@/next/features/pane/quick-open';
 import FindInFiles, {
   NO_FIND,
@@ -363,42 +362,11 @@ const FilesView = ({
     event.target.value = '';
   };
   const [dropping, setDropping] = useState(false);
-  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
-  const listItems = [
-    ...(take
-      ? [
-          {
-            icon: 'folder-plus' as const,
-            label: t('next.files.newFolder'),
-            onPick: () => startEdit({ kind: 'newFolder', name: '' }),
-          },
-        ]
-      : []),
-    ...(entryOps
-      ? [
-          {
-            icon: 'file-plus' as const,
-            label: t('next.files.newFile'),
-            onPick: () => startEdit({ kind: 'newFile', name: '' }),
-          },
-        ]
-      : []),
-    ...(take
-      ? [
-          {
-            icon: 'upload' as const,
-            label: t('next.files.upload'),
-            onPick: () => filesInput.current?.click(),
-          },
-        ]
-      : []),
-  ];
-  const openListMenu = (event: MouseEvent) => {
-    if (listItems.length === 0 || (event.target as HTMLElement).closest('.hx-disk__item, .hx-disk__name'))
-      return;
-    event.preventDefault();
-    setMenuAt({ x: event.clientX, y: event.clientY });
-  };
+  // The empty part of the list (a right click or a held finger): a new folder, a new file, files to upload.
+  const listMenu = useContextMenu({
+    accept: (target) =>
+      (take !== null || entryOps !== null) && target.closest('.hx-disk__item, .hx-disk__name') === null,
+  });
   const carriesFiles = (event: DragEvent) => event.dataTransfer.types.includes('Files');
   const dropTo = take
     ? {
@@ -578,7 +546,7 @@ const FilesView = ({
               data-picking={picking !== null || undefined}
               data-drop={dropping || undefined}
               {...dropTo}
-              onContextMenu={openListMenu}
+              {...listMenu.handlers}
               role={listing === null ? 'status' : undefined}
               aria-label={listing === null ? t('next.files.loading') : undefined}
             >
@@ -797,7 +765,23 @@ const FilesView = ({
           )}
         </PaneHead>
       </div>
-      <ListMenu at={menuAt} items={listItems} onClose={() => setMenuAt(null)} />
+      <PointMenu menu={listMenu} label={t('next.files.listMenu')} kind="files">
+        {take && (
+          <MenuItem icon="folder-plus" onClick={() => startEdit({ kind: 'newFolder', name: '' })}>
+            {t('next.files.newFolder')}
+          </MenuItem>
+        )}
+        {entryOps && (
+          <MenuItem icon="file-plus" onClick={() => startEdit({ kind: 'newFile', name: '' })}>
+            {t('next.files.newFile')}
+          </MenuItem>
+        )}
+        {take && (
+          <MenuItem icon="upload" onClick={() => filesInput.current?.click()}>
+            {t('next.files.upload')}
+          </MenuItem>
+        )}
+      </PointMenu>
     </div>
   );
 };

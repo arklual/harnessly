@@ -1,0 +1,28 @@
+/* The stand-in for a running app in the page gallery: a few quiet bars. */
+.hx-gallery-apppage .hx-main {
+  display: flex;
+  min-height: 100vh;
+}
+.hx-gallery-apppage__fake {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+.hx-gallery-apppage__fake i {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--hx-bg-bubble);
+}
+.hx-gallery-apppage__fake i:nth-child(1) {
+  width: 40%;
+  height: 22px;
+}
+.hx-gallery-apppage__fake i:nth-child(3) {
+  width: 80%;
+}
+.hx-gallery-apppage__fake i:nth-child(4) {
+  width: 60%;
+}

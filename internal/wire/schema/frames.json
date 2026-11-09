@@ -15,7 +15,7 @@
       "enum": [
         "queue", "steer", "questions", "permissions", "background", "model", "voice", "files", "checkpoints",
         "designly", "search", "vault", "push", "terminal", "machine", "apps", "settings", "drafts", "queue-move", "apps-hub", "terminal-stop", "rewind", "fork", "handoff",
-        "auto-continue", "made", "agent-browser"
+        "auto-continue", "made", "agent-browser", "snapshot-after"
       ]
     },
     "Reach": {"enum": ["online", "unreachable", "unknown"]},
@@ -288,7 +288,7 @@
         "conversation.create", "conversation.rename", "conversation.pin", "conversation.apps", "conversation.test", "conversation.move",
         "conversation.delete", "conversation.restore", "conversation.resume", "model", "bg.stop",
         "project.create", "project.update", "favorites.group.create", "favorites.group.rename", "favorites.group.delete",
-        "favorites.group.move", "favorites.place", "goal", "conversation.retitle", "draft.set", "queue.move", "terminal.stop", "rewind", "rewind.undo",
+        "favorites.group.move", "favorites.place", "goal", "conversation.retitle", "conversation.summarize", "draft.set", "queue.move", "terminal.stop", "rewind", "rewind.undo",
         "conversation.fork", "conversation.handoff", "conversation.merge",
         "limit"
       ]
@@ -2828,6 +2828,16 @@
         "id": {"$ref": "#/$defs/ConvId"}
       }
     },
+    "Cmd_conversation_summarize": {
+      "type": "object",
+      "required": ["opId", "id", "turnId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "turnId": {"$ref": "#/$defs/TurnId"}
+      }
+    },
     "Cmd_conversation_apps": {
       "type": "object",
       "required": ["opId", "id", "apps"],
@@ -3307,6 +3317,12 @@
           "type": "object",
           "required": ["op", "body"],
           "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.summarize"}, "body": {"$ref": "#/$defs/Cmd_conversation_summarize"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
           "properties": {"op": {"const": "draft.set"}, "body": {"$ref": "#/$defs/Cmd_draft_set"}}
         },
         {
@@ -3670,6 +3686,16 @@
           "properties": {
             "op": {"const": "conversation.retitle"},
             "body": {"$ref": "#/$defs/Cmd_conversation_retitle"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.summarize"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_summarize"},
             "result": {"$ref": "#/$defs/CmdResult"}
           }
         },

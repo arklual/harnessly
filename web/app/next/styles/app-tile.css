@@ -1,0 +1,139 @@
+/* The card of an app on /apps: installed and catalog alike. The name is the largest thing; the rest is quiet. */
+.hx-appk {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  transition:
+    border-color var(--hx-dur-md) var(--hx-ease-out),
+    box-shadow var(--hx-dur-md) var(--hx-ease-out),
+    transform var(--hx-dur-md) var(--hx-ease-out);
+  animation: hx-appmain-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+}
+.hx-appk[data-open]:hover {
+  border-color: var(--hx-border-strong);
+  box-shadow: var(--hx-shadow-md);
+  transform: translateY(-1px);
+}
+.hx-appk[data-muted] .hx-appk__body {
+  opacity: 0.55;
+}
+.hx-appk__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hx-space-1);
+  min-width: 0;
+  padding: var(--hx-space-5) var(--hx-space-5) var(--hx-space-4);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+}
+button.hx-appk__body {
+  cursor: pointer;
+}
+.hx-appk__body:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -2px;
+}
+.hx-appk__tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--hx-space-3);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-appk__name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--hx-text-lg, 1.0625rem);
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-appk__line {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.hx-appk__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--hx-space-2);
+  margin-top: auto;
+  padding-top: var(--hx-space-3);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs, var(--hx-text-sm));
+}
+.hx-appk__note {
+  color: var(--hx-accent);
+}
+.hx-appk__action {
+  padding: 0 var(--hx-space-5) var(--hx-space-4);
+}
+.hx-appk--skel {
+  min-height: 156px;
+  border-style: dashed;
+}
+
+/* The grid of cards: as many columns as fit, the whole width of the page. */
+.hx-appk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--hx-space-4);
+}
+@media (max-width: 760px) {
+  .hx-appk-grid {
+    grid-template-columns: 1fr;
+    gap: var(--hx-space-2);
+  }
+  /* On the phone a card is a row: the glyph on the left, the name and what it does on the right. */
+  .hx-appk__body {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: var(--hx-space-3);
+    align-items: center;
+    padding: var(--hx-space-3) var(--hx-space-4);
+  }
+  .hx-appk__tile {
+    grid-row: 1 / span 3;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0;
+    align-self: start;
+  }
+  .hx-appk__foot {
+    padding-top: 0;
+    margin-top: 0;
+  }
+  .hx-appk__action {
+    padding: 0 var(--hx-space-4) var(--hx-space-3) calc(40px + var(--hx-space-3) + var(--hx-space-4));
+  }
+  .hx-appk--skel {
+    min-height: 72px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-appk {
+    animation: none;
+    transition: none;
+  }
+  .hx-appk[data-open]:hover {
+    transform: none;
+  }
+}

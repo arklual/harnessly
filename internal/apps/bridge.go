@@ -67,6 +67,9 @@ type BridgeError struct {
 	Detail string
 	// SignIn, for an auth code, is where the person signs in; nil when no sign-in mends it.
 	SignIn *SignIn
+	// Hint is a sentence for the person: what is wrong and who can fix it (a host outside the deployment's network
+	// policy). It names nothing the page could not know: the host is the one the app asked for.
+	Hint string
 }
 
 func (e *BridgeError) Error() string { return e.Code + ": " + e.Message }

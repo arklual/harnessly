@@ -1,0 +1,74 @@
+/* The notification centre's gallery page (?dev=notifcenter): a made-up window around the bell; not part of the product. */
+.hx-ncg {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  font-family: var(--hx-font-ui);
+}
+.hx-ncg__side {
+  width: 248px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 10px;
+  box-sizing: border-box;
+  background: var(--hx-bg-rail);
+  border-right: 1px solid var(--hx-border);
+}
+.hx-ncg__proj {
+  margin: 4px 8px 8px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-ncg__chat {
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-ncg__chat[data-on] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-ncg__sp {
+  flex: 1;
+}
+.hx-ncg__bell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+.hx-ncg__bell:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-ncg__main {
+  flex: 1;
+  padding: 24px 32px;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-3);
+}
+@media (max-width: 900px) {
+  .hx-ncg__side {
+    width: 100%;
+  }
+  .hx-ncg__main {
+    display: none;
+  }
+}

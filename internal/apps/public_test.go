@@ -324,7 +324,7 @@ func TestUnpackArchiveReusesOnlyItsOwnFolder(t *testing.T) {
 		raw []byte
 		sum string
 	}{"first": {rawA, ArchiveSum(rawA)}, "other archive over it": {rawB, ArchiveSum(rawB)}, "first again": {rawA, ArchiveSum(rawA)}} {
-		pkg, err := unpackArchive(tc.raw, "acme.demo", "1.0.0", tc.sum, TemplateVersion, dst)
+		pkg, err := unpackArchive(tc.raw, "acme.demo", "1.0.0", tc.sum, TemplateVersion, dst, nil)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -341,7 +341,7 @@ func TestUnpackArchiveReusesOnlyItsOwnFolder(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dst, "planted.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := unpackArchive(rawA, "acme.demo", "1.0.0", ArchiveSum(rawA), TemplateVersion, dst); err != nil {
+	if _, err := unpackArchive(rawA, "acme.demo", "1.0.0", ArchiveSum(rawA), TemplateVersion, dst, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dst, "planted.txt")); err == nil {

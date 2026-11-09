@@ -95,3 +95,17 @@
   font-size: var(--hx-text-sm);
   overflow-wrap: anywhere;
 }
+
+/* A section of cards on /apps: the team's catalog, the public one. */
+.hx-appsec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  margin-top: var(--hx-space-8, 40px);
+}
+.hx-appsec__h2 {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-md, 1rem);
+  font-weight: var(--hx-weight-semibold);
+}

@@ -1039,8 +1039,10 @@ func TestHeartbeatGoesOnWhileARunWorks(t *testing.T) {
 		return clock
 	}}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go r.beatLoop(ctx, 5*time.Millisecond)
+	done := make(chan struct{})
+	go func() { r.beatLoop(ctx, 5*time.Millisecond); close(done) }()
+	// The loop ends before the test's folder is removed: a beat being written would leave a file in it.
+	defer func() { cancel(); <-done }()
 	read := func() int64 {
 		raw, err := os.ReadFile(filepath.Join(r.LinkDir, hubproto.EnvRunnerFile))
 		var b hubproto.EnvRunnerBeat

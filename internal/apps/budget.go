@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -56,7 +55,7 @@ func MCPWeight(ctx context.Context, srv MCPServer) (instructionsBytes, toolsByte
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	c := &mcpConn{url: srv.URL, headers: srv.Headers, http: &http.Client{
-		Transport:     &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: 10 * time.Second, Control: dialControl(false)}).DialContext},
+		Transport:     currentNetwork().Transport(mcpHost(srv.URL), dialControl(mcpHost(srv.URL), false)),
 		CheckRedirect: noRedirects,
 	}}
 	initRes, err := c.rpc(ctx, 1, "initialize", map[string]any{

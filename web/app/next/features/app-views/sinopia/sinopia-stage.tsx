@@ -49,6 +49,10 @@ export interface ISinopiaStageProps {
   viewing?: boolean;
   /** The document's own view. */
   children: ReactNode;
+  /** A band over the view (the project's kit). */
+  band?: ReactNode;
+  /** A panel of the document beside the view (its «Версии»), mounted while it shows and leaves. */
+  side?: ReactNode;
 }
 
 const SinopiaStage = ({
@@ -59,6 +63,8 @@ const SinopiaStage = ({
   sinopia,
   viewing = false,
   children,
+  band,
+  side,
 }: ISinopiaStageProps) => {
   const { active, focus, selection, viewPort } = sinopia;
   const panels = panelsOf(active);
@@ -85,8 +91,12 @@ const SinopiaStage = ({
   const bar = usePresence(!viewing && selection.length > 0 && actions.length > 0 ? 'bar' : null, EXIT_MS);
 
   return (
-    <div className="hx-sinopia" data-aside={aside !== null || undefined}>
-      <div className="hx-sinopia__main">{children}</div>
+    <div className="hx-sinopia" data-aside={aside !== null || band != null || side != null || undefined}>
+      <div className="hx-sinopia__main">
+        {band}
+        {children}
+      </div>
+      {aside === null && side}
       {aside !== null && (
         <aside className="hx-sinopia__panel" data-state={presence.state} aria-label={t('next.sinopia.panel')}>
           <div className="hx-sinopia__head">

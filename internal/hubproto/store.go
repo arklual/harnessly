@@ -32,6 +32,10 @@ type StoreSession struct {
 	Path string `json:"path"`
 	// Collections are the kinds this machine may open.
 	Collections []string `json:"collections"`
+	// Person names the machine's person in the apps collection: their user areas are
+	// storage/<app>/user/<Person>.json, which no other person's machine sees. "" from a hub that names nobody (an
+	// older one, or a machine nobody made): the user areas stay on the machine.
+	Person string `json:"person,omitempty"`
 }
 
 // SignStore makes the Authorization header value of the request for a store session.
@@ -42,4 +46,16 @@ func SignStore(priv ed25519.PrivateKey, machineID string, now time.Time, host st
 // VerifyStore is VerifyDial for the header SignStore made.
 func VerifyStore(pub ed25519.PublicKey, a DialAuth, host string, now time.Time) error {
 	return verifyHeader(StoreDomain, pub, a, host, now)
+}
+
+// SpaceApp is an app installed for a space as the hub lists it from the store (GET /api/spaces/{id}/apps):
+// the hub serves its view to the space's members at Path with every machine off.
+type SpaceApp struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Version string   `json:"version"`
+	Targets []string `json:"targets"`
+	// Path is the app's page at the hub (/apps/space/<space id>/<app id>/); empty for an app without a view for the app
+	// target.
+	Path string `json:"path,omitempty"`
 }

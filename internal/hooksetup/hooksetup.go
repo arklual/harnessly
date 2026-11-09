@@ -66,6 +66,8 @@ type Config struct {
 	// Budget writes the script that applies the hub's limits (internal/budget) and puts it in the Claude hook
 	// settings. Off, the files are as they were; it is on where a hub carries the runtime.
 	Budget bool
+	// AppsLiveHook is the live hook of the apps on UserPromptSubmit (claude.HookSettingsConfig.AppsLiveHook); "" for none.
+	AppsLiveHook string
 	// BudgetFile is the limits file as the script spells it (`$HOME/.<name>/budget.json`); "" is the data folder's.
 	BudgetFile string
 }
@@ -295,7 +297,8 @@ func (c Config) MCPConfig(port int, token string) []byte {
 
 // HookSettings is the `--settings` file Claude is launched with.
 func (w *Writer) HookSettings() []byte {
-	c := claude.HookSettingsConfig{StatusHook: w.StatusHookPath(), PermissionHook: w.PermissionHookPath(), Statusline: w.StatuslinePath(), Allow: w.cfg.Allow}
+	c := claude.HookSettingsConfig{StatusHook: w.StatusHookPath(), PermissionHook: w.PermissionHookPath(), Statusline: w.StatuslinePath(), Allow: w.cfg.Allow,
+		AppsLiveHook: w.cfg.AppsLiveHook}
 	if w.cfg.Budget {
 		c.BudgetHook = w.BudgetHookPath()
 	}

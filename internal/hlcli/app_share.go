@@ -128,7 +128,12 @@ func (c *cli) appPublish(args []string) error {
 		dir = rest[0]
 	}
 	dir = c.appDir(dir)
-	status, raw, err := c.call("POST", "/api/cli/apps/publish", nil, map[string]any{"dir": dir, "channel": channel, "team": vals["team"] == "true"})
+	body := map[string]any{"dir": dir, "channel": channel, "team": vals["team"] == "true"}
+	if strings.HasSuffix(dir, ".hlapp") {
+		// A package file: its signature (FILE.hlapp.sig) is checked and travels with the version on stable.
+		body = map[string]any{"archive": dir, "channel": channel, "team": vals["team"] == "true"}
+	}
+	status, raw, err := c.call("POST", "/api/cli/apps/publish", nil, body)
 	if err != nil {
 		return err
 	}
@@ -145,6 +150,13 @@ func (c *cli) appPublish(args []string) error {
 			c.out("%s\n", p)
 		}
 		return fail("not published: the package has errors (harnessly app validate %s)", dir)
+	}
+	if status == 403 && out.Error == "signature" {
+		var m struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(raw, &m)
+		return fail("not published: %s", m.Message)
 	}
 	if status >= 300 {
 		return shareError(status, raw)
