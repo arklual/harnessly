@@ -28,7 +28,7 @@ import ToolPane from '@/next/features/pane/tool-pane';
 import DesignlyHome, { type IDesignCard } from '@/next/features/designly/designly-home';
 import SiteView, { type ISitePage, type ISiteTab } from '@/next/features/designly/site-view';
 import Composer from '@/next/features/composer/composer';
-import { noteQuote } from '@/next/features/designly/site-notes';
+import { noteChip } from '@/next/features/designly/site-notes';
 import { usePaneChatStage } from '@/next/bindings/pane-stage';
 import { patchDesignNotes, useDesignNotes } from '@/next/stores/design-notes';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
@@ -332,8 +332,15 @@ const ChatField = () => {
         onFiles={() => {}}
         onRemoveAttachment={() => {}}
         onRetryAttachment={() => {}}
-        quotes={notes.map((note, i) => noteQuote(note, i + 1))}
-        onRemoveQuote={(id) => patchDesignNotes(CONV, (have) => have.filter((n) => n.id !== id))}
+        noteGroups={[
+          {
+            key: 'design',
+            notes: notes.map(noteChip),
+            onEdit: (id, words) =>
+              patchDesignNotes(CONV, (have) => have.map((n) => (n.id === id ? { ...n, text: words } : n))),
+            onRemove: (id) => patchDesignNotes(CONV, (have) => have.filter((n) => n.id !== id)),
+          },
+        ]}
         recording={null}
         onCancelRecording={() => {}}
         onFinishRecording={() => {}}

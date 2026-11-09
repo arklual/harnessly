@@ -50,6 +50,33 @@ func TestHeavyCalls(t *testing.T) {
 		{"npx", "eslint .", true},
 		{"npx", "prettier --check .", false},
 		{"npx", "tsc --version", false},
+		{"vitest", "--watch", false},
+		{"tsc", "-w -p .", false},
+		{"npm", "test", true},
+		{"npm", "t", true},
+		{"npm", "--prefix web test", true},
+		{"npm", "run lint", true},
+		{"npm", "run test:unit -- --reporter dot", true},
+		{"npm", "run build:web", true},
+		{"npm", "run check", true},
+		{"npm", "run dev", false},
+		{"npm", "run test -- --watch", false},
+		{"npm", "run", false},
+		{"npm", "install", false},
+		{"npm", "ci", false},
+		{"npm", "view vitest version", false},
+		{"npm", "exec vitest run", true},
+		{"npm", "exec -- eslint .", true},
+		{"npm", "--version", false},
+		{"pnpm", "test", true},
+		{"pnpm", "--filter web run build", true},
+		{"pnpm", "-C web lint", true},
+		{"pnpm", "vitest run", true},
+		{"pnpm", "dlx tsc --noEmit", true},
+		{"pnpm", "exec playwright test", true},
+		{"pnpm", "install", false},
+		{"pnpm", "dev", false},
+		{"pnpm", "add -D vitest", false},
 	}
 	for _, c := range cases {
 		if got := Heavy(c.tool, strings.Fields(c.args)); got != c.want {
@@ -112,10 +139,12 @@ func (f *fixture) run(args ...string) int {
 
 func (f *fixture) holdSlot(t *testing.T, n int) *os.File {
 	t.Helper()
-	if err := ensureDir(f.slots); err != nil {
+	root, err := openDir(f.slots)
+	if err != nil {
 		t.Fatal(err)
 	}
-	lock, err := openShared(filepath.Join(f.slots, "slot"+string(rune('0'+n))), os.O_RDONLY)
+	defer root.Close()
+	lock, err := openShared(root, "slot"+string(rune('0'+n)), os.O_RDONLY)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,8 +314,10 @@ func TestStatsCommand(t *testing.T) {
 
 func TestALinkInTheSharedFolderIsNeverFollowed(t *testing.T) {
 	f := newFixture(t)
-	if err := ensureDir(f.slots); err != nil {
+	if root, err := openDir(f.slots); err != nil {
 		t.Fatal(err)
+	} else {
+		root.Close()
 	}
 	victim := filepath.Join(t.TempDir(), "victim")
 	if err := os.WriteFile(victim, []byte("keep"), 0o644); err != nil {
@@ -309,7 +340,50 @@ func TestALinkedFolderIsNotUsedForSlots(t *testing.T) {
 	_ = os.MkdirAll(real, 0o755)
 	link := filepath.Join(root, "link")
 	_ = os.Symlink(real, link)
-	if err := ensureDir(link); err == nil {
+	if root, err := openDir(link); err == nil {
+		root.Close()
 		t.Error("a link was taken for the slots' folder")
+	}
+}
+
+func TestAHardLinkOrALinkInsideTheFolderIsNotUsed(t *testing.T) {
+	f := newFixture(t)
+	root, err := openDir(f.slots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	victim := filepath.Join(f.slots, "victim")
+	if err := os.WriteFile(victim, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(victim, filepath.Join(f.slots, "events")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("victim", filepath.Join(f.slots, "slot1")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openShared(root, "events", os.O_WRONLY|os.O_APPEND); err == nil {
+		t.Error("a hard link was opened")
+	}
+	if _, err := openShared(root, "slot1", os.O_RDONLY); err == nil {
+		t.Error("a link inside the folder was followed")
+	}
+	f.env["HARNESSLY_HEAVY_SLOTS"] = "1"
+	f.run("go", "test", "./...")
+	if got, _ := os.ReadFile(victim); string(got) != "keep" {
+		t.Errorf("the linked file was written: %q", got)
+	}
+}
+
+func TestANewFolderIsOpenToAllAndSticky(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "slots")
+	root, err := openDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root.Close()
+	if st, err := os.Lstat(dir); err != nil || st.Mode().Perm() != 0o777 || st.Mode()&os.ModeSticky == 0 {
+		t.Errorf("mode %v %v", st.Mode(), err)
 	}
 }

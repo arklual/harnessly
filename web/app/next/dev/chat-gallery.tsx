@@ -25,7 +25,8 @@ import { MessagePictures, type IMessagePictures } from '@/next/features/chat/pic
 import { RewindActions, type IRewindActions } from '@/next/features/chat/rewind';
 import { DelegatedChats } from '@/next/features/chat/delegation';
 import type { Conversation } from '@/next/protocol/v2';
-import SelBar from '@/next/features/chat/selbar';
+import SelBar, { FeedNotesBar, showFeedNote, useFeedNoteChips } from '@/next/features/chat/selbar';
+import type { INoteChipGroup } from '@/next/ui/notes/note-chips';
 import { ChatLinks, type IChatLinks } from '@/next/features/chat/handoff';
 import HandoffSheet, { SHEET_MODE, type TSheetMode } from '@/next/features/chat/handoff-sheet';
 import type {
@@ -61,7 +62,7 @@ import type {
 import GateCard from '@/next/features/questions/gate-card';
 import QuestionCard from '@/next/features/questions/question-card';
 import type { Permission, PermissionScope, Question } from '@/next/features/questions/types';
-import { quoteLabel, quoteTitle } from '@/next/stores/quotes';
+import { clearQuotes, editQuote, removeQuote, useQuotes, withQuotes } from '@/next/stores/quotes';
 import { useFeedKinds } from '@/next/stores/feed-kinds';
 import { bindLaunch } from '@/next/ui/flight';
 import { PortalContext } from '@/next/ui/portal';
@@ -1812,9 +1813,23 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
 
   // The field sends: with the agent idle the bubble goes to the feed and is confirmed a moment later, with it working
   // the message goes to the queue and is handed over later, so the motion of both can be seen (?scene=live).
+  const feedChips = useFeedNoteChips(CONV);
+  const feedQuotes = useQuotes(CONV);
+  const feedSend = useRef<(() => void) | null>(null);
+  const noteGroups: INoteChipGroup[] = [
+    {
+      key: 'feed',
+      notes: feedChips,
+      onEdit: (id, comment) => editQuote(CONV, id, comment),
+      onRemove: (id) => removeQuote(CONV, id),
+      onOpen: (id) => showFeedNote(CONV, id),
+    },
+  ];
   const send = () => {
-    const text = draft.trim();
+    // The feed's annotations lead the message as quotes, as in a chat.
+    const text = withQuotes(feedQuotes, draft.trim());
     if (!text) return;
+    clearQuotes(CONV);
     const clientId = nextId('c');
     bindLaunch(clientId);
     setDraft('');
@@ -1915,6 +1930,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
 
   const dock = (
     <>
+      <FeedNotesBar conv={CONV} count={feedChips.length} onSend={() => feedSend.current?.()} />
       <QuestionCard
         question={scene.question ?? null}
         device={DEVICE}
@@ -1945,6 +1961,8 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
         value={draft}
         onChange={setDraft}
         onSubmit={send}
+        noteGroups={noteGroups}
+        sendRef={feedSend}
         mode={scene.mode ?? 'idle'}
         placeholder={scene.limited ? limitPlaceholder(scene.limited, startedAt) : undefined}
         onStop={() => later()}
@@ -2022,23 +2040,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
       <MessagePictures.Provider value={scene.pictures ?? null}>
         <WorkflowRuns value={flowRuns}>
           <RewindActions value={rewindActions}>
-            <SelBar
-              onAdd={(text, note) => {
-                const quote = { id: `q${Date.now()}`, text, note };
-                setScene((current) => ({
-                  ...current,
-                  quotes: [
-                    ...(current.quotes ?? []),
-                    {
-                      id: quote.id,
-                      label: quoteLabel(quote),
-                      title: quoteTitle(quote),
-                      remark: note !== null,
-                    },
-                  ],
-                }));
-              }}
-            />
+            <SelBar conv={CONV} />
             <DelegatedChats.Provider value={scene.delegated ?? NO_DELEGATED}>
               <Feed
                 items={scene.items}

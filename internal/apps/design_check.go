@@ -14,7 +14,10 @@ import (
 // the theme). --strict counts them, as it does every warning.
 
 var (
-	inlineStyle  = regexp.MustCompile(`(?i)<[a-z][^>]*\sstyle\s*=`)
+	inlineStyle = regexp.MustCompile(`(?i)<[a-z][^>]*\sstyle\s*=`)
+	// An address from the root ("/assets/app.js"): the view's address carries its session, so only a relative one finds the file.
+	// "/__hl/" is the host's own (the SDK, hl-ui.css) and is rewritten for the page; "//host" and "/#" are not the view's files.
+	rootPath     = regexp.MustCompile(`(?i)\s(?:src|href)\s*=\s*["']/(?:[^/_#"'\s]|_[^_])`)
 	nativeSelect = regexp.MustCompile(`(?i)<select[\s>]`)
 	styleBlock   = regexp.MustCompile(`(?is)<style[^>]*>(.*?)</style>`)
 	// A colour value: #rgb… or rgb()/hsl()/oklch(); a var(--x, #fff) fallback is taken out before the look.
@@ -83,6 +86,12 @@ func designOf(rel, text string, css bool) Problems {
 	}
 	if loc := nativeSelect.FindStringIndex(text); loc != nil {
 		warn(loc[0], "a native <select> looks foreign in the pane: use .hl-seg buttons for a few choices, or a list")
+	}
+	if strings.HasPrefix(rel, "ui/") {
+		if loc := rootPath.FindStringIndex(text); loc != nil {
+			warn(loc[0], "an address from the root (\""+strings.TrimSpace(text[loc[0]:loc[1]])+"..): the view is served with its session in the path, so only a relative address "+
+				"finds the file (a bundler: base './'; Vite: base: './' in vite.config.ts)")
+		}
 	}
 	for _, m := range styleBlock.FindAllStringSubmatchIndex(text, -1) {
 		colors(text[m[2]:m[3]], m[2])

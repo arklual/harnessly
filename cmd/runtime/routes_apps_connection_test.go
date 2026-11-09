@@ -113,12 +113,13 @@ func TestViewToolCallGoesThroughThePersonsConnection(t *testing.T) {
 		t.Fatalf("calls: %v", *calls)
 	}
 
-	// No connection on this machine: the app waits for it, the call is refused, nothing goes out.
+	// No connection on this machine: the call is refused as a missing sign-in that names the connection (the host shows
+	// «Войти» on it), nothing goes out.
 	empty := mcpconn.New(t.TempDir(), &memSecrets{}, nil)
 	_, err := callConnectionTool(context.Background(), empty, true, decl, "whoami", nil)
 	var be *apps.BridgeError
-	if !errors.As(err, &be) || be.Message != apps.ToolRefused || !strings.Contains(be.Detail, "waits for a connection") {
-		t.Fatalf("want a refusal that waits for the connection: %v", err)
+	if !errors.As(err, &be) || be.Code != apps.CodeAuthRequired || be.SignIn == nil || be.SignIn.Connection != "linear" {
+		t.Fatalf("want auth_required naming the connection: %#v", err)
 	}
 	if _, err := callConnectionTool(context.Background(), sergey, false, decl, "whoami", nil); !errors.As(err, &be) || !strings.Contains(be.Detail, "waits for a connection") {
 		t.Fatalf("signed in but not agreed to: refused, got %v", err)
@@ -234,5 +235,30 @@ func TestSetupAllowsTheAppAConnection(t *testing.T) {
 	}
 	if code, got := post("/apps/setup/connection", `{"id":"acme.tracker","name":"linear","remove":true}`, true); code != http.StatusOK || got.Connections[0].Granted {
 		t.Fatalf("take back: %d %+v", code, got.Connections)
+	}
+}
+
+// A connection whose token the server takes no more: the view gets auth_expired naming the connection, and the page's
+// refusal carries it as signIn for «Войти снова». It stays a 403: a 401 is the page's own session.
+func TestConnectionRefusedSignInIsAuthExpired(t *testing.T) {
+	u, _ := url.Parse("http://127.0.0.1")
+	apps.SetNetwork(apps.DeployNetwork{Internal: []string{u.Hostname()}})
+	t.Cleanup(func() { apps.SetNetwork(apps.DeployNetwork{}) })
+	owners := map[string]string{"Bearer tok-sergey": "sergey"}
+	ts, calls := fakeLinear(t, owners)
+	revoked := signedIn(t, ts, "Bearer tok-sergey")
+	delete(owners, "Bearer tok-sergey") // the server revokes the token after the sign-in
+	_, err := callConnectionTool(context.Background(), revoked, true, apps.MCPServer{Type: "http", Connection: "linear"}, "whoami", nil)
+	var be *apps.BridgeError
+	if !errors.As(err, &be) || be.Code != apps.CodeAuthExpired || be.SignIn == nil || be.SignIn.Connection != "linear" {
+		t.Fatalf("want auth_expired naming the connection: %#v", err)
+	}
+	if len(*calls) != 0 {
+		t.Fatalf("no tool ran: %v", *calls)
+	}
+	status, body := bridgeRefused(err)
+	raw, _ := json.Marshal(body)
+	if status != http.StatusForbidden || !strings.Contains(string(raw), `"error":"auth_expired"`) || !strings.Contains(string(raw), `"signIn":{"connection":"linear"}`) {
+		t.Fatalf("refusal %d %s", status, raw)
 	}
 }

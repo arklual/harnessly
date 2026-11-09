@@ -102,6 +102,22 @@ func (l *Launcher) pluginDir(a Installed, session, token string) (dir string, er
 			l.connectionEntry(servers, name, srv, decl, a.ID, session, token, origin, tokenHeaders)
 			continue
 		}
+		if ok && decl.Auth != nil && decl.Auth.Type != AuthSecret && decl.Command == "" {
+			// A server the host signs in to (auth platform, oidc, oauth): the agent reaches it through the proxy, which adds
+			// the person's token; the entry carries the launch's token only.
+			if token == "" || session == "" || origin == "" || len(tokenHeaders) == 0 {
+				delete(servers, name)
+				continue
+			}
+			headers := map[string]any{}
+			for _, h := range tokenHeaders {
+				headers[h] = token
+			}
+			delete(srv, "auth")
+			srv["url"] = origin + ProxyPrefix + a.ID + "/" + name
+			srv["headers"] = headers
+			continue
+		}
 		if !ok || len(decl.Secrets()) == 0 {
 			continue
 		}

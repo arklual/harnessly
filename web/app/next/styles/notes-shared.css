@@ -1,0 +1,400 @@
+/* The numbered annotations (ui/notes/notes.tsx), the same in the pane's browser and in the chat's feed: a mark at
+   its --x, --y in the host's layer, the numbered dot, the row of its comment beside it, the bar «Аннотирование · N».
+   The host's layer (tab-annotations.css, feed-notes.css) says where the marks and the bar stand. */
+/* Its place is a transform of the CSS variables (the compositor moves it; nothing is laid out per scroll). */
+.hx-note__mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform: translate3d(var(--x, 0px), var(--y, 0px), 0);
+  transition: opacity 180ms var(--hx-ease-out);
+}
+/* The element is gone from the page (scrolled out, redrawn), the page is another one, the mark leaves or is sent: it
+   fades where it stood and takes no clicks. */
+.hx-note__mark[data-place='hidden'],
+.hx-note__mark[data-away],
+.hx-note__mark[data-leaving],
+.hx-note__mark[data-sending] {
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-note__mark[data-place='hidden'] > *,
+.hx-note__mark[data-away] > *,
+.hx-note__mark[data-leaving] > *,
+.hx-note__mark[data-sending] > * {
+  pointer-events: none;
+}
+.hx-note__dot {
+  position: absolute;
+  left: -11px;
+  top: -11px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: oklch(0.55 0.19 262);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: var(--hx-weight-medium);
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 160ms var(--hx-ease-out);
+  animation: hx-note-in 220ms var(--hx-ease-out) backwards;
+}
+.hx-note__dot:hover {
+  transform: scale(1.12);
+}
+.hx-note__dot:active {
+  transform: scale(0.94);
+}
+/* A mark with no word yet is hollow: it asks for one. */
+.hx-note__dot[data-empty] {
+  background: #fff;
+  color: oklch(0.55 0.19 262);
+  box-shadow:
+    0 0 0 2px oklch(0.55 0.19 262),
+    0 1px 4px rgb(0 0 0 / 0.35);
+}
+/* A number that changed (a mark before it was removed) comes in from above. */
+.hx-note__num {
+  display: block;
+  animation: hx-note-num 200ms var(--hx-ease-out) backwards;
+}
+.hx-note__dot[data-active] {
+  box-shadow:
+    0 0 0 3px oklch(0.55 0.19 262 / 0.3),
+    0 1px 4px rgb(0 0 0 / 0.35);
+}
+.hx-note__mark[data-flash] .hx-note__dot {
+  animation: hx-note-flash 900ms var(--hx-ease-out);
+}
+@keyframes hx-note-flash {
+  30% {
+    transform: scale(1.3);
+    box-shadow:
+      0 0 0 6px oklch(0.55 0.19 262 / 0.25),
+      0 1px 4px rgb(0 0 0 / 0.35);
+  }
+}
+.hx-note__dot:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+.hx-note__row {
+  position: absolute;
+  top: 16px;
+  left: -14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px;
+  width: 280px;
+  padding: 6px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  box-sizing: border-box;
+  pointer-events: auto;
+  /* A host whose row would run past the window's edge slides it back in. */
+  translate: var(--note-row-dx, 0px) 0;
+  transform-origin: 14px 0;
+  animation: hx-note-pop-in 200ms var(--hx-ease-out) backwards;
+}
+.hx-note__mark[data-flip='left'] .hx-note__row {
+  left: auto;
+  right: -14px;
+  transform-origin: calc(100% - 14px) 0;
+}
+.hx-note__mark[data-up='true'] .hx-note__row {
+  top: auto;
+  bottom: 16px;
+}
+.hx-note__row[data-state='closing'] {
+  animation: hx-note-pop-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-note__input {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 28px;
+  max-height: 96px;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  resize: none;
+  overflow-y: auto;
+  line-height: 16px;
+  border: 1px solid var(--hx-border);
+  border-radius: 8px;
+  background: var(--hx-bg-window);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+@media (pointer: coarse) {
+  .hx-note__input {
+    font-size: 16px;
+  }
+}
+.hx-note__input:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -1px;
+}
+.hx-note__btn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-note__btn:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-note__btn[data-primary] {
+  background: var(--hx-accent);
+  color: #fff;
+}
+.hx-note__btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-note__btn[aria-busy='true'] {
+  cursor: progress;
+}
+/* What the host unfolds under the line takes the row's whole width. */
+.hx-note__more {
+  flex: 1 0 100%;
+  min-width: 0;
+}
+/* A dot that only shows its number: in a row, in a list. */
+.hx-note__dot[data-static] {
+  position: static;
+  flex: none;
+  align-self: center;
+  margin: 0 2px;
+  border-width: 0;
+  box-shadow: none;
+  cursor: default;
+  animation: none;
+}
+/* The bar: its title, the tools, «Отправить». Where it stands is the host's. */
+.hx-note__bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 16px);
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 999px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  animation: hx-note-bar-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-note__bar[data-state='closing'] {
+  animation: hx-note-bar-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-note__title {
+  margin-right: 6px;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+}
+.hx-note__tool {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-note__tool:hover,
+.hx-note__tool[aria-pressed='true'] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-note__tool[aria-disabled='true'],
+.hx-note__send[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-note__send {
+  height: 28px;
+  margin: 0 2px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hx-accent);
+  color: #fff;
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+@keyframes hx-note-num {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.hx-note__send[aria-busy='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+/* No movement for those who ask for none: only opacity. */
+@media (prefers-reduced-motion: reduce) {
+  .hx-note__dot,
+  .hx-note__row,
+  .hx-note__bar,
+  .hx-note__num {
+    animation-name: hx-note-fade;
+  }
+  .hx-note__row[data-state='closing'],
+  .hx-note__bar[data-state='closing'] {
+    animation-name: hx-note-fade-out;
+  }
+  .hx-note__dot {
+    transition: none;
+  }
+  .hx-note__mark[data-flash] .hx-note__dot {
+    animation: none;
+  }
+  .hx-note__dot:hover,
+  .hx-note__dot:active {
+    transform: none;
+  }
+}
+@keyframes hx-note-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-note-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes hx-note-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+@keyframes hx-note-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+}
+@keyframes hx-note-pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+}
+@keyframes hx-note-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes hx-note-bar-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* The compact button over picked words (ui/notes/pill.tsx). */
+.hx-note__pill {
+  position: fixed;
+  left: var(--ax-pill);
+  top: var(--ay);
+  z-index: 60;
+  box-sizing: border-box;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  color: var(--hx-fg-1);
+  translate: 0 0;
+  transform-origin: 50% 100%;
+  animation: hx-note-pill-in 180ms var(--hx-ease-out) backwards;
+}
+.hx-note__pill[data-side='above'] {
+  translate: 0 -100%;
+}
+.hx-note__pill[data-side='below'] {
+  transform-origin: 50% 0;
+}
+.hx-note__pill[data-state='closing'] {
+  animation: hx-note-pill-out 160ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+@keyframes hx-note-pill-in {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+@keyframes hx-note-pill-out {
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+.hx-note__pillbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--hx-dur-xs);
+}
+.hx-note__pillbtn:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-note__pillbtn:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-note__pillbtn .hx-icon {
+  color: var(--hx-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-note__pill,
+  .hx-note__pill[data-state='closing'] {
+    animation-duration: 1ms;
+  }
+}
+.hx-note__dot[data-static]:hover {
+  transform: none;
+}

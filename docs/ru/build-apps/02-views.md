@@ -27,8 +27,9 @@ harnessly open app:acme.notes       # вкладка панели; окно с �
 
 ```js
 // ui/main.js: обычный скрипт, не модуль
-harnessly.connect().then(async (hl) => {
-  const note = (await hl.storage.chat.get('note')) ?? '';
+harnessly.connect({ protocol: 2 }).then(async (hl) => {
+  const got = await hl.storage.chat.get('note');
+  const note = hl.refused(got) ? '' : (got ?? '');
   const area = document.createElement('textarea');
   area.value = note;
   area.disabled = hl.context.readOnly === true;
@@ -84,7 +85,11 @@ sequenceDiagram
 Фрейм изолирован без `allow-same-origin`, на собственном источнике. Отсюда следует:
 
 - `localStorage` и cookie нет. Используйте `hl.storage`.
-- **Только обычные скрипты.** Непрозрачный источник фрейма отправляет cookie слота с обычными скриптами, стилями и картинками, но не с модулями, шрифтами и `fetch` ваших файлов без credentials: они возвращают 401. Данные отдавайте скриптом, который задаёт глобальную переменную. Сборщик подойдёт, если он пишет один обычный файл (IIFE). SDK есть и в `/__hl/app-sdk.mjs`, чтобы сборщик мог его импортировать.
+- **Адреса относительные.** Вид раздаётся с сессией в пути (`/<сессия>/<приложение>/ui/index.html`). Обычные и модульные скрипты, стили,
+  шрифты и `fetch` собственных файлов вида работают (хост 0.16.198 и новее), пока адрес относителен странице: `main.js`,
+  `./assets/app.js`. Адрес от корня (`/assets/app.js`) теряет сессию и отвечает 401; `validate` предупреждает. Сборщику нужна база `./`
+  (Vite: `base: './'`). SDK лежит по `/__hl/app-sdk.js` (обычный скрипт) и `/__hl/app-sdk.mjs` (модуль); оба пути работают от корня.
+  См. [от нуля за 5 минут](00-five-minutes.md).
 - Нет встроенных скриптов и нет `eval` (`script-src 'self'`). Встроенные стили разрешены.
 - Наружу ничего не уходит без `network`: `connect-src` равен `'none'`, пока `network.connect` не назовёт хост. См. [Бэкенд](03-backend.md).
 - Отдаются только точка входа окна, её папка и `ui/`. Файл до 10 МБ, файлы с точкой в начале имени никогда.

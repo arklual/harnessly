@@ -87,8 +87,12 @@ func bridgeRefused(err error) (int, any) {
 		if be.Code == apps.CodeInvalidParams {
 			status = http.StatusBadRequest
 		}
-		if be.Code == apps.CodeHostUnavailable {
+		if be.Code == apps.CodeHostUnavailable || be.Code == apps.CodeIdPUnreachable {
 			status = http.StatusBadGateway
+		}
+		// A refused sign-in stays a 403: a 401 is the page's own session, which the page answers by signing out.
+		if be.SignIn != nil {
+			return status, map[string]any{"error": be.Code, "message": be.Message, "signIn": be.SignIn}
 		}
 		return status, map[string]string{"error": be.Code, "message": be.Message}
 	case errors.Is(err, apps.ErrNotInstalled):
@@ -716,9 +720,13 @@ func callAppTool(ctx context.Context, d deps, reg *apps.Registry, appID, tool st
 	if decl := pkg.MCP[server]; decl.Connection != "" {
 		return callConnectionTool(ctx, mcpFor(d), reg.ConnectionGranted(appID, decl.Connection), decl, name, args)
 	}
-	srv, missing := pkg.MCP[server].Filled(revealApp(safeFor(d).store.Local, appID, pkg.MCP[server].Secrets()))
+	decl := pkg.MCP[server]
+	srv, missing := decl.Filled(revealApp(safeFor(d).store.Local, appID, decl.Secrets()))
 	if len(missing) > 0 {
 		return nil, &apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a secret"}
 	}
-	return apps.CallTool(ctx, srv, name, args)
+	if decl.Auth != nil && decl.Auth.Type == apps.AuthOAuth {
+		return callAppOAuthTool(ctx, mcpFor(d), appID, server, decl, srv, name, args)
+	}
+	return callWithAppToken(ctx, appTokensOf(d), appID, server, decl, srv, name, args)
 }

@@ -128,7 +128,7 @@ func TestGuestLinkEndsAtItsTimeAndWhenRevoked(t *testing.T) {
 func TestOnlyAnAppViewIsShared(t *testing.T) {
 	reg := newRegistry(t)
 	dir := scaffold(t, "acme.chatty", "chat")
-	if _, _, err := reg.Install(dir, InstallOptions{HostVersion: FirstVersion}); err != nil {
+	if _, _, err := reg.Install(dir, InstallOptions{HostVersion: TemplateVersion}); err != nil {
 		t.Fatal(err)
 	}
 	g := NewGuests(reg, &Storage{Root: t.TempDir()})

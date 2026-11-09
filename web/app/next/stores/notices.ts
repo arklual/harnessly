@@ -146,7 +146,8 @@ export const useNoticeList = (): readonly INotice[] =>
 
 // ---- the switches
 
-/** The corner (or the middle of the edge) of the window the cards stand in. */
+/** Where the smart notice stands: a corner or the middle of an edge of the window. The middle of the bottom edge is
+ *  over the field of the chat on screen (the window's bottom where there is no field). */
 export const NOTICE_PLACES = [
   'top-left',
   'top-center',
@@ -156,31 +157,42 @@ export const NOTICE_PLACES = [
   'bottom-right',
 ] as const;
 export type TNoticePlace = (typeof NOTICE_PLACES)[number];
-/** How long a card stays before it hides by itself, s; 0: until the person takes it away or opens its chat. */
-export const NOTICE_HIDE_AFTER = [0, 5, 10, 30, 60] as const;
-export type TNoticeHideAfter = (typeof NOTICE_HIDE_AFTER)[number];
+
+/** The sounds: something waits for an answer, something waits now (a code, a permission), something is ready. */
+export const NOTICE_SOUNDS = ['wait', 'urgent', 'done'] as const;
+export type TNoticeSound = (typeof NOTICE_SOUNDS)[number];
+
+/** The version of the saved switches: before 2 the default place was the top right corner, saved with everything. */
+const NOTIFY_VERSION = 2;
 
 export interface INotifySettings {
   /** Which events make a notice. */
   kinds: Readonly<Record<TNoticeKind, boolean>>;
-  /** A soft sound as one comes. */
+  /** The sounds at all; off, none of `sounds` plays. */
   sound: boolean;
+  sounds: Readonly<Record<TNoticeSound, boolean>>;
   /** A notification of the system while the app's tab is in the background (the browser's permission asked once). */
   system: boolean;
-  /** The cards in the window; off, a notice only counts in the tab's title and chimes. */
+  /** The smart notice in the window; off, a notice only counts in the tab's title and sounds. */
   cards: boolean;
   place: TNoticePlace;
-  hideAfter: TNoticeHideAfter;
 }
 
 export const DEFAULT_NOTIFY: INotifySettings = {
   kinds: { waiting: true, done: true, failed: true, limit: true },
   sound: true,
+  sounds: { wait: true, urgent: true, done: false },
   system: false,
   cards: true,
-  place: 'top-right',
-  hideAfter: 0,
+  place: 'bottom-center',
 } as const;
+
+const savedPlace = (s: Record<string, unknown>): TNoticePlace => {
+  const place = NOTICE_PLACES.find((one) => one === s.place);
+  // The old default was saved as if chosen: it moves to the new one; a place picked by hand stays.
+  if (!place || (s.v !== NOTIFY_VERSION && place === 'top-right')) return DEFAULT_NOTIFY.place;
+  return place;
+};
 
 /** The saved switches over the defaults: what this browser never saved is its default. */
 export const parseNotify = (raw: string | null): INotifySettings => {
@@ -195,13 +207,19 @@ export const parseNotify = (raw: string | null): INotifySettings => {
         const on = (s.kinds as Record<string, unknown>)[kind];
         if (typeof on === 'boolean') kinds[kind] = on;
       }
+    const sounds: Record<TNoticeSound, boolean> = { ...DEFAULT_NOTIFY.sounds };
+    if (typeof s.sounds === 'object' && s.sounds !== null)
+      for (const sound of NOTICE_SOUNDS) {
+        const on = (s.sounds as Record<string, unknown>)[sound];
+        if (typeof on === 'boolean') sounds[sound] = on;
+      }
     return {
       kinds,
       sound: typeof s.sound === 'boolean' ? s.sound : DEFAULT_NOTIFY.sound,
+      sounds,
       system: typeof s.system === 'boolean' ? s.system : DEFAULT_NOTIFY.system,
       cards: typeof s.cards === 'boolean' ? s.cards : DEFAULT_NOTIFY.cards,
-      place: NOTICE_PLACES.find((place) => place === s.place) ?? DEFAULT_NOTIFY.place,
-      hideAfter: NOTICE_HIDE_AFTER.find((after) => after === s.hideAfter) ?? DEFAULT_NOTIFY.hideAfter,
+      place: savedPlace(s),
     };
   } catch {
     return DEFAULT_NOTIFY;
@@ -222,12 +240,20 @@ const readSettings = (): INotifySettings => {
 export const notifySnapshot = (): INotifySettings => (settings ??= readSettings());
 
 export const setNotify = (
-  patch: Partial<Omit<INotifySettings, 'kinds'>> & { kinds?: Partial<INotifySettings['kinds']> },
+  patch: Partial<Omit<INotifySettings, 'kinds' | 'sounds'>> & {
+    kinds?: Partial<INotifySettings['kinds']>;
+    sounds?: Partial<INotifySettings['sounds']>;
+  },
 ): void => {
   const current = notifySnapshot();
-  settings = { ...current, ...patch, kinds: { ...current.kinds, ...patch.kinds } };
+  settings = {
+    ...current,
+    ...patch,
+    kinds: { ...current.kinds, ...patch.kinds },
+    sounds: { ...current.sounds, ...patch.sounds },
+  };
   try {
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, v: NOTIFY_VERSION }));
   } catch {
     // Private mode or a full storage: the switches hold for this page.
   }

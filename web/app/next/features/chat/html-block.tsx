@@ -1,7 +1,14 @@
 // An ```html answer: the page the agent wrote, in a sandboxed frame (html-doc.ts) that grows to its content, with the
 // source one toggle away and the page full size over the feed.
 import { useEffect, useMemo, useState } from 'react';
-import { frameDocument, FRAME_SANDBOX, isFrameHeight, newNonce } from '@/next/features/chat/html-doc';
+import {
+  frameDocument,
+  FRAME_SANDBOX,
+  isFrameHeight,
+  isFrameIssue,
+  issueLine,
+  newNonce,
+} from '@/next/features/chat/html-doc';
 import RichView from '@/next/features/chat/rich-view';
 import Icon from '@/next/ui/icon';
 import Segmented from '@/next/ui/segmented';
@@ -25,6 +32,17 @@ const PageFrame = ({ html, fit, height, onHeight }: IPageFrameProps) => {
   const [key] = useState(() => crypto.randomUUID());
   const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
   const doc = useMemo(() => frameDocument(html, { key, nonce: newNonce(), fit }), [html, key, fit]);
+
+  // What the page could not do (a blocked request, an error) goes to the console: an agent's page that looks wrong says why.
+  useEffect(() => {
+    if (!frame) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.source === frame.contentWindow && isFrameIssue(event.data, key))
+        console.warn(issueLine(event.data.issue));
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [frame, key]);
 
   useEffect(() => {
     if (!fit || !frame || !onHeight) return;

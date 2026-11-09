@@ -244,7 +244,7 @@ func (s *ViewServer) Handler() http.Handler {
 			return
 		}
 		if !s.hostOK(r.Host) {
-			http.Error(w, "forbidden", http.StatusForbidden)
+			refuseView(w, r, viewRefusal{Status: http.StatusForbidden, Code: "host", Reason: "Адрес не принадлежит серверу видов."})
 			return
 		}
 		switch r.URL.Path {
@@ -279,13 +279,25 @@ func (s *ViewServer) Handler() http.Handler {
 				serveBytes(w, r, typ, body)
 				return
 			}
-			http.NotFound(w, r)
+			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "sdk-file", App: sess.App, View: sess.View, Path: "__hl/" + name,
+				Reason: "Нет такого файла SDK: " + name + "."})
 			return
 		}
 		id, rel, ok := strings.Cut(rest, "/")
-		if !live || !ok || id != sess.App || !idRe.MatchString(id) {
-			http.NotFound(w, r)
+		if !live {
+			// The token is the session's secret: it is never written to the log, only that there was none.
+			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "no-session", Path: rest,
+				Reason: "Сессия вида закончилась или не выдавалась: откройте вид заново."})
 			return
+		}
+		if !ok || id != sess.App || !idRe.MatchString(id) {
+			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "other-app", App: sess.App, View: sess.View, Path: rest,
+				Reason: "Эта сессия не открывает файлы другого приложения."})
+			return
+		}
+		missing := func(why string) {
+			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "no-file", App: id, View: sess.View, Path: rel,
+				Reason: "Не загрузился файл " + rel + ": " + why})
 		}
 		if id == WidgetsApp {
 			s.serveWidget(w, r, sess, rel)
@@ -293,24 +305,25 @@ func (s *ViewServer) Handler() http.Handler {
 		}
 		app, err := s.reg.Get(id)
 		if err != nil || app.Manifest == nil {
-			http.NotFound(w, r)
+			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "no-app", App: id, View: sess.View, Path: rel,
+				Reason: "Приложение не установлено или выключено."})
 			return
 		}
 		pkg := &Package{Dir: app.Dir, Manifest: app.Manifest}
 		full, err := pkg.ViewFile(rel)
 		if err != nil {
-			http.NotFound(w, r)
+			missing("такого файла нет среди файлов видов приложения.")
 			return
 		}
 		f, err := os.Open(full)
 		if err != nil {
-			http.NotFound(w, r)
+			missing("файл не открывается.")
 			return
 		}
 		defer f.Close()
 		info, err := f.Stat()
 		if err != nil || info.IsDir() || info.Size() > maxViewBytes {
-			http.NotFound(w, r)
+			missing("это не файл или он слишком большой.")
 			return
 		}
 		size := info.Size()
@@ -319,7 +332,7 @@ func (s *ViewServer) Handler() http.Handler {
 		if isHTML, isJS := strings.HasPrefix(ct, "text/html"), strings.HasPrefix(ct, "text/javascript"); isHTML || isJS {
 			raw, err := io.ReadAll(io.LimitReader(f, maxViewBytes+1))
 			if err != nil || len(raw) > maxViewBytes {
-				http.NotFound(w, r)
+				missing("файл не читается или слишком большой.")
 				return
 			}
 			// The SDK by a path relative to the file, and a page with the session's nonce for the bridge to check.
@@ -330,6 +343,10 @@ func (s *ViewServer) Handler() http.Handler {
 			size = int64(len(page))
 		}
 		h := w.Header()
+		// Not for the page itself: its nonce is the bridge's check.
+		if !strings.HasPrefix(ct, "text/html") {
+			openCORS(h)
+		}
 		h.Set("Content-Type", contentType(full))
 		h.Set("Content-Security-Policy", app.Manifest.ViewCSP())
 		h.Set("X-Content-Type-Options", "nosniff")
@@ -430,8 +447,16 @@ func sdkFile(name string) ([]byte, string, bool) {
 	return nil, "", false
 }
 
+// openCORS lets the opaque origin of a view's frame read what it loads in CORS mode: module scripts (a bundler's
+// output), fetch of its own files, fonts. No credentials: what guards a file is the view session's token in its path.
+func openCORS(h http.Header) {
+	h.Set("Access-Control-Allow-Origin", "*")
+	h.Set("Cross-Origin-Resource-Policy", "cross-origin")
+}
+
 func serveBytes(w http.ResponseWriter, r *http.Request, typ string, body []byte) {
 	h := w.Header()
+	openCORS(h)
 	h.Set("Content-Type", typ)
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Cache-Control", "no-cache")

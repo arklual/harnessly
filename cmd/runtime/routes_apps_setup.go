@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"maps"
 	"net/http"
 	"slices"
@@ -189,6 +190,7 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 	store := safeFor(d).store.Local // an app's secrets stay in the file
 	ms := mcpFor(d)
 	connProxy := &mcpProxy{d: d, ms: ms, client: mcpProxyClient(nil)}
+	tokens := appTokensOf(d)
 	deny := func(w http.ResponseWriter, status int, why string) {
 		secretJSON(w, status, map[string]string{"error": why})
 	}
@@ -231,8 +233,37 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 				connProxy.serve(w, r, conn.ID+strings.TrimSuffix("/"+sub, "/"))
 				return
 			}
+			if has && srv.Command == "" && srv.Auth != nil && srv.Auth.Type == apps.AuthOAuth {
+				// The app's own server the person signed in to by OAuth (auth: oauth): the connections' proxy signs the call.
+				conn, ok := ms.ByOwner(appOwner(id, server))
+				if !ok || !sameServer(conn.URL, srv.URL) {
+					deny(w, http.StatusConflict, "signin-required")
+					return
+				}
+				_ = reg.Journal(id, apps.JournalEntry{What: "signin.call", Class: apps.ClassHigh, OK: true, Detail: server})
+				connProxy.serve(w, r, conn.ID+strings.TrimSuffix("/"+sub, "/"))
+				return
+			}
 			if sub != "" {
 				deny(w, http.StatusNotFound, "not-found")
+				return
+			}
+			platform := has && srv.Auth != nil && (srv.Auth.Type == apps.AuthPlatform || srv.Auth.Type == apps.AuthOIDC)
+			if platform && srv.Command == "" {
+				// The platform's token for the person (auth: platform or oidc), added here: the agent never holds it.
+				values := revealApp(store, id, srv.Secrets())
+				signed, err := withAppToken(r.Context(), tokens, id, server, srv, srv, false)
+				if err != nil {
+					var be *apps.BridgeError
+					if errors.As(err, &be) {
+						deny(w, http.StatusBadGateway, be.Code)
+						return
+					}
+					deny(w, http.StatusBadGateway, "unavailable")
+					return
+				}
+				_ = reg.Journal(id, apps.JournalEntry{What: "token.call", Class: apps.ClassHigh, OK: true, Detail: server + ": " + srv.Auth.Type})
+				apps.ProxyMCP(w, r, signed, values)
 				return
 			}
 			if !has || srv.Command != "" || len(srv.Secrets()) == 0 {

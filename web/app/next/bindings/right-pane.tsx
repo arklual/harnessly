@@ -83,7 +83,7 @@ import { usePresence } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
 import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } from '@/next/legacy/pane';
 import { MACHINE, browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
-import { requestOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
+import { requestOf, requestsOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
 import { foldRailForDesign } from '@/next/bindings/rail';
 import { usePhone } from '@/next/ui/use-media';
@@ -149,6 +149,8 @@ const FLOAT_OUT_MS = 200;
 const FLOAT_SWAP_MS = 120;
 /** The question about unsaved text sinks out as long as a dialog does. */
 const LEAVE_EXIT_MS = 220;
+/** No request is the runtime's own: all of them may bring the pane out. */
+const NO_REQUESTS: ReadonlySet<IPaneRequest> = new Set();
 
 let tabSeq = 0;
 /** Unique across reloads too: a chat's pane keeps its tabs (stores/pane-state.ts). */
@@ -1346,17 +1348,23 @@ export const useRightPane = (
   // the pane comes out for it with its motion. On the phone the pane is a sheet over the chat: it is not thrown over
   // what the person reads, the tabs wait under its button.
   const phone = usePhone();
-  /** `asked`: the person asked for it themselves (a view's button), so it comes in front whatever tab they are in. */
-  const applyRequests = (requests: readonly IPaneRequest[], asked = false) => {
+  /** `asked`: the person asked for it themselves (a view's button), so it comes in front whatever tab they are in.
+   *  `quiet`: what the runtime asked by itself: its tab goes behind with a dot, the pane does not come out. */
+  const applyRequests = (
+    requests: readonly IPaneRequest[],
+    asked = false,
+    quiet: ReadonlySet<IPaneRequest> = NO_REQUESTS,
+  ) => {
     if (!conv) return;
     const busy = !asked && open && state.active !== '' && state.active !== TOOLS_TAB;
     let tabs: IPaneTabs = state;
     let front: string | null = null;
     let show = false;
     for (const request of requests) {
-      const placed = placeRequest(tabs, request, { busy, cwd: conv.cwd, nextId });
+      const still = quiet.has(request);
+      const placed = placeRequest(tabs, request, { busy: busy || still, cwd: conv.cwd, nextId });
       tabs = placed.next;
-      show = show || placed.show;
+      show = show || (placed.show && !still);
       const effect = placed.effect;
       if (effect?.k === 'legacy') {
         if (effect.reload) legacy.reload(effect.kind, effect.target);
@@ -1381,12 +1389,14 @@ export const useRightPane = (
     }));
     if (show && !phone) setOpen(true);
   };
-  // A plain function: the hook below calls the newest one from its own effect event.
+  // A plain function: the hook below calls the newest one from its own effect event. What the agent asked with `open`
+  // comes in front; what the runtime asked by itself goes behind and leaves the pane as it is (requestsOf).
   const applyIntents = (intents: IPaneIntent[]) => {
     for (const { command } of intents)
       if (command.kind === 'open' && command.target && command.place)
         requestFilePlace(command.target, command.place);
-    applyRequests(intents.flatMap((intent) => requestOf(intent.command) ?? []));
+    const { asked, quiet } = requestsOf(intents);
+    applyRequests([...quiet, ...asked], false, new Set(quiet));
   };
   usePaneIntents(conv?.machineId ?? null, legacy.tabId, applyIntents);
   // What was asked for this chat while the person was in another one is placed now that they are back; a tab of

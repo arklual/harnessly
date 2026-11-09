@@ -2,7 +2,6 @@
 // connection or a slow machine (spec §12): it is rows from the store at any state of the socket, and the only thing
 // that comes of a bad connection is the strip over the field and a live turn that says it waits.
 import SelBar from '@/next/features/chat/selbar';
-import { addQuote } from '@/next/stores/quotes';
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import {
   cancelMessage,
@@ -482,7 +481,7 @@ const ChatView = ({
           onClose={() => setSharing({ path: sharing.path, open: false })}
         />
       )}
-      <SelBar onAdd={(text, note) => addQuote(conv, text, note)} />
+      <SelBar conv={conv} />
       <AppBackground machine={machine} conversation={conv} apps={record?.apps} />
     </AttachmentSrc.Provider>
   );

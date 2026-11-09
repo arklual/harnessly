@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"github.com/ly-solutions/harnessly/internal/apptoken"
 	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/hub/analytics"
 	"io/fs"
@@ -136,6 +137,8 @@ type Hub struct {
 	Ext *ext.Registry
 	// Safe keeps the machines' safes on the hub's server; nil when HUB_SECRETS_VAULT_ADDR is not set.
 	Safe *hubsafe.Broker
+	// appTokens signs the platform's token for apps' backends (apptoken.go); nil when HUB_APP_TOKEN=off.
+	appTokens *appTokens
 	// Store keeps the spaces' collections the machines sync with (docs/hub/store.md); nil when HUB_STORE=off.
 	Store *storehub.Store
 
@@ -201,6 +204,12 @@ func New(o Options) (*Hub, error) {
 			prefix = "harnessly"
 		}
 		h.Safe = hubsafe.New(kv, prefix, cfg.SafeRefPrefixes)
+	}
+	if h.appTokens, err = newAppTokens(cfg.AppToken, cfg.PublicURL, o.HTTPClient); err != nil {
+		return nil, err
+	}
+	if h.appTokens != nil && o.Now != nil {
+		h.appTokens.signer.SetClock(o.Now)
 	}
 	h.OrgEvents = events.NewMemoryBus(o.Now)
 	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents,
@@ -396,6 +405,8 @@ func New(o Options) (*Hub, error) {
 	}
 	mux.Handle("GET /agent/v1", h.Dialer)
 	mux.Handle("POST "+hubproto.SecretsPath, httpx.Handler(h.agentSecrets))
+	mux.Handle("POST "+hubproto.AppTokenPath, httpx.Handler(h.agentAppToken))
+	mux.HandleFunc("GET "+apptoken.JWKSPath, h.jwks)
 	mux.HandleFunc("DELETE /agent/v1", h.Dialer.ServeUnlink)
 	// Messages between agents of different machines (docs/hub/peers.md): off unless HUB_PEERS=on, and then the paths
 	// fall through to the 404 below, which the agent reads as "this hub does not carry them".

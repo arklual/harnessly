@@ -400,7 +400,7 @@ func (s *Service) setState(c *conv, st wire.AgentState) int64 {
 	c.rec.Rev++
 	if p := c.rec.PendingModel; p != nil && (st.K == wire.StateReady || st.K == wire.StateIdle) {
 		// The agent is at its prompt: the model change that waited for it goes in, as the runtime does.
-		to := wire.Model{ID: p.ID, Effort: p.Effort, Ultracode: p.Ultracode}
+		to := wire.Model{ID: p.ID, Effort: p.Effort, Ultracode: p.Ultracode, Fast: p.Fast, Permission: p.Permission}
 		c.rec.ModelLog = append(c.rec.ModelLog, wire.ModelSwitch{At: s.now(), From: c.rec.Model, To: to})
 		c.rec.Model, c.rec.PendingModel = &to, nil
 		return s.upsert(c)
@@ -922,11 +922,13 @@ func (s *Service) Do(ctx context.Context, device string, cmd wire.Command) wire.
 		}
 		if working(cv) || cv.rec.State.K == wire.StateStopped || cv.rec.State.K == wire.StateStarting {
 			// The agent is away or at work: the change waits for its prompt (setState applies it).
-			cv.rec.PendingModel = &wire.PendingModel{ID: c.Model, Effort: c.Effort, Ultracode: c.UltracodeAfter(cv.rec.Model), Since: s.now()}
+			cv.rec.PendingModel = &wire.PendingModel{ID: c.Model, Effort: c.Effort, Ultracode: c.UltracodeAfter(cv.rec.Model),
+				Fast: c.FastAfter(cv.rec.Model), Permission: c.PermissionAfter(cv.rec.Model), Since: s.now()}
 			return wire.Accepted(wire.ChannelConvs, s.upsert(cv))
 		}
 		from := cv.rec.Model
-		cv.rec.Model, cv.rec.PendingModel = &wire.Model{ID: c.Model, Effort: c.Effort, Ultracode: c.UltracodeAfter(from)}, nil
+		cv.rec.Model, cv.rec.PendingModel = &wire.Model{ID: c.Model, Effort: c.Effort, Ultracode: c.UltracodeAfter(from),
+			Fast: c.FastAfter(from), Permission: c.PermissionAfter(from)}, nil
 		cv.rec.ModelLog = append(cv.rec.ModelLog, wire.ModelSwitch{At: s.now(), From: from, To: *cv.rec.Model})
 		return wire.Accepted(wire.ChannelConvs, s.upsert(cv))
 	case wire.BgStopCmd:

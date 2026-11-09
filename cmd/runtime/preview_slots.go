@@ -670,7 +670,8 @@ func (s *previewSlots) slotHandler(slot int) http.Handler {
 		// A file of an app's view goes to the view server with or without the slot's cookie: the view's frame runs on an
 		// opaque origin, so a browser that keeps third-party cookies back sends it none, and the slot's cookie may name
 		// another target (a dev server the pane opened in this slot since).
-		if (sess == nil || !sess.showsAppViews()) && appViewAsset(r) {
+		viewAsset := appViewAsset(r)
+		if (sess == nil || !sess.showsAppViews()) && viewAsset {
 			sess = appViewSession(own)
 		}
 		if sess == nil {
@@ -688,7 +689,7 @@ func (s *previewSlots) slotHandler(slot int) http.Handler {
 			return
 		}
 		// Only the slot itself and the app drive a slot: a sibling slot is another target, maybe an external site.
-		if from != "" && from != own && !sess.drives(from) {
+		if !slotOriginOK(from, own, sess, viewAsset) {
 			previewDeny(w, 403, locale.Pick("A request from another address", "Запрос с чужого адреса"))
 			return
 		}
@@ -699,6 +700,13 @@ func (s *previewSlots) slotHandler(slot int) http.Handler {
 		}
 		s.forward(w, r, set, secret, sess)
 	})
+}
+
+// slotOriginOK says whether a request with this Origin may go through the slot. A view's opaque-origin frame says
+// "Origin: null" on its module scripts, fetch and fonts (CORS-mode loads); that is let through for a file of a live
+// view session (viewAsset), where the token in the path is the capability and the view server answers with open CORS.
+func slotOriginOK(from, own string, sess *previewSession, viewAsset bool) bool {
+	return from == "" || from == own || sess.drives(from) || viewAsset && from == "null"
 }
 
 // enter spends a ticket of the pane: the slot's cookie for its target, then the page it asked for.

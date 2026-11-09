@@ -1364,6 +1364,9 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 // be ones the profile lists (ultracode stays Claude's own). Without a profile the model must not be a vendor's only (a
 // profile of this CLI owns it and the CLI's own account does not list it): it would run on the wrong account.
 func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) (*wire.Model, wire.RefuseCode) {
+	if model != nil && model.Permission != "" && !model.Permission.Known() {
+		return nil, wire.RefuseBadRequest
+	}
 	if profile == "" {
 		if model != nil && r.d.vendorOnly(p, model.ID) {
 			return nil, wire.RefuseOptionUnknown
@@ -1384,7 +1387,7 @@ func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) 
 		model = &wire.Model{ID: models[0]}
 	}
 	capabilities, known := r.d.Profiles.Model(profile, model.ID)
-	if !slices.Contains(models, model.ID) || !known || model.Ultracode ||
+	if !slices.Contains(models, model.ID) || !known || model.Ultracode || model.Fast ||
 		(model.Effort != nil && !slices.Contains(capabilities.Efforts, *model.Effort)) {
 		return nil, wire.RefuseOptionUnknown
 	}

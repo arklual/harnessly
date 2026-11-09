@@ -1,27 +1,24 @@
-// The notices at the top of the window on made-up events (`?dev=notifs`), for the eye and for screenshots: the real
-// stack on the real store (this browser's list), with buttons that fire each kind of event.
+// The smart notice on made-up events (`?dev=notifs`), for the eye and for screenshots: the real plate with buttons
+// that make each kind of waiting, and a field at the bottom it stands over.
 //
 //   ?dev=notifs                    an empty page and the buttons
-//   &set=pile                      three notices at once; &set=one a single one
-//   &auto=1                        events one after another (a question, an answer, a failure, a limit)
+//   &set=pile                      a code, a question and a permission at once; &set=one a question
+//   &open=1                        the card open
+//   &place=top-right|…             where it stands (the middle of the bottom edge by default)
 //   &settings=1                    Settings → Notifications under the buttons
 //   &theme=light|dark&lang=en|ru
 import { useEffect, useState } from 'react';
-import NoticeStack from '@/next/features/notifications/notice-stack';
-import { playChime, setIconDot, titleWithCount, unlockSound } from '@/next/features/notifications/ping';
+import { playSound, unlockSound } from '@/next/features/notifications/ping';
 import { NoticesPage } from '@/next/bindings/settings-notices';
+import SmartNotice, {
+  SMART_CODE,
+  SMART_KIND,
+  type ISmartItem,
+  type TSmartDetail,
+  type TSmartKind,
+} from '@/next/features/smart-notice/smart-notice';
 import { pinLocale, type TLang } from '@/next/i18n';
-import {
-  NOTICE_KIND,
-  clearChatNotices,
-  dismissAllNotices,
-  dismissNotice,
-  pushNotice,
-  setNoticesPerson,
-  useNoticeList,
-  type INotice,
-  type TNoticeKind,
-} from '@/next/stores/notices';
+import { NOTICE_PLACES, type TNoticePlace } from '@/next/stores/notices';
 import { ToastHost, toast } from '@/next/ui/toast';
 import '@/next/styles/tokens.css';
 import '@/next/styles/motion.css';
@@ -29,103 +26,170 @@ import '@/next/styles/icons.css';
 import '@/next/styles/ui.css';
 import '@/next/styles/base.css';
 import '@/next/styles/settings.css';
+import '@/next/styles/code-field.css';
 import '@/next/dev/notifs-gallery.css';
 
 const params = new URLSearchParams(window.location.search);
 const LANG: TLang = params.get('lang') === 'en' ? 'en' : 'ru';
 pinLocale(LANG);
-setNoticesPerson('gallery');
+const PLACE: TNoticePlace = NOTICE_PLACES.find((p) => p === params.get('place')) ?? 'bottom-center';
 
-const SAMPLES: Record<TNoticeKind | 'perm', Omit<INotice, 'key' | 'at'>> = {
-  waiting: {
+type TSample = 'question' | 'permission' | 'code' | 'machine' | 'done' | 'failed';
+
+const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { detail: TSmartDetail }> = {
+  question: {
+    kind: SMART_KIND.question,
     chatId: 'tab-a',
-    kind: NOTICE_KIND.waiting,
-    icon: 'circle-question-mark',
-    title: 'Миграция базы на новый кластер',
-    text: 'Ждёт вашего ответа',
+    icon: 'message-square-text',
+    title: 'Лендинг кофейни',
+    text: 'Какой вариант шапки оставить?',
+    detail: {
+      k: 'question',
+      text: 'Какой вариант шапки оставить на главной?',
+      options: ['Тёмная, с фото зёрен', 'Светлая, только логотип', 'Как в макете'],
+    },
   },
-  perm: {
+  permission: {
+    kind: SMART_KIND.permission,
     chatId: 'tab-b',
-    kind: NOTICE_KIND.waiting,
     icon: 'shield-question',
-    title: 'Деплой витрины на стенд',
+    title: 'Миграция базы',
     text: 'Ждёт разрешения',
+    detail: { k: 'permission', command: 'psql -f migrations/0042_orders.sql "$DATABASE_URL"' },
+  },
+  code: {
+    kind: SMART_KIND.code,
+    chatId: 'tab-c',
+    icon: 'key-round',
+    title: 'Публикация пакета',
+    text: 'Нужен код',
+    detail: {
+      k: 'code',
+      why: 'Код из приложения-аутентификатора: npm просит его, чтобы выпустить новую версию.',
+      digits: 6,
+    },
+  },
+  machine: {
+    kind: SMART_KIND.machine,
+    chatId: null,
+    icon: 'memory-stick',
+    title: 'Моя ВМ',
+    text: 'Машина не справляется',
+    detail: {
+      k: 'machine',
+      text: 'Машине не хватает памяти — чаты могут отвечать медленно.',
+      level: 0.92,
+      heavy: [
+        { key: 'agents', icon: 'messages-square', name: 'Агенты', text: '3 чата работают', stoppable: false },
+        {
+          key: 'vite',
+          icon: 'square-terminal',
+          name: 'vite',
+          text: 'сборка или дев-сервер',
+          stoppable: true,
+        },
+        { key: 'chrome', icon: 'app-window', name: 'chrome', text: 'программа', stoppable: true },
+      ],
+    },
   },
   done: {
-    chatId: 'tab-c',
-    kind: NOTICE_KIND.done,
+    kind: SMART_KIND.done,
+    chatId: 'tab-d',
     icon: 'circle-check',
-    title: 'Разобрать падение сборки на SSR',
-    text: 'Причина — двойная гидратация шапки: поправил порядок провайдеров, сборка зелёная, тесты проходят.',
+    title: 'Меню на сайте',
+    text: 'Добавил раздел «Сезонное» и пометку у трёх позиций',
+    detail: { k: 'plain' },
   },
   failed: {
-    chatId: 'tab-d',
-    kind: NOTICE_KIND.failed,
-    icon: 'circle-alert',
-    title: 'Отчёт по продажам за неделю',
-    text: 'Ход прервался',
-  },
-  limit: {
+    kind: SMART_KIND.failed,
     chatId: 'tab-e',
-    kind: NOTICE_KIND.limit,
-    icon: 'gauge',
-    title: 'Ревью большого MR',
-    text: 'Упёрся в лимит подписки',
+    icon: 'circle-alert',
+    title: 'Отчёт за октябрь',
+    text: 'Ход прервался',
+    detail: { k: 'plain' },
   },
+};
+
+const RANK: Record<TSmartKind, number> = {
+  code: 0,
+  permission: 1,
+  machine: 2,
+  question: 2,
+  plan: 2,
+  failed: 3,
+  limit: 3,
+  done: 4,
 };
 
 let seq = 0;
-const fire = (sample: keyof typeof SAMPLES) => {
+
+type TGalleryItem = ISmartItem & { sample: TSample };
+
+const made = (sample: TSample): TGalleryItem => {
   seq += 1;
-  pushNotice({ ...SAMPLES[sample], key: `${SAMPLES[sample].chatId}:${seq}`, at: Date.now() - seq * 1000 });
+  const at = Date.now();
+  const { detail: _, ...rest } = SAMPLES[sample];
+  return { ...rest, sample, key: `${sample}:${seq}`, at, until: sample === 'code' ? at + 120_000 : null };
+};
+
+const byRank = (list: readonly TGalleryItem[]) => [...list].sort((a, b) => RANK[a.kind] - RANK[b.kind]);
+
+/** What the page starts with: `&set=pile` a code, a question and a permission, `&set=one` a question. */
+const firstItems = (): readonly TGalleryItem[] => {
+  const set = params.get('set');
+  if (set === 'pile') return byRank((['question', 'permission', 'code'] as const).map(made));
+  if (set === 'one') return [made('question')];
+  return [];
 };
 
 const Gallery = () => {
-  const notices = useNoticeList();
+  const [items, setItems] = useState<readonly TGalleryItem[]>(firstItems);
+  const [open, setOpen] = useState(params.get('open') === '1');
+  const [mainKey, setMainKey] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+
+  const fire = (sample: TSample) => {
+    const item = made(sample);
+    setItems((was) => byRank([...was, item]));
+    if (sample === 'code' || sample === 'permission' || sample === 'machine') playSound('urgent');
+    if (sample === 'question') playSound('wait');
+  };
+  const drop = (key: string) => setItems((was) => was.filter((i) => i.key !== key));
+
   useEffect(() => {
     const root = document.documentElement;
-    const theme = params.get('theme') === 'light' ? 'light' : 'dark';
+    const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
     root.dataset.theme = theme;
+    root.dataset.hxTheme = theme;
     root.classList.toggle('dark', theme === 'dark');
     root.style.colorScheme = theme;
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => unlockSound(), []);
-  useEffect(() => {
-    document.title = titleWithCount(document.title, notices.length);
-    setIconDot(notices.length > 0);
-  }, [notices.length]);
-  useEffect(() => {
-    dismissAllNotices();
-    const set = params.get('set');
-    if (set === 'pile') (['done', 'perm', 'waiting'] as const).forEach(fire);
-    if (set === 'one') fire('waiting');
-    if (params.get('auto') !== '1') return;
-    const order = ['waiting', 'done', 'failed', 'limit'] as const;
-    const timers = order.map((sample, index) => setTimeout(() => fire(sample), 400 + index * 900));
-    return () => timers.forEach(clearTimeout);
-  }, []);
+
+  const main = items.find((i) => i.key === mainKey) ?? items[0] ?? null;
+  const settle = async (item: ISmartItem, said: string) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    toast(item.title, { description: said });
+    setTimeout(() => drop(item.key), 900);
+  };
 
   return (
     <div className="hx-root hx-ng" data-testid="gallery">
       <div className="hx-ng__row">
-        {(Object.keys(SAMPLES) as (keyof typeof SAMPLES)[]).map((sample) => (
+        {(Object.keys(SAMPLES) as TSample[]).map((sample) => (
           <button
             key={sample}
             type="button"
             className="hx-ng__btn"
             data-testid={`fire-${sample}`}
-            onClick={() => {
-              fire(sample);
-              playChime();
-            }}
+            onClick={() => fire(sample)}
           >
             {sample}
           </button>
         ))}
-        <button type="button" className="hx-ng__btn" data-testid="clear" onClick={dismissAllNotices}>
+        <button type="button" className="hx-ng__btn" data-testid="clear" onClick={() => setItems([])}>
           clear
         </button>
       </div>
@@ -134,17 +198,40 @@ const Gallery = () => {
           <NoticesPage />
         </div>
       )}
-      <NoticeStack
-        notices={notices}
+      <div className="hx-ng__field hx-composer">Сообщение агенту</div>
+      <SmartNotice
+        items={items}
+        mainKey={main?.key ?? null}
+        detail={main ? SAMPLES[main.sample].detail : { k: 'plain' }}
+        open={open && items.length > 0}
+        place={PLACE}
+        anchor={PLACE === 'bottom-center' ? { x: window.innerWidth / 2, bottom: 112 } : null}
         now={now}
-        onOpen={(notice) => {
-          clearChatNotices(notice.chatId);
-          toast(notice.title, { description: 'open' });
+        onOpen={setOpen}
+        onMain={setMainKey}
+        onOpenChat={(item) => toast(item.title, { description: 'open chat' })}
+        onAnswer={(item, answer) =>
+          settle(item, 'text' in answer ? answer.text : `choice ${answer.choice + 1}`)
+        }
+        onDecide={(item, allow) => settle(item, allow ? 'allowed' : 'denied')}
+        onCode={async (item, code) => {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          if (code === '000000') return SMART_CODE.bad;
+          setTimeout(() => drop(item.key), 900);
+          return SMART_CODE.ok;
         }}
-        onDismiss={dismissNotice}
-        onDismissAll={dismissAllNotices}
-        place="top-right"
-        hideAfterMs={0}
+        onCancelCode={async (item) => drop(item.key)}
+        onStop={(item, heavy) => settle(item, `stopped ${heavy}`)}
+        onOpenMachine={(item) => toast(item.title, { description: 'open machine' })}
+        onHide={(item) => {
+          drop(item.key);
+          toast('Скрыто', { description: 'Чат всё ещё ждёт ответа' });
+        }}
+        onMute={(sound) => toast('Звук выключен', { description: sound })}
+        onSettings={() => toast('settings')}
+        announceMs={4000}
+        returnFocus={() => undefined}
+        focusOnOpen={false}
       />
       <ToastHost />
     </div>

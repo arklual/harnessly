@@ -95,7 +95,11 @@ link: `harnessly app share <id> --view <view> --ttl 1d --write`, then drive `/ap
 | `network_denied` | The tool's address is not public | Use a public https address, or ask the admin to list the host in `RUNTIME_APPS_INTERNAL_HOSTS` |
 | `host_not_allowed` | The server is no `https://` one and no listed internal host | Use https |
 | `tls_untrusted` | The server's certificate ends in no root the machine trusts | The admin adds the organization's root with `RUNTIME_APPS_CA_FILE` |
-| `upstream_error` | The server answered an HTTP error or no JSON-RPC | Look at the server's log |
+| `upstream_error` | The server answered an HTTP error other than 401/403, or no JSON-RPC | Look at the server's log |
+| `auth_required` | The server answered 401 to a call without a credential; or the app's connection is not made or not signed in. `error.signIn` names where to sign in | The host offers «Войти». Ask the person to sign in, then repeat the call |
+| `auth_expired` | The server answered 401 to a call with a credential; or the connection's token ran out and could not be refreshed | The host offers «Войти снова». Repeat the call after it |
+| `auth_denied` | The server answered 403 or `insufficient_scope`; the identity provider refused | A new sign-in does not help: the server's admin grants access |
+| `idp_unreachable` | The sign-in service did not answer (no token could be had) | Repeat later; nothing is wrong with the sign-in |
 | `rate_limited` | Over 60 calls a second | Slow down, batch |
 | `host_unavailable` | Outside harnessly; no chat; the machine did not answer; the runtime answered `not-on`, `failed` | Read the error's message for the word |
 | `conflict` | `set` with `ifVersion` found the key at another version; `error.version` is the current one; nothing was written | Read the key again (`getVersioned`), merge, write again |
@@ -128,7 +132,7 @@ The view gets only the runtime's error word. The longer reason is in the runtime
 
 | You see | Because |
 | --- | --- |
-| The view's own `fetch('data.json')` or font is 401 | The opaque origin sends no cookie with CORS-mode loads: use a classic script that sets a global |
+| A script, `fetch('data.json')` or a font of the view is 401 | The address starts with `/`, so it leaves out the session in the page's path: make it relative (`./data.json`; a bundler: base `./`). On a host older than 0.16.198 only classic scripts load |
 | Edits to permissions change nothing | Run `app dev` again |
 | The app opens nothing after a right was added | It waits for the person's consent: `app explain <id>` names what; the person agrees in «Приложения» |
 | The agent says the tool is missing | It started before the edit: restart it. Then check `.mcp.json`, and for an eval that the case mocks that server |

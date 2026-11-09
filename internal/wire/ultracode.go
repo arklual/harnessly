@@ -61,3 +61,23 @@ func (c ModelCmd) UltracodeAfter(cur *Model) bool {
 	}
 	return cur != nil && cur.Ultracode
 }
+
+// FastAfter is the fast mode the conversation runs once the ask is taken: the ask's, or the one cur runs.
+func (c ModelCmd) FastAfter(cur *Model) bool {
+	if c.Fast != nil {
+		return *c.Fast
+	}
+	return cur != nil && cur.Fast
+}
+
+// PermissionAfter is the permission mode the conversation runs once the ask is taken: the ask's, or the one cur runs
+// ("" for the machine's default).
+func (c ModelCmd) PermissionAfter(cur *Model) PermissionMode {
+	if c.Permission != nil {
+		return *c.Permission
+	}
+	if cur == nil {
+		return ""
+	}
+	return cur.Permission
+}

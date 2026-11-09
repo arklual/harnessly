@@ -6,28 +6,49 @@ import { useContext } from 'react';
 import { useLinkMenu } from '@/next/features/chat/link-menu';
 import { openOutside } from '@/next/features/chat/pane-sites';
 import { isOutsideClick, RefContext } from '@/next/features/chat/ref-chip';
-import { appConfig } from '@/platform/config';
+import { appConfig, type IAppConfig } from '@/platform/config';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 
 export type TCardKind = 'doc' | 'board';
 
-const originOf = (url: string | null): string | null => {
+const parse = (url: string | null): URL | null => {
   if (!url) return null;
   try {
-    return new URL(url).origin;
+    return new URL(url.replace('{slug}', ''));
   } catch {
     return null;
   }
 };
 
-/** Which of our pages a link is, or null for any other link. */
-export const cardKindOf = (href: string): TCardKind | null => {
-  const origin = originOf(href);
-  if (!origin) return null;
-  const { artifactsUrl, boardsUrl, readerUrl } = appConfig();
-  if (origin === originOf(boardsUrl)) return 'board';
-  if (origin === originOf(artifactsUrl) || origin === originOf(readerUrl)) return 'doc';
+const SLUG = String.raw`[\w-]+`;
+const DOC_PATH = new RegExp(String.raw`^/a/${SLUG}/?$`);
+const BOARD_PATH = new RegExp(String.raw`^/b/(${SLUG})/?$`);
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Which of our pages a link is, or null for any other link, by the exact patterns the runtime's
+ * `open` reads (internal/panel Classify): a document is `/a/<slug>` of the documents' server or `<reader path><slug>` of
+ * the platform's reader, a board `/b/<slug>` of the boards' server. The host alone tells nothing: the portal serves
+ * documents and boards on one host, and the platform's other pages are no document.
+ */
+export const cardKindOf = (
+  href: string,
+  config: Pick<IAppConfig, 'artifactsUrl' | 'boardsUrl' | 'readerUrl'> = appConfig(),
+): TCardKind | null => {
+  const url = parse(href);
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) return null;
+  const path = url.pathname;
+  const boards = parse(config.boardsUrl);
+  const board = BOARD_PATH.exec(path);
+  if (boards && url.origin === boards.origin && board && board[1] !== 'api') return 'board';
+  const docs = parse(config.artifactsUrl);
+  if (docs && url.origin === docs.origin && DOC_PATH.test(path)) return 'doc';
+  const reader = parse(config.readerUrl);
+  if (reader && url.origin === reader.origin) {
+    const prefix = reader.pathname.endsWith('/') ? reader.pathname : `${reader.pathname}/`;
+    if (new RegExp(String.raw`^${escape(prefix)}${SLUG}/?$`).test(path)) return 'doc';
+  }
   return null;
 };
 

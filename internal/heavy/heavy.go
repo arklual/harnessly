@@ -31,7 +31,7 @@ import (
 const ExitBusy = 75
 
 // Tools are the names harnessly puts a launcher under.
-var Tools = []string{"go", "vitest", "playwright", "tsc", "eslint", "npx"}
+var Tools = []string{"go", "vitest", "playwright", "tsc", "eslint", "npx", "npm", "pnpm"}
 
 // Marker is in every launcher harnessly writes; a file carrying it is never taken for the real tool.
 const Marker = "harnessly heavy"
@@ -293,9 +293,11 @@ func Heavy(tool string, args []string) bool {
 		}
 		return false
 	case "vitest", "tsc", "eslint":
-		return true
+		return !watching(args)
 	case "playwright":
 		return len(args) > 0 && args[0] == "test"
+	case "npm", "pnpm":
+		return npmCall(tool, args)
 	case "npx":
 		for i := 0; i < len(args); i++ {
 			a := args[i]
@@ -326,6 +328,72 @@ func Heavy(tool string, args []string) bool {
 }
 
 // onlyInfo is a call that asks for a version or the help.
+// watching is a call that keeps running (vitest watch, tsc -w): it would hold a slot for good, so it takes none.
+func watching(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "--watch", "-w", "watch", "dev", "--watchAll":
+			return true
+		}
+	}
+	return false
+}
+
+// heavyScripts are the package scripts that take a slot under npm and pnpm: test, test:unit, lint, build:web…
+var heavyScripts = map[string]bool{"test": true, "vitest": true, "playwright": true, "tsc": true, "eslint": true,
+	"lint": true, "build": true, "check": true}
+
+func heavyScript(name string) bool {
+	base, _, _ := strings.Cut(name, ":")
+	return heavyScripts[base]
+}
+
+// npmCall is `npm …` and `pnpm …`: a script of the list (npm test, npm run lint, pnpm build) or a tool of the list
+// (npm exec vitest, pnpm dlx tsc, pnpm vitest).
+func npmCall(tool string, args []string) bool {
+	valued := map[string]bool{"--prefix": true, "-w": true, "--workspace": true, "-C": true, "--dir": true, "--filter": true,
+		"-F": true, "--loglevel": true}
+	var words []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			words = append(words, args[i+1:]...)
+			break
+		}
+		if valued[a] {
+			i++
+			continue
+		}
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		words = append(words, args[i:]...)
+		break
+	}
+	if len(words) == 0 {
+		return false
+	}
+	rest := words[1:]
+	switch words[0] {
+	case "test", "t", "tst":
+		return !watching(rest)
+	case "run", "run-script", "rum", "urn":
+		for i, a := range rest {
+			if a == "--" || !strings.HasPrefix(a, "-") {
+				if a == "--" {
+					return false
+				}
+				return heavyScript(a) && !watching(rest[i+1:])
+			}
+		}
+		return false
+	case "exec", "x", "dlx":
+		return Heavy("npx", rest)
+	}
+	// pnpm runs a script or a local tool by its bare name.
+	return tool == "pnpm" && heavyScript(words[0]) && !watching(rest)
+}
+
 func onlyInfo(args []string) bool {
 	if len(args) == 0 {
 		return false
@@ -343,15 +411,17 @@ func onlyInfo(args []string) bool {
 // acquire takes the first free slot of n, trying again every env.Poll until wait is over. busy is called once, when
 // the first try finds them all taken. The slot's file stays open: closing it (or the process ending) frees the slot.
 func acquire(dir string, n int, wait time.Duration, env Env, busy func()) (int, *os.File, error) {
-	if err := ensureDir(dir); err != nil {
+	root, err := openDir(dir)
+	if err != nil {
 		return 0, nil, err
 	}
+	defer root.Close()
 	deadline := env.Now().Add(wait)
 	told := false
 	for {
 		usable := false
 		for i := 1; i <= n; i++ {
-			f, err := openShared(filepath.Join(dir, "slot"+strconv.Itoa(i)), os.O_RDONLY)
+			f, err := openShared(root, "slot"+strconv.Itoa(i), os.O_RDONLY)
 			if err != nil {
 				continue
 			}
@@ -377,63 +447,101 @@ func acquire(dir string, n int, wait time.Duration, env Env, busy func()) (int, 
 
 var errBusy = errors.New("no free slot")
 
-// ensureDir makes the slots' folder writable by every user of the machine, as /tmp is. A folder that is there already
-// must be a real folder (not a link), owned by root or by this user, or sticky and open to all like /tmp: anything
-// else may be another user's trap, and the slots are not used.
-func ensureDir(dir string) error {
-	st, err := os.Lstat(dir)
-	if errors.Is(err, os.ErrNotExist) {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return err
+// openDir opens the slots' folder, making it writable by every user of the machine, as /tmp is. Every file of it is
+// then opened through the returned root, so the folder checked is the folder used, and nothing leads out of it.
+//
+// A folder that is there already must be a real folder (not a link), owned by root or by this user, or sticky and open
+// to all like /tmp: anything else may be another user's trap, and the slots are not used.
+func openDir(dir string) (*os.Root, error) {
+	if err := os.Mkdir(dir, 0o700); err == nil {
+		// Ours and closed to others until it is opened to all through its own descriptor, never by path.
+		root, err := os.OpenRoot(dir)
+		if err != nil {
+			return nil, err
 		}
-		if err := os.Chmod(dir, os.ModeSticky|0o777); err != nil {
-			return err
+		d, err := root.Open(".")
+		if err == nil {
+			err = d.Chmod(os.ModeSticky | 0o777)
+			d.Close()
 		}
-		st, err = os.Lstat(dir)
+		if err != nil {
+			root.Close()
+			return nil, err
+		}
+		return root, nil
+	} else if !errors.Is(err, os.ErrExist) {
+		return nil, err
 	}
+	st, err := os.Lstat(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !st.IsDir() {
-		return fmt.Errorf("%s is not a folder", dir)
+		return nil, fmt.Errorf("%s is not a folder", dir)
 	}
 	if sys, ok := st.Sys().(*syscall.Stat_t); ok {
 		owner := int(sys.Uid)
 		if owner != 0 && owner != os.Getuid() && (st.Mode()&os.ModeSticky == 0 || st.Mode().Perm() != 0o777) {
-			return fmt.Errorf("%s belongs to another user and is not a sticky folder open to all", dir)
+			return nil, fmt.Errorf("%s belongs to another user and is not a sticky folder open to all", dir)
 		}
 	}
-	return nil
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+	// The folder opened is the one checked, not a link put in its place since.
+	if now, err := root.Stat("."); err != nil || !os.SameFile(st, now) {
+		root.Close()
+		return nil, fmt.Errorf("%s changed while it was opened", dir)
+	}
+	return root, nil
 }
 
 // openShared opens a file of the shared folder, making it (readable and writable by all) when it is not there. An
 // existing file is opened without O_CREAT: in a sticky folder the kernel refuses O_CREAT on another user's file
-// (fs.protected_regular). A link is never followed, and only a regular file is used.
-func openShared(path string, flag int) (*os.File, error) {
-	f, err := openRegular(path, flag)
+// (fs.protected_regular).
+func openShared(root *os.Root, name string, flag int) (*os.File, error) {
+	f, err := openRegular(root, name, flag)
 	if err == nil || !errors.Is(err, os.ErrNotExist) {
 		return f, err
 	}
-	nf, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o666)
+	nf, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o666)
 	if err == nil {
 		_ = nf.Chmod(0o666)
 		nf.Close()
 	} else if !errors.Is(err, os.ErrExist) {
 		return nil, err
 	}
-	return openRegular(path, flag)
+	return openRegular(root, name, flag)
 }
 
-func openRegular(path string, flag int) (*os.File, error) {
-	f, err := os.OpenFile(path, flag|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+// openRegular opens a plain file of the folder: never a link, a device or a fifo, and never a second name of a file
+// that lives elsewhere (a hard link).
+func openRegular(root *os.Root, name string, flag int) (*os.File, error) {
+	f, err := root.OpenFile(name, flag|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, err
 	}
-	if st, err := f.Stat(); err != nil || !st.Mode().IsRegular() {
+	st, err := f.Stat()
+	ok := err == nil && st.Mode().IsRegular()
+	if sys, isSys := st.Sys().(*syscall.Stat_t); ok && isSys && uint64(sys.Nlink) != 1 {
+		ok = false
+	}
+	if !ok {
 		f.Close()
-		return nil, fmt.Errorf("%s is not a regular file", path)
+		return nil, fmt.Errorf("%s is not a plain file of its own", name)
 	}
 	return f, nil
+}
+
+// ownFile says whether this user owns the open file.
+func ownFile(f *os.File) bool {
+	st, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	sys, ok := st.Sys().(*syscall.Stat_t)
+	return ok && int(sys.Uid) == os.Getuid()
 }
 
 // gentle puts the tool under nice and ionice when the machine has them.
@@ -556,17 +664,20 @@ func isLauncher(p string) bool {
 }
 
 // record appends one heavy call to <dir>/events: unix time, tool, ran|waited|refused, milliseconds waited. The file is
-// started over past 1 MiB.
+// started over past 1 MiB by its owner.
 func record(dir string, now time.Time, tool, outcome string, waited time.Duration) {
-	if ensureDir(dir) != nil {
+	root, err := openDir(dir)
+	if err != nil {
 		return
 	}
-	f, err := openShared(filepath.Join(dir, "events"), os.O_WRONLY|os.O_APPEND)
+	defer root.Close()
+	f, err := openShared(root, "events", os.O_WRONLY|os.O_APPEND)
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	if st, err := f.Stat(); err == nil && st.Size() > maxEvents {
+	// Only its owner starts the file over; the others append.
+	if st, err := f.Stat(); err == nil && st.Size() > maxEvents && ownFile(f) {
 		_ = f.Truncate(0)
 	}
 	fmt.Fprintf(f, "%d %s %s %d\n", now.Unix(), tool, outcome, waited.Milliseconds())
@@ -576,9 +687,9 @@ func record(dir string, now time.Time, tool, outcome string, waited time.Duratio
 const HelpText = `harnessly heavy — heavy checks share the machine
 
 The machine is shared: other agents and people's chats run on it. harnessly puts launchers named go, vitest,
-playwright, tsc, eslint and npx on your PATH. A light call (go env, go list, tsc --version) runs at once. A heavy
-one (go build/test/vet/install, vitest, playwright test, tsc, eslint, npx of those) takes one of the machine's
-few slots, runs gently (nice, ionice, GOMAXPROCS=2, -p=2), and waits when they are all taken.
+playwright, tsc, eslint, npx, npm and pnpm on your PATH. A light call (go env, npm install, tsc --version) runs at
+once. A heavy one (go build/test/vet/install, vitest, playwright test, tsc, eslint, npx of those, npm test, npm run
+lint/build/check) takes one of the machine's few slots, runs gently (nice, ionice, GOMAXPROCS=2, -p=2), and waits when they are all taken.
 
 When it says the machine is busy (exit 75), do not run the command again: go on without the check, or leave
 the full run to CI. Check in one batch at the end of a task, and only the package or test you changed.

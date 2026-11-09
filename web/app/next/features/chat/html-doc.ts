@@ -18,6 +18,21 @@ export const isFrameHeight = (data: unknown, key: string): data is IFrameHeight 
   typeof (data as IFrameHeight).height === 'number' &&
   Number.isFinite((data as IFrameHeight).height);
 
+/** What the frame reports besides its height: a request or style the policy blocked, or an error. */
+export interface IFrameIssue {
+  hxFrame: string;
+  issue: string;
+}
+
+export const isFrameIssue = (data: unknown, key: string): data is IFrameIssue =>
+  typeof data === 'object' &&
+  data !== null &&
+  (data as IFrameIssue).hxFrame === key &&
+  typeof (data as IFrameIssue).issue === 'string';
+
+/** The line the page's console gets for an issue of an agent's page; short, as the frame is not trusted with more. */
+export const issueLine = (issue: string): string => `[html-блок] ${issue.slice(0, 300)}`;
+
 export const policyOf = (nonce: string): string =>
   [
     "default-src 'none'",
@@ -43,7 +58,12 @@ const BASE =
 // Reads the height after layout and when anything resizes; the key is a plain token, so it needs no escaping.
 const reporter = (key: string): string =>
   `const send=()=>parent.postMessage({hxFrame:${JSON.stringify(key)},height:Math.ceil(document.documentElement.getBoundingClientRect().height)},'*');` +
-  'new ResizeObserver(send).observe(document.documentElement);addEventListener("load",send);send();';
+  'new ResizeObserver(send).observe(document.documentElement);addEventListener("load",send);send();' +
+  // The agent's scripts do not run, but a blocked request or a broken style is the reason a page looks wrong: told to the
+  // page's console, a few of them.
+  `let n=0;const tell=(issue)=>{if(n++<10)parent.postMessage({hxFrame:${JSON.stringify(key)},issue},'*')};` +
+  'addEventListener("securitypolicyviolation",(e)=>tell("CSP blocked "+(e.blockedURI||"inline")+" by "+e.violatedDirective));' +
+  'addEventListener("error",(e)=>tell(String(e.message||"error")));';
 
 const FORBIDDEN = 'meta, base, form, iframe, frame, frameset, object, embed, link, script, noscript, portal';
 

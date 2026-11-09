@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ANNOTATE_MARGIN,
-  chooseSide,
-  placeAnnotate,
-  type IAnnotatePlaceInput,
-} from '@/next/ui/annotate/place';
+import { ANNOTATE_MARGIN, chooseSide, placeAnnotate, type IAnnotatePlaceInput } from '@/next/ui/notes/place';
 
 const base: IAnnotatePlaceInput = {
   x: 500,

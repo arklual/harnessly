@@ -581,9 +581,147 @@
 .hx-picker__ultra[data-pending='true'] .hx-picker__ultra-hint {
   color: var(--hx-accent);
 }
+/* the fast mode on the pill, a mark before the name like ultracode's, without the glow. */
+.hx-model .hx-model__fast {
+  color: var(--hx-accent);
+}
+/* The permission mode: three equal segments under the depth; the backing slides under the chosen one. */
+.hx-perm {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+.hx-perm__seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 2px;
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-active);
+}
+.hx-perm__glider {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / 3);
+  border-radius: 6px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-sm);
+  transform: translateX(calc(var(--i, 0) * 100%));
+  transition: transform 420ms var(--hx-ease-out);
+}
+.hx-perm__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition: color var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-perm__item .hx-icon {
+  flex: none;
+  color: var(--hx-fg-3);
+  transition: color var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-perm__item[aria-checked='true'] {
+  color: var(--hx-fg-1);
+}
+.hx-perm__item[aria-checked='true'] .hx-icon {
+  color: var(--hx-accent);
+}
+.hx-perm__item:disabled {
+  cursor: default;
+}
+.hx-perm[data-frozen='true'] .hx-perm__seg {
+  opacity: 0.6;
+}
+.hx-perm__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-perm__hint {
+  text-align: center;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--hx-fg-3);
+}
+/* A mode the agent has not confirmed yet: said in the accent, as ultracode's. */
+.hx-perm__hint[data-pending='true'] {
+  color: var(--hx-accent);
+}
+/* The fast mode: a row like ultracode's, a switch at its end. */
+.hx-picker__mode {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-picker__mode:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-picker__mode[data-on='true'] {
+  background: var(--hx-accent-soft);
+}
+.hx-picker__mode .hx-switch {
+  grid-column: 3;
+  grid-row: 1;
+  margin-top: -2px;
+}
+.hx-picker__mode-ic {
+  grid-column: 1;
+  grid-row: 1;
+  margin-top: 2px;
+  color: var(--hx-fg-3);
+  transition: color var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-picker__mode[data-on='true'] .hx-picker__mode-ic {
+  color: var(--hx-accent);
+}
+.hx-picker__mode-text {
+  display: contents;
+}
+.hx-picker__mode-name {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  line-height: 20px;
+  color: var(--hx-fg-1);
+}
+.hx-picker__mode-hint {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--hx-fg-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-picker__mode[data-pending='true'] .hx-picker__mode-hint {
+  color: var(--hx-accent);
+}
 @media (prefers-reduced-motion: reduce) {
   .hx-model[data-ultracode='true'] {
     animation: none;
+  }
+  .hx-perm__glider {
+    transition: none;
   }
 }
 
@@ -596,13 +734,19 @@
   .hx-picker__center {
     min-height: 44px;
   }
-  .hx-picker__ultra {
+  .hx-picker__ultra,
+  .hx-picker__mode {
     min-height: 48px;
+  }
+  .hx-perm__item {
+    height: 40px;
   }
   .hx-picker__vm {
     min-height: 44px;
   }
-  .hx-picker__ultra-hint {
+  .hx-picker__ultra-hint,
+  .hx-picker__mode-hint,
+  .hx-perm__hint {
     font-size: 13px;
     line-height: 17px;
     white-space: normal;

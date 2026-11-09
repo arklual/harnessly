@@ -82,6 +82,7 @@ flowchart TD
 
 ## The pages
 
+0. [From zero to a working view in 5 minutes](00-five-minutes.md): `app new`, `dev`, the first view, and the Vite + React recipe.
 1. [Your first plugin](01-first-plugin.md): the package, the manifest, instructions, skills, commands, tool rules.
 2. [Views](02-views.md): UI in the pane, cards, a full screen, the SDK, theme tokens, storage, files.
 3. [Backend](03-backend.md): what can run where, and which way to choose. There is no host-run server.
@@ -90,6 +91,8 @@ flowchart TD
 6. [Debugging](06-debugging.md): the development loop, what is picked up when, limits, every error code.
 7. [Sharing](07-sharing.md): versions, channels, the team's catalog, the public catalog, links, evals as a gate.
 8. [A worked example](08-worked-example.md): `standup` from start to finish.
+9. [Compatibility](09-compatibility.md): what stays stable across updates.
+10. [Sign-in](10-auth.md): who calls your backend — the platform token, corporate SSO, OAuth, and every refused sign-in.
 
 The [reference](../apps.md) has every field and every call.
 

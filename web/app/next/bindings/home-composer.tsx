@@ -6,7 +6,7 @@ import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uuidv7 } from '@/next/core/ids';
 import { useBeta } from '@/next/stores/beta';
-import type { IModelChoice } from '@/next/features/composer/agents';
+import { launchModel, type IModelChoice } from '@/next/features/composer/agents';
 import { choiceKey, launchPrompt, toggleChoice } from '@/next/features/composer/multi-model';
 import { createConversation, setConversationApps, type NewConversation } from '@/next/commands';
 import { failureText } from '@/next/bindings/outcome';
@@ -214,7 +214,9 @@ const HomeComposer = ({
             where: place,
             provider: pick.provider,
             ...(pick.profile ? { profile: pick.profile } : {}),
-            model: pick.model ? { id: pick.model, effort: pick.effort, ultracode: pick.ultracode } : null,
+            model: pick.model
+              ? launchModel({ ...pick, model: pick.model, permission: choice.permission ?? null })
+              : null,
             first,
             launch,
             worktree: true,
@@ -250,9 +252,7 @@ const HomeComposer = ({
         where: place,
         provider: choice?.provider ?? 'claude',
         ...(choice?.profile ? { profile: choice.profile } : {}),
-        model: choice?.model
-          ? { id: choice.model, effort: choice.effort, ultracode: choice.ultracode }
-          : null,
+        model: choice?.model ? launchModel({ ...choice, model: choice.model }) : null,
         first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs },
       });
       void created.done.then((st) => {

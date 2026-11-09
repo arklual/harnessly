@@ -267,9 +267,15 @@ func (s MCPServer) Filled(values map[string]string) (MCPServer, []string) {
 		for k, v := range in {
 			f, miss := FillSecrets(v, values)
 			out[k] = f
+
 			missing = append(missing, miss...)
 		}
 		return out
+	}
+	for _, v := range s.Headers {
+		if strings.Contains(v, "${secret:") {
+			s.Credentialed = true
+		}
 	}
 	s.Headers = fill(s.Headers)
 	s.Env = fill(s.Env)

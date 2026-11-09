@@ -7,11 +7,112 @@
   color-scheme: normal;
   transition: height var(--hx-dur-md) var(--hx-ease-out);
 }
-/* While the frame loads: a quiet spinner on its own background, gone once its page paints over it. */
-.hx-appview[data-loading] {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' fill='none' stroke='rgba(128,128,128,0.25)' stroke-width='3'/%3E%3Cpath d='M14 3a11 11 0 0 1 11 11' fill='none' stroke='rgba(128,128,128,0.8)' stroke-width='3' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 14 14' to='360 14 14' dur='0.8s' repeatCount='indefinite'/%3E%3C/path%3E%3C/svg%3E")
-    center / 28px 28px no-repeat;
+/* The frame's box holds the frame, the skeleton over it while it starts, or the card of why it did not. */
+.hx-appview__box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hx-appview__box:not([data-fit]) {
+  flex: 1;
+  min-height: 0;
+}
+/* An opaque ground in the theme's colour: a view that paints nothing, or fails, never shows the page's white. */
+.hx-appview {
+  background: var(--hx-bg);
+}
+.hx-appview[data-state='loading'] {
   min-height: 120px;
+  visibility: hidden;
+}
+.hx-appview[data-state='failed'] {
+  display: none;
+}
+/* While the view starts: its icon and name over quiet bars in the theme's colours; it fades once the view is up. */
+.hx-appview__skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-5);
+  background: var(--hx-bg);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  transition:
+    opacity var(--hx-dur-md) var(--hx-ease-out),
+    visibility 0s linear var(--hx-dur-md);
+}
+.hx-appview__skeleton[data-state='ready'] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.hx-appview__skeleton-bar {
+  width: 60%;
+  height: 10px;
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-raised);
+  animation: hx-appview-pulse 1.4s ease-in-out infinite;
+}
+.hx-appview__skeleton-bar:last-child {
+  width: 40%;
+}
+@keyframes hx-appview-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-appview__skeleton-bar {
+    animation: none;
+  }
+}
+/* A view that did not start: the reason and the ways on, where the frame was. */
+.hx-appfail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-5);
+  background: var(--hx-bg);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-appfail__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-3);
+}
+.hx-appfail__txt {
+  min-width: 0;
+}
+.hx-appfail__title {
+  margin: 0;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: 600;
+}
+.hx-appfail__why {
+  margin: var(--hx-space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+.hx-appfail__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.hx-appfail__none {
+  margin: 0;
+  color: var(--hx-fg-3);
+}
+.hx-appfail__log {
+  margin: 0;
+  padding-left: var(--hx-space-5);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  overflow-wrap: anywhere;
 }
 .hx-appview:not([data-fit]) {
   flex: 1;

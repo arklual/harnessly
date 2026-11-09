@@ -367,6 +367,53 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		secretJSON(w, http.StatusOK, map[string]any{"safeMode": b.On})
 	}
 
+	// appSignIn is POST <platform>/apps/signin {app, server}: the «Войти» of an app whose server signs in by OAuth
+	// (auth: oauth). It finds or makes the connection the sign-in goes through and answers its id; the page then runs
+	// the connections' own sign-in (POST <platform>/mcp/<id>/signin) in a top-level popup. The token stays in the safe.
+	appSignIn := func(w http.ResponseWriter, r *http.Request) {
+		if sameorigin.Refuse(w, r) {
+			return
+		}
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		var b struct {
+			App    string `json:"app"`
+			Server string `json:"server"`
+		}
+		if !readSecretBody(r, &b) {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		pkg, err := reg.Package(b.App)
+		if err != nil {
+			secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
+			return
+		}
+		decl, ok := pkg.MCP[b.Server]
+		if !ok || decl.Auth == nil || decl.Auth.Type != apps.AuthOAuth {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "not-oauth", "message": "the server does not sign in by OAuth"})
+			return
+		}
+		name := b.App
+		if pkg.Manifest != nil && pkg.Manifest.Name != "" {
+			name = pkg.Manifest.Name
+		}
+		conn, err := appSignInConnection(r.Context(), mcpFor(d), b.App, b.Server, name, decl)
+		if err != nil {
+			agent.Log("warn", "apps: sign-in to an app's server", agent.F{K: "app", V: b.App}, agent.F{K: "error", V: err.Error()})
+			secretJSON(w, http.StatusBadGateway, map[string]string{"error": mcpconn.Reason(err)})
+			return
+		}
+		_ = reg.Journal(b.App, apps.JournalEntry{What: "signin.start", Class: apps.ClassHigh, OK: true, Detail: b.Server})
+		secretJSON(w, http.StatusOK, map[string]string{"connection": conn.ID})
+	}
+
 	cliList := func(w http.ResponseWriter, r *http.Request) {
 		if !cliOK(w, r, http.MethodGet) {
 			return
@@ -761,6 +808,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		{Match: is(platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
 		{Match: is("/agents" + platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
 		{Match: is(platformAPI + "/apps/safe-mode"), Handler: http.HandlerFunc(safeMode)},
+		{Match: is(platformAPI + "/apps/signin"), Handler: http.HandlerFunc(appSignIn)},
 		{Match: is("/agents" + platformAPI + "/apps/safe-mode"), Handler: http.HandlerFunc(safeMode)},
 		{Match: is("/api/cli/apps"), Handler: http.HandlerFunc(cliList)},
 		{Match: is("/api/cli/apps/install"), Handler: http.HandlerFunc(install)},

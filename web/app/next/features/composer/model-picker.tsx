@@ -7,7 +7,9 @@
 // switch and is said under it, never on the pill. On the phone it stays the same compact popover over the pill (the
 // design's mobile.css keeps it one), its rows a finger tall. A new chat of a person with several machines also says
 // the machine it starts on, a row under the depth that opens a third screen of the machines: another one
-// brings that machine's agents and models, the ones logged in there.
+// brings that machine's agents and models, the ones logged in there. Under the depth sit the permission mode, three
+// segments (plan, ask, ask nothing), and the fast mode, a switch like ultracode's on the models that run it;
+// like ultracode, both show what the agent was last seen running, and an ask that waits is said under its control.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   agentKey,
@@ -22,7 +24,13 @@ import {
   type IPickerAgent,
 } from '@/next/features/composer/agents';
 import { choiceKey } from '@/next/features/composer/multi-model';
-import { EFFORTS, type AgentModel, type Effort } from '@/next/protocol/v2';
+import {
+  EFFORTS,
+  PERMISSION_MODES,
+  type AgentModel,
+  type Effort,
+  type PermissionMode,
+} from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import Switch from '@/next/ui/switch';
 import { usePresentFlag } from '@/next/ui/presence';
@@ -51,6 +59,9 @@ export interface IModelPickerProps {
   offersUltracode?: boolean;
   /** The mode an ask waits for the agent to turn to; null or absent when none waits. value.ultracode is the mode seen. */
   ultracodeAsked?: boolean | null;
+  /** The same of the fast mode and of the permission mode: value.fast and value.permission are what the agent runs. */
+  fastAsked?: boolean | null;
+  permissionAsked?: PermissionMode | null;
   onChange: (choice: IModelChoice) => void;
   /**
    * Several models for one prompt (a beta function, a new chat only): `chosen` is every model of the set, the pill's own
@@ -86,6 +97,14 @@ const ULTRACODE_WAITS = {
   on: 'next.picker.ultracodeWaitsOn',
   off: 'next.picker.ultracodeWaitsOff',
 } as const;
+const FAST_WAITS = { on: 'next.picker.fastWaitsOn', off: 'next.picker.fastWaitsOff' } as const;
+
+/** The mark of each permission mode on its segment. */
+const PERMISSION_ICON: Readonly<Record<PermissionMode, string>> = {
+  plan: 'list-checks',
+  ask: 'shield-check',
+  bypass: 'shield-off',
+} as const;
 
 const ModelPicker = ({
   value,
@@ -95,6 +114,8 @@ const ModelPicker = ({
   blocked,
   offersUltracode = true,
   ultracodeAsked = null,
+  fastAsked = null,
+  permissionAsked = null,
   onChange,
   multi,
   handoff = null,
@@ -142,6 +163,22 @@ const ModelPicker = ({
   const switchOn = asked ?? ultracode;
   const ultraHint =
     asked === null ? t('next.picker.ultracodeHint') : t(ULTRACODE_WAITS[asked ? 'on' : 'off']);
+  const fastOffered = model?.fast === true;
+  const fast = fastOffered && value.fast === true;
+  const fastWaits = fastOffered && fastAsked !== null && fastAsked !== fast ? fastAsked : null;
+  const fastHint = fastWaits === null ? t('next.picker.fastHint') : t(FAST_WAITS[fastWaits ? 'on' : 'off']);
+  const permission = value.permission ?? agent.defaultPermission ?? 'ask';
+  const permissionWaits = permissionAsked !== null && permissionAsked !== permission ? permissionAsked : null;
+  const permissionShown = permissionWaits ?? permission;
+  const permissionHint =
+    permissionWaits === null
+      ? t(`next.picker.permissionHint.${permission}`)
+      : t('next.picker.permissionWaits');
+  // What a change sends keeps the asks of the other modes that still wait: a turn of one control does not take them back.
+  const keep = {
+    ...(fastWaits !== null ? { fast: fastWaits } : {}),
+    ...(permissionWaits !== null ? { permission: permissionWaits } : {}),
+  };
   // Where the thumb and the stops stand, for any number of stops (each model has its own count).
   const along = (i: number) => String(stops.length > 1 ? i / (stops.length - 1) : 0);
   useLayoutEffect(() => {
@@ -166,7 +203,7 @@ const ModelPicker = ({
   const setStep = (i: number) => {
     if (frozen || stops.length === 0) return;
     const next = stops[Math.max(0, Math.min(stops.length - 1, i))];
-    if (next !== effort) onChange({ ...value, effort: next });
+    if (next !== effort) onChange({ ...value, ...keep, effort: next });
   };
 
   // Outside press and Esc close; arrows move the depth on its screen.
@@ -270,6 +307,15 @@ const ModelPicker = ({
             aria-label={t('next.picker.ultracode')}
           />
         )}
+        {fast && (
+          <i
+            className="hx-icon hx-model__fast"
+            data-i="zap"
+            data-size="sm"
+            role="img"
+            aria-label={t('next.picker.fast')}
+          />
+        )}
         <span className="hx-model__name">{modelName(agent, value.model)}</span>
         {effort && <span className="hx-model__effort">{effortLabel(effort)}</span>}
         {more > 0 && <span className="hx-model__more">{`+${more}`}</span>}
@@ -357,6 +403,57 @@ const ModelPicker = ({
                 </>
               )}
               <div className="hx-picker__hint">{hint()}</div>
+              <div className="hx-perm" data-frozen={frozen || undefined}>
+                <div
+                  className="hx-perm__seg"
+                  role="radiogroup"
+                  aria-label={t('next.picker.permissionLabel')}
+                  ref={(el) =>
+                    el?.style.setProperty('--i', String(PERMISSION_MODES.indexOf(permissionShown)))
+                  }
+                >
+                  <span className="hx-perm__glider" />
+                  {PERMISSION_MODES.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      className="hx-perm__item"
+                      aria-checked={mode === permissionShown}
+                      data-mode={mode}
+                      disabled={frozen}
+                      onClick={() => {
+                        if (mode !== permissionShown) onChange({ ...value, ...keep, permission: mode });
+                      }}
+                    >
+                      <Icon name={PERMISSION_ICON[mode]} size="sm" />
+                      <span className="hx-perm__name">{t(`next.picker.permission.${mode}`)}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="hx-perm__hint" data-pending={permissionWaits !== null || undefined}>
+                  {permissionHint}
+                </div>
+              </div>
+              {fastOffered && (
+                <div
+                  className="hx-picker__mode"
+                  data-on={fast || undefined}
+                  data-pending={fastWaits !== null || undefined}
+                >
+                  <Icon name="zap" size="sm" className="hx-picker__mode-ic" />
+                  <span className="hx-picker__mode-text">
+                    <span className="hx-picker__mode-name">{t('next.picker.fast')}</span>
+                    <span className="hx-picker__mode-hint">{fastHint}</span>
+                  </span>
+                  <Switch
+                    label={t('next.picker.fast')}
+                    checked={fastWaits ?? fast}
+                    disabled={frozen}
+                    onChange={(on) => onChange({ ...value, ...keep, fast: on })}
+                  />
+                </div>
+              )}
               {ultracodeOffered && (
                 <div
                   className="hx-picker__ultra"
@@ -373,7 +470,7 @@ const ModelPicker = ({
                     label={t('next.picker.ultracode')}
                     checked={switchOn}
                     disabled={frozen}
-                    onChange={(on) => onChange({ ...value, ultracode: on })}
+                    onChange={(on) => onChange({ ...value, ...keep, ultracode: on })}
                   />
                 </div>
               )}

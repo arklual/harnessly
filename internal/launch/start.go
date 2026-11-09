@@ -18,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/state"
 	"github.com/ly-solutions/harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // Lines are the agent CLIs' launch lines.
@@ -433,7 +434,39 @@ func launchJSON(l *agents.Launch) *jsvalue.Object {
 	if len(l.Apps) > 0 {
 		o.Set("apps", AppsJSON(l.Apps))
 	}
+	setLaunchModes(o, l)
 	return o
+}
+
+// setLaunchModes writes the fast and permission modes of a launch into the tab's launch: a resume starts the
+// agent in them again. Absent ones are not written, so a launch without them is stored as it always was.
+func setLaunchModes(o *jsvalue.Object, l *agents.Launch) {
+	if l.Fast {
+		o.Set("fast", true)
+	} else {
+		o.Delete("fast")
+	}
+	if l.Permission != "" {
+		o.Set("permission", string(l.Permission))
+	} else {
+		o.Delete("permission")
+	}
+}
+
+// ModesOf reads the fast and permission modes a tab's launch keeps; an unknown permission reads as none.
+func ModesOf(o *jsvalue.Object) (fast bool, permission wire.PermissionMode) {
+	if o == nil {
+		return false, ""
+	}
+	if v, ok := o.Get("fast"); ok {
+		fast, _ = v.(bool)
+	}
+	if v, ok := o.Get("permission"); ok {
+		if s, isStr := v.(string); isStr && wire.PermissionMode(s).Known() {
+			permission = wire.PermissionMode(s)
+		}
+	}
+	return fast, permission
 }
 
 // AppsJSON is a launch's apps as the tab meta keeps them.

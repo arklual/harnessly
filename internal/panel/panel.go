@@ -576,6 +576,17 @@ func RateDecision(stamps []int64, now int64, limit int, windowMs int64) (bool, [
 	return true, append(recent, now)
 }
 
+// The kinds of addresses (docs/pane-opening.md), each by its exact pattern:
+//
+//	document       https://<PortalHost|ArtifactsHost>/a/<slug>, https://<ReaderHost><ReaderPath><slug>  artifacts
+//	board          https://<PortalHost|BoardsHost>/b/<slug>[?k=<key>]                                   artifacts
+//	stand          https://<one label><StandDomain>/…, no port; ai-… and auth are not stands            browser
+//	dev server     http(s)://localhost:<port> (127.0.0.1, 0.0.0.0), a bare port                          browser
+//	MR, commit     https://<GitLabHosts>/<project>/-/merge_requests/<n>, /-/commit/<sha>; GitHub's        gitlab
+//	task           a TaskKey (PROJ-12), https://<TrackerHosts>/issue/<key>                              task
+//
+// A document is never the browser: a page of the portal or the platform that is none of these is a plain site.
+//
 // Classify is the tab a link or a name the agent wrote opens in, by the rules of open: a tracker key is the task tab, a
 // GitLab merge request or commit or a GitHub pull request, commit or issue the gitlab tab, a document or a board of the portal the artifacts tab, and any other
 // http(s) address the browser. "" for what opens nothing. The chat's chips and the pane's links ask it, so the pane has

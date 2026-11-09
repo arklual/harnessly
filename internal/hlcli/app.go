@@ -19,10 +19,11 @@ import (
 // new and validate work on the folder alone; install, list, remove, enable and disable go through the runtime.
 
 func (c *cli) app(args []string) error {
-	sub := "list"
-	if len(args) > 0 {
-		sub, args = args[0], args[1:]
+	if help := appHelpFor(args); help != "" {
+		fmt.Fprint(c.env.Stdout, help)
+		return nil
 	}
+	sub, args := args[0], args[1:]
 	switch sub {
 	case "docs":
 		return c.appDocs(args)
@@ -80,7 +81,7 @@ func (c *cli) app(args []string) error {
 	case "logs":
 		return c.appLogs(args)
 	}
-	return usageErr("app takes catalog, sdk, docs, new, validate, install, dev, list, remove, enable, disable, explain, logs, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
+	return usageErr("app takes %s (harnessly app --help)", appSubNames)
 }
 
 // appDir is a folder argument made absolute; none is the working folder.

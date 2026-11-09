@@ -60,12 +60,12 @@ import {
 } from '@/next/features/designly/deck/chat-context';
 import { anchorItems } from '@/next/features/designly/note-anchor';
 import { itemsOf, NO_EDIT } from '@/next/features/designly/element-style';
+import { NoteChips } from '@/next/ui/notes/note-chips';
 import {
   NotePins,
   NotePopover,
-  noteQuote,
+  noteChip,
   NotesBar,
-  NoteStrip,
   NOTE_OUT_MS,
   type INote,
   type INotePopoverProps,
@@ -290,6 +290,7 @@ const NewDesignChat = ({ machine, draftKey, creating, start, extra, onFirst }: I
             }
             quotes={extra.quotes}
             onRemoveQuote={extra.onRemoveQuote}
+            noteGroups={extra.notes ? [extra.notes] : undefined}
             tools={extra.tools}
             placeholder={extra.placeholder}
             attachments={uploads.attachments}
@@ -620,10 +621,17 @@ export const useSiteStage = ({
     </button>
   ) : null;
   const extra: IDockExtra = {
-    quotes: [
-      ...notes.map((note, i) => noteQuote(note, i + 1)),
-      ...(deckCtx ? [deckContextQuote(deckCtx)] : []),
-    ],
+    quotes: deckCtx ? [deckContextQuote(deckCtx)] : [],
+    notes: {
+      key: 'design',
+      notes: notes.map(noteChip),
+      onEdit: (id, words) => setNotes((list) => list.map((n) => (n.id === id ? { ...n, text: words } : n))),
+      onRemove: removeNote,
+      onOpen: (id) => {
+        setMin(false);
+        editNote(id);
+      },
+    },
     placeholder: deckCtx
       ? t(deckCtx.selected ? 'next.deck.chat.placeholderSelected' : 'next.deck.chat.placeholder')
       : undefined,
@@ -869,15 +877,18 @@ export const useSiteStage = ({
         onPick={onPick}
         notes={notes.length}
         extra={
-          <NoteStrip
-            notes={notes}
-            onEdit={(id) => {
-              setMin(false);
-              editNote(id);
-            }}
-            onRemove={removeNote}
-            onClear={() => setNotes([])}
-          />
+          // The notes as the field's numbered chips, like their pins: the card of one changes its words, × takes it back.
+          <div className="hx-island__chips">
+            <NoteChips
+              notes={extra.notes?.notes ?? []}
+              onEdit={extra.notes?.onEdit ?? none}
+              onRemove={removeNote}
+              onOpen={(id) => {
+                setMin(false);
+                editNote(id);
+              }}
+            />
+          </div>
         }
       />
     ),

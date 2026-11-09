@@ -9,11 +9,11 @@
   gap: 8px;
   height: 36px;
   padding: 0 14px;
-  border: 1px solid var(--hx-border-strong);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--hx-bg-raised);
-  box-shadow: var(--hx-shadow-overlay);
-  color: var(--hx-fg-1);
+  background: var(--hx-ink-bg);
+  box-shadow: var(--hx-ink-shadow);
+  color: var(--hx-ink-fg);
   font-size: var(--hx-text-sm);
   white-space: nowrap;
   overflow: hidden;
@@ -21,7 +21,7 @@
   /* Never wider than the window: on a phone or in a narrow window the button stays inside the pill. */
   max-width: calc(100vw - 24px);
   transform: translateX(-50%);
-  animation: hx-net-in 420ms var(--hx-ease-out) backwards;
+  animation: hx-net-in 460ms var(--hx-ink-spring) backwards;
   transition:
     width 460ms var(--hx-ease-out),
     border-color 300ms ease;
@@ -56,15 +56,15 @@
 }
 .hx-net__icon {
   flex: none;
-  color: var(--hx-warning);
+  color: var(--hx-ink-fg);
   transition: color 240ms ease;
 }
 .hx-net[data-state='retry'] .hx-net__icon {
-  color: var(--hx-fg-3);
+  color: var(--hx-ink-fg3);
   animation: hx-net-spin 1s linear infinite;
 }
 .hx-net:is([data-state='back'], [data-state='closing']) .hx-net__icon {
-  color: var(--hx-success);
+  color: var(--hx-ink-fg);
 }
 .hx-net__text {
   min-width: 0;
@@ -76,7 +76,7 @@
   display: inline-block;
   flex: none;
   min-width: 8ch;
-  color: var(--hx-fg-3);
+  color: var(--hx-ink-fg2);
   font-variant-numeric: tabular-nums;
 }
 .hx-net__now {
@@ -86,8 +86,8 @@
   padding: 0 11px;
   border: 0;
   border-radius: 999px;
-  background: var(--hx-fg-1);
-  color: var(--hx-bg-app);
+  background: var(--hx-ink-fg);
+  color: var(--hx-ink-bg);
   font: inherit;
   font-size: var(--hx-text-xs);
   font-weight: var(--hx-weight-medium);
@@ -122,7 +122,7 @@
   cursor: default;
 }
 .hx-net__now:focus-visible {
-  outline: 2px solid var(--hx-focus);
+  outline: 2px solid var(--hx-ink-focus);
   outline-offset: 2px;
 }
 .hx-net[data-state='closing'] {
@@ -133,7 +133,7 @@
   from {
     opacity: 0;
     filter: blur(4px);
-    transform: translate(-50%, -12px) scale(0.94);
+    transform: translate(-50%, -12px) scale(0.6, 0.5);
   }
 }
 @keyframes hx-net-out {
@@ -153,7 +153,7 @@
   padding-right: 4px;
 }
 .hx-net[data-kind='update'] .hx-net__icon {
-  color: var(--hx-accent);
+  color: var(--hx-ink-fg);
 }
 /* Under «Нет связи» when both are up. */
 .hx-net ~ .hx-net[data-kind='update'],
@@ -165,20 +165,20 @@
   padding-right: 4px;
 }
 .hx-net[data-kind='release'] .hx-net__icon {
-  color: var(--hx-accent);
+  color: var(--hx-ink-fg);
 }
 .hx-net__link {
-  color: var(--hx-fg-3);
+  color: var(--hx-ink-fg2);
   font-size: var(--hx-text-xs);
   text-decoration: none;
   transition: color 140ms ease;
 }
 .hx-net__link:hover {
-  color: var(--hx-fg-1);
+  color: var(--hx-ink-fg);
   text-decoration: underline;
 }
 .hx-net__link:focus-visible {
-  outline: 2px solid var(--hx-focus);
+  outline: 2px solid var(--hx-ink-focus);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -190,11 +190,11 @@
   border: 0;
   border-radius: 999px;
   background: none;
-  color: var(--hx-fg-3);
+  color: var(--hx-ink-fg3);
   cursor: pointer;
   transition: background 140ms ease;
 }
 .hx-net__x:hover {
-  background: var(--hx-bg-hover);
-  color: var(--hx-fg-1);
+  background: var(--hx-ink-fill);
+  color: var(--hx-ink-fg);
 }

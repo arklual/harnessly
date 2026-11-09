@@ -64,11 +64,10 @@ type Made struct {
 }
 
 func (m *Made) config() outputs.Config {
-	host := ""
-	if m.Links != nil {
-		host = m.Links.DocsHost
+	if m.Links == nil {
+		return outputs.Config{}
 	}
-	return outputs.Config{DocsHost: host}
+	return outputs.Config{DocsHost: m.Links.DocsHost, ReaderHost: m.Links.ReaderHost, ReaderPath: m.Links.ReaderPath}
 }
 
 func tsMs(e *jsvalue.Object) wire.Ms {

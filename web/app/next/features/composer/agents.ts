@@ -6,6 +6,8 @@ import {
   type AgentModel,
   type Effort,
   type MachineAgent,
+  type Model,
+  type PermissionMode,
   type Provider,
 } from '@/next/protocol/v2';
 import type { Vendor } from '@/next/features/providers/model';
@@ -22,6 +24,8 @@ export interface IPickerAgent {
   models: readonly AgentModel[];
   /** A running chat of this agent takes a new model. */
   canSwitch: boolean;
+  /** The permission mode a chat of it starts in when it names none (the machine's setting); absent: ask. */
+  defaultPermission?: PermissionMode;
   /** Ready to run with known models; else its segment says why (not installed, not signed in). */
   available: boolean;
   status: AgentInstallStatus;
@@ -36,6 +40,10 @@ export interface IModelChoice {
   effort: Effort | null;
   /** Claude Code's ultracode: a mode beside the depth (dynamic workflows with subagents on every task), not a level. */
   ultracode: boolean;
+  /** The CLI's fast mode, on a model that runs it; absent is off. */
+  fast?: boolean;
+  /** How the agent asks before it acts; null or absent: the machine's default, for a chat that never chose. */
+  permission?: PermissionMode | null;
 }
 
 export const effortLabel = (effort: Effort): string => t(`next.picker.effort.${effort}`);
@@ -60,6 +68,7 @@ const pickerAgent = (agent: MachineAgent): IPickerAgent => ({
   ...NAMES[agent.provider],
   models: agent.models,
   canSwitch: agent.canSwitchModel,
+  ...(agent.defaultPermission ? { defaultPermission: agent.defaultPermission } : {}),
   available: agent.status === 'ready' && agent.models.length > 0,
   status: agent.status,
 });
@@ -83,6 +92,7 @@ const profileAgents = (agent: MachineAgent): IPickerAgent[] =>
       models: p.models,
       // A running chat takes a model of its own profile only; the runtime says so by the agent's flag.
       canSwitch: agent.canSwitchModel,
+      ...(agent.defaultPermission ? { defaultPermission: agent.defaultPermission } : {}),
       available: agent.status === 'ready',
       status: agent.status,
     }));
@@ -169,4 +179,25 @@ export const withModel = (choice: IModelChoice, agent: IPickerAgent, model: Agen
   model: model.id,
   effort: choice.effort && model.efforts.includes(choice.effort) ? choice.effort : model.defaultEffort,
   ultracode: choice.ultracode && model.ultracode === true,
+  ...modesOf(choice, model),
+});
+
+/** The fast and permission modes of a choice on a model: fast only where the model runs it; none that are off or
+ *  not chosen, so a choice without them stays as it was. */
+export const modesOf = (
+  choice: Pick<IModelChoice, 'fast' | 'permission'>,
+  model: AgentModel | undefined,
+): Pick<IModelChoice, 'fast' | 'permission'> => ({
+  ...(choice.fast && model?.fast === true ? { fast: true } : {}),
+  ...(choice.permission ? { permission: choice.permission } : {}),
+});
+
+/** The model a new chat is created with: the depth, ultracode and the fast and permission modes of the choice; modes
+ *  that are off or not chosen are left out. */
+export const launchModel = (choice: IModelChoice & { model: string }): Model => ({
+  id: choice.model,
+  effort: choice.effort,
+  ...(choice.ultracode ? { ultracode: true } : {}),
+  ...(choice.fast ? { fast: true } : {}),
+  ...(choice.permission ? { permission: choice.permission } : {}),
 });

@@ -801,11 +801,6 @@
   "next.site.placeholderIslandPlain": "Describe the edit",
   "next.notes.dialog": "Note",
   "next.notes.placeholder": "What to fix here?",
-  "next.notes.count": {
-    "one": "{n} edit",
-    "other": "{n} edits"
-  },
-  "next.notes.hint": "Click a block on the page",
   "next.notes.send": "Send to the agent",
   "next.notes.remove": "Remove",
   "next.notes.pick": "Pick on the page",
@@ -819,7 +814,6 @@
   "next.site.openSite": "Open the site",
   "next.notes.revert": "Cancel",
   "next.notes.delete": "Delete the annotation",
-  "next.notes.deleteTip": "Delete",
   "next.notes.toMessage": "Add to message",
   "next.notes.dictate": "Dictate",
   "next.notes.pin": "Note {n}: {label}",
@@ -842,6 +836,7 @@
   "next.notes.styleDiff.background": "Background → {value}",
   "next.notes.styleDiff.radius": "Radius → {value} px",
   "next.notes.styleDiff.opacity": "Opacity → {value}%",
+  "next.notes.styleFact": "Changes",
   "next.site.askWith": {
     "one": "Ask the agent · {n} annotation",
     "other": "Ask the agent · {n} annotations"

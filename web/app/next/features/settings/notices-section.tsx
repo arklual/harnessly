@@ -1,17 +1,18 @@
-// «Уведомления»: which events of a chat the person is not looking at come as a notice, where in the window the cards
-// stand and how long they stay, whether it chimes, and whether a tab in the background shows a notification of the
-// system. This browser's, as the theme is; the browser's permission is asked from the switch, never on load. A sample
-// card shows the choice at once.
-import { Group, Row, SegRow, SetButton, SwitchRow } from '@/next/features/settings/rows';
+// «Уведомления»: which events of a chat the person is not looking at come as a notice, where in the window the smart
+// notice stands, which sounds play, and whether a tab in the background shows a notification of the system. This
+// browser's, as the theme is; the browser's permission is asked from the switch, never on load. A sample shows the
+// place at once, «Послушать» each sound.
+import { Group, Row, SetButton, SwitchRow } from '@/next/features/settings/rows';
+import Switch from '@/next/ui/switch';
 import { t } from '@/next/i18n';
 import {
-  NOTICE_HIDE_AFTER,
   NOTICE_KINDS,
   NOTICE_PLACES,
+  NOTICE_SOUNDS,
   type INotifySettings,
-  type TNoticeHideAfter,
   type TNoticeKind,
   type TNoticePlace,
+  type TNoticeSound,
 } from '@/next/stores/notices';
 import { SYSTEM_PERMISSION, type TSystemPermission } from '@/next/features/notifications/ping';
 
@@ -21,10 +22,12 @@ export interface INoticesSectionProps {
   permission: TSystemPermission;
   onKind: (kind: TNoticeKind, on: boolean) => void;
   onSound: (on: boolean) => void;
+  onSoundOf: (sound: TNoticeSound, on: boolean) => void;
+  /** Plays a sound once, to hear it. */
+  onListen: (sound: TNoticeSound) => void;
   onSystem: (on: boolean) => void;
   onCards: (on: boolean) => void;
   onPlace: (place: TNoticePlace) => void;
-  onHideAfter: (after: TNoticeHideAfter) => void;
   /** Shows a sample card where the cards stand now. */
   onSample: () => void;
 }
@@ -74,10 +77,11 @@ const NoticesSection = ({
   permission,
   onKind,
   onSound,
+  onSoundOf,
+  onListen,
   onSystem,
   onCards,
   onPlace,
-  onHideAfter,
   onSample,
 }: INoticesSectionProps) => (
   <>
@@ -107,17 +111,6 @@ const NoticesSection = ({
       >
         <PlacePicker value={settings.place} disabled={!settings.cards} onPick={onPlace} />
       </Row>
-      <SegRow
-        label={t('next.notices.settings.hideAfter')}
-        hint={t('next.notices.settings.hideAfter.hint')}
-        value={settings.hideAfter}
-        choices={NOTICE_HIDE_AFTER.map((value) => ({
-          value,
-          label: t(`next.notices.settings.hideAfter.${value}`),
-        }))}
-        off={!settings.cards}
-        onPick={onHideAfter}
-      />
       <Row
         type="link"
         label={t('next.notices.settings.sample')}
@@ -136,6 +129,25 @@ const NoticesSection = ({
         on={settings.sound}
         onChange={onSound}
       />
+      {NOTICE_SOUNDS.map((sound) => (
+        <Row
+          key={sound}
+          type="switch"
+          label={t(`next.notices.settings.sound.${sound}`)}
+          hint={t(`next.notices.settings.sound.${sound}.hint`)}
+          off={!settings.sound}
+        >
+          <SetButton tone="ghost" icon="play" disabled={!settings.sound} onClick={() => onListen(sound)}>
+            {t('next.notices.settings.sound.listen')}
+          </SetButton>
+          <Switch
+            label={t(`next.notices.settings.sound.${sound}`)}
+            checked={settings.sounds[sound]}
+            disabled={!settings.sound}
+            onChange={(on) => onSoundOf(sound, on)}
+          />
+        </Row>
+      ))}
       <SwitchRow
         label={t('next.notices.settings.system')}
         hint={t(SYSTEM_HINT[permission])}

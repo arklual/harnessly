@@ -1,13 +1,18 @@
 // What the person picked out of the agent's answers to answer to: a quote, or a quote with their remark. It sits as a
-// chip in the field until the message goes and then leads its text as a Markdown quote. Kept for the page only.
+// chip in the field until the message goes and then leads its text as a Markdown quote. Kept for the page only. A quote
+// picked in the chat's feed keeps where its words are (an annotation): the feed marks them with its number while the
+// quote is in the field.
 
 import { createKeyedStore, flush, useKey } from '@/next/core/store';
+import type { IFeedAnchor } from '@/next/features/chat/feed-anchor';
 import type { ConvId } from '@/next/protocol/v2';
 
 export interface Quote {
   id: string;
   text: string;
   note: string | null;
+  /** Where the words stand in the feed: an annotation of the feed, numbered there and in the field. */
+  anchor?: IFeedAnchor;
 }
 
 const NONE: readonly Quote[] = [];
@@ -22,6 +27,40 @@ export function addQuote(conv: ConvId, text: string, note: string | null): void 
   seq += 1;
   quotesStore.patch(conv, (have) => [...(have ?? NONE), { id: `q${seq}`, text, note }]);
   flush();
+}
+
+/** A name for a feed annotation, given before it is in the field: its mark keeps it from the first press. */
+export const nextFeedNoteId = (): string => {
+  seq += 1;
+  return `q${seq}`;
+};
+
+/** An annotation of the feed: the words, where they stand, the remark; it goes after the quotes the field has. */
+export function addFeedNote(
+  conv: ConvId,
+  note: Required<Pick<Quote, 'id' | 'text' | 'note' | 'anchor'>>,
+): void {
+  quotesStore.patch(conv, (have) => [...(have ?? NONE), note]);
+  flush();
+}
+
+/** The remark of a quote, changed (an empty one leaves the words alone). */
+export function editQuote(conv: ConvId, id: string, note: string): void {
+  quotesStore.patch(conv, (have) =>
+    (have ?? NONE).map((q) => (q.id === id ? { ...q, note: note === '' ? null : note } : q)),
+  );
+}
+
+/** The feed's annotations, numbered 1, 2, 3… in the order they were put. */
+export const feedNotesOf = (quotes: readonly Quote[]): Quote[] =>
+  quotes.filter((q) => q.anchor !== undefined);
+
+/** «Очистить»: the feed's annotations go, the other quotes stay. */
+export function clearFeedNotes(conv: ConvId): void {
+  quotesStore.patch(conv, (have) => {
+    const left = (have ?? NONE).filter((q) => q.anchor === undefined);
+    return left.length > 0 ? left : undefined;
+  });
 }
 
 export function removeQuote(conv: ConvId, id: string): void {

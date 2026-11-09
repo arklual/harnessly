@@ -50,6 +50,9 @@ type MachineAgent struct {
 	Models []AgentModel `json:"models"`
 	// CanSwitchModel: a running conversation of this CLI takes the model command.
 	CanSwitchModel bool `json:"canSwitchModel"`
+	// DefaultPermission is the permission mode a chat of this CLI starts in when it names none (the runtime's
+	// dangerouslySkipPermissions: bypass, else ask); absent where the machine does not say.
+	DefaultPermission PermissionMode `json:"defaultPermission,omitempty"`
 	// Profiles are the vendor setups (Kimi, GLM, Grok) a conversation can start on through this CLI, each with its own
 	// models. Only a page that names the `profiles` cap gets them; absent where there are none.
 	Profiles []ProfileOffer `json:"profiles,omitempty"`
@@ -66,6 +69,8 @@ type AgentModel struct {
 	DefaultEffort *Effort  `json:"defaultEffort"`
 	// Ultracode: the model takes Claude Code's ultracode mode; absent when it does not.
 	Ultracode bool `json:"ultracode,omitempty"`
+	// Fast: the model runs in its CLI's fast mode (Claude Code's /fast, Codex's fast service tier); absent when not.
+	Fast bool `json:"fast,omitempty"`
 }
 
 // MachineLoad is a machine's load at one moment.
@@ -153,6 +158,11 @@ type Model struct {
 	ID        string  `json:"id"`
 	Effort    *Effort `json:"effort"`
 	Ultracode bool    `json:"ultracode,omitempty"`
+	// Fast is the CLI's fast mode (Claude Code's `fastMode`, Codex's `service_tier = "fast"`); absent is off.
+	Fast bool `json:"fast,omitempty"`
+	// Permission is how the agent asks before it acts (PermissionMode); absent: the machine's default, the runtime's
+	// dangerouslySkipPermissions.
+	Permission PermissionMode `json:"permission,omitempty"`
 	// Profile is the backend profile the conversation runs on (ProfileOffer.ID); absent for the CLI's own account. It
 	// is set when the conversation starts and does not change. Only a page that names the `profiles` cap gets it. A
 	// command never carries it here: it names the profile beside the model (ConversationCreateCmd.Profile).
@@ -559,11 +569,13 @@ const ModelLogMax = 20
 // before the next queued message is typed. Applying is true while the runtime types it into the agent's box. The
 // latest ask replaces the one waiting.
 type PendingModel struct {
-	ID        string  `json:"id"`
-	Effort    *Effort `json:"effort"`
-	Ultracode bool    `json:"ultracode,omitempty"`
-	Since     Ms      `json:"since"`
-	Applying  bool    `json:"applying"`
+	ID         string         `json:"id"`
+	Effort     *Effort        `json:"effort"`
+	Ultracode  bool           `json:"ultracode,omitempty"`
+	Fast       bool           `json:"fast,omitempty"`
+	Permission PermissionMode `json:"permission,omitempty"`
+	Since      Ms             `json:"since"`
+	Applying   bool           `json:"applying"`
 }
 
 // ModelSwitch is a change of model the runtime applied: From is nil when the conversation had no model on record.
@@ -1917,6 +1929,9 @@ type ModelCmd struct {
 	Model     string  `json:"model"`
 	Effort    *Effort `json:"effort"`
 	Ultracode *bool   `json:"ultracode,omitempty"`
+	// Fast and Permission turn the fast mode and the permission mode with the change; absent keeps what runs.
+	Fast       *bool           `json:"fast,omitempty"`
+	Permission *PermissionMode `json:"permission,omitempty"`
 }
 
 // BgStopCmd stops a background task.

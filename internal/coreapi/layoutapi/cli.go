@@ -4,6 +4,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
@@ -577,6 +578,16 @@ func (a *api) cliPanel(c *call) {
 	case "open", "show":
 		if !a.d.Panel.RateAllowed(tabID) {
 			c.fail(429, tooOften())
+			return
+		}
+		// Each address opens once: the same `open` within paneauto.RepeatWindow is answered, not asked again.
+		if id := paneauto.Repeated(a.d.Intents, tabID, command, time.Now()); id != "" {
+			what := locale.Pick("Tab \""+command.Tab+"\"", "Вкладка «"+command.Tab+"»")
+			if command.Target != "" {
+				what += " (" + command.Target + ")"
+			}
+			c.reply(200, jsvalue.NewObject("ok", true, "id", id, "applied", false, "repeat", true, "message",
+				what+locale.Pick(": already asked for a moment ago, not opened again", ": уже открывалась только что, повторно не открываю")))
 			return
 		}
 		intent := a.d.Intents.Add(tabID, command.JSON())

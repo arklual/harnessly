@@ -16,6 +16,39 @@
   var realParent = window.parent;
   if (!realParent || realParent === window) return;
 
+  // What breaks before app-sdk.js loads is told to the host here (the SDK reports only once it is up): a script or style
+  // that did not load, an exception, a rejected promise, a blocked request. The host puts it in the view's journal and,
+  // while the view has not connected, in the words of its «не запустилось» card. A few, short, and never the page's data.
+  var told = 0;
+  var tell = function (kind, text, src) {
+    if (told >= 20) return;
+    told += 1;
+    try {
+      realParent.postMessage(
+        { hlViewError: { kind: kind, text: String(text).slice(0, 500), src: src ? String(src).slice(0, 500) : '' } },
+        '*',
+      );
+    } catch (e) {
+      // a host that cannot be told stays untold
+    }
+  };
+  window.addEventListener(
+    'error',
+    function (e) {
+      var t = e.target;
+      if (t && t !== window && (t.src || t.href)) tell('resource', 'did not load', t.src || t.href);
+      else tell('error', (e.message || 'error') + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''), e.filename);
+    },
+    true,
+  );
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    tell('error', 'unhandled: ' + (r && r.message ? r.message : String(r)));
+  });
+  window.addEventListener('securitypolicyviolation', function (e) {
+    tell('csp', 'CSP blocked ' + (e.blockedURI || 'inline') + ' by ' + e.violatedDirective, e.blockedURI);
+  });
+
   var meta = document.querySelector('meta[name="hl-nonce"]');
   var nonce = meta ? meta.getAttribute('content') || '' : '';
   // A view the app's own server hosts (delivery mode remote) gets the nonce in the address's fragment, which never reaches

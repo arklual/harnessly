@@ -19,6 +19,7 @@ import type {
   MachineId,
   MessageRef,
   Model,
+  PermissionMode,
   ProfileId,
   Ms,
   Provider,
@@ -127,14 +128,24 @@ export const stopTerminal = (m: MachineId, id: ConvId, force = false) =>
 /** A chat held on its usage limit: go on now, do not go on by itself, or go on by itself at the reset again. */
 export const decideLimit = (m: MachineId, id: ConvId, action: LimitAction) =>
   runCommand(m, 'limit', { id, action });
-/** The model, its depth and ultracode for the chat; it takes at the first safe moment (pendingModel until then). */
+/** The model, its depth, ultracode and the fast and permission modes for the chat; it takes at the first safe moment
+ *  (pendingModel until then). A permission mode of null is not asked for. */
 export const setModel = (
   m: MachineId,
   id: ConvId,
   model: string,
   effort: Effort | null,
   ultracode: boolean,
-) => runCommand(m, 'model', { id, model, effort, ultracode });
+  modes: { fast: boolean; permission: PermissionMode | null } = { fast: false, permission: null },
+) =>
+  runCommand(m, 'model', {
+    id,
+    model,
+    effort,
+    ultracode,
+    fast: modes.fast,
+    ...(modes.permission ? { permission: modes.permission } : {}),
+  });
 export const stopBackground = (m: MachineId, conversationId: ConvId, taskId: string) =>
   runCommand(m, 'bg.stop', { conversationId, taskId });
 /** The session's /goal (Claude only); an empty text clears it. */

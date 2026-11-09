@@ -30,6 +30,9 @@ type Model struct {
 	// Efforts the model accepts; empty means the effort flag is not offered.
 	Efforts       []string `json:"efforts"`
 	DefaultEffort *string  `json:"defaultEffort"`
+	// Fast: the model runs in its CLI's fast mode (Codex's models_cache.json lists a «Fast» service tier for it); it is
+	// not in the Legacy answer.
+	Fast bool `json:"-"`
 }
 
 // LaunchOptions: what this machine can start an agent CLI with, the CLI's default and the remembered choice.
@@ -178,7 +181,7 @@ func parseCodexModels(raw string) (codexModels, error) {
 			hint = slug + locale.Pick(" · default ", " · по умолчанию ") + *def
 		}
 		out.models = append(out.models, Model{ID: slug, Label: label, Hint: hint, Description: stringOrEmpty(m["description"]),
-			Efforts: efforts, DefaultEffort: def})
+			Efforts: efforts, DefaultEffort: def, Fast: hasFastTier(m["service_tiers"])})
 	}
 	if f, ok := data["fetched_at"].(string); ok {
 		out.fetchedAt = &f
@@ -243,4 +246,16 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 	out.Warnings = warnings
 	out.Saved = c.saved(provider)
 	return out
+}
+
+// hasFastTier: a model of Codex's cache lists the «Fast» service tier (id "priority", what `service_tier = "fast"`
+// asks for).
+func hasFastTier(v any) bool {
+	tiers, _ := v.([]any)
+	for _, t := range tiers {
+		if o, ok := t.(map[string]any); ok && (o["id"] == "priority" || o["id"] == "fast") {
+			return true
+		}
+	}
+	return false
 }

@@ -1,7 +1,7 @@
 // What the server does with a change of model that cannot go in at once, and the steps of an agent that starts for a
 // message, as plain data for the line over the field. The server owns the truth (conversation.pendingModel, the agent's
 // state, the messages' states); this only reads it: nothing here sends or retries anything.
-import type { AgentStateKind, Effort, Model, PendingModel } from '@/next/protocol/v2';
+import type { AgentStateKind, Effort, Model, PendingModel, PermissionMode } from '@/next/protocol/v2';
 
 export const STEP = { launch: 'launch', model: 'model', send: 'send' } as const;
 export type TStep = (typeof STEP)[keyof typeof STEP];
@@ -25,6 +25,9 @@ export interface IPendingLine {
   effort: Effort | null;
   /** Ultracode turned on or off with the change; null when the mode stays as it is. */
   ultracode: boolean | null;
+  /** The same of the fast mode, and the permission mode it turns to; absent or null when they stay. */
+  fast?: boolean | null;
+  permission?: PermissionMode | null;
 }
 
 /** The states in which the agent is at work or waiting for the person: the change waits for the end of the turn. */
@@ -49,9 +52,22 @@ export const pendingLine = (
   const sameModel = current?.id === pending.id;
   const ultra = pending.ultracode === true;
   const ultracode = ultra === (current?.ultracode === true) ? null : ultra;
-  // The mode alone changes: the depth the chat keeps is no news.
-  const onlyMode = sameModel && ultracode !== null && pending.effort === (current?.effort ?? null);
-  return { when, model: sameModel ? null : pending.id, effort: onlyMode ? null : pending.effort, ultracode };
+  const quick = pending.fast === true;
+  const fast = quick === (current?.fast === true) ? null : quick;
+  const asked = pending.permission ?? null;
+  const permission = asked === null || asked === (current?.permission ?? null) ? null : asked;
+  const modes = ultracode !== null || fast !== null || permission !== null;
+  // A mode alone changes: the depth the chat keeps is no news.
+  const onlyMode = sameModel && modes && pending.effort === (current?.effort ?? null);
+  const line: IPendingLine = {
+    when,
+    model: sameModel ? null : pending.id,
+    effort: onlyMode ? null : pending.effort,
+    ultracode,
+  };
+  if (fast !== null) line.fast = fast;
+  if (permission !== null) line.permission = permission;
+  return line;
 };
 
 export interface IChainInput {

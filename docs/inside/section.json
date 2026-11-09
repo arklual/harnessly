@@ -6,6 +6,7 @@
     "README.md",
     "../architecture.md",
     "../slices.md",
+    "../pane-opening.md",
     "../hub/architecture.md",
     "../hub/api.md",
     "../design-engine.md",

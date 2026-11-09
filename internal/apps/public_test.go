@@ -65,20 +65,20 @@ func TestPublicCatalogFromPublishToInstall(t *testing.T) {
 		t.Fatalf("snapshot: %v %+v", err, snap)
 	}
 	reader := newRegistry(t)
-	if problems, err := reader.ApplyPublic(snap, FirstVersion, teamNow); err != nil || len(problems) != 0 {
+	if problems, err := reader.ApplyPublic(snap, TemplateVersion, teamNow); err != nil || len(problems) != 0 {
 		t.Fatalf("apply: %v %v", err, problems)
 	}
 	listed, _ := reader.PublicCatalog("")
 	if len(listed) != 1 || listed[0].Version != "1.0.0" || len(listed[0].Permissions) == 0 {
 		t.Fatalf("the reader browses: %+v", listed)
 	}
-	if _, _, err := reader.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: FirstVersion}); !errors.Is(err, ErrPublicChanged) {
+	if _, _, err := reader.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: TemplateVersion}); !errors.Is(err, ErrPublicChanged) {
 		t.Fatalf("an install that names no sum: %v", err)
 	}
-	if _, _, err := reader.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: FirstVersion, Sum: "0000"}); !errors.Is(err, ErrPublicChanged) {
+	if _, _, err := reader.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: TemplateVersion, Sum: "0000"}); !errors.Is(err, ErrPublicChanged) {
 		t.Fatalf("an install of another archive: %v", err)
 	}
-	got, _, err := reader.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: FirstVersion, Sum: listed[0].Sum})
+	got, _, err := reader.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: TemplateVersion, Sum: listed[0].Sum})
 	if err != nil || got.ID != "acme.demo" || got.Version != "1.0.0" || got.Team || got.Dev {
 		t.Fatalf("install: %v %+v", err, got)
 	}
@@ -88,12 +88,12 @@ func TestPublicCatalogFromPublishToInstall(t *testing.T) {
 	if err := reader.Remove("acme.demo"); err != nil {
 		t.Fatalf("the person's own install is removable: %v", err)
 	}
-	if _, _, err := reader.InstallFromPublic("acme.none", PublicInstallOptions{HostVersion: FirstVersion, Sum: "x"}); !errors.Is(err, ErrNotPublic) {
+	if _, _, err := reader.InstallFromPublic("acme.none", PublicInstallOptions{HostVersion: TemplateVersion, Sum: "x"}); !errors.Is(err, ErrNotPublic) {
 		t.Fatalf("an app that is not there: %v", err)
 	}
 	// A host that cannot run it says so.
 	old := newRegistry(t)
-	_, _ = old.ApplyPublic(snap, FirstVersion, teamNow)
+	_, _ = old.ApplyPublic(snap, TemplateVersion, teamNow)
 	if _, _, err := old.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: "0.1.0", Sum: listed[0].Sum}); !errors.Is(err, ErrHostVersion) {
 		t.Fatalf("a host too old: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestPublicCatalogRefusals(t *testing.T) {
 	snap.Entries = []PublicSnapshotEntry{{PublicEntry: PublicEntry{CatalogEntry: CatalogEntry{ID: "acme.trusted", Channel: "stable", Version: tv.Version, Name: "x",
 		Trust: TrustSandboxed, Sum: sum, Targets: []string{}, Permissions: []string{}}, Review: ReviewApproved}, Archive: raw}}
 	other := newRegistry(t)
-	problems, err := other.ApplyPublic(snap, FirstVersion, teamNow)
+	problems, err := other.ApplyPublic(snap, TemplateVersion, teamNow)
 	if err != nil || len(problems) != 1 {
 		t.Fatalf("apply a trusted app: %v %v", err, problems)
 	}
@@ -166,11 +166,11 @@ func TestPublicCatalogRefusals(t *testing.T) {
 	}
 	// An archive that is not the one the entry names is left out too.
 	snap.Entries[0].Sum = "feed"
-	if problems, _ := other.ApplyPublic(snap, FirstVersion, teamNow.Add(time.Second)); len(problems) != 1 {
+	if problems, _ := other.ApplyPublic(snap, TemplateVersion, teamNow.Add(time.Second)); len(problems) != 1 {
 		t.Errorf("a wrong sum: %v", problems)
 	}
 	// An old snapshot is not taken over a newer one.
-	if _, err := other.ApplyPublic(PublicSnapshot{At: 1, Entries: []PublicSnapshotEntry{}}, FirstVersion, teamNow); !errors.Is(err, ErrStaleTeam) {
+	if _, err := other.ApplyPublic(PublicSnapshot{At: 1, Entries: []PublicSnapshotEntry{}}, TemplateVersion, teamNow); !errors.Is(err, ErrStaleTeam) {
 		t.Errorf("a stale snapshot: %v", err)
 	}
 }
@@ -188,7 +188,7 @@ func TestPublicNetworkEverywhereWaitsForReview(t *testing.T) {
 	if got, _ := r.PublicCatalog(""); len(got) != 0 {
 		t.Fatalf("listed before a look: %+v", got)
 	}
-	if _, _, err := r.InstallFromPublic("acme.wide", PublicInstallOptions{HostVersion: FirstVersion, Sum: e.Sum}); !errors.Is(err, ErrNotPublic) {
+	if _, _, err := r.InstallFromPublic("acme.wide", PublicInstallOptions{HostVersion: TemplateVersion, Sum: e.Sum}); !errors.Is(err, ErrNotPublic) {
 		t.Fatalf("installed before a look: %v", err)
 	}
 	if pending, _ := r.PendingPublic(); len(pending) != 1 {
@@ -239,7 +239,7 @@ func publicSnapshotOf(t *testing.T) PublicSnapshot {
 // A snapshot is not trusted for what the person is shown: name, tier, targets and rights come from the archive, also for an
 // entry that this host is too old to run.
 func TestApplyPublicTakesMetadataFromTheArchive(t *testing.T) {
-	for _, host := range []string{FirstVersion, "0.1.0"} {
+	for _, host := range []string{TemplateVersion, "0.1.0"} {
 		snap := publicSnapshotOf(t)
 		real := snap.Entries[0].Permissions
 		e := &snap.Entries[0]
@@ -257,7 +257,7 @@ func TestApplyPublicTakesMetadataFromTheArchive(t *testing.T) {
 	snap := publicSnapshotOf(t)
 	snap.Entries[0].Archive = []byte("not an archive")
 	r := newRegistry(t)
-	problems, err := r.ApplyPublic(snap, FirstVersion, teamNow)
+	problems, err := r.ApplyPublic(snap, TemplateVersion, teamNow)
 	if got, _ := r.PublicCatalog(""); err != nil && len(got) != 0 || err == nil && (len(problems) == 0 || len(got) != 0) {
 		t.Fatalf("a broken archive is listed: %v %v %+v", err, problems, got)
 	}
@@ -268,7 +268,7 @@ func TestApplyPublicTakesMetadataFromTheArchive(t *testing.T) {
 func TestInstallFromPublicRefusesOtherRights(t *testing.T) {
 	snap := publicSnapshotOf(t)
 	r := newRegistry(t)
-	if _, err := r.ApplyPublic(snap, FirstVersion, teamNow); err != nil {
+	if _, err := r.ApplyPublic(snap, TemplateVersion, teamNow); err != nil {
 		t.Fatal(err)
 	}
 	listed, _ := r.PublicCatalog("")
@@ -282,7 +282,7 @@ func TestInstallFromPublicRefusesOtherRights(t *testing.T) {
 	if err := os.WriteFile(path, swapped, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, _, err := r.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: FirstVersion, Sum: listed[0].Sum})
+	got, _, err := r.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: TemplateVersion, Sum: listed[0].Sum})
 	if err == nil && got.Source != shared {
 		t.Fatalf("the install says it came from %s, not the catalog's folder %s", got.Source, shared)
 	}
@@ -302,7 +302,7 @@ func TestInstallFromPublicRefusesOtherRights(t *testing.T) {
 	if err := r.writePublic(p); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := r.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: FirstVersion, Sum: listed[0].Sum}); !errors.Is(err, ErrPublicChanged) {
+	if _, _, err := r.InstallFromPublic("acme.demo", PublicInstallOptions{HostVersion: TemplateVersion, Sum: listed[0].Sum}); !errors.Is(err, ErrPublicChanged) {
 		t.Fatalf("other rights than shown: %v", err)
 	}
 	if list, _ := r.List(); len(list) != 0 {
@@ -324,7 +324,7 @@ func TestUnpackArchiveReusesOnlyItsOwnFolder(t *testing.T) {
 		raw []byte
 		sum string
 	}{"first": {rawA, ArchiveSum(rawA)}, "other archive over it": {rawB, ArchiveSum(rawB)}, "first again": {rawA, ArchiveSum(rawA)}} {
-		pkg, err := unpackArchive(tc.raw, "acme.demo", "1.0.0", tc.sum, FirstVersion, dst)
+		pkg, err := unpackArchive(tc.raw, "acme.demo", "1.0.0", tc.sum, TemplateVersion, dst)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -341,7 +341,7 @@ func TestUnpackArchiveReusesOnlyItsOwnFolder(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dst, "planted.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := unpackArchive(rawA, "acme.demo", "1.0.0", ArchiveSum(rawA), FirstVersion, dst); err != nil {
+	if _, err := unpackArchive(rawA, "acme.demo", "1.0.0", ArchiveSum(rawA), TemplateVersion, dst); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dst, "planted.txt")); err == nil {
@@ -380,7 +380,7 @@ func TestApplyPublicKeepsAnAuthorsPendingEntryPending(t *testing.T) {
 	// The hub hands the list back, the pending entry in it; with its bytes and without them.
 	for name, entries := range map[string][]PublicSnapshotEntry{"with bytes": snap.Entries, "without": {{PublicEntry: snap.Entries[0].PublicEntry}}} {
 		list := PublicSnapshot{At: snap.At + 1, Entries: entries}
-		if problems, err := author.ApplyPublic(list, FirstVersion, teamNow); err != nil || len(problems) != 0 {
+		if problems, err := author.ApplyPublic(list, TemplateVersion, teamNow); err != nil || len(problems) != 0 {
 			t.Fatalf("%s: %v %v", name, err, problems)
 		}
 		if got, _ := author.PublicCatalog(""); len(got) != 0 {
@@ -390,7 +390,7 @@ func TestApplyPublicKeepsAnAuthorsPendingEntryPending(t *testing.T) {
 		if len(pending) != 1 || pending[0].Review != ReviewPending || len(pending[0].Why) != 1 {
 			t.Errorf("%s: pending after the list: %+v", name, pending)
 		}
-		if _, _, err := author.InstallFromPublic("acme.wide", PublicInstallOptions{HostVersion: FirstVersion, Sum: e.Sum}); !errors.Is(err, ErrNotPublic) {
+		if _, _, err := author.InstallFromPublic("acme.wide", PublicInstallOptions{HostVersion: TemplateVersion, Sum: e.Sum}); !errors.Is(err, ErrNotPublic) {
 			t.Errorf("%s: installed while pending: %v", name, err)
 		}
 		snap.At++
@@ -410,7 +410,7 @@ func TestPublishPublicTellsTheHook(t *testing.T) {
 	}
 	snap, _ := r.PublicSnapshot()
 	snap.At++
-	if _, err := r.ApplyPublic(snap, FirstVersion, teamNow); err != nil || calls != 1 {
+	if _, err := r.ApplyPublic(snap, TemplateVersion, teamNow); err != nil || calls != 1 {
 		t.Fatalf("a list from the platform tells no one: %v %d", err, calls)
 	}
 }
@@ -427,7 +427,7 @@ func TestApplyPublicKeepsAFreshOwnEntryUntilALaterListLacksIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A list made before the publish, not holding it (the hub had not read the snapshot): not stale, and the entry stays.
-	if problems, err := r.ApplyPublic(PublicSnapshot{At: listAt, Entries: []PublicSnapshotEntry{}}, FirstVersion, publishedAt); err != nil || len(problems) != 0 {
+	if problems, err := r.ApplyPublic(PublicSnapshot{At: listAt, Entries: []PublicSnapshotEntry{}}, TemplateVersion, publishedAt); err != nil || len(problems) != 0 {
 		t.Fatalf("early list: %v %v", err, problems)
 	}
 	if got, _ := r.PublicCatalog(""); len(got) != 1 || got[0].Sum != e.Sum {
@@ -438,11 +438,11 @@ func TestApplyPublicKeepsAFreshOwnEntryUntilALaterListLacksIt(t *testing.T) {
 		t.Fatalf("snapshot: %+v", snap)
 	}
 	// An older list than the one taken is stale.
-	if _, err := r.ApplyPublic(PublicSnapshot{At: listAt - 1, Entries: []PublicSnapshotEntry{}}, FirstVersion, publishedAt); !errors.Is(err, ErrStaleTeam) {
+	if _, err := r.ApplyPublic(PublicSnapshot{At: listAt - 1, Entries: []PublicSnapshotEntry{}}, TemplateVersion, publishedAt); !errors.Is(err, ErrStaleTeam) {
 		t.Fatalf("stale: %v", err)
 	}
 	// A list made after the publish that still lacks it: the platform dropped it, so does the machine.
-	if _, err := r.ApplyPublic(PublicSnapshot{At: publishedAt.UnixMilli() + 1, Entries: []PublicSnapshotEntry{}}, FirstVersion, publishedAt); err != nil {
+	if _, err := r.ApplyPublic(PublicSnapshot{At: publishedAt.UnixMilli() + 1, Entries: []PublicSnapshotEntry{}}, TemplateVersion, publishedAt); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := r.PublicCatalog(""); len(got) != 0 {
@@ -462,10 +462,10 @@ func TestApplyPublicDropsAnEntryOnceTheListHeldIt(t *testing.T) {
 	}
 	snap, _ := r.PublicSnapshot()
 	snap.At = teamNow.UnixMilli() - 1000
-	if _, err := r.ApplyPublic(snap, FirstVersion, teamNow); err != nil {
+	if _, err := r.ApplyPublic(snap, TemplateVersion, teamNow); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.ApplyPublic(PublicSnapshot{At: teamNow.UnixMilli() - 500, Entries: []PublicSnapshotEntry{}}, FirstVersion, teamNow); err != nil {
+	if _, err := r.ApplyPublic(PublicSnapshot{At: teamNow.UnixMilli() - 500, Entries: []PublicSnapshotEntry{}}, TemplateVersion, teamNow); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := r.PublicCatalog(""); len(got) != 0 {

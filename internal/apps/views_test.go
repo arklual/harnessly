@@ -36,7 +36,7 @@ func installedPaneApp(t *testing.T, network *Network) (*Registry, string) {
 		}
 	}
 	reg := &Registry{Root: filepath.Join(t.TempDir(), "apps")}
-	if _, _, err := reg.Install(dir, InstallOptions{HostVersion: FirstVersion}); err != nil {
+	if _, _, err := reg.Install(dir, InstallOptions{HostVersion: TemplateVersion}); err != nil {
 		t.Fatal(err)
 	}
 	return reg, dir
@@ -413,9 +413,27 @@ func TestInstallRefusesAPluginNameTwice(t *testing.T) {
 		ok bool
 	}{{"ab.c-d", true}, {"ab-c.d", false}, {"ab.c-d", true}, {"acme.other", true}} {
 		dir := scaffold(t, c.id, "chat")
-		_, _, err := reg.Install(dir, InstallOptions{HostVersion: FirstVersion})
+		_, _, err := reg.Install(dir, InstallOptions{HostVersion: TemplateVersion})
 		if (err == nil) != c.ok || (!c.ok && !errors.Is(err, ErrPluginName)) {
 			t.Errorf("%s: %v", c.id, err)
 		}
+	}
+}
+
+// The frame's opaque origin loads module scripts, fetch and fonts in CORS mode: the files of a view answer with open
+// CORS (no credentials), its page does not.
+func TestViewFilesAnswerCORSExceptThePage(t *testing.T) {
+	reg, _ := installedPaneApp(t, nil)
+	s, tok := tokened(t, reg)
+	defer s.Close()
+	h := s.Handler()
+	for _, p := range []string{tok + "/acme.demo/ui/app.js", "/__hl/app-sdk.mjs"} {
+		rec := get(t, h, p)
+		if rec.Code != 200 || rec.Header().Get("Access-Control-Allow-Origin") != "*" || rec.Header().Get("Access-Control-Allow-Credentials") != "" {
+			t.Errorf("%s: %d, ACAO %q", p, rec.Code, rec.Header().Get("Access-Control-Allow-Origin"))
+		}
+	}
+	if rec := get(t, h, tok+"/acme.demo/ui/index.html"); rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("the page itself is not readable cross-origin: %q", rec.Header().Get("Access-Control-Allow-Origin"))
 	}
 }

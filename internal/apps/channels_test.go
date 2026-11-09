@@ -153,7 +153,7 @@ func TestStableAsksTheEvals(t *testing.T) {
 
 func TestInstallsFollowTheirChannel(t *testing.T) {
 	r := newRegistry(t)
-	host := FirstVersion
+	host := TemplateVersion
 	publish := func(version string) {
 		t.Helper()
 		if _, _, err := r.Publish(versioned(t, "acme.demo", version), ChannelStable, PublishOptions{}); err != nil {
@@ -209,7 +209,7 @@ func TestNewRightsWaitForAWord(t *testing.T) {
 	if _, _, err := r.Publish(versioned(t, "acme.demo", "1.0.0"), ChannelStable, PublishOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := r.InstallChannel("acme.demo", ChannelStable, InstallOptions{HostVersion: FirstVersion}); err != nil {
+	if _, _, err := r.InstallChannel("acme.demo", ChannelStable, InstallOptions{HostVersion: TemplateVersion}); err != nil {
 		t.Fatal(err)
 	}
 	more := versioned(t, "acme.demo", "1.0.1")
@@ -219,7 +219,7 @@ func TestNewRightsWaitForAWord(t *testing.T) {
 	if _, _, err := r.Publish(more, ChannelStable, PublishOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	res, _ := r.SyncChannels(SyncOptions{HostVersion: FirstVersion})
+	res, _ := r.SyncChannels(SyncOptions{HostVersion: TemplateVersion})
 	if len(res) != 1 || res[0].Applied || res[0].Reason != "permissions" {
 		t.Fatalf("a new right: %+v", res)
 	}

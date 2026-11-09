@@ -19,11 +19,27 @@ import (
 type Config struct {
 	// DocsHost serves the team's published pages (RUNTIME_DOCS_HOST); StandDomain the feature stands (RUNTIME_STAND_DOMAIN).
 	DocsHost, StandDomain string
+	// ReaderHost and ReaderPath are where the platform reads a document (https://<ReaderHost><ReaderPath><slug>,
+	// RUNTIME_PLATFORM_HOST and RUNTIME_DOCS_READER_PATH): a document too, never a stand. "" for none.
+	ReaderHost, ReaderPath string
+	// CLI is the name the deployment gives the harnessly command (RUNTIME_CLI_NAME): `<CLI> open <link>` is read as
+	// `harnessly open <link>` is.
+	CLI string
 }
 
 // FromEnv is the Config the environment names.
 func FromEnv() Config {
-	return Config{DocsHost: strings.TrimSpace(os.Getenv("RUNTIME_DOCS_HOST")), StandDomain: strings.TrimSpace(os.Getenv("RUNTIME_STAND_DOMAIN"))}
+	cfg := Config{
+		DocsHost:    strings.TrimSpace(os.Getenv("RUNTIME_DOCS_HOST")),
+		StandDomain: strings.TrimSpace(os.Getenv("RUNTIME_STAND_DOMAIN")),
+		ReaderHost:  strings.TrimSpace(os.Getenv("RUNTIME_PLATFORM_HOST")),
+		ReaderPath:  strings.TrimSpace(os.Getenv("RUNTIME_DOCS_READER_PATH")),
+		CLI:         strings.TrimSpace(os.Getenv("RUNTIME_CLI_NAME")),
+	}
+	if cfg.ReaderHost != "" && cfg.ReaderPath == "" {
+		cfg.ReaderPath = "/agents/docs/"
+	}
+	return cfg
 }
 
 // Call is what a tool call says of itself that its result completes: the command it ran, what an Artifact call
@@ -47,8 +63,10 @@ var (
 	artifactCmdRe = regexp.MustCompile(`(?:^|[\s;&|(/-])artifacts?\s+publish\b`)
 	// The name of one feature stand under the stands' domain.
 	standNameRe = regexp.MustCompile(`^[\w-]+$`)
-	// A dev server the agent shows: `harnessly open http://localhost:5173`.
-	openCmdRe = regexp.MustCompile(`(?:^|[\s;&|(])harnessly\s+open\s+['"]?(https?://[^\s'"]+)`)
+	// A dev server the agent shows: `harnessly open http://localhost:5173` (or the deployment's name of the command).
+	openCmdRe = regexp.MustCompile(`(?:^|[\s;&|(/])([\w-]+)\s+open\s+['"]?(https?://[^\s'"]+)`)
+	// The slug of a document in the reader's path.
+	readerSlugRe = regexp.MustCompile(`^[\w-]+/?$`)
 	// A file handed to the person: `harnessly deliver <path>`.
 	deliverCmdRe = regexp.MustCompile(`(?:^|[\s;&|(])(?:harnessly)\s+deliver\b`)
 	// --title "…", --title='…', -t "…".
@@ -101,8 +119,10 @@ func Of(cfg Config, c Call, links []string) []wire.TurnOutput {
 		}
 	}
 	var out []wire.TurnOutput
-	if m := openCmdRe.FindStringSubmatch(cmd); m != nil {
-		out = append(out, opened(cfg, m[1]))
+	if m := openCmdRe.FindStringSubmatch(cmd); m != nil && (m[1] == "harnessly" || (cfg.CLI != "" && m[1] == cfg.CLI)) {
+		if o, ok := opened(cfg, m[2]); ok {
+			out = append(out, o)
+		}
 	}
 	if !strings.HasPrefix(strings.TrimSpace(cmd), "curl") {
 		if link := first(links, func(l string) bool { return StandLink(cfg, l) }); link != "" {
@@ -137,15 +157,32 @@ func artifactOf(cfg Config, pub *jsvalue.Object, links []string) []wire.TurnOutp
 	return []wire.TurnOutput{{Kind: wire.OutputArtifact, Op: op, Ref: link, Title: Clip(title)}}
 }
 
-// opened is what `harnessly open <link>` showed: a page of the catalogue, a merge request, or a stand.
-func opened(cfg Config, link string) wire.TurnOutput {
+// opened is what `harnessly open <link>` showed: a page of the catalogue (a document of the reader among them), a
+// merge request, a stand or a dev server of the machine. Any other site makes no card: it is no stand (a
+// document opened through the reader was a «stand» card).
+func opened(cfg Config, link string) (wire.TurnOutput, bool) {
 	switch {
 	case ArtifactLink(cfg, link):
-		return wire.TurnOutput{Kind: wire.OutputArtifact, Op: wire.OutputCreated, Ref: link, Title: SlugOf(link)}
+		return wire.TurnOutput{Kind: wire.OutputArtifact, Op: wire.OutputCreated, Ref: link, Title: SlugOf(link)}, true
 	case mrLinkRe.MatchString(link):
-		return wire.TurnOutput{Kind: wire.OutputMR, Op: wire.OutputCreated, Ref: link, Title: mrName(link)}
+		return wire.TurnOutput{Kind: wire.OutputMR, Op: wire.OutputCreated, Ref: link, Title: mrName(link)}, true
+	case StandLink(cfg, link) || localLink(link):
+		return wire.TurnOutput{Kind: wire.OutputStand, Op: wire.OutputCreated, Ref: link, Title: hostOf(link)}, true
 	}
-	return wire.TurnOutput{Kind: wire.OutputStand, Op: wire.OutputCreated, Ref: link, Title: hostOf(link)}
+	return wire.TurnOutput{}, false
+}
+
+// localLink is a server of this machine: http(s)://localhost:<port>, 127.0.0.1, 0.0.0.0, [::1].
+func localLink(link string) bool {
+	u, err := url.Parse(link)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Port() == "" {
+		return false
+	}
+	switch strings.ToLower(u.Hostname()) {
+	case "localhost", "127.0.0.1", "0.0.0.0", "::1":
+		return true
+	}
+	return false
 }
 
 // Wrote is what a write or an edit of a file made: a design of the library, a document of the repository; nothing
@@ -189,7 +226,18 @@ func ArtifactLink(cfg Config, link string) bool {
 	}
 	host := cfg.DocsHost
 	u, err := url.Parse(link)
-	return host != "" && err == nil && (u.Scheme == "https" || u.Scheme == "http") && strings.EqualFold(u.Host, host)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") {
+		return false
+	}
+	if host != "" && strings.EqualFold(u.Host, host) {
+		return true
+	}
+	// The platform's reader of a document: https://<ReaderHost><ReaderPath><slug>, nothing else of the platform.
+	if cfg.ReaderHost == "" || cfg.ReaderPath == "" || !strings.EqualFold(u.Host, cfg.ReaderHost) {
+		return false
+	}
+	rest, ok := strings.CutPrefix(u.Path, cfg.ReaderPath)
+	return ok && readerSlugRe.MatchString(rest)
 }
 
 // StandLink tells a feature stand, a preview of a branch: one name under RUNTIME_STAND_DOMAIN (`.preview.example.com`).

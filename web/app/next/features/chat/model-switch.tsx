@@ -3,6 +3,7 @@
 // at the place in the conversation where the agent took it. A change the agent did not take says so in its place:
 // «Модель не сменилась на Sonnet 5.5: агент оставил прежнюю».
 import { effortLabel } from '@/next/features/composer/agents';
+import type { PermissionMode } from '@/next/protocol/v2';
 import type { ModelSwitchItem } from '@/next/features/chat/types';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
@@ -28,6 +29,18 @@ export const ultracodeChange = (item: ModelSwitchItem): boolean | null => {
   return to === (item.from?.ultracode === true) ? null : to;
 };
 
+/** The fast mode turned on or off by the change; null when it stayed. */
+export const fastChange = (item: ModelSwitchItem): boolean | null => {
+  const to = item.to.fast === true;
+  return to === (item.from?.fast === true) ? null : to;
+};
+
+/** The permission mode the change turned to; null when it stayed or was never said. */
+export const permissionChange = (item: ModelSwitchItem): PermissionMode | null => {
+  const to = item.to.permission ?? null;
+  return to === null || to === (item.from?.permission ?? null) ? null : to;
+};
+
 /** Why the agent did not take a change, in words of the switch: it kept its model, or the model has no such mode. */
 const WHY: Readonly<Record<string, string>> = {
   conflict: 'next.modelSwitch.why.kept',
@@ -39,6 +52,8 @@ export const refusalReason = (code: string): string => t(WHY[code] ?? `next.refu
 const ModelSwitchRow = ({ item, label }: IModelSwitchProps) => {
   const effort = item.to.effort;
   const ultracode = ultracodeChange(item);
+  const fast = fastChange(item);
+  const permission = permissionChange(item);
   if (item.refused)
     return (
       <div className="hx-modelswitch" data-refused="true" role="status">
@@ -62,6 +77,18 @@ const ModelSwitchRow = ({ item, label }: IModelSwitchProps) => {
         {ultracode !== null && (
           <span className="hx-modelswitch__effort" data-ultracode={ultracode || undefined}>
             {t(ultracode ? 'next.modelSwitch.ultracodeOn' : 'next.modelSwitch.ultracodeOff')}
+          </span>
+        )}
+        {fast !== null && (
+          <span className="hx-modelswitch__effort">
+            {t(fast ? 'next.modelSwitch.fastOn' : 'next.modelSwitch.fastOff')}
+          </span>
+        )}
+        {permission !== null && (
+          <span className="hx-modelswitch__effort">
+            {t('next.modelSwitch.permission', {
+              mode: t(`next.picker.permission.${permission}`).toLowerCase(),
+            })}
           </span>
         )}
       </span>

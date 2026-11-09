@@ -1615,7 +1615,8 @@ func (c *conv) ultracodeAgain(now time.Time) {
 	off.Ultracode = false
 	c.rec.Model = &off
 	if c.rec.PendingModel == nil {
-		c.rec.PendingModel = &wire.PendingModel{ID: m.ID, Effort: m.Effort, Ultracode: true, Since: ms(now)}
+		c.rec.PendingModel = &wire.PendingModel{ID: m.ID, Effort: m.Effort, Ultracode: true, Fast: m.Fast, Permission: m.Permission,
+			Since: ms(now)}
 		c.pendingTries, c.pendingAt = 0, time.Time{}
 	}
 	c.touch()

@@ -12,11 +12,19 @@ import (
 
 // harnessly app new: a package that passes validate as it is, for the author (or the agent) to fill in.
 
-// FirstVersion is the first host version with apps: the range a new package starts with.
+// FirstVersion is the first host version with apps.
 const FirstVersion = "0.16.36"
 
+// TemplateVersion is the host version a new package asks for: the lowest that has what the templates use (the host's
+// hl-ui.css, protocol 2, widgets). The guide (docs/build-apps) says the same, and a test keeps them equal.
+const TemplateVersion = "0.16.68"
+
+// ViteTemplateVersion is the host that serves a view's module scripts, fetch and fonts to its opaque-origin frame (the
+// files carry open CORS and the slot lets "Origin: null" through): what a bundler's build needs.
+const ViteTemplateVersion = "0.16.198"
+
 // Templates are the starting points of `harnessly app new --template`.
-var Templates = []string{"chat", "pane-chat", "widget"}
+var Templates = []string{"chat", "pane-chat", "widget", "vite"}
 
 // Scaffold writes a new package for id into dir, which must not exist or be empty.
 func Scaffold(dir, id, name, template string) error {
@@ -45,7 +53,7 @@ func Scaffold(dir, id, name, template string) error {
 		Name:        name,
 		Description: "What " + name + " does, in one line",
 		Version:     "0.1.0",
-		Harnessly:   ">=" + FirstVersion,
+		Harnessly:   ">=" + TemplateVersion,
 		Trust:       TrustDeclarative,
 		Targets:     []string{TargetChat},
 		Activation:  &Activation{On: []string{OnManual}},
@@ -63,20 +71,31 @@ func Scaffold(dir, id, name, template string) error {
 			"# " + name + "\n\nThe reference the agent reads on demand.\n",
 		"CHANGELOG.md": "# Changelog\n\n## 0.1.0\n\n- First version.\n",
 	}
-	if template == "pane-chat" {
+	slug := id[strings.Index(id, ".")+1:]
+	if template == "pane-chat" || template == "vite" {
 		m.Trust = TrustSandboxed
 		m.Targets = append(m.Targets, TargetPane, TargetApp)
 		m.Activation = &Activation{On: []string{OnManual}, OpenView: "main"}
 		m.Permissions = []string{"chat.prompt", "pane.open", "storage"}
 		m.Views = []View{{ID: "main", Title: name, Entry: "ui/index.html", Targets: []string{TargetPane, TargetApp}}}
-		files["ui/index.html"] = "<!doctype html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"utf-8\">\n" +
-			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>" + name + "</title>\n</head>\n" +
-			"<body>\n<main>\n<h1>" + name + "</h1>\n</main>\n" +
-			"<!-- Classic scripts only: the view runs in an opaque-origin frame, which sends the slot's cookie with classic\n" +
-			"     scripts, stylesheets and images but not with module scripts or CORS loads (fetch, fonts): those come back 401. -->\n" +
-			"<script src=\"/__hl/app-sdk.js\"></script>\n<script src=\"main.js\"></script>\n</body>\n</html>\n"
-		files["ui/main.js"] = "// window.harnessly is the app SDK (docs/apps.md); connect() rejects with host_unavailable outside Harnessly.\n" +
-			"window.harnessly.connect().then(function (hl) {\n  console.log('" + name + "', hl.context.target);\n}).catch(function () {});\n"
+	}
+	if template == "pane-chat" {
+		files["ui/index.html"] = fillTemplate(paneChatHTML, name, slug)
+		files["ui/style.css"] = paneChatCSS
+		files["ui/main.js"] = fillTemplate(paneChatJS, name, slug)
+	}
+	if template == "vite" {
+		m.Harnessly = ">=" + ViteTemplateVersion
+		files["index.html"] = fillTemplate(viteIndexHTML, name, slug)
+		files["ui/index.html"] = fillTemplate(viteBuiltPlaceholder, name, slug)
+		files["package.json"] = fillTemplate(vitePackageJSON, name, slug)
+		files["vite.config.ts"] = viteConfig
+		files["tsconfig.json"] = viteTSConfig
+		files["src/main.tsx"] = viteMainTSX
+		files["src/App.tsx"] = fillTemplate(viteAppTSX, name, slug)
+		files["src/global.d.ts"] = viteGlobalDTS
+		files["src/app-sdk.d.ts"] = string(sdkDTS)
+		files[".gitignore"] = viteGitignore
 	}
 	if template == "widget" {
 		// A widget of the chat: the agent shows it in the feed with app.widget.show (or `harnessly widget show`) and the

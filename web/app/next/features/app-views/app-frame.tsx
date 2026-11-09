@@ -1,6 +1,6 @@
 // An app's view in a sandboxed frame: shown through a preview slot (so it runs on an origin of its own, never the
 // page's, and the preview's DevTools see it), and talked to only through the bridge (bridge.ts).
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { slotLeases } from '@/next/features/pane/slot-lease';
 import { openPreview } from '@/next/core/net/preview';
 import {
@@ -17,6 +17,7 @@ import {
   callSinopia,
   callStorage,
   callTool,
+  APP_STATE,
   createViewSession,
   renewViewSession,
   type IAppView,
@@ -33,8 +34,25 @@ import {
   type IViewContext,
   type TTarget,
 } from '@/next/features/app-views/bridge';
+import AppFail from '@/next/features/app-views/app-fail';
 import { logCall, logKey } from '@/next/features/app-views/bridge-log';
 import { bridgeLine, consoleLine, queueViewLog } from '@/next/features/app-views/view-log-report';
+import {
+  FAIL_REASON,
+  HANDSHAKE_WAIT_MS,
+  LOADING,
+  SESSION_WAIT_MS,
+  classifySessionError,
+  failureOfViewError,
+  keepTelling,
+  nextFrameState,
+  viewErrorOf,
+  watchHandshake,
+  withTimeout,
+  type IFailure,
+  type TFrameEvent,
+  type TFrameState,
+} from '@/next/features/app-views/frame-health';
 import { pageOffer } from '@/next/features/app-views/page-tools';
 import { askConfirm } from '@/next/features/app-views/confirm';
 import { hostKeys } from '@/next/features/app-views/host-keys';
@@ -49,6 +67,7 @@ import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
 import { toast } from '@/next/ui/toast';
 import { useTheme } from '@/platform/theme';
+import Icon from '@/next/ui/icon';
 import { t, locale } from '@/next/i18n';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 
@@ -57,9 +76,6 @@ import type { ConvId, MachineId } from '@/next/protocol/v2';
  * reach the slot's storage or another app's view. What it keeps goes through the bridge. (The view server's CSP says
  * the same, for a frame made some other way.)
  */
-/** How long a view has to make its handshake before the debug section says it did not. */
-const HANDSHAKE_WAIT_MS = 8000;
-
 /** The action an elevation dialog names, in the person's words. */
 const elevationAction = (method: string): string => {
   if (method === 'harnessly/terminal.run') return t('next.appview.elevate.run');
@@ -160,7 +176,6 @@ interface IOpened {
   session: string | null;
   /** The nonce of the view's pages; null for a view the app's own server hosts. */
   nonce: string | null;
-  error: string | null;
 }
 
 const isSlotTarget = (target: string) =>
@@ -189,15 +204,32 @@ const AppFrame = ({
   const [opened, setOpened] = useState<IOpened | null>(null);
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
   const [reload, setReload] = useState(0);
-  // The address the frame finished loading: until it is the one shown, the frame shows the loader (.hx-appview[data-loading]).
-  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  // Is the view up? Only the handshake says so (frame-health.ts): the frame's `load` also fires for a 404 page.
+  const [health, setHealth] = useState<{ key: string; state: TFrameState }>({ key: '', state: LOADING });
+  // The most telling thing the view said about its failure before it was up; the timeout then says it.
+  const seen = useRef<{ key: string; failure: IFailure } | null>(null);
   const bridge = useRef<AppBridge | null>(null);
   // This frame among the views of the chat that offer page tools.
   const frameId = useId();
   // A slot view holds a slot of its own: two views of one app on a page would share one cookie, and the second
   // one's session would replace the first one's.
   const lease = isSlotTarget(target) ? `app:${app.id}/${view.id}` : `app:${app.id}`;
-  const key = `${machine}|${app.id}|${view.id}|${viewPort}|${reload}|${reloadToken}`;
+  // An app that waits (for permission, a secret…) has no view to start: the card says so at once, and the key changes
+  // when it stops waiting, so the view then starts anew.
+  const waits = app.state === APP_STATE.waiting;
+  const key = `${machine}|${app.id}|${view.id}|${viewPort}|${reload}|${reloadToken}|${waits ? 'w' : ''}`;
+  const state: TFrameState = health.key === key ? health.state : LOADING;
+  const send = useCallback(
+    (event: TFrameEvent) =>
+      setHealth((h) => {
+        const was = h.key === key ? h.state : LOADING;
+        return {
+          key,
+          state: nextFrameState(was, event, seen.current?.key === key ? seen.current.failure : null),
+        };
+      }),
+    [key],
+  );
   // An app gets a chat only where the person turned it on; the runtime checks the same when it issues the session.
   const turnedOn = useConversation(conversation)?.apps?.includes(app.id) ?? false;
   const on = inChat || turnedOn;
@@ -207,35 +239,49 @@ const AppFrame = ({
   // Each app holds a slot of its own: a slot is one origin, and two apps on one would share it.
   useEffect(() => {
     let live = true;
-    const fail = (error: string) => live && setOpened({ key, src: null, session: null, nonce: null, error });
+    const fail = (failure: IFailure) => {
+      if (live) send({ k: 'session-failed', failure });
+    };
+    const failText = (text: string) => fail({ reason: FAIL_REASON.refused, detail: text });
+    const failError = (e: Error) => fail(classifySessionError(e.message));
+    const slow = t('next.appfail.sessionTimeout', { s: SESSION_WAIT_MS / 1000 });
+    if (waits) {
+      fail({ reason: FAIL_REASON.waiting, detail: app.reason ?? '' });
+      return () => {
+        live = false;
+      };
+    }
     // A view the app's own server hosts needs no slot: the frame goes there directly, with a session the page holds.
     if (view.url) {
       const direct = frameSrc(view.url, window.location.origin);
       if (direct === null) {
-        fail(t('next.appview.badAddress'));
+        failText(t('next.appview.badAddressWhy'));
         return;
       }
-      createViewSession(machine, {
-        app: app.id,
-        view: view.id,
-        target,
-        conversation: chat,
-        ...(doc === undefined ? {} : { document: doc }),
-      })
+      withTimeout(
+        createViewSession(machine, {
+          app: app.id,
+          view: view.id,
+          target,
+          conversation: chat,
+          ...(doc === undefined ? {} : { document: doc }),
+        }),
+        SESSION_WAIT_MS,
+        slow,
+      )
         .then((made) => {
           const at = made.url === undefined ? null : frameSrc(made.url, window.location.origin);
           if (!live) return;
-          if (at === null) fail(t('next.appview.badAddress'));
+          if (at === null) failText(t('next.appview.badAddressWhy'));
           else
             setOpened({
               key,
               src: withNonce(at, made.nonce),
               session: made.session,
               nonce: made.nonce,
-              error: null,
             });
         })
-        .catch((e: Error) => fail(e.message));
+        .catch(failError);
       return () => {
         live = false;
       };
@@ -243,25 +289,47 @@ const AppFrame = ({
     if (view.path) {
       const slot = slotLeases.lease('port', lease);
       // The view server serves a view's files only under the token of a session the runtime issued for this mount.
-      createViewSession(machine, {
-        app: app.id,
-        view: view.id,
-        target,
-        conversation: chat,
-        ...(doc === undefined ? {} : { document: doc }),
-      })
+      withTimeout(
+        createViewSession(machine, {
+          app: app.id,
+          view: view.id,
+          target,
+          conversation: chat,
+          ...(doc === undefined ? {} : { document: doc }),
+        }),
+        SESSION_WAIT_MS,
+        slow,
+      )
         .then(async (made) => {
           if (made.path === undefined) throw new Error(t('next.appview.noEntry'));
-          const o = await openPreview(machine, { kind: 'port', port: viewPort }, slot, made.path, [], 'path');
-          if (live)
-            setOpened({ key, src: o.enterUrl, session: made.session, nonce: made.nonce, error: null });
+          const o = await withTimeout(
+            openPreview(machine, { kind: 'port', port: viewPort }, slot, made.path, [], 'path'),
+            SESSION_WAIT_MS,
+            slow,
+          );
+          if (live) setOpened({ key, src: o.enterUrl, session: made.session, nonce: made.nonce });
         })
-        .catch((e: Error) => fail(e.message));
-    } else fail(t('next.appview.noEntry'));
+        .catch(failError);
+    } else failText(t('next.appview.noEntry'));
     return () => {
       live = false;
     };
-  }, [key, machine, view.url, view.path, view.id, viewPort, lease, app.id, target, chat, doc]);
+  }, [
+    key,
+    send,
+    waits,
+    app.reason,
+    machine,
+    view.url,
+    view.path,
+    view.id,
+    viewPort,
+    lease,
+    app.id,
+    target,
+    chat,
+    doc,
+  ]);
 
   // The slot went to a page used less recently: ask again, and get another.
   useEffect(
@@ -294,7 +362,7 @@ const AppFrame = ({
   const slotted = opened?.key === key ? opened : null;
   const remote = view.url !== undefined;
   const shown = slotted;
-  const ready = shown?.src != null && shown.error === null;
+  const ready = shown?.src != null;
   const session = shown?.session ?? null;
   const nonce = shown?.nonce ?? null;
   const src = shown?.src ?? null;
@@ -492,6 +560,7 @@ const AppFrame = ({
       context: latest.current.context,
       handlers: host,
       hostVersion: HOST_VERSION,
+      onReady: () => send({ k: 'handshake' }),
       ...(nonce === null ? {} : { nonce }),
       onCall: (entry) => {
         logCall(key, entry);
@@ -551,7 +620,49 @@ const AppFrame = ({
     remote,
     src,
     view.id,
+    send,
   ]);
+
+  // The view has HANDSHAKE_WAIT_MS from the moment its address is given to the frame; no handshake, no view. The wait
+  // ends the moment the handshake comes (`state` leaves `loading`).
+  const waiting = ready && state.k === 'loading';
+  useEffect(() => {
+    if (!waiting) return;
+    const watch = watchHandshake(() => send({ k: 'timeout' }));
+    return () => watch.cancel();
+  }, [waiting, send, src]);
+
+  // What the view says before the SDK is up (the shim of every page, or the server's page of refusal): a file that did
+  // not load, an exception, a blocked request. It goes to the journal, and the most telling of it is the card's reason.
+  useEffect(() => {
+    if (!frame || !ready) return;
+    const logKeyOfApp = logKey(app.id, chat);
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== frame.contentWindow) return;
+      const said = viewErrorOf(event.data);
+      if (said === null) return;
+      const failure = failureOfViewError(said, app.id);
+      seen.current = {
+        key,
+        failure: keepTelling(seen.current?.key === key ? seen.current.failure : null, failure),
+      };
+      const at = Date.now();
+      const message = said.src === '' ? said.text : `${said.text} ${failure.detail || said.src}`.trim();
+      logCall(logKeyOfApp, {
+        method: said.kind === 'resource' ? 'view.file' : `view.${said.kind}`,
+        permission: '',
+        ok: false,
+        message,
+        at,
+      });
+      // The same line goes to the machine, where `harnessly app logs` reads it: one journal, not two.
+      queueViewLog(machine, app.id, view.id, { level: 'error', text: message, at });
+      // A refusal of the view server is the answer, not a guess: the card needs no more waiting.
+      if (said.kind === 'refused') send({ k: 'session-failed', failure });
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [frame, ready, machine, app.id, view.id, chat, key, send]);
 
   // `storage`: a key of the app's storage was written (by the agent, another view of the app, the view itself), told at
   // once from the runtime's stream. It names the scope and the key, never the value; the view reads the key again.
@@ -617,22 +728,40 @@ const AppFrame = ({
     return () => cancelAnimationFrame(id);
   }, [context]);
 
-  if (shown?.error) return <p className="hx-appview__error">{shown.error}</p>;
-  const loading = shown?.src == null || loadedSrc !== shown.src;
+  // `load` is not «up»: a 404 page loads too. The frame is shown once the view says it is ready; until then the skeleton
+  // is over it, and when it did not start the card takes its place (the frame stays, hidden, in case it connects late).
   return (
-    <iframe
-      onLoad={() => setLoadedSrc(shown?.src ?? null)}
-      data-loading={loading || undefined}
-      ref={setFrame}
-      className="hx-appview"
-      title={view.title ?? app.name}
-      sandbox={remote ? REMOTE_FRAME_SANDBOX : APP_FRAME_SANDBOX}
-      referrerPolicy="no-referrer"
-      allow=""
-      src={shown?.src ?? undefined}
-      data-fit={fit || undefined}
-      height={fit ? height : undefined}
-    />
+    <div className="hx-appview__box" data-fit={fit || undefined} data-state={state.k}>
+      <iframe
+        ref={setFrame}
+        className="hx-appview"
+        data-state={state.k}
+        title={view.title ?? app.name}
+        sandbox={remote ? REMOTE_FRAME_SANDBOX : APP_FRAME_SANDBOX}
+        referrerPolicy="no-referrer"
+        allow=""
+        src={shown?.src ?? undefined}
+        data-fit={fit || undefined}
+        height={fit ? height : undefined}
+      />
+      {state.k !== 'failed' && (
+        <div className="hx-appview__skeleton" data-state={state.k} aria-hidden={state.k === 'ready'}>
+          <Icon name={app.icon || 'layout-grid'} />
+          <span className="hx-appview__skeleton-name">{t('next.appfail.loading', { name: app.name })}</span>
+          <span className="hx-appview__skeleton-bar" />
+          <span className="hx-appview__skeleton-bar" />
+        </div>
+      )}
+      {state.k === 'failed' && (
+        <AppFail
+          app={app}
+          failure={state.failure}
+          logKey={logKey(app.id, chat)}
+          conversation={conversation}
+          onRetry={() => setReload((n) => n + 1)}
+        />
+      )}
+    </div>
   );
 };
 

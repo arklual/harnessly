@@ -1,13 +1,31 @@
-// How a notice gets the person's attention besides the card: a soft two-note chime (made on the spot, no file to load),
+// How a notice gets the person's attention besides the card: a soft sound of its kind (made on the spot, no file to load),
 // «(2) …» before the tab's title and a dot on its icon while notices wait, and a notification of the system while the
 // tab is in the background. Every call is safe where the browser has no such thing: it does nothing.
+import type { TNoticeSound } from '@/next/stores/notices';
 
-/** The chime: two short sine notes, quiet, a little up. Hz, seconds from the start, seconds long. */
-const NOTES = [
-  { hz: 880, at: 0, len: 0.16 },
-  { hz: 1318.5, at: 0.09, len: 0.22 },
-] as const;
-const VOLUME = 0.06;
+interface INote {
+  hz: number;
+  /** Seconds from the start. */
+  at: number;
+  /** Seconds long. */
+  len: number;
+  volume: number;
+}
+
+/** The sounds of the smart notice, all sine notes made on the spot: «waits» two up, «waits now» the same and a third
+ *  higher, «ready» one low quiet note. */
+const SOUND_NOTES: Record<TNoticeSound, readonly INote[]> = {
+  wait: [
+    { hz: 880, at: 0, len: 0.16, volume: 0.06 },
+    { hz: 1318.5, at: 0.09, len: 0.22, volume: 0.06 },
+  ],
+  urgent: [
+    { hz: 880, at: 0, len: 0.14, volume: 0.07 },
+    { hz: 1318.5, at: 0.08, len: 0.14, volume: 0.07 },
+    { hz: 1760, at: 0.16, len: 0.26, volume: 0.06 },
+  ],
+  done: [{ hz: 523.25, at: 0, len: 0.38, volume: 0.04 }],
+};
 
 let audio: AudioContext | null = null;
 
@@ -26,16 +44,16 @@ export const unlockSound = (): (() => void) => {
   return () => events.forEach((name) => window.removeEventListener(name, wake, { capture: true }));
 };
 
-export const playChime = (): void => {
+export const playSound = (sound: TNoticeSound): void => {
   if (!audio || audio.state !== 'running') return;
   const start = audio.currentTime + 0.01;
-  for (const note of NOTES) {
+  for (const note of SOUND_NOTES[sound]) {
     const osc = audio.createOscillator();
     const gain = audio.createGain();
     osc.type = 'sine';
     osc.frequency.value = note.hz;
     gain.gain.setValueAtTime(0, start + note.at);
-    gain.gain.linearRampToValueAtTime(VOLUME, start + note.at + 0.015);
+    gain.gain.linearRampToValueAtTime(note.volume, start + note.at + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + note.at + note.len);
     osc.connect(gain).connect(audio.destination);
     osc.start(start + note.at);

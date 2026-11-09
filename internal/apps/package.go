@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -55,6 +56,83 @@ type MCPServer struct {
 	// catalog entry of that id: the address and the sign-in are the connection's, so a server with it names no url,
 	// headers or command. Nobody's token is in the package.
 	Connection string `json:"connection,omitempty"`
+	// Auth says how the host signs the person in to the server (docs/build-apps/10-auth.md); nil: as the headers say.
+	Auth *ServerAuth `json:"auth,omitempty"`
+	// Credentialed: the headers carry a credential (a secret the install keeps, a connection's token, the platform's
+	// token). A 401 to such a call is an expired sign-in, not a missing one. Set by the host, never read from a package.
+	Credentialed bool `json:"-"`
+}
+
+// The kinds of ServerAuth.
+const (
+	// AuthPlatform: the host puts the platform's JWT for the person (apptoken) in Authorization.
+	AuthPlatform = "platform"
+	// AuthOIDC: the host puts the organization's identity provider's token for the server, got by token exchange.
+	AuthOIDC = "oidc"
+	// AuthOAuth: the person signs in to the server itself, the way a connection does (MCP authorization: discovery,
+	// dynamic registration, PKCE); the host keeps the token in the safe and puts it in Authorization.
+	AuthOAuth = "oauth"
+	// AuthSecret: the headers carry ${secret:…} of the install, as without auth.
+	AuthSecret = "secret"
+)
+
+// ServerAuth is how the host signs the person in to an app's remote server. A platform token's aud is always the
+// server's origin (https://host[:port]): an app cannot ask a token for another backend and send it to its own address.
+// Audience names the identity provider's audience for oidc, which the hub's admin must have allowed for that origin
+// (HUB_APP_TOKEN_EXCHANGE_AUDIENCES); the origin when empty. Scope is asked of the provider for oidc and oauth. The
+// view never sees a token of any kind: the host adds it to the calls it makes for the view and the agent.
+type ServerAuth struct {
+	Type     string `json:"type"`
+	Audience string `json:"audience,omitempty"`
+	Scope    string `json:"scope,omitempty"`
+}
+
+// AudienceFor is the audience of the server's token: the origin of its url, or for oidc the declared one.
+func (s MCPServer) AudienceFor() string {
+	if s.Auth != nil && s.Auth.Type == AuthOIDC && s.Auth.Audience != "" {
+		return s.Auth.Audience
+	}
+	return s.Origin()
+}
+
+// Origin is the origin (scheme://host[:port]) of the server's url; "" for a server without one.
+func (s MCPServer) Origin() string {
+	u, err := url.Parse(s.URL)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+// authProblems is what is wrong with a server's auth.
+func authProblems(s MCPServer) []string {
+	a := s.Auth
+	if a == nil {
+		return nil
+	}
+	var out []string
+	switch a.Type {
+	case AuthPlatform, AuthOIDC, AuthOAuth, AuthSecret:
+	default:
+		return []string{fmt.Sprintf("auth.type %q is none of platform, oidc, oauth, secret", a.Type)}
+	}
+	if s.Connection != "" {
+		out = append(out, "a server with a connection signs in by the connection: no auth")
+	}
+	if s.Command != "" || s.URL == "" {
+		out = append(out, "auth is for a remote server (url)")
+	}
+	if a.Type == AuthPlatform && a.Audience != "" && a.Audience != s.Origin() {
+		out = append(out, "a platform token's audience is the server's own origin ("+s.Origin()+"): drop auth.audience")
+	}
+	if a.Type != AuthSecret {
+		for k := range s.Headers {
+			if strings.EqualFold(k, "Authorization") {
+				out = append(out, "auth "+a.Type+" puts its own Authorization header: drop the one in headers")
+			}
+		}
+	}
+	return out
 }
 
 // connectionProblems is what is wrong with a server that names a connection: it is a remote one (http or sse) whose
@@ -276,6 +354,9 @@ func (p *Package) checkFiles() Problems {
 				}
 			case s.Command == "" && !strings.HasPrefix(s.URL, "https://"):
 				add(path, "a remote server has an https:// url")
+			}
+			for _, why := range authProblems(s) {
+				add(path, "%s", why)
 			}
 		}
 	case !errors.Is(err, fs.ErrNotExist):

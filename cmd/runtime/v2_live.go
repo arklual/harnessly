@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -136,6 +137,10 @@ func newV2Live(d deps, c *core) *v2Live {
 	shareProviders(d.DataDir, v.profiles)
 	v.machine = newLiveMachine(v2Machine, version, features, d.DataDir, func() int { return v.rt.Busy() }, c.preflight, c.v2Models)
 	v.machine.offers = profileOffers(v.profiles)
+	if c.agents != nil {
+		v.machine.skip = c.agents.claude.SkipPermissions
+		v.machine.codexConfig = filepath.Join(d.Home, ".codex", "config.toml")
+	}
 	v.hub = wire.NewHub(v.machine)
 	v.tm = &v2Tmux{tm: c.cfg.Tmux, term: c.cfg.Term, guard: chatGuard}
 	v.starter = &v2Launcher{v: v}
@@ -320,6 +325,8 @@ func (c *core) v2Models(p wire.Provider) []wire.AgentModel {
 		}
 		// Claude's catalog lists ultracode among the levels --effort takes; on the wire it is a mode of its own.
 		am.Ultracode = p == wire.ProviderClaude && slices.Contains(m.Efforts, string(wire.EffortUltracode))
+		// Claude Code's /fast runs on Opus only; Codex says which of its models have the fast tier.
+		am.Fast = m.Fast || p == wire.ProviderClaude && strings.Contains(m.ID, "opus")
 		if def := v2DefaultEffort(p, m, opts); def != nil && slices.Contains(am.Efforts, *def) {
 			am.DefaultEffort = def
 		}
@@ -713,6 +720,23 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 			chosen.Ultracode = true
 		}
 	}
+	// The fast and permission modes the chat starts in; fast is Anthropic's and Codex's own, never a profile's.
+	// A Claude chat that names no permission mode starts in the machine's, said on the line all the same: left to the
+	// CLI, a `defaultMode` of the person's settings decided it (a GPT chat through Claude Code started in plan mode).
+	// Codex's own config.toml stays the default of a Codex chat.
+	if chosen == nil {
+		chosen = &agents.Launch{}
+	}
+	if m := req.Model; m != nil {
+		chosen.Fast = m.Fast && m.Profile == ""
+		chosen.Permission = m.Permission
+	}
+	if chosen.Permission == "" && req.Provider == wire.ProviderClaude {
+		chosen.Permission = l.defaultPermission()
+	}
+	if err := agents.CheckLaunch(chosen); err != nil {
+		return err
+	}
 	if len(req.Apps) > 0 {
 		if chosen == nil {
 			chosen = &agents.Launch{}
@@ -776,6 +800,21 @@ func (l *v2Launcher) start(req convo.LaunchRequest, chosen *agents.Launch, promp
 	_ = rt.Attach(req.ID, found.Tab.SessionName, "", "")
 }
 
+// defaultPermission is the permission mode of a chat that names none: the runtime's dangerouslySkipPermissions.
+func (l *v2Launcher) defaultPermission() wire.PermissionMode {
+	if a := l.v.c.agents; a != nil && a.claude.SkipPermissions != nil && a.claude.SkipPermissions() {
+		return wire.PermissionBypass
+	}
+	return wire.PermissionAsk
+}
+
+// KeepModes writes the fast and permission modes the chat now runs in into its tab's launch.
+func (l *v2Launcher) KeepModes(session string, fast bool, permission wire.PermissionMode) {
+	if err := l.v.c.store.SetTabLaunchModes(session, fast, string(permission)); err != nil {
+		agent.Log("warn", "v2: the chat's modes were not kept", agent.F{K: "session", V: session}, agent.F{K: "err", V: err.Error()})
+	}
+}
+
 // Resume brings a stopped agent back on its session.
 func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	c := l.v.c
@@ -794,6 +833,13 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	// The apps on in the chat come back with it: the tab's launch is what the resume reads (internal/apps).
 	if err := c.store.SetTabLaunchApps(conv.Session, conv.Apps); err != nil {
 		return err
+	}
+	// So do its fast and permission modes as the chat last had them: the agent starts in them again. A chat
+	// that never chose one keeps what its tab started with.
+	if m := conv.Model; m != nil && m.Permission != "" {
+		if err := c.store.SetTabLaunchModes(conv.Session, m.Fast && m.Profile == "", string(m.Permission)); err != nil {
+			return err
+		}
 	}
 	switch got := c.resumeForQueue(tab); got {
 	case prompts.ResumeResumed, prompts.ResumeRunning:

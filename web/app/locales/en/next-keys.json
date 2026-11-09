@@ -74,5 +74,6 @@
   "next.keys.cmd.site.pick": "Pick a place to comment",
   "next.keys.cmd.site.stopInspect": "Leave picking an element",
   "next.keys.cmd.files.quickOpen": "Go to file",
-  "next.keys.cmd.files.find": "Find in files"
+  "next.keys.cmd.files.find": "Find in files",
+  "next.keys.cmd.global.notice": "Open the smart notice"
 }

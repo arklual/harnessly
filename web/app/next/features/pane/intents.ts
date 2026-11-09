@@ -112,6 +112,39 @@ export const planIntents = (
   };
 };
 
+/**
+ * What opens the pane by itself (docs/pane-opening.md):
+ *
+ * | trigger                                              | what the person sees                               |
+ * |------------------------------------------------------|----------------------------------------------------|
+ * | the agent's `open <tab> <target>`, `open show`       | its tab in front, the pane comes out (not on phone) |
+ * | the same `open` again within 10 min                  | nothing: the runtime answers «already opened»      |
+ * | the runtime's own (auto): a design the agent edits,  | its tab behind, with a dot; the pane stays as it is |
+ * | a document it publishes, its browser, a file handed  |                                                    |
+ * | a reload of a document published again               | the tab that shows it reloads, nothing opens       |
+ * | an address in the agent's answer                     | a chip in the text: the pane opens on its click    |
+ * | the person's click on a chip, a card, a view button   | its tab in front, the pane comes out               |
+ *
+ * The person busy in a tab of the open pane never loses it: an asked tab goes behind it too. On the phone the pane is
+ * a sheet over the chat and never comes out by itself.
+ */
+export interface IIntentRequests {
+  /** What the agent asked with `open`: in front, the pane comes out for it. */
+  asked: IPaneRequest[];
+  /** What the runtime asked by itself on seeing the agent work: behind, the pane stays as it is. */
+  quiet: IPaneRequest[];
+}
+
+/** The requests of the intents a look applies, split by who asked: the agent, or the runtime by itself. */
+export const requestsOf = (intents: readonly IPaneIntent[]): IIntentRequests => {
+  const out: IIntentRequests = { asked: [], quiet: [] };
+  for (const intent of intents) {
+    const request = requestOf(intent.command);
+    if (request) (isAuto(intent) ? out.quiet : out.asked).push(request);
+  }
+  return out;
+};
+
 /** Where a request goes in the new pane. */
 export type IPaneRequest = { reload: boolean } & (
   | { k: 'show' }

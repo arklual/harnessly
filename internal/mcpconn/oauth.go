@@ -371,7 +371,7 @@ func (s *Service) accessToken(ctx context.Context, id string, force bool) (strin
 			return o.AccessToken, nil
 		}
 		s.setState(id, StateSignIn)
-		return "", fmt.Errorf("%w: the sign-in expired", ErrSignInRequired)
+		return "", ErrSignInExpired
 	}
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
@@ -382,7 +382,7 @@ func (s *Service) accessToken(ctx context.Context, id string, force bool) (strin
 	ans, err := s.token(ctx, o.TokenEndpoint, c, form)
 	if errors.Is(err, errInvalidGrant) || errors.Is(err, errInvalidClient) {
 		s.setState(id, StateSignIn)
-		return "", fmt.Errorf("%w: the sign-in expired", ErrSignInRequired)
+		return "", ErrSignInExpired
 	}
 	if err != nil {
 		return "", err

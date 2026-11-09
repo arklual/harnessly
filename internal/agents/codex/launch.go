@@ -250,11 +250,8 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	args = append(args, "--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false")
 	args = append(args, devArgs...)
 	args = append(args, c.shellEnvArgs(prof.KeyEnv)...)
-	if c.SkipPermissions != nil && c.SkipPermissions() {
-		args = append(args, "--yolo")
-	} else if c.ContainerSandbox {
-		args = append(args, ContainerSandboxArgs...)
-	}
+	args = append(args, c.permissionArgs(launch)...)
+	args = append(args, FastArgs(launch)...)
 	launchArgs, err := RuntimeLaunchArgs(launch)
 	if err != nil {
 		return Start{}, false, err
@@ -553,4 +550,64 @@ func MCPURL(port int, path string) string {
 		return ""
 	}
 	return "http://127.0.0.1:" + strconv.Itoa(port) + path
+}
+
+// permissionArgs are how the launch's Codex asks before it acts. A launch that names a permission mode gets
+// it whatever the machine's default:
+//
+//   - bypass: --yolo, nothing asked and no sandbox;
+//   - ask: approvals for anything but plain reads (`untrusted`), in the workspace-write sandbox;
+//   - plan: changes nothing on its own: a read-only sandbox, and asks before anything past it (`on-request`). Codex has
+//     no way to start in its Plan mode, and this is what that mode is for.
+//
+// In a container Codex's sandbox cannot start (ContainerSandbox): the container is the boundary, and plan and ask
+// both ask before every command that is not a plain read. Without a mode the machine's default stands: --yolo when the
+// runtime skips permissions, the container's args in a container, else Codex's own config.
+func (c LaunchConfig) permissionArgs(launch *agents.Launch) []string {
+	mode := wire.PermissionMode("")
+	if launch != nil {
+		mode = launch.Permission
+	}
+	sandbox := func(own string) []string {
+		if c.ContainerSandbox {
+			return []string{"-c", `sandbox_mode="danger-full-access"`, "-c", `approval_policy="untrusted"`}
+		}
+		return []string{"-c", `sandbox_mode="` + own + `"`}
+	}
+	switch mode {
+	case wire.PermissionBypass:
+		return []string{"--yolo"}
+	case wire.PermissionAsk:
+		if c.ContainerSandbox {
+			return sandbox("")
+		}
+		return append(sandbox("workspace-write"), "-c", `approval_policy="untrusted"`)
+	case wire.PermissionPlan:
+		if c.ContainerSandbox {
+			return sandbox("")
+		}
+		return append(sandbox("read-only"), "-c", `approval_policy="on-request"`)
+	}
+	if c.SkipPermissions != nil && c.SkipPermissions() {
+		return []string{"--yolo"}
+	}
+	if c.ContainerSandbox {
+		return ContainerSandboxArgs
+	}
+	return nil
+}
+
+// FastArgs are the service tier of a launch that chose it: `fast` when it is on; `default` when a launch
+// that names its modes has it off, so a `service_tier = "fast"` of the person's config does not turn it on. A launch
+// that names no mode leaves the config alone.
+func FastArgs(launch *agents.Launch) []string {
+	switch {
+	case launch == nil:
+		return nil
+	case launch.Fast:
+		return []string{"-c", `service_tier="fast"`}
+	case launch.Permission != "":
+		return []string{"-c", `service_tier="default"`}
+	}
+	return nil
 }

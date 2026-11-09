@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cleanHtml,
+  isFrameIssue,
   frameDocument,
   FRAME_SANDBOX,
   isFrameHeight,
@@ -91,5 +92,16 @@ describe('the sandbox of an HTML answer', () => {
     });
     expect(doc).not.toContain('refresh');
     expect(doc).toContain('<p>hi</p>');
+  });
+});
+
+describe('what the frame reports besides its height', () => {
+  it('tells blocked requests and errors, tagged with the frame key', () => {
+    const doc = frameDocument('<p>x</p>', { key: 'k1', nonce: 'n', fit: true });
+    expect(doc).toContain('securitypolicyviolation');
+    expect(doc).toContain('addEventListener("error"');
+    expect(isFrameIssue({ hxFrame: 'k1', issue: 'CSP blocked x' }, 'k1')).toBe(true);
+    expect(isFrameIssue({ hxFrame: 'other', issue: 'x' }, 'k1')).toBe(false);
+    expect(isFrameIssue({ hxFrame: 'k1', height: 3 }, 'k1')).toBe(false);
   });
 });

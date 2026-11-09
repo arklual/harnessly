@@ -67,4 +67,21 @@ func TestSecretsAreCutAsTheGatewayCutsThem(t *testing.T) {
 	if out, found := RedactSecrets(escaped); found["bearer"] != 1 || strings.Contains(string(out), strings.Repeat("Z", 30)) {
 		t.Errorf("an escaped token stayed: %s", out)
 	}
+
+	// A password with a quote in it: the prefilter lets through what the rules would cut.
+	raw, _ = json.Marshal(map[string]string{"a": `postgres://app:pa"ss@db:5432/x`, "b": `https://bo"t:hun"ter2@example.com/x`})
+	out, found = RedactSecrets(raw)
+	if found["conn-string"] != 1 || found["url-credentials"] != 1 || strings.Contains(string(out), "hun") || strings.Contains(string(out), `ss@db`) {
+		t.Errorf("a password with a quote: %s %v", out, found)
+	}
+	// A secret as a key is cut too; two keys that become the same are one entry with both values.
+	first, second := "ghp_"+strings.Repeat("a", 36), "ghp_"+strings.Repeat("b", 36)
+	raw, _ = json.Marshal(map[string]any{first: 1, second: 2, "plain": map[string]any{"glpat-" + strings.Repeat("c", 20): "x"}})
+	out, found = RedactSecrets(raw)
+	if strings.Contains(string(out), first) || strings.Contains(string(out), second) || strings.Contains(string(out), "glpat-") {
+		t.Errorf("a secret key stayed: %s", out)
+	}
+	if want := `{"[скрыто: github]":[1,2],"plain":{"[скрыто: gitlab]":"x"}}`; string(out) != want || found["github"] != 2 {
+		t.Errorf("secret keys: %s %v", out, found)
+	}
 }

@@ -135,6 +135,67 @@ func UltracodeSettings(hooksPath string) (string, error) {
 	return target, nil
 }
 
+// FastSettings writes, next to a settings file, a copy of it with `"fastMode"` set to on (rewritten only when its
+// content changes) and gives its path: Claude Code reads one --settings.
+func FastSettings(settingsPath string, on bool) (string, error) {
+	raw, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return "", err
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return "", err
+	}
+	settings["fastMode"] = on
+	body, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	suffix := ".fast-off.json"
+	if on {
+		suffix = ".fast-on.json"
+	}
+	target := strings.TrimSuffix(settingsPath, ".json") + suffix
+	if have, err := os.ReadFile(target); err == nil && string(have) == string(body) {
+		return target, nil
+	}
+	tmp := target + ".tmp"
+	if err := os.WriteFile(tmp, body, 0o600); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, target); err != nil {
+		_ = os.Remove(tmp)
+		return "", err
+	}
+	return target, nil
+}
+
+// ClaudePermissionModes are Claude Code's names of the picker's permission modes (`--permission-mode`); `default` is
+// the one that asks, named so by every version (2.1.319 calls it `manual` too).
+var ClaudePermissionModes = map[wire.PermissionMode]string{
+	wire.PermissionPlan:   "plan",
+	wire.PermissionAsk:    "default",
+	wire.PermissionBypass: "bypassPermissions",
+}
+
+// permissionFlags are how the launch's Claude asks before it acts. A launch that names a permission mode
+// starts in it with --permission-mode, whatever the person's settings say (a `defaultMode` of theirs used to start a
+// chat in plan mode). Never with --allow-dangerously-skip-permissions: Claude Code counts such a session as started
+// with bypass, and its plan mode then «won't ask before most edits or commands». Without a mode the machine's default
+// stands.
+func (c LaunchConfig) permissionFlags(launch *agents.Launch) []string {
+	if launch != nil && launch.Permission != "" {
+		if mode, ok := ClaudePermissionModes[launch.Permission]; ok {
+			return []string{"--permission-mode " + mode}
+		}
+		return nil
+	}
+	if c.SkipPermissions != nil && c.SkipPermissions() {
+		return []string{"--dangerously-skip-permissions"}
+	}
+	return nil
+}
+
 // AllowSettings writes, next to a settings file, a copy of it with the rules added to permissions.allow (rewritten only
 // when its content changes) and gives its path: Claude Code reads one --settings, so rules that change between launches
 // go into a copy of the one the launch has.
@@ -273,6 +334,15 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 		}
 		settings, settingsFile = path, path
 	}
+	// Fast mode is a setting too: a launch that names its modes says it either way, so a `fastMode` the person's
+	// own settings keep (Claude Code saves /fast there) does not decide it. A profile's model has no fast mode.
+	if launch != nil && launch.Profile == "" && (launch.Fast || launch.Permission != "") {
+		path, err := FastSettings(settingsFile, launch.Fast)
+		if err != nil {
+			return "", "", err
+		}
+		settings, settingsFile = agents.ShellQuote(path), path
+	}
 	// The person's MCP servers: their tools are allowed in a copy of the settings chosen above, which the apps' file
 	// extends in turn. A copy that cannot be written leaves the tools asking.
 	extraMCP, extraAllow := "", []string(nil)
@@ -339,9 +409,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 		return "", "", err
 	}
 	parts = append(parts, prompts...)
-	if c.SkipPermissions != nil && c.SkipPermissions() {
-		parts = append(parts, "--dangerously-skip-permissions")
-	}
+	parts = append(parts, c.permissionFlags(launch)...)
 	flags, err := LaunchFlags(launch)
 	if err != nil {
 		return "", "", err

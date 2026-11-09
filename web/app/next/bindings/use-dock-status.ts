@@ -25,6 +25,13 @@ const target = (line: IPendingLine, agent: IPickerAgent | null): string => {
   if (line.model) parts.push(agent ? modelName(agent, line.model) : line.model);
   if (line.effort) parts.push(t('next.modelSwitch.effort', { effort: effortLabel(line.effort) }));
   if (line.ultracode !== null) parts.push(ultracodeWord(line.ultracode));
+  if (line.fast != null) parts.push(t(line.fast ? 'next.modelSwitch.fastOn' : 'next.modelSwitch.fastOff'));
+  if (line.permission)
+    parts.push(
+      t('next.modelSwitch.permission', {
+        mode: t(`next.picker.permission.${line.permission}`).toLowerCase(),
+      }),
+    );
   return parts.join(' · ');
 };
 
@@ -45,8 +52,11 @@ export const pendingSentence = (line: IPendingLine, agent: IPickerAgent | null):
   const launch = line.when === WHEN.launch;
   if (line.model)
     return t(launch ? 'next.modelSwitch.pendingLaunch' : 'next.modelSwitch.pendingTurn', { to });
-  if (!line.effort && line.ultracode !== null)
+  const otherModes = line.fast != null || !!line.permission;
+  if (!line.effort && line.ultracode !== null && !otherModes)
     return t(ULTRACODE_SENTENCE[launch ? 'launch' : 'turn'][line.ultracode ? 'on' : 'off']);
+  if (!line.effort && otherModes)
+    return t(launch ? 'next.modelSwitch.pendingLaunchModes' : 'next.modelSwitch.pendingTurnModes', { to });
   return t(launch ? 'next.modelSwitch.pendingLaunchEffort' : 'next.modelSwitch.pendingTurnEffort', {
     effort: line.effort ? effortLabel(line.effort) : '',
   });

@@ -4,21 +4,32 @@ import {
   agentKey,
   choiceAgentKey,
   firstChoice,
+  modesOf,
   type IModelChoice,
   type IPickerAgent,
 } from '@/next/features/composer/agents';
-import { EFFORTS, type AgentOption, type Effort, type Provider } from '@/next/protocol/v2';
+import {
+  EFFORTS,
+  PERMISSION_MODES,
+  type AgentOption,
+  type Effort,
+  type PermissionMode,
+  type Provider,
+} from '@/next/protocol/v2';
 
 const LAST_KEY = 'hx-next-new-chat-choice';
 
 const isEffort = (value: unknown): value is Effort =>
   typeof value === 'string' && (EFFORTS as readonly string[]).includes(value);
 
+const isPermission = (value: unknown): value is PermissionMode =>
+  typeof value === 'string' && (PERMISSION_MODES as readonly string[]).includes(value);
+
 export const readLastChoice = (): IModelChoice | null => {
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(LAST_KEY) ?? 'null');
     if (typeof raw !== 'object' || raw === null) return null;
-    const { provider, profile, model, effort, ultracode } = raw as Record<string, unknown>;
+    const { provider, profile, model, effort, ultracode, fast, permission } = raw as Record<string, unknown>;
     if (provider !== 'claude' && provider !== 'codex') return null;
     return {
       provider,
@@ -26,6 +37,8 @@ export const readLastChoice = (): IModelChoice | null => {
       model: typeof model === 'string' ? model : null,
       effort: isEffort(effort) ? effort : null,
       ultracode: ultracode === true,
+      ...(fast === true ? { fast: true } : {}),
+      ...(isPermission(permission) ? { permission } : {}),
     };
   } catch {
     return null;
@@ -38,6 +51,19 @@ export const rememberChoice = (choice: IModelChoice) => {
   } catch {
     // Private mode or full storage: the pick lives for this page only.
   }
+};
+
+/** The fast and permission modes of a choice made in a running chat become the next new chat's, its model staying
+ *  as last picked for a new chat. */
+export const rememberModes = (choice: Pick<IModelChoice, 'fast' | 'permission'>) => {
+  const last = readLastChoice();
+  if (!last) return;
+  const { fast: _fast, permission: _permission, ...rest } = last;
+  rememberChoice({
+    ...rest,
+    ...(choice.fast ? { fast: true } : {}),
+    ...(choice.permission ? { permission: choice.permission } : {}),
+  });
 };
 
 /** The agent's model a settings value names: the id itself, or an alias or a full id around it («opus[1m]»,
@@ -85,6 +111,7 @@ const choiceFor = (agent: IPickerAgent, last: IModelChoice | null): IModelChoice
     model: model.id,
     effort,
     ultracode: last.ultracode && model.ultracode === true,
+    ...modesOf(last, model),
   };
 };
 
@@ -103,5 +130,22 @@ export const startChoice = ({ ready, picked, settings, last }: IStartInput): IMo
   if (!agent) return null;
   // The settings file is the CLI's own: a profile group runs on the vendor's models, not on what it names.
   const options = agent.profile ? null : settings[agent.provider];
-  return (options && settingsChoice(agent, options)) ?? choiceFor(agent, last) ?? firstChoice(agent);
+  return withLastModes(
+    (options && settingsChoice(agent, options)) ?? choiceFor(agent, last) ?? firstChoice(agent),
+    agent,
+    last,
+  );
+};
+
+/** The fast and permission modes of the last pick carry to the next chat whatever its model came from: they are the
+ *  person's way of working, not the model's. Fast stays on only on a model that runs it. */
+const withLastModes = (
+  choice: IModelChoice,
+  agent: IPickerAgent,
+  last: IModelChoice | null,
+): IModelChoice => {
+  if (!last || (!last.fast && !last.permission)) return choice;
+  const model = agent.models.find((m) => m.id === choice.model);
+  const { fast: _fast, permission: _permission, ...rest } = choice;
+  return { ...rest, ...modesOf(last, model) };
 };

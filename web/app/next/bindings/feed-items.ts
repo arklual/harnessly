@@ -176,7 +176,14 @@ export const outgoingItem = (m: MessageView): OutgoingItem => ({
 });
 
 const sameModel = (a: SwitchModel | null, b: SwitchModel | null): boolean =>
-  a === b || (!!a && !!b && a.id === b.id && a.effort === b.effort && !!a.ultracode === !!b.ultracode);
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.id === b.id &&
+    a.effort === b.effort &&
+    !!a.ultracode === !!b.ultracode &&
+    !!a.fast === !!b.fast &&
+    (a.permission ?? null) === (b.permission ?? null));
 
 /**
  * The applied changes of model among the turns: each stands before the first turn that started after it, so it reads

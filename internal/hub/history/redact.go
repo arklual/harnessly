@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -106,8 +107,10 @@ var secretRules = []secretRule{
 }
 
 // secretPrefilter finds a superset of what the rules find, in linear time (RE2): the rules run only where it matches.
+// Every alternative is at most as narrow as its rule: the credentials of an address may hold a quote, so the class
+// of the address part takes everything the rules' classes take.
 var secretPrefilter = regexp.MustCompile(withSpace(
-	`-----BEGIN [A-Z ]*PRIVATE KEY|eyJ[\w-]{10,}\.|sk-ant-|sk-(?:proj-)?[\w-]{20}|gh[pousr]_|github_pat_|glpat-|perm[:-]|hvs\.|xox[abprs]-|\d{8,10}:[\w-]{35}|AKIA|AIza|Bearer\s|://[^\s:/@"]+:[^\s@"]+@`,
+	`-----BEGIN [A-Z ]*PRIVATE KEY|eyJ[\w-]{10,}\.|sk-ant-|sk-(?:proj-)?[\w-]{20}|gh[pousr]_|github_pat_|glpat-|perm[:-]|hvs\.|xox[abprs]-|\d{8,10}:[\w-]{35}|AKIA|AIza|Bearer\s|://[^\s:/@]+:[^\s@]+@`,
 	jscompat.SpaceClass[1:len(jscompat.SpaceClass)-1]))
 
 func secretPlaceholder(kind string) string { return "[скрыто: " + kind + "]" }
@@ -161,12 +164,53 @@ func redactWalk(v any, found map[string]int, deadline time.Time) any {
 		}
 		return t
 	case map[string]any:
-		for k, item := range t {
-			t[k] = redactWalk(item, found, deadline)
+		// The keys too: a secret can be a key (a map of tokens). Two keys that become the same placeholder are one entry,
+		// their values merged. In the keys' order, so the same event always comes out the same.
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
 		}
-		return t
+		sort.Strings(keys)
+		out := make(map[string]any, len(t))
+		for _, k := range keys {
+			item := redactWalk(t[k], found, deadline)
+			if secretPrefilter.MatchString(k) {
+				k = redactString(k, found, deadline)
+			}
+			if have, ok := out[k]; ok {
+				item = mergeValues(have, item)
+			}
+			out[k] = item
+		}
+		return out
 	}
 	return v
+}
+
+// mergeValues is one value of two that came under the same key: objects merge key by key, a list takes the other's
+// items, anything else becomes a list of both.
+func mergeValues(a, b any) any {
+	am, aok := a.(map[string]any)
+	bm, bok := b.(map[string]any)
+	if aok && bok {
+		for k, v := range bm {
+			if have, ok := am[k]; ok {
+				v = mergeValues(have, v)
+			}
+			am[k] = v
+		}
+		return am
+	}
+	if al, ok := a.([]any); ok {
+		if bl, ok := b.([]any); ok {
+			return append(al, bl...)
+		}
+		return append(al, b)
+	}
+	if bl, ok := b.([]any); ok {
+		return append([]any{a}, bl...)
+	}
+	return []any{a, b}
 }
 
 // RedactSecrets is the event with the secrets cut out of its strings, and which kinds were cut how many times; the

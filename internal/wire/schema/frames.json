@@ -368,7 +368,8 @@
         "hint": {"type": "string"},
         "efforts": {"type": "array", "items": {"$ref": "#/$defs/Effort"}},
         "defaultEffort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
-        "ultracode": {"type": "boolean"}
+        "ultracode": {"type": "boolean"},
+        "fast": {"type": "boolean"}
       }
     },
     "MachineAgent": {
@@ -381,6 +382,7 @@
         "status": {"$ref": "#/$defs/AgentInstallStatus"},
         "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}},
         "canSwitchModel": {"type": "boolean"},
+        "defaultPermission": {"$ref": "#/$defs/PermissionMode"},
         "profiles": {"type": "array", "items": {"$ref": "#/$defs/ProfileOffer"}}
       }
     },
@@ -1308,9 +1310,12 @@
         "id": {"type": "string", "minLength": 1},
         "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
         "ultracode": {"type": "boolean"},
+        "fast": {"type": "boolean"},
+        "permission": {"$ref": "#/$defs/PermissionMode"},
         "profile": {"$ref": "#/$defs/ProfileId"}
       }
     },
+    "PermissionMode": {"enum": ["plan", "ask", "bypass"]},
     "PendingModel": {
       "type": "object",
       "required": ["id", "effort", "since", "applying"],
@@ -1319,6 +1324,8 @@
         "id": {"type": "string", "minLength": 1},
         "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
         "ultracode": {"type": "boolean"},
+        "fast": {"type": "boolean"},
+        "permission": {"$ref": "#/$defs/PermissionMode"},
         "since": {"type": "integer", "minimum": 0},
         "applying": {"type": "boolean"}
       }
@@ -2999,7 +3006,9 @@
         "id": {"$ref": "#/$defs/ConvId"},
         "model": {"type": "string", "minLength": 1},
         "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
-        "ultracode": {"type": "boolean"}
+        "ultracode": {"type": "boolean"},
+        "fast": {"type": "boolean"},
+        "permission": {"$ref": "#/$defs/PermissionMode"}
       }
     },
     "Cmd_bg_stop": {

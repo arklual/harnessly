@@ -375,5 +375,44 @@ func (s *Store) TabLaunch(tab *jsvalue.Object) *jsvalue.Object {
 			out.Set("apps", list)
 		}
 	}
+	if f, ok := l.Get("fast"); ok && f == true {
+		out.Set("fast", true)
+	}
+	if p, ok := l.Get("permission"); ok {
+		if mode, isStr := p.(string); isStr && mode != "" {
+			out.Set("permission", mode)
+		}
+	}
 	return out
+}
+
+// SetTabLaunchModes writes the fast and permission modes a tab's next launch starts in (launch.fast and
+// launch.permission of its metadata), keeping the rest of the launch; off and "" remove them. A tab with no
+// launch choice gets one of no model and no effort.
+func (s *Store) SetTabLaunchModes(sessionName string, fast bool, permission string) error {
+	return s.mutateTab(sessionName, func(tab *jsvalue.Object) bool {
+		meta := tab.Object(s.cfg.MetaKey)
+		var launch *jsvalue.Object
+		if meta != nil && meta.Object("launch") != nil {
+			launch = jsvalue.Clone(meta.Object("launch")).(*jsvalue.Object)
+		} else {
+			launch = jsvalue.NewObject("model", nil, "effort", nil)
+		}
+		if fast {
+			launch.Set("fast", true)
+		} else {
+			launch.Delete("fast")
+		}
+		if permission != "" {
+			launch.Set("permission", permission)
+		} else {
+			launch.Delete("permission")
+		}
+		next, changed := MergeMeta(meta, jsvalue.NewObject("launch", launch))
+		if !changed {
+			return false
+		}
+		tab.Set(s.cfg.MetaKey, next)
+		return true
+	})
 }

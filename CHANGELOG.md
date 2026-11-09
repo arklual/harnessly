@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Heavy checks share the machine: launchers named `go`, `vitest`, `playwright`, `tsc`, `eslint` and `npx` on the agents'
+- Heavy checks share the machine: launchers named `go`, `vitest`, `playwright`, `tsc`, `eslint`, `npx`, `npm` and `pnpm` on the agents'
   `PATH` run builds, tests, type checks and linters through `harnessly heavy`, which gives them one of the machine's
   few slots (by its cores), runs them gently and, when the machine stays busy, tells the agent to go on without the check
   (exit 75). `harnessly heavy stats` counts the calls that waited and were refused; the workspace prompt asks agents

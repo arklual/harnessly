@@ -13,6 +13,37 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-09s',
+    items: [
+      { key: 'smartNotice', icon: 'bell' },
+      { key: 'gestures', icon: 'command' },
+      { key: 'machine', icon: 'gauge' },
+    ],
+  },
+  {
+    id: '2026-11-09r',
+    items: [{ key: 'appStart', icon: 'app-window' }],
+  },
+  {
+    id: '2026-11-09q',
+    items: [{ key: 'authorPath', icon: 'blocks' }],
+  },
+  {
+    id: '2026-11-09p',
+    items: [{ key: 'appSignIn', icon: 'log-in' }],
+  },
+  {
+    id: '2026-11-09n',
+    items: [{ key: 'sinopiaNotes', icon: 'square-dashed-mouse-pointer' }],
+  },
+  {
+    id: '2026-11-09m',
+    items: [
+      { key: 'feedNotes', icon: 'message-square-text' },
+      { key: 'feedNotesSend', icon: 'send' },
+    ],
+  },
+  {
     id: '2026-11-09k',
     items: [
       { key: 'kitCanvas', icon: 'palette' },

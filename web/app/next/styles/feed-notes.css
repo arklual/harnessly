@@ -1,0 +1,21 @@
+/* The annotations of the chat's feed (features/chat/selbar.tsx): the marks over the agent's answers stand in a layer as
+   big as the window, each at its --x, --y (ui/notes/notes.tsx draws them); the marked words wear a soft highlight;
+   the bar «Аннотирование · N» stands over the field, in the dock. */
+.hx-fnotes {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.hx-fnotes .hx-note__row {
+  width: min(280px, calc(100vw - 16px));
+}
+::highlight(hx-feed-note) {
+  background-color: var(--hx-accent-soft);
+}
+.hx-fnotes__bar {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto var(--hx-space-2);
+}

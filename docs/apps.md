@@ -109,12 +109,12 @@ are served; nothing else of the package is.
 
 ### `@harnessly/app-sdk`
 
-One dependency-free file the runtime serves to every view at `/__hl/app-sdk.js` as a classic script (the same code as an ES module is at `/__hl/app-sdk.mjs`, for a bundler; a module script cannot carry the slot's cookie from an opaque origin). Types: `/__hl/app-sdk.d.ts`:
+One dependency-free file the runtime serves to every view at `/__hl/app-sdk.js` as a classic script (the same code as an ES module is at `/__hl/app-sdk.mjs` and in the npm package `@harnessly/app-sdk`, for a bundler). Types: `/__hl/app-sdk.d.ts`:
 
 ```html
 <script src="/__hl/app-sdk.js"></script>           <!-- a classic script: window.harnessly -->
 <script>
-  harnessly.connect().then(async (hl) => {         // rejects with host_unavailable outside Harnessly
+  harnessly.connect({ protocol: 2 }).then(async (hl) => {  // rejects with host_unavailable outside Harnessly; protocol 2: a refused call answers a Refusal
   hl.context                                        // app, target, view, theme, locale, chat, user, readOnly, data (a card)
   await hl.chat.send('Make a draft')
   await hl.storage.install.set('last', { id: 7 })
@@ -136,9 +136,10 @@ One dependency-free file the runtime serves to every view at `/__hl/app-sdk.js` 
 | `hl.ui.toast/confirm`, `hl.notify(text)` | `notify` for the last | A notice, a question, a message to the person |
 | `hl.resize(height)` | none | The height of a card (sent by itself for cards) |
 
-**Classic scripts only.** A view's frame has an opaque origin, which sends the slot's cookie with classic scripts, stylesheets
-and images but not with module scripts or CORS-mode loads (`fetch` without credentials, fonts), so those come back 401. Load
-the SDK with `<script src="/__hl/app-sdk.js">`, ship data as a script that sets a global, and keep the code in classic files.
+**Addresses are relative.** A view's frame has an opaque origin and is served with its session in the path, so module scripts, `fetch`
+of its own files and fonts load (host 0.16.198 and later) as long as every address is relative to the page; one from the root
+(`/assets/app.js`) leaves the session out and comes back 401 (`validate` warns). Load the SDK with `<script src="/__hl/app-sdk.js">` or,
+for a bundler, import `@harnessly/app-sdk` (the same code and its types).
 
 A refusal is a `HarnesslyError` with a `code`: `permission_denied`, `not_in_target`, `policy_blocked`, `network_denied`,
 `rate_limited` (60 calls a second), `host_unavailable`, `invalid_params`.
@@ -219,7 +220,7 @@ needs the right `tools.page` and registers each tool with `hl.tools.register` or
 `navigator.modelContext.registerTool` (the SDK provides it in the view):
 
 ```js
-const hl = await harnessly.connect();
+const hl = await harnessly.connect({ protocol: 2 });
 navigator.modelContext.registerTool({
   name: 'fill_order',
   description: 'Fill the order form with a customer and items',

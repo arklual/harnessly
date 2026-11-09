@@ -12,12 +12,29 @@ export type HarnesslyErrorCode =
   | 'host_unavailable'
   | 'invalid_params'
   | 'conflict'
-  | 'quota_exceeded';
+  | 'quota_exceeded'
+  | 'auth_required'
+  | 'auth_expired'
+  | 'auth_denied'
+  | 'idp_unreachable';
+
+/**
+ * Where a refused sign-in is mended (`auth_required`, `auth_expired`): the person's connection the server goes through,
+ * or the app's own server the host signs in to. The host shows «Войти» on it; a view cannot sign in by itself and never
+ * sees a token.
+ */
+export interface SignInHint {
+  connection?: string;
+  app?: string;
+  server?: string;
+}
 
 export class HarnesslyError extends Error {
   readonly code: HarnesslyErrorCode;
   /** For `conflict`: the version the key has now. */
   readonly version?: number;
+  /** For `auth_required` and `auth_expired`: where the person signs in. */
+  readonly signIn?: SignInHint;
   constructor(code: HarnesslyErrorCode, message?: string);
 }
 
@@ -31,6 +48,7 @@ export interface Refusal {
   code: HarnesslyErrorCode;
   message: string;
   version?: number;
+  signIn?: SignInHint;
 }
 
 export type StorageScope = 'install' | 'user' | 'chat' | 'space' | 'doc';

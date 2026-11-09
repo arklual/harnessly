@@ -62,6 +62,12 @@ type Launcher interface {
 	Resume(conv wire.Conversation) error
 }
 
+// ModeKeeper is a Launcher that keeps the fast and permission modes a chat last ran in on its tab, so the
+// next start of its agent, the runtime's own resume at startup too, starts in them again.
+type ModeKeeper interface {
+	KeepModes(session string, fast bool, permission wire.PermissionMode)
+}
+
 // LaunchRequest is a conversation to start.
 type LaunchRequest struct {
 	ID       string

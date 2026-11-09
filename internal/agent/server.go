@@ -60,6 +60,10 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 		a.appsEventRoute(w, r)
 		return
 	}
+	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == AppTokenRoute {
+		a.appTokenRoute(w, r)
+		return
+	}
 	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == SafeRoute {
 		a.safeRoute(w, r)
 		return

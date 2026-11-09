@@ -161,6 +161,7 @@ func tabLaunch(o *jsvalue.Object) *agents.Launch {
 		l.Profile, _ = p.(string)
 	}
 	l.Apps = AppsOf(o)
+	l.Fast, l.Permission = ModesOf(o)
 	return l
 }
 

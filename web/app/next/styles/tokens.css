@@ -197,3 +197,19 @@ html[data-theme='dark'],
     --hx-text-lg: 17px;
   }
 }
+
+/* The black material: the smart notice and all that pops over the interface («Что нового», the pills at the top,
+   toasts, the tour's hints). Black in both themes, as Apple's (HRN-884). */
+:root {
+  --hx-ink-bg: #000;
+  --hx-ink-fg: #fff;
+  --hx-ink-fg2: rgba(255, 255, 255, 0.64);
+  --hx-ink-fg3: rgba(255, 255, 255, 0.44);
+  --hx-ink-fill: rgba(255, 255, 255, 0.08);
+  --hx-ink-fill2: rgba(255, 255, 255, 0.14);
+  --hx-ink-line: rgba(255, 255, 255, 0.08);
+  --hx-ink-focus: rgba(255, 255, 255, 0.85);
+  --hx-ink-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --hx-ink-spring: cubic-bezier(0.34, 1.26, 0.64, 1);
+}

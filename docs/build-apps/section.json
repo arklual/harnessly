@@ -4,6 +4,7 @@
   "order": 70,
   "pages": [
     "README.md",
+    "00-five-minutes.md",
     "01-first-plugin.md",
     "02-views.md",
     "03-backend.md",
@@ -13,6 +14,7 @@
     "07-sharing.md",
     "08-worked-example.md",
     "09-compatibility.md",
+    "10-auth.md",
     "../apps.md",
     "../apps/reference.md"
   ]

@@ -41,3 +41,23 @@ func TestDesignProblems(t *testing.T) {
 		t.Fatalf("got\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// An address from the root misses the session in the view's path: warned in the view's own folder, not for the host's /__hl/.
+func TestDesignProblemsRootAddress(t *testing.T) {
+	dir := t.TempDir()
+	for rel, text := range map[string]string{
+		"ui/index.html": "<link rel=\"stylesheet\" href=\"/__hl/hl-ui.css\">\n<script type=\"module\" crossorigin src=\"/assets/index.js\"></script>\n",
+		"ui/ok.html":    "<script src=\"/__hl/app-sdk.js\"></script><script type=\"module\" src=\"./assets/index.js\"></script><a href=\"#x\">x</a>\n",
+		"index.html":    "<script type=\"module\" src=\"/src/main.tsx\"></script>\n",
+	} {
+		p := filepath.Join(dir, rel)
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := DesignProblems(dir)
+	if len(got) != 1 || got[0].Path != "ui/index.html:2" || !strings.Contains(got[0].Message, "base: './'") {
+		t.Fatalf("got %v", got)
+	}
+}

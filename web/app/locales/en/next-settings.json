@@ -275,7 +275,7 @@
   "next.settings.general.topTabs": "Tabs on top",
   "next.settings.general.topTabs.hint": "Open chats, designs and pages stay as tabs above the window",
   "next.settings.general.paneAuto": "Open what the agent works on",
-  "next.settings.general.paneAuto.hint": "A design, document or board the agent works on opens in the right pane by itself",
+  "next.settings.general.paneAuto.hint": "A design, document or board the agent works on is added as a tab of the right pane; the pane itself does not come out",
   "next.settings.links": "Links from the chat",
   "next.settings.links.foot": "Links to these sites open in the pane on the right, any other in a new tab of the browser. ⌘ or Ctrl with a click always opens the browser. The list is kept in this browser",
   "next.settings.links.reset": "Back to the installation's list",

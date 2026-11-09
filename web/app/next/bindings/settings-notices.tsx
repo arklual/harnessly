@@ -1,8 +1,14 @@
 // Settings → Notifications on the browser's own switches (stores/notices.ts) and its permission for notifications of
-// the system, asked when the person turns that switch on; «Показать пример» puts a sample card in the pile.
+// the system, asked when the person turns that switch on; «Показать» puts a sample on the smart notice's place,
+// «Послушать» plays a sound.
 import { useState } from 'react';
 import NoticesSection from '@/next/features/settings/notices-section';
-import { SYSTEM_PERMISSION, askSystemPermission, systemPermission } from '@/next/features/notifications/ping';
+import {
+  SYSTEM_PERMISSION,
+  askSystemPermission,
+  playSound,
+  systemPermission,
+} from '@/next/features/notifications/ping';
 import { t } from '@/next/i18n';
 import { pushNotice, SAMPLE_CHAT, setNotify, useNotify } from '@/next/stores/notices';
 
@@ -28,9 +34,10 @@ export const NoticesPage = () => {
       permission={permission}
       onKind={(kind, on) => setNotify({ kinds: { [kind]: on } })}
       onSound={(sound) => setNotify({ sound })}
+      onSoundOf={(sound, on) => setNotify({ sounds: { [sound]: on } })}
+      onListen={playSound}
       onCards={(cards) => setNotify({ cards })}
       onPlace={(place) => setNotify({ place })}
-      onHideAfter={(hideAfter) => setNotify({ hideAfter })}
       onSample={showSample}
       onSystem={(on) => {
         if (!on) {

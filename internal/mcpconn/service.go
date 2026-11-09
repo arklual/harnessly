@@ -158,7 +158,7 @@ func (s *Service) Enabled() []Server {
 	if err != nil {
 		return nil
 	}
-	return slices.DeleteFunc(list, func(srv Server) bool { return !srv.Enabled || srv.State == StateSignIn })
+	return slices.DeleteFunc(list, func(srv Server) bool { return !srv.Enabled || srv.State == StateSignIn || srv.Owner != "" })
 }
 
 // Catalog is the well-known servers the page offers.
@@ -183,6 +183,8 @@ type AddInput struct {
 	// Transport is a hint: SSE tries the legacy transport first. The probe decides.
 	Transport Transport    `json:"transport,omitempty"`
 	Header    *HeaderInput `json:"header,omitempty"`
+	// Owner makes the server one app's own sign-in (Server.Owner); the runtime sets it, a request body cannot.
+	Owner string `json:"-"`
 }
 
 // AuthStart says what the page asks next after Add: an OAuth sign-in (StartSignIn) or a header (SetHeader).
@@ -213,6 +215,23 @@ func authStart(srv Server) *AuthStart {
 	return a
 }
 
+// ByOwner is the sign-in kept for one app's server (Server.Owner), if any.
+func (s *Service) ByOwner(owner string) (Server, bool) {
+	if owner == "" {
+		return Server{}, false
+	}
+	list, err := s.List()
+	if err != nil {
+		return Server{}, false
+	}
+	for _, srv := range list {
+		if srv.Owner == owner {
+			return srv, true
+		}
+	}
+	return Server{}, false
+}
+
 // Add probes a server and keeps it. A server without auth (or with the header given) is checked at once; an OAuth one
 // is kept in state "signin" and AuthStart says so. A typed header that the server refuses is ErrDenied and nothing is
 // kept. Adding a URL that is already connected answers that server.
@@ -233,7 +252,7 @@ func (s *Service) Add(ctx context.Context, in AddInput) (Server, *AuthStart, err
 	}
 	if list, err := s.List(); err == nil {
 		for _, srv := range list {
-			if srv.URL == canon {
+			if srv.URL == canon && srv.Owner == in.Owner {
 				return srv, authStart(srv), nil
 			}
 		}
@@ -258,7 +277,8 @@ func (s *Service) Add(ctx context.Context, in AddInput) (Server, *AuthStart, err
 		HeaderName:       p.HeaderName,
 		OAuthUnavailable: p.OAuthUnavailable,
 		CatalogID:        in.CatalogID,
-		Enabled:          true,
+		Owner:            in.Owner,
+		Enabled:          in.Owner == "",
 		State:            StateSignIn,
 		CreatedAt:        s.now().UTC(),
 	}

@@ -32,6 +32,7 @@ import PlusMenu, {
 import type { IStash } from '@/next/features/composer/stash-list';
 import { RefChips, type IRefChip } from '@/next/features/chat/ref-chips';
 import { AnnotationChips } from '@/next/features/composer/annotation-chips';
+import { NoteChips, type INoteChipGroup } from '@/next/ui/notes/note-chips';
 import type { IAnnotation } from '@/next/features/pane/annotations';
 import { usePromptHistory } from '@/next/features/composer/prompt-history';
 import { useSlashPalette, type ISlashSource } from '@/next/features/composer/slash-palette';
@@ -149,6 +150,10 @@ export interface IComposerProps {
   notes?: readonly IAnnotation[];
   onEditNote?: (id: string, comment: string) => void;
   onRemoveNote?: (id: string) => void;
+  /** Annotations as numbered chips, a group each (the feed's words, a design's blocks); a press shows the annotated. */
+  noteGroups?: readonly INoteChipGroup[];
+  /** Filled with the field's own send (Enter's), for a host's button that sends what the field holds. */
+  sendRef?: RefObject<(() => void) | null>;
   /** What «+» can attach besides files; without it only files, prompts and contexts. */
   attach?: IPlusAttach | null;
   /** Drafts put aside («Отложить черновик», ⌘⇧S); without it the field has no such thing. */
@@ -345,6 +350,7 @@ const Composer = (props: IComposerProps) => {
     (props.quotes?.length ?? 0) > 0 ||
     (props.refs?.length ?? 0) > 0 ||
     (props.notes?.length ?? 0) > 0 ||
+    (props.noteGroups ?? []).some((group) => group.notes.length > 0) ||
     attachments.some((file) => file.status !== 'error');
   const canSend = hasContent && !tooLong && !failedFile;
   const working = mode === 'working';
@@ -378,6 +384,14 @@ const Composer = (props: IComposerProps) => {
   const submit = (sendMode: TSendMode) => {
     if (canSend) send(sendMode);
   };
+  const { sendRef } = props;
+  useEffect(() => {
+    if (!sendRef) return;
+    sendRef.current = () => submit('queue');
+    return () => {
+      sendRef.current = null;
+    };
+  });
 
   // The dictation counts every text it fixed in the field; «stop and send» goes once the next one is there. A recording
   // that ends otherwise (cancelled, failed, silent) sends nothing.
@@ -516,6 +530,15 @@ const Composer = (props: IComposerProps) => {
             </span>
           ))}
           {props.refs && <RefChips refs={props.refs} onRemove={props.onRemoveRef} />}
+          {props.noteGroups?.map((group) => (
+            <NoteChips
+              key={group.key}
+              notes={group.notes}
+              onEdit={group.onEdit}
+              onRemove={group.onRemove}
+              onOpen={group.onOpen}
+            />
+          ))}
           {props.notes && props.onEditNote && props.onRemoveNote && (
             <AnnotationChips notes={props.notes} onEdit={props.onEditNote} onRemove={props.onRemoveNote} />
           )}

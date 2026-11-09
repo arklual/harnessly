@@ -249,6 +249,15 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     gets it from `--settings` (the `ultracode` key: Claude Code never saves it), and one resumed gets it typed again,
     since a new process starts without it. Effort `ultracode` of before is read as `{effort: xhigh, ultracode: true}`:
     what `--effort ultracode` ran.
+33b. **Fast and permission modes.** `models[].fast: true` marks the models with a fast mode (Claude's Opus,
+    Codex models with a fast service tier); `machine.agents[].defaultPermission` is the mode a chat starts in when it
+    names none. `Model`, `pendingModel` and `model` carry `fast` (absent is off; in `model`, absent keeps it) and
+    `permission`: `plan`, `ask` or `bypass` (absent: the machine's default). A new chat starts in them: Claude with
+    `--permission-mode plan|default|bypassPermissions` and `fastMode` in its `--settings`, Codex with sandbox and
+    approval flags and `service_tier`. A running Claude takes them like ultracode: `/fast on|off`, then shift+tab round
+    its footer for plan↔ask; a change with bypass on either side, or from a chat that never said its mode, stops the
+    terminal and resumes the agent on its session in the new mode. Fast on a model without it or on a vendor profile is
+    `refused{option-unknown}`; Codex chats keep their modes until they are resumed.
 
 ## Background, closing, projects
 

@@ -847,13 +847,6 @@
   "next.site.placeholderIslandPlain": "Опишите правку",
   "next.notes.dialog": "Пометка",
   "next.notes.placeholder": "Что здесь поправить?",
-  "next.notes.count": {
-    "one": "{n} правка",
-    "few": "{n} правки",
-    "many": "{n} правок",
-    "other": "{n} правки"
-  },
-  "next.notes.hint": "Нажмите на блок на странице",
   "next.notes.send": "Отправить агенту",
   "next.notes.remove": "Убрать",
   "next.notes.pick": "Выделить на странице",
@@ -867,7 +860,6 @@
   "next.site.openSite": "Открыть сайт",
   "next.notes.revert": "Отменить",
   "next.notes.delete": "Удалить аннотацию",
-  "next.notes.deleteTip": "Удалить",
   "next.notes.toMessage": "В сообщение",
   "next.notes.dictate": "Надиктовать",
   "next.notes.pin": "Пометка {n}: {label}",
@@ -892,6 +884,7 @@
   "next.notes.styleDiff.background": "Фон → {value}",
   "next.notes.styleDiff.radius": "Скругление → {value} px",
   "next.notes.styleDiff.opacity": "Непрозрачность → {value}%",
+  "next.notes.styleFact": "Правки",
   "next.site.askWith": {
     "one": "Спросить агента · {n} аннотация",
     "few": "Спросить агента · {n} аннотации",

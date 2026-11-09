@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agentstate"
+	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -39,7 +41,8 @@ func (c *conv) model(m wire.ModelCmd, finish func(wire.CmdResult), now time.Time
 	// A conversation on a vendor profile names the profile's models, which may be «vendor/model»; modelFits then
 	// holds them to the profile's own list.
 	onProfile := c.rec.Model != nil && c.rec.Model.Profile != ""
-	if !modelIDRe.MatchString(m.Model) && !(onProfile && agents.IsProfileModelID(m.Model)) {
+	if !modelIDRe.MatchString(m.Model) && !(onProfile && agents.IsProfileModelID(m.Model)) ||
+		m.Permission != nil && !m.Permission.Known() {
 		finish(wire.Refused(wire.RefuseBadRequest))
 		return
 	}
@@ -72,12 +75,13 @@ func (c *conv) model(m wire.ModelCmd, finish func(wire.CmdResult), now time.Time
 
 // modelDiff is which of the commands a change needs, against the model on record.
 type modelDiff struct {
-	model, effort, ultracode bool
-	// ultracodeOn is the mode the change asks for (whether it is to be typed or not).
-	ultracodeOn bool
+	model, effort, ultracode, fast, permission bool
+	// ultracodeOn, fastOn and permissionTo are the modes the change asks for (whether they are to be typed or not).
+	ultracodeOn, fastOn bool
+	permissionTo        wire.PermissionMode
 }
 
-func (d modelDiff) any() bool { return d.model || d.effort || d.ultracode }
+func (d modelDiff) any() bool { return d.model || d.effort || d.ultracode || d.fast || d.permission }
 
 // modelDiff says which of the commands the change needs, against the model on record. A model switch leaves the
 // ultracode mode as it was in Claude Code: it is typed only when the ask turns it the other way.
@@ -86,9 +90,18 @@ func (c *conv) modelDiff(m wire.ModelCmd) modelDiff {
 	if cur := c.rec.Model; cur != nil {
 		curModel, curEffort, curUltra = cur.ID, cur.Effort, cur.Ultracode
 	}
-	d := modelDiff{model: m.Model != curModel, ultracodeOn: m.UltracodeAfter(c.rec.Model)}
+	d := modelDiff{model: m.Model != curModel, ultracodeOn: m.UltracodeAfter(c.rec.Model),
+		fastOn: m.FastAfter(c.rec.Model), permissionTo: m.PermissionAfter(c.rec.Model)}
 	d.effort = m.Effort != nil && (d.model || curEffort == nil || *curEffort != *m.Effort)
 	d.ultracode = d.ultracodeOn != curUltra
+	// Fast mode and the permission mode are typed when the ask turns them; a permission mode of "" is the
+	// machine's default and is never typed.
+	curFast, curPermission := false, wire.PermissionMode("")
+	if cur := c.rec.Model; cur != nil {
+		curFast, curPermission = cur.Fast, cur.Permission
+	}
+	d.fast = d.fastOn != curFast
+	d.permission = d.permissionTo != "" && d.permissionTo != curPermission
 	return d
 }
 
@@ -104,7 +117,8 @@ func (c *conv) canSwitchNow() bool {
 
 // queueModel keeps the change until the agent can take it.
 func (c *conv) queueModel(m wire.ModelCmd, now time.Time) {
-	c.rec.PendingModel = &wire.PendingModel{ID: m.Model, Effort: m.Effort, Ultracode: m.UltracodeAfter(c.rec.Model), Since: ms(now)}
+	c.rec.PendingModel = &wire.PendingModel{ID: m.Model, Effort: m.Effort, Ultracode: m.UltracodeAfter(c.rec.Model),
+		Fast: m.FastAfter(c.rec.Model), Permission: m.PermissionAfter(c.rec.Model), Since: ms(now)}
 	c.pendingTries, c.pendingAt = 0, time.Time{}
 	c.touch()
 }
@@ -141,8 +155,12 @@ func (c *conv) applyPending(now time.Time) bool {
 	if !c.canSwitchNow() {
 		return false
 	}
-	ultra := p.Ultracode
-	m := wire.ModelCmd{ID: c.rec.ID, Model: p.ID, Effort: p.Effort, Ultracode: &ultra}
+	ultra, fast := p.Ultracode, p.Fast
+	m := wire.ModelCmd{ID: c.rec.ID, Model: p.ID, Effort: p.Effort, Ultracode: &ultra, Fast: &fast}
+	if p.Permission != "" {
+		permission := p.Permission
+		m.Permission = &permission
+	}
 	diff := c.modelDiff(m)
 	if !diff.any() {
 		c.dropPending()
@@ -181,7 +199,7 @@ func (c *conv) applyPending(now time.Time) bool {
 func (c *conv) refusedPending(p wire.PendingModel, err error, now time.Time) {
 	c.dropPending()
 	code := modelRefusal(err)
-	to := wire.Model{ID: p.ID, Effort: p.Effort, Ultracode: p.Ultracode}
+	to := wire.Model{ID: p.ID, Effort: p.Effort, Ultracode: p.Ultracode, Fast: p.Fast, Permission: p.Permission}
 	if c.rec.Model != nil {
 		to.Profile = c.rec.Model.Profile
 	}
@@ -197,6 +215,15 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 		return
 	}
 	session, clock := c.rec.Session, c.d.Clock
+	// A permission mode shift+tab cannot reach truthfully is the restart's, after what is typed (restartInMode).
+	restart := diff.permission && c.permissionNeedsRestart(diff.permissionTo)
+	if restart {
+		if !c.canRestart() {
+			done(errNoRestart, c.d.Clock.Now())
+			return
+		}
+		diff.permission = false
+	}
 	c.switching = true
 	from := c.rec.Model
 	c.spawn(func() any {
@@ -223,6 +250,18 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 			}
 			took.ultracode = true
 		}
+		if diff.fast {
+			if err := typist.SetFast(pane, clock, diff.fastOn); err != nil {
+				return took.failed(err)
+			}
+			took.fast = true
+		}
+		if diff.permission {
+			if err := typist.SetPermissionMode(pane, clock, claudeMode[diff.permissionTo]); err != nil {
+				return took.failed(err)
+			}
+			took.permission = true
+		}
 		return took
 	}, func(r any) {
 		c.switching = false
@@ -231,14 +270,90 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 		took, _ := r.(modelTook)
 		if to := took.on(from, m, diff); to != nil {
 			c.applied(to, now)
+			if k, ok := c.d.Launcher.(ModeKeeper); ok && (took.fast || took.permission) {
+				k.KeepModes(c.rec.Session, to.Fast && to.Profile == "", to.Permission)
+			}
 		}
 		err := took.err
 		if err != nil {
 			c.d.Log.Warn("model not switched", "conv", c.rec.ID, "err", err)
 		}
+		if err == nil && restart {
+			c.restartInMode(diff.permissionTo, func(err error, now time.Time) {
+				if err != nil {
+					c.d.Log.Warn("permission mode not switched", "conv", c.rec.ID, "err", err)
+				}
+				done(err, now)
+				c.read(now)
+				c.pump(now)
+			})
+			return
+		}
 		done(err, now)
 		c.read(now)
 		c.pump(now)
+	})
+}
+
+// errNoRestart: the chat's agent cannot be started again here (no terminals or launcher of the runtime's own, no session
+// to resume on).
+var errNoRestart = errors.New("convo: the agent cannot be restarted in another permission mode")
+
+// permissionNeedsRestart: shift+tab cannot turn the running Claude to the mode truthfully. Its cycle has bypass only in
+// a Claude started with it, and in one started with it the other modes do not ask («Session was started with bypass
+// permissions, so plan mode won't ask…», Claude Code 2.1.319). Plan and ask go round from one to the other; anything
+// with bypass on either side, or a chat that never said its mode (started on the machine's default), is restarted.
+func (c *conv) permissionNeedsRestart(to wire.PermissionMode) bool {
+	cur := wire.PermissionMode("")
+	if c.rec.Model != nil {
+		cur = c.rec.Model.Permission
+	}
+	return cur == "" || cur == wire.PermissionBypass || to == wire.PermissionBypass
+}
+
+// canRestart: the runtime can stop the chat's terminal and resume its agent on its session.
+func (c *conv) canRestart() bool {
+	return c.d.Terminals != nil && c.d.Launcher != nil && c.rec.Session != "" &&
+		(c.rec.AgentSessionID != "" || c.rec.TranscriptPath != "")
+}
+
+// restartInMode starts the chat's agent again in the permission mode: its terminal is stopped the way an idle
+// one is, under the pane's lock, the record takes the mode, and the agent is resumed on its session at once, with the
+// mode on its launch line (the tab's launch keeps it, Launcher.Resume). The queue waits meanwhile, as for a switch.
+func (c *conv) restartInMode(to wire.PermissionMode, done func(err error, now time.Time)) {
+	if !c.canRestart() {
+		done(errNoRestart, c.d.Clock.Now())
+		return
+	}
+	session, terms := c.rec.Session, c.d.Terminals
+	c.switching = true
+	c.spawn(func() any {
+		if !terms.Owned(session) {
+			return errNotOwned
+		}
+		unlock := typist.Lock(session)
+		defer unlock()
+		_, err := terms.Stop(session)
+		return err
+	}, func(r any) {
+		c.switching = false
+		now := c.d.Clock.Now()
+		if err, _ := r.(error); err != nil {
+			done(err, now)
+			return
+		}
+		c.mark, c.markConvs = 0, 0
+		c.lookSeq++
+		c.looking, c.lookAgain = false, false
+		c.input(agentstate.Input{K: agentstate.Shell, Resumable: true}, now)
+		next := wire.Model{}
+		if c.rec.Model != nil {
+			next = *c.rec.Model
+		}
+		next.Permission = to
+		c.applied(&next, now)
+		c.resume(now)
+		done(nil, now)
 	})
 }
 
@@ -262,8 +377,8 @@ func (c *conv) logSwitch(sw wire.ModelSwitch) {
 
 // modelTook is which steps of a change the agent confirmed, and the error of the first that it did not.
 type modelTook struct {
-	model, effort, ultracode bool
-	err                      error
+	model, effort, ultracode, fast, permission bool
+	err                                        error
 }
 
 func (t modelTook) failed(err error) modelTook {
@@ -273,7 +388,7 @@ func (t modelTook) failed(err error) modelTook {
 
 // on is the model the agent runs after the steps that took, from what it ran; nil when none took.
 func (t modelTook) on(from *wire.Model, m wire.ModelCmd, diff modelDiff) *wire.Model {
-	if !t.model && !t.effort && !t.ultracode {
+	if !t.model && !t.effort && !t.ultracode && !t.fast && !t.permission {
 		return nil
 	}
 	to := wire.Model{}
@@ -290,6 +405,12 @@ func (t modelTook) on(from *wire.Model, m wire.ModelCmd, diff modelDiff) *wire.M
 	if t.ultracode {
 		to.Ultracode = diff.ultracodeOn
 	}
+	if t.fast {
+		to.Fast = diff.fastOn
+	}
+	if t.permission {
+		to.Permission = diff.permissionTo
+	}
 	return &to
 }
 
@@ -302,7 +423,7 @@ func (c *conv) modelFits(m wire.ModelCmd) wire.RefuseCode {
 		}
 		_, _, models, ok := c.d.Profiles.Lookup(cur.Profile)
 		capabilities, known := c.d.Profiles.Model(cur.Profile, m.Model)
-		if !ok || !known || !slices.Contains(models, m.Model) || m.UltracodeAfter(cur) ||
+		if !ok || !known || !slices.Contains(models, m.Model) || m.UltracodeAfter(cur) || m.FastAfter(cur) ||
 			(m.Effort != nil && !slices.Contains(capabilities.Efforts, *m.Effort)) {
 			return wire.RefuseOptionUnknown
 		}
@@ -325,7 +446,17 @@ func (c *conv) modelFits(m wire.ModelCmd) wire.RefuseCode {
 	if m.UltracodeAfter(c.rec.Model) && !list[i].Ultracode {
 		return wire.RefuseOptionUnknown
 	}
+	if m.Fast != nil && *m.Fast && !list[i].Fast {
+		return wire.RefuseOptionUnknown
+	}
 	return ""
+}
+
+// claudeMode is Claude Code's footer name of a permission mode of the picker.
+var claudeMode = map[wire.PermissionMode]string{
+	wire.PermissionPlan:   screen.ClaudeModePlan,
+	wire.PermissionAsk:    screen.ClaudeModeDefault,
+	wire.PermissionBypass: screen.ClaudeModeBypass,
 }
 
 func modelRefusal(err error) wire.RefuseCode {
@@ -336,6 +467,8 @@ func modelRefusal(err error) wire.RefuseCode {
 		return wire.RefuseConflict
 	case errors.Is(err, typist.ErrCommandRefused):
 		return wire.RefuseOptionUnknown
+	case errors.Is(err, errNoRestart), errors.Is(err, errNotOwned):
+		return wire.RefuseUnsupported
 	}
 	return wire.RefuseInternal
 }

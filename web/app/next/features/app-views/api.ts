@@ -14,6 +14,7 @@ import type {
 import {
   BridgeError,
   isBridgeCode,
+  readSignIn,
   type TFilesOp,
   type TGitOp,
   type TRunOp,
@@ -237,6 +238,17 @@ export interface IInstalledApps {
 export const setSafeMode = (m: MachineId, on: boolean): Promise<unknown> =>
   runtimeJson(m, platformPath('/apps/safe-mode'), postJson({ on }));
 
+/**
+ * «Войти» of an app whose server signs in by OAuth (auth: oauth, error.signIn {app, server}): the connection the sign-in
+ * goes through (POST /apps/signin). The page then runs the connections' own sign-in for that id in a top-level popup.
+ */
+export const appSignInConnection = (
+  m: MachineId,
+  app: string,
+  server: string,
+): Promise<{ connection: string }> =>
+  runtimeJson<{ connection: string }>(m, platformPath('/apps/signin'), postJson({ app, server }));
+
 export const loadInstalledApps = (m: MachineId): Promise<IInstalledApps> =>
   runtimeJson<IInstalledApps>(m, platformPath('/installed-apps'));
 
@@ -246,10 +258,15 @@ const asBridgeError = (e: unknown): BridgeError => {
     // A conflict says the version the key has now, which the view needs to read it again and decide.
     const body = typeof e.body === 'object' && e.body !== null ? (e.body as Record<string, unknown>) : {};
     const text = typeof body.message === 'string' ? body.message : e.message;
+    const signIn = readSignIn(body.signIn);
+    const extra = {
+      ...(typeof body.version === 'number' ? { version: body.version } : {}),
+      ...(signIn ? { signIn } : {}),
+    };
     return new BridgeError(
       isBridgeCode(e.message) ? e.message : 'host_unavailable',
       text,
-      typeof body.version === 'number' ? { version: body.version } : undefined,
+      Object.keys(extra).length > 0 ? extra : undefined,
     );
   }
   return new BridgeError('host_unavailable', e instanceof Error ? e.message : undefined);

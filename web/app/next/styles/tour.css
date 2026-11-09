@@ -45,15 +45,30 @@
   width: 300px;
   max-width: calc(100vw - 24px);
   box-sizing: border-box;
-  padding: var(--hx-space-4);
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-lg);
-  background: var(--hx-bg-raised);
-  box-shadow: var(--hx-shadow-overlay);
+  /* The black material: the card's own tokens, so what is in it (its buttons too) turns white on black. */
+  --hx-fg-1: var(--hx-ink-fg);
+  --hx-fg-2: var(--hx-ink-fg2);
+  --hx-fg-3: var(--hx-ink-fg3);
+  --hx-bg-app: var(--hx-ink-bg);
+  --hx-bg-raised: var(--hx-ink-bg);
+  --hx-bg-hover: var(--hx-ink-fill);
+  --hx-border: var(--hx-ink-line);
+  --hx-border-strong: var(--hx-ink-fill2);
+  --hx-accent: var(--hx-ink-fg);
+  --hx-accent-soft: var(--hx-ink-fill2);
+  --hx-focus: var(--hx-ink-focus);
+  --hx-primary: var(--hx-ink-fg);
+  --hx-primary-fg: var(--hx-ink-bg);
+  padding: 14px 14px 12px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: var(--hx-ink-bg);
+  box-shadow: var(--hx-ink-shadow);
+  color: var(--hx-ink-fg);
   transform: translate(var(--tour-x, 0), var(--tour-y, 0));
   transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
   pointer-events: auto;
-  animation: hx-tour-in 0.22s ease-out;
+  animation: hx-tour-in 0.42s var(--hx-ink-spring);
 }
 .hx-tour-card[data-state='closing'],
 .hx-tour[data-state='closing'] .hx-tour-card {
@@ -67,7 +82,7 @@
 @keyframes hx-tour-in {
   from {
     opacity: 0;
-    scale: 0.97;
+    scale: 0.85;
   }
 }
 @keyframes hx-tour-out {

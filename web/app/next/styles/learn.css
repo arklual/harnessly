@@ -520,17 +520,32 @@
   z-index: 8980;
   width: min(440px, calc(100vw - 32px));
   box-sizing: border-box;
+  /* The black material: its own tokens, so its buttons turn white on black. */
+  --hx-fg-1: var(--hx-ink-fg);
+  --hx-fg-2: var(--hx-ink-fg2);
+  --hx-fg-3: var(--hx-ink-fg3);
+  --hx-bg-app: var(--hx-ink-bg);
+  --hx-bg-raised: var(--hx-ink-bg);
+  --hx-bg-hover: var(--hx-ink-fill);
+  --hx-border: var(--hx-ink-line);
+  --hx-border-strong: var(--hx-ink-fill2);
+  --hx-accent: var(--hx-ink-fg);
+  --hx-accent-soft: var(--hx-ink-fill2);
+  --hx-focus: var(--hx-ink-focus);
+  --hx-primary: var(--hx-ink-fg);
+  --hx-primary-fg: var(--hx-ink-bg);
   padding: 18px 18px 14px;
-  border: 1px solid var(--hx-border-strong);
-  border-radius: var(--hx-radius-lg);
-  background: radial-gradient(120% 70% at 0% 0%, var(--hx-accent-soft), transparent 60%), var(--hx-bg-raised);
-  box-shadow: var(--hx-shadow-overlay);
-  color: var(--hx-fg-1);
+  border: 1px solid transparent;
+  border-radius: 26px;
+  background: var(--hx-ink-bg);
+  box-shadow: var(--hx-ink-shadow);
+  color: var(--hx-ink-fg);
   transform: translateX(-50%);
-  animation: hx-learn-down 0.52s var(--hx-ease-out) backwards;
+  transform-origin: center top;
+  animation: hx-learn-down 0.46s var(--hx-ink-spring) backwards;
 }
 .hx-learn-hello[data-state='closing'] {
-  animation: hx-learn-up 0.28s ease-in forwards;
+  animation: hx-learn-up 0.28s var(--hx-ease-out) forwards;
   pointer-events: none;
 }
 .hx-learn-hello__x {

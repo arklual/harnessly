@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,7 +30,15 @@ type Stats struct {
 // ReadStats counts the events at or after since.
 func ReadStats(dir string, since time.Time) (Stats, error) {
 	st := Stats{Dir: dir, Since: since.UTC().Format(time.RFC3339), ByTool: map[string]int{}}
-	f, err := openRegular(filepath.Join(dir, "events"), os.O_RDONLY)
+	if _, err := os.Lstat(dir); errors.Is(err, os.ErrNotExist) {
+		return st, nil
+	}
+	root, err := openDir(dir)
+	if err != nil {
+		return st, err
+	}
+	defer root.Close()
+	f, err := openRegular(root, "events", os.O_RDONLY)
 	if errors.Is(err, os.ErrNotExist) {
 		return st, nil
 	}

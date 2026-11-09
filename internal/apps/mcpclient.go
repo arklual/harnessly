@@ -35,7 +35,7 @@ func CallTool(ctx context.Context, srv MCPServer, tool string, args map[string]a
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	c := &mcpConn{url: srv.URL, headers: srv.Headers, http: &http.Client{
+	c := &mcpConn{url: srv.URL, headers: srv.Headers, credentialed: srv.Credentialed, http: &http.Client{
 		Transport: &http.Transport{Proxy: nil, TLSClientConfig: network.tlsConfig(),
 			DialContext: (&net.Dialer{Timeout: 10 * time.Second, Control: dialControl(internal)}).DialContext},
 		CheckRedirect: noRedirects,
@@ -62,8 +62,10 @@ func noRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastR
 type mcpConn struct {
 	url     string
 	headers map[string]string
-	session string
-	http    *http.Client
+	// credentialed: the host filled a credential into the headers (MCPServer.Credentialed).
+	credentialed bool
+	session      string
+	http         *http.Client
 }
 
 // What a view is told of a failed tool call: one of these words. The remote's own error text and the transport's are
@@ -163,6 +165,10 @@ func (c *mcpConn) rpc(ctx context.Context, id int, method string, params any) (j
 	if s := resp.Header.Get("Mcp-Session-Id"); s != "" {
 		c.session = s
 	}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		return nil, authRefusal(resp, c.signedIn())
+	}
 	if resp.StatusCode >= 300 {
 		return nil, &BridgeError{Code: CodeUpstreamError, Message: ToolUnreachable, Detail: fmt.Sprintf("the MCP server answered %d", resp.StatusCode)}
 	}
@@ -187,6 +193,46 @@ func (c *mcpConn) rpc(ctx context.Context, id int, method string, params any) (j
 		return nil, &BridgeError{Code: CodePolicyBlocked, Message: ToolError, Detail: rpc.Error.Message}
 	}
 	return rpc.Result, nil
+}
+
+// signedIn says whether the call carries a credential: an Authorization header, or a header the host filled (an API key
+// header has no fixed name).
+func (c *mcpConn) signedIn() bool {
+	if c.credentialed {
+		return true
+	}
+	for k := range c.headers {
+		if strings.EqualFold(k, "Authorization") {
+			return true
+		}
+	}
+	return false
+}
+
+// What a view is told of a refused sign-in. The server's own words stay in the log.
+const (
+	AuthRequiredMessage   = "the server wants a sign-in: sign in, then repeat the call"
+	AuthExpiredMessage    = "the server no longer takes the sign-in: sign in again, then repeat the call"
+	AuthDeniedMessage     = "the server refuses this to the signed-in person: ask its admin for access"
+	IdPUnreachableMessage = "the sign-in service did not answer: try again later"
+)
+
+// authRefusal maps a 401 or a 403 of an MCP server to the code of a refused sign-in. A 401 to a call that carried a
+// credential is an expired one; to a call without, a missing one. A 403, or a 401 that says insufficient_scope
+// (RFC 6750), is a refusal no new sign-in mends.
+func authRefusal(resp *http.Response, signedIn bool) *BridgeError {
+	detail := fmt.Sprintf("the MCP server answered %d", resp.StatusCode)
+	if wa := resp.Header.Get("WWW-Authenticate"); wa != "" {
+		detail += " (WWW-Authenticate: " + clipHookText(wa, 300) + ")"
+	}
+	wa := strings.ToLower(resp.Header.Get("WWW-Authenticate"))
+	switch {
+	case resp.StatusCode == http.StatusForbidden || strings.Contains(wa, "insufficient_scope"):
+		return &BridgeError{Code: CodeAuthDenied, Message: AuthDeniedMessage, Detail: detail}
+	case signedIn:
+		return &BridgeError{Code: CodeAuthExpired, Message: AuthExpiredMessage, Detail: detail}
+	}
+	return &BridgeError{Code: CodeAuthRequired, Message: AuthRequiredMessage, Detail: detail}
 }
 
 // readAnswer is the JSON-RPC message with the id: the body itself, or the matching event of an event stream.

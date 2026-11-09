@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AnnotationChips, NOTE_EXIT_MS } from '@/next/features/composer/annotation-chips';
+import { AnnotationChips } from '@/next/features/composer/annotation-chips';
+import { NOTE_EXIT_MS } from '@/next/ui/notes/note-chips';
 import type { IAnnotation } from '@/next/features/pane/annotations';
 
 beforeEach(() => vi.useFakeTimers());

@@ -254,6 +254,19 @@ func (d *Dialer) AdmitSecrets(r *http.Request, body []byte) (store.Machine, erro
 	return m, err
 }
 
+// AdmitAppToken checks the signed request of a machine for an app's token (POST /agent/app-token) over its body and
+// returns the machine. Its nonces are kept apart from the dial's and the safe's.
+func (d *Dialer) AdmitAppToken(r *http.Request, body []byte) (store.Machine, error) {
+	verify := func(pub ed25519.PublicKey, a hubproto.DialAuth, host string, now time.Time) error {
+		return hubproto.VerifyAppToken(pub, a, host, now, body)
+	}
+	m, err := d.admit(r, verify, false, "apptoken:")
+	if err == nil && m.DisabledAt != nil {
+		err = errDisabled
+	}
+	return m, err
+}
+
 // AdmitPeers checks the signed request of a machine about messages between machines (POST /agent/peers/send and
 // /agent/peers/directory) and returns the machine. Its nonces are kept apart from the dial's: a chatty machine must not
 // fill the table its own link's dial needs.

@@ -122,7 +122,14 @@ export const startDesignConv = ({
     where: { cwd: dir },
     provider: choice?.provider ?? 'claude',
     ...(choice?.profile ? { profile: choice.profile } : {}),
-    model: choice?.model ? { id: choice.model, effort: choice.effort } : null,
+    model: choice?.model
+      ? {
+          id: choice.model,
+          effort: choice.effort,
+          ...(choice.fast ? { fast: true } : {}),
+          ...(choice.permission ? { permission: choice.permission } : {}),
+        }
+      : null,
     first: { text, attachments },
   });
   if (!created.firstClientId) return null;

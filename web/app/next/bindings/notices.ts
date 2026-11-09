@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { appBasePath } from '@/platform/config';
 import { noticeEventOf } from '@/next/features/notifications/notice-events';
 import {
-  playChime,
+  playSound,
   setIconDot,
   showSystem,
   titleWithCount,
@@ -27,14 +27,17 @@ import {
   setNoticesPerson,
   useNoticeList,
   type INotice,
+  type INotifySettings,
+  type TNoticeSound,
 } from '@/next/stores/notices';
+import type { Conversation } from '@/next/protocol/v2';
 
 /** What the service worker's click and the current interface's links ask for: open this chat (hooks/use-web-push.ts). */
 const OPEN_CONVERSATION_EVENT = 'hl:open-conversation';
 /** The last event a window of this browser chimed for: two windows of the app do not both chime. */
 const PING_KEY = 'hx-notice-ping';
 
-const firstToPing = (key: string): boolean => {
+export const firstToPing = (key: string): boolean => {
   try {
     if (window.localStorage.getItem(PING_KEY) === key) return false;
     window.localStorage.setItem(PING_KEY, key);
@@ -43,6 +46,26 @@ const firstToPing = (key: string): boolean => {
   }
   return true;
 };
+
+/** The sound an event makes: a permission waits now, a question or a plan waits, a turn is ready; a failure is quiet. */
+export const soundOf = (kind: INotice['kind'], conv: Pick<Conversation, 'gate'>): TNoticeSound | null => {
+  if (kind === 'waiting') return conv.gate?.kind === 'permission' ? 'urgent' : 'wait';
+  if (kind === 'done') return 'done';
+  return null;
+};
+
+const LOUDNESS: Record<TNoticeSound, number> = { urgent: 3, wait: 2, done: 1 };
+
+/** Of two sounds the one that says more: «waits now» over «waits» over «ready». */
+export const louder = (a: TNoticeSound | null, b: TNoticeSound | null): TNoticeSound | null => {
+  if (a === null) return b;
+  if (b === null) return a;
+  return LOUDNESS[b] > LOUDNESS[a] ? b : a;
+};
+
+/** Whether this sound is on: the sounds at all and this one. */
+export const soundOn = (settings: INotifySettings, sound: TNoticeSound | null): sound is TNoticeSound =>
+  sound !== null && settings.sound && settings.sounds[sound];
 
 const pageInFront = (): boolean => document.visibilityState === 'visible' && document.hasFocus();
 
@@ -75,6 +98,7 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
     const settings = notifySnapshot();
     const now = new Map<string, string | null>();
     const fresh: INotice[] = [];
+    let sound: TNoticeSound | null = null;
     for (const conv of convs) {
       // The list the browser kept is not what happened: only the machine's own snapshot and what follows it are.
       if (!convsLoadedStore.has(conv.machineId)) continue;
@@ -85,6 +109,7 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
       if (before === undefined || !event || event.key === before) continue;
       if (!settings.kinds[event.kind]) continue;
       if (conv.id === current.current && pageInFront()) continue;
+      sound = louder(sound, soundOf(event.kind, conv));
       fresh.push({
         key: event.key,
         chatId: conv.id,
@@ -100,7 +125,7 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
     const last = fresh[fresh.length - 1];
     if (!last) return;
     if (document.visibilityState === 'visible') {
-      if (settings.sound && firstToPing(last.key)) playChime();
+      if (soundOn(settings, sound) && firstToPing(last.key)) playSound(sound);
       return;
     }
     if (!settings.system) return;

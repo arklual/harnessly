@@ -476,3 +476,52 @@ func TestOpenGitHubChangesInTheGitlabTab(t *testing.T) {
 		t.Errorf("github.com opened natively though the deployment reads another GitHub: %q", tab)
 	}
 }
+
+// every kind of address by its exact pattern, as the chat's chips, the agent's `open` and the runtime's own
+// opening read it. A document (/a/<slug> of the portal, the platform's reader) is never the browser, so it never opens
+// as a stand; a stand is one name under the stands' domain; a dev server a port of this machine.
+func TestEveryKindOfAddressByItsExactPattern(t *testing.T) {
+	tracked := targets
+	tracked.TrackerHosts = []string{"tracker.example.org"}
+	cases := []struct{ kind, in, tab, target string }{
+		{"document", "https://a.example.org/a/plan", "artifacts", "/agents/docs/plan"},
+		{"document", "https://a.example.org/a/plan/", "artifacts", "/agents/docs/plan"},
+		{"document", "https://a.example.org/a/plan?v=2#part", "artifacts", "/agents/docs/plan"},
+		{"document", "https://A.Example.org/a/plan", "artifacts", "/agents/docs/plan"},
+		{"document", "https://ai.example.org/agents/docs/plan", "artifacts", "/agents/docs/plan"},
+		{"document", "https://ai.example.org/agents/docs/plan/", "artifacts", "/agents/docs/plan"},
+		{"document", "/agents/docs/plan", "artifacts", "/agents/docs/plan"},
+		{"board", "https://a.example.org/b/flow?k=key1", "artifacts", "https://a.example.org/b/flow?k=key1"},
+		{"board", "https://a.example.org/b/flow", "artifacts", "/agents/docs/flow"},
+		{"stand", "https://stand-1.preview.example.org/adminpanel", "browser", "https://stand-1.preview.example.org/adminpanel"},
+		{"dev server", "http://localhost:4400/x", "browser", "http://localhost:4400/x"},
+		{"merge request", "https://gitlab.example.org/g/p/-/merge_requests/5", "gitlab", "https://gitlab.example.org/g/p/-/merge_requests/5"},
+		{"commit", "https://gitlab.example.org/g/p/-/commit/abcdef1", "gitlab", "https://gitlab.example.org/g/p/-/commit/abcdef1"},
+		{"task", "PROJ-12", "task", "PROJ-12"},
+		{"task", "https://tracker.example.org/issue/DEMO-7", "task", "DEMO-7"},
+		// Not a document: the platform itself, a page under the portal that is no /a/ or /b/ slug.
+		{"site", "https://ai.example.org/agents/chat/1", "browser", "https://ai.example.org/agents/chat/1"},
+		{"site", "https://a.example.org/", "browser", "https://a.example.org/"},
+	}
+	for _, c := range cases {
+		tab, target := tracked.Classify(c.in)
+		if tab != c.tab || target != c.target {
+			t.Errorf("%s %q = %q %q, want %q %q", c.kind, c.in, tab, target, c.tab, c.target)
+		}
+	}
+	// The stand's own rules (portTarget, what `open browser` takes): one label, https, no port, not the pane's slots.
+	for in, want := range map[string]string{
+		"https://stand-1.preview.example.org/adminpanel": "https://stand-1.preview.example.org/adminpanel",
+		"https://a.b.preview.example.org/":               "",
+		"http://stand-1.preview.example.org/":            "",
+		"https://ai-slot.preview.example.org/":           "",
+		"https://auth.preview.example.org/":              "",
+		"https://preview.example.org.evil.io/":           "",
+		"4400":                                           "localhost:4400",
+		"localhost:4400/x":                               "localhost:4400/x",
+	} {
+		if got := targets.portTarget(in); got != want {
+			t.Errorf("portTarget(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

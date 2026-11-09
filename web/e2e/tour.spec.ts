@@ -318,9 +318,9 @@ test('site lesson counts the real actions', async ({ page }) => {
   await site.locator('h1').click();
 
   await expect(title(page)).toHaveText('Напишите, что поменять', { timeout: 10_000 });
-  await expect(page.locator('.hx-ann__input')).toHaveValue('Сделай заголовок короче и ярче');
+  await expect(page.locator('.hx-ann .hx-note__input')).toHaveValue('Сделай заголовок короче и ярче');
   await snap(page, 'note');
-  await page.locator('.hx-ann__ok').click();
+  await page.locator('.hx-ann .hx-note__btn[data-primary]').click();
 
   await expect(title(page)).toHaveText('Отправьте агенту', { timeout: 10_000 });
   await expect(page.locator('.hx-npin')).toHaveCount(1);

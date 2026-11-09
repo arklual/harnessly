@@ -5,15 +5,9 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { fixedPin, placePin, type IAnchorStore } from '@/next/features/designly/note-anchor';
 import { annotationName, numberOf, type IAnnotation } from '@/next/features/pane/annotations';
-import Icon from '@/next/ui/icon';
-import { PRESENCE, useLeavingList, usePresence, usePresentFlag } from '@/next/ui/presence';
+import { NOTE_OUT_MS, NOTE_ROW_H, NOTE_ROW_W, NoteBar, NoteBarButton, NoteMark } from '@/next/ui/notes/notes';
+import { useLeavingList } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
-
-/** The comment row's exit and the bar's, as long as hx-tann-out in tab-annotations.css. */
-export const ANNOTATION_OUT_MS = 160;
-/** A row that would run past this edge of the page opens on the other side of its mark. */
-const ROW_W = 280;
-const ROW_H = 96;
 
 export interface IAnnotationEditing {
   id: string;
@@ -38,57 +32,6 @@ interface ILayerProps {
   onRemove: (id: string) => void;
   onCancel: () => void;
 }
-
-interface IRowProps {
-  annotation: IAnnotation;
-  open: boolean;
-  onCommit: (comment: string) => void;
-  onRemove: () => void;
-  onCancel: () => void;
-}
-
-/** The comment of one mark: a field and ✓; Enter keeps it, Esc leaves it; 🗑 takes the mark away. */
-const Row = ({ annotation, open, onCommit, onRemove, onCancel }: IRowProps) => {
-  const [text, setText] = useState(annotation.comment);
-  return (
-    <form
-      className="hx-tann__row"
-      data-state={open ? 'open' : 'closing'}
-      aria-label={t('next.pane.annot.row')}
-      onSubmit={(event) => {
-        event.preventDefault();
-        onCommit(text.trim());
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          event.stopPropagation();
-          onCancel();
-        }
-      }}
-    >
-      <input
-        className="hx-tann__input"
-        value={text}
-        autoFocus
-        placeholder={t('next.pane.annot.placeholder')}
-        aria-label={t('next.pane.annot.placeholder')}
-        onChange={(event) => setText(event.target.value)}
-      />
-      <button
-        type="button"
-        className="hx-tann__btn"
-        aria-label={t('next.pane.annot.remove')}
-        onClick={onRemove}
-      >
-        <Icon name="trash-2" size="sm" />
-      </button>
-      <button type="submit" className="hx-tann__btn" data-primary aria-label={t('next.pane.annot.save')}>
-        <Icon name="check" size="sm" />
-      </button>
-    </form>
-  );
-};
 
 interface IMarkProps extends Omit<ILayerProps, 'list' | 'editing' | 'hidden' | 'sending' | 'at'> {
   annotation: IAnnotation;
@@ -117,7 +60,6 @@ const Mark = ({
   onCancel,
 }: IMarkProps) => {
   const ref = useRef<HTMLDivElement>(null);
-  const row = usePresentFlag(editing, ANNOTATION_OUT_MS);
   const { id, rect } = annotation;
   const { x, y, width, height } = rect;
   useLayoutEffect(() => {
@@ -133,8 +75,8 @@ const Mark = ({
       const left = page.left - box.left + (at.box.x + at.mark.x) * fit;
       const top = page.top - box.top + (at.box.y + at.mark.y) * fit;
       el.dataset.place = at.place;
-      el.dataset.flip = left > box.width - ROW_W ? 'left' : 'right';
-      el.dataset.up = top > box.height - ROW_H ? 'true' : 'false';
+      el.dataset.flip = left > box.width - NOTE_ROW_W ? 'left' : 'right';
+      el.dataset.up = top > box.height - NOTE_ROW_H ? 'true' : 'false';
       el.style.setProperty('--x', `${Math.round(left)}px`);
       el.style.setProperty('--y', `${Math.round(top)}px`);
     };
@@ -156,36 +98,22 @@ const Mark = ({
   }, [anchors, frame, stage, fit, id, x, y, width, height]);
 
   return (
-    <div
-      ref={ref}
-      className="hx-tann__mark"
-      data-editing={editing || undefined}
-      data-leaving={leaving || undefined}
-      data-away={away || undefined}
-      data-sending={sending || undefined}
-      data-empty={annotation.comment === '' || undefined}
-    >
-      <button
-        type="button"
-        className="hx-tann__dot"
-        aria-label={t('next.pane.annot.mark', { n, name: annotationName(annotation) })}
-        tabIndex={leaving || away ? -1 : undefined}
-        onClick={() => onOpen(id)}
-      >
-        <span key={n} className="hx-tann__num">
-          {n}
-        </span>
-      </button>
-      {row.mounted && (
-        <Row
-          annotation={annotation}
-          open={row.state === PRESENCE.open}
-          onCommit={(comment) => onCommit(id, comment)}
-          onRemove={() => onRemove(id)}
-          onCancel={onCancel}
-        />
-      )}
-    </div>
+    <NoteMark
+      markRef={ref}
+      n={n}
+      label={t('next.pane.annot.mark', { n, name: annotationName(annotation) })}
+      comment={annotation.comment}
+      editing={editing}
+      leaving={leaving}
+      away={away}
+      sending={sending}
+      rowLabel={t('next.pane.annot.row')}
+      placeholder={t('next.pane.annot.placeholder')}
+      onOpen={() => onOpen(id)}
+      onCommit={(comment) => onCommit(id, comment)}
+      onRemove={() => onRemove(id)}
+      onCancel={onCancel}
+    />
   );
 };
 
@@ -194,7 +122,7 @@ const samePage = (a: string, b: string | null): boolean => b !== null && a.split
 
 /** The marks over the page; hidden, they fade out but stay where they are, and a removed one fades out in its place. */
 export const AnnotationLayer = ({ list, editing, hidden, sending, at, ...rest }: ILayerProps) => {
-  const shown = useLeavingList(list, (a) => a.id, ANNOTATION_OUT_MS);
+  const shown = useLeavingList(list, (a) => a.id, NOTE_OUT_MS);
   // A mark that is leaving keeps the number it had.
   const current = list.map((a) => `${a.id}:${numberOf(list, a.id)}`).join(' ');
   const [numbers, setNumbers] = useState(new Map<string, number>());
@@ -236,32 +164,6 @@ interface IBarProps {
   onClose: () => void;
 }
 
-const BarButton = ({
-  icon,
-  label,
-  disabled,
-  pressed,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  disabled?: boolean;
-  pressed?: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    className="hx-tann__tool hx-tipped"
-    aria-label={label}
-    aria-pressed={pressed}
-    aria-disabled={disabled || undefined}
-    onClick={() => !disabled && onClick()}
-  >
-    <Icon name={icon} size="sm" />
-    <span className="hx-tip">{label}</span>
-  </button>
-);
-
 /** «Аннотирование · N»: hide the marks, delete all, send, close. */
 export const AnnotationBar = ({
   visible,
@@ -273,36 +175,33 @@ export const AnnotationBar = ({
   onSend,
   onClose,
 }: IBarProps) => {
-  // The count the bar had while it leaves, so «0» does not flash in its exit.
-  const bar = usePresence(visible ? count : null, ANNOTATION_OUT_MS);
-  if (bar.value === null) return null;
   const empty = count === 0;
   return (
-    <div
+    <NoteBar
       className="hx-tann__bar"
-      role="toolbar"
-      aria-label={t('next.pane.annot.title')}
-      data-state={bar.state === PRESENCE.closing ? 'closing' : 'open'}
-    >
-      <span className="hx-tann__title">{t('next.pane.annot.bar', { n: bar.value })}</span>
-      <BarButton
-        icon={hidden ? 'eye' : 'eye-off'}
-        label={hidden ? t('next.pane.annot.show') : t('next.pane.annot.hide')}
-        pressed={hidden}
-        disabled={empty}
-        onClick={onToggleHidden}
-      />
-      <BarButton icon="trash-2" label={t('next.pane.annot.clear')} disabled={empty} onClick={onClear} />
-      <button
-        type="button"
-        className="hx-tann__send"
-        aria-disabled={empty || sending || undefined}
-        aria-busy={sending || undefined}
-        onClick={() => !empty && !sending && onSend()}
-      >
-        {t('next.pane.annot.send')}
-      </button>
-      <BarButton icon="x" label={t('next.pane.annot.close')} onClick={onClose} />
-    </div>
+      visible={visible}
+      count={count}
+      sending={sending}
+      sendLabel={t('next.pane.annot.send')}
+      onSend={onSend}
+      tools={
+        <>
+          <NoteBarButton
+            icon={hidden ? 'eye' : 'eye-off'}
+            label={hidden ? t('next.pane.annot.show') : t('next.pane.annot.hide')}
+            pressed={hidden}
+            disabled={empty}
+            onClick={onToggleHidden}
+          />
+          <NoteBarButton
+            icon="trash-2"
+            label={t('next.pane.annot.clear')}
+            disabled={empty}
+            onClick={onClear}
+          />
+        </>
+      }
+      after={<NoteBarButton icon="x" label={t('next.pane.annot.close')} onClick={onClose} />}
+    />
   );
 };

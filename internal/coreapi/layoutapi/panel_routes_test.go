@@ -285,3 +285,21 @@ func TestCLIDeliverOpensTheFileOnceAndAnswersTheRecord(t *testing.T) {
 		t.Fatal("a refused file opened something")
 	}
 }
+
+// each address opens once. The agent's second `open` of the same document is answered with the first one's id
+// and keeps no intent; another document, or the same one at another place, is a new one.
+func TestCLIPanelOpensTheSameAddressOnce(t *testing.T) {
+	r := panelRig(t)
+	r.sync.clients = 0
+	first := r.ask(`{"session":"` + agentSession + `","command":{"kind":"open","tab":"artifacts","target":"https://a.example.org/a/plan"}}`).json(t)
+	again := r.ask(`{"session":"` + agentSession + `","command":{"kind":"open","tab":"artifacts","target":"https://a.example.org/a/plan"}}`)
+	r.want(again, 200, "*")
+	o := again.json(t)
+	if repeat, _ := o.Get("repeat"); repeat != true || o.String("id") != first.String("id") || !strings.Contains(o.String("message"), "повторно не открываю") {
+		t.Fatal(again.body)
+	}
+	r.ask(`{"session":"` + agentSession + `","command":{"kind":"open","tab":"artifacts","target":"https://a.example.org/a/other"}}`)
+	if n := len(r.deps.Intents.List("tab-1")); n != 2 {
+		t.Fatalf("intents: %d, want 2", n)
+	}
+}

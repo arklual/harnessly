@@ -165,6 +165,7 @@ describe('v2 closed lists', () => {
     LoginReason: v2.LOGIN_REASONS,
     MessageStatusKind: v2.MESSAGE_STATUS_KINDS,
     HandedWhere: v2.HANDED_WHERES,
+    PermissionMode: v2.PERMISSION_MODES,
     HttpKind: Object.keys(parsePage),
   };
 

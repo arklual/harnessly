@@ -34,7 +34,11 @@ export type TBridgeCode =
   | 'host_unavailable'
   | 'invalid_params'
   | 'conflict'
-  | 'quota_exceeded';
+  | 'quota_exceeded'
+  | 'auth_required'
+  | 'auth_expired'
+  | 'auth_denied'
+  | 'idp_unreachable';
 
 const CODES: readonly string[] = [
   'permission_denied',
@@ -49,7 +53,34 @@ const CODES: readonly string[] = [
   'invalid_params',
   'conflict',
   'quota_exceeded',
+  'auth_required',
+  'auth_expired',
+  'auth_denied',
+  'idp_unreachable',
 ];
+
+/** The codes of a refused sign-in: the card of a view that did not start offers «Войти» on the first two. */
+export const AUTH_CODES: readonly TBridgeCode[] = [
+  'auth_required',
+  'auth_expired',
+  'auth_denied',
+  'idp_unreachable',
+];
+
+/** Where a refused sign-in is mended (internal/apps/bridge.go SignIn): a connection, or an app's own server. */
+export interface ISignInHint {
+  connection?: string;
+  app?: string;
+  server?: string;
+}
+
+export const readSignIn = (v: unknown): ISignInHint | undefined => {
+  if (typeof v !== 'object' || v === null) return undefined;
+  const o = v as Record<string, unknown>;
+  const out: ISignInHint = {};
+  for (const k of ['connection', 'app', 'server'] as const) if (typeof o[k] === 'string') out[k] = o[k];
+  return Object.keys(out).length > 0 ? out : undefined;
+};
 
 /** A refusal or failure with the code a view sees as HarnesslyError.code. */
 export class BridgeError extends Error {
@@ -354,6 +385,8 @@ export interface IBridgeOptions {
   context: IViewContext;
   handlers: IBridgeHandlers;
   hostVersion: string;
+  /** The view said it is ready (ui/notifications/initialized): the frame is up, whatever its `load` said. */
+  onReady?: () => void;
   /**
    * What the view's document presents in ui/initialize: the view server writes the session's nonce into its own pages,
    * so a document the frame navigated to (another page, another origin) cannot. Absent for a view at the app's own
@@ -821,6 +854,7 @@ export class AppBridge {
       }
       case 'ui/notifications/initialized':
         this.initialized = true;
+        this.opts.onReady?.();
         return undefined;
       case 'ui/notifications/size-changed': {
         const h = p.height;

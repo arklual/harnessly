@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { quoteLabel, quoteTitle, withQuotes } from '@/next/stores/quotes';
+import type { ConvId } from '@/next/protocol/v2';
+import {
+  addFeedNote,
+  addQuote,
+  clearFeedNotes,
+  editQuote,
+  feedNotesOf,
+  nextFeedNoteId,
+  quoteLabel,
+  quotesStore,
+  quoteTitle,
+  withQuotes,
+} from '@/next/stores/quotes';
 
 describe('quotes', () => {
   it('lead the message as Markdown quotes, a remark under its quote', () => {
@@ -28,5 +40,20 @@ describe('quotes', () => {
   it('hint a chip with the whole quote and the remark under it', () => {
     expect(quoteTitle({ id: 'q', text: 'the part', note: null })).toBe('«the part»');
     expect(quoteTitle({ id: 'q', text: 'the part', note: 'is wrong' })).toBe('«the part»\n\nis wrong');
+  });
+
+  it('keep the feed’s annotations numbered apart, with their remarks, and clear only them', () => {
+    const conv = 'c-feed' as ConvId;
+    addQuote(conv, 'from a file', null);
+    const anchor = { key: 't1', start: 0, raw: 'words' };
+    const id = nextFeedNoteId();
+    addFeedNote(conv, { id, text: 'words', note: null, anchor });
+    editQuote(conv, id, 'why so?');
+    const have = quotesStore.get(conv) ?? [];
+    expect(feedNotesOf(have)).toEqual([{ id, text: 'words', note: 'why so?', anchor }]);
+    editQuote(conv, id, '');
+    expect(feedNotesOf(quotesStore.get(conv) ?? [])[0]?.note).toBeNull();
+    clearFeedNotes(conv);
+    expect((quotesStore.get(conv) ?? []).map((q) => q.text)).toEqual(['from a file']);
   });
 });

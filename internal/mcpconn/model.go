@@ -10,6 +10,7 @@ package mcpconn
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -62,8 +63,11 @@ type Server struct {
 	// OAuthUnavailable: the server signs in with OAuth but lets no new client register, so it takes a typed token.
 	OAuthUnavailable bool   `json:"oauthUnavailable,omitempty"`
 	CatalogID        string `json:"catalogId,omitempty"`
-	Enabled          bool   `json:"enabled"`
-	State            State  `json:"state"`
+	// Owner is "app:<app>/<server>" for a sign-in made for one app's own server (auth: oauth): only that app's calls
+	// use it; it is never given to agents and never found by its address or catalog id for anyone else.
+	Owner   string `json:"owner,omitempty"`
+	Enabled bool   `json:"enabled"`
+	State   State  `json:"state"`
 	// Me is who or what the server signs in as, when known.
 	Me        string    `json:"me,omitempty"`
 	Tools     []Tool    `json:"tools,omitempty"`
@@ -114,6 +118,9 @@ var (
 	ErrSignInRequired = errors.New("signin-required")
 	// ErrOAuthFailed: the authorization server refused the sign-in or answered something unexpected.
 	ErrOAuthFailed = errors.New("oauth-failed")
+	// ErrSignInExpired is an ErrSignInRequired of a person who was signed in: the token ran out with no refresh, or the
+	// identity provider refused the refresh.
+	ErrSignInExpired = fmt.Errorf("%w: the sign-in expired", ErrSignInRequired)
 )
 
 // Reason is the short word for an error.

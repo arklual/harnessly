@@ -27,7 +27,7 @@ review/
   CHANGELOG.md
 ```
 
-У `harnessly app new` два шаблона: `chat` (по умолчанию, этот) и `pane-chat` (добавляет окно).
+У `harnessly app new` четыре шаблона: `chat` (по умолчанию, этот), `pane-chat` (добавляет вид), `widget` (карточка в чате) и `vite` (вид на Vite + React; см. [от нуля за 5 минут](00-five-minutes.md)).
 
 ## Манифест
 

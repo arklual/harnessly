@@ -4,6 +4,19 @@
 // keeps), once per conversation: the next edit of a design changes nothing (its board updates by itself), the next
 // publication of a document asks a tab that shows it to reload. Conservative on purpose: only the pane's own apps, only
 // what a successful call names.
+//
+// What opens the pane by itself (docs/pane-opening.md); the intents this package keeps are Auto, and the page
+// places an Auto intent behind, with a dot, without bringing the pane out:
+//
+//	trigger                                        intent             the page
+//	the agent's `open` (layoutapi cliPanel)        open               in front, the pane comes out (not on a phone)
+//	the same `open` within RepeatWindow            none (Repeated)    nothing
+//	a design file the agent writes                 open, auto         behind, the pane stays as it is
+//	a document or board it publishes               open, auto         behind, the pane stays as it is
+//	the same document published again              open, auto, reload the tab that shows it reloads
+//	its browser tool (chrome_*)                    open, auto         behind, the pane stays as it is
+//	a file it hands over (OpenOnce)                open, auto         behind, the pane stays as it is
+//	an address in its answer                       none               a chip in the text; opens on its click
 package paneauto
 
 import (
@@ -216,4 +229,28 @@ func OpenOnce(intents *paneintents.Store, tabID, tab, target string) bool {
 	}
 	intents.Add(tabID, panel.Command{Kind: "open", Tab: tab, Target: target, Auto: true}.JSON())
 	return true
+}
+
+// RepeatWindow: the agent's `open` of the very thing it asked for within this is not asked again. Each address opens
+// once: an agent that names the same document in every reply, or runs `open` for it twice, does not throw the
+// pane at the person again. After it, an `open` acts again: the person may have asked to see it once more.
+const RepeatWindow = 10 * time.Minute
+
+// Repeated is the id of an earlier `open` of the same tab, target and place the conversation's pane was asked for
+// within RepeatWindow, "" for none. Reloads and `show` are never repeats.
+func Repeated(intents *paneintents.Store, tabID string, c panel.Command, now time.Time) string {
+	if intents == nil || c.Kind != "open" || c.Reload {
+		return ""
+	}
+	since := now.Add(-RepeatWindow).UnixMilli()
+	for _, it := range intents.List(tabID) {
+		cmd := it.Object("command")
+		if !sameThing(cmd, Found{Tab: c.Tab, Target: c.Target}) || isReload(cmd) || cmd.String("place") != c.Place {
+			continue
+		}
+		if at, _ := it.Number("createdAt"); int64(at) >= since {
+			return it.String("id")
+		}
+	}
+	return ""
 }

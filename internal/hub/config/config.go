@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 
+	"github.com/ly-solutions/harnessly/internal/apptoken"
 	"github.com/ly-solutions/harnessly/internal/secrets/vaultkv"
 )
 
@@ -189,6 +190,8 @@ type Config struct {
 	SafeVault       *vaultkv.Config
 	SafePrefix      string
 	SafeRefPrefixes []string
+	// AppToken is the platform's token for apps' backends (docs/build-apps/10-auth.md).
+	AppToken AppToken
 	// Warnings are what the hub starts with although its operator should look at it again: the binary logs each at
 	// error level and check-config prints them.
 	Warnings []string
@@ -1029,6 +1032,7 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 		c.SitesS3.Prefix = c.S3.Prefix + "sites/"
 	}
 	c.loadStore(get, def, bad)
+	c.loadAppToken(get, def, bad)
 	if c.SitesAbuseURL != "" {
 		if u, err := url.Parse(c.SitesAbuseURL); err != nil || (u.Scheme != "https" && u.Scheme != "http" && u.Scheme != "mailto") {
 			bad("HARNESSLY_SITES_ABUSE_URL must be an http(s) or mailto: address")
@@ -1088,4 +1092,69 @@ func featureList(raw, env string, bad func(string, ...any)) map[string]bool {
 		out[f] = on
 	}
 	return out
+}
+
+// AppToken is how the hub signs the platform's token for apps' backends (HUB_APP_TOKEN_*). KeyFile is the Ed25519 key
+// (PKCS#8 PEM; made there when missing; every replica reads the same file); "" when HUB_APP_TOKEN=off. PreviousKeys are
+// public keys (PKIX PEM) of earlier rotations, still published. Exchange is the hub's client at the organization's
+// identity provider for token exchange (RFC 8693); its TokenURL is "" when there is none. ExchangeAudience is the aud
+// of the platform token the provider is handed (the provider's issuer or the hub's client id there).
+type AppToken struct {
+	KeyFile          string
+	PreviousKeys     []string
+	Exchange         apptoken.ExchangeConfig
+	ExchangeAudience string
+	ExchangeScope    string
+	// ExchangeAudiences are the provider audiences the hub exchanges for, each with the origin of the backend it may be
+	// sent to (HUB_APP_TOKEN_EXCHANGE_AUDIENCES=aud=https://host,…): an app gets no exchange for anything else.
+	ExchangeAudiences map[string]string
+}
+
+// On says whether the hub mints tokens.
+func (a AppToken) On() bool { return a.KeyFile != "" }
+
+func (c *Config) loadAppToken(get func(string) string, def func(string, string) string, bad func(string, ...any)) {
+	switch strings.ToLower(def("HUB_APP_TOKEN", "on")) {
+	case "on", "true", "1", "yes":
+		c.AppToken.KeyFile = def("HUB_APP_TOKEN_KEY_FILE", filepath.Join(c.DataDir, "app-token.pem"))
+	case "off", "false", "0", "no":
+		return
+	default:
+		bad("HUB_APP_TOKEN must be on or off")
+	}
+	for _, f := range strings.Split(get("HUB_APP_TOKEN_PREVIOUS_KEYS"), ",") {
+		if f = strings.TrimSpace(f); f != "" {
+			c.AppToken.PreviousKeys = append(c.AppToken.PreviousKeys, f)
+		}
+	}
+	x := apptoken.ExchangeConfig{TokenURL: get("HUB_APP_TOKEN_EXCHANGE_URL"), ClientID: get("HUB_APP_TOKEN_EXCHANGE_CLIENT_ID"),
+		ClientSecret: get("HUB_APP_TOKEN_EXCHANGE_CLIENT_SECRET"), SubjectTokenType: get("HUB_APP_TOKEN_EXCHANGE_SUBJECT_TOKEN_TYPE")}
+	if x.TokenURL == "" {
+		return
+	}
+	if u, err := url.Parse(x.TokenURL); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		bad("HUB_APP_TOKEN_EXCHANGE_URL must be an http(s) URL")
+	}
+	if x.ClientID == "" {
+		bad("HUB_APP_TOKEN_EXCHANGE_URL needs HUB_APP_TOKEN_EXCHANGE_CLIENT_ID")
+	}
+	c.AppToken.Exchange = x
+	c.AppToken.ExchangeAudience = def("HUB_APP_TOKEN_EXCHANGE_AUDIENCE", x.ClientID)
+	c.AppToken.ExchangeScope = get("HUB_APP_TOKEN_EXCHANGE_SCOPE")
+	c.AppToken.ExchangeAudiences = map[string]string{}
+	for _, pair := range strings.Split(get("HUB_APP_TOKEN_EXCHANGE_AUDIENCES"), ",") {
+		if pair = strings.TrimSpace(pair); pair == "" {
+			continue
+		}
+		aud, origin, ok := strings.Cut(pair, "=")
+		u, err := url.Parse(origin)
+		if !ok || aud == "" || err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.Path != "" {
+			bad("HUB_APP_TOKEN_EXCHANGE_AUDIENCES: %q is not audience=https://host[:port]", pair)
+			continue
+		}
+		c.AppToken.ExchangeAudiences[aud] = strings.ToLower(u.Scheme + "://" + u.Host)
+	}
+	if len(c.AppToken.ExchangeAudiences) == 0 {
+		bad("HUB_APP_TOKEN_EXCHANGE_URL needs HUB_APP_TOKEN_EXCHANGE_AUDIENCES: the audiences apps may get, each with its backend")
+	}
 }

@@ -30,7 +30,34 @@ const (
 	CodeConflict = "conflict"
 	// CodeQuotaExceeded: a storage write would take its area past its limit.
 	CodeQuotaExceeded = "quota_exceeded"
+	// CodeAuthRequired: the server wants the person signed in and nobody is (no token, no connection signed in). The
+	// error's SignIn says where the person signs in.
+	CodeAuthRequired = "auth_required"
+	// CodeAuthExpired: the person was signed in and the server takes the sign-in no more (an expired or revoked token,
+	// a refresh the identity provider refused). Signing in again mends it.
+	CodeAuthExpired = "auth_expired"
+	// CodeAuthDenied: the person is signed in and the server (or the identity provider) refuses them this: HTTP 403, an
+	// insufficient scope, access_denied. Signing in again does not mend it; an admin of the server does.
+	CodeAuthDenied = "auth_denied"
+	// CodeIdPUnreachable: the identity provider (its token or discovery endpoint) did not answer, so no token could be
+	// had. Nothing is wrong with the sign-in; the call may be repeated later.
+	CodeIdPUnreachable = "idp_unreachable"
 )
+
+// SignIn says where a refused call is mended by a sign-in: the host shows «Войти» on it. Connection is the catalog id
+// of the person's connection the app's server goes through; App and Server name an app's own server that the host signs
+// in to (auth: oauth). A view reads it and may not act on it by itself: the sign-in is the host's, in a top window.
+type SignIn struct {
+	Connection string `json:"connection,omitempty"`
+	App        string `json:"app,omitempty"`
+	Server     string `json:"server,omitempty"`
+}
+
+// authCodes are the codes of a refused sign-in.
+var authCodes = map[string]bool{CodeAuthRequired: true, CodeAuthExpired: true, CodeAuthDenied: true, CodeIdPUnreachable: true}
+
+// IsAuthCode says whether a code is one of a refused sign-in.
+func IsAuthCode(code string) bool { return authCodes[code] }
 
 // BridgeError is a refusal with the code a view sees.
 type BridgeError struct {
@@ -38,6 +65,8 @@ type BridgeError struct {
 	Message string
 	// Detail is for the log only: a transport or remote error the page must not read.
 	Detail string
+	// SignIn, for an auth code, is where the person signs in; nil when no sign-in mends it.
+	SignIn *SignIn
 }
 
 func (e *BridgeError) Error() string { return e.Code + ": " + e.Message }

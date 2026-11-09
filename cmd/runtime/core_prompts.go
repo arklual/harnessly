@@ -160,6 +160,13 @@ func (w *promptWiring) LaunchChosen(session string, applied prompts.Applied) {
 	if len(current.Apps) > 0 {
 		launch.Set("apps", launchpkg.AppsJSON(current.Apps))
 	}
+	// And its fast and permission modes.
+	if current.Fast {
+		launch.Set("fast", true)
+	}
+	if current.Permission != "" {
+		launch.Set("permission", string(current.Permission))
+	}
 	patch := jsvalue.NewObject()
 	patch.Set("launch", launch)
 	if _, err := w.c.store.UpdateTabMeta(session, patch); err != nil {
@@ -279,6 +286,7 @@ func (c *core) tabLaunch(session string) agents.Launch {
 		launched.Profile = *p
 	}
 	launched.Apps = launchpkg.AppsOf(l)
+	launched.Fast, launched.Permission = launchpkg.ModesOf(l)
 	// The chat is not kept on the tab: it is the one that runs in this session now.
 	launched.Conversation, _ = convOf(c, session)
 	return launched

@@ -10,7 +10,7 @@ import (
 func TestEnvironmentInstallsAreTheOrganizationsNotThePersons(t *testing.T) {
 	r := newRegistry(t)
 	dir := versioned(t, "acme.kit", "1.0.0")
-	opt := EnvInstallOptions{Link: "own", ItemID: "item-kit", Locked: true, HostVersion: FirstVersion, Now: teamNow}
+	opt := EnvInstallOptions{Link: "own", ItemID: "item-kit", Locked: true, HostVersion: TemplateVersion, Now: teamNow}
 
 	got, changed, err := r.InstallForEnv(dir, opt)
 	if err != nil || !changed || got.ID != "acme.kit" {
@@ -54,7 +54,7 @@ func TestEnvironmentInstallsAreTheOrganizationsNotThePersons(t *testing.T) {
 	}
 
 	// The person's own install of the same app wins over the environment's.
-	if _, _, err := r.Install(dir, InstallOptions{HostVersion: FirstVersion}); err != nil {
+	if _, _, err := r.Install(dir, InstallOptions{HostVersion: TemplateVersion}); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := r.List(); len(list) != 1 || list[0].Env {
@@ -77,7 +77,7 @@ func TestEnvironmentInstallsAreTheOrganizationsNotThePersons(t *testing.T) {
 	if gone, err := r.PruneEnv("observe", nil); err != nil || len(gone) != 0 {
 		t.Fatalf("another link pruned: %v %v", err, gone)
 	}
-	if _, _, err := r.InstallForEnv(v2, EnvInstallOptions{Link: "observe", ItemID: "item-kit", HostVersion: FirstVersion, Now: teamNow}); err == nil {
+	if _, _, err := r.InstallForEnv(v2, EnvInstallOptions{Link: "observe", ItemID: "item-kit", HostVersion: TemplateVersion, Now: teamNow}); err == nil {
 		t.Fatal("another link took the app over")
 	}
 	// The item left the list: pruned, the copy goes.
@@ -102,7 +102,7 @@ func TestEnvironmentRefusesATrustedApp(t *testing.T) {
 	if p, ps := LoadPackage(dir); p == nil || len(ps.Errors()) > 0 {
 		t.Skipf("the manifest of a trusted app needs more than the trust field: %v", ps)
 	}
-	if _, _, err := r.InstallForEnv(dir, EnvInstallOptions{ItemID: "x", HostVersion: FirstVersion, Now: teamNow}); !errors.Is(err, ErrTrustedEnv) {
+	if _, _, err := r.InstallForEnv(dir, EnvInstallOptions{ItemID: "x", HostVersion: TemplateVersion, Now: teamNow}); !errors.Is(err, ErrTrustedEnv) {
 		t.Fatalf("trusted: %v", err)
 	}
 }

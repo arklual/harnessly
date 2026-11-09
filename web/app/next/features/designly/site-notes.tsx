@@ -1,8 +1,10 @@
 // The person's edits on the page of a design: a note opens at the block they picked (the card .hx-note.hx-ann), a pin
 // with its number stays on the block, the notes ride over the island's field as a strip «N annotations» with a list, or,
-// in «Правки», in the bar at the foot (.hx-notesbar) that sends them to the agent in one message.
+// in «Правки», in the bar «Аннотирование · N» at the foot (.hx-notesbar) that sends them to the agent in one message.
+// The pins, the card and the bar speak the shared language of annotations (ui/notes/notes.tsx).
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
-import { AnnotateQuote } from '@/next/ui/annotate/parts';
+import type { INoteChip } from '@/next/ui/notes/note-chips';
+import { NoteBar, NoteDot, NoteRow } from '@/next/ui/notes/notes';
 import Icon from '@/next/ui/icon';
 import Sheet from '@/next/ui/sheet';
 import { usePhone } from '@/next/ui/use-media';
@@ -53,14 +55,23 @@ export interface INote {
   style: IStyleEdit;
 }
 
-/** A note as a chip of the field: its number and what it says, or the block it is on. */
-export const noteQuote = (note: INote, n: number) => ({
-  id: note.id,
-  label: `#${n} ${note.text || note.picked.component || note.picked.text || note.picked.tag}`,
-  title: note.text || note.picked.selector,
-  remark: true,
-  icon: 'square-dashed-mouse-pointer',
-});
+/** A note as a numbered chip of the field (ui/notes/note-chips.tsx): the block it is on; its card says the page, the
+ *  block and the look tried on it, and holds the words to change. */
+export const noteChip = (note: INote): INoteChip => {
+  const diffs = changedKeys(note.style).map((key) =>
+    t(`next.notes.styleDiff.${key}`, { value: String(note.style[key]) }),
+  );
+  return {
+    id: note.id,
+    name: pickedLabel(note.picked),
+    comment: note.text,
+    facts: [
+      { label: t('next.composer.note.page'), value: note.page },
+      { label: t('next.composer.note.element'), value: `<${note.picked.tag}>`, title: note.picked.selector },
+      ...(diffs.length > 0 ? [{ label: t('next.notes.styleFact'), value: diffs.join(', ') }] : []),
+    ],
+  };
+};
 
 export interface INoteDraft {
   picked: IPicked;
@@ -368,6 +379,73 @@ export const NotePopover = ({
     return () => window.clearTimeout(timer);
   }, [voiceDone]);
 
+  const lead = look ? (
+    <button
+      type="button"
+      className="hx-note__btn hx-ann__tune hx-tipped"
+      aria-pressed={tune}
+      aria-label={t('next.notes.tune')}
+      onClick={() => setTune((on) => !on)}
+    >
+      <Icon name="sliders-horizontal" size="sm" />
+      <span className="hx-tip" data-pos="below" data-align="start">
+        {t('next.notes.tune')}
+      </span>
+    </button>
+  ) : (
+    <NoteDot
+      n={n}
+      label={t('next.notes.pin', { n, label: pickedLabel(draft.picked) })}
+      empty={!text.trim()}
+    />
+  );
+  const tools = (
+    <>
+      {mic && (
+        <button
+          type="button"
+          className="hx-note__btn hx-ann__mic hx-tipped"
+          data-rec={mic.recording}
+          aria-label={t('next.notes.dictate')}
+          onClick={mic.onToggle}
+        >
+          <Icon name="mic" size="sm" />
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {t('next.notes.dictate')}
+          </span>
+        </button>
+      )}
+      {/* A note being changed can go back to what it was; a new one is dropped by the trash. */}
+      {draft.id !== undefined && (
+        <button
+          type="button"
+          className="hx-note__btn hx-ann__cancel hx-tipped"
+          aria-label={t('next.notes.revert')}
+          onClick={() => leave(onCancel)}
+        >
+          <Icon name="undo-2" size="sm" />
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {t('next.notes.revert')}
+          </span>
+        </button>
+      )}
+    </>
+  );
+  const more =
+    look || (image && !guest && draft.picked.draw) ? (
+      <>
+        {look && <NoteProps look={look} edit={draft.style} onEdit={onStyle} open={tune} gone={gone} />}
+        {image && !guest && draft.picked.draw && (
+          <CardImageGen
+            machine={image.machine}
+            artifact={image.artifact}
+            file={image.file}
+            draw={draft.picked.draw}
+          />
+        )}
+      </>
+    ) : null;
+
   return (
     <div
       ref={ref}
@@ -381,123 +459,39 @@ export const NotePopover = ({
       aria-hidden={hidden}
       inert={hidden}
     >
-      <div
-        className="hx-ann__plate"
-        onPointerDown={(event) =>
+      <NoteRow
+        comment={text}
+        onValue={onText}
+        open
+        label={t('next.notes.dialog')}
+        placeholder={guest ? t('next.guest.placeholder') : t('next.notes.placeholder')}
+        lead={lead}
+        tools={tools}
+        more={more}
+        okLabel={guest ? t('next.guest.send') : t('next.notes.toMessage')}
+        okDisabled={wants}
+        busy={sending}
+        onCommit={ok}
+        onCancel={() => leave(onCancel)}
+        onRemove={guest ? undefined : () => leave(onDelete)}
+        removeLabel={t('next.notes.delete')}
+        // The card is moved by its own ground; a double press puts it back at its block.
+        onGround={(event) =>
           dragNote(event, (at) => {
             setMoved(at);
             keepNotePos(at);
           })
         }
-        onDoubleClick={() => {
+        onGroundDouble={() => {
           setMoved(null);
           keepNotePos(null);
         }}
-      >
-        <span className="hx-ann__grip" aria-hidden="true" />
-        <AnnotateQuote
-          lead={`<${draft.picked.tag}>`}
-          text={draft.picked.text || draft.picked.component || ''}
-        />
-      </div>
-      <div className="hx-ann__row">
-        {look ? (
-          <button
-            type="button"
-            className="hx-ann__tune hx-tipped"
-            aria-pressed={tune}
-            aria-label={t('next.notes.tune')}
-            onClick={() => setTune((on) => !on)}
-          >
-            <Icon name="sliders-horizontal" />
-            <span className="hx-tip" data-pos="below" data-align="start">
-              {t('next.notes.tune')}
-            </span>
-          </button>
-        ) : (
-          <span className="hx-ann__n">{n}</span>
-        )}
-        <textarea
-          className="hx-ann__input"
-          autoFocus
-          rows={1}
-          disabled={sending}
-          placeholder={guest ? t('next.guest.placeholder') : t('next.notes.placeholder')}
-          value={text}
-          onChange={(event) => onText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              ok();
-            }
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              event.stopPropagation();
-              leave(onCancel);
-            }
-          }}
-        />
-      </div>
-      {look && <NoteProps look={look} edit={draft.style} onEdit={onStyle} open={tune} gone={gone} />}
-      {image && !guest && draft.picked.draw && (
-        <CardImageGen
-          machine={image.machine}
-          artifact={image.artifact}
-          file={image.file}
-          draw={draft.picked.draw}
-        />
-      )}
-      <div className="hx-ann__foot">
-        <button type="button" className="hx-ann__cancel" onClick={() => leave(onCancel)}>
-          {t('next.notes.revert')}
-        </button>
-        {!guest && (
-          <button
-            type="button"
-            className="hx-ann__icon hx-tipped"
-            aria-label={t('next.notes.delete')}
-            onClick={() => leave(onDelete)}
-          >
-            <Icon name="trash-2" size="sm" />
-            <span className="hx-tip" data-pos="below">
-              {t('next.notes.deleteTip')}
-            </span>
-          </button>
-        )}
-        <span className="hx-spacer" />
-        {mic && (
-          <button
-            type="button"
-            className="hx-ann__icon hx-ann__mic hx-tipped"
-            data-rec={mic.recording}
-            aria-label={t('next.notes.dictate')}
-            onClick={mic.onToggle}
-          >
-            <Icon name="mic" />
-            <span className="hx-tip" data-pos="below" data-align="end">
-              {t('next.notes.dictate')}
-            </span>
-          </button>
-        )}
-        <button
-          type="button"
-          className="hx-ann__ok hx-tipped"
-          aria-label={guest ? t('next.guest.send') : t('next.notes.toMessage')}
-          disabled={wants}
-          data-busy={sending || undefined}
-          onClick={ok}
-        >
-          <Icon name="arrow-up" />
-          <span className="hx-tip" data-pos="below" data-align="end">
-            {guest ? t('next.guest.send') : t('next.notes.toMessage')}
-            <kbd>↵</kbd>
-          </span>
-        </button>
-      </div>
+      />
     </div>
   );
 };
 
+/** «Аннотирование · N» at the foot of the page in «Правки»: «Отправить» sends the notes to the agent in one message. */
 export const NotesBar = ({
   notes,
   shown,
@@ -507,15 +501,13 @@ export const NotesBar = ({
   shown: boolean;
   onSend: () => void;
 }) => (
-  <div className="hx-notesbar" data-shown={shown}>
-    <span className="hx-notesbar__text">
-      {notes.length > 0 ? plural(notes.length, 'next.notes.count') : t('next.notes.hint')}
-    </span>
-    <button type="button" className="hx-notesbar__send" data-on={notes.length > 0} onClick={onSend}>
-      <Icon name="arrow-up" size="sm" />
-      {t('next.notes.send')}
-    </button>
-  </div>
+  <NoteBar
+    className="hx-notesbar"
+    visible={shown}
+    count={notes.length}
+    sendLabel={t('next.notes.send')}
+    onSend={onSend}
+  />
 );
 
 const EMPTY_NOTES: readonly INote[] = [];
@@ -549,14 +541,14 @@ const NotePin = ({
     >
       <span className="hx-npin__frame" />
       <span className="hx-npin__mark">
-        <button
-          type="button"
-          className="hx-npin__dot"
-          aria-label={t('next.notes.pin', { n, label: pickedLabel(note.picked) })}
-          onClick={onOpen}
-        >
-          {n}
-        </button>
+        <NoteDot
+          n={n}
+          label={t('next.notes.pin', { n, label: pickedLabel(note.picked) })}
+          empty={!note.text}
+          active={open}
+          inert={leaving}
+          onOpen={onOpen}
+        />
         {note.text && <span className="hx-npin__tip">{note.text}</span>}
       </span>
     </div>

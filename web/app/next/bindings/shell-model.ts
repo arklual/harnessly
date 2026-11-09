@@ -167,6 +167,7 @@ export const alertOf = (machine: Machine, linkDown: boolean): IMachineAlert | nu
     key: `${machine.id}:${critical.map((i) => i.metric).join(',')}`,
     icon: METRIC_ICON[first.metric],
     text: alertText(first, machine.load),
+    metric: first.metric,
   };
 };
 

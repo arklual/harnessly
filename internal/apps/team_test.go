@@ -20,7 +20,7 @@ func publishedToTeam(t *testing.T, r *Registry, id, version string) CatalogEntry
 	if err != nil {
 		t.Fatal(err)
 	}
-	e, err := r.PublishToTeam(id, pv.Version, ChannelStable, "ann@team.test", FirstVersion, teamNow)
+	e, err := r.PublishToTeam(id, pv.Version, ChannelStable, "ann@team.test", TemplateVersion, teamNow)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestOwnerInstallsForTheTeamAndMembersGetIt(t *testing.T) {
 	if list, _ := owner.List(); len(list) != 0 {
 		t.Fatalf("catalog only: %+v", list)
 	}
-	ti, err := owner.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: FirstVersion, By: "ann@team.test", Now: teamNow.Add(time.Minute)})
+	ti, err := owner.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: TemplateVersion, By: "ann@team.test", Now: teamNow.Add(time.Minute)})
 	if err != nil || ti.Version != "1.0.0" {
 		t.Fatalf("install for team: %v %+v", err, ti)
 	}
@@ -82,7 +82,7 @@ func TestOwnerInstallsForTheTeamAndMembersGetIt(t *testing.T) {
 	}
 	snap.Role = RoleMember
 	member := newRegistry(t)
-	problems, err := member.ApplyTeam(snap, FirstVersion, teamNow.Add(2*time.Minute))
+	problems, err := member.ApplyTeam(snap, TemplateVersion, teamNow.Add(2*time.Minute))
 	if err != nil || len(problems) > 0 {
 		t.Fatalf("apply: %v %v", err, problems)
 	}
@@ -98,7 +98,7 @@ func TestOwnerInstallsForTheTeamAndMembersGetIt(t *testing.T) {
 	}
 
 	// A member does not install for the team, nor remove its app; they turn it off for themselves.
-	if _, err := member.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: FirstVersion, Now: teamNow}); !errors.Is(err, ErrNotOwner) {
+	if _, err := member.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: TemplateVersion, Now: teamNow}); !errors.Is(err, ErrNotOwner) {
 		t.Fatalf("member install: %v", err)
 	}
 	if err := member.UninstallForTeam("acme.demo", teamNow); !errors.Is(err, ErrNotOwner) {
@@ -118,7 +118,7 @@ func TestOwnerInstallsForTheTeamAndMembersGetIt(t *testing.T) {
 	}
 	// A newer snapshot keeps the member's choice.
 	snap.At += 10
-	if _, err := member.ApplyTeam(snap, FirstVersion, teamNow); err != nil {
+	if _, err := member.ApplyTeam(snap, TemplateVersion, teamNow); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := member.List(); len(list) != 0 {
@@ -133,7 +133,7 @@ func TestOwnerInstallsForTheTeamAndMembersGetIt(t *testing.T) {
 
 	// The member's own install of the same app wins over the team's.
 	own := versioned(t, "acme.demo", "0.9.0")
-	if _, _, err := member.Install(own, InstallOptions{HostVersion: FirstVersion}); err != nil {
+	if _, _, err := member.Install(own, InstallOptions{HostVersion: TemplateVersion}); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := member.Get("acme.demo"); got.Team || got.Version != "0.9.0" {
@@ -142,7 +142,7 @@ func TestOwnerInstallsForTheTeamAndMembersGetIt(t *testing.T) {
 	// An older snapshot is not taken.
 	old := snap
 	old.At = 1
-	if _, err := member.ApplyTeam(old, FirstVersion, teamNow); !errors.Is(err, ErrStaleTeam) {
+	if _, err := member.ApplyTeam(old, TemplateVersion, teamNow); !errors.Is(err, ErrStaleTeam) {
 		t.Fatalf("stale: %v", err)
 	}
 	// The owner takes it off the team's machines.
@@ -168,10 +168,10 @@ func TestTrustedIsNeverInstalledForTheTeam(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := owner.PublishToTeam("acme.risky", pv.Version, ChannelStable, "x", FirstVersion, teamNow); err != nil {
+	if _, err := owner.PublishToTeam("acme.risky", pv.Version, ChannelStable, "x", TemplateVersion, teamNow); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := owner.InstallForTeam("acme.risky", ChannelStable, TeamInstallOptions{HostVersion: FirstVersion, Now: teamNow}); !errors.Is(err, ErrTrustedTeam) {
+	if _, err := owner.InstallForTeam("acme.risky", ChannelStable, TeamInstallOptions{HostVersion: TemplateVersion, Now: teamNow}); !errors.Is(err, ErrTrustedTeam) {
 		t.Fatalf("install: %v", err)
 	}
 	// A snapshot that carries one is applied without it.
@@ -179,7 +179,7 @@ func TestTrustedIsNeverInstalledForTheTeam(t *testing.T) {
 	snap.Installs = []SnapshotInstall{{ID: "acme.risky", Channel: "stable", Version: snap.Catalog[0].Version, Sum: snap.Catalog[0].Sum, Archive: snap.Catalog[0].Archive, At: 1}}
 	snap.Role = RoleMember
 	member := newRegistry(t)
-	problems, err := member.ApplyTeam(snap, FirstVersion, teamNow)
+	problems, err := member.ApplyTeam(snap, TemplateVersion, teamNow)
 	if err != nil || len(problems) == 0 {
 		t.Fatalf("want a problem and no install: %v %v", err, problems)
 	}
@@ -194,7 +194,7 @@ func TestNoTeamNoCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.PublishToTeam("acme.demo", pv.Version, ChannelStable, "x", FirstVersion, teamNow); !errors.Is(err, ErrNoTeam) {
+	if _, err := r.PublishToTeam("acme.demo", pv.Version, ChannelStable, "x", TemplateVersion, teamNow); !errors.Is(err, ErrNoTeam) {
 		t.Fatalf("publish: %v", err)
 	}
 	if _, err := r.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{Now: teamNow}); !errors.Is(err, ErrNoTeam) {
@@ -206,7 +206,7 @@ func TestTeamInstallFollowsCatalogAndRollsBack(t *testing.T) {
 	owner := newRegistry(t)
 	_ = owner.SetTeam("sp1", RoleOwner, teamNow)
 	publishedToTeam(t, owner, "acme.demo", "1.0.0")
-	if _, err := owner.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: FirstVersion, Now: teamNow}); err != nil {
+	if _, err := owner.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: TemplateVersion, Now: teamNow}); err != nil {
 		t.Fatal(err)
 	}
 	// A minor in the catalog reaches the install; a major does not.
@@ -219,11 +219,11 @@ func TestTeamInstallFollowsCatalogAndRollsBack(t *testing.T) {
 		t.Fatalf("major waits: %s", got.Version)
 	}
 	// Rolling the catalog back makes the entry 1.1.0 again: the install is already there.
-	e, err := owner.RollbackCatalog("acme.demo", ChannelStable, FirstVersion, teamNow)
+	e, err := owner.RollbackCatalog("acme.demo", ChannelStable, TemplateVersion, teamNow)
 	if err != nil || e.Version != "1.1.0" {
 		t.Fatalf("rollback: %v %+v", err, e)
 	}
-	if _, err := owner.RollbackCatalog("acme.demo", ChannelStable, FirstVersion, teamNow); !errors.Is(err, ErrNoPrevious) {
+	if _, err := owner.RollbackCatalog("acme.demo", ChannelStable, TemplateVersion, teamNow); !errors.Is(err, ErrNoPrevious) {
 		t.Fatalf("only one step is kept: %v", err)
 	}
 	info, _ := owner.Team()
@@ -257,7 +257,7 @@ func TestSnapshotRefusesWhatItShould(t *testing.T) {
 	snap.Installs = []SnapshotInstall{{ID: "acme.demo", Channel: "stable", Version: snap.Catalog[0].Version, Sum: snap.Catalog[0].Sum, Archive: bytes.Repeat([]byte{1}, 64), At: 1}}
 	snap.Catalog[0].Archive = bytes.Repeat([]byte{1}, 64)
 	member := newRegistry(t)
-	problems, _ := member.ApplyTeam(snap, FirstVersion, teamNow)
+	problems, _ := member.ApplyTeam(snap, TemplateVersion, teamNow)
 	if len(problems) == 0 {
 		t.Fatal("want the tampered archive reported")
 	}
@@ -294,7 +294,7 @@ func TestSnapshotInstallsThePackageTheOwnerApproved(t *testing.T) {
 		t.Fatal(err)
 	}
 	e1 := publishedToTeam(t, owner, "acme.demo", "1.0.0")
-	if _, err := owner.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: FirstVersion, By: "ann", Now: teamNow.Add(time.Minute)}); err != nil {
+	if _, err := owner.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: TemplateVersion, By: "ann", Now: teamNow.Add(time.Minute)}); err != nil {
 		t.Fatal(err)
 	}
 	// Someone without owner rights publishes a newer version to the same catalog entry.
@@ -313,7 +313,7 @@ func TestSnapshotInstallsThePackageTheOwnerApproved(t *testing.T) {
 		t.Fatalf("the catalog moved on: %+v", snap.Catalog[0].CatalogEntry)
 	}
 	member := newRegistry(t)
-	if problems, err := member.ApplyTeam(snap, FirstVersion, teamNow.Add(3*time.Minute)); err != nil || len(problems) > 0 {
+	if problems, err := member.ApplyTeam(snap, TemplateVersion, teamNow.Add(3*time.Minute)); err != nil || len(problems) > 0 {
 		t.Fatalf("apply: %v %v", err, problems)
 	}
 	if got, _ := member.Get("acme.demo"); got.Version != "1.0.0" {
@@ -325,7 +325,7 @@ func TestSnapshotInstallsThePackageTheOwnerApproved(t *testing.T) {
 	bad.Installs = []SnapshotInstall{snap.Installs[0]}
 	bad.Installs[0].Sum = e2.Sum
 	fresh := newRegistry(t)
-	problems, err := fresh.ApplyTeam(bad, FirstVersion, teamNow)
+	problems, err := fresh.ApplyTeam(bad, TemplateVersion, teamNow)
 	if err != nil || len(problems) == 0 {
 		t.Fatalf("a wrong sum is a problem: %v %v", err, problems)
 	}
@@ -352,18 +352,18 @@ func TestTeamChangeHookAndAMembersPublishKeepsTheTeamsTime(t *testing.T) {
 		t.Fatalf("the member's publish moved the team's time: %d != %d", snap.At, at)
 	}
 	// The platform's snapshot, made at the same moment the team was set, is taken.
-	if _, err := r.ApplyTeam(TeamSnapshot{Space: "sp1", Role: RoleMember, At: at}, FirstVersion, teamNow); err != nil || calls != 1 {
+	if _, err := r.ApplyTeam(TeamSnapshot{Space: "sp1", Role: RoleMember, At: at}, TemplateVersion, teamNow); err != nil || calls != 1 {
 		t.Fatalf("a snapshot applied from the platform tells no one: %v %d", err, calls)
 	}
 	if err := r.SetTeam("sp1", RoleOwner, teamNow.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	publishedToTeam(t, r, "acme.demo", "1.1.0")                                                                                                               // 2
-	publishedToTeam(t, r, "acme.demo", "1.2.0")                                                                                                               // 3
-	if _, err := r.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: FirstVersion, Now: teamNow.Add(2 * time.Minute)}); err != nil { // 4
+	publishedToTeam(t, r, "acme.demo", "1.1.0")                                                                                                                  // 2
+	publishedToTeam(t, r, "acme.demo", "1.2.0")                                                                                                                  // 3
+	if _, err := r.InstallForTeam("acme.demo", ChannelStable, TeamInstallOptions{HostVersion: TemplateVersion, Now: teamNow.Add(2 * time.Minute)}); err != nil { // 4
 		t.Fatal(err)
 	}
-	if _, err := r.RollbackCatalog("acme.demo", ChannelStable, FirstVersion, teamNow.Add(3*time.Minute)); err != nil { // 5
+	if _, err := r.RollbackCatalog("acme.demo", ChannelStable, TemplateVersion, teamNow.Add(3*time.Minute)); err != nil { // 5
 		t.Fatal(err)
 	}
 	if err := r.UninstallForTeam("acme.demo", teamNow.Add(4*time.Minute)); err != nil { // 6

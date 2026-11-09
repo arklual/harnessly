@@ -49,6 +49,12 @@ export const AGENT_INSTALL_STATUSES = ['ready', 'missing', 'login-required'] as 
 export type AgentInstallStatus = (typeof AGENT_INSTALL_STATUSES)[number];
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const;
 export type Effort = (typeof EFFORTS)[number];
+/**
+ * How the agent asks before it acts: `plan` plans and changes nothing until the plan is accepted, `ask` asks before
+ * edits and commands, `bypass` asks nothing.
+ */
+export const PERMISSION_MODES = ['plan', 'ask', 'bypass'] as const;
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
 export const GOAL_STATUSES = ['active', 'paused', 'met'] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
 export const TITLE_SOURCES = ['user', 'agent', 'first-message'] as const;
@@ -438,6 +444,8 @@ export interface MachineAgent {
   models: AgentModel[];
   /** A running conversation of this CLI takes the `model` command. */
   canSwitchModel: boolean;
+  /** The permission mode a chat that names none starts in on this machine; absent where the machine does not say. */
+  defaultPermission?: PermissionMode;
   /** The vendor setups (Kimi, GLM, Grok) a conversation can start on through this CLI; absent where there are none,
    *  and for a page that does not name the `profiles` cap. Draw only the `configured` ones. */
   profiles?: ProfileOffer[];
@@ -592,6 +600,8 @@ export interface AgentModel {
   defaultEffort: Effort | null;
   /** The model takes Claude Code's ultracode mode; absent when it does not. */
   ultracode?: boolean;
+  /** The model runs in its CLI's fast mode (Claude Code's /fast, Codex's fast tier); absent when it does not. */
+  fast?: boolean;
 }
 export interface MachineLoad {
   at: Ms;
@@ -1244,6 +1254,10 @@ export interface Model {
   id: string;
   effort: Effort | null;
   ultracode?: boolean;
+  /** The CLI's fast mode; absent is off. */
+  fast?: boolean;
+  /** How the agent asks before it acts; absent: the machine's default. */
+  permission?: PermissionMode;
   /** The backend profile the chat runs on (ProfileOffer.id); absent for the CLI's own account. Set when the chat
    *  starts and never changed. A command names it beside the model (`profile`), not here. */
   profile?: ProfileId;
@@ -1272,6 +1286,8 @@ export interface PendingModel {
   id: string;
   effort: Effort | null;
   ultracode?: boolean;
+  fast?: boolean;
+  permission?: PermissionMode;
   since: Ms;
   applying: boolean;
 }
@@ -1906,8 +1922,15 @@ export interface CommandBodies {
   // A stopped conversation's own, or a session the agent CLI kept on the machine that no conversation holds (a new
   // conversation answers it).
   'conversation.resume': OpBody & ({ id: ConvId } | { provider: Provider; sessionId: string; cwd: string });
-  // ultracode: turn the mode on or off with the change; absent keeps the mode the conversation runs.
-  model: OpBody & { id: ConvId; model: string; effort: Effort | null; ultracode?: boolean };
+  // ultracode, fast, permission: turn the mode with the change; absent keeps the mode the conversation runs.
+  model: OpBody & {
+    id: ConvId;
+    model: string;
+    effort: Effort | null;
+    ultracode?: boolean;
+    fast?: boolean;
+    permission?: PermissionMode;
+  };
   'bg.stop': OpBody & { conversationId: ConvId; taskId: string };
   'project.create': OpBody & { path?: string; name?: string };
   // path: the folder the project's next chats start in; name: what it is called. Absent keeps it; one is needed.
@@ -2221,7 +2244,7 @@ const agentModel: Decoder<AgentModel> = object(
     efforts: array(effort),
     defaultEffort: nullable(effort),
   },
-  { ultracode: bool },
+  { ultracode: bool, fast: bool },
 );
 const PROFILE_ID = /^[a-z][a-z0-9-]{0,31}$/;
 const profileId: Decoder<ProfileId> = (v, p) =>
@@ -2242,7 +2265,7 @@ const machineAgent: Decoder<MachineAgent> = object(
     models: array(agentModel),
     canSwitchModel: bool,
   },
-  { profiles: array(profileOffer) },
+  { defaultPermission: oneOf(PERMISSION_MODES), profiles: array(profileOffer) },
 );
 const PROFILE_TAIL = /^….{4}$/u;
 const profileKey: Decoder<ProfileKey> = object({
@@ -2318,7 +2341,10 @@ function legacyUltracode<T>(d: Decoder<T>): Decoder<T> {
   };
 }
 const model: Decoder<Model> = legacyUltracode(
-  object({ id, effort: nullable(effort) }, { ultracode: bool, profile: profileId }),
+  object(
+    { id, effort: nullable(effort) },
+    { ultracode: bool, fast: bool, permission: oneOf(PERMISSION_MODES), profile: profileId },
+  ),
 );
 
 const agentStateKinds = {
@@ -2687,7 +2713,7 @@ const pendingModel: Decoder<PendingModel> = legacyUltracode(
       since: ms,
       applying: bool,
     },
-    { ultracode: bool },
+    { ultracode: bool, fast: bool, permission: oneOf(PERMISSION_MODES) },
   ),
 );
 const modelSwitch: Decoder<ModelSwitch> = object(
@@ -3264,7 +3290,10 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
     object({ opId: id, id: convId }),
   ),
   model: legacyUltracode(
-    object({ opId: id, id: convId, model: id, effort: nullable(effort) }, { ultracode: bool }),
+    object(
+      { opId: id, id: convId, model: id, effort: nullable(effort) },
+      { ultracode: bool, fast: bool, permission: oneOf(PERMISSION_MODES) },
+    ),
   ),
   'bg.stop': object({ ...scoped, taskId: id }),
   'project.create': object({ opId: id }, { path: id, name: id }),

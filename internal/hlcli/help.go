@@ -95,7 +95,7 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
   harnessly app docs export DIR     write the guide and the example packages into DIR, to search and copy
   harnessly app catalog [SECTION]   the targets, contributions, rights, bridge methods and agent tools an app can use
   harnessly app sdk DIR             the SDK files a view on the app's own server (https entry) serves itself
-  harnessly app new ID [--template chat|pane-chat] [--dir DIR]
+  harnessly app new ID [--template chat|pane-chat|widget|vite] [--dir DIR]
                                     write a new package that passes validate, e.g. harnessly app new acme.cashback
   harnessly app validate [DIR] [--strict]
                                     check the package; each problem names its field (--strict: warnings fail too)
@@ -266,7 +266,11 @@ Deliver only a file the person asked to receive ("put it in a zip", "send me the
 changed: those stay in the Files tab and make no card. The file must lie inside the workspace (or /tmp).
 Run it again after you change the file, to hand over the new version.
 `,
-	"app": `harnessly app new|validate|dev|install|list|remove|enable|disable|explain|logs
+	"app": `harnessly app <subcommand> [--help]
+
+Subcommands: docs, catalog, sdk, new, validate (check), install, dev, list, remove, enable, disable, connect, explain, logs,
+publish, promote, rollback, channels, update, share, shares, unshare, team, public, eval, mock-mcp.
+harnessly app <subcommand> --help says what each takes. New here: harnessly app docs, the first chapter.
 
 An app is a package: a Claude Code plugin (instructions.md, skills/, commands/, .mcp.json) plus the manifest
 harnessly/app.json that says where it works (targets: chat, pane, app, sinopia.<kind>), what it may do (permissions)

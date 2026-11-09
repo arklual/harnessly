@@ -44,6 +44,7 @@ export const KEY_COMMANDS = [
   cmd('global', 'pane', 'Mod+Backslash'),
   cmd('global', 'sideChat', 'Mod+Alt+KeyS'),
   cmd('global', 'settings', 'Mod+Comma'),
+  cmd('global', 'notice', 'Mod+KeyJ'),
   cmd('global', 'stepBack', 'Alt+ArrowLeft'),
   cmd('global', 'stepOn', 'Alt+ArrowRight'),
 

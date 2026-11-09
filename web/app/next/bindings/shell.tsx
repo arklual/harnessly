@@ -41,13 +41,14 @@ import { BackgroundButton, TerminalButton } from '@/next/features/header/header-
 import { ChatTerminalContext, ChatTerminalSlotContext } from '@/next/features/terminal/chat-terminal';
 import { notificationsFromChats } from '@/next/features/notifications/from-chats';
 import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
+import { notificationsFromHistory } from '@/next/features/notifications/from-history';
 import NotificationCenter from '@/next/features/notifications/notification-center';
-import NoticeStack from '@/next/features/notifications/notice-stack';
 import { BrowserProfileAskHost } from '@/next/bindings/browser-profile-asks';
 import { BrowserLoginAskHost } from '@/next/bindings/browser-login-asks';
 import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { useNotices } from '@/next/bindings/notices';
-import { useNotify } from '@/next/stores/notices';
+import SmartNoticeHost from '@/next/bindings/smart-notice';
+import { setHistoryPerson, useHistory } from '@/next/stores/notice-history';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
 import { useInstalledApps } from '@/next/features/app-views/api';
@@ -476,7 +477,8 @@ const Shell = ({ owner }: IShellProps) => {
     currentId: besideId ?? currentId,
     onOpenChat: openChat,
   });
-  const notify = useNotify();
+  setHistoryPerson(owner || 'local');
+  const history = useHistory();
 
   const chat = useMemo(
     () => (currentId === null ? null : (model.chats?.find((item) => item.id === currentId) ?? null)),
@@ -488,8 +490,14 @@ const Shell = ({ owner }: IShellProps) => {
   );
   const notificationItems = useMemo(() => {
     const fromChats = notificationsFromChats(model.chats);
-    return fromChats && [...notificationsFromMachines(model.machineNotices), ...fromChats];
-  }, [model.chats, model.machineNotices]);
+    return (
+      fromChats && [
+        ...notificationsFromMachines(model.machineNotices),
+        ...fromChats,
+        ...notificationsFromHistory(history),
+      ]
+    );
+  }, [model.chats, model.machineNotices, history]);
   const [machineReveal, setMachineReveal] = useState(0);
   const unread = notificationItems?.some((item) => item.unread) ?? false;
   const messages = useMessageSearch(model.active, query, searchOpen);
@@ -905,17 +913,25 @@ const Shell = ({ owner }: IShellProps) => {
           }}
         />
       )}
-      {notify.cards && (
-        <NoticeStack
-          notices={notices.notices}
-          now={now}
-          onOpen={notices.onOpen}
-          onDismiss={notices.onDismiss}
-          onDismissAll={notices.onDismissAll}
-          place={notify.place}
-          hideAfterMs={notify.hideAfter * 1000}
-        />
-      )}
+      <SmartNoticeHost
+        person={owner || 'local'}
+        notices={notices.notices}
+        machineNotices={model.machineNotices}
+        machine={boot.k === 'ready' ? model.active : null}
+        currentId={besideId ?? currentId}
+        onOpenChat={openChat}
+        onOpenMachine={() => setMachineReveal((n) => n + 1)}
+        onOpenSettings={() => openScreen({ kind: ROUTE.settings, section: 'notifications' })}
+        onOpenCenter={() => {
+          // The bell over the chat, or the one of the side menu when no chat is open.
+          const header = document.querySelector<HTMLElement>('.hx-header__bell');
+          const side = document.querySelector<HTMLElement>(
+            `[aria-label="${t('next.sidebar.notifications')}"]`,
+          );
+          if (header) toggleNotifications(header, 'bottom');
+          else if (side) toggleNotifications(side, 'right');
+        }}
+      />
       <BrowserProfileAskHost machine={boot.k === 'ready' ? model.active : null} />
       <BrowserLoginAskHost
         machine={boot.k === 'ready' ? model.active : null}

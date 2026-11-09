@@ -8,7 +8,10 @@ import {
   removeQuote,
   useQuotes,
   withQuotes,
+  editQuote,
 } from '@/next/stores/quotes';
+import { FeedNotesBar, showFeedNote, useFeedNoteChips } from '@/next/features/chat/selbar';
+import type { INoteChipGroup } from '@/next/ui/notes/note-chips';
 import { useContextWindow } from '@/next/bindings/use-context-window';
 import { useAgentLimits } from '@/next/bindings/use-limits';
 import { limitsProviderOf } from '@/next/features/limits/model';
@@ -44,6 +47,7 @@ import {
   type IPickerAgent,
 } from '@/next/features/composer/agents';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
+import { rememberModes } from '@/next/features/composer/start-choice';
 import Composer, { type IComposerQuote, type TSendMode } from '@/next/features/composer/composer';
 import { formatAnnotation, renumberBlock, withAnnotations } from '@/next/features/designly/annotation';
 import {
@@ -52,7 +56,7 @@ import {
   dropCarriedNote,
   useCarriedNotes,
 } from '@/next/stores/carried-notes';
-import { noteQuote } from '@/next/features/designly/site-notes';
+import { noteChip } from '@/next/features/designly/site-notes';
 import { clearDesignNotes, patchDesignNotes, useDesignNotes } from '@/next/stores/design-notes';
 import { putFileSelectionChip, useFileSelectionChip } from '@/next/stores/file-selection';
 import {
@@ -126,6 +130,8 @@ const straightTo = (working: boolean): PromoteTo => (working ? 'steer' : 'now');
 /** What a host adds to the dock (a design's notes on its blocks): chips that go with the message, buttons on the bar. */
 export interface IDockExtra {
   quotes: readonly IComposerQuote[];
+  /** The host's annotations (a design's notes on its blocks): numbered chips of their own, like their pins. */
+  notes?: INoteChipGroup;
   onRemoveQuote: (id: string) => void;
   /** The message as it goes: the field's words with the host's own. */
   wrap: (text: string) => string;
@@ -170,8 +176,36 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const uploads = useUploads(machine, conv, files);
   const stash = useFieldStash(conv);
   const quotes = useQuotes(conv);
+  // The annotations of the feed's words: numbered chips of their own, the bar «Аннотирование · N» over the field.
+  const feedChips = useFeedNoteChips(conv);
+  const sendRef = useRef<(() => void) | null>(null);
   // The notes made on a design in the pane beside this chat ride in its field like quotes and go with the message.
   const designNotes = useDesignNotes(conv);
+  // The notes made on a design in the pane: numbered like their pins; the words change in the chip's card.
+  const designChips = useMemo(() => designNotes.map(noteChip), [designNotes]);
+  const noteGroups = useMemo<INoteChipGroup[]>(
+    () => [
+      {
+        key: 'feed',
+        notes: feedChips,
+        onEdit: (id, comment) => editQuote(conv, id, comment),
+        onRemove: (id) => removeQuote(conv, id),
+        onOpen: (id) => showFeedNote(conv, id),
+      },
+      {
+        key: 'design',
+        notes: designChips,
+        onEdit: (id, comment) =>
+          patchDesignNotes(conv, (have) => have.map((n) => (n.id === id ? { ...n, text: comment } : n))),
+        onRemove: (id) => patchDesignNotes(conv, (have) => have.filter((n) => n.id !== id)),
+      },
+    ],
+    [conv, feedChips, designChips],
+  );
+  const allGroups = useMemo(
+    () => (extra?.notes ? [...noteGroups, extra.notes] : noteGroups),
+    [noteGroups, extra],
+  );
   const fileChip = useFileSelectionChip(conv);
   // The notes of a queued message taken back into the field: chips before the new ones, numbered first.
   const carried = useCarriedNotes(conv);
@@ -453,7 +487,12 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     if (choice.model === null) return;
     setModelBusy(true);
     try {
-      const handle = setModel(machine, conv, choice.model, choice.effort, choice.ultracode);
+      const handle = setModel(machine, conv, choice.model, choice.effort, choice.ultracode, {
+        fast: choice.fast === true,
+        permission: choice.permission ?? null,
+      });
+      // The modes are the person's way of working: the next new chat starts in them too.
+      rememberModes(choice);
       const st = handle ? await handle.done : null;
       // The agent kept its model, or the model has no such mode: said in words of the switch, the pill stays true.
       if (st?.k === 'failed') {
@@ -476,9 +515,13 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   // that waits shows only on the switch, said as waiting (the record's pendingModel), until the agent confirms it.
   const wanted = record?.pendingModel ?? record?.model;
   const ultracodeAsked = record?.pendingModel ? record.pendingModel.ultracode === true : null;
+  // The fast and permission modes are shown as the agent last ran them too, an ask that waits only on its control.
+  const fastAsked = record?.pendingModel ? record.pendingModel.fast === true : null;
+  const permissionAsked = record?.pendingModel?.permission ?? null;
 
   return (
     <>
+      <FeedNotesBar conv={conv} count={feedChips.length} onSend={() => sendRef.current?.()} />
       <ConnectionBanner
         connection={machineOff ? undefined : connection}
         machineName={machineName}
@@ -537,8 +580,12 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
                   model: wanted?.id ?? null,
                   effort: wanted?.effort ?? null,
                   ultracode: record.model?.ultracode === true,
+                  fast: record.model?.fast === true,
+                  permission: record.model?.permission ?? null,
                 },
                 ultracodeAsked,
+                fastAsked,
+                permissionAsked,
                 busy: modelBusy,
                 blocked: modelBlocked(agent),
                 agents: [agent],
@@ -558,18 +605,22 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         notes={notes}
         onEditNote={(id, comment) => editDraftAnnotation(conv, id, comment)}
         onRemoveNote={(id) => removeDraftAnnotation(conv, id)}
+        noteGroups={allGroups}
+        sendRef={sendRef}
         attach={attach}
         stash={stash}
         takes={voice.onMic ? takes : null}
         apps={plusApps}
         acceptsChats
         quotes={[
-          ...quotes.map((q) => ({
-            id: q.id,
-            label: quoteLabel(q),
-            title: quoteTitle(q),
-            remark: q.note !== null,
-          })),
+          ...quotes
+            .filter((q) => q.anchor === undefined)
+            .map((q) => ({
+              id: q.id,
+              label: quoteLabel(q),
+              title: quoteTitle(q),
+              remark: q.note !== null,
+            })),
           ...carried.map((note, i) => ({
             id: `${CARRIED_PREFIX}${i}`,
             label: [`#${i + 1}`, note.page, note.comment || note.element].filter(Boolean).join(' '),
@@ -577,7 +628,6 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
             remark: true,
             icon: 'map-pin',
           })),
-          ...designNotes.map((note, i) => noteQuote(note, carried.length + i + 1)),
           ...(fileChip ? [fileSelectionQuote(fileChip.path, fileChip.selection)] : []),
           ...(extra?.quotes ?? []),
         ]}
@@ -586,9 +636,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
           else if (id.startsWith(CARRIED_PREFIX))
             dropCarriedNote(conv, Number(id.slice(CARRIED_PREFIX.length)));
           else if (extra?.quotes.some((q) => q.id === id)) extra.onRemoveQuote(id);
-          else if (designNotes.some((n) => n.id === id)) {
-            patchDesignNotes(conv, (have) => have.filter((n) => n.id !== id));
-          } else removeQuote(conv, id);
+          else removeQuote(conv, id);
         }}
         tools={
           extra?.tools || appButtons.length > 0 ? (

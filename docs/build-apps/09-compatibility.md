@@ -26,7 +26,7 @@ version that has what you use; leave the upper end open.
 ## Ask whether the host can, not which version it is
 
 ```js
-const hl = await harnessly.connect();
+const hl = await harnessly.connect({ protocol: 2 });
 if (hl.has('files.read')) {
   const text = await hl.files.read('README.md');
 }
@@ -41,7 +41,7 @@ method is simply false: the app goes on without it.
 A call is refused when the app lacks the right, the place does not allow it, or the host does not do it. Two ways to
 meet it:
 
-- **Protocol 1 (the default).** The call rejects with `HarnesslyError`; `error.code` says why. Catch it:
+- **Protocol 1 (what `connect()` does without an argument, kept for apps written before 2).** The call rejects with `HarnesslyError`; `error.code` says why. Catch it:
 
   ```js
   try {
@@ -51,7 +51,7 @@ meet it:
   }
   ```
 
-- **Protocol 2.** Ask for it at the handshake, and every method answers a refusal as a value instead of rejecting:
+- **Protocol 2 (use it in a new app: the templates do).** Ask for it at the handshake, and every method answers a refusal as a value instead of rejecting:
 
   ```js
   const hl = await harnessly.connect({ protocol: 2 });

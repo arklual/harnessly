@@ -148,3 +148,22 @@ func TestAppViewEnterKeepsTheSlot(t *testing.T) {
 		t.Fatalf("an app view's enter wipes the slot: %v", h)
 	}
 }
+
+func TestSlotOriginOKLetsAViewAssetSayNull(t *testing.T) {
+	sess := &previewSession{app: "https://app.example", target: devtools.Target{Kind: "port", Port: 3000}}
+	for _, c := range []struct {
+		name, from string
+		asset, ok  bool
+	}{
+		{"no Origin", "", false, true},
+		{"the slot itself", "https://slot.example", false, true},
+		{"the app", "https://app.example", false, true},
+		{"opaque origin, a view's file", "null", true, true},
+		{"opaque origin, anything else", "null", false, false},
+		{"another site, a view's file", "https://evil.example", true, false},
+	} {
+		if got := slotOriginOK(c.from, "https://slot.example", sess, c.asset); got != c.ok {
+			t.Errorf("%s: %v, want %v", c.name, got, c.ok)
+		}
+	}
+}

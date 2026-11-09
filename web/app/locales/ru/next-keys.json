@@ -74,5 +74,6 @@
   "next.keys.cmd.site.pick": "Выбрать место для комментария",
   "next.keys.cmd.site.stopInspect": "Выйти из выбора элемента",
   "next.keys.cmd.files.quickOpen": "Перейти к файлу",
-  "next.keys.cmd.files.find": "Найти в файлах"
+  "next.keys.cmd.files.find": "Найти в файлах",
+  "next.keys.cmd.global.notice": "Раскрыть умное уведомление"
 }

@@ -23,6 +23,7 @@ const refusalOf = (e) => {
   else if (code === 'host_unavailable' || /removed from the SDK|method not found|no method/.test(e?.message || '')) kind = 'unsupported';
   const out = { error: kind, code, message: e?.message || code };
   if (typeof e?.version === 'number') out.version = e.version;
+  if (e?.signIn) out.signIn = e.signIn;
   return out;
 };
 const isRefusal = (v) => v !== null && typeof v === 'object' && typeof v.error === 'string' && typeof v.code === 'string';
@@ -75,6 +76,9 @@ const errorOf = (e) => {
   const err = new HarnesslyError(e?.data?.code || 'host_unavailable', e?.message);
   // A conflict says the version the key has now.
   if (typeof e?.data?.version === 'number') err.version = e.data.version;
+  // A refused sign-in says where the person signs in (the host shows «Войти»; the view cannot sign in by itself).
+  const signIn = e?.data?.signIn;
+  if (signIn !== null && typeof signIn === 'object') err.signIn = { ...signIn };
   return err;
 };
 

@@ -28,7 +28,7 @@ review/
   CHANGELOG.md
 ```
 
-`harnessly app new` has two templates: `chat` (the default, this one) and `pane-chat` (adds a view).
+`harnessly app new` has four templates: `chat` (the default, this one), `pane-chat` (adds a view), `widget` (a card in the chat) and `vite` (a view built with Vite + React; see [from zero in 5 minutes](00-five-minutes.md)).
 
 ## The manifest
 

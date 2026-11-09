@@ -50,13 +50,21 @@ describe('the switches', () => {
     });
   });
 
-  it('keep a place and a time to hide only from their lists', () => {
-    expect(parseNotify(JSON.stringify({ place: 'bottom-left', hideAfter: 10, cards: false }))).toEqual({
+  it('keep a place only from its list, and the sounds one by one', () => {
+    expect(
+      parseNotify(JSON.stringify({ v: 2, place: 'bottom-left', cards: false, sounds: { done: true, x: 1 } })),
+    ).toEqual({
       ...DEFAULT_NOTIFY,
       place: 'bottom-left',
-      hideAfter: 10,
       cards: false,
+      sounds: { ...DEFAULT_NOTIFY.sounds, done: true },
     });
-    expect(parseNotify(JSON.stringify({ place: 'middle', hideAfter: 7 }))).toEqual(DEFAULT_NOTIFY);
+    expect(parseNotify(JSON.stringify({ place: 'middle' }))).toEqual(DEFAULT_NOTIFY);
+  });
+
+  it('move the old default corner to the field, but keep a corner picked after it', () => {
+    expect(parseNotify(JSON.stringify({ place: 'top-right' })).place).toBe('bottom-center');
+    expect(parseNotify(JSON.stringify({ place: 'top-left' })).place).toBe('top-left');
+    expect(parseNotify(JSON.stringify({ v: 2, place: 'top-right' })).place).toBe('top-right');
   });
 });

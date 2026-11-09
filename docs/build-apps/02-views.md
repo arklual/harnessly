@@ -28,8 +28,9 @@ harnessly open app:acme.notes       # the pane tab; a view with the app target a
 
 ```js
 // ui/main.js: a classic script, not a module
-harnessly.connect().then(async (hl) => {
-  const note = (await hl.storage.chat.get('note')) ?? '';
+harnessly.connect({ protocol: 2 }).then(async (hl) => {
+  const got = await hl.storage.chat.get('note');
+  const note = hl.refused(got) ? '' : (got ?? '');
   const area = document.createElement('textarea');
   area.value = note;
   area.disabled = hl.context.readOnly === true;
@@ -89,9 +90,11 @@ view becomes visible (the `visibility` event). The `tool-result` event is not co
 The frame is sandboxed without `allow-same-origin` on an origin of its own. Consequences:
 
 - `localStorage` and cookies are not there. Use `hl.storage`.
-- **Classic scripts only.** The frame's opaque origin sends the slot's cookie with classic scripts, stylesheets and images, but not with
-  module scripts, fonts or `fetch` of your own files without credentials: those come back 401. Ship data as a script that sets a global.
-  A bundler is fine if it writes one classic file (an IIFE). The SDK is also at `/__hl/app-sdk.mjs` for a bundler to import.
+- **Addresses are relative.** The view is served with its session in the path (`/<session>/<app>/ui/index.html`). Classic scripts,
+  module scripts, styles, fonts and `fetch` of the view's own files all work (host 0.16.198 and later), as long as the address
+  is relative to the page: `main.js`, `./assets/app.js`. An address from the root (`/assets/app.js`) leaves the session out and comes
+  back 401; `validate` warns of it. A bundler needs its base set to `./` (Vite: `base: './'`). The SDK is at `/__hl/app-sdk.js`
+  (a classic script) and `/__hl/app-sdk.mjs` (a module); both paths work from the root. See [from zero in 5 minutes](00-five-minutes.md).
 - No inline scripts and no `eval` (`script-src 'self'`). Inline styles are allowed.
 - Nothing leaves without `network`: `connect-src` is `'none'` until `network.connect` lists a host. See [Backend](03-backend.md).
 - Only the view's entry, its folder and `ui/` are served. A file up to 10 MB, dot-files never.

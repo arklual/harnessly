@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -259,6 +261,11 @@ type liveMachine struct {
 	health  *machines.HealthMonitor
 	// offers are the profiles a provider's CLI can start a chat on; nil is a machine without profiles.
 	offers func(wire.Provider) []wire.ProfileOffer
+	// codexConfig is Codex's config.toml, whose approval_policy is a Codex chat's default when the runtime skips nothing.
+	codexConfig string
+	// skip is the runtime's dangerouslySkipPermissions, the permission mode a chat that names none starts in; nil says
+	// nothing of it.
+	skip func() bool
 
 	mu      sync.Mutex
 	machine wire.Machine
@@ -374,6 +381,12 @@ func (m *liveMachine) refresh() {
 		return
 	}
 	agents := m.withOffers(agentsNow(m.check(), m.models))
+	if m.skip != nil {
+		skip := m.skip()
+		for i := range agents {
+			agents[i].DefaultPermission = defaultPermissionOf(agents[i].Provider, skip, m.codexConfig)
+		}
+	}
 	m.mu.Lock()
 	changed := !reflect.DeepEqual(agents, m.machine.Agents)
 	m.machine.Agents = agents
@@ -486,4 +499,28 @@ func (m *liveMachine) run(ctx context.Context) {
 			m.refresh()
 		}
 	}
+}
+
+// codexNeverAsksRE is a top-level `approval_policy = "never"` of Codex's config.toml.
+var codexNeverAsksRE = regexp.MustCompile(`(?m)^\s*approval_policy\s*=\s*["']never["']`)
+
+// defaultPermissionOf is the permission mode a chat that names none starts in: bypass when the runtime skips
+// permissions; a Claude chat asks (the launch says so); a Codex chat runs on its config.toml, which asks unless its
+// approval_policy is "never" (read before its first table).
+func defaultPermissionOf(p wire.Provider, skip bool, codexConfig string) wire.PermissionMode {
+	if skip {
+		return wire.PermissionBypass
+	}
+	if p != wire.ProviderCodex || codexConfig == "" {
+		return wire.PermissionAsk
+	}
+	raw, err := os.ReadFile(codexConfig)
+	if err != nil {
+		return wire.PermissionAsk
+	}
+	head, _, _ := strings.Cut(string(raw), "\n[")
+	if codexNeverAsksRE.MatchString(head) {
+		return wire.PermissionBypass
+	}
+	return wire.PermissionAsk
 }

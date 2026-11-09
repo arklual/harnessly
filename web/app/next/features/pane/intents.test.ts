@@ -4,6 +4,7 @@ import {
   parseIntents,
   planIntents,
   requestOf,
+  requestsOf,
   type IPaneIntent,
   type TIntentCommand,
 } from '@/next/features/pane/intents';
@@ -138,5 +139,28 @@ describe('requestOf', () => {
       reload: true,
     });
     expect(requestOf(open('nonsense'))).toBeNull();
+  });
+});
+
+// only the agent's own `open` brings the pane out; what the runtime asked by itself waits behind.
+describe('requestsOf', () => {
+  it('splits what the agent asked from what the runtime asked by itself', () => {
+    const got = requestsOf([
+      intent('a', open('artifacts', '/agents/docs/plan')),
+      intent('b', open('agent-browser', undefined, { auto: true })),
+      intent('c', open('design', 'landing', { auto: true })),
+      intent('d', open('artifacts', '/agents/docs/plan', { auto: true, reload: true })),
+      intent('e', { kind: 'show' }),
+      intent('f', open('nowhere')),
+    ]);
+    expect(got.asked).toEqual([
+      { k: 'legacy', kind: 'artifacts', target: '/agents/docs/plan', reload: false },
+      { k: 'show', reload: false },
+    ]);
+    expect(got.quiet).toEqual([
+      { k: 'agent-browser', reload: false },
+      { k: 'design', target: 'landing', reload: false },
+      { k: 'legacy', kind: 'artifacts', target: '/agents/docs/plan', reload: true },
+    ]);
   });
 });

@@ -166,3 +166,46 @@ func TestDeliveredIsTheLatestHandOver(t *testing.T) {
 		}
 	}
 }
+
+// what `open` showed is a card by the exact kind of its address. A document the platform's reader shows is a
+// page, not a stand; a stand is one name under the stands' domain, a dev server a port of this machine; any other site
+// makes no card. The deployment's name of the command is read as `harnessly open` is.
+func TestOpenedAddressIsItsOwnKind(t *testing.T) {
+	t.Setenv("RUNTIME_DOCS_HOST", "a.example.com")
+	t.Setenv("RUNTIME_STAND_DOMAIN", ".preview.example.com")
+	t.Setenv("RUNTIME_PLATFORM_HOST", "ai.example.com")
+	t.Setenv("RUNTIME_DOCS_READER_PATH", "/agents/docs/")
+	t.Setenv("RUNTIME_CLI_NAME", "acme")
+	cases := map[string]string{
+		"harnessly open https://a.example.com/a/plan":                 "artifact",
+		"harnessly open https://a.example.com/b/flow?k=key1":          "artifact",
+		"harnessly open https://ai.example.com/agents/docs/plan":      "artifact",
+		"acme open https://ai.example.com/agents/docs/plan/":          "artifact",
+		"acme open https://stand-1.preview.example.com/adminpanel":    "stand",
+		"acme open http://localhost:4400/dev":                         "stand",
+		"acme open https://gitlab.example.com/g/p/-/merge_requests/5": "mr",
+		"acme open https://ai.example.com/agents/chat/42":             "",
+		"acme open https://example.org/page":                          "",
+		"other open https://stand-1.preview.example.com/":             "",
+	}
+	for cmd, want := range cases {
+		got := ""
+		for _, o := range outputs.Of(outputs.FromEnv(), outputs.Call{Tool: "Bash", Command: cmd}, outputs.LinksIn(cmd)) {
+			if got == "" {
+				got = string(o.Kind)
+			}
+		}
+		// A stand named in the command is a stand card on its own; only the open's card is asked about here.
+		if strings.HasPrefix(cmd, "other ") {
+			got = ""
+		}
+		if got != want {
+			t.Errorf("%s → %q, want %q", cmd, got, want)
+		}
+	}
+	if !outputs.ArtifactLink(outputs.FromEnv(), "https://AI.example.com/agents/docs/plan") ||
+		outputs.ArtifactLink(outputs.FromEnv(), "https://ai.example.com/agents/docs/") ||
+		outputs.ArtifactLink(outputs.FromEnv(), "https://ai.example.com/agents/docs/a/b") {
+		t.Fatal("the reader's document is told by its exact path")
+	}
+}

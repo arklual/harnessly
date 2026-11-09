@@ -6,6 +6,7 @@ import type {
   Effort,
   ImageGen,
   MessageRef,
+  PermissionMode,
   TerminalAside,
   TurnOutput,
 } from '@/next/protocol/v2';
@@ -279,6 +280,10 @@ export interface SwitchModel {
   effort: Effort | null;
   /** Claude Code's ultracode mode; absent is off. */
   ultracode?: boolean;
+  /** The CLI's fast mode; absent is off. */
+  fast?: boolean;
+  /** How the agent asks before it acts; absent: the machine's default. */
+  permission?: PermissionMode;
 }
 
 /** A change of model the runtime applied, drawn where it happened: «Model: Opus 5.5 → Sonnet 5.5 · effort high». */

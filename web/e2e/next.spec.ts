@@ -1827,27 +1827,26 @@ test('10. a new design opens with its chat; an edit picked on its page goes to t
   await note.locator('.hx-ann__step button[aria-label="More"]').click();
   await note.locator('.hx-ann__range input').fill('50');
   await expect.poll(async () => (await look()).slice(0, 2)).toEqual(['2px', '0.5']);
-  await note.locator('.hx-ann__input').fill('Make it bigger');
-  await note.locator('.hx-ann__ok').click();
+  await note.locator('.hx-note__input').fill('Make it bigger');
+  await note.locator('.hx-note__btn[data-primary]').click();
   await expect(note).toHaveCount(0);
   // It stays on the page while the note is there.
   await expect.poll(async () => (await look()).slice(0, 2)).toEqual(['2px', '0.5']);
   // The note stays on the page as a pin with its number; the bar counts it.
-  await expect(page.locator('.hx-site__pins .hx-npin__dot')).toHaveText('1');
-  await expect(page.locator('.hx-notesbar')).toContainText('1 edit');
-  // In the island the notes are one strip over the field: its count, and a list with the words, where the note is
-  // taken back to its card.
+  await expect(page.locator('.hx-site__pins .hx-npin .hx-note__dot')).toHaveText('1');
+  await expect(page.locator('.hx-notesbar')).toContainText('Annotating · 1');
+  // In the island each note is a numbered chip over the field: its card says what was changed on the block, and a
+  // press on the chip takes the note back to its card.
   await page.locator('.hx-site-modes__item[aria-label="Island"]').click();
-  await expect(page.locator('.hx-anns__main')).toContainText('1');
-  await page.locator('.hx-anns__main').click();
-  await expect(page.locator('.hx-anns__list .hx-anns__text')).toHaveText('Make it bigger');
-  await expect(page.locator('.hx-anns__list .hx-anns__diff')).toHaveText(['Radius → 2 px', 'Opacity → 50%']);
-  await page.locator('.hx-anns__act[aria-label="Edit"]').click();
-  await expect(page.locator('.hx-note .hx-ann__input')).toHaveValue('Make it bigger');
+  const chip = page.locator('.hx-island__chips .hx-pagenote');
+  await expect(chip.locator('.hx-pagenote__num')).toHaveText('1');
+  await expect(chip.locator('.hx-pagenote__facts')).toContainText('Radius → 2 px, Opacity → 50%');
+  await chip.locator('.hx-pagenote__open').click();
+  await expect(page.locator('.hx-note .hx-note__input')).toHaveValue('Make it bigger');
   await page.locator('.hx-note .hx-ann__cancel').click();
   await expect(page.locator('.hx-note')).toHaveCount(0);
   await page.locator('.hx-site-modes__item[aria-label="Edits"]').click();
-  await page.locator('.hx-notesbar__send').click();
+  await page.locator('.hx-notesbar .hx-note__send').click();
   // Sent: the agent changes the source, and the page gives the block back what it had.
   await expect.poll(look).toEqual(before);
 

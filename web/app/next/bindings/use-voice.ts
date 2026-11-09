@@ -461,6 +461,8 @@ export const useVoice = (
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
+    // finish reads the live session through refs: the listener only has to come and go with the recording.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listening]);
 
   // Leaving the field (another chat, another screen) ends the recording as «stop» does, not as «cancel»: the microphone

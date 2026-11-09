@@ -123,6 +123,8 @@ export interface IMachineAlert {
   key: string;
   icon: string;
   text: string;
+  /** What runs short first: the smart notice says it in words. */
+  metric: 'disk' | 'mem' | 'cpu';
 }
 
 export interface IMachineCard {
