@@ -54,6 +54,8 @@ type PeerOutbound struct {
 	FromTitle string `json:"fromTitle"`
 	Text      string `json:"text"`
 	Via       string `json:"via"`
+	Revoke    bool   `json:"revoke,omitempty"`
+	TTL       int64  `json:"ttl,omitempty"`
 }
 
 // PeerInbound is a message for a chat of the machine. Same JSON as the runtime's peers.Inbound.
@@ -64,6 +66,8 @@ type PeerInbound struct {
 	FromTitle string `json:"fromTitle"`
 	Text      string `json:"text"`
 	Via       string `json:"via"`
+	Revoke    bool   `json:"revoke,omitempty"`
+	TTL       int64  `json:"ttl,omitempty"`
 }
 
 // PeerResult is what came of a message. Same JSON as the runtime's peers.Result.
@@ -79,6 +83,7 @@ type PeerResult struct {
 const (
 	PeerDelivered   = "delivered"
 	PeerRefused     = "refused"
+	PeerHeld        = "held" // waits for the owner of the machine to accept it
 	PeerOff         = "off"
 	PeerRateLimited = "rate-limited"
 	PeerBadRef      = "bad-ref"
@@ -88,6 +93,11 @@ const (
 	PeerEmpty       = "empty"
 	PeerTooLong     = "too-long"
 )
+
+// PeerStateKnown says whether a result's state is one a runtime gives.
+func PeerStateKnown(state string) bool {
+	return state == PeerDelivered || state == PeerRefused || state == PeerHeld
+}
 
 // PeerRefusal is a refused PeerResult.
 func PeerRefusal(id, reason, detail string) PeerResult {

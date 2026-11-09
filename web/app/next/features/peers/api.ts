@@ -12,6 +12,7 @@ const SEND_TIMEOUT_MS = 20_000;
 export const PEER_SCOPES = ['team', 'list'] as const;
 export const PEER_DELIVERIES = ['step', 'turn'] as const;
 export const PEER_RULE_KINDS = ['machine', 'person'] as const;
+export const PEER_APPROVALS = ['none', 'others'] as const;
 
 export interface IPeerSender {
   person: string;
@@ -32,6 +33,8 @@ export interface IPeerSettings {
   scope: (typeof PEER_SCOPES)[number];
   delivery: (typeof PEER_DELIVERIES)[number];
   rules: IPeerRule[];
+  /** others: a message of anyone but this machine's owner waits for the owner's approval. */
+  approve: (typeof PEER_APPROVALS)[number];
   rev: number;
 }
 
@@ -47,9 +50,21 @@ export interface IPeerRecord {
   from: IPeerParty;
   to: IPeerParty;
   text: string;
-  state: 'delivered' | 'refused';
+  state: 'delivered' | 'refused' | 'held';
   reason: TPeerReason | null;
   via: string;
+  /** Who decided on a held message: the owner, "sender" (taken back) or "expired". */
+  by: string;
+}
+
+/** A message waiting for the owner's approval. */
+export interface IPeerHeld {
+  id: string;
+  at: number;
+  expires: number;
+  from: IPeerParty;
+  to: IPeerParty;
+  text: string;
 }
 
 export interface IPeersView {
@@ -59,6 +74,7 @@ export interface IPeersView {
   relay: boolean;
   senders: IPeerSender[];
   audit: IPeerRecord[];
+  held: IPeerHeld[];
 }
 
 const obj = (v: unknown, what: string): Record<string, unknown> => {
@@ -108,6 +124,7 @@ export const readSettings = (v: unknown): IPeerSettings => {
         allow: r.allow === true,
       };
     }),
+    approve: o.approve === 'others' ? 'others' : 'none',
     rev: typeof o.rev === 'number' ? o.rev : 0,
   };
 };
@@ -128,9 +145,21 @@ export const readView = (v: unknown): IPeersView => {
         from: readParty(r.from),
         to: readParty(r.to),
         text: str(r.text),
-        state: oneOf(r.state, ['delivered', 'refused'] as const, 'state'),
+        state: oneOf(r.state, ['delivered', 'refused', 'held'] as const, 'state'),
         reason: reasonOf(r.reason),
         via: str(r.via),
+        by: str(r.by),
+      };
+    }),
+    held: (Array.isArray(o.held) ? o.held : []).map((raw) => {
+      const h = obj(raw, 'held');
+      return {
+        id: str(h.id),
+        at: typeof h.at === 'number' ? h.at : 0,
+        expires: typeof h.expires === 'number' ? h.expires : 0,
+        from: readParty(h.from),
+        to: readParty(h.to),
+        text: str(h.text),
       };
     }),
   };
@@ -144,6 +173,7 @@ export const readOutcome = (v: unknown): TPeerOutcome => {
     const line = to ? [str(to.owner), str(to.machineName), str(to.title)].filter(Boolean).join(' · ') : '';
     return { ok: true, to: line || null };
   }
+  if (o.state === 'held') return { ok: true, to: null, held: true };
   return { ok: false, reason: reasonOf(o.reason) };
 };
 
@@ -154,6 +184,16 @@ export const loadPeers = (machine: MachineId) => getPage(settingsPath(machine), 
 /** Keeps the settings if they are still at `settings.rev`; the answer is the section as it is now. */
 export const savePeers = (machine: MachineId, settings: IPeerSettings) =>
   sendBody('PUT', settingsPath(machine), settings, readView, PEERS_TIMEOUT_MS);
+
+/** The owner's word on a held message; the answer is the section as it is now. */
+export const decideHeld = (machine: MachineId, id: string, accept: boolean) =>
+  sendBody(
+    'POST',
+    runtimePath(platformPath('/peers/held'), machine),
+    { id, accept },
+    (v) => readView(obj(v, 'held answer').view),
+    SEND_TIMEOUT_MS,
+  );
 
 /** The person's own message to another agent's chat, from the chat it answers. */
 export const sendPeer = async (

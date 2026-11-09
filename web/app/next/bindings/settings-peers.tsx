@@ -4,7 +4,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { pageText } from '@/next/bindings/outcome';
 import type { Pending } from '@/next/bindings/settings-agents';
-import { loadPeers, savePeers, type IPeerSettings, type IPeersView } from '@/next/features/peers/api';
+import {
+  decideHeld,
+  loadPeers,
+  savePeers,
+  type IPeerSettings,
+  type IPeersView,
+} from '@/next/features/peers/api';
 import PeersSection from '@/next/features/settings/peers-section';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
@@ -59,6 +65,17 @@ export const PeersPage = ({ machine, now, pending }: IPeersPageProps) => {
       setState({ k: 'ready', view: res.value });
     });
 
+  const decide = (id: string, accept: boolean) =>
+    void pending.run(`held:${id}`, t('next.settings.failed'), async () => {
+      const res = await decideHeld(machine, id, accept);
+      if (!('ok' in res)) {
+        // Decided elsewhere, taken back or expired meanwhile: show what waits now.
+        retry();
+        throw new Error(pageText(res));
+      }
+      setState({ k: 'ready', view: res.value });
+    });
+
   const fleet = (machines ?? []).map(({ machine: m }) => ({ id: m.id, name: m.name }));
   return (
     <PeersSection
@@ -68,6 +85,7 @@ export const PeersPage = ({ machine, now, pending }: IPeersPageProps) => {
       now={now}
       busy={new Set(pending.pending.keys())}
       onChange={change}
+      onDecide={decide}
     />
   );
 };

@@ -90,7 +90,7 @@ export interface IPeerLogRow {
   why: string | null;
 }
 
-const partyLine = (p: IPeerRecord['from']) =>
+export const partyLine = (p: IPeerRecord['from']) =>
   [p.personName || p.person, p.machineName || p.machine, p.title]
     .filter((part) => part.length > 0)
     .join(' · ');
@@ -100,6 +100,9 @@ export const peerLogRows = (audit: readonly IPeerRecord[], now: number): IPeerLo
     const refused = r.state === 'refused';
     let why: string | null = null;
     if (refused) why = r.reason ? t(`next.peers.reason.${r.reason}`) : t('next.peers.notDelivered');
+    if (r.state === 'held') why = t('next.peers.held');
+    if (r.by && r.by !== 'sender' && r.by !== 'expired')
+      why = `${why ?? t('next.peers.delivered')} · ${t('next.settings.peers.decidedBy', { who: r.by })}`;
     return {
       id: r.id,
       dir: r.dir,

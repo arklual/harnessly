@@ -149,7 +149,8 @@ func (h *Hub) peersSend(w http.ResponseWriter, r *http.Request) error {
 	if l == nil {
 		return answer(hubproto.PeerRefusal(msg.ID, hubproto.PeerUnreachable, "the machine is offline"))
 	}
-	in := hubproto.PeerInbound{ID: msg.ID, To: conv, FromConv: msg.FromConv, FromTitle: msg.FromTitle, Text: msg.Text, Via: msg.Via}
+	in := hubproto.PeerInbound{ID: msg.ID, To: conv, FromConv: msg.FromConv, FromTitle: msg.FromTitle, Text: msg.Text, Via: msg.Via,
+		Revoke: msg.Revoke, TTL: msg.TTL}
 	ctx, cancel := context.WithTimeout(r.Context(), peersDeliverWait)
 	defer cancel()
 	var res hubproto.PeerResult
@@ -160,7 +161,7 @@ func (h *Hub) peersSend(w http.ResponseWriter, r *http.Request) error {
 		}
 		return answer(hubproto.PeerRefusal(msg.ID, hubproto.PeerUnreachable, ""))
 	}
-	if res.State != hubproto.PeerDelivered && res.State != hubproto.PeerRefused {
+	if !hubproto.PeerStateKnown(res.State) {
 		return answer(hubproto.PeerRefusal(msg.ID, hubproto.PeerUnreachable, "the machine gave no result"))
 	}
 	res.ID = msg.ID

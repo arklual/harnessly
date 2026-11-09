@@ -35,7 +35,13 @@ type State string
 const (
 	StateDelivered State = "delivered" // the conversation took it: it is in its agent's queue or turn
 	StateRefused   State = "refused"   // refused before it reached any agent; Reason says why
+	StateHeld      State = "held"      // waits for the owner's approval (Settings.Approve) before it reaches the agent
 )
+
+// Known says whether st is a state a result may carry.
+func (st State) Known() bool {
+	return st == StateDelivered || st == StateRefused || st == StateHeld
+}
 
 // Record is one message as the audit keeps it: who, to whom, the beginning of the text, and what came of it.
 type Record struct {
@@ -49,6 +55,9 @@ type Record struct {
 	Reason Refusal   `json:"reason"`
 	// Via: "agent", or "person" for a reply typed in the card.
 	Via string `json:"via"`
+	// By is who decided on a held message: the owner who accepted or rejected it, "sender" for one taken back,
+	// "expired" for one nobody decided on in time.
+	By string `json:"by,omitempty"`
 }
 
 // AuditKept is how many records the audit keeps, the newest; AuditText how much of a text.

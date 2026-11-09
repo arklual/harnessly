@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // The chats of other agents, on this machine and the fleet's others, and messages to them (internal/peers).
@@ -41,14 +42,20 @@ var peerReasons = map[string]string{
 	"unreachable":  "the other machine did not answer",
 	"bad-ref":      "the address is <machine>/<conversation id>, as harnessly peers lists them",
 	"failed":       "the chat did not take the message",
+	"rejected":     "the owner of that machine did not accept the message",
+	"expired":      "the message waited for the owner's approval past its time",
+	"revoked":      "the message was taken back before the owner decided",
 }
 
 func (c *cli) peers(args []string) error {
 	if len(args) > 0 && args[0] == "send" {
 		return c.peerSend(args[1:])
 	}
+	if len(args) > 0 && args[0] == "revoke" {
+		return c.peerRevoke(args[1:])
+	}
 	if len(args) > 0 && args[0] != "list" && args[0] != "ls" {
-		return usageErr("peers takes list or send: harnessly peers [list], harnessly peers send REF TEXT...")
+		return usageErr("peers takes list, send or revoke: harnessly peers [list], harnessly peers send [--ttl 2h] [--id ID] REF TEXT..., harnessly peers revoke REF ID")
 	}
 	raw, err := c.request("GET", "/api/cli/peers", nil, nil)
 	if err != nil {
@@ -78,6 +85,21 @@ func (c *cli) peers(args []string) error {
 }
 
 func (c *cli) peerSend(args []string) error {
+	body := map[string]any{"session": c.session()}
+	for len(args) > 1 && (args[0] == "--ttl" || args[0] == "--id") {
+		switch args[0] {
+		case "--ttl":
+			d, err := time.ParseDuration(args[1])
+			if err != nil || d <= 0 {
+				return usageErr("--ttl is how long the message may wait for the owner's approval, like 30m or 2h")
+			}
+			body["ttl"] = int64(d / time.Second)
+		case "--id":
+			// The same id again never delivers twice: it answers what came of the first.
+			body["id"] = args[1]
+		}
+		args = args[2:]
+	}
 	if len(args) < 2 {
 		return usageErr("peers send needs the chat and the text: harnessly peers send REF TEXT... (or - to read stdin)")
 	}
@@ -89,10 +111,28 @@ func (c *cli) peerSend(args []string) error {
 		}
 		text = string(raw)
 	}
-	raw, err := c.request("POST", "/api/cli/peers/send", url.Values{}, map[string]any{"session": c.session(), "to": ref, "text": text})
+	body["to"], body["text"] = ref, text
+	raw, err := c.request("POST", "/api/cli/peers/send", url.Values{}, body)
 	if err != nil {
 		return err
 	}
+	return c.peerAnswer(raw, ref)
+}
+
+func (c *cli) peerRevoke(args []string) error {
+	if len(args) != 2 {
+		return usageErr("peers revoke needs the chat and the message id: harnessly peers revoke REF ID")
+	}
+	raw, err := c.request("POST", "/api/cli/peers/revoke", url.Values{}, map[string]any{"to": args[0], "id": args[1]})
+	if err != nil {
+		return err
+	}
+	return c.peerAnswer(raw, args[0])
+}
+
+// peerAnswer prints what came of a message: delivered, held for the other owner (with the id to follow or take it
+// back), or the refusal in words.
+func (c *cli) peerAnswer(raw []byte, ref string) error {
 	if c.json {
 		c.printRaw(raw)
 	}
@@ -107,6 +147,13 @@ func (c *cli) peerSend(args []string) error {
 				who = strings.Join(nonEmpty(r.To.Owner, r.To.MachineName, r.To.Title), " · ") + " (" + r.To.Ref + ")"
 			}
 			c.out("delivered → %s\n", who)
+		}
+		return nil
+	}
+	if r.State == "held" {
+		if !c.json {
+			c.out("held → %s waits for its owner's approval; id %s (send again with --id %s to see what came of it, take it back with: harnessly peers revoke %s %s)\n",
+				ref, r.ID, r.ID, ref, r.ID)
 		}
 		return nil
 	}

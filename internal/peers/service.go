@@ -54,6 +54,10 @@ type Outbound struct {
 	FromTitle string `json:"fromTitle"`
 	Text      string `json:"text"`
 	Via       string `json:"via"`
+	// Revoke takes back the held message of the same id instead of sending one (Text is empty then).
+	Revoke bool `json:"revoke,omitempty"`
+	// TTL is how long, in seconds, the message may wait for the owner's approval; 0 is HeldTTL, past MaxHeldTTL is cut.
+	TTL int64 `json:"ttl,omitempty"`
 }
 
 // Inbound is a message for one of this machine's chats; its sender comes from elsewhere (identity.go).
@@ -64,6 +68,10 @@ type Inbound struct {
 	FromTitle string `json:"fromTitle"`
 	Text      string `json:"text"`
 	Via       string `json:"via"`
+	// Revoke takes back the held message of the same id instead of sending one (Text is empty then).
+	Revoke bool `json:"revoke,omitempty"`
+	// TTL is how long, in seconds, the message may wait for the owner's approval; 0 is HeldTTL, past MaxHeldTTL is cut.
+	TTL int64 `json:"ttl,omitempty"`
 }
 
 // Result is what came of a message: delivered (in the chat's queue or turn) or refused with a reason the sender sees.
@@ -103,6 +111,7 @@ type Service struct {
 	sent    map[string][]time.Time
 	results map[string]Result
 	order   []string
+	held    map[string]*Held
 }
 
 func (s *Service) now() time.Time {
@@ -240,6 +249,13 @@ func (s *Service) Receive(ctx context.Context, sender Sender, in Inbound) Result
 		in.ID = NewID()
 	}
 	key := sender.Machine + "/" + in.ID
+	if in.Revoke {
+		s.expire()
+		if !s.allowRate(sender, now) {
+			return refused(in.ID, RefuseRateLimited, "")
+		}
+		return s.revoke(sender, in.ID)
+	}
 	if r, ok := s.remembered(key); ok {
 		return r
 	}
@@ -292,6 +308,18 @@ func (s *Service) Receive(ctx context.Context, sender Sender, in Inbound) Result
 		env.Ref = sender.Machine + "/" + in.FromConv
 	}
 	steer := s.Settings.Get().Delivery == DeliveryStep
+	if s.needsApproval(sender) {
+		s.expire()
+		h := &Held{ID: in.ID, At: now.UnixMilli(), Expires: now.Add(heldTTL(in.TTL)).UnixMilli(), From: rec.From,
+			To: partyOf(s.Self, target.Conv, target.Title), Text: in.Text, Via: in.Via, key: key, sender: sender,
+			conv: target.Conv, wrapped: Wrap(env), steer: steer, target: target}
+		if !s.hold(h) {
+			r := refused(in.ID, RefuseRateLimited, "the owner's inbox is full")
+			r.To = &target
+			return finish(r)
+		}
+		return finish(Result{ID: in.ID, State: StateHeld, To: &target})
+	}
 	why, detail := s.Local.Deliver(ctx, target.Conv, "peer-"+in.ID, Wrap(env), steer)
 	if why != "" {
 		r := refused(in.ID, why, detail)
@@ -304,7 +332,25 @@ func (s *Service) Receive(ctx context.Context, sender Sender, in Inbound) Result
 // Send is a message from one of this machine's chats (fromConv, "" for none) to the chat ref names: delivered here when
 // the chat is on this machine, through the relay when it is on another.
 func (s *Service) Send(ctx context.Context, fromConv, ref, text, by string) Result {
-	id := NewID()
+	return s.Post(ctx, fromConv, ref, Outbound{ID: NewID(), Text: text, Via: by})
+}
+
+// Revoke takes back a message this machine sent to the chat ref names while it still waits for that owner's approval.
+func (s *Service) Revoke(ctx context.Context, ref, id string) Result {
+	return s.Post(ctx, "", ref, Outbound{ID: id, Revoke: true})
+}
+
+// Post is Send with the message's own id, its approval time (o.TTL) or a take-back (o.Revoke); o.To and the sending
+// chat's title come from ref and fromConv.
+func (s *Service) Post(ctx context.Context, fromConv, ref string, o Outbound) Result {
+	id := o.ID
+	if !msgID.MatchString(id) {
+		if o.Revoke {
+			return refused(id, RefuseBadRef, "no message id")
+		}
+		id = NewID()
+	}
+	by := o.Via
 	machine, conv, ok := s.ParseRef(ref)
 	if !ok {
 		return refused(id, RefuseBadRef, "")
@@ -316,19 +362,24 @@ func (s *Service) Send(ctx context.Context, fromConv, ref, text, by string) Resu
 		fromConv = ""
 	}
 	if machine == "" {
-		return s.Receive(ctx, s.Self, Inbound{ID: id, To: conv, FromConv: fromConv, FromTitle: title, Text: text, Via: by})
+		return s.Receive(ctx, s.Self, Inbound{ID: id, To: conv, FromConv: fromConv, FromTitle: title, Text: o.Text, Via: by,
+			Revoke: o.Revoke, TTL: o.TTL})
 	}
+	text := o.Text
 	rec := Record{ID: id, At: s.now().UnixMilli(), Dir: DirOut, From: partyOf(s.Self, fromConv, title),
 		To: Party{Machine: machine, Conv: conv}, Text: text, Via: via(by)}
+	if o.Revoke {
+		rec.By = "sender"
+	}
 	var r Result
 	switch {
-	case checkText(text) != "":
+	case !o.Revoke && checkText(text) != "":
 		r = refused(id, checkText(text), "")
 	case s.Relay == nil:
 		r = refused(id, RefuseNoRelay, "")
 	default:
 		r = s.Relay.Send(ctx, Outbound{ID: id, To: machine + "/" + conv, FromConv: fromConv, FromTitle: title, Text: text,
-			Via: via(by)})
+			Via: via(by), Revoke: o.Revoke, TTL: o.TTL})
 		if r.ID == "" {
 			r.ID = id
 		}

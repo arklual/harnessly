@@ -28,6 +28,15 @@ const (
 	DeliveryTurn Delivery = "turn"
 )
 
+// Approval is which messages wait for the owner before they reach an agent: none (the default), or those of anyone
+// but the machine's owner.
+type Approval string
+
+const (
+	ApproveNone   Approval = "none"
+	ApproveOthers Approval = "others"
+)
+
 // RuleKind says what a rule names.
 type RuleKind string
 
@@ -51,12 +60,14 @@ type Settings struct {
 	Scope    Scope    `json:"scope"`
 	Delivery Delivery `json:"delivery"`
 	Rules    []Rule   `json:"rules"`
-	Rev      int64    `json:"rev"`
+	// Approve: what comes from another person waits in the owner's inbox until the owner accepts it.
+	Approve Approval `json:"approve"`
+	Rev     int64    `json:"rev"`
 }
 
 // Defaults: on, for the whole fleet, at the agent's next step.
 func Defaults() Settings {
-	return Settings{Accept: true, Scope: ScopeTeam, Delivery: DeliveryStep, Rules: []Rule{}}
+	return Settings{Accept: true, Scope: ScopeTeam, Delivery: DeliveryStep, Rules: []Rule{}, Approve: ApproveNone}
 }
 
 // Refusal is why a message was not taken: a code the sender's CLI prints and the page translates.
@@ -75,7 +86,10 @@ const (
 	RefuseNoRelay     Refusal = "no-relay"     // this machine has no way to the other machines
 	RefuseUnreachable Refusal = "unreachable"  // the other machine did not answer
 	RefuseBadRef      Refusal = "bad-ref"
-	RefuseFailed      Refusal = "failed" // the conversation did not take it (its reason is in the detail)
+	RefuseFailed      Refusal = "failed"   // the conversation did not take it (its reason is in the detail)
+	RefuseRejected    Refusal = "rejected" // the owner did not accept a held message
+	RefuseExpired     Refusal = "expired"  // a held message waited past its time
+	RefuseRevoked     Refusal = "revoked"  // the sender took a held message back
 )
 
 const maxRules = 200
@@ -89,6 +103,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Delivery != DeliveryStep && s.Delivery != DeliveryTurn {
 		return errors.New("delivery: step or turn")
+	}
+	if s.Approve != ApproveNone && s.Approve != ApproveOthers {
+		return errors.New("approve: none or others")
 	}
 	if len(s.Rules) > maxRules {
 		return errors.New("rules: too many")
@@ -165,7 +182,10 @@ func (st *Store) read() Settings {
 		return s
 	}
 	var got Settings
-	if json.Unmarshal(raw, &got) != nil || got.Validate() != nil {
+	if json.Unmarshal(raw, &got) == nil && got.Approve == "" {
+		got.Approve = ApproveNone // kept before the inbox existed
+	}
+	if got.Validate() != nil {
 		return s
 	}
 	if got.Rules == nil {
@@ -179,6 +199,9 @@ var ErrConflict = errors.New("conflict")
 
 // Put keeps next if the kept settings are still at next.Rev; the answer is what is kept now.
 func (st *Store) Put(next Settings) (Settings, error) {
+	if next.Approve == "" {
+		next.Approve = ApproveNone
+	}
 	if next.Rules == nil {
 		next.Rules = []Rule{}
 	}

@@ -72,7 +72,7 @@ const SEND_PHASE = { idle: 'idle', sending: 'sending', failed: 'failed' } as con
 type TSendPhase = (typeof SEND_PHASE)[keyof typeof SEND_PHASE];
 
 const outcomeText = (outcome: TPeerOutcome): string => {
-  if (outcome.ok) return t('next.peers.delivered');
+  if (outcome.ok) return t(outcome.held ? 'next.peers.held' : 'next.peers.delivered');
   if (outcome.reason) return t(`next.peers.reason.${outcome.reason}`);
   return t('next.peers.notDelivered');
 };
@@ -220,7 +220,7 @@ export const PeerCard = memo(({ peer, delivery }: IPeerCardProps) => {
 
 const outState = (out: IPeerOut): { tone: 'run' | 'ok' | 'fail'; text: string } => {
   if (out.outcome === null) return { tone: 'run', text: t('next.peers.sending') };
-  if (out.outcome.ok) return { tone: 'ok', text: t('next.peers.delivered') };
+  if (out.outcome.ok) return { tone: 'ok', text: outcomeText(out.outcome) };
   return { tone: 'fail', text: outcomeText(out.outcome) };
 };
 

@@ -113,10 +113,10 @@ func (a *Agent) peersRoute(w http.ResponseWriter, r *http.Request) {
 		res = hubproto.PeerRefusal(msg.ID, hubproto.PeerNoRelay, "the hub does not carry messages between machines")
 	case err != nil:
 		res = hubproto.PeerRefusal(msg.ID, hubproto.PeerUnreachable, err.Error())
-	case res.State != hubproto.PeerDelivered && res.State != hubproto.PeerRefused:
+	case !hubproto.PeerStateKnown(res.State):
 		res = hubproto.PeerRefusal(msg.ID, hubproto.PeerUnreachable, "the hub gave no result")
 	}
-	h.audit.Record("peers.send", res.State == hubproto.PeerDelivered, map[string]any{"reason": res.Reason})
+	h.audit.Record("peers.send", res.State != hubproto.PeerRefused, map[string]any{"reason": res.Reason})
 	reply(w, http.StatusOK, res)
 }
 
@@ -212,7 +212,7 @@ func (h *hub) opPeers(op string, req map[string]json.RawMessage) (any, func(), e
 	if _, err := h.runtimePeers(ctx, http.MethodPost, "/inbox", token, msg, &res); err != nil || res.State == "" {
 		res = hubproto.PeerRefusal(msg.ID, hubproto.PeerUnreachable, "the runtime did not answer")
 	}
-	h.audit.Record(op, res.State == hubproto.PeerDelivered, map[string]any{"from": sender.Machine, "reason": res.Reason})
+	h.audit.Record(op, res.State != hubproto.PeerRefused, map[string]any{"from": sender.Machine, "reason": res.Reason})
 	return res, nil, nil
 }
 

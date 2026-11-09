@@ -19,6 +19,9 @@ export const PEER_REASONS = [
   'unreachable',
   'bad-ref',
   'failed',
+  'rejected',
+  'expired',
+  'revoked',
 ] as const;
 export type TPeerReason = (typeof PEER_REASONS)[number];
 
@@ -132,7 +135,9 @@ export const convOfRef = (ref: string): `tab-${string}` | null => {
   return ref.slice(ref.indexOf('/') + 1) as `tab-${string}`;
 };
 
-export type TPeerOutcome = { ok: true; to: string | null } | { ok: false; reason: TPeerReason | null };
+/** held: it waits for the other machine's owner to accept it (GitHub #38). */
+export type TPeerOutcome =
+  { ok: true; to: string | null; held?: boolean } | { ok: false; reason: TPeerReason | null };
 
 /** A message our agent sent to another agent, read off its tool step. */
 export interface IPeerOut {
@@ -143,7 +148,8 @@ export interface IPeerOut {
 }
 
 // The deployment may ship the CLI under its own name: any command word before `peers send`.
-const CLI_SEND = /^\$\s*[\w.-]+\s+peers?\s+send\s+(\S+)\s*([\s\S]*)$/;
+const CLI_SEND = /^\$\s*[\w.-]+\s+peers?\s+send\s+(?:--(?:ttl|id)\s+\S+\s+)*(\S+)\s*([\s\S]*)$/;
+const HELD = /^held → (\S+)/m;
 const DELIVERED = /^delivered → (.+)$/m;
 const REFUSED = /refused: ([a-z-]+)/;
 
@@ -174,7 +180,9 @@ export const parsePeerOut = (
   let outcome: TPeerOutcome | null = null;
   const delivered = output ? DELIVERED.exec(output) : null;
   const refusedMatch = output ? REFUSED.exec(output) : null;
+  const held = output ? HELD.exec(output) : null;
   if (delivered) outcome = { ok: true, to: delivered[1] };
+  else if (held) outcome = { ok: true, to: held[1], held: true };
   else if (refusedMatch) outcome = { ok: false, reason: reasonOf(refusedMatch[1]) };
   else if (ok === false) outcome = { ok: false, reason: null };
   return { to: m[1], text: text === '-' ? '' : text, outcome };

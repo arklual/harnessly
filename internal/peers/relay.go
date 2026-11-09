@@ -73,7 +73,7 @@ func (h *HTTPRelay) do(ctx context.Context, method, path string, body any, out a
 // Send hands o to the gateway; a machine that cannot be reached is a refusal the sender sees, never an error.
 func (h *HTTPRelay) Send(ctx context.Context, o Outbound) Result {
 	var r Result
-	if err := h.do(ctx, http.MethodPost, "/send", o, &r); err != nil || (r.State != StateDelivered && r.State != StateRefused) {
+	if err := h.do(ctx, http.MethodPost, "/send", o, &r); err != nil || !r.State.Known() {
 		detail := "no answer"
 		if err != nil {
 			detail = err.Error()

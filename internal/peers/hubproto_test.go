@@ -30,11 +30,12 @@ func TestHubprotoSpeaksThePeersJSON(t *testing.T) {
 	if got := roundTrip[Chat](t, roundTrip[hubproto.PeerChat](t, chat)); got != chat {
 		t.Fatalf("chat %+v", got)
 	}
-	out := Outbound{ID: "1", To: "m-1/c", FromConv: "f", FromTitle: "Release", Text: "hi", Via: "agent"}
+	out := Outbound{ID: "1", To: "m-1/c", FromConv: "f", FromTitle: "Release", Text: "hi", Via: "agent",
+		Revoke: true, TTL: 60}
 	if got := roundTrip[Outbound](t, roundTrip[hubproto.PeerOutbound](t, out)); got != out {
 		t.Fatalf("outbound %+v", got)
 	}
-	in := Inbound{ID: "1", To: "c", FromConv: "f", FromTitle: "Release", Text: "hi", Via: "agent"}
+	in := Inbound{ID: "1", To: "c", FromConv: "f", FromTitle: "Release", Text: "hi", Via: "agent", Revoke: true, TTL: 60}
 	if got := roundTrip[Inbound](t, roundTrip[hubproto.PeerInbound](t, in)); got != in {
 		t.Fatalf("inbound %+v", got)
 	}
@@ -48,7 +49,8 @@ func TestHubprotoSpeaksThePeersJSON(t *testing.T) {
 	}
 	// The states and reasons the hub and the agent give themselves are the runtime's.
 	for hub, own := range map[string]string{hubproto.PeerDelivered: string(StateDelivered), hubproto.PeerRefused: string(StateRefused),
-		hubproto.PeerOff: string(RefuseOff), hubproto.PeerRateLimited: string(RefuseRateLimited), hubproto.PeerBadRef: string(RefuseBadRef),
+		hubproto.PeerHeld: string(StateHeld),
+		hubproto.PeerOff:  string(RefuseOff), hubproto.PeerRateLimited: string(RefuseRateLimited), hubproto.PeerBadRef: string(RefuseBadRef),
 		hubproto.PeerNoRelay: string(RefuseNoRelay), hubproto.PeerUnreachable: string(RefuseUnreachable),
 		hubproto.PeerUnverified: string(RefuseUnverified), hubproto.PeerEmpty: string(RefuseEmpty), hubproto.PeerTooLong: string(RefuseTooLong)} {
 		if hub != own {

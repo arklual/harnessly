@@ -48,6 +48,32 @@ never learns another's hostname or fleet id, and an answer is written back to th
 - **Limits.** 30 requests a minute per machine for sends and directory lookups together (`rate-limited`), 1 MB a
   request; the runtime has its own limits (16000 characters, 20 messages a minute from one machine).
 
+## Asking the owner first
+
+With **Ask me first** on (Settings → Machines, `approve: "others"` in the settings), a message from anyone but the
+machine's owner does not reach the agent at once. The sender gets `held`, and the message waits in the owner's inbox on
+the machine's page, with who sent it, from which machine and chat, to which chat, and until when.
+
+- **Accept** delivers it exactly as it came; **Reject** refuses it with `rejected`. Only the page session decides
+  (`POST <platform>/peers/held`): no agent of the machine can accept a message sent to it.
+- The sender takes a waiting message back with `harnessly peers revoke REF ID` (`revoked`). Only the machine and person
+  that sent it can do that.
+- A message waits 24 hours, or as long as the sender asks with `harnessly peers send --ttl 2h …` (7 days at most). Then
+  it ends as `expired`.
+- The same id again (`harnessly peers send --id ID …`) never runs twice. It answers what came of the first message:
+  still held, delivered, rejected, revoked or expired. That is also the protection against a replayed request.
+- The audit keeps every step: the requester, the chat that ran the message, and the owner who decided (`by`).
+- The inbox lives in the runtime's memory. A restart empties it, and a message sent again waits again.
+
+The owner's own machines are not held: the setting is about other people.
+
+### Where the boundary is
+
+These rules are the application's: they decide who among the people of the fleet may reach an agent, and when. They do
+not protect a machine from whoever runs its infrastructure. The hub's operator and anyone with root on the machine can
+read what reaches the agents and act as the machine. A task that must not run with the owner's own credentials belongs
+on a machine set up for it: its own owner (a service account), and no personal tokens in its safe.
+
 ## Turning it on
 
 | Where | Setting | Default |
@@ -64,7 +90,7 @@ The kill switch turns it off with everything else. A refused delivery because of
 
 | Method, path | Request | Response |
 | --- | --- | --- |
-| `POST /agent/peers/send` | `Authorization` made like the dial's, under `harnessly-agent-peers-v1`; body `{ person, message: { id, to, fromConversationId, fromTitle, text, via } }` | 200 `{ id, state: 'delivered' \| 'refused', reason?, detail?, to?: PeerChat }` either way; 401 bad signature, 403 revoked or switched off |
+| `POST /agent/peers/send` | `Authorization` made like the dial's, under `harnessly-agent-peers-v1`; body `{ person, message: { id, to, fromConversationId, fromTitle, text, via, revoke?, ttl? } }` | 200 `{ id, state: 'delivered' \| 'refused' \| 'held', reason?, detail?, to?: PeerChat }` either way; 401 bad signature, 403 revoked or switched off |
 | `POST /agent/peers/directory` | the same header; body `{ person }` | 200 `{ chats: PeerChat[] }`; 429 past the limit |
 
 Operations on the link (hub → agent):

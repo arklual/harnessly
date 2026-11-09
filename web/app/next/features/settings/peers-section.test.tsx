@@ -191,4 +191,38 @@ describe('«Agent-to-agent messages» in Settings → Machines', () => {
       .closest('.hx-peers-set__who');
     expect(row?.getAttribute('data-busy')).toBe('true');
   });
+
+  it('asks the owner first: a held message waits with Accept and Reject (GitHub #38)', () => {
+    const raw = JSON.parse(JSON.stringify(answer));
+    raw.settings.approve = 'others';
+    raw.held = [
+      {
+        id: 'pm_9',
+        at: NOW - 60_000,
+        expires: NOW + 3_600_000,
+        from: raw.audit[0].from,
+        to: raw.audit[0].to,
+        text: 'Собери релиз',
+      },
+    ];
+    const v = readView(raw);
+    expect(v.settings.approve).toBe('others');
+    const onDecide = vi.fn();
+    render(
+      <PeersSection view={v} fleet={[]} now={NOW} busy={new Set()} onChange={vi.fn()} onDecide={onDecide} />,
+    );
+    expect(screen.getByText('Waiting for your approval')).toBeTruthy();
+    expect(screen.getByText('Собери релиз')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Accept/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Reject/ }));
+    expect(onDecide.mock.calls).toEqual([
+      ['pm_9', true],
+      ['pm_9', false],
+    ]);
+  });
+
+  it('reads settings kept before the inbox as asking nobody', () => {
+    expect(view().settings.approve).toBe('none');
+    expect(view().held).toEqual([]);
+  });
 });

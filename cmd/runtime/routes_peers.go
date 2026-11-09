@@ -22,7 +22,10 @@ import (
 //	POST /api/peers/inbox, GET /api/peers/directory   another machine, through the fleet's gateway: a token signed
 //	                                                   with this runtime's own secret (peers.VerifyInbox)
 //	GET  /api/cli/peers, POST /api/cli/peers/send      an agent of this machine: the cli-token (harnessly peers)
+//	POST /api/cli/peers/revoke                         an agent of this machine takes back a message still held
 //	GET|PUT <platform>/peers/settings, POST <platform>/peers/send   the person's page: a page session
+//	POST <platform>/peers/held                         the owner accepts or rejects a held message: a page session
+//	                                                   only, so no agent can approve what was sent to it
 //
 // The person's page never takes the cli-token, and the agents' routes never take a page session alone.
 
@@ -133,6 +136,8 @@ type peerSettingsView struct {
 	Relay   bool           `json:"relay"`
 	Senders []peers.Sender `json:"senders"`
 	Audit   []peers.Record `json:"audit"`
+	// Held is the messages waiting for the owner's approval (Settings.Approve), the oldest first.
+	Held []peers.Held `json:"held"`
 }
 
 const peerAuditShown = 50
@@ -143,6 +148,10 @@ type peerSendBody struct {
 	From    string `json:"from"`
 	To      string `json:"to"`
 	Text    string `json:"text"`
+	// ID is the message's own id (a new one when empty): the CLI prints it, a take-back names it.
+	ID string `json:"id"`
+	// TTL is how long, in seconds, the message may wait for the other owner's approval.
+	TTL int64 `json:"ttl"`
 }
 
 func peerJSON(w http.ResponseWriter, status int, v any) {
@@ -188,7 +197,11 @@ func peerRoutes(d deps, c *core) []gate.Route {
 				from = rt.ConvOfSession(b.Session)
 			}
 		}
-		peerJSON(w, http.StatusOK, svc.Send(r.Context(), from, b.To, b.Text, by))
+		peerJSON(w, http.StatusOK, svc.Post(r.Context(), from, b.To, peers.Outbound{ID: b.ID, Text: b.Text, Via: by, TTL: b.TTL}))
+	}
+	view := func() peerSettingsView {
+		return peerSettingsView{Self: svc.Self, Settings: svc.Settings.Get(), Relay: svc.Relay != nil,
+			Senders: svc.Audit.Senders(), Audit: svc.Audit.Recent(peerAuditShown), Held: svc.HeldList()}
 	}
 	return []gate.Route{
 		route("/api/peers/inbox", svc.InboxHandler(d.Secret).ServeHTTP),
@@ -207,6 +220,37 @@ func peerRoutes(d deps, c *core) []gate.Route {
 			if cliOK(w, r) {
 				send(w, r, "agent")
 			}
+		}),
+		route("/api/cli/peers/revoke", func(w http.ResponseWriter, r *http.Request) {
+			if !cliOK(w, r) {
+				return
+			}
+			var b peerSendBody
+			if r.Method != http.MethodPost || !peers.ReadJSON(r, &b) || b.ID == "" {
+				peerJSON(w, http.StatusBadRequest, map[string]string{"error": "POST {to, id}"})
+				return
+			}
+			peerJSON(w, http.StatusOK, svc.Revoke(r.Context(), b.To, b.ID))
+		}),
+		route(platformAPI+"/peers/held", func(w http.ResponseWriter, r *http.Request) {
+			if !pageOK(w, r) {
+				return
+			}
+			var b struct {
+				ID     string `json:"id"`
+				Accept bool   `json:"accept"`
+			}
+			if r.Method != http.MethodPost || !peers.ReadJSON(r, &b) {
+				peerJSON(w, http.StatusBadRequest, map[string]string{"error": "POST {id, accept}"})
+				return
+			}
+			// The page session is the owner's own: the audit names the owner as the one who decided.
+			res, err := svc.Decide(r.Context(), b.ID, b.Accept, "")
+			if err != nil {
+				peerJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+				return
+			}
+			peerJSON(w, http.StatusOK, map[string]any{"result": res, "view": view()})
 		}),
 		route(platformAPI+"/peers/send", func(w http.ResponseWriter, r *http.Request) {
 			if pageOK(w, r) {
@@ -237,8 +281,7 @@ func peerRoutes(d deps, c *core) []gate.Route {
 				peerJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 				return
 			}
-			peerJSON(w, http.StatusOK, peerSettingsView{Self: svc.Self, Settings: svc.Settings.Get(), Relay: svc.Relay != nil,
-				Senders: svc.Audit.Senders(), Audit: svc.Audit.Recent(peerAuditShown)})
+			peerJSON(w, http.StatusOK, view())
 		}),
 	}
 }

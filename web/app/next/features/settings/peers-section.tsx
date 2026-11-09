@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { IPeerSettings, IPeersView } from '@/next/features/peers/api';
 import {
   parseWho,
+  partyLine,
   peerLogRows,
   peerWhoRows,
   withRule,
@@ -12,6 +13,7 @@ import {
 } from '@/next/features/settings/peers';
 import { Group, Note, SegRow, SetButton, Spin, SwitchRow } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
+import { formatAgo } from '@/next/i18n/format';
 import Icon from '@/next/ui/icon';
 import LoadFailed from '@/next/ui/load-failed';
 import Switch from '@/next/ui/switch';
@@ -41,9 +43,11 @@ export interface IPeersSectionProps {
   busy: ReadonlySet<string>;
   /** Keeps `next` (made against the shown revision); `key` names the control that waits. */
   onChange: (key: string, next: IPeerSettings) => void;
+  /** The owner accepts or rejects a held message (busy key `held:<id>`). */
+  onDecide?: (id: string, accept: boolean) => void;
 }
 
-const PeersSection = ({ view, failed = null, fleet, now, busy, onChange }: IPeersSectionProps) => {
+const PeersSection = ({ view, failed = null, fleet, now, busy, onChange, onDecide }: IPeersSectionProps) => {
   const [who, setWho] = useState('');
   if (view === null) {
     return (
@@ -91,7 +95,59 @@ const PeersSection = ({ view, failed = null, fleet, now, busy, onChange }: IPeer
           off={off}
           onPick={(delivery) => onChange('delivery', { ...settings, delivery })}
         />
+        <SwitchRow
+          label={t('next.settings.peers.approve')}
+          hint={t('next.settings.peers.approveHint')}
+          on={settings.approve === 'others'}
+          busy={busy.has('approve')}
+          onChange={(on) => onChange('approve', { ...settings, approve: on ? 'others' : 'none' })}
+        />
       </Group>
+
+      {(settings.approve === 'others' || view.held.length > 0) && (
+        <Group title={t('next.settings.peers.heldTitle')} foot={t('next.settings.peers.heldFoot')}>
+          {view.held.length === 0 && <Note>{t('next.settings.peers.heldEmpty')}</Note>}
+          {view.held.map((h) => (
+            <div
+              className="hx-peers-log"
+              key={h.id}
+              data-state="held"
+              aria-busy={busy.has(`held:${h.id}`) || undefined}
+            >
+              <Icon name="clock" size="sm" className="hx-peers-log__ic" />
+              <div className="hx-peers-log__main">
+                <div className="hx-peers-log__line">
+                  <span className="hx-peers-log__route">{`${partyLine(h.from)} → ${partyLine(h.to)}`}</span>
+                  <span className="hx-peers-log__when">{formatAgo(h.at, now)}</span>
+                </div>
+                <div className="hx-peers-log__text">{h.text}</div>
+                <div className="hx-peers-log__why">
+                  {t('next.settings.peers.heldUntil', { when: new Date(h.expires).toLocaleString() })}
+                </div>
+                <div className="hx-peers-set__add">
+                  <SetButton
+                    tone="primary"
+                    icon="check"
+                    busy={busy.has(`held:${h.id}`)}
+                    disabled={!onDecide}
+                    onClick={() => onDecide?.(h.id, true)}
+                  >
+                    {t('next.settings.peers.accept1')}
+                  </SetButton>
+                  <SetButton
+                    tone="ghost"
+                    icon="x"
+                    disabled={!onDecide || busy.has(`held:${h.id}`)}
+                    onClick={() => onDecide?.(h.id, false)}
+                  >
+                    {t('next.settings.peers.reject')}
+                  </SetButton>
+                </div>
+              </div>
+            </div>
+          ))}
+        </Group>
+      )}
 
       <Group title={t('next.settings.peers.whoTitle')} foot={t('next.settings.peers.whoFoot')}>
         {rows.map((row) => (
