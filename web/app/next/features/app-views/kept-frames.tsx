@@ -1,10 +1,10 @@
-// An app's view in the pane lives on while its tab is not on screen: another tab in front, another chat, the pane
-// closed, another screen of the page. A frame cannot be moved in the document without starting again, so the views of
-// the pane's app tabs are not drawn in the pane: they stand in one layer of the page (KeptAppFrames, mounted once by
-// the shell), each over its place in the pane (KeptSlot) while that place is on screen, and out of sight, still
+// An app's view lives on while it is not on screen. A pane tab's view: another tab in front, another chat, the pane
+// closed, another screen of the page. The app's own page (/apps/<id>): another screen of the page. A frame cannot be moved in the document without starting again, so the views of
+// the pane's app tabs and of the app's page are not drawn in place: they stand in one layer of the page (KeptAppFrames,
+// mounted once by the shell), each over its place (KeptSlot) while that place is on screen, and out of sight, still
 // running, while it is not. So a view's music plays on, and what the person typed into it stays. The view is told it is
-// hidden (`visibility`) as before. A view is let go when its tab is closed, its chat is forgotten, the app's own page
-// opens it (one player, not two), or more than MAX_HIDDEN wait out of sight (the least recent goes).
+// hidden (`visibility`) as before. A view is let go when its tab is closed, its chat is forgotten, another view of the
+// same app comes on screen (one player, not two), or more than MAX_HIDDEN wait out of sight (the least recent goes).
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import AppFrame from '@/next/features/app-views/app-frame';
@@ -16,25 +16,34 @@ import { chatPaneOf, chatPanes } from '@/next/stores/pane-state';
 /** Views out of sight beyond this many are let go, the least recent first. */
 export const MAX_HIDDEN = 4;
 
+/** Where a kept view is shown: a tab of a chat's pane, or the app's own page (/apps/<id>). */
+export type TKeptTarget = 'pane' | 'app';
+
 export interface IKeptFrame {
-  /** `<conversation>:<pane tab id>`. */
+  /** `pane:<conversation>:<tab>` or `app:<machine>:<app>`. */
   key: string;
+  target: TKeptTarget;
   machine: MachineId;
-  conversation: ConvId;
-  tab: string;
+  /** The chat the view's session is for; null: the app's page with no chat. */
+  conversation: ConvId | null;
+  /** The pane tab; null on the app's page. */
+  tab: string | null;
   app: string;
   view: string | null;
   /** The inspector's «reload». */
   reload: number;
-  /** Its place in the pane while on screen. */
+  /** Its place while on screen. */
   slot: HTMLElement | null;
   /** When it was last on screen. */
   at: number;
 }
 
-type TKeptInput = Omit<IKeptFrame, 'key' | 'slot' | 'at'>;
+export type TKeptInput = Omit<IKeptFrame, 'key' | 'slot' | 'at'>;
 
-const keyOf = (conversation: string, tab: string) => `${conversation}:${tab}`;
+export const keyOfKept = (
+  x: Pick<IKeptFrame, 'target' | 'machine' | 'conversation' | 'tab' | 'app'>,
+): string =>
+  x.target === 'app' ? `app:${x.machine}:${x.app}` : `pane:${x.conversation ?? ''}:${x.tab ?? ''}`;
 
 let kept: readonly IKeptFrame[] = [];
 const listeners = new Set<() => void>();
@@ -62,26 +71,29 @@ const capped = (list: readonly IKeptFrame[]): readonly IKeptFrame[] => {
 
 export const keptFrames = {
   list: (): readonly IKeptFrame[] => kept,
-  /** The tab's place is on screen: its view stands there (made now, or the one kept). */
+  /**
+   * The place is on screen: its view stands there (made now, or the one kept). Another copy of the same app kept out of
+   * sight is let go, so one view of an app runs at a time (two would play two sounds).
+   */
   show(input: TKeptInput, slot: HTMLElement) {
-    const key = keyOf(input.conversation, input.tab);
+    const key = keyOfKept(input);
     const entry: IKeptFrame = { ...input, key, slot, at: Date.now() };
-    commit(capped([...kept.filter((x) => x.key !== key), entry]));
+    const rest = kept.filter((x) => x.key !== key && !(x.app === input.app && x.slot === null));
+    commit(capped([...rest, entry]));
   },
   /** The place left the screen: the view goes out of sight and runs on. */
-  hide(conversation: string, tab: string, slot: HTMLElement) {
-    const key = keyOf(conversation, tab);
+  hide(key: string, slot: HTMLElement) {
     if (!kept.some((x) => x.key === key && x.slot === slot)) return;
     commit(capped(kept.map((x) => (x.key === key ? { ...x, slot: null, at: Date.now() } : x))));
   },
-  /** Lets go of the views of an app (its own page opens it now). */
-  dropApp(app: string) {
-    if (kept.some((x) => x.app === app && x.slot === null))
-      commit(kept.filter((x) => x.app !== app || x.slot !== null));
+  /** Lets go of a view (the app's page closed by the person). */
+  drop(key: string) {
+    if (kept.some((x) => x.key === key)) commit(kept.filter((x) => x.key !== key));
   },
-  /** Lets go of the views whose tab is no longer in its chat's pane. */
+  /** Lets go of the pane views whose tab is no longer in its chat's pane. */
   prune() {
     const next = kept.filter((x) => {
+      if (x.target !== 'pane') return true;
       const tab = chatPaneOf(x.conversation).tabs.find((t) => t.id === x.tab);
       return tab?.kind === 'app' && tab.app === x.app && tab.view === x.view;
     });
@@ -98,17 +110,19 @@ interface IKeptSlotProps extends TKeptInput {
   className?: string;
 }
 
-/** The place of a kept view in the pane: an empty box the layer puts the view over. */
-export const KeptSlot = ({ className, machine, conversation, tab, app, view, reload }: IKeptSlotProps) => {
+/** The place of a kept view: an empty box the layer puts the view over. */
+export const KeptSlot = ({ className, ...input }: IKeptSlotProps) => {
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  const { target, machine, conversation, tab, app, view, reload } = input;
+  const key = keyOfKept(input);
   useLayoutEffect(() => {
     if (!slot) return;
-    keptFrames.show({ machine, conversation, tab, app, view, reload }, slot);
-  }, [slot, machine, conversation, tab, app, view, reload]);
+    keptFrames.show({ target, machine, conversation, tab, app, view, reload }, slot);
+  }, [slot, target, machine, conversation, tab, app, view, reload]);
   useLayoutEffect(() => {
     if (!slot) return;
-    return () => keptFrames.hide(conversation, tab, slot);
-  }, [slot, conversation, tab]);
+    return () => keptFrames.hide(key, slot);
+  }, [slot, key]);
   return <div ref={setSlot} className={className ?? 'hx-keptslot'} />;
 };
 
@@ -181,12 +195,13 @@ const KeptFrame = ({ frame }: { frame: IKeptFrame }) => {
   }, [box]);
   const app = list?.apps.find((a) => a.id === frame.app);
   const view = app?.views.find(
-    (v) => (frame.view === null || v.id === frame.view) && v.targets.includes('pane'),
+    (v) => (frame.view === null || v.id === frame.view) && v.targets.includes(frame.target),
   );
   return (
     <div
       ref={ref}
       className="hx-keptframe"
+      data-target={frame.target}
       data-shown={shown || undefined}
       aria-hidden={!shown || undefined}
       inert={!shown || undefined}
@@ -197,7 +212,7 @@ const KeptFrame = ({ frame }: { frame: IKeptFrame }) => {
             machine={frame.machine}
             app={app}
             view={view}
-            target="pane"
+            target={frame.target}
             viewPort={list.viewPort}
             conversation={frame.conversation}
             reloadToken={frame.reload}
