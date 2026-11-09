@@ -404,7 +404,7 @@ A code from an authenticator lives about 30 seconds, so it is not put in the saf
 starts the moment the person types it.
 
 ```
-agent (in the background): harnessly secret run --code npm_config_otp --why "npm publish vizloom" -- npm publish
+agent (in the background): harnessly secret run --code npm_config_otp --why "npm publish my-package" -- npm publish
    │  POST /api/cli/secrets/code {why, digits, wait}     opens an ask of this chat (cli-token; a chat is required)
    │  POST /api/cli/secrets/code/wait {id, wait ≤ 55 s}   the run waits on it, again and again, up to --wait (10 min)
    ▼

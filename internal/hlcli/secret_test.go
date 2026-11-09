@@ -185,7 +185,7 @@ func TestSecretRunWaitsForACodeAndRunsWithIt(t *testing.T) {
 		t.Skip("no sh")
 	}
 	srv, calls := codeRuntime(t, "ready")
-	r := runSafe(t, srv.URL, "secret", "run", "--code", "OTP", "--why", "npm publish vizloom", "--env", "TOKEN=gitlab-token",
+	r := runSafe(t, srv.URL, "secret", "run", "--code", "OTP", "--why", "npm publish my-package", "--env", "TOKEN=gitlab-token",
 		"--", "sh", "-c", `echo "otp=$OTP len=${#OTP} tok=${#TOKEN}"`)
 	if r.code != 0 || strings.Contains(r.out+r.errs, "407193") || !strings.Contains(r.out, "otp=•••••• len=6 tok=26") {
 		t.Fatalf("code run: %d %q %q", r.code, r.out, r.errs)
@@ -193,7 +193,7 @@ func TestSecretRunWaitsForACodeAndRunsWithIt(t *testing.T) {
 	if !strings.Contains(r.errs, "waiting for a code") {
 		t.Fatalf("no word of the wait: %q", r.errs)
 	}
-	if !strings.Contains((*calls)[1], `"digits":6`) || !strings.Contains((*calls)[1], `"why":"npm publish vizloom"`) {
+	if !strings.Contains((*calls)[1], `"digits":6`) || !strings.Contains((*calls)[1], `"why":"npm publish my-package"`) {
 		t.Fatalf("open: %v", *calls)
 	}
 

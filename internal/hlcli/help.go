@@ -131,7 +131,7 @@ SECRETS (the safe of this machine: tokens and keys the person put in, outside th
   harnessly secret run --env VAR=NAME [--file VAR=NAME]... -- COMMAND ARGS...
                                     run a command with secrets in its environment (--file: VAR is the path of a
                                     temporary file with the value); the values are masked in its output
-  harnessly secret run --code VAR --why "npm publish vizloom" [--digits 6] [--wait 10m] -- COMMAND ARGS...
+  harnessly secret run --code VAR --why "npm publish my-package" [--digits 6] [--wait 10m] -- COMMAND ARGS...
                                     a one-time code (2FA, SMS, e-mail): the person types it in this chat's panel, the
                                     command starts at once with it in VAR. Run it in the background: its end wakes you.
   harnessly secret file NAME [--ttl 15m]
@@ -311,7 +311,7 @@ commands by name. The person puts a secret in Settings → Safe, or on the card 
   harnessly secret run --env TOKEN=gitlab-token -- sh -c 'curl -sf -H "PRIVATE-TOKEN: $TOKEN" https://gitlab.example/api/v4/user'
   harnessly secret run --file KUBECONFIG=kubeconfig -- kubectl get pods
   harnessly secret file deploy-key --ttl 10m
-  harnessly secret run --code npm_config_otp --why "npm publish vizloom" -- npm publish
+  harnessly secret run --code npm_config_otp --why "npm publish my-package" -- npm publish
   harnessly secret run --code OTP --why "sign in to the bank" --env TOKEN=bank-token -- sh -c 'tool login --otp "$OTP"'
 
 run --code asks the person for a one-time code (2FA from an authenticator, a code from an SMS or an e-mail): the chat's

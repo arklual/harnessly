@@ -348,7 +348,7 @@ func (c *cli) secretRun(args []string) error {
 		return usageErr("secret run needs a secret and a command: harnessly secret run --env VAR=NAME -- COMMAND ARGS...")
 	}
 	if code.env != "" && strings.TrimSpace(code.why) == "" {
-		return usageErr("secret run --code needs --why: what the code is for, as the person sees it (\"npm publish vizloom\")")
+		return usageErr("secret run --code needs --why: what the code is for, as the person sees it (\"npm publish my-package\")")
 	}
 	if code.env == "" && code.why != "" {
 		return usageErr("secret run: --why goes with --code")

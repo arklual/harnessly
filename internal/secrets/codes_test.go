@@ -15,11 +15,11 @@ func testCodes() (*Codes, *time.Time) {
 
 func TestCodeIsHandedOnceToItsChat(t *testing.T) {
 	c, _ := testCodes()
-	a, err := c.Open("npm publish vizloom", "conv-a", "Release", 6, 5*time.Minute)
+	a, err := c.Open("npm publish my-package", "conv-a", "Release", 6, 5*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := c.Pending(); len(got) != 1 || got[0].ID != a.ID || got[0].Digits != 6 || got[0].Why != "npm publish vizloom" {
+	if got := c.Pending(); len(got) != 1 || got[0].ID != a.ID || got[0].Digits != 6 || got[0].Why != "npm publish my-package" {
 		t.Fatalf("pending = %+v", got)
 	}
 	if _, err := c.Put(a.ID, "12345"); ReasonOf(err) != ReasonBadCode {

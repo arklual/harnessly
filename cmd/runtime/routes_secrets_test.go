@@ -219,10 +219,10 @@ func TestSafeRoutesOneTimeCode(t *testing.T) {
 	cli := map[string]string{"x-cli-token": "tok"}
 	const code = "407193"
 
-	if c, _ := call("POST", "/api/cli/secrets/code", `{"why":"npm publish vizloom","digits":6}`, cli); c != http.StatusBadRequest {
+	if c, _ := call("POST", "/api/cli/secrets/code", `{"why":"npm publish my-package","digits":6}`, cli); c != http.StatusBadRequest {
 		t.Fatalf("a code outside a chat: %d", c)
 	}
-	_, body := call("POST", "/api/cli/secrets/code", `{"session":"hs-agent","why":"npm publish vizloom","digits":6,"wait":300}`, cli)
+	_, body := call("POST", "/api/cli/secrets/code", `{"session":"hs-agent","why":"npm publish my-package","digits":6,"wait":300}`, cli)
 	var opened struct {
 		ID    string `json:"id"`
 		Until int64  `json:"until"`
@@ -234,7 +234,7 @@ func TestSafeRoutesOneTimeCode(t *testing.T) {
 		t.Fatalf("the cli-token lists no asks: %d", c)
 	}
 	_, body = call("GET", "/agents/api/platform/secret-codes", "", page)
-	if !strings.Contains(body, opened.ID) || !strings.Contains(body, `"why":"npm publish vizloom"`) || !strings.Contains(body, `"conv":"c-1"`) {
+	if !strings.Contains(body, opened.ID) || !strings.Contains(body, `"why":"npm publish my-package"`) || !strings.Contains(body, `"conv":"c-1"`) {
 		t.Fatalf("page list: %s", body)
 	}
 

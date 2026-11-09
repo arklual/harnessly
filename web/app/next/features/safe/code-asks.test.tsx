@@ -13,7 +13,7 @@ afterEach(() => {
 
 const ask: ICodeAsk = {
   id: 'sc_1',
-  why: 'npm publish vizloom',
+  why: 'npm publish my-package',
   conv: 'c-1',
   title: 'Release',
   digits: 6,
@@ -50,9 +50,9 @@ describe('CodeAsks', () => {
     const { getByText, getByLabelText } = render(
       <CodeAsks asks={[ask]} now={0} skew={0} onPut={onPut} onCancel={async () => {}} onDone={onDone} />,
     );
-    expect(getByText('npm publish vizloom')).toBeTruthy();
+    expect(getByText('npm publish my-package')).toBeTruthy();
     expect(getByText(/8/)).toBeTruthy();
-    const input = getByLabelText(/npm publish vizloom/) as HTMLInputElement;
+    const input = getByLabelText(/npm publish my-package/) as HTMLInputElement;
     fireEvent.change(input, { target: { value: '407193' } });
     expect(onPut).toHaveBeenCalledExactlyOnceWith(ask, '407193');
     await act(async () => sent(CODE_SENT.ok));

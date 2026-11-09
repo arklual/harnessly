@@ -15,7 +15,7 @@ file of the workspace or a commit.
   same command again to keep waiting. Add ` + "`--replace`" + ` when the kept value stopped working.
 - ` + "`harnessly secret run --env VAR=NAME [--env VAR2=NAME2] -- COMMAND ARGS...`" + ` — runs the command with the secret
   in its environment; its output comes back with the value masked. Prefer this.
-- ` + "`harnessly secret run --code VAR --why \"npm publish vizloom\" -- COMMAND ARGS...`" + ` — a one-time code (2FA,
+- ` + "`harnessly secret run --code VAR --why \"npm publish my-package\" -- COMMAND ARGS...`" + ` — a one-time code (2FA,
   SMS, e-mail): the person types it in this chat's panel and the command starts at once with it in VAR (npm reads
   ` + "`npm_config_otp`" + `). Run it in the background: it waits up to 10 minutes and its end wakes you. Never ask for a code in
   the chat or in a "!" command.
