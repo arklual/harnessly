@@ -905,3 +905,70 @@ func TestMachineInventedRunsAreBounded(t *testing.T) {
 		t.Errorf("trimmed: %d bytes, %d steps, first log %d, last log %d", len(row.Steps), len(steps), len(steps[0].Log), len(steps[59].Log))
 	}
 }
+
+// GitHub issue 40: the screen reorders scripts starting from the order it is shown, so the view lists scripts by their
+// saved positions, not their names; repeated moves go on from the last one, grouped scripts included.
+func TestScriptsAreListedInTheirSavedOrder(t *testing.T) {
+	a := newAcme(t)
+	mk := func(name string) string {
+		return a.item(t, "script", name, map[string]any{"from": "text", "body": "echo " + name})
+	}
+	// Made in the reverse of name order: positions 1, 2, 3 against names В, Б, А.
+	vega, beta, alpha := mk("Вега"), mk("Бета"), mk("Альфа")
+	byItem := map[string]string{}
+	for _, id := range []string{vega, beta, alpha} {
+		_, row := a.entry(t, a.anna, "org", a.org, id, nil)
+		byItem[row.EntryID] = id
+	}
+	r := a.anna.Do("POST", a.url("/env/groups"), map[string]any{"layer": "org", "scopeId": a.org, "name": "Сборка"})
+	var g struct{ Group env.GroupView }
+	r.JSON(&g)
+	for e, it := range byItem {
+		if it == beta {
+			if r := a.anna.Do("PATCH", a.url("/env/entries/"+e), map[string]any{"groupId": g.Group.ID}); r.Code != 200 {
+				t.Fatalf("into the group: %s", r)
+			}
+		}
+	}
+	shown := func() ([]string, []int) {
+		var items []string
+		var pos []int
+		for _, row := range layer(a.layers(t, a.anna, ""), "org", a.org).Items {
+			if row.Kind == "script" {
+				items, pos = append(items, row.ItemID), append(pos, row.Position)
+			}
+		}
+		return items, pos
+	}
+	if got, pos := shown(); !slices.Equal(got, []string{vega, beta, alpha}) || !slices.Equal(pos, []int{1, 2, 3}) {
+		t.Fatalf("shown %v %v, want the saved order", got, pos)
+	}
+	// Move Альфа up twice, each time from what the screen shows, as the arrow keys do.
+	for range 2 {
+		var entries []string
+		for _, row := range layer(a.layers(t, a.anna, ""), "org", a.org).Items {
+			if row.Kind == "script" {
+				entries = append(entries, row.EntryID)
+			}
+		}
+		i := slices.IndexFunc(entries, func(e string) bool { return byItem[e] == alpha })
+		entries[i-1], entries[i] = entries[i], entries[i-1]
+		if r := a.anna.Do("PUT", a.url("/env/order"), map[string]any{"layer": "org", "scopeId": a.org, "entryIds": entries}); r.Code != 200 {
+			t.Fatalf("order: %s", r)
+		}
+	}
+	if got, pos := shown(); !slices.Equal(got, []string{alpha, vega, beta}) || !slices.Equal(pos, []int{1, 2, 3}) {
+		t.Errorf("after two moves up: %v %v", got, pos)
+	}
+	set, ok := sendTo(t, a, hubproto.FeatureEnvSetup)
+	if !ok {
+		t.Fatal("nothing sent")
+	}
+	order := map[string]int{}
+	for _, it := range set.Items {
+		order[it.ItemID] = it.Order
+	}
+	if order[alpha] != 1 || order[vega] != 2 || order[beta] != 3 {
+		t.Errorf("machine order = %v", order)
+	}
+}

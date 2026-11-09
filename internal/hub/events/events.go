@@ -4,6 +4,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,9 @@ type Event struct {
 	Data json.RawMessage
 	// OwnersOnly keeps the event from members: install steps and login links are the owners' business.
 	OwnersOnly bool
+	// MachineID, when set, makes the event carry a machine's metadata: a stream gets it only while the Broker's machine
+	// gate lets the stream's person see that machine.
+	MachineID string
 }
 
 // Sub is one open stream.
@@ -40,6 +44,21 @@ type Broker struct {
 	mu     sync.Mutex
 	subs   map[string]map[*Sub]struct{}
 	closed bool
+	gate   func(ctx context.Context, userID, machineID string) bool
+}
+
+// SetMachineGate sets the rule that decides, per event and per stream at delivery time, whether a person may see a
+// machine. Without it every machine event is delivered.
+func (b *Broker) SetMachineGate(g func(ctx context.Context, userID, machineID string) bool) {
+	b.mu.Lock()
+	b.gate = g
+	b.mu.Unlock()
+}
+
+func (b *Broker) machineGate() func(ctx context.Context, userID, machineID string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.gate
 }
 
 func NewBroker() *Broker { return &Broker{subs: map[string]map[*Sub]struct{}{}} }
@@ -99,6 +118,15 @@ func (b *Broker) PublishJSON(spaceID, name string, data any, ownersOnly bool) {
 	b.Publish(spaceID, Event{Name: name, Data: raw, OwnersOnly: ownersOnly})
 }
 
+// PublishMachine is PublishJSON for an event about one machine; see Event.MachineID.
+func (b *Broker) PublishMachine(spaceID, machineID, name string, data any, ownersOnly bool) {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+	b.Publish(spaceID, Event{Name: name, Data: raw, OwnersOnly: ownersOnly, MachineID: machineID})
+}
+
 // Kick ends the streams of a user in a space (they left, were removed, or their role changed): the page reconnects
 // and is told again what it may see.
 func (b *Broker) Kick(spaceID, userID string) {
@@ -153,6 +181,9 @@ func (b *Broker) Serve(w http.ResponseWriter, r *http.Request, s *Sub) {
 	for {
 		select {
 		case e := <-s.ch:
+			if g := b.machineGate(); e.MachineID != "" && g != nil && !g(r.Context(), s.userID, e.MachineID) {
+				continue
+			}
 			if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", e.Name, e.Data); err != nil {
 				return
 			}

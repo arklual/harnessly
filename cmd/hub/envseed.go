@@ -47,12 +47,31 @@ func runEnvSeed(ctx context.Context, args []string, lookup func(string) (string,
 		fmt.Fprintln(stderr, "hub env-seed: data folder:", err)
 		return 1
 	}
-	db, err := store.Open(ctx, cfg.DatabaseURL)
+	// The database opens the way the serving hub and `hub seed` open it: its schema, pooler, migration URL and checks.
+	// A dry run only connects, so a probe of the configuration never migrates the database it reads.
+	log := logger(stderr, cfg.LogLevel)
+	var db *store.DB
+	if *dry {
+		db, err = connectDB(ctx, cfg, log)
+	} else {
+		db, err = openDB(ctx, cfg, log)
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, "hub env-seed:", err)
-		return 1
+		return exitCode(err)
 	}
 	defer db.Close()
+	if *dry {
+		pending, _, err := db.PendingMigrations(ctx)
+		if err != nil {
+			fmt.Fprintln(stderr, "hub env-seed:", err)
+			return 1
+		}
+		if len(pending) > 0 {
+			fmt.Fprintf(stderr, "hub env-seed: the database is %d migrations behind this hub (%s first); a dry run does not migrate: start the hub or run hub seed, then dry-run again\n", len(pending), pending[0])
+			return 1
+		}
+	}
 	changes, err := envseed.Apply(ctx, db, plan, *dry, time.Now())
 	if err != nil {
 		fmt.Fprintln(stderr, "hub env-seed:", err)

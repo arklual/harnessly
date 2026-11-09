@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -192,7 +193,7 @@ func applyEvent(ctx context.Context, q store.Q, o Owner, ch string, raw json.Raw
 		return nil // projects, favorites and drafts are not part of the history
 	}
 	if conv := convOf(ch); conv != "" {
-		return applyConvEvent(ctx, q, o, conv, kind, e, now)
+		return applyConvEvent(ctx, q, o, conv, kind, e, now, seq > 0)
 	}
 	return nil
 }
@@ -277,7 +278,7 @@ var convKinds = map[string]bool{
 
 // applyConvEvent is one event of a `conv:<id>` channel. Only what the history is made of is stored; the live parts
 // (queue, gates, the agent's `now`) stay on the machine.
-func applyConvEvent(ctx context.Context, q store.Q, o Owner, conv, kind string, e obj, now time.Time) error {
+func applyConvEvent(ctx context.Context, q store.Q, o Owner, conv, kind string, e obj, now time.Time, live bool) error {
 	if !convKinds[kind] {
 		return nil
 	}
@@ -323,9 +324,56 @@ func applyConvEvent(ctx context.Context, q store.Q, o Owner, conv, kind string, 
 				return err
 			}
 		}
+		if live {
+			if err := leaveTurns(ctx, q, o, conv, turns); err != nil {
+				return err
+			}
+		}
 		return moveCursor(ctx, q, o, conv, e)
 	}
 	return nil
+}
+
+// leaveTurns: a live `feed_reset` is the machine putting the chat on another transcript (a rewind or its undo), the
+// newest turns of the feed as it is now. A stored turn from the oldest of them on that is not among them fell out of the
+// feed: it is marked as left after the newest turn kept (” when none was kept), as the rewind's mark names it.
+func leaveTurns(ctx context.Context, q store.Q, o Owner, conv string, turns []json.RawMessage) error {
+	type kept struct {
+		id      string
+		started int64
+	}
+	var in []kept
+	for _, raw := range turns {
+		t, ok := object(raw)
+		if !ok {
+			continue
+		}
+		id, _ := str(t["id"])
+		started, okS := num(t["startedAt"])
+		if id != "" && okS {
+			in = append(in, kept{id, started})
+		}
+	}
+	newest, newestAt, from := "", int64(math.MinInt64), int64(math.MinInt64)
+	args := []any{"", o.MachineID, conv}
+	for i, k := range in {
+		if i == 0 || k.started < from {
+			from = k.started
+		}
+		if newest == "" || k.started >= newestAt {
+			newest, newestAt = k.id, k.started
+		}
+		args = append(args, k.id)
+	}
+	args[0] = newest
+	args = append(args, from)
+	notIn := ""
+	if len(in) > 0 {
+		notIn = ` AND turn_id NOT IN (` + placeholders(len(in)) + `)`
+	}
+	_, err := q.Exec(ctx, `UPDATE history_turns SET left_after = ? WHERE machine_id = ? AND conv_id = ? AND left_after IS NULL`+
+		notIn+` AND started_ms >= ?`, args...)
+	return err
 }
 
 // storeTurn upserts a turn; a turn that has ended is not made running again by a late copy of an earlier state of it.
@@ -342,7 +390,7 @@ func storeTurn(ctx context.Context, q store.Q, o Owner, conv string, raw json.Ra
 	}
 	_, err := q.Exec(ctx, `INSERT INTO history_turns (machine_id, conv_id, turn_id, started_ms, ended_ms, status, body) VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (machine_id, conv_id, turn_id) DO UPDATE SET started_ms = excluded.started_ms, ended_ms = excluded.ended_ms,
-			status = excluded.status, body = excluded.body
+			status = excluded.status, body = excluded.body, left_after = NULL
 		WHERE history_turns.ended_ms IS NULL OR excluded.ended_ms IS NOT NULL`,
 		o.MachineID, conv, id, started, nullNum(t["endedAt"]), status, string(raw))
 	return err
@@ -365,6 +413,7 @@ func storeEntry(ctx context.Context, q store.Q, o Owner, conv string, raw json.R
 		turn = t
 	}
 	rev, _ := num(x["rev"])
+	raw = keepLonger(ctx, q, o, conv, id, rev, x, raw)
 	_, err := q.Exec(ctx, `INSERT INTO history_entries (machine_id, conv_id, entry_id, turn_id, at_ms, rev, kind, ord, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (machine_id, conv_id, entry_id) DO UPDATE SET turn_id = excluded.turn_id, at_ms = excluded.at_ms, rev = excluded.rev,
 			kind = excluded.kind, body = excluded.body

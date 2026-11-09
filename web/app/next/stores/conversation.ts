@@ -439,6 +439,32 @@ export function applyConvSnapshot(
 }
 
 /**
+ * The cluster's copy of a chat, drawn as soon as it comes, whatever the machine does (spec v10: reading goes
+ * through the hub, the machine is only for what is live). It never goes over what the machine itself said: a feed
+ * the machine's snapshot already filled keeps it, and the machine's snapshot that comes after replaces it as usual.
+ */
+export function importCentralFeed(
+  conv: ConvId,
+  machine: MachineId,
+  page: { turns: Turn[]; entries: Entry[]; beforeTurnId: TurnId | null },
+): boolean {
+  const have = feedStore.get(conv);
+  if (have?.loaded && have.source === 'live') return false;
+  ensureFeed(conv, machine);
+  const incoming = mergeTurnsAndEntries(conv, page.turns, page.entries, false);
+  patchFeed(conv, (f) => ({
+    ...f,
+    loaded: true,
+    source: 'cached',
+    rows: mergeRows(f.rows, incoming, () => false),
+    // Older pages the browser kept go on from where they stopped; otherwise the copy's page says where older ones are.
+    beforeTurnId: f.loaded && f.older ? f.beforeTurnId : page.beforeTurnId,
+    error: null,
+  }));
+  return true;
+}
+
+/**
  * A conversation that conversation.create has just made has no history to wait for: its channel replays from the first
  * event, and the feed is complete (and empty) from the start. Without this the feed would stay unloaded, a skeleton,
  * because only a snapshot, the cache or an error say «loaded».

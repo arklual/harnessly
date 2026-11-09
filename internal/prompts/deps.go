@@ -65,6 +65,7 @@ const (
 	ResumeResumed   = "resumed"
 	ResumeRunning   = "running"
 	ResumeNoSession = "no-session"
+	ResumeBusyShell = "busy-shell"
 	// Anything else (a shell still starting, a busy shell) is tried again later.
 )
 

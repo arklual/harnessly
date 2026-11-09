@@ -173,6 +173,8 @@ The server `harnessly-app`, in a chat with apps on. The last ones are the builti
 | `data_get` | Read what the app keeps for this chat under a key. |
 | `data_set` | Write what the app keeps for this chat under a key. |
 | `settings_get` | Read the app's settings. |
+| `logs` | Read the app's log: what its views reported and what the host refused. |
+| `check` | Open an app's view in a headless browser of the machine and judge how it loaded. |
 | `ask` | Put a choice to the person in the app's view and wait for the answer. |
 | `widget_show` | Show an app's chat view in the feed with the data given. |
 | `widget_render` | Draw a widget written on the spot in the feed. |

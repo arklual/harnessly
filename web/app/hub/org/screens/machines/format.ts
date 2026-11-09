@@ -1,4 +1,4 @@
-import type { MachineBusyKind, OrgMachine } from '../../api/machines';
+import type { MachineBusyKind, MovePlan, OrgMachine } from '../../api/machines';
 
 /** 1 → one, 2–4 → few, 5+ → many (Russian). */
 export const plural = (n: number, one: string, few: string, many: string): string => {
@@ -71,3 +71,22 @@ export const priceOf = (
   r: number,
   d: number,
 ) => plan.core * c + plan.ramGb * r + plan.diskGb * d;
+
+/** Lines of the plan of a move, as the dry run of the hub reports them. */
+export const movePlanLines = (p: MovePlan): { text: string; bad?: boolean }[] => {
+  const out: { text: string; bad?: boolean }[] = [];
+  if (p.noop) return [{ text: 'Машина уже в этом тенанте.' }];
+  if (p.teamCleared) out.push({ text: `Привязка к команде «${p.teamCleared}» снимется.` });
+  if (p.teamAssigned) out.push({ text: `Машина войдёт в команду «${p.teamAssigned}».` });
+  if (p.accessRevoked.length > 0) {
+    out.push({ text: `Доступ потеряют: ${p.accessRevoked.join(', ')}. Выдайте его заново в новом тенанте.` });
+  }
+  out.push({
+    text:
+      p.limits.toRules > 0
+        ? `Новые траты пойдут в лимиты «${p.to.name}» (правил: ${p.limits.toRules}); прошлые останутся в истории «${p.from.name}».`
+        : `Новые траты пойдут в «${p.to.name}» — лимитов там нет; прошлые останутся в истории «${p.from.name}».`,
+  });
+  if (p.kept.length > 0) out.push({ text: `Остаётся как было: ${p.kept.join(', ')}.` });
+  return out;
+};

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 	"github.com/ly-solutions/harnessly/internal/secrets"
@@ -239,6 +240,11 @@ func (t Tools) call(ctx context.Context, i *agentbrowser.Instance, name string, 
 	if name == "chrome_open" || name == "chrome_navigate" {
 		if err := allowedURL(a.URL); err != nil {
 			return nil, err
+		}
+		// The browser's egress refuses the same: checked first, the agent reads why (nothing listens on the port,
+		// a port of the machine that is not a dev server, a private network) instead of a 403 page.
+		if why := host.Refusal(a.URL); why != "" {
+			return nil, errors.New(why)
 		}
 		if name == "chrome_open" || (a.Tab == "" && i.Current(t.Caller) == "") {
 			tab, err := i.AgentNewTab(ctx, t.Caller, "about:blank")

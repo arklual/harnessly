@@ -241,10 +241,14 @@ func (s Store) InviteByID(ctx context.Context, id string) (Invite, error) {
 	return scanInvite(s.q.QueryRow(ctx, `SELECT `+inviteCols+` FROM invites WHERE id = ?`, id))
 }
 
+// activeInvite is what keeps an invite open: not revoked, not expired at the bound time, not used up. Everything that
+// counts or lists open invites shares it, so the invitations screen and the tenant's deletion plan agree.
+const activeInvite = `revoked_at IS NULL AND expires_at > ? AND (max_uses IS NULL OR uses < max_uses)`
+
 // ActiveInvites lists the space's invites that are not revoked, not expired and not used up.
 func (s Store) ActiveInvites(ctx context.Context, spaceID string, now time.Time) ([]Invite, error) {
-	rows, err := s.q.Query(ctx, `SELECT `+inviteCols+` FROM invites WHERE space_id = ? AND revoked_at IS NULL AND expires_at > ?
-		AND (max_uses IS NULL OR uses < max_uses) ORDER BY created_at, id`, spaceID, Ms(now))
+	rows, err := s.q.Query(ctx, `SELECT `+inviteCols+` FROM invites WHERE space_id = ? AND `+activeInvite+`
+		ORDER BY created_at, id`, spaceID, Ms(now))
 	if err != nil {
 		return nil, err
 	}

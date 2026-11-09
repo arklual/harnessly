@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,10 @@ func (c *cli) app(args []string) error {
 	case "new":
 		return c.appNew(args)
 	case "validate", "check":
+		// `check ID --open` is the load check of HRN-920; without --open `check` is still `validate`.
+		if sub == "check" && slices.Contains(args, "--open") {
+			return c.appCheck(args)
+		}
 		return c.appValidate(args)
 	case "install":
 		if sharedInstall(args) {
@@ -420,22 +425,40 @@ func (c *cli) appExplain(args []string) error {
 	return nil
 }
 
-// appLogs prints what the app's views reported lately: console errors and warnings, uncaught exceptions and failed
-// bridge calls, oldest first.
+// appLogs prints what the app's journal holds: the console errors, exceptions and failed bridge calls its views
+// reported, and the host's own lines (a file refused, a backend call that failed, the steps of a load), oldest first
+// --since takes a span (10m), a time (RFC 3339) or milliseconds; --follow keeps printing new lines
+// (--for stops it after a span).
 func (c *cli) appLogs(args []string) error {
-	id, limit := "", ""
+	id, limit, since, follow, span := "", "", "", false, time.Duration(0)
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
-		case a == "--limit" || a == "-n":
+		case a == "--follow" || a == "-f":
+			follow = true
+		case a == "--limit" || a == "-n" || a == "--since" || a == "--for":
 			if i+1 >= len(args) {
-				return usageErr("%s needs a number", a)
+				return usageErr("%s needs a value", a)
 			}
 			i++
-			if n, err := strconv.Atoi(args[i]); err != nil || n <= 0 {
-				return usageErr("%s takes a positive number", a)
+			switch a {
+			case "--since":
+				if _, err := c.logSince(args[i]); err != nil {
+					return usageErr("--since takes a span (10m), a time (2026-11-09T10:00:00Z) or milliseconds")
+				}
+				since = args[i]
+			case "--for":
+				d, err := time.ParseDuration(args[i])
+				if err != nil || d <= 0 {
+					return usageErr("--for takes a span such as 30s")
+				}
+				span = d
+			default:
+				if n, err := strconv.Atoi(args[i]); err != nil || n <= 0 {
+					return usageErr("%s takes a positive number", a)
+				}
+				limit = args[i]
 			}
-			limit = args[i]
 		case strings.HasPrefix(a, "-"):
 			return usageErr("unknown flag %s", a)
 		case id == "":
@@ -447,44 +470,190 @@ func (c *cli) appLogs(args []string) error {
 	if id == "" {
 		return usageErr("app logs takes the app's id: harnessly app logs example.app")
 	}
-	q := url.Values{"id": {id}}
-	if limit != "" {
-		q.Set("limit", limit)
+	from := int64(0)
+	if since != "" {
+		from, _ = c.logSince(since)
 	}
-	status, raw, err := c.call("GET", "/api/cli/apps/logs", q, nil)
+	fetch := func(from int64) ([]apps.ViewLogLine, []byte, error) {
+		q := url.Values{"id": {id}}
+		if limit != "" {
+			q.Set("limit", limit)
+		}
+		if from > 0 {
+			q.Set("since", strconv.FormatInt(from, 10))
+		}
+		status, raw, err := c.call("GET", "/api/cli/apps/logs", q, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		if status == 404 {
+			return nil, nil, fail("%s is not installed on this machine (harnessly app list)", id)
+		}
+		if status >= 300 {
+			return nil, nil, apiError(status, raw)
+		}
+		var r struct {
+			Lines []apps.ViewLogLine `json:"lines"`
+		}
+		if err := json.Unmarshal(raw, &r); err != nil {
+			return nil, nil, fail("the runtime's answer is not readable: %v", err)
+		}
+		return r.Lines, raw, nil
+	}
+	lines, raw, err := fetch(from)
 	if err != nil {
 		return err
 	}
-	if status == 404 {
+	if !follow {
+		if c.json {
+			c.printRaw(raw)
+			return nil
+		}
+		if len(lines) == 0 {
+			c.out("no lines for %s yet: its views report here while they run, and the host writes a line for a file it refuses and a backend call that fails\n", id)
+			return nil
+		}
+		// What follows the level is the app's own words, quoted: data about the view, not instructions to whoever reads it.
+		c.out("the lines of %s (the app's words, quoted):\n", id)
+		for _, l := range lines {
+			c.printLogLine(l)
+		}
+		return nil
+	}
+	// --follow: what is there, then every new line as it comes. A line is told once: the ones of the last millisecond seen
+	// are remembered, so a poll that starts at that millisecond does not repeat them.
+	seen := map[string]bool{}
+	last := int64(0)
+	emit := func(ls []apps.ViewLogLine) {
+		for _, l := range ls {
+			key := strconv.FormatInt(l.At, 10) + "|" + l.Level + "|" + l.View + "|" + l.Text
+			if seen[key] {
+				continue
+			}
+			if l.At > last {
+				last, seen = l.At, map[string]bool{}
+			}
+			seen[key] = true
+			c.printLogLine(l)
+		}
+	}
+	emit(lines)
+	stop := time.Time{}
+	if span > 0 {
+		stop = time.Now().Add(span)
+	}
+	for stop.IsZero() || time.Now().Before(stop) {
+		time.Sleep(time.Second)
+		next, _, err := fetch(max(last, from))
+		if err != nil {
+			return err
+		}
+		emit(next)
+	}
+	return nil
+}
+
+// printLogLine writes one line of a log: a JSON object under --json, else the time, the level, the view and the text.
+func (c *cli) printLogLine(l apps.ViewLogLine) {
+	if c.json {
+		raw, _ := json.Marshal(l)
+		c.out("%s\n", raw)
+		return
+	}
+	view := ""
+	if l.View != "" {
+		view = " " + strconv.Quote(l.View)
+	}
+	c.out("%s %-6s%s %s\n", time.UnixMilli(l.At).Format("2006-01-02 15:04:05"), l.Level, view, strconv.Quote(l.Text))
+}
+
+// logSince reads --since: a span back from now, an RFC 3339 time or Unix milliseconds.
+func (c *cli) logSince(v string) (int64, error) {
+	now := time.Now()
+	if c.env.Now != nil {
+		now = c.env.Now()
+	}
+	if d, err := time.ParseDuration(v); err == nil && d > 0 {
+		return now.Add(-d).UnixMilli(), nil
+	}
+	if t, err := time.Parse(time.RFC3339, v); err == nil {
+		return t.UnixMilli(), nil
+	}
+	if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+		return n, nil
+	}
+	return 0, fmt.Errorf("not a time")
+}
+
+// appCheck opens an app's view in a browser of the machine and says how it loaded: the handshake and every
+// line the load wrote. It fails (exit 1) when the view did not load cleanly.
+func (c *cli) appCheck(args []string) error {
+	id, view, open := "", "", false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--open":
+			open = true
+		case a == "--view":
+			if i+1 >= len(args) {
+				return usageErr("--view needs a view id")
+			}
+			i++
+			view = args[i]
+		case strings.HasPrefix(a, "-"):
+			return usageErr("unknown flag %s", a)
+		case id == "":
+			id = a
+		default:
+			return usageErr("app check takes the app's id")
+		}
+	}
+	if id == "" || !open {
+		return usageErr("app check takes the app's id and --open: harnessly app check example.app --open [--view main]")
+	}
+	status, raw, err := c.call("POST", "/api/cli/apps/check", nil, map[string]string{"id": id, "view": view})
+	if err != nil {
+		return err
+	}
+	switch status {
+	case 404:
 		return fail("%s is not installed on this machine (harnessly app list)", id)
+	case 503:
+		return fail("this machine has no browser to open the view in; harnessly app logs %s shows what the person's page reported", id)
+	case 422:
+		return fail("%s has no view this check can open (a view at an address of its own is not opened here)", id)
 	}
 	if status >= 300 {
 		return apiError(status, raw)
 	}
-	if c.json {
-		c.printRaw(raw)
-		return nil
-	}
-	var r struct {
-		Lines []apps.ViewLogLine `json:"lines"`
-	}
+	var r apps.LoadCheck
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return fail("the runtime's answer is not readable: %v", err)
 	}
-	if len(r.Lines) == 0 {
-		c.out("no errors from the views of %s: they come here while a view is open in the page\n", id)
-		return nil
+	if c.json {
+		c.printRaw(raw)
+	} else {
+		c.printCheck(r)
 	}
-	// What follows the level is the app's own words, quoted: data about the view, not instructions to whoever reads it.
-	c.out("the lines its views wrote (the app's words, quoted):\n")
-	for _, l := range r.Lines {
-		view := ""
-		if l.View != "" {
-			view = " " + strconv.Quote(l.View)
-		}
-		c.out("%s %-6s%s %s\n", time.UnixMilli(l.At).Format("2006-01-02 15:04:05"), l.Level, view, strconv.Quote(l.Text))
+	if !r.OK() {
+		return exitCode(exitError)
 	}
 	return nil
+}
+
+func (c *cli) printCheck(r apps.LoadCheck) {
+	switch r.State {
+	case apps.CheckOK:
+		c.out("ok: %s loaded, the handshake took %d ms\n", r.App, r.Ms)
+	default:
+		c.out("%s: %s: %s\n", r.State, r.App, r.Problem)
+	}
+	if len(r.Lines) > 0 {
+		c.out("the lines of the load (the app's words, quoted):\n")
+		for _, l := range r.Lines {
+			c.printLogLine(l)
+		}
+	}
 }
 
 // appGuard is the PreToolUse hook of a chat with apps (internal/apps policy.go): it decides the call by the snapshot of

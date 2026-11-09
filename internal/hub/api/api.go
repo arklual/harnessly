@@ -479,7 +479,8 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 	go h.Analytics.RunLive(ctx, h.OrgEvents.Active)
 	go h.Design.Run(ctx)
-	go h.Docs.Run(ctx) // comments not yet handed to their conversations
+	go h.Proxy.RunOutbox(ctx) // messages written to a machine that was off, handed over once it is back
+	go h.Docs.Run(ctx)        // comments not yet handed to their conversations
 	if h.Ext != nil {
 		go h.Ext.Run(ctx, ext.CheckEvery)
 	}

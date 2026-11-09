@@ -229,7 +229,7 @@ func (q *req) row(e store.EnvEntry, edit bool, c cover, use *usageIndex, rs []En
 		above = LockedAbove(rs, e.Layer, q.w.org.ID, q.w.tenantOf(e.Layer, e.ScopeID), e.ItemID)
 	}
 	row := EntryItem{EntryID: e.ID, ItemID: it.ID, Kind: it.Kind, Name: it.Name, Hint: it.Hint, Audience: audienceView(e.Audience),
-		Pinned: e.Pinned, Enabled: e.Enabled, GroupID: e.GroupID}
+		Pinned: e.Pinned, Enabled: e.Enabled, GroupID: e.GroupID, Position: e.Position}
 	row.LockedReason = lockedReason(edit, above, e)
 	row.Locked = row.LockedReason != nil
 	if use.has {

@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The search over the chats, the sidebar's projects and favorites, and the turns a rewind left behind open from the
+  cluster's and the hub's copy, with the machine off too: the hub serves `…/history/search`, `…/history/sidebar` (one
+  document per person, written on its revision) and `…/history/conversations/<id>/rewinds/<n>/turns`, as the gateway
+  does. A rewind's live `feed_reset` marks the turns it left behind, so the copy's feed no longer shows them; an undone
+  rewind brings them back.
+- The hub keeps the messages written to a machine that is off, like the cluster's gateway (`…/offline-prompts`): they
+  outlive the tab, show on the person's other devices, and the hub hands each one to the machine as the page's own send
+  command once it is back, in order and once per opId.
+- A message written to a machine that is off waits in the cluster's gateway too, as the very send command the page
+  sends the machine: it outlives the tab, shows on the person's other devices and goes by itself when the machine is
+  back; the machine takes one opId once, so the agent gets it once whoever comes first. A hub without the gateway's
+  queue keeps the page's own outbox, as before.
+- A tool's whole output is in the cluster's and the hub's copy: the agent reads it from the runtime apart from the
+  stream (up to 1 MiB) for every tool it sees cut, pages keep carrying its first 4 KB, and «show all» reads it from
+  `…/history/conversations/<id>/entries/<entry>/output` — with the machine off too.
 - Heavy checks share the machine: launchers named `go`, `vitest`, `playwright`, `tsc`, `eslint`, `npx`, `npm` and `pnpm` on the agents'
   `PATH` run builds, tests, type checks and linters through `harnessly heavy`, which gives them one of the machine's
   few slots (by its cores), runs them gently and, when the machine stays busy, tells the agent to go on without the check
@@ -246,6 +261,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The agent's Chrome is held to rules: it goes out only through an egress proxy shared with the pane's live
+  browser, which refuses private networks, link-local and the machine's own addresses (by the address a name resolves
+  to) and on `localhost` opens only the machine's dev servers, never the runtime's port; `file:`, `chrome:`,
+  `javascript:` and `data:` pages are refused. It closes after 3 minutes idle by default and keeps session cookies
+  across, runs at most 3 per machine (`RUNTIME_BROWSER_MAX_HOSTS`) with 8 tabs each (`RUNTIME_BROWSER_MAX_TABS`, also
+  the renderer bound) under `nice 10`, downloads into its profile up to 100 MiB a file
+  (`RUNTIME_BROWSER_DOWNLOAD_LIMIT`), is replaced after an update (build in `Host.hello`) and closed by
+  `RUNTIME_BROWSER=off`. See `docs/configuration.md`.
 - A runtime that listens beyond loopback and has no password and no `INIT_PASSWORD` makes a one-time initial password at
   start and prints it once (`Initial password: …`), so the first visitor of a public host can no longer choose the
   password. `RUNTIME_GENERATE_INIT_PASSWORD=1|0` forces it on or off; a runtime on `127.0.0.1` behaves as before.
@@ -264,6 +287,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A fresh device opening `/agents/` while the home machine's runtime hangs (its agent keeping the link) no longer stays
+  blank for up to 30 s: the hub waits on that machine's page settings at most 2 s and not again for 30 s, the person's
+  other machine that is on answers for them meanwhile, and the page draws the machines without waiting for its
+  `me` past 3 s.
+- A chat opens whole while its machine is starting, hung or switched off: the feed, older turns and a turn's steps are
+  read from the hub's (the cluster's) copy first, not only once the machine is called offline; the machine answers
+  only for what the copy does not have yet. A chat the copy does not hold back to its first turn says so (`complete`),
+  so its oldest page asks the machine for the rest instead of ending the feed early.
 - A restart no longer loses the runtime's `RUNTIME_*` settings. `install.sh` keeps the `RUNTIME_*` variables
   it was given in `~/.config/harnessly/env` (before, only the first start, which inherited them from the installer's
   shell, had them) and passes them to the launchd job; the hub machine's installer keeps the lines added to

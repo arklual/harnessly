@@ -56,6 +56,32 @@
 
   var port = null;
 
+  // The page of a check (`harnessly app check`) tells the app's log how the view loaded: the handshake, what the view
+  // wrote to its console, and a wait that ran out. A guest's own link reports nothing.
+  var started = Date.now();
+  var queue = [];
+  var report = function (level, text) {
+    if (!cfg.check) return;
+    queue.push({ level: level, text: String(text).slice(0, 1000) });
+    if (queue.length > 40) queue.shift();
+  };
+  var flush = function () {
+    if (!cfg.check || queue.length === 0) return;
+    var lines = queue;
+    queue = [];
+    fetch('__guest/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lines: lines }) }).catch(function () {});
+  };
+  if (cfg.check) {
+    window.setInterval(flush, 250);
+    report('load', 'check page opened');
+    window.setTimeout(function () {
+      if (port === null) report('error', 'no handshake in 8 s: the view did not load its SDK, or it failed before ui/initialize');
+    }, 8000);
+    frame.addEventListener('load', function () {
+      report('load', 'frame loaded after ' + (Date.now() - started) + ' ms');
+    });
+  }
+
   var refuse = function (id, code, message, version) {
     var data = { code: code };
     if (typeof version === 'number') data.version = version;
@@ -95,8 +121,13 @@
       if (id !== undefined) port.postMessage({ jsonrpc: '2.0', id: id, result: result });
     };
     var deny = function (code, message) {
+      report('bridge', m.method + ' — ' + code + ': ' + message);
       if (id !== undefined) refuse(id, code, message);
     };
+    if (m.method === 'harnessly/debug.log') {
+      if (typeof params.text === 'string') report(params.level === 'warn' ? 'warn' : 'error', params.text);
+      return reply({});
+    }
     if (m.method === 'ui/notifications/initialized' || m.method === 'ui/notifications/size-changed' || m.method === 'harnessly/ui.toast') {
       return reply({});
     }
@@ -120,6 +151,7 @@
     if (!m.params || m.params.nonce !== cfg.nonce) return;
     var channel = new MessageChannel();
     port = channel.port1;
+    report('load', 'handshake ok after ' + (Date.now() - started) + ' ms');
     port.onmessage = onPort;
     port.start();
     frame.contentWindow.postMessage(

@@ -111,6 +111,7 @@ type fakePanes struct {
 	mu       sync.Mutex
 	sessions map[string]int // session → pane pid
 	safe     bool
+	busyFor  int // the first checks of the terminal see it busy, as a shell still starting
 	created  []string
 	sent     []string
 	createE  error
@@ -140,7 +141,15 @@ func (p *fakePanes) CreateSession(n string, cols, rows int, cwd string) error {
 	return nil
 }
 
-func (p *fakePanes) CheckTerminalProcess(string) (bool, string) { return p.safe, "bash" }
+func (p *fakePanes) CheckTerminalProcess(string) (bool, string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.busyFor > 0 {
+		p.busyFor--
+		return false, "zsh-startup"
+	}
+	return p.safe, "bash"
+}
 
 func (p *fakePanes) SendKeys(n, line string) error {
 	p.mu.Lock()
@@ -228,7 +237,7 @@ func newRig(t *testing.T) *rig {
 		Visibility:         r.vis,
 		MirrorVisibility:   func(id string, v bool) { r.mu.Lock(); defer r.mu.Unlock(); r.mirror = append(r.mirror, id) },
 		SessionProcessPath: "/api/app/session-process",
-		Timings:            Timings{ShellReady: time.Millisecond, BackstopPoll: 2 * time.Millisecond, BackstopWait: 20 * time.Millisecond, BackstopGrace: 5 * time.Millisecond},
+		Timings:            Timings{ShellReady: time.Millisecond, ShellSettle: 30 * time.Millisecond, ShellPoll: 2 * time.Millisecond, BackstopPoll: 2 * time.Millisecond, BackstopWait: 20 * time.Millisecond, BackstopGrace: 5 * time.Millisecond},
 	}
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "state-mode.json"), []byte(`{"goSlices":["core"]}`), 0o600); err != nil {
@@ -507,6 +516,10 @@ func TestSessionProcessResume(t *testing.T) {
 	r.panes.safe = false
 	expect(t, r.post("/api/app/session-process", `{"tabId":"tab-2","action":"resume"}`), 409, `{"error":"Во вкладке занят терминал — сначала освободите его"}`)
 	r.panes.safe = true
+	// A terminal busy only for a moment (a shell still starting, GitHub #52) is waited for, not refused.
+	r.panes.mu.Lock()
+	r.panes.busyFor = 3
+	r.panes.mu.Unlock()
 	expect(t, r.post("/api/app/session-process", `{"tabId":"tab-2","action":"resume"}`), 200, `{"result":"resumed"}`)
 	if last := r.panes.sent[len(r.panes.sent)-1]; !strings.Contains(last, "22222222-2222-4222-8222-222222222222") {
 		t.Fatal(last)

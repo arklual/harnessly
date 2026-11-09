@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/web"
@@ -47,6 +48,9 @@ func webExport(dir string) error {
 	})
 	return err
 }
+
+// The browser host answers the runtime's build to Host.hello: a runtime of another build replaces it.
+func init() { host.Build = agent.BuildVersion }
 
 // subcommand handles browser-host, web export and sandbox-exec before the runtime starts serving.
 // Unknown arguments retain their previous meaning to the server.

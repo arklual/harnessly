@@ -30,15 +30,13 @@ type PeriodKey = (typeof PERIODS)[number];
 
 const OUTCOME_KEY: Record<MeSession['outcome'], string> = {
   running: 'next.manage.outcome.running',
-  mr_merged: 'next.manage.outcome.merged',
   mr_open: 'next.manage.outcome.open',
-  abandoned: 'next.manage.outcome.abandoned',
   done: 'next.manage.outcome.done',
 };
 
 const LimitCard = ({ me, hub, onSent }: { me: HubMe; hub: ManageHub; onSent: () => void }) => {
   const { limits, usage } = me;
-  const limit = decidingLimit(limits);
+  const limit = limits.mode === 'off' ? null : decidingLimit(limits);
   if (!limit) {
     return (
       <section className="hx-mg-card">
@@ -57,10 +55,9 @@ const LimitCard = ({ me, hub, onSent }: { me: HubMe; hub: ManageHub; onSent: () 
       </h2>
       <p className="hx-mg-card__sub">
         {limit.setBy
-          ? t('next.manage.limit.setBy', { name: limit.setBy.name, role: limit.setBy.role })
+          ? t('next.manage.limit.setByName', { name: limit.setBy.name })
           : t('next.manage.limit.setByHub')}
-        {' · '}
-        {t('next.manage.limit.resets', { date: resets })}
+        {resets && ` · ${t('next.manage.limit.resets', { date: resets })}`}
       </p>
       <p className="hx-mg-big" data-tone={tone}>
         {hubMoneyShort(limit.used, limits.currency)}
@@ -183,7 +180,9 @@ const ManageView = ({ onOpen }: { onOpen: (route: TRoute) => void }) => {
             <h1 className="hx-mg-head__title">{t('next.manage.title')}</h1>
             <p className="hx-mg-head__sub">
               {me
-                ? t('next.manage.measured', { time: stamp(me.limits.measuredUntil) })
+                ? me.limits.measuredUntil
+                  ? t('next.manage.measured', { time: stamp(me.limits.measuredUntil) })
+                  : t('next.manage.notMeasured')
                 : t('next.manage.localOnly')}
             </p>
           </div>
@@ -260,7 +259,7 @@ const ManageView = ({ onOpen }: { onOpen: (route: TRoute) => void }) => {
             <p className="hx-mg-card__sub">
               {me ? t('next.manage.spend.sub.hub') : t('next.manage.spend.sub.local')}
             </p>
-            {local.totals.cost === 0 && !me ? (
+            {(me ? me.usage.days.length === 0 : local.totals.cost === 0) ? (
               <p className="hx-mg-empty">{t('next.manage.spend.empty')}</p>
             ) : (
               <DayBars

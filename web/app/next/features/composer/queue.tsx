@@ -72,6 +72,7 @@ const PAUSE_KEYS: Partial<Record<QueuePause['reason'], string>> = {
   'launch-failed': 'next.queue.pausedLaunch',
   'agent-gone': 'next.queue.pausedGone',
   'needs-target': 'next.queue.pausedTarget',
+  'resume-blocked': 'next.queue.pausedBlocked',
 } as const;
 
 const pauseNote = (pause: QueuePause | null, launchFailure: LaunchFailure | null): string => {

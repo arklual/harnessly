@@ -1,15 +1,16 @@
 // The pill over the field and its popover (the design's .hx-model and .hx-picker): the first screen is the depth of
 // thinking on a slider of the stops the model takes, a tap on the agent and model goes to the second, the agents in
 // segments and their models in a sideways carousel. In a created chat the agent is fixed and only its models show.
-// Ultracode (Claude Code's mode of dynamic workflows with subagents) is no stop of the slider: a switch of its own under
+// Ultracode (Claude Code's mode of dynamic workflows with subagents) is no stop of the slider: a chip of its own under
 // it, on the models that run it, and on the pill a glow and a mark of its own beside «model · depth». The pill and the
-// row's glow are what the agent was last seen running; a turn of the switch the agent has not confirmed yet shows on the
-// switch and is said under it, never on the pill. On the phone it stays the same compact popover over the pill (the
+// chip's fill are what the agent was last seen running; a turn of the chip the agent has not confirmed yet shows on the
+// chip (its switch state and outline) and in its hint, never on the pill. On the phone it stays the same compact popover over the pill (the
 // design's mobile.css keeps it one), its rows a finger tall. A new chat of a person with several machines also says
 // the machine it starts on, a row under the depth that opens a third screen of the machines: another one
 // brings that machine's agents and models, the ones logged in there. Under the depth sit the permission mode, three
-// segments (plan, ask, ask nothing), and the fast mode, a switch like ultracode's on the models that run it;
-// like ultracode, both show what the agent was last seen running, and an ask that waits is said under its control.
+// segments (plan, ask, ask nothing), and under them one row of chips: the fast mode on the models that run it
+// and ultracode, each a switch whose hint (on hover, above it) says what it does or that an ask waits for the agent;
+// both show what the agent was last seen running.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   agentKey,
@@ -32,7 +33,7 @@ import {
   type PermissionMode,
 } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
-import Switch from '@/next/ui/switch';
+import Tooltip from '@/next/ui/tooltip';
 import { usePresentFlag } from '@/next/ui/presence';
 import type { IMachineChoice } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
@@ -162,7 +163,7 @@ const ModelPicker = ({
     ultracodeOffered && ultracodeAsked !== null && ultracodeAsked !== ultracode ? ultracodeAsked : null;
   const switchOn = asked ?? ultracode;
   const ultraHint =
-    asked === null ? t('next.picker.ultracodeHint') : t(ULTRACODE_WAITS[asked ? 'on' : 'off']);
+    asked === null ? t('next.picker.ultracodeTitle') : t(ULTRACODE_WAITS[asked ? 'on' : 'off']);
   const fastOffered = model?.fast === true;
   const fast = fastOffered && value.fast === true;
   const fastWaits = fastOffered && fastAsked !== null && fastAsked !== fast ? fastAsked : null;
@@ -435,43 +436,44 @@ const ModelPicker = ({
                   {permissionHint}
                 </div>
               </div>
-              {fastOffered && (
-                <div
-                  className="hx-picker__mode"
-                  data-on={fast || undefined}
-                  data-pending={fastWaits !== null || undefined}
-                >
-                  <Icon name="zap" size="sm" className="hx-picker__mode-ic" />
-                  <span className="hx-picker__mode-text">
-                    <span className="hx-picker__mode-name">{t('next.picker.fast')}</span>
-                    <span className="hx-picker__mode-hint">{fastHint}</span>
-                  </span>
-                  <Switch
-                    label={t('next.picker.fast')}
-                    checked={fastWaits ?? fast}
-                    disabled={frozen}
-                    onChange={(on) => onChange({ ...value, ...keep, fast: on })}
-                  />
-                </div>
-              )}
-              {ultracodeOffered && (
-                <div
-                  className="hx-picker__ultra"
-                  data-on={ultracode || undefined}
-                  data-pending={asked !== null || undefined}
-                  title={t('next.picker.ultracodeTitle')}
-                >
-                  <Icon name="workflow" size="sm" className="hx-picker__ultra-ic" />
-                  <span className="hx-picker__ultra-text">
-                    <span className="hx-picker__ultra-name">{t('next.picker.ultracode')}</span>
-                    <span className="hx-picker__ultra-hint">{ultraHint}</span>
-                  </span>
-                  <Switch
-                    label={t('next.picker.ultracode')}
-                    checked={switchOn}
-                    disabled={frozen}
-                    onChange={(on) => onChange({ ...value, ...keep, ultracode: on })}
-                  />
+              {(fastOffered || ultracodeOffered) && (
+                <div className="hx-picker__chips">
+                  {fastOffered && (
+                    <Tooltip label={fastHint}>
+                      <button
+                        type="button"
+                        role="switch"
+                        className="hx-picker__chip"
+                        aria-checked={fastWaits ?? fast}
+                        data-mode="fast"
+                        data-on={fast || undefined}
+                        data-pending={fastWaits !== null || undefined}
+                        disabled={frozen}
+                        onClick={() => onChange({ ...value, ...keep, fast: !(fastWaits ?? fast) })}
+                      >
+                        <Icon name="zap" size="sm" className="hx-picker__chip-ic" />
+                        <span className="hx-picker__chip-name">{t('next.picker.fastChip')}</span>
+                      </button>
+                    </Tooltip>
+                  )}
+                  {ultracodeOffered && (
+                    <Tooltip label={ultraHint}>
+                      <button
+                        type="button"
+                        role="switch"
+                        className="hx-picker__chip"
+                        aria-checked={switchOn}
+                        data-mode="ultracode"
+                        data-on={ultracode || undefined}
+                        data-pending={asked !== null || undefined}
+                        disabled={frozen}
+                        onClick={() => onChange({ ...value, ...keep, ultracode: !switchOn })}
+                      >
+                        <Icon name="workflow" size="sm" className="hx-picker__chip-ic" />
+                        <span className="hx-picker__chip-name">{t('next.picker.ultracode')}</span>
+                      </button>
+                    </Tooltip>
+                  )}
                 </div>
               )}
               {machine && startsOn && (

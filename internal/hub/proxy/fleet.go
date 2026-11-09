@@ -202,12 +202,32 @@ func (s *Service) home(ctx context.Context, userID string, onHub bool) string {
 	if err != nil || len(list) == 0 {
 		return ""
 	}
+	// a machine that is on but did not give its page a moment ago (its runtime hangs while its agent keeps the
+	// link) answers for the person only when no other machine of theirs is on.
+	first := ""
 	for _, f := range list {
-		if f.Online {
+		if !f.Online {
+			continue
+		}
+		if !s.hangs(f.ID) {
 			return f.ID
 		}
+		if first == "" {
+			first = f.ID
+		}
+	}
+	if first != "" {
+		return first
 	}
 	return list[0].ID
+}
+
+// hangs: the machine did not give its page settings when last asked, a moment ago (machineSettings).
+func (s *Service) hangs(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.pages[id]
+	return ok && c.missed && s.now().Before(c.until)
 }
 
 // serveFleet answers /api/v2/…: the list of machines itself, anything else for the machine named by ?machine=.

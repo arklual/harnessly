@@ -238,13 +238,20 @@ func (s *ViewServer) Close() {
 // Handler answers the views' requests.
 func (s *ViewServer) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A file the server refuses is also a line of the app's log, so `harnessly app logs` names it.
+		refuse := func(v viewRefusal) {
+			if v.App != "" {
+				s.reg.LogEventOnce(v.App, v.View, ViewLogServe, "GET "+clip(v.Path, 200)+" — "+strconv.Itoa(v.Status)+" "+v.Code)
+			}
+			refuseView(w, r, v)
+		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		if !s.hostOK(r.Host) {
-			refuseView(w, r, viewRefusal{Status: http.StatusForbidden, Code: "host", Reason: "Адрес не принадлежит серверу видов."})
+			refuse(viewRefusal{Status: http.StatusForbidden, Code: "host", Reason: "Адрес не принадлежит серверу видов."})
 			return
 		}
 		switch r.URL.Path {
@@ -279,24 +286,24 @@ func (s *ViewServer) Handler() http.Handler {
 				serveBytes(w, r, typ, body)
 				return
 			}
-			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "sdk-file", App: sess.App, View: sess.View, Path: "__hl/" + name,
+			refuse(viewRefusal{Status: http.StatusNotFound, Code: "sdk-file", App: sess.App, View: sess.View, Path: "__hl/" + name,
 				Reason: "Нет такого файла SDK: " + name + "."})
 			return
 		}
 		id, rel, ok := strings.Cut(rest, "/")
 		if !live {
 			// The token is the session's secret: it is never written to the log, only that there was none.
-			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "no-session", Path: rest,
+			refuse(viewRefusal{Status: http.StatusNotFound, Code: "no-session", Path: rest,
 				Reason: "Сессия вида закончилась или не выдавалась: откройте вид заново."})
 			return
 		}
 		if !ok || id != sess.App || !idRe.MatchString(id) {
-			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "other-app", App: sess.App, View: sess.View, Path: rest,
+			refuse(viewRefusal{Status: http.StatusNotFound, Code: "other-app", App: sess.App, View: sess.View, Path: rest,
 				Reason: "Эта сессия не открывает файлы другого приложения."})
 			return
 		}
 		missing := func(why string) {
-			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "no-file", App: id, View: sess.View, Path: rel,
+			refuse(viewRefusal{Status: http.StatusNotFound, Code: "no-file", App: id, View: sess.View, Path: rel,
 				Reason: "Не загрузился файл " + rel + ": " + why})
 		}
 		if id == WidgetsApp {
@@ -305,7 +312,7 @@ func (s *ViewServer) Handler() http.Handler {
 		}
 		app, err := s.reg.Get(id)
 		if err != nil || app.Manifest == nil {
-			refuseView(w, r, viewRefusal{Status: http.StatusNotFound, Code: "no-app", App: id, View: sess.View, Path: rel,
+			refuse(viewRefusal{Status: http.StatusNotFound, Code: "no-app", App: id, View: sess.View, Path: rel,
 				Reason: "Приложение не установлено или выключено."})
 			return
 		}

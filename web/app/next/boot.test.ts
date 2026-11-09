@@ -5,7 +5,7 @@ import { hub } from '@/next/core/realtime/hub';
 import { FakeRuntime } from '@/next/core/testing/fake-runtime';
 import { resetCore } from '@/next/core/testing/reset';
 import { bootFake, fakeEnv, settle, useFakeTime } from '@/next/core/testing/setup';
-import { bootNext, bootStore, ME_RETRY_MS, shutdownNext } from '@/next/boot';
+import { bootNext, bootStore, ME_FIRST_SCREEN_MS, ME_RETRY_MS, shutdownNext } from '@/next/boot';
 import { connectionStore } from '@/next/stores/connection';
 import { convsLoadedStore } from '@/next/stores/conversations';
 import { machinesStore } from '@/next/stores/machines';
@@ -223,6 +223,29 @@ describe('whose data the page keeps', () => {
     expect(meStore.get().k).toBe('ready');
     expect(messagesStore.get(id)).toBeDefined();
     expect(rt.commands.filter((c) => c.op === 'send' && c.body.opId === id).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a me the home machine holds back does not hold the first screen, and is taken when it comes (HRN-879)', async () => {
+    const rt = new FakeRuntime();
+    await bootFake({ rt, start: false });
+    const good = localMeSource({ email: 'a@x.ru' });
+    // A home machine whose agent keeps its link while its runtime hangs: me answers after 10 s.
+    const me: MeSource = {
+      load: () => new Promise((resolve) => setTimeout(() => resolve(good.load()), 10_000)),
+      patch: good.patch,
+    };
+    let ready = false;
+    const booting = bootNext(bootOpts(rt, () => memoryKV(), me, null)).then((st) => {
+      ready = true;
+      return st;
+    });
+    await vi.advanceTimersByTimeAsync(ME_FIRST_SCREEN_MS + 400);
+    expect(ready).toBe(true);
+    expect(await booting).toEqual({ k: 'ready', machines: [rt.machineId] });
+    expect(meStore.get().k).toBe('loading');
+    await vi.advanceTimersByTimeAsync(10_000);
+    await settle();
+    expect(meStore.get().k).toBe('ready');
   });
 
   it('a me retry that hears 401 is the sign-in screen, not a local success', async () => {

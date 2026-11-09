@@ -136,9 +136,16 @@ func Explain(in ExplainInput) []ExplainLine {
 			add("chat", false, "%s", w)
 		}
 	}
-	if n := len(in.ViewLog); n > 0 {
+	// The steps of a load are not errors: only the failures are counted.
+	n, lastLevel := 0, ""
+	for _, l := range in.ViewLog {
+		if ViewLogFailure(l) {
+			n, lastLevel = n+1, l.Level
+		}
+	}
+	if n > 0 {
 		// Only the count and the level: the text is the app's own words, read with app logs, marked as such there.
-		add("views", false, "%d line(s) of its views' errors, the last a %s line (harnessly app logs %s)", n, in.ViewLog[n-1].Level, a.ID)
+		add("views", false, "%d line(s) of its views' errors, the last a %s line (harnessly app logs %s)", n, lastLevel, a.ID)
 	}
 	switch {
 	case !in.Wall:

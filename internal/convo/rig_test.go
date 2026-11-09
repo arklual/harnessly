@@ -134,6 +134,8 @@ type fakeLauncher struct {
 	launched []LaunchRequest
 	resumed  []string
 	err      error
+	// resumeErr is what Resume answers; nil resumes.
+	resumeErr error
 }
 
 func (l *fakeLauncher) Launch(req LaunchRequest) error {
@@ -142,7 +144,7 @@ func (l *fakeLauncher) Launch(req LaunchRequest) error {
 }
 func (l *fakeLauncher) Resume(c wire.Conversation) error {
 	l.resumed = append(l.resumed, c.ID)
-	return nil
+	return l.resumeErr
 }
 
 type rig struct {

@@ -2,6 +2,7 @@ package convo
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -290,5 +291,39 @@ func TestAnEffortTheModelDoesNotTakeIsRefusedBeforeAnyKey(t *testing.T) {
 	}
 	if len(r.pane.calls) != 0 {
 		t.Fatalf("%v", r.pane.calls)
+	}
+}
+
+// GitHub #52: a resume refused because the terminal is busy does not leave the message waiting with no word. The
+// queue pauses with the reason, and «continue sending» tries the resume again, with the same message.
+func TestAResumeRefusedByABusyTerminalPausesTheQueueAndContinueTriesAgain(t *testing.T) {
+	r := newRig(t)
+	r.open()
+	r.settle(wire.StateReady)
+	r.machine.probes["s1"] = Probe{Session: true, Shell: true, Resumable: true}
+	r.tick(time.Second)
+	if st := r.state(); st.K != wire.StateStopped || !st.Resumable {
+		t.Fatalf("state %+v", st)
+	}
+	r.launcher.resumeErr = fmt.Errorf("not resumed: %w", ErrResumeBlocked)
+	r.send("m1", "hello", wire.ModeQueue)
+	if len(r.launcher.resumed) != 1 {
+		t.Fatalf("resumed %v", r.launcher.resumed)
+	}
+	if p := r.record().Queue.Paused; p == nil || p.Reason != wire.PausedResumeBlocked {
+		t.Fatalf("paused %+v", p)
+	}
+	r.launcher.resumeErr = nil
+	if res := r.do(wire.QueueResumeCmd{OpID: "r1", ConversationID: r.id}); res.R != wire.ResultAccepted {
+		t.Fatalf("%+v", res)
+	}
+	if len(r.launcher.resumed) != 2 {
+		t.Fatalf("continue should resume again: %v", r.launcher.resumed)
+	}
+	if p := r.record().Queue.Paused; p != nil {
+		t.Fatalf("still paused %+v", p)
+	}
+	if st := r.state(); st.K != wire.StateStarting {
+		t.Fatalf("state %+v", st)
 	}
 }

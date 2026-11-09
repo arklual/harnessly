@@ -1,43 +1,42 @@
-// What the hub says about the person (`/api/me/*`, plan §2.11). The contract is still being written
-// (docs/hub/orgs.md and its neighbours); these are the shapes the screen needs, to be aligned when it lands.
-// Times are RFC 3339 UTC strings, money is in the organization's display currency.
+// What the Manage screen needs from the hub, already in display money. The hub's own answers (`/api/me/limits`,
+// `/usage`, `/sessions`, `/kpis`) are read by `wire.ts` and mapped into these shapes by `api.ts`; nothing here is a
+// wire type. Times are RFC 3339 UTC strings, money is in the organization's display currency.
 
-export type HubCurrency = 'RUB' | 'USD';
+/** An ISO 4217 code as the hub sends it (`currency.code`). */
+export type HubCurrency = string;
 
-/** One limit that acts on the person; the tightest one decides (`MeLimits.limits[].effective`). */
+/** One limit that acts on the person; the tightest one decides (`MeLimit.effective`). */
 export interface MeLimit {
   id: string;
-  /** The axis it limits: the person, their team, the tenant, a shared account, a model. */
-  axis: 'person' | 'team' | 'tenant' | 'account' | 'model';
   label: string;
   used: number;
   amount: number;
-  /** Share of the amount at which a warning comes. */
+  /** Share of the amount, in percent, at which a warning comes. */
   warnPct: number;
-  /** The person who set it; null when the hub itself did. */
-  setBy: { name: string; role: string } | null;
-  resetsAt: string;
+  /** The person who set it; null when the hub did not name one. */
+  setBy: { name: string } | null;
+  /** The end of the limit's period; null when the hub does not say. */
+  resetsAt: string | null;
   effective: boolean;
 }
 
 export interface MeLimits {
   currency: HubCurrency;
-  measuredUntil: string;
+  /** `off`: the hub keeps the rules but does not enforce them. */
+  mode: 'off' | 'warn' | 'stop';
+  /** When the server last counted; null until it has counted anything. */
+  measuredUntil: string | null;
   limits: MeLimit[];
-  /** The lead who gets «Попросить больше»; null when nobody can grant it. */
+  /** «Попросить больше» needs a request the hub's endpoint takes (amount, reason, scope); the page hides it for now. */
   askTo: { name: string } | null;
-  /** A request already sent in this period. */
   pendingRequest: { at: string } | null;
 }
 
 export interface MeUsage {
   currency: HubCurrency;
-  measuredUntil: string;
   days: { day: string; cost: number }[];
   byModel: { model: string; cost: number }[];
-  /** What the agent's own machine cost, apart from the models. */
-  machineCost: number;
-  /** A guess at the month's end at the current pace. */
+  /** A guess at the month's end at the current pace; the hub does not give one. */
   forecast: number | null;
 }
 
@@ -47,16 +46,14 @@ export interface MeSession {
   endedAt: string | null;
   cost: number;
   machine: string;
-  outcome: 'running' | 'mr_merged' | 'mr_open' | 'abandoned' | 'done';
+  outcome: 'running' | 'mr_open' | 'done';
 }
 
 export interface MeSessions {
-  measuredUntil: string;
   sessions: MeSession[];
 }
 
 export interface MeKpis {
-  measuredUntil: string;
   kpis: { id: 'moneyPerMr' | 'yield' | 'timeToMr' | 'mrPerMonth'; value: number; previous: number | null }[];
 }
 

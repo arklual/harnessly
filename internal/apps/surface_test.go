@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"testing"
 )
@@ -52,6 +53,17 @@ func TestSurfaceIsConsistent(t *testing.T) {
 	for _, tool := range []string{"open", "data_get", "data_set", "settings_get", "ask", "widget_show", "widget_render", "catalog", "page_tools", "page_call"} {
 		if !slices.ContainsFunc(surfaceTools, func(s SurfaceTool) bool { return s.Name == tool }) {
 			t.Errorf("tool %s is not in the catalog", tool)
+		}
+	}
+}
+
+// The generated reference is public text: no tracker keys in it. The open-source export strips them from comments and
+// Markdown, not from Go strings, so a key in a Doc made the exported reference differ from its source.
+func TestSurfaceDocsCarryNoTrackerKeys(t *testing.T) {
+	key := regexp.MustCompile(`\([A-Z]{2,6}-[0-9]+\)`)
+	for path, body := range SurfaceFiles() {
+		if m := key.Find(body); m != nil {
+			t.Errorf("%s carries %s: keep tracker keys in comments, not in the surface's Doc strings", path, m)
 		}
 	}
 }

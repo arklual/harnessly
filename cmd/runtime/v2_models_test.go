@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/catalog"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -141,5 +142,41 @@ func TestAgentsNowCodexLogin(t *testing.T) {
 	}
 	if got := status(preflight.Codex{Installed: true, LoggedIn: true}); got != wire.InstallReady {
 		t.Errorf("signed in: %s", got)
+	}
+}
+
+// Claude Code's /fast is offered on Opus only while Claude runs on an API key; a claude.ai subscription has none.
+func TestClaudeFastModeIsOfferedOnAKeyOnly(t *testing.T) {
+	c := machineModels(t, `{}`, "")
+	for auth, want := range map[string]bool{"api_key": true, "subscription": false, "": false} {
+		c.agents.claudeAuth = func() string { return auth }
+		ms := c.v2Models(wire.ProviderClaude)
+		if byID(ms, "opus").Fast != want || byID(ms, "sonnet").Fast {
+			t.Fatalf("%q: opus fast=%v sonnet fast=%v", auth, byID(ms, "opus").Fast, byID(ms, "sonnet").Fast)
+		}
+	}
+}
+
+// The sign-in is read as a chat would start: the agent's env files over the runtime's environment, then Claude's own.
+func TestClaudeAuthIsReadLikeAChatStarts(t *testing.T) {
+	home, envDir := t.TempDir(), t.TempDir()
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	auth := claudeAuthOf(home, envDir)
+	if got := auth(); got != "" {
+		t.Fatalf("signed in nowhere: %q", got)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"oauthAccount":{"accountUuid":"acc-1"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := auth(); got != "subscription" {
+		t.Fatalf("claude.ai: %q", got)
+	}
+	if err := os.WriteFile(agents.EnvFile(envDir, "claude"), []byte("ANTHROPIC_API_KEY='test-key'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := auth(); got != "api_key" {
+		t.Fatalf("a key in the env file: %q", got)
 	}
 }

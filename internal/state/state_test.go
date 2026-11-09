@@ -709,3 +709,28 @@ func TestAddTabTakesTheChosenID(t *testing.T) {
 		t.Fatalf("a tab without a chosen id: %v", other)
 	}
 }
+
+// a GPT chat's relay reads the tab's fast mode off its launch.
+func TestTabLaunchFast(t *testing.T) {
+	r := newRig(t)
+	session := "tk-ws-a1-pane-b2-tab-c3"
+	r.writeLayout("ws-a1", `{"root":{"type":"pane","id":"pane-b2","activeTabId":"tab-c3","tabs":[{"id":"tab-c3","sessionName":"`+session+`","name":"Claude","order":0,"panelType":"claude-code"}]},"activePaneId":"pane-b2","updatedAt":"2026-09-25T00:00:00.000Z"}`)
+	if fast, ok := r.s.TabLaunchFast(session); fast || !ok {
+		t.Fatalf("a tab without a launch: %v %v", fast, ok)
+	}
+	if err := r.s.SetTabLaunchModes(session, true, "ask"); err != nil {
+		t.Fatal(err)
+	}
+	if fast, ok := r.s.TabLaunchFast(session); !fast || !ok {
+		t.Fatalf("on: %v %v", fast, ok)
+	}
+	if err := r.s.SetTabLaunchModes(session, false, "ask"); err != nil {
+		t.Fatal(err)
+	}
+	if fast, _ := r.s.TabLaunchFast(session); fast {
+		t.Fatal("off")
+	}
+	if _, ok := r.s.TabLaunchFast("tk-ws-a1-pane-b2-tab-gone"); ok {
+		t.Fatal("a missing tab")
+	}
+}

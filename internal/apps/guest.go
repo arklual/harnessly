@@ -68,7 +68,10 @@ type GuestLink struct {
 	App  string `json:"app"`
 	View string `json:"view"`
 	// Write lets the guest's view write to the link's storage; a link reads only by default.
-	Write     bool  `json:"write,omitempty"`
+	Write bool `json:"write,omitempty"`
+	// Check marks a link `harnessly app check` made for the machine's own headless browser: any local view, a
+	// couple of minutes, never listed, and the only kind whose page reports to the app's log.
+	Check     bool  `json:"check,omitempty"`
 	CreatedAt int64 `json:"createdAt"`
 	ExpiresAt int64 `json:"expiresAt"`
 	Revoked   bool  `json:"revoked,omitempty"`
@@ -140,6 +143,66 @@ func (m *Manifest) ShareableView(view string) (View, bool) {
 	return View{}, false
 }
 
+// CheckTTL is how long a link of a check lives.
+const CheckTTL = 2 * time.Minute
+
+// ErrCheckRemote: the view lives at an address of its own, which a check on the machine does not open.
+var ErrCheckRemote = errors.New("apps: the view is at an address of its own; a check opens only a view the package carries")
+
+// checkView is the view a check opens: the one named, or the first the package carries.
+func (m *Manifest) checkView(view string) (View, bool) {
+	for _, v := range m.Views {
+		if (view == "" || v.ID == view) && v.Entry != "" && !strings.HasPrefix(v.Entry, "https://") {
+			return v, true
+		}
+	}
+	return View{}, false
+}
+
+// viewOf is the view a link shows.
+func (l GuestLink) viewOf(m *Manifest) (View, bool) {
+	if l.Check {
+		return m.checkView(l.View)
+	}
+	return m.ShareableView(l.View)
+}
+
+// CreateCheck makes a link of a check to an installed app's view (any local one); the token comes back once.
+func (g *Guests) CreateCheck(appID, view string) (token string, link GuestLink, err error) {
+	app, err := g.reg.Find(appID)
+	if err != nil {
+		return "", GuestLink{}, err
+	}
+	if app.Manifest == nil {
+		return "", GuestLink{}, ErrGuestTarget
+	}
+	v, ok := app.Manifest.checkView(view)
+	if !ok {
+		return "", GuestLink{}, ErrCheckRemote
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", GuestLink{}, err
+	}
+	token = base64.RawURLEncoding.EncodeToString(raw)
+	now := g.now()
+	h := hashToken(token)
+	link = GuestLink{ID: h[:16], Hash: h, App: appID, View: v.ID, Check: true, CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(CheckTTL).UnixMilli()}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	list, err := g.read()
+	if err != nil {
+		return "", GuestLink{}, err
+	}
+	live := list[:0:0]
+	for _, l := range list {
+		if l.Live(now) {
+			live = append(live, l)
+		}
+	}
+	return token, link, g.write(append(live, link))
+}
+
 // Create makes a link to an installed app's view; the token comes back once. A ttl of 0 is DefaultGuestTTL.
 func (g *Guests) Create(appID, view string, ttl time.Duration, write bool) (token string, link GuestLink, err error) {
 	app, err := g.reg.Get(appID)
@@ -204,7 +267,7 @@ func (g *Guests) List(appID string) ([]GuestLink, error) {
 	now := g.now()
 	out := []GuestLink{}
 	for _, l := range list {
-		if l.Live(now) && (appID == "" || l.App == appID) {
+		if l.Live(now) && !l.Check && (appID == "" || l.App == appID) {
 			out = append(out, l)
 		}
 	}
@@ -285,11 +348,15 @@ func (g *Guests) Resolve(token string) (GuestLink, Installed, error) {
 		if !l.Live(now) {
 			return GuestLink{}, Installed{}, ErrGuestGone
 		}
-		app, err := g.reg.Get(l.App)
-		if err != nil || app.Manifest == nil || !app.Manifest.HasTarget(TargetApp) {
+		find := g.reg.Get
+		if l.Check {
+			find = g.reg.Find
+		}
+		app, err := find(l.App)
+		if err != nil || app.Manifest == nil || (!l.Check && !app.Manifest.HasTarget(TargetApp)) {
 			return GuestLink{}, Installed{}, ErrGuestGone
 		}
-		if _, ok := app.Manifest.ShareableView(l.View); !ok {
+		if _, ok := l.viewOf(app.Manifest); !ok {
 			return GuestLink{}, Installed{}, ErrGuestGone
 		}
 		return l, app, nil
@@ -358,6 +425,8 @@ func (g *Guests) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		g.sdkFile(w, r, strings.TrimPrefix(rest, "__hl/"))
 	case rest == "__guest/storage":
 		g.storageCall(w, r, link, app)
+	case rest == "__guest/report":
+		g.report(w, r, link)
 	default:
 		g.serveFile(w, r, token, rest, app)
 	}
@@ -377,10 +446,10 @@ func (g *Guests) page(w http.ResponseWriter, r *http.Request, token string, l Gu
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	v, _ := app.Manifest.ShareableView(l.View)
+	v, _ := l.viewOf(app.Manifest)
 	lang := guestLang(r)
 	cfg, _ := json.Marshal(map[string]any{
-		"nonce": guestNonce(token), "app": app.ID, "version": app.Version, "view": v.ID, "write": l.Write, "locale": lang,
+		"nonce": guestNonce(token), "app": app.ID, "version": app.Version, "view": v.ID, "write": l.Write, "locale": lang, "check": l.Check,
 	})
 	title := html.EscapeString(app.Manifest.Name)
 	body := `<!doctype html><html lang="` + lang + `"><head><meta charset="utf-8">` +
@@ -454,21 +523,25 @@ func (g *Guests) serveFile(w http.ResponseWriter, r *http.Request, token, rest s
 		http.NotFound(w, r)
 		return
 	}
+	miss := func(why string) {
+		g.reg.LogEventOnce(app.ID, "", ViewLogServe, "GET "+clip(rel, 200)+" — 404: "+why)
+		http.NotFound(w, r)
+	}
 	pkg := &Package{Dir: app.Dir, Manifest: app.Manifest}
 	full, err := pkg.ViewFile(rel)
 	if err != nil {
-		http.NotFound(w, r)
+		miss("not among the files the views may load (" + clip(err.Error(), 120) + ")")
 		return
 	}
 	f, err := os.Open(full)
 	if err != nil {
-		http.NotFound(w, r)
+		miss("the file is not there")
 		return
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil || info.IsDir() || info.Size() > maxViewBytes {
-		http.NotFound(w, r)
+		miss("a folder, or a file over the size a view may load")
 		return
 	}
 	size := info.Size()
@@ -612,4 +685,39 @@ func (g *Guests) storageCall(w http.ResponseWriter, r *http.Request, l GuestLink
 	default:
 		guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, fmt.Sprintf("no op %q", b.Op))
 	}
+}
+
+// report takes the lines the page of a check link sends (host.js): the view's console, its handshake, the wait that ran
+// out. Only a link of a check may write to the app's log; the lines are bounded as every report is.
+func (g *Guests) report(w http.ResponseWriter, r *http.Request, l GuestLink) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !l.Check {
+		guestRefusal(w, http.StatusForbidden, CodePermissionDenied, "this link does not report")
+		return
+	}
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
+		guestRefusal(w, http.StatusForbidden, CodePermissionDenied, "not from this page")
+		return
+	}
+	var b struct {
+		Lines []ViewLogLine `json:"lines"`
+	}
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxGuestBody+1))
+	if err != nil || len(raw) > maxGuestBody || json.Unmarshal(raw, &b) != nil {
+		guestRefusal(w, http.StatusBadRequest, CodeInvalidParams, "a bad request")
+		return
+	}
+	for i := range b.Lines {
+		b.Lines[i].View = l.View
+	}
+	kept, err := g.reg.AppendViewLog(l.App, b.Lines, g.now())
+	if err != nil {
+		guestRefusal(w, http.StatusInternalServerError, CodeHostUnavailable, "failed")
+		return
+	}
+	guestJSON(w, http.StatusOK, map[string]int{"kept": len(kept)})
 }

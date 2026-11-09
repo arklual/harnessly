@@ -580,3 +580,35 @@ func (s *Scanner) Listener(port int) (*devtools.Listener, error) {
 	}
 	return nil, errors.New("no listener")
 }
+
+// DevServers are the ports a page of this machine may be opened from by the agent's browser: the listeners of this
+// user's own processes (ss names no other user's), less the platform's own (internalCommands, the hidden ports and
+// those of processes platform says are its own). A port that anyone else listens on too, on any address, is not one:
+// 127.0.0.1:N of a dev server does not open [::1]:N of the runtime.
+func DevServers(out string, platform func(pid int) bool, hidden map[int]bool) map[int]bool {
+	ports, other := map[int]bool{}, map[int]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		cols := strings.Fields(line)
+		if len(cols) < 5 || cols[0] != "LISTEN" {
+			continue
+		}
+		_, port, ok := splitAddress(cols[3])
+		if !ok {
+			continue
+		}
+		m := userProcess.FindStringSubmatch(line)
+		if m == nil || hidden[port] || internalCommands[m[1]] {
+			other[port] = true
+			continue
+		}
+		if pid, _ := strconv.Atoi(m[2]); platform != nil && platform(pid) {
+			other[port] = true
+			continue
+		}
+		ports[port] = true
+	}
+	for p := range other {
+		delete(ports, p)
+	}
+	return ports
+}

@@ -524,6 +524,9 @@ runs on the machines of wider layers.
 - `hub env-seed --file env.yaml [--dry-run]` moves catalog items (`kind`, `name`, `hint`, `source`, `owner`) and entries
   (`layer`, `tenant`, `team`, `item`, `pinned`, `disabled`, `audience`, `position`) of organizations named by slug, matched
   by (kind, name) and (layer, scope, item); in a script `source.repo` may be the repository item's name. An item without a `hint` in the file keeps the hint it has.
+  It opens the database with the serving hub's settings (`HUB_DATABASE_URL`, `HUB_DB_SCHEMA`, `HUB_DB_POOLER`,
+  `HUB_DB_MIGRATE_URL`, `HUB_DB_CHECK`). `--dry-run` only connects: it never migrates, and refuses a database that is
+  behind the binary.
 
 ## Storage
 

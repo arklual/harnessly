@@ -1,9 +1,12 @@
 package convo
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -128,5 +131,59 @@ func TestAPermissionModeNeedingARestartIsRefusedWithoutTerminals(t *testing.T) {
 	}
 	if len(r.launcher.resumed) != 0 {
 		t.Fatalf("%v", r.launcher.resumed)
+	}
+}
+
+// keepingLauncher is the rig's launcher that also keeps the modes on the tab, as the runtime's does.
+type keepingLauncher struct {
+	*fakeLauncher
+	kept []string
+}
+
+func (k *keepingLauncher) KeepModes(session string, fast bool, permission wire.PermissionMode) {
+	k.kept = append(k.kept, fmt.Sprintf("%s fast=%v %s", session, fast, permission))
+}
+
+// A GPT chat through Claude Code turns its fast mode without a word typed: the vendor's fast tier is the relay's, which
+// reads it off the tab. It is offered only on a model that has the tier.
+func TestAProfileChatTurnsFastModeWithoutTypingIt(t *testing.T) {
+	r := newRig(t)
+	keep := &keepingLauncher{fakeLauncher: r.launcher}
+	r.deps = func(d *Deps) {
+		d.Launcher = keep
+		d.Profiles = fakeProfiles{via: wire.ProviderClaude, configured: true}
+	}
+	r.rt = r.runtime()
+	r.open()
+	r.settle(wire.StateReady)
+	if err := r.rt.call(context.Background(), r.id, func(cv *conv, _ time.Time) {
+		cv.rec.Model = &wire.Model{ID: "gpt-6.1-sol", Profile: "gpt"}
+		cv.touch()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r.pane.calls = nil
+	if res := r.do(wire.ModelCmd{OpID: "g1", ID: r.id, Model: "gpt-6.1-sol", Fast: on()}); res.R != wire.ResultAccepted {
+		t.Fatalf("%+v", res)
+	}
+	if len(r.pane.calls) != 0 {
+		t.Fatalf("typed %v", r.pane.calls)
+	}
+	if m := r.modelOf(); !m.Fast || m.Profile != "gpt" {
+		t.Fatalf("%+v", m)
+	}
+	if len(keep.kept) != 1 || keep.kept[0] != "s1 fast=true " {
+		t.Fatalf("kept %v", keep.kept)
+	}
+	off := false
+	if res := r.do(wire.ModelCmd{OpID: "g2", ID: r.id, Model: "gpt-6.1-sol", Fast: &off}); res.R != wire.ResultAccepted {
+		t.Fatalf("%+v", res)
+	}
+	if m := r.modelOf(); m.Fast || len(r.pane.calls) != 0 || len(keep.kept) != 2 || keep.kept[1] != "s1 fast=false " {
+		t.Fatalf("%+v %v %v", m, r.pane.calls, keep.kept)
+	}
+	// A model of the profile without the tier takes no fast mode.
+	if res := r.do(wire.ModelCmd{OpID: "g3", ID: r.id, Model: "gpt-6-astra", Fast: on()}); res.R != wire.ResultRefused || res.Code != wire.RefuseOptionUnknown {
+		t.Fatalf("%+v", res)
 	}
 }

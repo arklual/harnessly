@@ -305,6 +305,8 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	settings := c.HooksPath
 	// settingsFile is the same file unquoted, for the apps' file to extend.
 	settingsFile := c.HooksPath
+	// lineEnv are the profile's own words of the launch line's environment (the GPT chat's pane header).
+	lineEnv := ""
 	if launch != nil && launch.Profile != "" {
 		// The profile's settings file is the hooks file plus the vendor's address, models and key helper. Claude Code
 		// reads one --settings (the last one given), so it replaces the hooks file here, and the model goes in the file's
@@ -326,6 +328,9 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 			return "", "", err
 		}
 		settings, settingsFile = agents.ShellQuote(path), path
+		if e, ok := c.Profiles.(profileLineEnv); ok {
+			lineEnv = e.ClaudeLineEnv(launch.Profile)
+		}
 	} else if launch != nil && launch.Ultracode {
 		// Claude Code reads one --settings (the last one given): the mode goes into a copy of the hooks settings.
 		path, err := UltracodeSettings(c.HooksPath)
@@ -415,7 +420,13 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 		return "", "", err
 	}
 	parts = append(parts, flags...)
-	return strings.Join(parts, " "), strings.TrimSpace(apps.Env + " " + apps.Wrap), nil
+	return strings.Join(parts, " "), strings.TrimSpace(lineEnv + " " + apps.Env + " " + apps.Wrap), nil
+}
+
+// profileLineEnv is a profile launcher that adds words to a chat's launch-line environment: sh words, the pane's
+// shell expanding them when the line runs (providers.Launcher).
+type profileLineEnv interface {
+	ClaudeLineEnv(profile string) string
 }
 
 func (c LaunchConfig) withEditor(command string) string {

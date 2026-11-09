@@ -15,7 +15,7 @@ import (
 // The errors of the apps' views (internal/apps viewlog.go):
 //
 //	POST <platform>/apps/view-log   the page: {id, view, lines: [{at, level, text}]} — what a view it runs reported
-//	GET  /api/cli/apps/logs?id=&limit=   harnessly app logs <id>: the last lines, oldest first
+//	GET  /api/cli/apps/logs?id=&limit=&since=   harnessly app logs <id>: the last lines (written at or after since), oldest first
 //
 // Every line kept goes to the runtime's own log too, a few a minute for each app, so a view that throws in a loop does
 // not fill it.
@@ -112,7 +112,9 @@ func appViewLogRoutes(d deps, reg *apps.Registry) []gate.Route {
 		if limit <= 0 || limit > apps.ViewLogMax {
 			limit = apps.ViewLogMax
 		}
-		lines, err := reg.ViewLog(id, limit)
+		// since: only the lines written at or after it (milliseconds), for --since and --follow.
+		since, _ := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
+		lines, err := reg.ViewLogSince(id, since, limit)
 		if err != nil {
 			agent.Log("warn", "apps: view log: "+err.Error())
 			secretJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed"})

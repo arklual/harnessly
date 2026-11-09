@@ -215,6 +215,7 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 		return
 	}
 	session, clock := c.rec.Session, c.d.Clock
+	onProfile := c.rec.Model != nil && c.rec.Model.Profile != ""
 	// A permission mode shift+tab cannot reach truthfully is the restart's, after what is typed (restartInMode).
 	restart := diff.permission && c.permissionNeedsRestart(diff.permissionTo)
 	if restart {
@@ -250,10 +251,14 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 			}
 			took.ultracode = true
 		}
-		if diff.fast {
+		// A profile's fast mode is its proxy's (the gpt relay reads it off the tab on each request): nothing is
+		// typed, the tab keeps it once the change is on record.
+		if diff.fast && !onProfile {
 			if err := typist.SetFast(pane, clock, diff.fastOn); err != nil {
 				return took.failed(err)
 			}
+		}
+		if diff.fast {
 			took.fast = true
 		}
 		if diff.permission {
@@ -271,7 +276,7 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 		if to := took.on(from, m, diff); to != nil {
 			c.applied(to, now)
 			if k, ok := c.d.Launcher.(ModeKeeper); ok && (took.fast || took.permission) {
-				k.KeepModes(c.rec.Session, to.Fast && to.Profile == "", to.Permission)
+				k.KeepModes(c.rec.Session, to.Fast, to.Permission)
 			}
 		}
 		err := took.err
@@ -423,7 +428,7 @@ func (c *conv) modelFits(m wire.ModelCmd) wire.RefuseCode {
 		}
 		_, _, models, ok := c.d.Profiles.Lookup(cur.Profile)
 		capabilities, known := c.d.Profiles.Model(cur.Profile, m.Model)
-		if !ok || !known || !slices.Contains(models, m.Model) || m.UltracodeAfter(cur) || m.FastAfter(cur) ||
+		if !ok || !known || !slices.Contains(models, m.Model) || m.UltracodeAfter(cur) || m.FastAfter(cur) && !capabilities.Fast ||
 			(m.Effort != nil && !slices.Contains(capabilities.Efforts, *m.Effort)) {
 			return wire.RefuseOptionUnknown
 		}

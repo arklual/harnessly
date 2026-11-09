@@ -5,7 +5,7 @@ import { type KeyboardEvent, useState } from 'react';
 import type { EnvEntryRow, EnvLayer } from '../../../../hub-api/env';
 import { Icon } from '../../ui';
 import { Help } from './bits';
-import { type DragLock, keyMove, startDrag } from './drag';
+import { type DragLock, keyMove, scriptOrder, startDrag } from './drag';
 import { type GroupActions, GroupHead, MoveTo, NewGroup } from './groups';
 import { KIND } from './model';
 import { type PresetActions, PresetChips, PresetsEditor } from './presets';
@@ -73,6 +73,7 @@ const Row = ({
       className="ev-row"
       data-fresh={fresh ? 'true' : undefined}
       data-dg={canDrag ? group : undefined}
+      data-entry={r.entryId}
       role={a.onOpen ? 'button' : undefined}
       tabIndex={a.onOpen ? 0 : undefined}
       onClick={a.onOpen ? open : undefined}
@@ -198,7 +199,7 @@ export const LayerCard = ({
     }, GROUP_CLOSE_MS);
   };
   const { layer, meta, edit } = vm;
-  const scriptIds = layer.items.filter((r) => r.enabled && r.kind === 'script').map((r) => r.entryId);
+  const scriptIds = scriptOrder(layer.items);
   const groupIds = new Set(layer.groups.map((g) => g.id));
   const loose = rows
     .map((b) => ({ ...b, rows: b.rows.filter((r) => !groupIds.has(r.groupId)) }))

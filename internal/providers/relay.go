@@ -43,6 +43,10 @@ type Relay struct {
 	Extra func(ctx context.Context) http.Header
 	// Allow says whether a request may use the relay; nil lets every one through, the route in front having checked it.
 	Allow func(*http.Request) bool
+	// Prepare may change an allowed request before it goes up: its headers in place, and its body (nil for a request
+	// without one), given back; rest is the path after Prefix. nil sends it as it came (the GPT relay's fast
+	// tier).
+	Prepare func(r *http.Request, rest string, body []byte) []byte
 }
 
 // RelayBodyMax bounds a request Codex sends: a long chat with every tool runs to a few megabytes.
@@ -88,6 +92,9 @@ func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				body, names = out, n
 			}
 		}
+	}
+	if rl.Prepare != nil {
+		body = rl.Prepare(r, rest, body)
 	}
 	token, err := rl.Credential(r.Context())
 	if err != nil {

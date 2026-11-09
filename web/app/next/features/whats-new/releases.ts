@@ -13,6 +13,13 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-09t',
+    items: [
+      { key: 'appLog', icon: 'file-text' },
+      { key: 'appCheck', icon: 'server' },
+    ],
+  },
+  {
     id: '2026-11-09s',
     items: [
       { key: 'smartNotice', icon: 'bell' },

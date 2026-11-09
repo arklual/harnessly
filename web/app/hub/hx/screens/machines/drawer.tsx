@@ -208,6 +208,23 @@ export const MachineDrawer = ({
           </div>
         )}
         {m.canAdmin && (
+          <div className="md-sec">
+            <div className="md-sec__t">Перенести в другой тенант</div>
+            <p className="md-note">
+              Машина сохранит id и ключ. Перед переносом покажем, что изменится: команда, доступ и лимиты.
+            </p>
+            <Btn
+              variant="outline"
+              size="sm"
+              icon="arrow-right-left"
+              disabled={locked}
+              onClick={() => url.setDlg('move')}
+            >
+              Перенести…
+            </Btn>
+          </div>
+        )}
+        {m.canAdmin && (
           <div className="md-sec md-remove">
             <div className="md-sec__t">Убрать машину</div>
             <p className="md-note">
@@ -311,6 +328,10 @@ export const MachineDrawer = ({
         onOff={() => {
           url.setDlg(null);
           void card.disable();
+        }}
+        onMoved={() => {
+          url.setDlg(null);
+          onRemoved();
         }}
         onRemove={() => {
           url.setDlg(null);

@@ -392,7 +392,7 @@ func (r *run) publish() {
 	snapshot.Steps = append([]step(nil), r.j.Steps...)
 	id := r.machineID
 	r.mu.Unlock()
-	r.s.events.PublishJSON(r.spaceID, "job", map[string]any{"machineId": id, "job": snapshot}, true)
+	r.s.events.PublishMachine(r.spaceID, id, "job", map[string]any{"machineId": id, "job": snapshot}, true)
 }
 
 // set changes a step and publishes.

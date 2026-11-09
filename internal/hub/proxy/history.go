@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/history"
@@ -20,11 +21,16 @@ import (
 //	GET <platform api>/history/conversations                            the list, which machines are on, the chats
 //	GET <platform api>/history/conversations/<id>?before=&limit=        a page of a chat, oldest turn first
 //	GET <platform api>/history/conversations/<id>/turns/<turn>/entries  the steps of one folded turn
+//	GET <platform api>/history/conversations/<id>/entries/<entry>/output the whole output of a tool
+//	GET <platform api>/history/conversations/<id>/rewinds/<n>/turns      the turns rewind n left behind
+//	GET <platform api>/history/search?q=&limit=                          the person's messages that hold the words
+//	GET <platform api>/history/sidebar                                   the person's projects and favorites, with its rev
+//	PUT <platform api>/history/sidebar {baseRev, doc}                    writes it on baseRev; 409 with the current one
 //
 // The person is the session's; only chats of machines they may open and that they own are served.
 
 var (
-	historyPath = regexp.MustCompile(`^/api/[A-Za-z0-9_-]+/history/conversations(/|$)`)
+	historyPath = regexp.MustCompile(`^/api/[A-Za-z0-9_-]+/history/(conversations(/|$)|search$|sidebar$)`)
 	turnID      = regexp.MustCompile(`^[A-Za-z0-9:#_.-]{1,200}$`)
 )
 
@@ -35,15 +41,22 @@ type historyMachine struct {
 }
 
 func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.Principal, rest string) {
+	if strings.HasSuffix(rest, "/history/sidebar") {
+		s.serveSidebar(w, r, p)
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 		return
 	}
 	at := strings.Index(rest, "/history/conversations")
+	search := strings.HasSuffix(rest, "/history/search")
 	var parts []string
-	for _, part := range strings.Split(strings.TrimPrefix(rest[at+len("/history/conversations"):], "/"), "/") {
-		if part != "" {
-			parts = append(parts, part)
+	if !search {
+		for _, part := range strings.Split(strings.TrimPrefix(rest[at+len("/history/conversations"):], "/"), "/") {
+			if part != "" {
+				parts = append(parts, part)
+			}
 		}
 	}
 	list, err := s.fleet(r.Context(), p.User.ID, true)
@@ -65,6 +78,32 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 	w.Header().Set("Cache-Control", "no-store")
 	ctx := r.Context()
 	switch {
+	case search:
+		q := r.URL.Query()
+		limit := 50
+		if v := q.Get("limit"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || n > 200 {
+				httpx.WriteError(w, r, httpx.Invalid("limit", "1–200"))
+				return
+			}
+			limit = n
+		}
+		in := ids
+		if m := q.Get("machine"); m != "" && m != "local" {
+			in = nil
+			for _, id := range ids {
+				if id == m {
+					in = []string{id}
+				}
+			}
+		}
+		hits, err := history.Search(ctx, s.db, p.User.ID, q.Get("q"), in, limit)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"query": q.Get("q"), "hits": hits, "indexing": false})
 	case len(parts) == 0:
 		chats, err := history.List(ctx, s.db, p.User.ID, ids)
 		if err != nil {
@@ -119,9 +158,96 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"turnId": parts[2], "entries": entries})
+	case len(parts) == 4 && parts[1] == "entries" && parts[3] == "output" && turnID.MatchString(parts[2]):
+		page, err := history.EntryOutput(ctx, s.db, p.User.ID, parts[0], parts[2], ids)
+		if errors.Is(err, history.ErrNotFound) {
+			httpx.WriteError(w, r, httpx.ErrNotFound)
+			return
+		}
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(page)
+	case len(parts) == 4 && parts[1] == "rewinds" && parts[3] == "turns":
+		n, err := strconv.Atoi(parts[2])
+		if err != nil || n < 0 {
+			httpx.WriteError(w, r, httpx.ErrNotFound)
+			return
+		}
+		page, err := history.Rewound(ctx, s.db, p.User.ID, parts[0], n, ids)
+		if errors.Is(err, history.ErrNotFound) {
+			httpx.WriteError(w, r, httpx.ErrNotFound)
+			return
+		}
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"turns": page.Turns, "entries": page.Entries, "beforeTurnId": nil})
 	default:
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 	}
+}
+
+// serveSidebar is the person's sidebar document: one for every machine of theirs, kept with the copy, as the
+// cluster's gateway keeps it.
+func (s *Service) serveSidebar(w http.ResponseWriter, r *http.Request, p *auth.Principal) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodPut {
+		httpx.WriteError(w, r, httpx.New(http.StatusMethodNotAllowed, "method_not_allowed", "Метод не поддерживается"))
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	ctx := r.Context()
+	list, _ := s.fleet(ctx, p.User.ID, true)
+	if len(list) == 0 {
+		if r.Method == http.MethodPut {
+			httpx.WriteError(w, r, httpx.ErrNotFound)
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"enabled": false, "rev": 0, "doc": nil})
+		return
+	}
+	if r.Method != http.MethodPut {
+		rev, doc, err := history.Sidebar(ctx, s.db, p.User.ID)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"enabled": true, "rev": rev, "doc": doc})
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, history.SidebarMaxBytes+1024)
+	var body struct {
+		BaseRev *float64        `json:"baseRev"`
+		Doc     json.RawMessage `json:"doc"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		httpx.WriteError(w, r, httpx.New(http.StatusBadRequest, "bad_request", "Некорректный запрос"))
+		return
+	}
+	doc, ok := history.ParseSidebar(body.Doc)
+	if !ok || body.BaseRev == nil || *body.BaseRev < 0 || *body.BaseRev != float64(int64(*body.BaseRev)) {
+		httpx.WriteError(w, r, httpx.New(http.StatusBadRequest, "bad_request", "Некорректный запрос"))
+		return
+	}
+	rev, err := history.WriteSidebar(ctx, s.db, p.User.ID, int64(*body.BaseRev), doc, time.Now().UnixMilli())
+	if errors.Is(err, history.ErrSidebarChanged) {
+		cur, curDoc, err := history.Sidebar(ctx, s.db, p.User.ID)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		httpx.WriteJSON(w, http.StatusConflict, map[string]any{"conflict": true, "rev": cur, "doc": curDoc})
+		return
+	}
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"rev": rev})
 }
 
 // withMachine is a chat's record with the machine it is on: the record carries the machine's own name for itself.

@@ -13,6 +13,9 @@
 # usage: publish-linux.sh   (tag pipeline of vX.Y.Z)
 set -eu
 
+# shellcheck source=tools/ci/package-files.sh
+. "$(dirname "$0")/package-files.sh"
+
 version="${CI_COMMIT_TAG#v}"
 api="$CI_API_V4_URL/projects/$CI_PROJECT_ID"
 out=dist
@@ -40,8 +43,8 @@ reuse() {
     printf '%s' "$files" | grep -q "\"file_name\":\"$f\"" || { echo "package $package_id has no $f"; return 1; }
   done
   # Every file (and every re-upload of one) carries the pipeline that wrote it.
-  pipelines="$(printf '%s' "$files" | grep -o '"pipelines":\[[^]]*\]' | grep -o '"id":[0-9][0-9]*' | sort -u | tr '\n' ' ')"
-  build_pipeline="${pipelines#\"id\":}"; build_pipeline="${build_pipeline% }"
+  pipelines="$(written_by_pipelines "$files")"
+  build_pipeline="$pipelines"
   case "$build_pipeline" in ''|*[!0-9]*) echo "package $package_id was written by other pipelines or none ($pipelines)"; return 1 ;; esac
   [ "$(printf '%s' "$files" | grep -o '"file_name"' | wc -l)" -eq 4 ] || { echo "package $package_id holds other files than the four of release-build"; return 1; }
   info="$(get "pipelines/$build_pipeline")" || { echo "cannot read pipeline $build_pipeline"; return 1; }

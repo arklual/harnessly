@@ -416,3 +416,21 @@ func (s *Store) SetTabLaunchModes(sessionName string, fast bool, permission stri
 		return true
 	})
 }
+
+// TabLaunchFast says whether the tab of a session starts in fast mode (launch.fast of its metadata): what a
+// GPT chat's relay reads on each request. ok is false when no tab has the session.
+func (s *Store) TabLaunchFast(sessionName string) (fast, ok bool) {
+	wsID, _, _, valid := s.cfg.Tmux.ParseSessionName(sessionName)
+	if !valid || !ValidWorkspaceID(wsID) {
+		return false, false
+	}
+	m := s.layoutLock(wsID)
+	m.Lock()
+	defer m.Unlock()
+	tab := tabBySession(s.readLayout(wsID), sessionName)
+	if tab == nil {
+		return false, false
+	}
+	f, _ := tab.Object(s.cfg.MetaKey).Object("launch").Get("fast")
+	return f == true, true
+}

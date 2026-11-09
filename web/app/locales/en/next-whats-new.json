@@ -1,4 +1,8 @@
 {
+  "next.whatsNew.2026-11-09t.appLog.title": "The app's log: what broke is visible to the agent",
+  "next.whatsNew.2026-11-09t.appLog.text": "`harnessly app logs` shows a view's errors, refused files and backend failures; it is always written, dev installs included.",
+  "next.whatsNew.2026-11-09t.appCheck.title": "Check a load with one command",
+  "next.whatsNew.2026-11-09t.appCheck.text": "`harnessly app check <id> --open` opens the app's view in a browser of the machine and says whether it loaded; the agent that writes the app can do the same.",
   "next.whatsNew.2026-11-09s.smartNotice.title": "Smart notice",
   "next.whatsNew.2026-11-09s.smartNotice.text": "A question from an agent, a permission or a code comes as a black plate above the message field — answer right in it without opening the chat. «Waits», «urgent» and «done» now sound different.",
   "next.whatsNew.2026-11-09s.gestures.title": "⌘J and gestures",

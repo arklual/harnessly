@@ -195,7 +195,7 @@ func (s *Service) emit(ctx context.Context, m store.Machine, kind string, data a
 		}
 		return
 	}
-	s.events.PublishJSON(m.SpaceID, kind, data, false)
+	s.events.PublishMachine(m.SpaceID, m.ID, kind, data, false)
 }
 
 // ---- restart ----

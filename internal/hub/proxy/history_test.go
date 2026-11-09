@@ -92,10 +92,42 @@ func TestWorkspaceReadsTheChatsFromTheHubsCopy(t *testing.T) {
 	if _, chat := read(); len(chat.Turns) != 1 || chat.Machine != "offline" {
 		t.Errorf("with the machine off %+v", chat)
 	}
+	// The search and the sidebar answer from the hub too.
+	var found struct {
+		Hits []struct{ ConvID, EntryID, Role string }
+	}
+	if r := owner.Do("GET", "/agents/api/acme/history/search?q=%D0%BF%D1%80%D0%B8%D0%B2&machine=local", nil); r.Code != 200 {
+		t.Fatalf("search: %s", r)
+	} else if r.JSON(&found); len(found.Hits) != 1 || found.Hits[0].EntryID != "c:t1#0" || found.Hits[0].Role != "user" {
+		t.Errorf("search %+v", found)
+	}
+	doc := map[string]any{"projects": []any{}, "favorites": map[string]any{"groups": []any{}, "loose": []any{"tab-a"}}, "merged": []any{}}
+	if r := owner.Do("PUT", "/agents/api/acme/history/sidebar", map[string]any{"baseRev": 0, "doc": doc}); r.Code != 200 {
+		t.Fatalf("sidebar write: %s", r)
+	}
+	if r := owner.Do("PUT", "/agents/api/acme/history/sidebar", map[string]any{"baseRev": 0, "doc": doc}); r.Code != http.StatusConflict {
+		t.Errorf("sidebar over a newer one: %s", r)
+	}
+	var side struct {
+		Enabled bool
+		Rev     int
+		Doc     struct{ Favorites struct{ Loose []string } }
+	}
+	if r := owner.Do("GET", "/agents/api/acme/history/sidebar", nil); r.Code != 200 {
+		t.Fatalf("sidebar: %s", r)
+	} else if r.JSON(&side); !side.Enabled || side.Rev != 1 || len(side.Doc.Favorites.Loose) != 1 {
+		t.Errorf("sidebar %+v", side)
+	}
+	if r := owner.Do("GET", "/agents/api/acme/history/conversations/tab-a/rewinds/0/turns", nil); r.Code != 404 {
+		t.Errorf("a rewind the chat has not: %s", r)
+	}
 	// Somebody else reads nothing of it.
 	stranger := s.SignIn("stranger@example.com")
 	if r := stranger.Do("GET", "/agents/api/acme/history/conversations/tab-a", nil); r.Code == 200 {
 		t.Errorf("a stranger reads the chat: %s", r)
+	}
+	if r := stranger.Do("GET", "/agents/api/acme/history/search?q=%D0%BF%D1%80%D0%B8%D0%B2", nil); r.Code == 200 && strings.Contains(r.String(), "c:t1#0") {
+		t.Errorf("a stranger finds the chat: %s", r)
 	}
 }
 

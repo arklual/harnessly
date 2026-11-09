@@ -76,16 +76,12 @@ const open = (
 };
 
 describe('ultracode in the picker', () => {
-  it('is a switch of its own under the slider on a model that runs it, and turns on keeping the depth', () => {
+  it('is a chip of its own under the slider on a model that runs it, and turns on keeping the depth', () => {
     const { view, onChange } = open(choice());
     const toggle = view.getByRole('switch', { name: 'Ultracode' });
     expect(toggle.getAttribute('aria-checked')).toBe('false');
-    expect(view.container.querySelector('.hx-picker__ultra-hint')?.textContent).toBe(
-      'Subagents on every task',
-    );
-    expect(view.container.querySelector('.hx-picker__ultra')?.getAttribute('title')).toBe(
-      'Dynamic workflows with subagents on every task',
-    );
+    expect(toggle.classList.contains('hx-picker__chip')).toBe(true);
+    expect(toggle.dataset.on).toBeUndefined();
     act(() => toggle.click());
     expect(onChange).toHaveBeenCalledWith(choice({ ultracode: true }));
   });
@@ -145,29 +141,26 @@ describe('ultracode in the picker', () => {
     const { view, pill } = open(choice(), vi.fn(), true, true);
     expect(pill.dataset.ultracode).toBeUndefined();
     expect(pill.querySelector('.hx-model__ultra')).toBeNull();
-    const row = view.container.querySelector<HTMLElement>('.hx-picker__ultra');
-    expect(row?.dataset.on).toBeUndefined();
-    expect(row?.dataset.pending).toBe('true');
-    expect(view.getByRole('switch', { name: 'Ultracode' }).getAttribute('aria-checked')).toBe('true');
-    expect(row?.querySelector('.hx-picker__ultra-hint')?.textContent).toBe(
-      'Turns on once the agent confirms',
-    );
+    const chip = view.getByRole('switch', { name: 'Ultracode' });
+    expect(chip.dataset.on).toBeUndefined();
+    expect(chip.dataset.pending).toBe('true');
+    expect(chip.getAttribute('aria-checked')).toBe('true');
     cleanup();
     // Seen on, asked off: the pill still glows until the agent says it is off.
     const off = open(choice({ ultracode: true }), vi.fn(), true, false);
     expect(off.pill.dataset.ultracode).toBe('true');
-    expect(off.view.getByRole('switch', { name: 'Ultracode' }).getAttribute('aria-checked')).toBe('false');
-    expect(off.view.container.querySelector('.hx-picker__ultra-hint')?.textContent).toBe(
-      'Turns off once the agent confirms',
-    );
+    const offChip = off.view.getByRole('switch', { name: 'Ultracode' });
+    expect(offChip.getAttribute('aria-checked')).toBe('false');
+    expect(offChip.dataset.on).toBe('true');
+    expect(offChip.dataset.pending).toBe('true');
   });
 
   it('says nothing waits once the agent is seen in the mode asked', () => {
     const { view, pill } = open(choice({ ultracode: true }), vi.fn(), true, true);
     expect(pill.dataset.ultracode).toBe('true');
-    const row = view.container.querySelector<HTMLElement>('.hx-picker__ultra');
-    expect(row?.dataset.pending).toBeUndefined();
-    expect(row?.querySelector('.hx-picker__ultra-hint')?.textContent).toBe('Subagents on every task');
+    const chip = view.getByRole('switch', { name: 'Ultracode' });
+    expect(chip.dataset.pending).toBeUndefined();
+    expect(chip.dataset.on).toBe('true');
   });
 
   it('keeps the mode on to a model that runs it and drops it on one that does not', () => {

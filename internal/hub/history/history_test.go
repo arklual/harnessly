@@ -154,8 +154,23 @@ func TestAChatPageIsTheMachinesOwnShape(t *testing.T) {
 		t.Errorf("entries %d", len(page.Entries))
 	}
 	older, _ := Read(ctx, db, "u-sergey", "tab-a", []string{"m-1"}, *page.BeforeTurnID, 33)
-	if got := ids(t, older.Turns); len(got) != 7 || got[6] != "c:t06#0" || older.BeforeTurnID != nil {
-		t.Errorf("the older page %v %v", got, older.BeforeTurnID)
+	// a page without the walk's mark does not make the chat whole: its oldest page still offers more, and
+	// past it the page is empty and says the copy is not complete, for the page to ask the machine.
+	if got := ids(t, older.Turns); len(got) != 7 || got[6] != "c:t06#0" || older.Complete ||
+		older.BeforeTurnID == nil || *older.BeforeTurnID != "c:t00#0" {
+		t.Errorf("the older page %v %v %v", got, older.BeforeTurnID, older.Complete)
+	}
+	if past, _ := Read(ctx, db, "u-sergey", "tab-a", []string{"m-1"}, "c:t00#0", 33); len(past.Turns) != 0 || past.BeforeTurnID != nil || past.Complete {
+		t.Errorf("past the copy %d %v %v", len(past.Turns), past.BeforeTurnID, past.Complete)
+	}
+	// The walk reaches the first turn: the chat is whole, its oldest page ends there.
+	if err := ApplyBackfill(ctx, db, mine, hubproto.HistoryBackfill{Ch: "conv:tab-a", Events: []json.RawMessage{
+		j(map[string]any{"type": "feed_reset", "turns": turns, "entries": entries, "beforeTurnId": nil, "history": map[string]any{"from": ""}}),
+	}}, now); err != nil {
+		t.Fatal(err)
+	}
+	if whole, _ := Read(ctx, db, "u-sergey", "tab-a", []string{"m-1"}, *page.BeforeTurnID, 33); !whole.Complete || whole.BeforeTurnID != nil {
+		t.Errorf("the whole chat %v %v", whole.BeforeTurnID, whole.Complete)
 	}
 	_, steps, err := TurnEntries(ctx, db, "u-sergey", "tab-a", "c:t00#0", []string{"m-1"})
 	if err != nil || len(steps) != 3 {

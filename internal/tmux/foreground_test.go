@@ -87,3 +87,34 @@ func TestPaneCurrentCommandReadsProcBehindTmux(t *testing.T) {
 		t.Fatalf("PaneDetail = %+v", d)
 	}
 }
+
+// GitHub issue 37: under gVisor /proc/<pid>/stat gives tty_nr 0 and tpgid 0. The session's processes still tell an idle
+// shell from a running agent, and an unclear session leaves tmux's word, which reads as busy.
+func TestForegroundWithoutTheTerminalsGroup(t *testing.T) {
+	fakeProc(t, map[int][2]string{
+		// An idle shell: nothing else in its session.
+		500: {"500 (bash) S 1 500 500 0 0 4194560 0 0", "/bin/bash\x00-l\x00"},
+		// An agent in the foreground; a subshell of the prompt stays in the shell's own group.
+		600: {"600 (bash) S 1 600 600 0 0 4194560 0 0", "bash\x00"},
+		611: {"611 (claude) S 600 611 600 0 0 4194560 0 0", "claude\x00--resume\x00x\x00"},
+		612: {"612 (node) S 611 611 600 0 0 4194560 0 0", "node\x00"},
+		613: {"613 (bash) S 600 600 600 0 0 4194560 0 0", "bash\x00"},
+		// A stopped job does not hold the foreground.
+		700: {"700 (bash) S 1 700 700 0 0 4194560 0 0", "bash\x00"},
+		711: {"711 (vim) T 700 711 700 0 0 4194560 0 0", "vim\x00"},
+		// Two running groups: which is in the foreground is not known.
+		800: {"800 (bash) S 1 800 800 0 0 4194560 0 0", "bash\x00"},
+		811: {"811 (claude) S 800 811 800 0 0 4194560 0 0", "claude\x00"},
+		822: {"822 (sleep) S 800 822 800 0 0 4194560 0 0", "sleep\x0099\x00"},
+		// Not a session leader.
+		900: {"900 (claude) S 1 900 1 0 0 4194560 0 0", "claude\x00"},
+	})
+	for _, c := range []struct {
+		pid  int
+		want string
+	}{{500, "bash"}, {600, "claude"}, {700, "bash"}, {800, "nice"}, {900, "nice"}} {
+		if got := ForegroundCommand("nice", c.pid); got != c.want {
+			t.Errorf("ForegroundCommand(nice, %d) = %q, want %q", c.pid, got, c.want)
+		}
+	}
+}

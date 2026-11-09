@@ -105,6 +105,10 @@ export interface Stack {
   emailCode: (email: string) => string;
   /** Registers the machine with a one-time code (the owner asked the hub for it in the browser's session) and runs it. */
   registerMachine: (o: { code: string; name: string }) => Promise<{ machineId: string; basePath: string }>;
+  /** Switches the machine off: its agent and runtime go, the hub and its copy stay. */
+  stopMachine: () => Promise<void>;
+  /** Freezes the machine's runtime (SIGSTOP) or lets it go on: a machine whose agent is on but answers nothing. */
+  hangRuntime: (hung: boolean) => void;
   stop: () => Promise<void>;
 }
 
@@ -121,18 +125,35 @@ async function waitFor(url: string, ms: number) {
   }
 }
 
-function build(out: string, pkg: string) {
-  execFileSync('go', ['build', '-o', out, pkg], {
+// The hub is built with the runtime's page (tag webui): it serves the fleet's workspace at /agents/, the page that
+// opens with every machine off (internal/hub/proxy/workspace.go).
+function build(out: string, pkg: string, tags = '') {
+  execFileSync('go', ['build', ...(tags ? ['-tags', tags] : []), '-o', out, pkg], {
     cwd: repo,
     stdio: 'inherit',
     env: { ...process.env, CGO_ENABLED: '0', GOFLAGS: '-mod=readonly' },
   });
 }
 
-export async function startStack(name: CellName): Promise<Stack> {
+export async function startStack(name: CellName, extraEnv: Record<string, string> = {}): Promise<Stack> {
   const cell = CELLS[name];
   const root = mkdtempSync(join(tmpdir(), `hub-journey-${name}-`));
   const procs: ChildProcess[] = [];
+  const machineProcs: ChildProcess[] = [];
+  // The runtime's tmux server outlives the runtime (its agents' panes): it is let go by its socket, in its own dir.
+  const machineTmux: { dir: string; socket: string }[] = [];
+  const tmuxSocket = (port: number) => `hs-journey-${process.pid}-${port}`;
+  const killMachineTmux = () => {
+    for (const t of machineTmux.splice(0))
+      try {
+        execFileSync('tmux', ['-L', t.socket, 'kill-server'], {
+          stdio: 'ignore',
+          env: { ...process.env, TMUX_TMPDIR: t.dir },
+        });
+      } catch {
+        /* gone */
+      }
+  };
   const spawnLogged = (cmd: string, args: string[], env: Record<string, string>, log: string) => {
     const fd = openSync(log, 'a');
     const p = spawn(cmd, args, { env, stdio: ['ignore', fd, fd], detached: true });
@@ -150,7 +171,7 @@ export async function startStack(name: CellName): Promise<Stack> {
     ] as const)
       copyFileSync(join(process.env.E2E_BIN_DIR, n), dst);
   } else {
-    build(hubBin, './cmd/hub');
+    build(hubBin, './cmd/hub', 'webui');
     build(agentBin, './cmd/agent');
     build(runtimeBin, './cmd/runtime');
   }
@@ -190,6 +211,7 @@ export async function startStack(name: CellName): Promise<Stack> {
     // The sign-in codes are read from the hub's log; the cloud edition refuses that without this.
     HUB_MAIL_LOG: 'allow',
     ...cell.env({ oidc }),
+    ...extraEnv,
   };
   if (process.env.E2E_DATABASE_URL) hubEnv.HUB_DATABASE_URL = process.env.E2E_DATABASE_URL;
   spawnLogged(hubBin, [], hubEnv, logs.hub);
@@ -264,26 +286,48 @@ export async function startStack(name: CellName): Promise<Stack> {
       runtimeBasePath: string;
     };
     const [rt, ag] = [await freePort(), await freePort()];
-    spawnLogged(
-      runtimeBin,
-      [],
-      {
-        ...menv,
-        RUNTIME_GATE_LISTEN: `127.0.0.1:${rt}`,
-        RUNTIME_GATE_UPSTREAM: '',
-        RUNTIME_APP_BASE_PATH: mf.runtimeBasePath,
-        RUNTIME_HUB_URL: direct,
-        RUNTIME_PREVIEW_LISTEN: 'off',
-        RUNTIME_WORKSPACE_DIR: work,
-        RUNTIME_WEB_DIR: resolve(repo, 'web', 'dist'),
-        RUNTIME_CLAUDE_LAUNCHER: join(home, 'bin', 'claude'),
-        RUNTIME_LOCALE: 'en',
-        RUNTIME_TMUX_SOCKET: `hs-journey-${process.pid}-${rt}`,
-      },
-      logs.runtime,
+    machineTmux.push({ dir: tmux, socket: tmuxSocket(rt) });
+    machineProcs.push(
+      spawnLogged(
+        runtimeBin,
+        [],
+        {
+          ...menv,
+          RUNTIME_GATE_LISTEN: `127.0.0.1:${rt}`,
+          RUNTIME_GATE_UPSTREAM: '',
+          RUNTIME_APP_BASE_PATH: mf.runtimeBasePath,
+          RUNTIME_HUB_URL: direct,
+          RUNTIME_PREVIEW_LISTEN: 'off',
+          RUNTIME_WORKSPACE_DIR: work,
+          RUNTIME_WEB_DIR: resolve(repo, 'web', 'dist'),
+          RUNTIME_CLAUDE_LAUNCHER: join(home, 'bin', 'claude'),
+          RUNTIME_LOCALE: 'en',
+          RUNTIME_TMUX_SOCKET: tmuxSocket(rt),
+        },
+        logs.runtime,
+      ),
     );
-    spawnLogged(agentBin, [], { ...menv, AGENT_PORT: String(ag), RUNTIME_PORT: String(rt) }, logs.agent);
+    machineProcs.push(
+      spawnLogged(agentBin, [], { ...menv, AGENT_PORT: String(ag), RUNTIME_PORT: String(rt) }, logs.agent),
+    );
     return { machineId: mf.machineId, basePath: mf.runtimeBasePath };
+  };
+
+  const hangRuntime = (hung: boolean) => {
+    const runtime = machineProcs[0];
+    if (runtime?.pid) process.kill(-runtime.pid, hung ? 'SIGSTOP' : 'SIGCONT');
+  };
+
+  const stopMachine = async () => {
+    for (const p of machineProcs.splice(0))
+      if (p.pid)
+        try {
+          process.kill(-p.pid, 'SIGKILL');
+        } catch {
+          /* gone */
+        }
+    killMachineTmux();
+    await new Promise((r) => setTimeout(r, 500));
   };
 
   const stop = async () => {
@@ -307,6 +351,7 @@ export async function startStack(name: CellName): Promise<Stack> {
     } catch {
       /* none */
     }
+    killMachineTmux();
     // The logs stay for the CI artifacts (E2E_KEEP=1, or E2E_LOGS_DIR to copy them out).
     if (process.env.E2E_LOGS_DIR) {
       mkdirSync(process.env.E2E_LOGS_DIR, { recursive: true });
@@ -319,5 +364,5 @@ export async function startStack(name: CellName): Promise<Stack> {
     }
     if (!process.env.E2E_KEEP) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   };
-  return { cell, hub, root, oidc, logs, emailCode, registerMachine, stop };
+  return { cell, hub, root, oidc, logs, emailCode, registerMachine, stopMachine, hangRuntime, stop };
 }

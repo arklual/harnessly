@@ -47,6 +47,17 @@ export function isMachineOff(m: MachineId | null): boolean {
   return c.enabled && c.off.has(m) && connectionStore.get(m)?.k !== 'live';
 }
 
+/**
+ * HRN-879, spec v10: whether the cluster keeps this machine's chats, so their history (the feed, older pages, a turn's
+ * steps) is read from it whether the machine is on, off, starting or hung. The machine answers only for what the copy
+ * does not have yet.
+ */
+export function keepsHistory(m: MachineId | null): boolean {
+  if (m === null) return false;
+  const c = centralStore.get();
+  return c.enabled && c.on.has(m);
+}
+
 export const useCentral = (): CentralView => useStore(centralStore);
 
 /** A chat of a switched-off machine is shown stopped and not resumable: nothing there can run it. */

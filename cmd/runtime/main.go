@@ -303,6 +303,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	}
 	if ref.c.agents != nil && ref.c.agents.gpt != nil {
 		// The relay the GPT proxy talks to: only that proxy, which holds this runtime's secret of it.
+		ref.c.agents.gpt.FastPane = ref.c.gptFastPane(&paneSessions{})
 		gptRelay := ref.c.agents.gpt.Relay()
 		routes = append(routes, gate.Route{
 			Match:   func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, providers.GPTRelayPath+"/") },
@@ -424,6 +425,9 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	envNoSandbox := provision.EnvNoSandbox()
 	browserConfig.NoSandbox = func() bool { return envNoSandbox || browserProfiles.NoSandbox() }
 	agentBrowser := agentbrowser.New(browserConfig)
+	// Hosts left by the previous runtime: of another build they are replaced on the next use, with RUNTIME_BROWSER=off
+	// they are closed now.
+	go agentBrowser.Sweep(context.Background())
 	browserAccess.Manager = agentBrowser
 	d.BrowserTools = &browsertools.Service{Manager: agentBrowser, Access: browserAccess}
 	configureBrowserSecrets(d, ref.c)

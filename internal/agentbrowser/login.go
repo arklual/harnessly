@@ -3,11 +3,11 @@ package agentbrowser
 import (
 	"context"
 	"errors"
-	"net/url"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
 	"github.com/ly-solutions/harnessly/internal/secrets"
 	"github.com/ly-solutions/harnessly/internal/vault"
 )
@@ -231,13 +231,13 @@ func (i *Instance) loginURL(id string) string {
 	return "about:blank"
 }
 
-// AllowedURL is shared by chrome_open and login requests, including localhost.
+// AllowedURL is shared by chrome_open and login requests: http(s) or about:blank. Where an address may lead
+// (localhost only to the machine's dev servers) is the egress's to decide; see host.Refusal.
 func AllowedURL(raw string) error {
-	u, err := url.Parse(raw)
-	if err == nil && ((u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil || raw == "about:blank") {
+	if host.AllowedNavigation(raw) {
 		return nil
 	}
-	return errors.New("URL refused: use http://, https:// or about:blank (localhost is allowed)")
+	return errors.New("URL refused: use http://, https:// or about:blank (localhost: this machine's dev servers)")
 }
 
 func (i *Instance) pendingLogin(id string) *LoginAsk {

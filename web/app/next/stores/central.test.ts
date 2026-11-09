@@ -4,7 +4,14 @@ const page = vi.hoisted(() => ({ getPage: vi.fn() }));
 vi.mock('@/next/core/net/http', () => ({ getPage: page.getPage }));
 vi.mock('@/next/core/net/machine', () => ({ gatewayPath: (p: string) => `/agents/api/x${p}` }));
 
-import { asOffline, centralStore, isMachineOff, movedKey, refreshCentral } from '@/next/stores/central';
+import {
+  asOffline,
+  centralStore,
+  isMachineOff,
+  keepsHistory,
+  movedKey,
+  refreshCentral,
+} from '@/next/stores/central';
 import { connectionStore } from '@/next/stores/connection';
 import { conversationsStore, convsCachedStore, convsLoadedStore } from '@/next/stores/conversations';
 import type { Conversation } from '@/next/protocol/v2';
@@ -110,5 +117,24 @@ describe('central history', () => {
     page.getPage.mockResolvedValue({ r: 'failed', code: 'network', status: null });
     await refreshCentral();
     expect(centralStore.get().enabled).toBe(false);
+  });
+
+  it('reads the history of every machine the copy keeps, on or off (HRN-879)', async () => {
+    connectionStore.set('a', { k: 'stale' } as never);
+    connectionStore.set('b', { k: 'live' } as never);
+    answer(true, [], []);
+    await refreshCentral();
+    // The cluster still calls both online: the copy is read all the same, the machine only for what it lacks.
+    expect(keepsHistory('a')).toBe(true);
+    expect(keepsHistory('b')).toBe(true);
+    expect(keepsHistory('c')).toBe(false);
+    expect(keepsHistory(null)).toBe(false);
+    expect(isMachineOff('a')).toBe(false);
+  });
+
+  it('reads nothing from the copy while it is off for the person', async () => {
+    answer(false, [], []);
+    await refreshCentral();
+    expect(keepsHistory('a')).toBe(false);
   });
 });

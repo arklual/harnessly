@@ -210,7 +210,7 @@ export interface Message {
 }
 
 export type PauseReason =
-  'interrupted' | 'user' | 'launch-failed' | 'agent-gone' | 'limited' | 'needs-target';
+  'interrupted' | 'user' | 'launch-failed' | 'agent-gone' | 'limited' | 'needs-target' | 'resume-blocked';
 
 export interface QueuePause {
   reason: PauseReason;

@@ -66,56 +66,61 @@ type Page struct {
 	Turns        []json.RawMessage `json:"turns"`
 	Entries      []json.RawMessage `json:"entries"`
 	BeforeTurnID *string           `json:"beforeTurnId"`
+	// Complete: the copy holds the chat back to its first turn (history_done). Until then the oldest turn kept
+	// still offers more, and a page past what is kept comes back empty and incomplete: the page asks the machine for
+	// the rest when it is there, instead of taking a cut feed for the whole one.
+	Complete bool `json:"complete"`
 }
 
 // ErrNotFound: the person has no such chat on a machine they may open.
 var ErrNotFound = errors.New("history: no such chat")
 
 // head is the newest stored copy of a chat of the person on one of the machines.
-func head(ctx context.Context, db *store.DB, userID, conv string, machines []string) (string, json.RawMessage, error) {
+func head(ctx context.Context, db *store.DB, userID, conv string, machines []string) (string, json.RawMessage, bool, error) {
 	if !convID.MatchString(conv) || len(machines) == 0 {
-		return "", nil, ErrNotFound
+		return "", nil, false, ErrNotFound
 	}
 	in := map[string]bool{}
 	for _, m := range machines {
 		in[m] = true
 	}
-	rows, err := db.Query(ctx, `SELECT machine_id, record FROM history_conversations
+	rows, err := db.Query(ctx, `SELECT machine_id, record, history_done FROM history_conversations
 		WHERE conv_id = ? AND owner_id = ? AND record IS NOT NULL AND deleted_at IS NULL ORDER BY updated_at DESC`, conv, userID)
 	if err != nil {
-		return "", nil, err
+		return "", nil, false, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var machine, record string
-		if err := rows.Scan(&machine, &record); err != nil {
-			return "", nil, err
+		var done int
+		if err := rows.Scan(&machine, &record, &done); err != nil {
+			return "", nil, false, err
 		}
 		if in[machine] {
-			return machine, json.RawMessage(record), nil
+			return machine, json.RawMessage(record), done != 0, nil
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return "", nil, err
+		return "", nil, false, err
 	}
-	return "", nil, ErrNotFound
+	return "", nil, false, ErrNotFound
 }
 
 // Read is a page of a chat: up to limit turns ending right before the turn `before` ("" for the newest).
 func Read(ctx context.Context, db *store.DB, userID, conv string, machines []string, before string, limit int) (Page, error) {
-	machine, record, err := head(ctx, db, userID, conv, machines)
+	machine, record, complete, err := head(ctx, db, userID, conv, machines)
 	if err != nil {
 		return Page{}, err
 	}
 	limit = min(max(limit, 1), PageTurnsMax)
-	q := `SELECT body, started_ms, turn_id FROM history_turns WHERE machine_id = ? AND conv_id = ?`
+	q := `SELECT body, started_ms, turn_id FROM history_turns WHERE machine_id = ? AND conv_id = ? AND left_after IS NULL`
 	args := []any{machine, conv}
 	if before != "" {
 		var started int64
 		err := db.QueryRow(ctx, `SELECT started_ms FROM history_turns WHERE machine_id = ? AND conv_id = ? AND turn_id = ?`,
 			machine, conv, before).Scan(&started)
 		if errors.Is(err, sql.ErrNoRows) {
-			return Page{MachineID: machine, Conversation: record, Turns: []json.RawMessage{}, Entries: []json.RawMessage{}}, nil
+			return Page{MachineID: machine, Conversation: record, Turns: []json.RawMessage{}, Entries: []json.RawMessage{}, Complete: complete}, nil
 		}
 		if err != nil {
 			return Page{}, err
@@ -153,11 +158,11 @@ func Read(ctx context.Context, db *store.DB, userID, conv string, machines []str
 	if more {
 		found = found[:limit]
 	}
-	page := Page{MachineID: machine, Conversation: record, Turns: make([]json.RawMessage, 0, len(found)), Entries: []json.RawMessage{}}
+	page := Page{MachineID: machine, Conversation: record, Turns: make([]json.RawMessage, 0, len(found)), Entries: []json.RawMessage{}, Complete: complete}
 	for i := len(found) - 1; i >= 0; i-- {
 		page.Turns = append(page.Turns, found[i].body)
 	}
-	if more && len(page.Turns) > 0 {
+	if (more || !complete) && len(page.Turns) > 0 {
 		id := found[len(found)-1].id
 		page.BeforeTurnID = &id
 	}
@@ -212,14 +217,14 @@ func entries(ctx context.Context, db *store.DB, machine, conv string, full, face
 		if err := rows.Scan(&body); err != nil {
 			return nil, err
 		}
-		out = append(out, json.RawMessage(body))
+		out = append(out, pageEntry(json.RawMessage(body)))
 	}
 	return out, rows.Err()
 }
 
 // TurnEntries are the steps of one folded turn, as `GET …/turns/<id>/entries` gives them.
 func TurnEntries(ctx context.Context, db *store.DB, userID, conv, turn string, machines []string) (string, []json.RawMessage, error) {
-	machine, _, err := head(ctx, db, userID, conv, machines)
+	machine, _, _, err := head(ctx, db, userID, conv, machines)
 	if err != nil {
 		return "", nil, err
 	}
@@ -235,7 +240,7 @@ func TurnEntries(ctx context.Context, db *store.DB, userID, conv, turn string, m
 		if err := rows.Scan(&body); err != nil {
 			return "", nil, err
 		}
-		out = append(out, json.RawMessage(body))
+		out = append(out, pageEntry(json.RawMessage(body)))
 	}
 	return machine, out, rows.Err()
 }

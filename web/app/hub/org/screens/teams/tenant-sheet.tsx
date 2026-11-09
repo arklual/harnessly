@@ -10,6 +10,7 @@ import { useOrg } from '../../context';
 import type { TenantRef } from '../../types';
 import { Seg } from '../../ui/page';
 import { Sheet } from '../../ui/sheet';
+import { BLOCKER, REMOVES } from './format';
 
 const ROLES = [
   { value: 'owner', label: 'Владелец' },
@@ -159,20 +160,6 @@ const People = ({ tenant }: { tenant: TenantRef }) => {
       {error != null && <p className="ht-err">{orgErrorText(error)}</p>}
     </section>
   );
-};
-
-const BLOCKER: Record<string, string> = {
-  machines: 'машин',
-  members: 'участников',
-  grants: 'выданных прав',
-  teams: 'команд',
-  invites: 'действующих приглашений',
-  sites: 'сайтов',
-  environment: 'записей окружения',
-};
-const REMOVES: Record<string, string> = {
-  limit_rules: 'правил лимитов',
-  revoked_machines_detached: 'отключённых машин (останутся с историей, без тенанта)',
 };
 
 const Delete = ({ tenant, onClose }: { tenant: TenantRef; onClose: () => void }) => {

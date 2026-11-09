@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -263,6 +264,11 @@ func (i *Instance) newTab(ctx context.Context, conv, by, url string, login *logi
 	}
 	// targetCreated precedes createTarget's reply. Do not expose this brief unowned state.
 	i.mu.Lock()
+	if limit := i.manager.cfg.MaxTabs; limit > 0 && len(i.pages)+i.creating >= limit {
+		i.mu.Unlock()
+		return Tab{}, fmt.Errorf("%d tabs are open in this browser, the most it keeps (RUNTIME_BROWSER_MAX_TABS): "+
+			"close one first (chrome_close_tab)", limit)
+	}
 	i.creating++
 	i.mu.Unlock()
 	defer i.finishCreating()

@@ -485,6 +485,8 @@ const rowOf = (role: Role, e: Entry): EnvEntryRow => {
     unused: null,
     delivery: null,
     groupId: e.groupId ?? '',
+    // The order of the layer's entries is the order its scripts run in.
+    position: entries.filter((x) => x.layer === e.layer && x.scopeId === e.scopeId).indexOf(e) + 1,
   };
 };
 

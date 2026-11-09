@@ -1,6 +1,7 @@
 package convo
 
 import (
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
@@ -409,7 +410,8 @@ func (c *conv) input(in agentstate.Input, now time.Time) {
 	if c.liftInterrupt(effects, now) {
 		c.pump(now)
 	}
-	if p := c.box.Paused(); p != nil && p.Reason == wire.PausedAgentGone && c.rec.State.K != wire.StateGone {
+	if p := c.box.Paused(); p != nil && (p.Reason == wire.PausedAgentGone && c.rec.State.K != wire.StateGone ||
+		p.Reason == wire.PausedResumeBlocked && agentUp(c.rec.State.K)) {
 		// The pause was for an agent that is gone; one that is back (found again, a restart) takes its queue — or, held
 		// on its usage limit, waits for the reset.
 		if c.rec.Limited != nil {
@@ -1559,12 +1561,21 @@ func (c *conv) pumpWith(pane typist.Pane, look *typist.Screen, now time.Time) {
 	})
 }
 
+// ErrResumeBlocked is a resume refused because something else holds the tab's terminal.
+var ErrResumeBlocked = errors.New("the tab's terminal is busy")
+
 func (c *conv) resume(now time.Time) {
 	if c.d.Launcher == nil {
 		return
 	}
 	if err := c.d.Launcher.Resume(c.rec); err != nil {
 		c.d.Log.Warn("resume failed", "conv", c.rec.ID, "err", err)
+		// The queue says why it waits; «continue sending» lifts the pause and the resume is tried again (GitHub #52).
+		reason := wire.PausedLaunchFailed
+		if errors.Is(err, ErrResumeBlocked) {
+			reason = wire.PausedResumeBlocked
+		}
+		c.change(c.box.Pause(reason, now), now)
 		return
 	}
 	c.ultracodeAgain(now)

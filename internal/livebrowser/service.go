@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/egress"
 	"github.com/ly-solutions/harnessly/internal/preview"
 )
 
@@ -66,7 +67,7 @@ type Service struct {
 	lookup func(string) (string, error)
 	// resolve is resolveHost, except in tests, which load pages from the machine.
 	resolve func(host string) (addr, why string)
-	egress  *egress
+	egress  *egress.Proxy
 	// windows are the pages a tab's page opened, by target id, while they are adopted (watchTargets).
 	windows map[string]*Tab
 
@@ -180,10 +181,6 @@ func (s *Service) ProfileDir() string { return filepath.Join(s.cfg.DataDir, "liv
 func (s *Service) args(profile, proxy string) []string {
 	args := []string{
 		"--headless=new", "--remote-debugging-pipe",
-		// Every connection goes through the egress, the loopback too (Chrome would skip the proxy for it otherwise);
-		// nothing goes around it: no QUIC, no WebRTC past the proxy.
-		"--proxy-server=http://" + proxy, "--proxy-bypass-list=<-loopback>",
-		"--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
 		"--user-data-dir=" + profile,
 		"--no-first-run", "--no-default-browser-check", "--disable-session-crashed-bubble",
 		"--disable-dev-shm-usage", "--disable-gpu", "--disable-background-networking",
@@ -193,6 +190,9 @@ func (s *Service) args(profile, proxy string) []string {
 		"--window-size=1280,800", "--lang=ru-RU", "--hide-scrollbars=false",
 		"--autoplay-policy=user-gesture-required", "--mute-audio", "--disable-extensions",
 	}
+	// Every connection goes through the egress, the loopback too (Chrome would skip the proxy for it otherwise);
+	// nothing goes around it: no QUIC, no WebRTC past the proxy.
+	args = append(args, egress.ChromeArgs(proxy)...)
 	// The first window shows nothing (not chrome://newtab): the pages are made over the protocol.
 	return append(append(args, s.cfg.ExtraArgs...), "about:blank")
 }
@@ -209,7 +209,7 @@ func (s *Service) startLocked(ctx context.Context) error {
 	}
 	// A lock of a browser that was killed keeps a new one from using the profile.
 	_ = os.Remove(filepath.Join(profile, "SingletonLock"))
-	eg, err := listenEgress(func(host string) (string, string) { return s.resolve(host) })
+	eg, err := egress.Listen(func(host, _ string) (string, string) { return s.resolve(host) })
 	if err != nil {
 		return err
 	}

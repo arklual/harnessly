@@ -180,6 +180,12 @@ A machine's access list is `access: [{ kind: 'user' | 'team', id }]` (set by `PA
 Who passes: an instance administrator, a manager of the tenant (owner or administrator grant), the person who connected
 the machine, anyone on an empty list, a person listed by `user`, and a member of a listed `team`.
 
+With `on` the list also decides who *sees* the machine: a person it does not let in gets the machine in no list (the
+tenant's machines, the organization's inventory, the fleet), `GET /api/machines/{id}` answers 404 as for a machine that
+does not exist, and the live events of the machine (`machine`, `machine.op`, `job`, `login`) are checked per person at
+delivery, so an open stream stops getting them as soon as the person is taken off the list. `off` and `warn` show every
+machine to every member, as before.
+
 Things to know:
 
 - It applies to members of the tenant. Someone outside the tenant is refused by the membership check before this one (an

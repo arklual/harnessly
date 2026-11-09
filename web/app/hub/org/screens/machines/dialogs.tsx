@@ -12,7 +12,7 @@ import { useOrg } from '../../context';
 import { useAction } from '../../hooks';
 import { Seg } from '../../ui/page';
 import { useClosing } from '../../ui/closing';
-import { rub } from './format';
+import { movePlanLines, rub } from './format';
 
 const Card = ({
   open,
@@ -199,25 +199,6 @@ export const OffDialog = ({
     {error != null && <p className="hm-dlg__err">{orgErrorText(error)}</p>}
   </Card>
 );
-
-/** Lines of the plan of a move, as the dry run of the hub reports them. */
-export const movePlanLines = (p: MovePlan): { text: string; bad?: boolean }[] => {
-  const out: { text: string; bad?: boolean }[] = [];
-  if (p.noop) return [{ text: 'Машина уже в этом тенанте.' }];
-  if (p.teamCleared) out.push({ text: `Привязка к команде «${p.teamCleared}» снимется.` });
-  if (p.teamAssigned) out.push({ text: `Машина войдёт в команду «${p.teamAssigned}».` });
-  if (p.accessRevoked.length > 0) {
-    out.push({ text: `Доступ потеряют: ${p.accessRevoked.join(', ')}. Выдайте его заново в новом тенанте.` });
-  }
-  out.push({
-    text:
-      p.limits.toRules > 0
-        ? `Новые траты пойдут в лимиты «${p.to.name}» (правил: ${p.limits.toRules}); прошлые останутся в истории «${p.from.name}».`
-        : `Новые траты пойдут в «${p.to.name}» — лимитов там нет; прошлые останутся в истории «${p.from.name}».`,
-  });
-  if (p.kept.length > 0) out.push({ text: `Остаётся как было: ${p.kept.join(', ')}.` });
-  return out;
-};
 
 export const MoveDialog = ({
   open,

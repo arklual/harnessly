@@ -2033,6 +2033,34 @@
         }
       ]
     },
+    "history_sidebars": {
+      "columns": [
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "doc",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "owner_id"
+      ],
+      "indexes": []
+    },
     "history_turns": {
       "columns": [
         {
@@ -2068,6 +2096,10 @@
           "name": "body",
           "type": "text",
           "notNull": true
+        },
+        {
+          "name": "left_after",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -3016,6 +3048,94 @@
           "name": "merged_mrs_merged",
           "columns": [
             "merged_at"
+          ]
+        }
+      ]
+    },
+    "offline_prompts": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "tab_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "client_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "send",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "error",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "changed_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "offline_prompts_client",
+          "unique": true,
+          "columns": [
+            "user_id",
+            "machine_id",
+            "client_id"
+          ]
+        },
+        {
+          "name": "offline_prompts_state",
+          "columns": [
+            "state",
+            "created_at"
+          ]
+        },
+        {
+          "name": "offline_prompts_tab",
+          "columns": [
+            "user_id",
+            "machine_id",
+            "tab_id",
+            "created_at"
           ]
         }
       ]

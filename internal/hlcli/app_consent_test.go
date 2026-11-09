@@ -35,7 +35,7 @@ func TestAppLogs(t *testing.T) {
 	if c := f.last(); c.Path != "/api/cli/apps/logs" || !strings.Contains(c.Query, "limit=5") {
 		t.Fatalf("asked %+v", c)
 	}
-	if r := f.run(t, "", "app", "logs", "example.quiet"); r.code != 0 || !strings.Contains(r.out, "no errors") {
+	if r := f.run(t, "", "app", "logs", "example.quiet"); r.code != 0 || !strings.Contains(r.out, "no lines for example.quiet") {
 		t.Fatalf("no lines: %d %q", r.code, r.out)
 	}
 }
@@ -101,4 +101,54 @@ func TestAppValidateWarningsEndToEnd(t *testing.T) {
 func lastLine(s string) string {
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	return lines[len(lines)-1]
+}
+
+// --since goes to the runtime as a time, --json prints the lines as the runtime sent them.
+func TestAppLogsSinceAndJSON(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "", "app", "logs", "example.app", "--since", "10m")
+	if r.code != 0 {
+		t.Fatalf("logs --since: %d %q %q", r.code, r.out, r.errs)
+	}
+	if c := f.last(); !strings.Contains(c.Query, "since=") {
+		t.Fatalf("asked %+v", c)
+	}
+	if r := f.run(t, "", "app", "logs", "example.app", "--since", "soon"); r.code == 0 || !strings.Contains(r.errs, "--since takes") {
+		t.Fatalf("a bad span: %d %q", r.code, r.errs)
+	}
+	r = f.run(t, "", "--json", "app", "logs", "example.app")
+	if r.code != 0 || !strings.Contains(r.out, `"lines"`) || !strings.Contains(r.out, "TypeError") {
+		t.Fatalf("logs --json: %d %q", r.code, r.out)
+	}
+}
+
+// --follow prints what is there, then stops after --for; a line is told once.
+func TestAppLogsFollowStopsAfterFor(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "", "app", "logs", "example.app", "--follow", "--for", "1s")
+	if r.code != 0 || strings.Count(r.out, "TypeError: x is undefined") != 1 {
+		t.Fatalf("follow: %d %q %q", r.code, r.out, r.errs)
+	}
+}
+
+// app check says how the view loaded and fails (exit 1) when it did not load cleanly.
+func TestAppCheck(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "", "app", "check", "example.app", "--open", "--view", "main")
+	if r.code != 0 || !strings.Contains(r.out, "ok: example.app loaded") {
+		t.Fatalf("check ok: %d %q %q", r.code, r.out, r.errs)
+	}
+	if c := f.last(); c.Path != "/api/cli/apps/check" || c.Body["view"] != "main" {
+		t.Fatalf("asked %+v", c)
+	}
+	r = f.run(t, "", "app", "check", "example.broken", "--open")
+	if r.code != 1 || !strings.Contains(r.out, `"ReferenceError: nope"`) || !strings.Contains(r.out, "failed: example.broken") {
+		t.Fatalf("check failed: %d %q %q", r.code, r.out, r.errs)
+	}
+	if r := f.run(t, "", "--json", "app", "check", "example.broken", "--open"); r.code != 1 || !strings.Contains(r.out, `"state": "failed"`) {
+		t.Fatalf("check --json: %d %q", r.code, r.out)
+	}
+	if r := f.run(t, "", "app", "check", "example.nobrowser", "--open"); r.code == 0 || !strings.Contains(r.errs, "no browser") {
+		t.Fatalf("no browser: %d %q", r.code, r.errs)
+	}
 }

@@ -240,6 +240,7 @@ export const PAUSE_REASONS = [
   'agent-gone',
   'limited',
   'needs-target',
+  'resume-blocked',
 ] as const;
 export type PauseReason = (typeof PAUSE_REASONS)[number];
 export const GATE_KINDS = ['question', 'permission', 'plan'] as const;
@@ -2069,6 +2070,9 @@ export interface CentralChat extends TurnsPage {
   machine: CentralState;
   machineId: MachineId;
   conversation: Conversation;
+  /** the copy holds the chat back to its first turn; false: older turns may still be only on the machine.
+   *  Absent from an older gateway or hub. */
+  complete?: boolean;
 }
 export interface EntriesPage {
   turnId: TurnId;
@@ -3404,14 +3408,17 @@ const centralList: Decoder<CentralList> = object(
   },
   { moved: array(object({ machineId: id, convId, toMachineId: id, toConvId: convId })) },
 );
-const centralChat: Decoder<CentralChat> = object({
-  machine: centralState,
-  machineId: id,
-  conversation,
-  turns: array(turn),
-  entries: array(entry),
-  beforeTurnId: nullable(turnId),
-});
+const centralChat: Decoder<CentralChat> = object(
+  {
+    machine: centralState,
+    machineId: id,
+    conversation,
+    turns: array(turn),
+    entries: array(entry),
+    beforeTurnId: nullable(turnId),
+  },
+  { complete: bool },
+);
 
 const profileProject: Decoder<ProfileProject> = object({
   id,

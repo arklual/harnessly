@@ -81,6 +81,9 @@ type Visibility interface {
 type Timings struct {
 	// ShellReady: a fresh tmux session's shell needs a moment before it takes keys.
 	ShellReady time.Duration
+	// ShellSettle and ShellPoll: how long and how often a terminal that looks busy is looked at again before a resume
+	// gives up on it.
+	ShellSettle, ShellPoll time.Duration
 	// BackstopPoll and BackstopWait: how often and how long the agent is looked for after the resume line; BackstopGrace
 	// is how long it may then run without a SessionStart hook before one is synthesized.
 	BackstopPoll, BackstopWait, BackstopGrace time.Duration
@@ -93,6 +96,8 @@ func (t Timings) withDefaults() Timings {
 		}
 	}
 	def(&t.ShellReady, 500*time.Millisecond)
+	def(&t.ShellSettle, 3*time.Second)
+	def(&t.ShellPoll, 200*time.Millisecond)
 	def(&t.BackstopPoll, 500*time.Millisecond)
 	def(&t.BackstopWait, 30*time.Second)
 	def(&t.BackstopGrace, 5*time.Second)

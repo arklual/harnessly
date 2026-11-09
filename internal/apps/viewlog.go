@@ -31,6 +31,11 @@ const (
 	ViewLogError  = "error"
 	ViewLogWarn   = "warn"
 	ViewLogBridge = "bridge"
+	// The host's own lines: a file of a view the server refused, a call of the app's MCP backend that failed,
+	// and the steps of a load (a view opened, its handshake answered, no handshake in time).
+	ViewLogServe = "serve"
+	ViewLogMCP   = "mcp"
+	ViewLogLoad  = "load"
 )
 
 // ViewLogLine is one line of an app's log.
@@ -45,7 +50,41 @@ var viewLogMu sync.Mutex
 
 // ValidViewLevel says whether a level is one a line may carry.
 func ValidViewLevel(level string) bool {
-	return level == ViewLogError || level == ViewLogWarn || level == ViewLogBridge
+	switch level {
+	case ViewLogError, ViewLogWarn, ViewLogBridge, ViewLogServe, ViewLogMCP, ViewLogLoad:
+		return true
+	}
+	return false
+}
+
+// ViewLogFailure says whether a line is a failure: everything but a load step and a warning.
+func ViewLogFailure(l ViewLogLine) bool { return l.Level != ViewLogLoad && l.Level != ViewLogWarn }
+
+// LogEvent adds one line of the host's own to an app's log; a failure to write it is not the caller's concern.
+func (r *Registry) LogEvent(id, view, level, text string) {
+	if r == nil {
+		return
+	}
+	_, _ = r.AppendViewLog(id, []ViewLogLine{{Level: level, View: view, Text: text}}, time.Now())
+}
+
+// ViewLogSince is the lines of an app's log written at or after since (milliseconds), oldest first, at most limit of the
+// last ones (0: all kept).
+func (r *Registry) ViewLogSince(id string, since int64, limit int) ([]ViewLogLine, error) {
+	all, err := r.ViewLog(id, 0)
+	if err != nil {
+		return nil, err
+	}
+	out := all[:0:0]
+	for _, l := range all {
+		if l.At >= since {
+			out = append(out, l)
+		}
+	}
+	if limit > 0 && len(out) > limit {
+		out = out[len(out)-limit:]
+	}
+	return out, nil
 }
 
 func (r *Registry) viewLogPath(id string) (string, bool) {
@@ -158,4 +197,27 @@ func (r *Registry) ClearViewLog(id string) error {
 		return err
 	}
 	return nil
+}
+
+var (
+	onceMu   sync.Mutex
+	onceSeen = map[string]time.Time{}
+)
+
+// LogEventOnce is LogEvent, but the same line of the same app is written once in ten seconds: a view that asks for a
+// missing file on every load fills its log with one line, not a hundred.
+func (r *Registry) LogEventOnce(id, view, level, text string) {
+	key := id + "|" + view + "|" + level + "|" + text
+	now := time.Now()
+	onceMu.Lock()
+	if at, ok := onceSeen[key]; ok && now.Sub(at) < 10*time.Second {
+		onceMu.Unlock()
+		return
+	}
+	if len(onceSeen) > 500 {
+		onceSeen = map[string]time.Time{}
+	}
+	onceSeen[key] = now
+	onceMu.Unlock()
+	r.LogEvent(id, view, level, text)
 }

@@ -1,0 +1,10 @@
+{
+  "currency": {
+    "code": "USD",
+    "perUsd": 1,
+    "rateDate": "2026-11-01",
+    "source": "none"
+  },
+  "next": null,
+  "sessions": []
+}

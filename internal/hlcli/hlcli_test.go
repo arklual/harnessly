@@ -102,6 +102,14 @@ func (f *fakeRuntime) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"ok":true,"applied":true,"message":"opened for the person"}`))
 	case r.URL.Path == "/api/cli/deliver":
 		_, _ = w.Write([]byte(`{"ok":true,"message":"Delivered notes.md\nhttps://delivered.harnessly.invalid/file"}`))
+	case r.URL.Path == "/api/cli/apps/check" && body["id"] == "example.broken":
+		_, _ = w.Write([]byte(`{"app":"example.broken","view":"main","state":"failed","handshake":true,"ms":120,"errors":1,"problem":"the view loaded, with errors","lines":[` +
+			`{"at":1700000000000,"level":"load","view":"main","text":"check page opened"},{"at":1700000000120,"level":"error","view":"main","text":"ReferenceError: nope"}]}`))
+	case r.URL.Path == "/api/cli/apps/check" && body["id"] == "example.nobrowser":
+		w.WriteHeader(503)
+		_, _ = w.Write([]byte(`{"error":"no-browser"}`))
+	case r.URL.Path == "/api/cli/apps/check":
+		_, _ = w.Write([]byte(`{"app":"example.app","view":"main","state":"ok","handshake":true,"ms":87,"errors":0,"lines":[{"at":1700000000000,"level":"load","text":"check page opened"}]}`))
 	case r.URL.Path == "/api/cli/apps/logs" && r.URL.Query().Get("id") == "example.quiet":
 		_, _ = w.Write([]byte(`{"id":"example.quiet","lines":[]}`))
 	case r.URL.Path == "/api/cli/apps/logs":

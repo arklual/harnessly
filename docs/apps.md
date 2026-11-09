@@ -247,6 +247,12 @@ section in its «…» menu and in the right pane: the bridge calls with the rea
 handshake), and a line when the view did not connect within 8 s, the usual sign that its scripts did not load. A view
 runs script files only: `harnessly app validate` warns of a `<script>` written into the page.
 
+The switch only opens the section. What the section shows is also kept by the runtime, whatever the switch: one log of 200 lines
+per app (the page's lines, the files the view server refused, the failed calls of the app's MCP backend, the steps of a load),
+read with `harnessly app logs <id> [--follow] [--since 10m] [--json]`. `harnessly app check <id> --open [--view v]` opens the
+view in a headless browser of the machine, waits for the handshake and prints how it loaded (exit 1 on a failure). A dev
+install (`harnessly app dev`) shows its debug section without the switch. See [Debugging](build-apps/06-debugging.md#where-to-look).
+
 ### Host calls beyond storage and tools
 
 These are done by the page, after the bridge has checked the call against `permissions` and `targets`:
@@ -336,6 +342,7 @@ one app is on. Claude writes tool names with `_`, the tool rules with `.`: `mcp_
 | `open` (`app.open`) | Opens the app's view for the pane (`view`, the first one when omitted) in the person's pane |
 | `data_get`, `data_set` (`app.data.get`, `app.data.set`) | The app's `chat` storage of this chat by `key`: the same data its view reads with `hl.storage.chat`, with the same limits. `data_get` answers `{"value", "version"}`; `data_set` takes `ifVersion` and answers `{"version"}`, or is refused with `conflict` (and the current version) or `quota_exceeded`. A write reaches the open views as the `storage` event |
 | `settings_get` (`app.settings.get`) | The app's settings: what the person saved in its form over the defaults (what `hl.settings.get()` gives a view). Secrets are never in it |
+| `logs`, `check` (`app.logs`, `app.check`) | `logs` reads the app's log (`limit`, `sinceSeconds`): what its views reported and what the host refused; `check` opens a view in a headless browser of the machine and answers `{state, handshake, ms, errors, problem, lines}` (up to 20 s). The agent that writes an app sees what broke with them |
 | `ask` (`app.ask`) | Puts a choice (`question`, 2 to 8 `options`) to the person in the app and waits up to ten minutes; answers with the option or `cancelled` |
 
 The host's choice is drawn over the app's view with the app's name and answered through `GET <platform>/apps/asks?conversation=`

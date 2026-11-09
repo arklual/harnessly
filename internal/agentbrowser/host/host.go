@@ -22,6 +22,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"github.com/ly-solutions/harnessly/internal/cdp"
+	"github.com/ly-solutions/harnessly/internal/egress"
 )
 
 // LogLimit caps the persistent host log in bytes.
@@ -31,7 +32,33 @@ const LogLimit = 4 << 20
 type Config struct {
 	ProfileDir, Socket, Chrome, Mode string
 	NoSandbox                        *bool
+	// Idle closes the host once no runtime has been connected for this long (0: never). The runtime closes an idle
+	// browser it is connected to itself; this is for a runtime that went away (an update, a crash) and left it behind.
+	Idle time.Duration
+	// MaxTabs bounds Chrome's renderer processes (--renderer-process-limit); 0 leaves Chrome's own bound.
+	MaxTabs int
+	// Nice lowers Chrome's and Xvfb's priority (0 keeps it).
+	Nice int
+	// DownloadLimit is the largest file a page may download into the profile's downloads/; 0 refuses downloads.
+	DownloadLimit int64
 }
+
+// Build is the runtime's build (set by the runtime's main): a host answers it to Host.hello, and a runtime of another
+// build replaces the host, so an update reaches the browser too.
+var Build = "dev"
+
+// BuildID is Build, with the executable's time for a dev build: every rebuild is another build.
+var BuildID = sync.OnceValue(func() string {
+	if Build != "dev" {
+		return Build
+	}
+	if exe, err := os.Executable(); err == nil {
+		if st, err := os.Stat(exe); err == nil {
+			return Build + "+" + strconv.FormatInt(st.ModTime().UnixNano(), 36)
+		}
+	}
+	return Build
+})
 
 // SocketPath keeps room for the terminating NUL on both Linux and Darwin.
 func SocketPath(runDir, profile string) string {
@@ -70,6 +97,10 @@ func Main(args []string) error {
 	fs.StringVar(&cfg.Chrome, "chrome", "", "Chrome executable")
 	fs.StringVar(&cfg.Mode, "mode", "auto", "auto, xvfb or headless")
 	sandbox := fs.String("sandbox", "inherit", "inherit, enabled or disabled")
+	fs.DurationVar(&cfg.Idle, "idle", 0, "close after this long without a runtime (0: never)")
+	fs.IntVar(&cfg.MaxTabs, "max-tabs", 0, "renderer process limit (0: Chrome's own)")
+	fs.IntVar(&cfg.Nice, "nice", 0, "priority of Chrome and Xvfb")
+	fs.Int64Var(&cfg.DownloadLimit, "download-limit", DefaultDownloadLimit, "largest download in bytes (0: none)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -102,6 +133,8 @@ func Start(executable string, cfg Config) error {
 	cmd := exec.Command(executable, "browser-host",
 		"--profile", cfg.ProfileDir, "--socket", cfg.Socket, "--chrome", cfg.Chrome, "--mode", cfg.Mode,
 	)
+	cmd.Args = append(cmd.Args, "--idle", cfg.Idle.String(), "--max-tabs", strconv.Itoa(cfg.MaxTabs),
+		"--nice", strconv.Itoa(cfg.Nice), "--download-limit", strconv.FormatInt(cfg.DownloadLimit, 10))
 	if cfg.NoSandbox != nil {
 		value := "enabled"
 		if *cfg.NoSandbox {
@@ -215,7 +248,7 @@ func Run(ctx context.Context, cfg Config) error {
 		}
 		defer rd.Close()
 		// Exit when Chrome disconnects even if the host was killed before it could clean up.
-		x := exec.Command(xvfb, "-displayfd", "3", "-screen", "0", "3840x2160x24", "-nolisten", "tcp", "-terminate")
+		x := niced(cfg.Nice, xvfb, "-displayfd", "3", "-screen", "0", "3840x2160x24", "-nolisten", "tcp", "-terminate")
 		x.ExtraFiles = []*os.File{wr}
 		x.Stdout = log
 		x.Stderr = log
@@ -253,18 +286,29 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 	defer readChrome.Close()
 	defer fromChrome.Close()
+	// Every connection of the browser goes through the egress, held to the gate: no internal address, no port of the
+	// machine but its dev servers. Prompt injection in a page gets no further than the page itself could.
+	proxy, err := egress.Listen(newGate(true).resolve)
+	if err != nil {
+		return err
+	}
+	defer proxy.Close()
 	args := []string{
 		"--remote-debugging-pipe", "--user-data-dir=" + filepath.Join(cfg.ProfileDir, "chrome"),
 		"--no-first-run", "--no-default-browser-check", "--password-store=basic", "--use-mock-keychain",
 		"--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding",
 		"--disable-background-timer-throttling", "--disable-dev-shm-usage",
 	}
+	args = append(args, egress.ChromeArgs(proxy.Addr())...)
+	if cfg.MaxTabs > 0 {
+		args = append(args, "--renderer-process-limit="+strconv.Itoa(cfg.MaxTabs))
+	}
 	if display == "" {
 		args = append(args, "--headless=new")
 	}
 	args = append(args, provision.SandboxArgs(strings.Fields(os.Getenv("RUNTIME_BROWSER_CHROME_ARGS")), cfg.NoSandbox)...)
 	args = append(args, "--no-startup-window")
-	chrome := exec.Command(cfg.Chrome, args...)
+	chrome := niced(cfg.Nice, cfg.Chrome, args...)
 	chrome.ExtraFiles = []*os.File{toChrome, fromChrome}
 	chrome.Stdout = log
 	chrome.Stderr = log
@@ -296,7 +340,15 @@ func Run(ctx context.Context, cfg Config) error {
 	go func() { chromeDone <- chrome.Wait() }()
 	stream := cdp.NewStream(pipe{readChrome, writeChrome})
 	defer func() { _ = stream.Close() }()
-	r := &relay{chrome: stream}
+	r := &relay{chrome: stream, build: BuildID(), alone: time.Now()}
+	keeper := &sessionKeeper{dir: cfg.ProfileDir, relay: r}
+	loads := &downloads{dir: filepath.Join(cfg.ProfileDir, "downloads"), limit: cfg.DownloadLimit, relay: r}
+	r.event = loads.event
+	r.beforeClose = func() {
+		saveCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		keeper.save(saveCtx)
+	}
 	defer func() {
 		_ = listener.Close()
 		r.mu.Lock()
@@ -307,7 +359,35 @@ func Run(ctx context.Context, cfg Config) error {
 		r.mu.Unlock()
 	}()
 	readDone := make(chan error, 1)
-	go func() { readDone <- r.read(ctx) }()
+	// The reader outlives ctx: the cookies are read from the browser after the signal to stop.
+	go func() { readDone <- r.read(context.Background()) }()
+	setupCtx, setupCancel := context.WithTimeout(ctx, 10*time.Second)
+	err = loads.setup(setupCtx)
+	if err == nil {
+		err = keeper.restore(setupCtx)
+	}
+	setupCancel()
+	if err != nil {
+		return fmt.Errorf("browser setup: %w", err)
+	}
+	idle := make(chan struct{})
+	if cfg.Idle > 0 {
+		go func() {
+			tick := time.NewTicker(min(cfg.Idle/4+time.Second, 30*time.Second))
+			defer tick.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case now := <-tick.C:
+					if r.idle(now) >= cfg.Idle {
+						close(idle)
+						return
+					}
+				}
+			}
+		}()
+	}
 	go func() {
 		for {
 			conn, e := listener.Accept()
@@ -318,11 +398,18 @@ func Run(ctx context.Context, cfg Config) error {
 		}
 	}()
 	var relayErr error
+	stopping := false
 	select {
 	case err = <-chromeDone:
 		return err
 	case relayErr = <-readDone:
 	case <-ctx.Done():
+		stopping = true
+	case <-idle:
+		stopping = true
+	}
+	if stopping {
+		r.beforeClose()
 	}
 	// Give Chrome a chance to flush persistent cookies before terminating its process group.
 	closeCtx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -334,8 +421,20 @@ func Run(ctx context.Context, cfg Config) error {
 		_ = syscall.Kill(-chrome.Process.Pid, syscall.SIGKILL)
 		err = <-chromeDone
 	}
-	if ctx.Err() != nil {
+	if stopping {
 		return nil
 	}
 	return errors.Join(err, relayErr)
+}
+
+// niced runs name at a lower priority through nice, when there is one and the priority is lowered at all.
+func niced(priority int, name string, args ...string) *exec.Cmd {
+	if priority > 0 {
+		if nice, err := exec.LookPath("nice"); err == nil {
+			// #nosec G204 -- the browser or Xvfb and the host's fixed flags.
+			return exec.Command(nice, append([]string{"-n", strconv.Itoa(priority), name}, args...)...)
+		}
+	}
+	// #nosec G204 -- the browser or Xvfb and the host's fixed flags.
+	return exec.Command(name, args...)
 }

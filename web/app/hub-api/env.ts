@@ -95,6 +95,7 @@ export type EnvEntryRow = {
   // What the machines holding the current list said about the item; null: none of them reported it.
   delivery: ItemDelivery | null;
   groupId: string; // the group of the layer the entry is in; '' for none
+  position: number; // the entry's place among the layer's entries: scripts run in this order (0 until placed)
 };
 
 // A group of a layer's entries (docs/hub/environment.md, «Groups»). Required: its items are pinned. Optional: each

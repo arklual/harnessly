@@ -107,7 +107,12 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
                                     the person agrees that the app uses their connection (Settings → Connections), or takes it back
   harnessly app explain ID          why the app is on or off here, layer by layer: machine, team, consent, setup,
                                     activation, this chat, the wall, its views' errors; ✗ marks what keeps it off
-  harnessly app logs ID [--limit N] what its views reported: console errors, exceptions, failed bridge calls
+  harnessly app logs ID [--follow] [--since 10m] [--limit N] [--json]
+                                    the app's log: what its views reported (console errors, exceptions, failed bridge
+                                    calls) and what the host refused (files, backend calls, a load that did not finish)
+  harnessly app check ID --open [--view V]
+                                    opens the view in a browser of this machine, waits for its handshake and says how it
+                                    loaded, with every error; exit 1 when it did not load cleanly
   harnessly app publish [DIR] --channel dev|beta|stable [--team]
                                     publish a new, immutable version on a channel (--team: also to the team's catalog)
   harnessly app promote VERSION --channel beta|stable | rollback --channel C | channels [ID]
@@ -268,9 +273,10 @@ Run it again after you change the file, to hand over the new version.
 `,
 	"app": `harnessly app <subcommand> [--help]
 
-Subcommands: docs, catalog, sdk, new, validate (check), install, dev, list, remove, enable, disable, connect, explain, logs,
+Subcommands: docs, catalog, sdk, new, validate (check), install, dev, list, remove, enable, disable, connect, explain, logs, check,
 publish, promote, rollback, channels, update, share, shares, unshare, team, public, eval, mock-mcp.
 harnessly app <subcommand> --help says what each takes. New here: harnessly app docs, the first chapter.
+  harnessly app check ID --open [--view V]   open the view in the machine's browser, say how it loaded (exit 1 on failure)
 
 An app is a package: a Claude Code plugin (instructions.md, skills/, commands/, .mcp.json) plus the manifest
 harnessly/app.json that says where it works (targets: chat, pane, app, sinopia.<kind>), what it may do (permissions)
@@ -284,7 +290,8 @@ and what the agent of a chat gets while it is on (agent: instructions, skills, m
   harnessly app enable acme.cashback    # in the chat this tab runs
   harnessly app list --json
   harnessly app explain example.app     # why it is on or off, layer by layer
-  harnessly app logs example.app        # what its views reported: console errors, exceptions, failed calls
+  harnessly app logs example.app -f     # the app's log, new lines as they come (add --since 10m, --json)
+  harnessly app check example.app --open  # open the view in a headless browser, get the load's verdict
 
 An app with any right waits for the person's consent after app dev or app install from the CLI: only the person's click
 in harnessly's page gives it («Приложения» → the app → «Посмотреть доступы»); no command does, since agents run the CLI

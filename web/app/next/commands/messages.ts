@@ -12,6 +12,7 @@
 import { machineNow, pageClock } from '@/next/core/clock';
 import { uuidv7 } from '@/next/core/ids';
 import { batch } from '@/next/core/store';
+import { adoptParked, parkInCluster, unparkInCluster } from '@/next/commands/cluster-queue';
 import { startMessageStatus } from '@/next/commands/message-status';
 import { runCommand, type OpHandle } from '@/next/commands/run';
 import { anyKept, takeKept } from '@/next/commands/uploads';
@@ -125,12 +126,31 @@ export function newView(
   };
 }
 
+/**
+ * the messages of this chat that wait in the cluster and this page has not got (written on another device, or
+ * before the tab was closed) join the page's own, on their way; the outbox sends them too when the machine is back.
+ */
+export async function adoptParkedMessages(machine: MachineId, conv: ConvId): Promise<void> {
+  const taken = await adoptParked(machine, conv, (send) =>
+    newView(machine, send.clientId, conv, {
+      text: send.text,
+      mode: send.mode,
+      kind: send.kind,
+      ...(send.refs ? { refs: send.refs } : {}),
+    }),
+  );
+  for (const clientId of taken) void submit(clientId);
+}
+
 /** Sends (or sends again) a message the runtime has not shown yet. */
 async function submit(clientId: ClientId): Promise<void> {
   const m = messagesStore.get(clientId);
   if (!m || m.rev > 0 || !m.conversationId || inFlight.has(clientId)) return;
   inFlight.add(clientId);
   try {
+    // to a machine that is off, the cluster keeps the message too (it outlives the tab, shows on another
+    // device, goes by itself when the machine is back); this page goes on sending it as well, under the same opId.
+    void parkInCluster(clientId);
     // what was attached while the machine was off is in the hub; the machine takes it before the message goes.
     // A message without them goes in the same frame, as before.
     const attachments = anyKept(m.attachments)
@@ -257,6 +277,8 @@ export function resendRefused(clientId: ClientId): ClientId | null {
 export function cancelMessage(clientId: ClientId): OpHandle | null {
   const m = messagesStore.get(clientId);
   if (!m || !m.conversationId) return null;
+  // The cluster's copy of a message the machine has not shown goes with it.
+  if (m.rev === 0) void unparkInCluster(m);
   // Nothing of it is on the runtime — it refused it, or no try has been answered and none is on its way — so the
   // page's copy is all there is, and it goes at once, machine or no machine.
   if (m.rev === 0 && (m.state.k === 'failed' || (m.state.k === 'submitting' && !inFlight.has(clientId)))) {

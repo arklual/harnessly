@@ -93,7 +93,7 @@ func TestLifecycleIdleAccounting(t *testing.T) {
 	for _, tt := range []struct {
 		value string
 		want  time.Duration
-	}{{"", 0}, {"0", 0}, {"0s", 0}, {"30m", 30 * time.Minute}, {"-1s", 0}, {"invalid", 0}} {
+	}{{"", DefaultIdle}, {"0", 0}, {"0s", 0}, {"off", 0}, {"30m", 30 * time.Minute}, {"-1s", 0}, {"invalid", DefaultIdle}} {
 		if got := browserIdle(tt.value); got != tt.want {
 			t.Fatalf("idle %q: %v", tt.value, got)
 		}

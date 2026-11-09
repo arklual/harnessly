@@ -30,6 +30,28 @@ const rowsOf = (body: Element, group: string): HTMLElement[] => [
   ...body.querySelectorAll<HTMLElement>(`.ev-row[data-dg="${group}"]`),
 ];
 
+// The rows are drawn loose first and then group by group, while the scripts run in the order of o.ids: a row is found
+// by its entry, never by its place on the screen.
+const rowOf = (rows: HTMLElement[], id: string | undefined) => rows.find((r) => r.dataset.entry === id);
+
+/**
+ * The scripts of a layer in the order they run: by saved position, then name, as the hub sorts them. Reordering starts
+ * from here, so every move goes on from the last one (GitHub issue 40). The hub takes the order of all the layer's
+ * scripts, switched off ones too.
+ */
+export const scriptOrder = (
+  items: { entryId: string; kind: string; name: string; position: number }[],
+): string[] =>
+  items
+    .filter((r) => r.kind === 'script')
+    .sort(
+      (x, y) =>
+        x.position - y.position ||
+        (x.name < y.name ? -1 : x.name > y.name ? 1 : 0) ||
+        (x.entryId < y.entryId ? -1 : x.entryId > y.entryId ? 1 : 0),
+    )
+    .map((r) => r.entryId);
+
 export interface DragLock {
   busy: boolean;
 }
@@ -117,7 +139,13 @@ export const startDrag = (ev: ReactPointerEvent<HTMLElement>, id: string, o: Dra
     }
     const slot = to > from ? target.bottom - h : target.top;
     const off = me.top + dy - slot;
-    const ok = await o.commit(moved(o.ids, id, to));
+    const at = o.ids.indexOf(rows[to]?.dataset.entry ?? '');
+    if (at === -1) {
+      lock.busy = false;
+      putBack();
+      return;
+    }
+    const ok = await o.commit(moved(o.ids, id, at));
     if (!ok) {
       lock.busy = false;
       putBack();
@@ -130,7 +158,7 @@ export const startDrag = (ev: ReactPointerEvent<HTMLElement>, id: string, o: Dra
       r.style.transform = '';
       r.removeAttribute('data-lift');
     }
-    const t = now[to];
+    const t = rowOf(now, id);
     lock.busy = false;
     if (!t) return;
     t.setAttribute('data-lift', '');
@@ -178,5 +206,5 @@ export const keyMove = async (
   lock.busy = false;
   if (!ok || !body) return;
   await afterPaint();
-  rowsOf(body, o.group)[j]?.querySelector<HTMLElement>('.ev-grip')?.focus();
+  rowOf(rowsOf(body, o.group), id)?.querySelector<HTMLElement>('.ev-grip')?.focus();
 };

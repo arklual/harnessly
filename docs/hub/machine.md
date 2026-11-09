@@ -407,6 +407,13 @@ variables.
   command, shown on a page of its own at `<base>/console/<id>` (the output as text with its links clickable, a field to
   type into, a few keys). The chat page has no tab for a shell that belongs to no chat, so this page is the console. The
   agent polls the status until the agent is signed in. It needs `terminal = true`.
+  A CLI that waits for the provider's redirect on a loopback port (`http://127.0.0.1:<port>/callback?code=…`) can't get it:
+  the browser that ends on that address runs on the person's computer. When a process of the console listens on a
+  loopback port, the page shows a field for the address the browser ended on (the "this site can't be reached" page),
+  and the runtime makes that one GET to the listener on this machine. Only loopback hosts (`localhost`, `127.0.0.1`,
+  `::1`) and only a port a process of that console listens on; once per console; the console belongs to the first
+  signed-in person who opened it, anyone else is refused (403); the address is never logged and the listener's answer
+  isn't sent back, only its status.
 - **API key.** Sealed in the browser to the machine's X25519 key, opened here, checked with the provider (a models-list
   request), stored in `claude.env` or `codex.env`. A key already exported on the machine is checked in place.
 - **Proxy.** `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` in an env file, for all agents or for one. A `socks5://` proxy gets

@@ -1387,7 +1387,7 @@ func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) 
 		model = &wire.Model{ID: models[0]}
 	}
 	capabilities, known := r.d.Profiles.Model(profile, model.ID)
-	if !slices.Contains(models, model.ID) || !known || model.Ultracode || model.Fast ||
+	if !slices.Contains(models, model.ID) || !known || model.Ultracode || model.Fast && !capabilities.Fast ||
 		(model.Effort != nil && !slices.Contains(capabilities.Efforts, *model.Effort)) {
 		return nil, wire.RefuseOptionUnknown
 	}

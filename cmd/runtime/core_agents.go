@@ -55,6 +55,8 @@ type coreAgents struct {
 	// alwaysApps are the installed apps on in every new chat (apps.go); a tab started here gets them as a chat started
 	// from the page does. nil: none.
 	alwaysApps func() []string
+	// claudeAuth is how Claude Code signs in now (usagefeed.Identity's AuthMode: subscription, api_key or ""); nil: unknown.
+	claudeAuth func() string
 	// envDir holds the env files a machine agent keeps (keys, secrets, proxy): the CLIs' launch lines source them first
 	// (agents.EnvSourcePrefix); "" or no files, nothing is added.
 	envDir string
@@ -111,7 +113,11 @@ func skipPermissions(configFile string) func() bool {
 func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	profiles := &providers.Store{Dir: filepath.Join(c.DataDir, "providers"), Logins: profileLogins(c.Home)}
 	loadExtraProfiles(profiles)
+	options := catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey}
 	gpt := gptProxy(c, profiles)
+	if gpt != nil {
+		gpt.FastTier = codexFastTier(options)
+	}
 	profiles.Switches = map[string]providers.Switch{}
 	if gpt != nil {
 		profiles.Switches["gpt"] = gpt
@@ -147,7 +153,8 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 		router:     router,
 		checker:    preflight.New(c.Home),
 		envDir:     c.EnvDir,
-		options:    catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
+		claudeAuth: claudeAuthOf(c.Home, c.EnvDir),
+		options:    options,
 		claude: claude.LaunchConfig{
 			HooksPath:     filepath.Join(c.DataDir, "hooks.json"),
 			MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),

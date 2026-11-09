@@ -22,7 +22,8 @@ type Launch struct {
 	Effort *string `json:"effort"`
 	// Ultracode starts Claude Code in its ultracode mode, beside the effort (the `ultracode` settings key).
 	Ultracode bool `json:"ultracode,omitempty"`
-	// Fast starts the CLI in its fast mode: Claude Code's `fastMode` setting, Codex's `service_tier = "fast"`.
+	// Fast starts the CLI in its fast mode: Claude Code's `fastMode` setting, Codex's `service_tier = "fast"`; on a
+	// profile, the vendor's fast tier, asked for by the profile's proxy on each request (the gpt profile's relay).
 	Fast bool `json:"fast,omitempty"`
 	// Permission is how the agent asks before it acts (wire.PermissionMode); "" leaves it to the machine's default
 	// (the runtime's dangerouslySkipPermissions, then the CLI's own settings).
@@ -197,9 +198,10 @@ func CheckLaunch(l *Launch) error {
 		return ErrLaunchMode
 	}
 	if l.Profile != "" {
-		// A profile needs a model and takes no ultracode nor fast mode (both are Anthropic's). Its launcher checks the
-		// effort against this model's own list.
-		if !ProfileIDRe.MatchString(l.Profile) || l.Model == nil || *l.Model == "" || l.Ultracode || l.Fast {
+		// A profile needs a model and takes no ultracode (Anthropic's). Its launcher checks the effort against this
+		// model's own list. Fast mode on a profile is the vendor's fast tier, which the profile's proxy asks for:
+		// nothing on the launch line turns it.
+		if !ProfileIDRe.MatchString(l.Profile) || l.Model == nil || *l.Model == "" || l.Ultracode {
 			return ErrLaunchProfile
 		}
 	}

@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { orgErrorText } from '../../../org/api/errors';
 import type { AuditEntry, TeamsView } from '../../../org/api/teams';
-import type { TenantMember, TenantRole } from '../../../org/api/tenant';
+import type { TenantDeletePlan, TenantMember, TenantRole } from '../../../org/api/tenant';
 import { useOrg } from '../../../org/context';
-import { ago, describe, kRub, needsText } from '../../../org/screens/teams/format';
+import { ago, BLOCKER, describe, kRub, needsText, REMOVES } from '../../../org/screens/teams/format';
 import type { TenantRef } from '../../../org/types';
 import { Btn, Drawer, Icon, initial } from '../../ui';
+import { ConfirmDialog } from './confirm';
 import { sliderOf, stopsOf, TENANT_STEPS } from './model';
 import { tenantLimit } from './ops';
 import { Seg } from './sheet';
@@ -334,6 +335,94 @@ const Journal = ({ slug }: { slug: string }) => {
   );
 };
 
+/** Deleting an empty tenant: the hub's dry run first (what is in the way, what goes with it), the deletion after it. */
+export const useTenantDelete = (tenant: TenantRef, onDone: () => void) => {
+  const { api, shell, refreshShell } = useOrg();
+  const [plan, setPlan] = useState<TenantDeletePlan | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const check = async () => {
+    if (checking) return;
+    setChecking(true);
+    setError(null);
+    try {
+      setPlan(await api.planDeleteTenant(shell.org.slug, tenant.id));
+    } catch (e) {
+      setError(orgErrorText(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+  const remove = async () => {
+    // The hub's plan allows it, or nothing is sent.
+    if (!plan?.canDelete || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.deleteTenant(shell.org.slug, tenant.id);
+      setAsking(false);
+      refreshShell();
+      onDone();
+    } catch (e) {
+      setError(orgErrorText(e));
+    } finally {
+      setDeleting(false);
+    }
+  };
+  return { plan, checking, deleting, asking, setAsking, error, check, remove };
+};
+
+export const Delete = ({ del }: { del: ReturnType<typeof useTenantDelete> }) => {
+  const { plan, checking, error } = del;
+  return (
+    <div className="md-sec md-remove">
+      <div className="md-sec__t">Удаление тенанта</div>
+      <p className="md-note">Удалить можно только пустой тенант: без машин, людей, команд и сайтов.</p>
+      {plan && plan.blockers.length > 0 && (
+        <ul className="md-note">
+          {plan.blockers.map((b) => (
+            <li key={b.kind}>
+              Мешает: {b.count} {BLOCKER[b.kind] ?? b.kind}
+            </li>
+          ))}
+        </ul>
+      )}
+      {plan?.canDelete && plan.removes.length > 0 && (
+        <ul className="md-note">
+          {plan.removes.map((r) => (
+            <li key={r.kind}>
+              Уйдёт вместе с ним: {r.count} {REMOVES[r.kind] ?? r.kind}
+            </li>
+          ))}
+        </ul>
+      )}
+      {plan?.canDelete && <p className="md-note">Тенант пуст. Удаление нельзя отменить.</p>}
+      {error && !del.asking && (
+        <p className="md-note tm-err" role="alert">
+          {error}
+        </p>
+      )}
+      {plan?.canDelete ? (
+        <Btn
+          variant="outline"
+          size="sm"
+          icon="trash-2"
+          className="md-danger"
+          onClick={() => del.setAsking(true)}
+        >
+          Удалить тенант…
+        </Btn>
+      ) : (
+        <Btn variant="outline" size="sm" busy={checking} onClick={() => void del.check()}>
+          Проверить, можно ли удалить
+        </Btn>
+      )}
+    </div>
+  );
+};
+
 export const TenantSheet = ({
   open,
   tenant,
@@ -348,22 +437,39 @@ export const TenantSheet = ({
   apply: (op: Op) => Promise<boolean>;
   problem: string | null;
   onClose: () => void;
-}) => (
-  <Drawer
-    open={open}
-    onClose={onClose}
-    className="md"
-    label="Тенант"
-    title="Тенант"
-    sub={`${tenant.name} · лимит ${view.scope.limitRub === null ? 'не задан' : kRub(view.scope.limitRub)}`}
-  >
-    {open && (
-      <>
-        <Name tenant={tenant} />
-        <Limit view={view} apply={apply} problem={problem} />
-        <People tenant={tenant} />
-        <Journal slug={tenant.slug} />
-      </>
-    )}
-  </Drawer>
-);
+}) => {
+  const del = useTenantDelete(tenant, onClose);
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      className="md"
+      label="Тенант"
+      title="Тенант"
+      sub={`${tenant.name} · лимит ${view.scope.limitRub === null ? 'не задан' : kRub(view.scope.limitRub)}`}
+      over={
+        <ConfirmDialog
+          open={del.asking}
+          label="Удалить тенант"
+          title={`Удалить тенант ${tenant.name}?`}
+          lead="Тенант пуст. Удаление нельзя отменить."
+          yes="Удалить тенант"
+          busy={del.deleting}
+          error={del.error}
+          onNo={() => del.setAsking(false)}
+          onYes={() => void del.remove()}
+        />
+      }
+    >
+      {open && (
+        <>
+          <Name tenant={tenant} />
+          <Limit view={view} apply={apply} problem={problem} />
+          <People tenant={tenant} />
+          <Journal slug={tenant.slug} />
+          <Delete del={del} />
+        </>
+      )}
+    </Drawer>
+  );
+};

@@ -363,7 +363,20 @@ The runtime service must use `KillMode=process` to preserve the host on restart.
 | `RUNTIME_BROWSER_CHROME_URL` | full archive URL for an internal mirror; the pinned SHA-256 is still mandatory |
 | `RUNTIME_BROWSER_MODE` | `auto` (default), `xvfb`, or `headless`; auto uses a private Xvfb when available, otherwise `--headless=new` |
 | `RUNTIME_BROWSER_CHROME_ARGS` | extra whitespace-separated Chrome arguments, also used by the VNC browser; managed agent profiles follow the Settings → Browser sandbox preference, and `--no-sandbox` here turns their sandbox off as well (the container image sets it) |
-| `RUNTIME_BROWSER_IDLE` | opt-in idle shutdown as a Go duration, e.g. `30m`; unset or `0` disables it. A profile with no viewers or calls stops and restores tabs on next use. Sites that keep you signed in only until the browser closes will ask you to sign in again. Idle shutdown is disabled by default |
+| `RUNTIME_BROWSER_IDLE` | idle shutdown as a Go duration; default `3m`, `0` or `off` keeps browsers running. A profile with no viewers or calls stops and restores its tabs on next use; the host keeps the session cookies across the stop, so sites stay signed in. A host left without a runtime (an update, a crash) closes itself after the same time |
+| `RUNTIME_BROWSER_MAX_HOSTS` | managed agent browsers running at once, default `3`; one more closes the longest idle and is refused while all are busy; `0` is no bound |
+| `RUNTIME_BROWSER_MAX_TABS` | tabs of one agent browser, default `8`; also its `--renderer-process-limit`; `0` is no bound |
+| `RUNTIME_BROWSER_NICE` | priority of the agent browser's Chrome and Xvfb (`nice`), default `10` |
+| `RUNTIME_BROWSER_DOWNLOAD_LIMIT` | largest download in bytes, default 100 MiB; files land in the profile's `downloads/` (never `~/Downloads`), which holds up to five times the limit; `0` or `off` refuses downloads |
+
+The agent browser goes out only through its host's egress proxy (`--proxy-server`, the one the pane's live browser
+uses): it opens public addresses and the hosts of `RUNTIME_PREVIEW_PRIVATE_HOSTS`, and on `localhost` only this
+machine's dev servers (this user's listeners, not the runtime's, the machine agent's or `RUNTIME_RESERVED_PORTS`).
+Private networks, link-local addresses and the machine's own addresses (`RUNTIME_PREVIEW_SELF_IPS`) are refused,
+for every request of a page; a name is checked by the address it resolves to, and the proxy connects to that address.
+A page opens only at `http(s)` or `about:blank`: `file:`, `chrome:`, `javascript:` and `data:` are refused for every
+client of the host. After an update the runtime replaces hosts of the previous build (`Host.hello`); with
+`RUNTIME_BROWSER=off` it closes the hosts already running.
 
 Profiles and machine-local project/chat permissions are stored atomically in
 `<data>/agent-browser/profiles.json` with mode `0600`. Each project gets its own managed profile on first use.

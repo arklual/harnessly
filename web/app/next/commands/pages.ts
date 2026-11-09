@@ -2,7 +2,7 @@
 // full output. Each merges into the stores by id, so what is on screen keeps its place.
 
 import { gatewayPath } from '@/next/core/net/machine';
-import { isMachineOff, loadCentralChat } from '@/next/stores/central';
+import { isMachineOff, keepsHistory, loadCentralChat } from '@/next/stores/central';
 import { getPage, sendBody, sendPage, type PageOutcome } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { batch } from '@/next/core/store';
@@ -39,13 +39,18 @@ export async function loadOlderTurns(
   before: TurnId,
   limit = 20,
 ): Promise<PageOutcome<true>> {
-  // A machine that is off: the older turns come from the cluster's copy.
-  if (isMachineOff(m)) {
+  // the older turns come from the cluster's copy whenever it keeps the machine's chats, on or off; the
+  // machine is asked only for a chat the copy does not have yet, and only when it is there to answer.
+  if (keepsHistory(m)) {
     const central = await loadCentralChat(conv, before, limit);
-    if (!('ok' in central)) return central;
-    const { turns, entries, beforeTurnId } = central.value;
-    batch(() => applyOlderTurns(conv, turns, entries, beforeTurnId));
-    return { ok: true, value: true };
+    // A page past what the copy keeps of a chat it does not hold whole yet: the rest is the machine's, when it is there.
+    const pastCopy = 'ok' in central && central.value.turns.length === 0 && central.value.complete === false;
+    if ('ok' in central && !(pastCopy && !isMachineOff(m))) {
+      const { turns, entries, beforeTurnId } = central.value;
+      batch(() => applyOlderTurns(conv, turns, entries, beforeTurnId));
+      return { ok: true, value: true };
+    }
+    if (!('ok' in central) && isMachineOff(m)) return central;
   }
   const url = machineApi(m).http(`/conversations/${enc(conv)}/turns?before=${enc(before)}&limit=${limit}`);
   const res = await getPage(url, parsePage.turns, limitsOf(m).cmdTimeoutMs);
@@ -55,9 +60,21 @@ export async function loadOlderTurns(
 }
 
 export async function loadEntries(m: MachineId, conv: ConvId, turn: TurnId): Promise<PageOutcome<true>> {
-  const url = isMachineOff(m)
-    ? gatewayPath(`/history/conversations/${enc(conv)}/turns/${enc(turn)}/entries`)
-    : machineApi(m).http(`/conversations/${enc(conv)}/turns/${enc(turn)}/entries`);
+  // a turn's steps from the cluster's copy first; a turn the copy has no steps of yet (the one under way) is
+  // the machine's to tell, when it is there.
+  if (keepsHistory(m)) {
+    const central = await getPage(
+      gatewayPath(`/history/conversations/${enc(conv)}/turns/${enc(turn)}/entries`),
+      parsePage.entries,
+      limitsOf(m).cmdTimeoutMs,
+    );
+    if ('ok' in central && (central.value.entries.length > 0 || isMachineOff(m))) {
+      batch(() => applyTurnEntries(conv, central.value.turnId, central.value.entries));
+      return { ok: true, value: true };
+    }
+    if (!('ok' in central) && isMachineOff(m)) return central;
+  }
+  const url = machineApi(m).http(`/conversations/${enc(conv)}/turns/${enc(turn)}/entries`);
   const res = await getPage(url, parsePage.entries, limitsOf(m).cmdTimeoutMs);
   if (!('ok' in res)) return res;
   batch(() => applyTurnEntries(conv, res.value.turnId, res.value.entries));
@@ -70,11 +87,25 @@ export async function loadOutput(
   conv: ConvId,
   entry: EntryId,
 ): Promise<PageOutcome<OutputPage>> {
+  const put = (page: OutputPage) =>
+    entryStore.patch(key(conv, entry), (e) => (e && e.t === 'tool' ? { ...e, output: page.output } : e));
+  // the cluster's copy keeps a tool's whole output (the agent sends it apart from the stream). The machine is
+  // asked only for what the copy does not have whole yet (a tool that has just ended), and only when it is there.
+  if (keepsHistory(m)) {
+    const central = await getPage(
+      gatewayPath(`/history/conversations/${enc(conv)}/entries/${enc(entry)}/output`),
+      parsePage.output,
+      limitsOf(m).cmdTimeoutMs,
+    );
+    if ('ok' in central && (central.value.output.truncated === null || isMachineOff(m))) {
+      put(central.value);
+      return central;
+    }
+    if (!('ok' in central) && isMachineOff(m)) return central;
+  }
   const url = machineApi(m).http(`/conversations/${enc(conv)}/entries/${enc(entry)}/output`);
   const res = await getPage(url, parsePage.output, limitsOf(m).cmdTimeoutMs);
-  if ('ok' in res) {
-    entryStore.patch(key(conv, entry), (e) => (e && e.t === 'tool' ? { ...e, output: res.value.output } : e));
-  }
+  if ('ok' in res) put(res.value);
   return res;
 }
 
@@ -90,13 +121,26 @@ export const loadRewindPlan = (
     limitsOf(m).cmdTimeoutMs,
   );
 
-/** The turns the conversation's rewind n (of its rewinds, oldest first) left behind, by their faces; not in the stores. */
-export const loadRewound = (m: MachineId, conv: ConvId, n: number): Promise<PageOutcome<TurnsPage>> =>
-  getPage(
+/**
+ * The turns the conversation's rewind n (of its rewinds, oldest first) left behind, by their faces; not in the stores.
+ * the cluster's copy keeps them (marked by the rewind's live feed_reset); the machine is asked only when the
+ * copy has not got them and the machine is there.
+ */
+export async function loadRewound(m: MachineId, conv: ConvId, n: number): Promise<PageOutcome<TurnsPage>> {
+  if (keepsHistory(m)) {
+    const central = await getPage(
+      gatewayPath(`/history/conversations/${enc(conv)}/rewinds/${n}/turns`),
+      parsePage.turns,
+      limitsOf(m).cmdTimeoutMs,
+    );
+    if (('ok' in central && central.value.turns.length > 0) || isMachineOff(m)) return central;
+  }
+  return getPage(
     machineApi(m).http(`/conversations/${enc(conv)}/rewinds/${n}/turns`),
     parsePage.turns,
     limitsOf(m).cmdTimeoutMs,
   );
+}
 
 /** The folders the machine offers for a new project. */
 export const loadDirs = (m: MachineId): Promise<PageOutcome<Dir[]>> =>
@@ -145,17 +189,30 @@ export const loadContext = (m: MachineId, conv: ConvId): Promise<PageOutcome<Con
     limitsOf(m).cmdTimeoutMs,
   );
 
-/** The messages of the machine's conversations that hold the words of the query. */
-export const searchMessages = (
+/**
+ * The messages of the machine's conversations that hold the words of the query. HRN-879: from the cluster's copy, so
+ * the search works with the machine off; the machine's own index answers when the copy finds nothing or fails.
+ */
+export async function searchMessages(
   m: MachineId,
   query: string,
   limit = 40,
-): Promise<PageOutcome<MessageSearch>> =>
-  getPage(
+): Promise<PageOutcome<MessageSearch>> {
+  if (keepsHistory(m)) {
+    const central = await getPage(
+      gatewayPath(`/history/search?q=${enc(query)}&limit=${limit}&machine=${enc(m)}`),
+      parsePage.search,
+      limitsOf(m).cmdTimeoutMs,
+    );
+    // Nothing found while the copy is still taking older chats: the machine's own index has them all.
+    if (('ok' in central && central.value.hits.length > 0) || isMachineOff(m)) return central;
+  }
+  return getPage(
     machineApi(m).http(`/search?q=${enc(query)}&limit=${limit}`),
     parsePage.search,
     limitsOf(m).cmdTimeoutMs,
   );
+}
 
 /** A chat cut to the size of a context block for another agent, and the whole of it written to a file on the machine. */
 export const loadChatDigest = (m: MachineId, conv: ConvId): Promise<PageOutcome<ChatDigest>> =>

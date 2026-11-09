@@ -65,9 +65,15 @@ Gives the app one of the person's connections (a tracker, a wiki, a code host), 
 
 Why the app is on or off here, layer by layer: machine, team, setup, activation, this chat, the wall; ✗ marks the layer that keeps it off.
 `,
-	"logs": `harnessly app logs ID [--limit N]
+	"logs": `harnessly app logs ID [--follow] [--since 10m] [--limit N] [--json]
 
-What the app's views reported: console errors, exceptions, failed bridge calls (the last N, 50 by default).
+The app's log: what its views reported (console errors, exceptions, failed bridge calls) and what the host refused (files, backend
+calls, a load that did not finish). --since takes a span, a time or milliseconds; --follow keeps printing (--for 30s stops it).
+`,
+	"check": `harnessly app check ID --open [--view V]
+
+Opens the view in a headless browser of this machine, waits for its handshake and says how it loaded, with every error; exit 1 when it
+did not load cleanly. Without --open, check is validate.
 `,
 	"publish": `harnessly app publish [DIR] --channel dev|beta|stable [--team]
 
@@ -121,11 +127,11 @@ Serves an MCP server from a fixture file, the way an eval mocks the app's own se
 }
 
 // appSubNames lists every subcommand of `harnessly app`, for the usage line of a mistyped one.
-const appSubNames = "docs, catalog, sdk, new, validate (check), install, dev, list, remove, enable, disable, connect, explain, " +
+const appSubNames = "docs, catalog, sdk, new, validate (check), install, dev, list, remove, enable, disable, connect, explain, logs, check (--open), " +
 	"publish, promote, rollback, channels, update, share, shares, unshare, team, public, eval or mock-mcp"
 
 // appHelpAliases are the names that print another subcommand's help.
-var appHelpAliases = map[string]string{"check": "validate", "ls": "list", "rm": "remove", "uninstall": "remove", "on": "enable",
+var appHelpAliases = map[string]string{"ls": "list", "rm": "remove", "uninstall": "remove", "on": "enable",
 	"off": "disable", "why": "explain"}
 
 func init() {

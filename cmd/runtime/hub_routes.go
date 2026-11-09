@@ -16,6 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/proc"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
@@ -75,6 +76,10 @@ type hubConsole struct {
 	// busy is how many chats have an agent at work; exit ends the process (a test replaces it).
 	busy func() int
 	exit func(code int)
+	// claims are the page session's claims (its person is "sub"); ports are the ports a console's processes listen on.
+	claims func(*http.Request) map[string]any
+	ports  func(name string) []int
+	holds  consoleHolds
 }
 
 // hubRoutes are the routes of a runtime carried by a hub; none for any other.
@@ -83,7 +88,8 @@ func hubRoutes(d deps) []gate.Route {
 		return nil
 	}
 	c := &hubConsole{tm: d.Tmux, cwd: os.Getenv("RUNTIME_WORKSPACE_DIR"), base: appBase(), agent: d.MachineAgent, session: d.SessionOK,
-		guard: chatGuard, ready: shellReady, now: time.Now, busy: d.Busy, exit: os.Exit}
+		guard: chatGuard, ready: shellReady, now: time.Now, busy: d.Busy, exit: os.Exit, claims: d.Claims}
+	c.ports = func(name string) []int { return proc.TreeListeningPorts(c.tm.PanePID(name)) }
 	return []gate.Route{{Match: c.matches, Handler: http.HandlerFunc(c.serve)}}
 }
 
@@ -298,9 +304,10 @@ func (c *hubConsole) sweep() {
 			c.tm.KillSession(name)
 		}
 	}
+	c.holds.drop(func(id string) bool { return c.tm.HasSession(c.sessionName(id)) })
 }
 
-// api is `/api/console/<id>/screen` (GET) and `/api/console/<id>/keys` (POST).
+// api is `/api/console/<id>/screen` (GET), `/api/console/<id>/keys` (POST) and `/api/console/<id>/callback` (POST).
 func (c *hubConsole) api(w http.ResponseWriter, r *http.Request, tail string) {
 	if !c.session(r) {
 		errReply(w, http.StatusUnauthorized, "Unauthorized")
@@ -312,6 +319,10 @@ func (c *hubConsole) api(w http.ResponseWriter, r *http.Request, tail string) {
 		return
 	}
 	name := c.sessionName(id)
+	if !c.claim(id, r) {
+		errReply(w, http.StatusForbidden, "This terminal belongs to another person.")
+		return
+	}
 	switch {
 	case what == "screen" && r.Method == http.MethodGet:
 		if !c.tm.HasSession(name) {
@@ -323,9 +334,12 @@ func (c *hubConsole) api(w http.ResponseWriter, r *http.Request, tail string) {
 			jsonReply(w, http.StatusOK, map[string]any{"alive": false, "screen": ""})
 			return
 		}
-		jsonReply(w, http.StatusOK, map[string]any{"alive": true, "screen": strings.TrimRight(tmux.StripControlChars(out), " \n\t")})
+		jsonReply(w, http.StatusOK, map[string]any{"alive": true, "screen": strings.TrimRight(tmux.StripControlChars(out), " \n\t"),
+			"callback": c.callbackState(id, name)})
 	case what == "keys" && r.Method == http.MethodPost:
 		c.keys(w, r, name)
+	case what == "callback" && r.Method == http.MethodPost:
+		c.callback(w, r, id, name)
 	default:
 		errReply(w, http.StatusNotFound, "Not found")
 	}
@@ -403,6 +417,12 @@ func consoleTexts() map[string]string {
 		"send":    locale.Pick("Send", "Отправить"),
 		"ended":   locale.Pick("The terminal has ended.", "Сеанс завершён."),
 		"offline": locale.Pick("No connection to the machine…", "Нет связи с машиной…"),
+		"cbHint": locale.Pick("The sign-in waits for the browser on this machine. After you sign in, the browser opens an address that starts with http://localhost and does not load: copy it from the address bar and paste it here.",
+			"Вход ждёт браузер на этой машине. После входа браузер откроет адрес, начинающийся с http://localhost, и он не загрузится: скопируйте его из адресной строки и вставьте сюда."),
+		"cbInput":  locale.Pick("http://localhost:…", "http://localhost:…"),
+		"cbSend":   locale.Pick("Finish sign-in", "Завершить вход"),
+		"cbDone":   locale.Pick("Delivered to the sign-in on the machine. Follow the terminal above.", "Передано входу на машине. Дальше смотрите терминал выше."),
+		"cbFailed": locale.Pick("Not delivered: ", "Не передано: "),
 	}
 }
 
@@ -437,6 +457,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .keys{display:flex;flex-wrap:wrap;gap:6px}
 .keys button{padding:5px 10px;font-size:13px}
 #state{color:var(--mute);font-size:13px;min-height:1.2em}
+#cb{display:none;gap:6px}
+#cb p{margin:0;color:var(--mute);font-size:13px}
 </style>
 </head>
 <body>
@@ -444,6 +466,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 <pre id="screen" aria-live="polite"></pre>
 <footer>
 <form id="form" autocomplete="off"><input id="text" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="` + html.EscapeString(t["input"]) + `" aria-label="` + html.EscapeString(t["input"]) + `"><button class="primary" type="submit">` + html.EscapeString(t["send"]) + `</button></form>
+<div id="cb"><p>` + html.EscapeString(t["cbHint"]) + `</p><form id="cbform" autocomplete="off"><input id="cburl" type="url" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="` + html.EscapeString(t["cbInput"]) + `" aria-label="` + html.EscapeString(t["cbInput"]) + `"><button type="submit">` + html.EscapeString(t["cbSend"]) + `</button></form><p id="cbstate"></p></div>
 <div class="keys" id="keys"></div>
 <div id="state"></div>
 </footer>
@@ -478,10 +501,27 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
       return r.json();
     }).then(function (d) {
       show(d.screen || '');
+      callback(d.callback);
       ended = !d.alive;
       state.textContent = ended ? T.ended : '';
     }).catch(function () { state.textContent = T.offline; });
   }
+  var cb = document.getElementById('cb'), cbstate = document.getElementById('cbstate'), cburl = document.getElementById('cburl'), sent = false;
+  function callback(c) {
+    var open = !!c && !c.used && c.ports && c.ports.length > 0;
+    cb.style.display = open || sent ? 'grid' : 'none';
+  }
+  document.getElementById('cbform').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = cburl.value.trim();
+    if (!u || ended) return;
+    fetch(api + '/callback', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        if (x.ok) { sent = true; cburl.value = ''; cbstate.textContent = T.cbDone; setTimeout(poll, 300); }
+        else cbstate.textContent = T.cbFailed + ((x.d && x.d.error) || '');
+      }).catch(function () { cbstate.textContent = T.offline; });
+  });
   function send(body) {
     if (ended) return;
     fetch(api + '/keys', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

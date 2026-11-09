@@ -46,10 +46,11 @@ func (s Store) CountLimitRulesOfTenant(ctx context.Context, spaceID string) (int
 	return n, err
 }
 
-// CountActiveInvitesOfSpace counts the invites of a space that are neither revoked nor expired at nowMs.
+// CountActiveInvitesOfSpace counts the invites of a space that still let someone in at nowMs: the ones ActiveInvites
+// lists, which the invitations screen shows and can revoke. A used-up invite opens nothing and keeps no tenant.
 func (s Store) CountActiveInvitesOfSpace(ctx context.Context, spaceID string, nowMs int64) (int, error) {
 	var n int
-	err := s.q.QueryRow(ctx, `SELECT COUNT(*) FROM invites WHERE space_id = ? AND revoked_at IS NULL AND expires_at > ?`, spaceID, nowMs).Scan(&n)
+	err := s.q.QueryRow(ctx, `SELECT COUNT(*) FROM invites WHERE space_id = ? AND `+activeInvite, spaceID, nowMs).Scan(&n)
 	return n, err
 }
 

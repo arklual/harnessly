@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/browseract"
 	"github.com/ly-solutions/harnessly/internal/fileplace"
@@ -325,8 +326,9 @@ func (c *core) v2Models(p wire.Provider) []wire.AgentModel {
 		}
 		// Claude's catalog lists ultracode among the levels --effort takes; on the wire it is a mode of its own.
 		am.Ultracode = p == wire.ProviderClaude && slices.Contains(m.Efforts, string(wire.EffortUltracode))
-		// Claude Code's /fast runs on Opus only; Codex says which of its models have the fast tier.
-		am.Fast = m.Fast || p == wire.ProviderClaude && strings.Contains(m.ID, "opus")
+		// Claude Code's /fast runs on Opus only, and only on an API key: a claude.ai subscription has none.
+		// Codex says which of its models have the fast tier.
+		am.Fast = m.Fast || p == wire.ProviderClaude && strings.Contains(m.ID, "opus") && c.agents.claudeOnKey()
 		if def := v2DefaultEffort(p, m, opts); def != nil && slices.Contains(am.Efforts, *def) {
 			am.DefaultEffort = def
 		}
@@ -720,7 +722,8 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 			chosen.Ultracode = true
 		}
 	}
-	// The fast and permission modes the chat starts in; fast is Anthropic's and Codex's own, never a profile's.
+	// The fast and permission modes the chat starts in; fast is Anthropic's and Codex's own, and on a profile
+	// the vendor's fast tier, which the profile's proxy asks for (the gpt profile's relay reads it off the tab).
 	// A Claude chat that names no permission mode starts in the machine's, said on the line all the same: left to the
 	// CLI, a `defaultMode` of the person's settings decided it (a GPT chat through Claude Code started in plan mode).
 	// Codex's own config.toml stays the default of a Codex chat.
@@ -728,7 +731,7 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 		chosen = &agents.Launch{}
 	}
 	if m := req.Model; m != nil {
-		chosen.Fast = m.Fast && m.Profile == ""
+		chosen.Fast = m.Fast
 		chosen.Permission = m.Permission
 	}
 	if chosen.Permission == "" && req.Provider == wire.ProviderClaude {
@@ -837,13 +840,15 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	// So do its fast and permission modes as the chat last had them: the agent starts in them again. A chat
 	// that never chose one keeps what its tab started with.
 	if m := conv.Model; m != nil && m.Permission != "" {
-		if err := c.store.SetTabLaunchModes(conv.Session, m.Fast && m.Profile == "", string(m.Permission)); err != nil {
+		if err := c.store.SetTabLaunchModes(conv.Session, m.Fast, string(m.Permission)); err != nil {
 			return err
 		}
 	}
 	switch got := c.resumeForQueue(tab); got {
 	case prompts.ResumeResumed, prompts.ResumeRunning:
 		return nil
+	case prompts.ResumeBusyShell:
+		return fmt.Errorf("not resumed: %w", convo.ErrResumeBlocked)
 	default:
 		return errors.New("not resumed: " + got)
 	}
@@ -883,7 +888,7 @@ func profileOffers(store *providers.Store) func(wire.Provider) []wire.ProfileOff
 		for _, pr := range providers.Presets() {
 			if pr.Via == p {
 				out = append(out, wire.ProfileOffer{ID: pr.ID, Label: pr.Label, Vendor: pr.Vendor,
-					Configured: store.Ready(pr.ID), Models: pr.AgentModels()})
+					Configured: store.Ready(pr.ID), Models: store.AgentModels(pr)})
 			}
 		}
 		return out

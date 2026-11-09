@@ -6,6 +6,8 @@ playwright-report
 dist-hub
 app/next/features/app-views/fixtures/ext-apps
 app/next/features/app-views/fixtures/compat
+# Written by the Go test (internal/hub/orgs/me_fixtures_test.go), byte for byte
+app/next/features/manage/fixtures
 
 # The design board's stylesheets, copied as they are: keep them diffable against the design
 app/hub/hx/styles/tokens.css

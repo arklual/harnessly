@@ -1,0 +1,183 @@
+{
+  "currency": {
+    "code": "USD",
+    "perUsd": 1,
+    "rateDate": "2026-10-01",
+    "source": "none"
+  },
+  "effective": [
+    {
+      "account": null,
+      "bindingRuleId": "wrvfukx6dp2z7fdnhwnk",
+      "modelPattern": "",
+      "pct": 0.84,
+      "reason": "Личный лимит — 84% за октябрь",
+      "resetsAt": "2026-10-31T21:00:00Z",
+      "ruleIds": [
+        "wrvfukx6dp2z7fdnhwnk",
+        "xh3berl6n7ykgqd2vdd3",
+        "ustfkdqcspjswaukgwfl"
+      ],
+      "status": "warn"
+    },
+    {
+      "account": null,
+      "bindingRuleId": "4nlddzkyfgr4smhn6itg",
+      "modelPattern": "opus-4-1",
+      "pct": 1,
+      "reason": "Модель opus-4-1 в организации запрещена",
+      "resetsAt": null,
+      "ruleIds": [
+        "4nlddzkyfgr4smhn6itg"
+      ],
+      "status": "stop"
+    },
+    {
+      "account": {
+        "id": "a2claudemax",
+        "label": "Claude Max №2"
+      },
+      "bindingRuleId": "nacksollmzwzsubkmm32",
+      "modelPattern": "",
+      "pct": 1.022,
+      "reason": "Окно Claude Max №2 — 92%, сброс в 20:00",
+      "resetsAt": "2026-10-31T17:00:00Z",
+      "ruleIds": [
+        "nacksollmzwzsubkmm32",
+        "wrvfukx6dp2z7fdnhwnk",
+        "xh3berl6n7ykgqd2vdd3",
+        "ustfkdqcspjswaukgwfl"
+      ],
+      "status": "stop"
+    }
+  ],
+  "machines": [],
+  "mode": "off",
+  "rules": [
+    {
+      "accountId": "a2claudemax",
+      "amount": 90,
+      "estimated": true,
+      "forbid": false,
+      "id": "nacksollmzwzsubkmm32",
+      "modelPattern": null,
+      "pct": 1.022,
+      "period": "five_hour",
+      "resetsAt": "2026-10-31T17:00:00Z",
+      "scope": {
+        "id": "gysn2ejnemt5qchaqgwy",
+        "kind": "org"
+      },
+      "setAt": "2026-10-31T16:00:00Z",
+      "setBy": {
+        "name": "anna@example.com",
+        "userId": "fztke7hl3k7i6w5rgcs2"
+      },
+      "status": "stop",
+      "unit": "window_pct",
+      "used": 92,
+      "userId": null,
+      "warnPct": 0.8
+    },
+    {
+      "accountId": null,
+      "amount": 0,
+      "estimated": false,
+      "forbid": true,
+      "id": "4nlddzkyfgr4smhn6itg",
+      "modelPattern": "opus-4-1",
+      "pct": 1,
+      "period": "month",
+      "resetsAt": null,
+      "scope": {
+        "id": "gysn2ejnemt5qchaqgwy",
+        "kind": "org"
+      },
+      "setAt": "2026-10-31T16:00:00Z",
+      "setBy": {
+        "name": "anna@example.com",
+        "userId": "fztke7hl3k7i6w5rgcs2"
+      },
+      "status": "stop",
+      "unit": "money",
+      "used": 0,
+      "userId": null,
+      "warnPct": 0.8
+    },
+    {
+      "accountId": null,
+      "amount": 100,
+      "estimated": false,
+      "forbid": false,
+      "id": "wrvfukx6dp2z7fdnhwnk",
+      "modelPattern": null,
+      "pct": 0.84,
+      "period": "month",
+      "resetsAt": "2026-10-31T21:00:00Z",
+      "scope": {
+        "id": "r5add2dh6tm3nzhmqzc6",
+        "kind": "team"
+      },
+      "setAt": "2026-10-31T16:00:00Z",
+      "setBy": {
+        "name": "boris@example.com",
+        "userId": "xpjprmtkzawzga3zsnyv"
+      },
+      "status": "warn",
+      "unit": "money",
+      "used": 84,
+      "userId": "2bxk5ms62fs2txhhugvy",
+      "warnPct": 0.8
+    },
+    {
+      "accountId": null,
+      "amount": 150,
+      "estimated": false,
+      "forbid": false,
+      "id": "ustfkdqcspjswaukgwfl",
+      "modelPattern": null,
+      "pct": 0.56,
+      "period": "month",
+      "resetsAt": "2026-10-31T21:00:00Z",
+      "scope": {
+        "id": "ewwyv6sydmmosbhxue42",
+        "kind": "tenant"
+      },
+      "setAt": "2026-10-31T16:00:00Z",
+      "setBy": {
+        "name": "anna@example.com",
+        "userId": "fztke7hl3k7i6w5rgcs2"
+      },
+      "status": "ok",
+      "unit": "money",
+      "used": 84,
+      "userId": "2bxk5ms62fs2txhhugvy",
+      "warnPct": 0.8
+    },
+    {
+      "accountId": null,
+      "amount": 1500,
+      "estimated": false,
+      "forbid": false,
+      "id": "xh3berl6n7ykgqd2vdd3",
+      "modelPattern": null,
+      "pct": 0.793,
+      "period": "month",
+      "resetsAt": "2026-10-31T21:00:00Z",
+      "scope": {
+        "id": "r5add2dh6tm3nzhmqzc6",
+        "kind": "team"
+      },
+      "setAt": "2026-10-31T16:00:00Z",
+      "setBy": {
+        "name": "anna@example.com",
+        "userId": "fztke7hl3k7i6w5rgcs2"
+      },
+      "status": "ok",
+      "unit": "money",
+      "used": 1190,
+      "userId": null,
+      "warnPct": 0.8
+    }
+  ]
+}

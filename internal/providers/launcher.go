@@ -83,12 +83,12 @@ func (l Launcher) Lookup(id string) (via wire.Provider, configured bool, models 
 }
 
 // Model is the wire capability record of one of the profile's models.
-func (Launcher) Model(profile, id string) (wire.AgentModel, bool) {
+func (l Launcher) Model(profile, id string) (wire.AgentModel, bool) {
 	p, ok := Find(profile)
 	if !ok {
 		return wire.AgentModel{}, false
 	}
-	for _, m := range p.AgentModels() {
+	for _, m := range l.Store.AgentModels(p) {
 		if m.ID == id {
 			return m, true
 		}

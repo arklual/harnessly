@@ -490,16 +490,6 @@
       0 0 14px var(--hx-accent-soft);
   }
 }
-.hx-picker__ultra {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  align-items: start;
-  column-gap: 8px;
-  margin-top: 6px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  transition: background var(--hx-dur-md) var(--hx-ease-out);
-}
 /* the machine a new chat starts on, a quiet row under the depth that opens the machines' screen. */
 .hx-picker__vm {
   display: flex;
@@ -532,54 +522,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.hx-picker__ultra:hover {
-  background: var(--hx-bg-hover);
-}
-.hx-picker__ultra[data-on='true'] {
-  background: var(--hx-accent-soft);
-}
-.hx-picker__ultra .hx-switch {
-  grid-column: 3;
-  grid-row: 1;
-  margin-top: -2px;
-}
-.hx-picker__ultra-ic {
-  grid-column: 1;
-  grid-row: 1;
-  /* On the first line: the name's line is 20px tall, the icon 16px. */
-  margin-top: 2px;
-  color: var(--hx-fg-3);
-  transition: color var(--hx-dur-md) var(--hx-ease-out);
-}
-.hx-picker__ultra[data-on='true'] .hx-picker__ultra-ic {
-  color: var(--hx-accent);
-}
-/* The name and the hint sit straight in the row's grid: the hint runs under the name and the switch. */
-.hx-picker__ultra-text {
-  display: contents;
-}
-.hx-picker__ultra-name {
-  grid-column: 2;
-  grid-row: 1;
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
-  line-height: 20px;
-  color: var(--hx-fg-1);
-}
-.hx-picker__ultra-hint {
-  grid-column: 2 / 4;
-  grid-row: 2;
-  overflow: hidden;
-  font-size: 11px;
-  line-height: 14px;
-  color: var(--hx-fg-3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* A turn of the switch the agent has not confirmed: said under the name, in the accent. */
-.hx-picker__ultra[data-pending='true'] .hx-picker__ultra-hint {
-  color: var(--hx-accent);
 }
 /* the fast mode on the pill, a mark before the name like ultracode's, without the glow. */
 .hx-model .hx-model__fast {
@@ -616,10 +558,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   height: 28px;
-  padding: 0 6px;
+  padding: 0 4px;
+  font-size: 12px;
+  white-space: nowrap;
   border: 0;
   background: transparent;
   font: inherit;
@@ -660,67 +604,74 @@
 .hx-perm__hint[data-pending='true'] {
   color: var(--hx-accent);
 }
-/* The fast mode: a row like ultracode's, a switch at its end. */
-.hx-picker__mode {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  align-items: start;
-  column-gap: 8px;
-  margin-top: 6px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  transition: background var(--hx-dur-md) var(--hx-ease-out);
+/* the fast mode and ultracode, one row of chips under the permission mode. A chip is a switch: neutral off,
+   the accent's backing on; an ask the agent has not confirmed yet keeps an accent outline. What it does is its hint. */
+.hx-picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
 }
-.hx-picker__mode:hover {
+.hx-picker__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-md) var(--hx-ease-out),
+    color var(--hx-dur-md) var(--hx-ease-out),
+    border-color var(--hx-dur-md) var(--hx-ease-out),
+    transform 160ms var(--hx-ease-out);
+}
+.hx-picker__chip:hover {
   background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
 }
-.hx-picker__mode[data-on='true'] {
-  background: var(--hx-accent-soft);
+.hx-picker__chip:active:not(:disabled) {
+  transform: scale(0.96);
 }
-.hx-picker__mode .hx-switch {
-  grid-column: 3;
-  grid-row: 1;
-  margin-top: -2px;
+.hx-picker__chip:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
 }
-.hx-picker__mode-ic {
-  grid-column: 1;
-  grid-row: 1;
-  margin-top: 2px;
+.hx-picker__chip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.hx-picker__chip-ic {
+  flex: none;
   color: var(--hx-fg-3);
   transition: color var(--hx-dur-md) var(--hx-ease-out);
 }
-.hx-picker__mode[data-on='true'] .hx-picker__mode-ic {
-  color: var(--hx-accent);
-}
-.hx-picker__mode-text {
-  display: contents;
-}
-.hx-picker__mode-name {
-  grid-column: 2;
-  grid-row: 1;
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
-  line-height: 20px;
+.hx-picker__chip[data-on='true'] {
+  background: var(--hx-accent-soft);
   color: var(--hx-fg-1);
 }
-.hx-picker__mode-hint {
-  grid-column: 2 / 4;
-  grid-row: 2;
-  overflow: hidden;
-  font-size: 11px;
-  line-height: 14px;
-  color: var(--hx-fg-3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-picker__mode[data-pending='true'] .hx-picker__mode-hint {
+.hx-picker__chip[data-on='true'] .hx-picker__chip-ic,
+.hx-picker__chip[aria-checked='true'] .hx-picker__chip-ic {
   color: var(--hx-accent);
+}
+.hx-picker__chip[data-pending='true'] {
+  border-color: var(--hx-accent);
 }
 @media (prefers-reduced-motion: reduce) {
   .hx-model[data-ultracode='true'] {
     animation: none;
   }
   .hx-perm__glider {
+    transition: none;
+  }
+  .hx-picker__chip {
     transition: none;
   }
 }
@@ -734,9 +685,9 @@
   .hx-picker__center {
     min-height: 44px;
   }
-  .hx-picker__ultra,
-  .hx-picker__mode {
-    min-height: 48px;
+  .hx-picker__chip {
+    height: 36px;
+    padding: 0 14px;
   }
   .hx-perm__item {
     height: 40px;
@@ -744,8 +695,6 @@
   .hx-picker__vm {
     min-height: 44px;
   }
-  .hx-picker__ultra-hint,
-  .hx-picker__mode-hint,
   .hx-perm__hint {
     font-size: 13px;
     line-height: 17px;

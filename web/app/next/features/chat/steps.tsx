@@ -28,6 +28,7 @@ import CardOutput, { cardOutputPending } from '@/next/features/app-views/card-ou
 import { setHookOff, useInstalledApps } from '@/next/features/app-views/api';
 import { type IGuardDenial, parseGuardDenial } from '@/next/features/app-views/guard-denial';
 import { parseWidgetRef } from '@/next/features/app-views/widgets';
+import { loadOutput } from '@/next/commands/pages';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { useSeen } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
@@ -117,6 +118,32 @@ const HookOffHere = ({ app }: { app: string }) => {
   return host === null ? null : <HookOff machine={host.machine} app={app} />;
 };
 
+/**
+ * the rest of a cut output. It is read from the cluster's copy (the machine only when the copy has not got it
+ * whole and the machine is there), so it opens with the machine off; the step in the store gets it.
+ */
+const WholeOutput = ({ entry }: { entry: ToolEntry }) => {
+  const host = useContext(ImageHost);
+  const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
+  if (host === null) return null;
+  return (
+    <button
+      type="button"
+      className="hx-tool__act"
+      disabled={state === 'busy'}
+      onClick={() => {
+        setState('busy');
+        loadOutput(host.machine, host.conv, entry.id).then(
+          (res) => setState('ok' in res ? 'idle' : 'failed'),
+          () => setState('failed'),
+        );
+      }}
+    >
+      {t(state === 'failed' ? 'next.tool.showAllFailed' : 'next.tool.showAll')}
+    </button>
+  );
+};
+
 const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
   const [open, setOpen] = useState(false);
   const seen = useSeen(open);
@@ -177,6 +204,7 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
                     })}
                   </div>
                 )}
+                {entry.output?.truncated && !denial && <WholeOutput entry={entry} />}
               </div>
             )}
           </div>

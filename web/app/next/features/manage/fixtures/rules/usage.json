@@ -1,0 +1,62 @@
+{
+  "accountedUntil": null,
+  "byAccount": [
+    {
+      "accountId": "a2key",
+      "funding": "org",
+      "label": "anthropic ключ",
+      "list": {
+        "shown": 84,
+        "usd": 84
+      },
+      "paid": {
+        "shown": 84,
+        "usd": 84
+      }
+    }
+  ],
+  "byDay": [
+    {
+      "day": "2026-10-10",
+      "list": {
+        "shown": 84,
+        "usd": 84
+      },
+      "paid": {
+        "shown": 84,
+        "usd": 84
+      }
+    }
+  ],
+  "byModel": [
+    {
+      "calls": 1,
+      "list": {
+        "shown": 84,
+        "usd": 84
+      },
+      "model": "claude-sonnet-4-6"
+    }
+  ],
+  "currency": {
+    "code": "USD",
+    "perUsd": 1,
+    "rateDate": "2026-10-01",
+    "source": "none"
+  },
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "total": {
+    "list": {
+      "shown": 84,
+      "usd": 84
+    },
+    "paid": {
+      "shown": 84,
+      "usd": 84
+    }
+  }
+}

@@ -132,6 +132,13 @@ const flushOnHidden = () => {
   if (document.visibilityState === 'hidden') flushOnHide();
 };
 
+/**
+ * How long the first screen waits for me before it draws the machines. me is the home machine's answer; a
+ * home machine whose agent keeps its link while its runtime hangs answered it late or never, and a fresh device, with
+ * nothing kept to draw, stayed blank for that long. The list and the chats are the hub's; me comes when it comes.
+ */
+export const ME_FIRST_SCREEN_MS = 3000;
+
 const withinCacheWait = (ready: Promise<void>) =>
   Promise.race([ready, new Promise<void>((r) => pageClock().setTimeout(r, CACHE_WAIT_MS))]);
 
@@ -233,10 +240,23 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     if (gone()) return bootStore.get();
     // The person's machines are asked alongside me: one after the other cost the first screen a round trip.
     const machinesAsked = loadMachines(gone);
-    const me = await loadMe();
+    const meAsked = loadMe();
+    const me = await Promise.race([
+      meAsked,
+      new Promise<MeState>((r) => pageClock().setTimeout(() => r({ k: 'loading' }), ME_FIRST_SCREEN_MS)),
+    ]);
     if (gone()) return bootStore.get();
     if (me.k === 'signed-out') return signOut(me);
     if (me.k === 'ready') await adopt(me, openKV);
+    else if (me.k === 'loading') {
+      // me is late: the machines draw now, and the answer, when it comes, is taken as the first one would have been.
+      void meAsked.then(async (late) => {
+        if (mine !== generation) return;
+        if (late.k === 'ready') await adopt(late, openKV);
+        else if (late.k === 'signed-out') signOut(late);
+        else retryMe(mine, openKV);
+      });
+    }
     // me did not answer as it should (a runtime restarting, a reply that is not a record): the machines still load,
     // and me is asked again until it answers; its person's outbox starts then, without a reload.
     else retryMe(mine, openKV);

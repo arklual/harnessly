@@ -604,7 +604,7 @@ func FastArgs(launch *agents.Launch) []string {
 	switch {
 	case launch == nil:
 		return nil
-	case launch.Fast:
+	case launch.Fast && launch.Profile == "":
 		return []string{"-c", `service_tier="fast"`}
 	case launch.Permission != "":
 		return []string{"-c", `service_tier="default"`}

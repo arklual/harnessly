@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -144,5 +145,82 @@ func TestEnvSeedCommand(t *testing.T) {
 		if code, _, errOut := do("env-seed", "--file", write(name+".yaml", body)); code != 1 {
 			t.Errorf("%s: %d %q", name, code, errOut)
 		}
+	}
+}
+
+// env-seed opens the database the way the serving hub and `hub seed` do (GitHub issue 32): a non-default schema and a
+// transaction pooler with a separate migration URL reach the same tables, the same file twice is one change set, and
+// a dry run reads the intended organization without writing.
+func TestEnvSeedUsesTheHubDatabaseOptions(t *testing.T) {
+	dsn := os.Getenv("HUB_TEST_POSTGRES_URL")
+	if dsn == "" {
+		t.Skip("HUB_TEST_POSTGRES_URL is not set")
+	}
+	admin, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	for name, extra := range map[string]map[string]string{
+		"schema": {},
+		"pooler": {"HUB_DB_POOLER": "transaction", "HUB_DB_MIGRATE_URL": dsn},
+	} {
+		t.Run(name, func(t *testing.T) {
+			schema := "envseed_" + strings.ToLower(store.RandomBase32(6))
+			t.Cleanup(func() { _, _ = admin.Exec(`DROP SCHEMA IF EXISTS ` + schema + ` CASCADE`) })
+			dir := t.TempDir()
+			vars := map[string]string{"HUB_PUBLIC_URL": "http://127.0.0.1:8080", "HUB_DATA_DIR": filepath.Join(dir, "data"),
+				"HUB_DATABASE_URL": dsn, "HUB_DB_SCHEMA": schema}
+			for k, v := range extra {
+				vars[k] = v
+			}
+			e := env(vars)
+			do := func(args ...string) (int, string, string) {
+				var out, errOut bytes.Buffer
+				code := run(context.Background(), args, e, &out, &errOut)
+				return code, out.String(), errOut.String()
+			}
+			write := func(name, body string) string {
+				p := filepath.Join(dir, name)
+				if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				return p
+			}
+			file := write("env.yaml", envSeedFile)
+			// Before the hub made its schema, a dry run refuses and migrates nothing.
+			if code, _, errOut := do("env-seed", "--file", file, "--dry-run"); code == 0 || !strings.Contains(errOut, "migrations behind") {
+				t.Fatalf("dry run on an empty schema: %d %q", code, errOut)
+			}
+			var tables int
+			_ = admin.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = $1`, schema).Scan(&tables)
+			if tables != 0 {
+				t.Fatalf("the dry run made %d tables", tables)
+			}
+			if code, _, errOut := do("seed", "--file", write("org.yaml", envSeedOrg)); code != 0 {
+				t.Fatalf("seed: %d %s", code, errOut)
+			}
+			items := func() int {
+				var n int
+				if err := admin.QueryRow(`SELECT COUNT(*) FROM ` + schema + `.catalog_items`).Scan(&n); err != nil {
+					t.Fatal(err)
+				}
+				return n
+			}
+			if code, out, errOut := do("env-seed", "--file", file, "--dry-run"); code != 0 || !strings.Contains(out, "+ script «Установка»") || items() != 0 {
+				t.Fatalf("dry run: %d %q %q (items %d)", code, out, errOut, items())
+			}
+			if code, out, errOut := do("env-seed", "--file", file); code != 0 || !strings.Contains(out, "changes written") || items() != 4 {
+				t.Fatalf("apply: %d %q %q (items %d)", code, out, errOut, items())
+			}
+			if code, out, errOut := do("env-seed", "--file", file); code != 0 || strings.TrimSpace(out) != "изменений нет" || items() != 4 {
+				t.Fatalf("apply again: %d %q %q", code, out, errOut)
+			}
+			var public int
+			_ = admin.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'catalog_items'`).Scan(&public)
+			if public != 0 {
+				t.Fatalf("env-seed wrote outside the hub's schema")
+			}
+		})
 	}
 }

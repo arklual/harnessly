@@ -48,6 +48,7 @@
             "teams": []
           },
           "pinned": true,
+          "position": 0,
           "locked": false,
           "lockedReason": null,
           "enabled": true,
@@ -74,6 +75,7 @@
             "teams": []
           },
           "pinned": true,
+          "position": 1,
           "locked": false,
           "lockedReason": null,
           "enabled": true,
@@ -159,6 +161,7 @@
             "teams": []
           },
           "pinned": false,
+          "position": 0,
           "locked": false,
           "lockedReason": null,
           "enabled": true,
@@ -201,6 +204,7 @@
             "teams": []
           },
           "pinned": false,
+          "position": 0,
           "locked": true,
           "lockedReason": "pinned_by_org",
           "enabled": true,
@@ -227,6 +231,7 @@
             "teams": []
           },
           "pinned": true,
+          "position": 1,
           "locked": false,
           "lockedReason": null,
           "enabled": true,
@@ -253,6 +258,7 @@
             "teams": []
           },
           "pinned": true,
+          "position": 2,
           "locked": false,
           "lockedReason": null,
           "enabled": true,
@@ -279,6 +285,7 @@
             "teams": []
           },
           "pinned": true,
+          "position": 3,
           "locked": false,
           "lockedReason": null,
           "enabled": true,

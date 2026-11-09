@@ -5,8 +5,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/api"
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
@@ -205,5 +207,57 @@ func TestWorkspaceLeavesOutMachinesTheHubDoesNotTrust(t *testing.T) {
 				t.Errorf("/api/v2/machines lists %d, want %d: %s", len(list), want, r)
 			}
 		})
+	}
+}
+
+// hangingRuntime is pageRuntime whose runtime stops answering while hang is set, its agent keeping the link.
+func hangingRuntime(name string, hang *atomic.Bool) http.Handler {
+	page := pageRuntime(name)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hang.Load() {
+			select {
+			case <-r.Context().Done():
+			case <-time.After(5 * time.Second):
+			}
+			return
+		}
+		page.ServeHTTP(w, r)
+	})
+}
+
+// a home machine whose runtime hangs while its agent keeps the link held every load of /agents/ for the whole
+// wait on its settings, and kept answering for the person (me) with nothing. The page waits a moment once, the
+// machine is not asked again for a while, and the person's other machine that is on answers for them meanwhile.
+func TestWorkspaceDoesNotWaitOnAHomeMachineThatHangs(t *testing.T) {
+	s := hubtest.New(t, withWorkspace, fleetOn)
+	owner := s.SignIn("owner@example.com")
+	first, _ := owner.NewSpace("Команда")
+	second, _ := owner.NewSpace("Вторая")
+	var hangA, hangB atomic.Bool
+	owner.Machine(first, hangingRuntime("Acme", &hangA))
+	owner.Machine(second, hangingRuntime("Beta", &hangB))
+	hang, otherName := &hangA, "Beta"
+	if r := owner.Do("GET", "/agents/api/which", nil); strings.HasPrefix(string(r.Body), "Beta ") {
+		hang, otherName = &hangB, "Acme"
+	}
+	hang.Store(true)
+	defer hang.Store(false)
+
+	start := time.Now()
+	if r := owner.Do("GET", "/agents/", nil, navigate...); r.Code != 200 {
+		t.Fatalf("page: %s", r)
+	}
+	if took := time.Since(start); took > 4*time.Second {
+		t.Errorf("the first page waited %s on the machine that hangs", took)
+	}
+	start = time.Now()
+	if r := owner.Do("GET", "/agents/", nil, navigate...); r.Code != 200 {
+		t.Fatalf("page again: %s", r)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("the machine that hangs was waited on again: %s", took)
+	}
+	if r := owner.Do("GET", "/agents/api/which", nil); r.Code != 200 || !strings.HasPrefix(string(r.Body), otherName+" ") {
+		t.Errorf("the person's own calls go to the machine that answers: %s", r)
 	}
 }

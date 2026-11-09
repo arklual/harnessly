@@ -28,6 +28,8 @@ func (f fakeProfiles) Lookup(id string) (wire.Provider, bool, []string, bool) {
 		return wire.ProviderCodex, f.configured, []string{"grok-build"}, true
 	case "zai-router":
 		return wire.ProviderClaude, f.configured, []string{"zai/glm-5.3", "zai/glm-4.6"}, true
+	case "gpt":
+		return wire.ProviderClaude, f.configured, []string{"gpt-6.1-sol", "gpt-6-astra"}, true
 	}
 	return "", false, nil, false
 }
@@ -41,6 +43,8 @@ func (f fakeProfiles) Model(profile, model string) (wire.AgentModel, bool) {
 	switch profile {
 	case "glm", "kimi", "zai-router":
 		m.Efforts = []wire.Effort{wire.EffortLow, wire.EffortHigh, wire.EffortMax}
+	case "gpt":
+		m.Efforts, m.Fast = []wire.Effort{wire.EffortLow, wire.EffortHigh}, model == "gpt-6.1-sol"
 	case "xai":
 		m.Efforts = []wire.Effort{wire.EffortLow, wire.EffortMedium, wire.EffortHigh, wire.EffortXHigh}
 	}

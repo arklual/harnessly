@@ -588,6 +588,7 @@ func appShareRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version str
 		{Match: is(platformAPI + "/apps/team/install"), Handler: http.HandlerFunc(teamPageInstall)},
 		{Match: is(platformAPI + "/apps/team/uninstall"), Handler: http.HandlerFunc(teamPageUninstall)},
 		{Match: is(platformAPI + "/apps/team/mute"), Handler: http.HandlerFunc(teamPageMute)},
+		{Match: is("/api/cli/apps/check"), Handler: http.HandlerFunc(checkRoute(d, reg, guests))},
 		{Match: is(platformAPI + "/apps/team/sync"), Handler: http.HandlerFunc(teamSync)},
 		{Match: is(platformAPI + "/apps/team/snapshot"), Handler: http.HandlerFunc(teamSnapshot)},
 	}

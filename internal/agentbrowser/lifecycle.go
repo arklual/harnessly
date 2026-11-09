@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,15 +14,55 @@ import (
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
-// Normal Chrome startup drops session cookies after graceful shutdown. Chrome
-// session restoration can retain them, but managed tab restoration does not enable
-// native session restore. Automatic shutdown is therefore opt-in.
+// The defaults of ConfigFromEnv: the same as the pane's live browser, a little wider for tabs (a profile serves every
+// chat of a project).
+const (
+	DefaultIdle     = 3 * time.Minute
+	DefaultMaxHosts = 3
+	DefaultMaxTabs  = 8
+	DefaultNice     = 10
+)
+
+// browserIdle reads RUNTIME_BROWSER_IDLE: a duration, "0" or "off" to keep the browser running. Chrome drops session
+// cookies on a normal exit; the host keeps them across a stop (session-cookies.json), so an idle stop signs nobody out.
 func browserIdle(value string) time.Duration {
-	d, err := time.ParseDuration(strings.TrimSpace(value))
-	if err != nil || d < 0 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return DefaultIdle
+	}
+	if strings.EqualFold(value, "off") {
 		return 0
 	}
-	return d
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		if n, e := strconv.Atoi(value); e == nil && n == 0 {
+			return 0
+		}
+		return DefaultIdle
+	}
+	return max(d, 0)
+}
+
+// envCount is a non-negative number from the environment, fallback when unset or unreadable.
+func envCount(name string, fallback int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name)))
+	if err != nil || n < 0 {
+		return fallback
+	}
+	return n
+}
+
+// downloadLimit reads RUNTIME_BROWSER_DOWNLOAD_LIMIT: bytes, "off" or 0 to refuse downloads.
+func downloadLimit(value string) int64 {
+	value = strings.TrimSpace(value)
+	if strings.EqualFold(value, "off") {
+		return 0
+	}
+	n, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || n < 0 {
+		return host.DefaultDownloadLimit
+	}
+	return n
 }
 
 func (m *Manager) lookupProfile(id string) (Profile, error) {

@@ -17,6 +17,7 @@ import {
 import { conversationsStore } from '@/next/stores/conversations';
 import { favoritesStore } from '@/next/stores/favorites';
 import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
+import { machineOrderStore, putMachines } from '@/next/stores/machines';
 import type {
   ClientId,
   ConvChannel,
@@ -322,5 +323,94 @@ describe('a snapshot settles the messages that ended while the page was away', (
       { ch: CH, mode: 'replace', data: { ...conv.data, messages: [] } } as never,
     );
     expect(messagesStore.get(memory.clientId)?.state.k).toBe('queued');
+  });
+});
+
+describe('GitHub #33: chats cached under a machine id the fleet no longer has', () => {
+  const OLD = 'm-before-reenroll';
+  const convsSnap = (rt: { conversations: unknown[] }) =>
+    ({ ch: 'convs', data: { conversations: rt.conversations, projects: [], defaultCwd: '/' } }) as never;
+
+  /** The page as a reload left it: the chat, its drawn feed and its messages kept under the old id. */
+  async function strayChat() {
+    const boot = await openChat();
+    const msg = ev<{ type: 'message_upsert'; message: Message }>('ev.message_upsert').message;
+    applyMessage(boot.m, { ...msg, conversationId: CONV });
+    const known = messagesStore.get(msg.clientId)!;
+    const unsent = { ...known, clientId: '01a17230-0000-7000-8000-0000000000aa' as ClientId };
+    putLocal({ ...unsent, rev: 0, state: { k: 'submitting' }, wait: null, issue: 'network' });
+    const draft = { ...known, clientId: '01a17230-0000-7000-8000-0000000000bb' as ClientId };
+    putLocal({ ...draft, rev: 0, state: { k: 'draft' } });
+    conversationsStore.patch(CONV, (c) => c && { ...c, machineId: OLD });
+    feedStore.patch(CONV, (f) => f && { ...f, machineId: OLD });
+    for (const id of [known.clientId, unsent.clientId, draft.clientId])
+      messagesStore.patch(id, (m) => m && { ...m, machineId: OLD });
+    return { ...boot, known: known.clientId, unsent: unsent.clientId, draft: draft.clientId };
+  }
+
+  it('the same runtime enrolled again takes its chats over once the old id is gone from the fleet', async () => {
+    const { rt, m, known, unsent, draft } = await strayChat();
+    const sends = rt.commands.length;
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(conversationsStore.get(CONV)?.machineId).toBe(m);
+    expect(feedStore.get(CONV)?.machineId ?? m).toBe(m);
+    // The runtime's message moves along (the new machine's feed snapshot then settles it like its own).
+    expect(messagesStore.get(known)?.machineId).toBe(m);
+    // The feed comes from the new machine now.
+    const conv = fixture<{ ch: ConvChannel; data: ConvSnapshot }>('snapshot.conv');
+    storeSink.snapshot(m, { ch: CH, mode: 'replace', data: conv.data } as never);
+    expect(feedStore.get(CONV)?.machineId).toBe(m);
+    expect(feedStore.get(CONV)?.rows.length).toBeGreaterThan(0);
+    // The unconfirmed one waits for Повторить and is not sent by itself.
+    const left = messagesStore.get(unsent)!;
+    expect(left.machineId).toBe(m);
+    expect(left.state).toMatchObject({ k: 'failed', code: 'unconfirmed', retryable: true });
+    expect(left.held).toBe(true);
+    expect(messagesStore.get(draft)?.state.k).toBe('draft');
+    await settle();
+    expect(rt.commands.slice(sends).filter((c) => c.op === 'send')).toEqual([]);
+    // A reconnect brings the same list again: nothing changes.
+    const record = conversationsStore.get(CONV);
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(conversationsStore.get(CONV)).toBe(record);
+    expect(messagesStore.get(unsent)?.state.k).toBe('failed');
+  });
+
+  it('keeps the chat with its owner while the fleet still lists the old machine', async () => {
+    const { rt, m, unsent } = await strayChat();
+    putMachines([rt.machine, { ...rt.machine, id: OLD as never, name: 'old' }]);
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(conversationsStore.get(CONV)?.machineId).toBe(OLD);
+    expect(feedStore.get(CONV)?.machineId).toBe(OLD);
+    expect(messagesStore.get(unsent)?.machineId).toBe(OLD);
+    expect(messagesStore.get(unsent)?.state.k).toBe('submitting');
+  });
+
+  it('does not take over a different chat behind a colliding id', async () => {
+    const { rt, m, unsent } = await strayChat();
+    for (const other of [{ createdAt: 1700000000000 }, { cwd: '/somewhere/else' }]) {
+      conversationsStore.patch(CONV, (c) => c && { ...c, ...other });
+      storeSink.snapshot(m, convsSnap(rt));
+      expect(conversationsStore.get(CONV)?.machineId).toBe(OLD);
+      expect(feedStore.get(CONV)?.machineId).toBe(OLD);
+      expect(messagesStore.get(unsent)?.machineId).toBe(OLD);
+    }
+  });
+
+  it('waits for the fleet: before it loads, a missing machine is not yet gone', async () => {
+    const { rt, m } = await strayChat();
+    machineOrderStore.set(null);
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(conversationsStore.get(CONV)?.machineId).toBe(OLD);
+  });
+
+  it('a kept feed with no record of its chat is dropped, its messages stay where they were', async () => {
+    const { rt, m, unsent } = await strayChat();
+    conversationsStore.delete(CONV);
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(conversationsStore.get(CONV)?.machineId).toBe(m);
+    expect(feedStore.get(CONV)).toBeUndefined();
+    expect(messagesStore.get(unsent)?.machineId).toBe(OLD);
+    expect(messagesStore.get(unsent)?.state.k).toBe('submitting');
   });
 });

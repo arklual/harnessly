@@ -38,6 +38,14 @@ const workspaceBase = "/agents"
 // workspaceConfigTTL is how long the home machine's page settings are believed.
 const workspaceConfigTTL = time.Minute
 
+// the page waits on the home machine's settings at most workspaceSettingsWait, and a machine that did not give
+// them is not asked again for workspaceMissTTL: a home machine whose agent keeps its link while its runtime hangs held
+// every load of /agents/ for the whole wait. The settings it gave before are kept meanwhile.
+const (
+	workspaceSettingsWait = 2 * time.Second
+	workspaceMissTTL      = 30 * time.Second
+)
+
 // workspaceMetas are the settings a runtime fills into its index.html (cmd/runtime/routes_web.go).
 var (
 	metaHLConfig    = regexp.MustCompile(`<meta name="hl-config" content="([^"]*)" />`)
@@ -49,6 +57,8 @@ type workspaceConfig struct {
 	config      map[string]any
 	platformAPI string
 	until       time.Time
+	// missed: the machine did not give its settings; config is what it gave before, if anything.
+	missed bool
 }
 
 // Workspace: whether this hub serves the fleet's workspace at /agents/ (it was built with the runtime's page). Whether a
@@ -127,6 +137,10 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	if uploadsPath.MatchString(rest) && s.uploadsStore() != nil {
 		s.serveUploads(w, r, p, rest)
+		return
+	}
+	if outboxPath.MatchString(rest) {
+		s.serveOutbox(w, r, p)
 		return
 	}
 	if s.history && historyPath.MatchString(rest) {
@@ -280,15 +294,43 @@ func (s *Service) workspaceSettings(r *http.Request, u store.User) (map[string]a
 
 func (s *Service) machineSettings(r *http.Request, u store.User, m store.Machine) (workspaceConfig, bool) {
 	s.mu.Lock()
-	got, ok := s.pages[m.ID]
+	had, ok := s.pages[m.ID]
 	s.mu.Unlock()
-	if ok && s.now().Before(got.until) {
-		return got, true
+	if ok && s.now().Before(had.until) {
+		return had, !had.missed || had.config != nil
 	}
 	if s.reg.Get(m.ID) == nil {
 		return workspaceConfig{}, false
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	got, ok := s.askSettings(r, u, m)
+	if !ok && r.Context().Err() != nil {
+		// The page's own request went away: that says nothing of the machine.
+		return had, had.config != nil
+	}
+	if !ok {
+		// Not asked again for a while; what it gave before stands in.
+		miss := workspaceConfig{config: had.config, platformAPI: had.platformAPI, until: s.now().Add(workspaceMissTTL), missed: true}
+		s.keepSettings(m.ID, miss)
+		return miss, miss.config != nil
+	}
+	got.until = s.now().Add(workspaceConfigTTL)
+	s.keepSettings(m.ID, got)
+	return got, true
+}
+
+func (s *Service) keepSettings(id string, c workspaceConfig) {
+	s.mu.Lock()
+	if len(s.pages) >= maxAuthz {
+		s.pages = map[string]workspaceConfig{}
+	}
+	s.pages[id] = c
+	s.mu.Unlock()
+}
+
+// askSettings reads the settings from the machine's own index.html, waiting for it at most workspaceSettingsWait.
+func (s *Service) askSettings(r *http.Request, u store.User, m store.Machine) (workspaceConfig, bool) {
+	// The wait is the machine's alone: a page that goes away meanwhile does not make it look hung.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), workspaceSettingsWait)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/m/"+m.ID+"/", nil)
 	if err != nil {
@@ -302,18 +344,11 @@ func (s *Service) machineSettings(r *http.Request, u store.User, m store.Machine
 	if rec.status != http.StatusOK || !strings.HasPrefix(rec.header.Get("Content-Type"), "text/html") {
 		return workspaceConfig{}, false
 	}
-	got, err = parseSettings(rec.body.Bytes())
+	got, err := parseSettings(rec.body.Bytes())
 	if err != nil {
 		s.log.Warn("workspace: the home machine's page settings are unreadable", "machine", m.ID, "err", err)
 		return workspaceConfig{}, false
 	}
-	got.until = s.now().Add(workspaceConfigTTL)
-	s.mu.Lock()
-	if len(s.pages) >= maxAuthz {
-		s.pages = map[string]workspaceConfig{}
-	}
-	s.pages[m.ID] = got
-	s.mu.Unlock()
 	return got, true
 }
 

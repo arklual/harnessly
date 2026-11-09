@@ -158,6 +158,21 @@ func (c *Checker) Check(ctx context.Context, userID string, m store.Machine) err
 	return ErrAccess
 }
 
+// Visible says whether the person may see the machine in lists, details and live events. It follows the list only in
+// HUB_ACCESS_ENFORCE=on; off and warn show everything (warn still only logs what opening would refuse). A failed lookup
+// hides the machine.
+func (c *Checker) Visible(ctx context.Context, userID string, m store.Machine) bool {
+	if !c.Hides() {
+		return true
+	}
+	return c.Check(ctx, userID, m) == nil
+}
+
+// Hides says whether the access list hides machines at all (HUB_ACCESS_ENFORCE=on): without it nothing is looked up.
+func (c *Checker) Hides() bool {
+	return c.Enforcing() && c.Config.Machines.AccessEnforce == config.AccessOn
+}
+
 // manages: the person manages the machine's tenant, or its team.
 func (c *Checker) manages(ctx context.Context, userID string, m store.Machine) (bool, error) {
 	if c.Authz == nil || m.SpaceID == "" {

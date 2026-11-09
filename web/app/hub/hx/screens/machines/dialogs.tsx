@@ -1,7 +1,11 @@
 // The two questions of the machine card: restart (the runner or the whole machine) and switch off.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
-import type { OrgMachine, ResourcePlan, RestartWhat, RestartWhen } from '../../../org/api/machines';
+import { orgErrorText } from '../../../org/api/errors';
+
+import type { MovePlan, OrgMachine, ResourcePlan, RestartWhat, RestartWhen } from '../../../org/api/machines';
+import { useOrg } from '../../../org/context';
+import { movePlanLines } from '../../../org/screens/machines/format';
 import { Btn, Dialog, Icon } from '../../ui';
 import { offItems, restartHint } from './calc';
 
@@ -136,6 +140,114 @@ const Off = ({
   </>
 );
 
+/** Moving the machine to another tenant: the hub's dry run is shown first, the move itself waits for it. */
+export const Move = ({
+  m,
+  onClose,
+  onMoved,
+}: {
+  m: OrgMachine;
+  onClose: () => void;
+  onMoved: () => void;
+}) => {
+  const { api, shell } = useOrg();
+  const targets = shell.tenants.filter((t) => t.id !== m.tenantId);
+  const [tenantId, setTenantId] = useState('');
+  const [plan, setPlan] = useState<MovePlan | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const seq = useRef(0);
+  const pick = (id: string) => {
+    const mine = ++seq.current;
+    setTenantId(id);
+    setPlan(null);
+    setError(null);
+    if (!id) return setLoading(false);
+    setLoading(true);
+    api.planMoveMachine(m.id, id).then(
+      (p) => {
+        if (seq.current !== mine) return;
+        setPlan(p);
+        setLoading(false);
+      },
+      (e: unknown) => {
+        if (seq.current !== mine) return;
+        setError(orgErrorText(e));
+        setLoading(false);
+      },
+    );
+  };
+  const go = async () => {
+    if (!plan || plan.noop || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.moveMachine(m.id, tenantId);
+      onMoved();
+    } catch (e) {
+      setError(orgErrorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <span className="md-dlg__ic">
+        <Icon i="arrow-right-left" />
+      </span>
+      <h4>Перенести {m.name} в другой тенант?</h4>
+      <p className="md-dlg__lead">
+        Машина сохранит id и ключ: ничего переустанавливать не нужно. Переносить может админ обоих тенантов.
+      </p>
+      <select
+        className="hx-set__input"
+        aria-label="Куда перенести"
+        value={tenantId}
+        disabled={busy}
+        onChange={(e) => pick(e.target.value)}
+      >
+        <option value="">Выберите тенант</option>
+        {targets.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      {loading && <p className="md-note">Считаем, что изменится…</p>}
+      {plan && (
+        <ul className="md-dlg__list">
+          {movePlanLines(plan).map((l) => (
+            <li key={l.text}>
+              <Icon i="arrow-right-left" size="sm" />
+              <span>{l.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && (
+        <p className="md-note tm-err" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="md-dlg__foot">
+        <Btn variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+          Отмена
+        </Btn>
+        <Btn
+          variant="primary"
+          size="sm"
+          busy={busy}
+          disabled={!plan || plan.noop || loading}
+          onClick={() => void go()}
+        >
+          Перенести
+        </Btn>
+      </div>
+    </>
+  );
+};
+
 export const MachineDialogs = ({
   dlg,
   m,
@@ -144,14 +256,16 @@ export const MachineDialogs = ({
   onRestart,
   onOff,
   onRemove,
+  onMoved,
 }: {
-  dlg: 'restart' | 'off' | 'remove' | null;
+  dlg: 'restart' | 'off' | 'remove' | 'move' | null;
   m: OrgMachine;
   plan: ResourcePlan | null;
   onClose: () => void;
   onRestart: (what: RestartWhat, when: RestartWhen) => void;
   onOff: () => void;
   onRemove: () => void;
+  onMoved: () => void;
 }) => (
   <>
     <Dialog inline open={dlg === 'restart'} onClose={onClose} label={`Перезапустить ${m.name}`}>
@@ -159,6 +273,9 @@ export const MachineDialogs = ({
     </Dialog>
     <Dialog inline open={dlg === 'remove'} onClose={onClose} label={`Убрать ${m.name}`}>
       <Remove m={m} onClose={onClose} onConfirm={onRemove} />
+    </Dialog>
+    <Dialog inline open={dlg === 'move'} onClose={onClose} label={`Перенести ${m.name}`}>
+      <Move m={m} onClose={onClose} onMoved={onMoved} />
     </Dialog>
     <Dialog inline open={dlg === 'off'} onClose={onClose} label={`Отключить ${m.name}`}>
       <Off m={m} plan={plan} onClose={onClose} onConfirm={onOff} />

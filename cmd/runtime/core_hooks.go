@@ -269,7 +269,7 @@ func (c *core) resumeForQueue(tabID string) string {
 		if errors.Is(err, coreapi.ErrResumeLine) {
 			return prompts.ResumeNoSession
 		}
-		return "busy-shell"
+		return prompts.ResumeBusyShell
 	}
 	return result
 }

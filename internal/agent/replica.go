@@ -80,7 +80,13 @@ type replica struct {
 	askConvs  func()
 	pages     func(conv, before string, limit int) (json.RawMessage, error)
 	entries   func(conv, turn string) (json.RawMessage, error)
+	output    func(conv, entry string) (json.RawMessage, error)
 	pause     time.Duration
+
+	// The tool outputs the cluster's copy gets whole (replica_outputs.go).
+	outQ    chan outputJob
+	outMu   sync.Mutex
+	outSeen map[string]int64
 
 	mu         sync.Mutex
 	enabled    bool
@@ -104,6 +110,8 @@ func newReplica(a *Agent) *replica {
 		askConvs:  func() {},
 		pause:     replicaPause,
 		chans:     map[string]*replicaChan{},
+		outQ:      make(chan outputJob, outputQueue),
+		outSeen:   map[string]int64{},
 	}
 }
 
@@ -115,6 +123,10 @@ func (r *replica) start(enabled bool, cursors map[string]cursor, known map[strin
 	r.generation++
 	r.chans = map[string]*replicaChan{}
 	r.mu.Unlock()
+	// A new start may be another cluster or one that lost what it had: the outputs seen go again.
+	r.outMu.Lock()
+	r.outSeen = map[string]int64{}
+	r.outMu.Unlock()
 	if enabled {
 		r.askConvs() // the runtime answers with its chats, and `convs` below backfills them
 	}
@@ -163,6 +175,7 @@ func (r *replica) event(ch string, seq int64, raw json.RawMessage) {
 	if !r.enabled || r.epoch == "" {
 		return
 	}
+	r.noteOutputs(ch, raw)
 	c := r.chans[ch]
 	if c == nil {
 		c = &replicaChan{}
@@ -348,6 +361,7 @@ func (r *replica) backfillChat(generation int, job backfillJob) {
 			return
 		}
 		r.emit(evV2Backfill{Event: "v2.backfill", Ch: ch, Events: []json.RawMessage{ev}})
+		r.noteOutputs(ch, raw)
 		if before == "" {
 			// A page holds a folded turn as its first entry and its answer; the steps of the newest turns are read apart.
 			r.backfillSteps(generation, job.id, p.Turns)
@@ -393,6 +407,7 @@ func (r *replica) backfillSteps(generation int, id string, turns []json.RawMessa
 		}
 		ev, _ := json.Marshal(map[string]any{"type": "feed_reset", "turns": []json.RawMessage{}, "entries": page.Entries, "beforeTurnId": nil})
 		r.emit(evV2Backfill{Event: "v2.backfill", Ch: "conv:" + id, Events: []json.RawMessage{ev}})
+		r.noteOutputs("conv:"+id, raw)
 		time.Sleep(r.pause)
 	}
 }
@@ -427,6 +442,10 @@ func (a *Agent) startReplica(ctx context.Context) {
 	r.entries = func(conv, turn string) (json.RawMessage, error) {
 		return a.runtimeGet(a.cfg.V2Path + "/conversations/" + url.PathEscape(conv) + "/turns/" + url.PathEscape(turn) + "/entries")
 	}
+	r.output = func(conv, entry string) (json.RawMessage, error) {
+		return a.runtimeGet(a.cfg.V2Path + "/conversations/" + url.PathEscape(conv) + "/entries/" + url.PathEscape(entry) + "/output")
+	}
+	go r.shipOutputs(ctx)
 	go func() {
 		wait := replicaRetryMin
 		for ctx.Err() == nil {

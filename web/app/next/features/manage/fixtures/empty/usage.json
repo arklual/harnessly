@@ -1,0 +1,27 @@
+{
+  "accountedUntil": null,
+  "byAccount": [],
+  "byDay": [],
+  "byModel": [],
+  "currency": {
+    "code": "USD",
+    "perUsd": 1,
+    "rateDate": "2026-11-01",
+    "source": "none"
+  },
+  "period": {
+    "from": "2026-11-01",
+    "to": "2026-12-01",
+    "tz": "Europe/Moscow"
+  },
+  "total": {
+    "list": {
+      "shown": 0,
+      "usd": 0
+    },
+    "paid": {
+      "shown": 0,
+      "usd": 0
+    }
+  }
+}

@@ -156,6 +156,17 @@ func New(d Deps) *Service {
 		s.tickets = ticket.New(s.now)
 	}
 	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log}
+	// Live events of a machine reach a stream only while its person may still see the machine (HUB_ACCESS_ENFORCE=on).
+	s.events.SetMachineGate(func(ctx context.Context, userID, machineID string) bool {
+		if !s.acc.Hides() {
+			return true
+		}
+		m, err := s.db.S().MachineByID(ctx, machineID)
+		if err != nil {
+			return store.IsNotFound(err) // a gone machine has no metadata left to leak
+		}
+		return s.acc.Visible(ctx, userID, m)
+	})
 	return s
 }
 
@@ -205,6 +216,11 @@ func (s *Service) Authorize(ctx context.Context, userID, machineID string, owner
 		return store.Machine{}, httpx.ErrNotFound
 	}
 	return m, nil
+}
+
+// Visible says whether the person may see the machine in an inventory: the access list under HUB_ACCESS_ENFORCE=on.
+func (s *Service) Visible(ctx context.Context, userID string, m store.Machine) bool {
+	return s.acc.Visible(ctx, userID, m)
 }
 
 // View is a machine as the API sends it.
@@ -360,7 +376,7 @@ func (s *Service) Publish(ctx context.Context, m store.Machine) {
 		s.log.Warn("machine view not built", "machine", m.ID, "error", err)
 		return
 	}
-	s.events.PublishJSON(fresh.SpaceID, "machine", map[string]any{"machine": v}, false)
+	s.events.PublishMachine(fresh.SpaceID, fresh.ID, "machine", map[string]any{"machine": v}, false)
 }
 
 // PublishJob tells the owners of the machine's space about a step of an install.
@@ -368,7 +384,7 @@ func (s *Service) PublishJob(m store.Machine, job json.RawMessage) {
 	if m.SpaceID == "" {
 		return
 	}
-	s.events.PublishJSON(m.SpaceID, "job", map[string]any{"machineId": m.ID, "job": job}, true)
+	s.events.PublishMachine(m.SpaceID, m.ID, "job", map[string]any{"machineId": m.ID, "job": job}, true)
 }
 
 // PublishLogin tells the owners about a change of an agent login.
@@ -376,7 +392,7 @@ func (s *Service) PublishLogin(m store.Machine, login json.RawMessage) {
 	if m.SpaceID == "" {
 		return
 	}
-	s.events.PublishJSON(m.SpaceID, "login", map[string]any{"machineId": m.ID, "login": login}, true)
+	s.events.PublishMachine(m.SpaceID, m.ID, "login", map[string]any{"machineId": m.ID, "login": login}, true)
 }
 
 func (s *Service) list(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -391,6 +407,9 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request, p *auth.Principal
 	}
 	out := make([]View, 0, len(ms))
 	for _, m := range ms {
+		if !s.Visible(ctx, p.User.ID, m) {
+			continue
+		}
 		v, err := s.View(ctx, m)
 		if err != nil {
 			return err
@@ -405,6 +424,9 @@ func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 	m, err := s.Authorize(r.Context(), p.User.ID, r.PathValue("machineId"), false)
 	if err != nil {
 		return err
+	}
+	if !s.Visible(r.Context(), p.User.ID, m) {
+		return httpx.ErrNotFound // the same answer as for a machine that does not exist
 	}
 	v, err := s.View(r.Context(), m)
 	if err != nil {

@@ -147,6 +147,13 @@ turn() {
   fi
   case "$1" in *references*) out='total 0\nfixtures: https://gitlab.example.test/team/admin/-/merge_requests/502' ;; esac
   printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%s","content":"%s"}]},"uuid":"r-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$out" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  # An output past the 4 KB an event carries (HRN-879): a bash-mode line («! cmd») run in the turn, whose whole output
+  # the feed keeps; «show all» reads the rest.
+  case "$1" in *bigoutput*)
+    big=$(for i in $(seq 1 120); do printf 'line %03d of a long listing ..................................................\\n' "$i"; done; printf 'END-OF-BIG-OUTPUT')
+    printf '{"type":"user","message":{"role":"user","content":"<bash-input>cat big.log</bash-input>"},"uuid":"b-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+    printf '{"type":"user","message":{"role":"user","content":"<bash-stdout>%s</bash-stdout><bash-stderr></bash-stderr>"},"uuid":"o-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$big" "$n" "$(now)" "$sid" "$cwd" >> "$transcript" ;;
+  esac
   deliver_held
   reply="Fake agent reply: $1"
   for h in "${held[@]}"; do reply="$reply"$'\n\n'"Fake agent reply: $h"; done

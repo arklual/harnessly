@@ -709,6 +709,25 @@ func revealApp(store *secrets.Store, app string, names []string) map[string]stri
 // connection with that connection's grant, any other with the app's secrets the machine fills into its headers (the
 // page never holds one). A server whose secret has no value is not called: the app waits for it.
 func callAppTool(ctx context.Context, d deps, reg *apps.Registry, appID, tool string, args map[string]any) (json.RawMessage, error) {
+	out, err := callAppToolRaw(ctx, d, reg, appID, tool, args)
+	if err != nil {
+		// The author reads a backend's refusal in `harnessly app logs`: the tool, the code and the short reason,
+		// never the arguments or the answer's body.
+		reg.LogEventOnce(appID, "", apps.ViewLogMCP, "tools.call "+clip(tool, 80)+" — "+toolFailure(err))
+	}
+	return out, err
+}
+
+// toolFailure is the code and the short detail of a failed backend call, in one line.
+func toolFailure(err error) string {
+	var be *apps.BridgeError
+	if errors.As(err, &be) {
+		return clip(strings.TrimSpace(be.Code+": "+be.Message+" "+be.Detail), 300)
+	}
+	return clip(err.Error(), 300)
+}
+
+func callAppToolRaw(ctx context.Context, d deps, reg *apps.Registry, appID, tool string, args map[string]any) (json.RawMessage, error) {
 	pkg, err := reg.Package(appID)
 	if err != nil {
 		return nil, err

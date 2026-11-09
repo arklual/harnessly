@@ -89,6 +89,8 @@ type EntryItem struct {
 	Delivery *ItemDelivery `json:"delivery"`
 	// GroupID is the group of the layer the entry is in; "" for none.
 	GroupID string `json:"groupId"`
+	// Position is the entry's place among the layer's entries: scripts run in this order (0 until placed).
+	Position int `json:"position"`
 }
 
 // LayerView is one layer with its rows.
@@ -211,7 +213,17 @@ func lockedReason(canEdit bool, above string, e store.EnvEntry) *string {
 }
 
 func sortEntryItems(items []EntryItem) {
+	// Scripts go in the order the machine runs them (scriptOrder): by position, then name. The screen's reordering starts
+	// from this order, so a name order would undo every move (GitHub issue 40). Other kinds have no order of their own.
 	slices.SortFunc(items, func(a, b EntryItem) int {
-		return cmp.Or(cmp.Compare(a.Kind, b.Kind), cmp.Compare(a.Name, b.Name), cmp.Compare(a.EntryID, b.EntryID))
+		if c := cmp.Compare(a.Kind, b.Kind); c != 0 {
+			return c
+		}
+		if a.Kind == store.CatalogScript {
+			if c := cmp.Compare(a.Position, b.Position); c != 0 {
+				return c
+			}
+		}
+		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.EntryID, b.EntryID))
 	})
 }

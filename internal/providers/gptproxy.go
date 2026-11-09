@@ -45,6 +45,11 @@ type GPTProxy struct {
 	Install func(ctx context.Context, dir string) (string, error)
 	// Command is the proxy's command for a config file; nil runs the binary with it and the built-in model lists.
 	Command func(bin, config string) *exec.Cmd
+	// FastTier says whether the ChatGPT backend has the fast tier for a model (Codex's model cache); nil: for none.
+	FastTier func(model string) bool
+	// FastPane says whether the chat in a tmux pane (its $TMUX_PANE, on the server of that socket name, "" for any) is
+	// in fast mode; nil: none is. It is read on each request of the relay.
+	FastPane func(pane, socket string) bool
 
 	// mu orders the switch's changes; a turn on holds it until the proxy answers.
 	mu sync.Mutex
@@ -521,7 +526,7 @@ var gptForwarded = []string{"Content-Type", "Accept", "User-Agent", "Originator"
 // request goes up to the ChatGPT backend with the Codex CLI's token and account.
 func (g *GPTProxy) Relay() *Relay {
 	return &Relay{
-		Upstream: gptUpstream, Prefix: GPTRelayPath, Plain: true, Forward: gptForwarded,
+		Upstream: gptUpstream, Prefix: GPTRelayPath, Plain: true, Forward: gptForwarded, Prepare: g.prepare,
 		Credential: g.Login.Token,
 		Extra: func(context.Context) http.Header {
 			if id := g.Login.AccountID(); id != "" {

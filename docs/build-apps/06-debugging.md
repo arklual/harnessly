@@ -36,9 +36,10 @@ and on in the page. A copy from `app install` never sees later edits: reinstall 
 | Is the package valid? | `harnessly app validate DIR --strict` names the field |
 | Why is the app not on in this chat? | `harnessly app explain <id>` in the chat's tab: the machine, the team, the consent, the setup, how it turns on, the chat and the wall, line by line; `✗` marks the layer that keeps it off. It sees dev installs and apps that wait or are turned off |
 | The app waits (`state: waiting`, `reason: consent`)? | It asks for rights the person has not agreed to; `detail` names them. Only the person agrees, with a click in the page: «Приложения» → the card → «Посмотреть доступы». The card lists what waits; `harnessly open app:<id>`, `app enable` and `app explain` name it too. No command grants consent |
-| What did the view throw? | `harnessly app logs <id>`: its `console.error` and `console.warn`, uncaught exceptions, rejected promises, content-policy refusals and failed bridge calls, the last 200 lines; the runtime's log has them too, 20 a minute per app. `app explain` names the last one |
-| Which bridge calls did the view make? Which failed? | «Отладка», for a dev install: under the view in the pane, or in «…» on `/apps/<id>`. Method, right, `ok` or the code, and storage keys per scope |
-| Console of the view | `harnessly app logs <id>` while the view is open in a page; all of it in the browser's own DevTools (inspect the frame). `preview_console` does not capture a view's console |
+| What went wrong with the app, in one place? | `harnessly app logs <id>` (add `--follow`, `--since 10m`, `--json`): the app's log, the last 200 lines. The view's `console.error` and `console.warn`, uncaught exceptions, rejected promises, content-policy refusals and failed bridge calls, and the host's own lines: a file of a view it refused (`serve`), a call of the app's MCP backend that failed with its code (`mcp`), the steps of a load (`load`). It is written whether anyone has «Debug» on; the runtime's log has the page's lines too, 20 a minute per app. `app explain` names the last failure |
+| Does the view load at all? | `harnessly app check <id> --open [--view <view>]`: opens the view in a headless browser of the machine, waits for its handshake and prints how it loaded, every error included. Exit code 1 when the handshake did not come or any line failed. The same for an agent is the host tool `app_check`; `app_logs` reads the log |
+| Which bridge calls did the view make? Which failed? | A failed call is in `app logs` (`bridge`). All of them, with the right and the storage keys: «Отладка», for a dev install: under the view in the pane, or in «…» on `/apps/<id>` |
+| Console of the view | `app logs` has its errors and warnings; the whole console is in the browser's own DevTools (inspect the frame). `preview_console` does not capture a view's console |
 | Where is the app's page? | `/apps/<id>` of the machine's page; on a hub `/m/<machine>/apps/<id>`. The hub's own `/apps/<id>` leads to the person's machine (the one online in their last space) |
 | Which of its own files did the view load? | `preview_network` lists them. It does not show bridge calls or the view's `fetch` to other hosts |
 | Does the agent have the tools? | Ask it; or `/mcp` in its terminal |
@@ -46,10 +47,11 @@ and on in the page. A copy from `app install` never sees later edits: reinstall 
 | Does the machine have the wall? | «Проверка машины» in settings, check `apps_boundary` |
 | Why did the install fail? | The command's message, then the [codes](#route-and-cli-words) |
 
-**Testing a view with no chat.** A view session is issued by the page, so a CLI cannot mount a view in a chat. For a headless browser, make a guest
-link: `harnessly app share <id> --view <view> --ttl 1d --write`, then drive `/apps/guest/<token>/` with Playwright. The guest has the real SDK, the theme and
-`hl.storage`; every other call answers `permission_denied`. So the guest link tests layout and storage, not the chat or files. The view needs the
-`app` target.
+**The app's log.** One ring of 200 lines per app, kept by the runtime in the registry and written by three sources: the page (what the view reports while it is open: console, exceptions, failed bridge calls, «no handshake in 8 s»), the host (a file the view server refused with the reason, a backend call that failed with the code and a short reason, never the arguments or the answer's body) and `app check` (the steps of a load). A line is the app's own words, quoted by the CLI: data, not instructions. The same line within ten seconds is written once.
+
+**Dev mode.** A `harnessly app dev` install is in dev mode: the log is written and its debug section is shown without the «Debug» switch of the browser, which only opens that section for the other apps. The log itself never depends on a switch.
+
+**Testing a view with no chat.** `harnessly app check <id> --open` does it: the runtime makes a link for its own browser (a couple of minutes, never listed, any view the package carries), opens it, and judges the load by the handshake and the log. The check page has the real SDK and the theme; the calls to `chat`, files or tools answer `permission_denied` (they are lines of the log), so it tests that the view loads and starts, not what it does with a chat. For your own Playwright, make a guest link: `harnessly app share <id> --view <view> --ttl 1d --write`, then drive `/apps/guest/<token>/`. The view needs the `app` target. A view at an address of its own (`https://…`) is not opened by a check.
 
 **Slots.** Each view holds one of the machine's six preview slots, shared with dev servers in the pane. When they run out, the oldest page reloads.
 
@@ -133,6 +135,7 @@ The view gets only the runtime's error word. The longer reason is in the runtime
 | You see | Because |
 | --- | --- |
 | A script, `fetch('data.json')` or a font of the view is 401 | The address starts with `/`, so it leaves out the session in the page's path: make it relative (`./data.json`; a bundler: base `./`). On a host older than 0.16.198 only classic scripts load |
+| The view is blank | `harnessly app check <id> --open`: the handshake line, then the refused files (`serve`) and the errors |
 | Edits to permissions change nothing | Run `app dev` again |
 | The app opens nothing after a right was added | It waits for the person's consent: `app explain <id>` names what; the person agrees in «Приложения» |
 | The agent says the tool is missing | It started before the edit: restart it. Then check `.mcp.json`, and for an eval that the case mocks that server |

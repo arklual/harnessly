@@ -56,6 +56,9 @@ func (s *Service) machinesList(w http.ResponseWriter, r *http.Request, p *auth.P
 			if x.sc.Kind == store.ScopeTeam && m.TeamID != x.sc.ID {
 				continue
 			}
+			if !s.machines.Visible(ctx, p.User.ID, m) {
+				continue
+			}
 			ms = append(ms, m)
 		}
 	}

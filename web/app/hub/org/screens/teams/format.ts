@@ -105,3 +105,18 @@ export const describe = (e: AuditEntry): { who: string; what: string } => {
       return { who, what: [ACTION[e.action] ?? e.action, label].filter(Boolean).join(' ') };
   }
 };
+
+/** What keeps a tenant from being deleted, as a genitive plural noun. */
+export const BLOCKER: Record<string, string> = {
+  machines: 'машин',
+  members: 'участников',
+  grants: 'выданных прав',
+  teams: 'команд',
+  invites: 'действующих приглашений',
+  sites: 'сайтов',
+  environment: 'записей окружения',
+};
+export const REMOVES: Record<string, string> = {
+  limit_rules: 'правил лимитов',
+  revoked_machines_detached: 'отключённых машин (останутся с историей, без тенанта)',
+};

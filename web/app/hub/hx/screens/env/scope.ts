@@ -184,6 +184,7 @@ export const layersOfMe = (me: MeEnvResponse): EnvLayer[] => {
       unused: null,
       delivery: null,
       groupId: it.groupId,
+      position: l.items.length + 1, // a member cannot reorder: the list keeps the order it came in
     });
   }
   const rank: Record<EnvLayerKind, number> = { org: 0, tenant: 1, team: 2 };

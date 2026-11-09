@@ -1,7 +1,7 @@
 // Frames into stores: the Sink of every RealtimeClient. The client has already checked seq and epoch; here every
 // frame merges by id and rev, so a replay, a resent snapshot or a snapshot after a restart changes only what is new.
 
-import { noteServerTime, pageClock } from '@/next/core/clock';
+import { machineNow, noteServerTime, pageClock } from '@/next/core/clock';
 import { noteCursor, noteLastEntry, resumeOf } from '@/next/core/realtime/cursors';
 import type { Sink } from '@/next/core/realtime/client';
 import { shownConnection } from '@/next/core/realtime/grace';
@@ -18,6 +18,7 @@ import {
   applyQueue,
   applyStep,
   applyTurn,
+  dropConversationData,
   feedStore,
   markFeedError,
   removeBackground,
@@ -29,8 +30,16 @@ import { conversationsStore, convsCachedStore, convsLoadedStore } from '@/next/s
 import { favoritesStore } from '@/next/stores/favorites';
 import { applyRemoteDraft, applyRemoteDrafts } from '@/next/core/drafts-cloud';
 import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
-import { machinesStore } from '@/next/stores/machines';
-import { applyMessage, applyPromptState, forgetEndedElsewhere } from '@/next/stores/messages';
+import { machineOrderStore, machinesStore } from '@/next/stores/machines';
+import {
+  applyMessage,
+  applyPromptState,
+  convMessagesStore,
+  forgetEndedElsewhere,
+  isTerminal,
+  messagesStore,
+  returnToQueue,
+} from '@/next/stores/messages';
 import { touchConversation } from '@/next/stores/cache';
 import type {
   ConvChannel,
@@ -65,6 +74,48 @@ function putConversation(machine: MachineId, c: Conversation): void {
   // The channel names the machine, not the record: a record that claims another one is stored as this machine's.
   const own = c.machineId === machine ? c : { ...c, machineId: machine };
   conversationsStore.patch(c.id, (have) => (have && have.rev >= own.rev ? have : own));
+}
+
+/** The fleet has loaded and no longer lists the machine: it was disabled or removed, nothing of it can answer. */
+const goneFromFleet = (machine: MachineId): boolean => {
+  const order = machineOrderStore.get();
+  return order !== null && !order.includes(machine);
+};
+
+/**
+ * GitHub #33. The same runtime data enrolled again under a new machine id: the browser still holds its chats under
+ * the old id, and `owns` keeps the new machine out of them, so they wait for a machine that is never coming back.
+ * The new machine takes such a chat over only when the old one is gone from the fleet and the record is the same
+ * chat (made at the same moment in the same folder). An id that merely collides — the other machine still listed, or
+ * a different chat behind the same id — stays with its owner.
+ *
+ * The cached feed goes (the new machine's snapshot draws it again). The chat's messages move with it; one the runtime
+ * never confirmed is not sent again by itself: it goes back over the field as not sent, and Повторить sends it to the
+ * new machine — the person's word, not a replay to another identity.
+ */
+function adoptStray(machine: MachineId, c: Conversation): void {
+  const record = conversationsStore.get(c.id);
+  const feed = feedStore.get(c.id);
+  const was = record?.machineId ?? feed?.machineId;
+  if (!was || was === machine || !goneFromFleet(was)) return;
+  if (feed && feed.machineId !== was) return;
+  if (!record) {
+    // Only a drawing of the old machine's feed, nothing to prove it is this chat: the drawing goes, its messages stay.
+    dropConversationData(c.id);
+    return;
+  }
+  if (record.createdAt !== c.createdAt || record.cwd !== c.cwd) return;
+  const at = machineNow(machine);
+  for (const id of convMessagesStore.get(c.id) ?? []) {
+    const m = messagesStore.get(id);
+    if (!m || m.machineId !== was || m.conversationId !== c.id) continue;
+    messagesStore.set(id, { ...m, machineId: machine });
+    // A draft stays a draft and a failure keeps its reason; one on its way (or waiting to go) stops and waits.
+    if (m.rev === 0 && !isTerminal(m.state) && m.state.k !== 'failed' && m.state.k !== 'draft')
+      returnToQueue(id, at);
+  }
+  dropConversationData(c.id);
+  conversationsStore.delete(c.id);
 }
 
 const ownRecord = (machine: MachineId, id: ConvId): boolean =>
@@ -229,7 +280,10 @@ export const storeSink: Sink = {
       for (const c of [...conversationsStore.values()]) {
         if (c.machineId === machine && !ids.has(c.id)) conversationsStore.delete(c.id);
       }
-      for (const c of s.data.conversations) putConversation(machine, c);
+      for (const c of s.data.conversations) {
+        adoptStray(machine, c);
+        putConversation(machine, c);
+      }
       const projectIds = new Set(s.data.projects.map((p) => p.id));
       for (const p of [...projectsStore.values()]) {
         if (p.machineId === machine && !projectIds.has(p.id)) projectsStore.delete(projectKey(machine, p.id));

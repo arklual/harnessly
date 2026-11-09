@@ -34,6 +34,9 @@ func (v *v2Live) serveAppTools(done <-chan struct{}) {
 				return rec.Apps
 			},
 			Open: func(target string) error { return v.openAppTab(conv, target) },
+			Check: func(ctx context.Context, app, view string) (apps.LoadCheck, error) {
+				return runAppCheck(ctx, v.d, reg, apps.NewGuests(reg, storage), app, view)
+			},
 			Sinopia: &apps.SinopiaHost{
 				Docs: sinopiaDocs(v.d), State: appSinopia,
 				Tab: func(conv string) string {

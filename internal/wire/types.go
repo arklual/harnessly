@@ -2535,10 +2535,13 @@ const (
 	PausedAgentGone    PauseReason = "agent-gone"
 	PausedLimited      PauseReason = "limited" // the agent hit its usage limit: the queue waits for the reset
 	PausedNeedsTarget  PauseReason = "needs-target"
+	// PausedResumeBlocked: the agent was to be resumed, but something else holds the tab's terminal; «continue
+	// sending» tries the resume again, with the queue as it was.
+	PausedResumeBlocked PauseReason = "resume-blocked"
 )
 
 // PauseReasons is every PauseReason, in the schema's order.
-var PauseReasons = []PauseReason{PausedInterrupted, PausedUser, PausedLaunchFailed, PausedAgentGone, PausedLimited, PausedNeedsTarget}
+var PauseReasons = []PauseReason{PausedInterrupted, PausedUser, PausedLaunchFailed, PausedAgentGone, PausedLimited, PausedNeedsTarget, PausedResumeBlocked}
 
 // TerminalFailureKind is a stable, provider-neutral terminal outcome.
 type TerminalFailureKind string

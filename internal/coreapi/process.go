@@ -104,11 +104,20 @@ func (c *Config) Resume(found FoundTab) (string, error) {
 		}
 		time.Sleep(timings.ShellReady)
 	}
-	if pane := c.Panes.PanePID(t.SessionName); pane > 0 && agent.Running(pane) {
-		return "running", nil
-	}
-	if safe, _ := c.Panes.CheckTerminalProcess(t.SessionName); !safe {
-		return "busy-shell", nil
+	// A shell still starting (its rc files run programs of their own) or the stopped agent still on its way out holds
+	// the terminal for a moment: it is looked at again for a while before the resume gives up as busy-shell.
+	settle := time.Now().Add(timings.ShellSettle)
+	for {
+		if pane := c.Panes.PanePID(t.SessionName); pane > 0 && agent.Running(pane) {
+			return "running", nil
+		}
+		if safe, _ := c.Panes.CheckTerminalProcess(t.SessionName); safe {
+			break
+		}
+		if !time.Now().Before(settle) {
+			return "busy-shell", nil
+		}
+		time.Sleep(timings.ShellPoll)
 	}
 	var launch *agents.Launch
 	if c.LaunchOf != nil {

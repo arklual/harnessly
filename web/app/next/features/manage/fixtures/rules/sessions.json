@@ -1,0 +1,34 @@
+{
+  "currency": {
+    "code": "USD",
+    "perUsd": 1,
+    "rateDate": "2026-10-01",
+    "source": "none"
+  },
+  "next": null,
+  "sessions": [
+    {
+      "endedAt": "2026-10-10T10:00:00Z",
+      "funding": "org",
+      "list": {
+        "shown": 84,
+        "usd": 84
+      },
+      "machine": null,
+      "models": [
+        "claude-sonnet-4-6"
+      ],
+      "mrs": 0,
+      "origin": "live",
+      "paid": {
+        "shown": 84,
+        "usd": 84
+      },
+      "provider": "claude",
+      "sessionKey": "sb",
+      "startedAt": "2026-10-10T09:00:00Z",
+      "subagents": 0,
+      "turns": 0
+    }
+  ]
+}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -35,22 +34,36 @@ type Config struct {
 	// NoSandbox, when set, is the explicit preference and overrides environment flags.
 	NoSandbox func() bool
 	// Idle is the inactivity timeout; zero disables automatic shutdown.
-	Idle       time.Duration
-	DataDir    string
-	Executable string
-	Chrome     string
-	Mode       string
-	CDP        string
-	Off        bool
+	Idle time.Duration
+	// MaxHosts bounds the managed browsers running at once for this runtime (RUNTIME_BROWSER_MAX_HOSTS): starting one
+	// more closes the longest idle, or is refused while every one is busy. Zero is no bound.
+	MaxHosts int
+	// MaxTabs bounds a browser's tabs and its renderer processes (RUNTIME_BROWSER_MAX_TABS); zero is no bound.
+	MaxTabs int
+	// Nice lowers the priority of Chrome and Xvfb (RUNTIME_BROWSER_NICE).
+	Nice int
+	// DownloadLimit is the largest file a page may download into its profile (RUNTIME_BROWSER_DOWNLOAD_LIMIT,
+	// bytes); zero refuses downloads.
+	DownloadLimit int64
+	DataDir       string
+	Executable    string
+	Chrome        string
+	Mode          string
+	CDP           string
+	Off           bool
 }
 
 // ConfigFromEnv reads browser settings without starting any processes.
 func ConfigFromEnv(data string) Config {
 	return Config{
 		DataDir: data, Chrome: os.Getenv("RUNTIME_BROWSER_CHROME"), Mode: os.Getenv("RUNTIME_BROWSER_MODE"),
-		CDP:  strings.TrimSpace(os.Getenv("RUNTIME_BROWSER_CDP")),
-		Idle: browserIdle(os.Getenv("RUNTIME_BROWSER_IDLE")),
-		Off:  strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off"),
+		CDP:           strings.TrimSpace(os.Getenv("RUNTIME_BROWSER_CDP")),
+		Idle:          browserIdle(os.Getenv("RUNTIME_BROWSER_IDLE")),
+		MaxHosts:      envCount("RUNTIME_BROWSER_MAX_HOSTS", DefaultMaxHosts),
+		MaxTabs:       envCount("RUNTIME_BROWSER_MAX_TABS", DefaultMaxTabs),
+		Nice:          envCount("RUNTIME_BROWSER_NICE", DefaultNice),
+		DownloadLimit: downloadLimit(os.Getenv("RUNTIME_BROWSER_DOWNLOAD_LIMIT")),
+		Off:           strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off"),
 	}
 }
 
@@ -188,10 +201,22 @@ func (i *Instance) connect(ctx context.Context) (*cdp.Conn, error) {
 	if i.profile.Kind == "attached" {
 		return cdp.Dial(ctx, i.profile.CDP, i.event)
 	}
-	socket := host.SocketPath(filepath.Join(cfg.DataDir, "agent-browser", "run"), i.profile.ID)
+	socket := i.manager.profileSocket(i.profile.ID)
 	dial := func() (net.Conn, error) { return (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "unix", socket) }
 	if conn, err := dial(); err == nil {
-		return cdp.New(cdp.NewStream(conn), i.event), nil
+		stream := cdp.NewStream(conn)
+		if build, e := hostBuild(conn, stream); e == nil && build == host.BuildID() {
+			return cdp.New(stream, i.event), nil
+		}
+		// A host of another build (the runtime was updated) or one that does not answer: replace it, so the
+		// browser runs with this build's rules. The host keeps the session cookies across.
+		_ = stream.Close()
+		if err = host.Stop(ctx, i.dir, socket); err != nil {
+			return nil, fmt.Errorf("replace browser host: %w", err)
+		}
+	}
+	if err := i.manager.makeRoom(ctx, i.profile.ID); err != nil {
+		return nil, err
 	}
 	chrome, err := i.manager.preparedChrome(ctx)
 	if err != nil {
@@ -209,7 +234,8 @@ func (i *Instance) connect(ctx context.Context) (*cdp.Conn, error) {
 		mode = "auto"
 	}
 	if err = host.Start(executable, host.Config{ProfileDir: i.dir, Socket: socket,
-		Chrome: chrome, Mode: mode, NoSandbox: sandboxPreference(cfg.NoSandbox)}); err != nil {
+		Chrome: chrome, Mode: mode, NoSandbox: sandboxPreference(cfg.NoSandbox),
+		Idle: cfg.Idle, MaxTabs: cfg.MaxTabs, Nice: cfg.Nice, DownloadLimit: cfg.DownloadLimit}); err != nil {
 		return nil, err
 	}
 	ticker := time.NewTicker(50 * time.Millisecond)
