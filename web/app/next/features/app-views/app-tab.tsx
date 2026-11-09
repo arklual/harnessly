@@ -34,8 +34,10 @@ const AppTab = ({ tab, machine, conversation, app: id, view: viewId, inspect = f
   return (
     <>
       <KeptSlot
+        target="pane"
         machine={machine}
         conversation={conversation}
+        shownChat={conversation}
         tab={tab}
         app={id}
         view={viewId}

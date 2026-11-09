@@ -4,14 +4,12 @@
 // alone.
 import { useCallback, useEffect, useState } from 'react';
 import AppAsks from '@/next/features/app-views/asks';
-import AppFrame from '@/next/features/app-views/app-frame';
-import { ConsentStage } from '@/next/features/app-consent/consent-ask';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import ConsentBlock from '@/next/features/app-consent/consent-block';
 import AppInspector from '@/next/features/app-views/inspector';
 import { onOpenAppTab } from '@/next/features/app-views/open';
 import { switchedByView } from '@/next/features/app-views/chat-handoff';
-import { keptFrames } from '@/next/features/app-views/kept-frames';
+import { KeptSlot } from '@/next/features/app-views/kept-frames';
 import { parseAppTarget } from '@/next/features/app-views/target';
 import AppIsland from '@/next/features/app-main/app-island';
 import AppMain, { type IAppMenuItem } from '@/next/features/app-main/app-main';
@@ -126,9 +124,6 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
   const view = own ?? app?.views.find((v) => v.targets.includes('pane')) ?? null;
   const target = own ? 'app' : 'pane';
   useTabTitle(routePath({ kind: ROUTE.app, id, ...(chat ? { chat } : {}) }), app?.name ?? null);
-
-  // The app's own page is its one view: a pane view of it kept out of sight goes, rather than two players sounding.
-  useEffect(() => keptFrames.dropApp(id), [id]);
 
   // A card's «Открыть в панели» of another app takes this page to that app; this one is already open. The chat goes
   // along only where that app is on.
@@ -295,18 +290,18 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
         onFloat={(float) => place({ ...layout, float })}
         menu={menu}
         stage={
-          <ConsentStage machine={machine} app={app}>
-            <AppFrame
-              machine={machine}
-              app={app}
-              view={view}
-              target={target}
-              viewPort={list.viewPort}
-              conversation={sessionConv}
-              shownChat={onChat ? conv : null}
-              reloadToken={reload}
-            />
-          </ConsentStage>
+          // The view stands in the page's layer of kept views over this place, and plays on while the person is on
+          // another screen (kept-frames).
+          <KeptSlot
+            target={target}
+            machine={machine}
+            conversation={sessionConv}
+            shownChat={onChat ? conv : null}
+            tab={null}
+            app={id}
+            view={view.id}
+            reload={reload}
+          />
         }
         chat={
           onChat ? (
