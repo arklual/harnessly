@@ -86,11 +86,13 @@ func (o v2Open) open(ctx context.Context, rec wire.Conversation, ref string) *wi
 	if m := mrRef.FindStringSubmatch(ref); m != nil {
 		return o.openMR(ctx, rec, m[1], m[2])
 	}
-	tab, target := o.targets.Classify(ref)
-	if tab == "" {
+	// The connections and the documents provider are asked before the generic site (o.targets.Resolve), so an address
+	// one of them reads opens in the pane and never starts the remote browser by itself.
+	l := o.targets.ClassifyLink(ctx, ref)
+	if l.Tab == "" {
 		return nil
 	}
-	return &wire.OpenTarget{Tab: wire.OpenTab(tab), Target: target}
+	return &wire.OpenTarget{Tab: wire.OpenTab(l.Tab), Target: l.Target, Reason: l.Reason}
 }
 
 func (o v2Open) openMR(ctx context.Context, rec wire.Conversation, name, iid string) *wire.OpenTarget {

@@ -4,10 +4,12 @@
 package panel
 
 import (
+	"context"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
@@ -63,6 +65,49 @@ type Targets struct {
 	// AppWhyNot says why an installed app the text names opens no pane view when it is the app's state (it waits for
 	// the person's consent, it is turned off), "" otherwise; nil says nothing more than the hint.
 	AppWhyNot func(text string) string
+	// Resolve asks what the deployment's connections (an issue tracker, a wiki) and its documents provider make of an
+	// address, before any generic site: a zero Link is "none of mine". nil: nothing is asked.
+	Resolve func(ctx context.Context, text string) Link
+}
+
+// Link is where one address opens. Tab "link" is an address that opens in no tab of the pane: Reason says why
+// (ReasonConnect: the connection that reads it has no working sign-in; ReasonEmbed: its service cannot be framed) and
+// Target is the address itself, which the person may open by choice, never in the remote browser by itself.
+type Link struct {
+	Tab, Target, Reason string
+}
+
+// The reasons a Link opens in no tab.
+const (
+	ReasonConnect = "connect"
+	ReasonEmbed   = "embed"
+)
+
+// ConnTarget is the target of the task tab for an issue ("issue") or a page ("page") of a connection: the connection's
+// id and the key exactly as the provider writes it, never derived from an address.
+func ConnTarget(conn, kind, key string) string { return "conn:" + conn + ":" + kind + ":" + key }
+
+// ParseConnTarget is ConnTarget's inverse; ok is false for a target that names no connection.
+func ParseConnTarget(target string) (conn, kind, key string, ok bool) {
+	rest, ok := strings.CutPrefix(target, "conn:")
+	if !ok {
+		return "", "", "", false
+	}
+	parts := strings.SplitN(rest, ":", 3)
+	if len(parts) != 3 || parts[0] == "" || parts[2] == "" || (parts[1] != "issue" && parts[1] != "page") {
+		return "", "", "", false
+	}
+	return parts[0], parts[1], parts[2], true
+}
+
+// DocTarget is the target of the artifacts tab for a document or a board of the provider, by its local name.
+func (t Targets) DocTarget(slug string) string { return t.readerPath() + slug }
+
+func (t Targets) resolved(ctx context.Context, text string) Link {
+	if t.Resolve == nil || !clean(text) {
+		return Link{}
+	}
+	return t.Resolve(ctx, jsvalue.TrimJS(text))
 }
 
 func (t Targets) readerPath() string {
@@ -436,6 +481,24 @@ func (t Targets) hint(tab string, k targetKind) string {
 	return locale.Pick("open "+tab+": a path without \"..\" and control characters is required", "open "+tab+": нужен путь без «..» и управляющих символов")
 }
 
+// resolvedFor is the target of the tab for an address a connection or the documents provider reads (open task <url>,
+// open artifacts <url>), and the refusal the agent reads when that address needs a sign-in or cannot be framed.
+func (t Targets) resolvedFor(tab, text string) (target, refusal string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	l := t.resolved(ctx, text)
+	switch {
+	case l.Tab == tab:
+		return l.Target, ""
+	case l.Tab == "link" && l.Reason == ReasonConnect:
+		return "", locale.Pick("open "+tab+": the connection that reads this address needs a sign-in (Settings → Connections)",
+			"open "+tab+": подключению, которое читает этот адрес, нужен вход (Настройки → Подключения)")
+	case l.Tab == "link":
+		return "", locale.Pick("open "+tab+": this address cannot be shown in the pane; give the person the link", "open "+tab+": этот адрес нельзя показать в панели; дайте человеку ссылку")
+	}
+	return "", ""
+}
+
 func (t Targets) parseOpen(tab, target any) (Command, string) {
 	if !IsTabKind(tab) {
 		return Command{}, locale.Pick("open: unknown tab, available: ", "open: неизвестная вкладка, доступны ") + strings.Join(Kinds(), ", ")
@@ -452,7 +515,7 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 	if !isStr || jscompat.Len(text) > MaxArg {
 		return Command{}, locale.Pick("open "+name+": the target is too long or not a string", "open "+name+": цель слишком длинная или не строка")
 	}
-	var c string
+	var c, blocked string
 	switch k {
 	case port:
 		c = t.portTarget(text)
@@ -460,10 +523,16 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 		c = pathTarget(text)
 	case doc:
 		c = t.docTarget(text)
+		if c == "" {
+			c, blocked = t.resolvedFor(name, text)
+		}
 	case gitlab:
 		c = t.changeTarget(text)
 	case task:
 		c = t.taskTarget(text)
+		if c == "" {
+			c, blocked = t.resolvedFor(name, text)
+		}
 	case designRef:
 		if t.DesignRef != nil && clean(text) {
 			c = t.DesignRef(jsvalue.TrimJS(text))
@@ -477,6 +546,9 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 				}
 			}
 		}
+	}
+	if blocked != "" {
+		return Command{}, blocked
 	}
 	if c == "" {
 		return Command{}, t.hint(name, k)
@@ -592,25 +664,36 @@ func RateDecision(stamps []int64, now int64, limit int, windowMs int64) (bool, [
 // http(s) address the browser. "" for what opens nothing. The chat's chips and the pane's links ask it, so the pane has
 // one set of rules for the agent's open command and for what the person clicks.
 func (t Targets) Classify(text string) (tab, target string) {
+	l := t.ClassifyLink(context.Background(), text)
+	return l.Tab, l.Target
+}
+
+// ClassifyLink is Classify with the reason an address opens in no tab (Tab "link"). The connections and the documents
+// provider are asked after the fixed rules and before the generic site, so an address one of them reads never reaches
+// the browser.
+func (t Targets) ClassifyLink(ctx context.Context, text string) Link {
 	if jscompat.Len(text) > MaxArg {
-		return "", ""
+		return Link{}
 	}
 	if c := t.taskTarget(text); c != "" {
-		return "task", c
+		return Link{Tab: "task", Target: c}
 	}
 	if c := t.trackerTask(text); c != "" {
-		return "task", c
+		return Link{Tab: "task", Target: c}
 	}
 	if c := t.changeTarget(text); c != "" {
-		return "gitlab", c
+		return Link{Tab: "gitlab", Target: c}
 	}
 	if c := t.docTarget(text); c != "" {
-		return "artifacts", c
+		return Link{Tab: "artifacts", Target: c}
+	}
+	if l := t.resolved(ctx, text); l.Tab != "" {
+		return l
 	}
 	if c := urlTarget(text); c != "" {
 		if u, err := url.Parse(c); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil {
-			return "browser", c
+			return Link{Tab: "browser", Target: c}
 		}
 	}
-	return "", ""
+	return Link{}
 }

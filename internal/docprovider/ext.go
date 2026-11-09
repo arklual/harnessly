@@ -26,6 +26,7 @@ import (
 //	                     POST /v1/threads/reply {slug, threadId, body, author} -> Thread
 //	                     POST /v1/threads/status {slug, threadId, status} -> Thread
 //	                     POST /v1/threads/read {person, slug} -> {}
+//	capability resolve   POST /v1/resolve {url} -> {kind: "document"|"board", id, embed?} (404: not this service's address)
 //	capability boards         POST /v1/boards {} -> {boards: [Board]}
 //	capability boards-search  POST /v1/boards/search {query, limit} -> {boards: [Board]}
 //
@@ -232,6 +233,26 @@ func (p *ExtProvider) Publish(ctx context.Context, req PublishRequest) (Publishe
 	}
 	out.ExternalID, out.Slug = out.Slug, a
 	return out, nil
+}
+
+// Resolve asks the adapter which document or board an address names. An adapter without the `resolve` capability claims
+// nothing (ok is false and no call is sent), so the address keeps the pane's own rules.
+func (p *ExtProvider) Resolve(ctx context.Context, address string) (Resolved, bool, error) {
+	if !p.desc.Has("resolve") {
+		return Resolved{}, false, nil
+	}
+	var out Resolved
+	err := p.call(ctx, "resolve", "/v1/resolve", map[string]any{"url": address}, false, &out)
+	var up *integrations.UpstreamError
+	switch {
+	case errors.As(err, &up) && up.Status == http.StatusNotFound, errors.Is(err, ErrUnsupported):
+		return Resolved{}, false, nil
+	case err != nil:
+		return Resolved{}, false, err
+	case (out.Kind != "document" && out.Kind != "board") || Alias(out.ID) == "":
+		return Resolved{}, false, nil
+	}
+	return out, true, nil
 }
 
 func (p *ExtProvider) Embed(ctx context.Context, slug string) (Embed, error) {

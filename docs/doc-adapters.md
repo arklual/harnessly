@@ -45,6 +45,7 @@ did not list is not sent: publishing then answers 501, comments are an empty lis
 | `comments`      | `/v1/threads`, `/v1/threads/create`, `/v1/threads/reply`, `/v1/threads/status`, `/v1/threads/read` |
 | `boards`        | `/v1/boards`                                                                                       |
 | `boards-search` | `/v1/boards/search` (query, limit) -> boards                                                       |
+| `resolve`       | `/v1/resolve` (url) -> `{kind, id, embed?}`, or 404 when the address is not the adapter's          |
 
 Answers: 404 not found, 501 not supported, 401/403 refusal, 409 conflict, 413 or `{"error":"too_large"}` an answer
 too big to give. Shapes match the page's own document types (`DocSummary`, `DocVersion`, `DocDiff`, `DocThread`,
@@ -54,6 +55,18 @@ changes.
 
 The list of documents carries `capabilities` (publish, access, comments, boards, boardsSearch, providerEmbed,
 maxAnswerBytes), so the page offers only what the adapter does.
+
+### Resolving an address
+
+A link of the chat, a chip, the context menu and the `open` command all ask the same question before the remote
+browser is considered: is this address one of the adapter's? An adapter that declares `resolve` answers
+`POST /v1/resolve {"url": "..."}` with `{"kind": "document" | "board", "id": "<external id>", "embed": true}`; 404 (or
+501) means "not mine", and the address goes on to the browser as it did. `id` is the adapter's own id, kept as it
+is (case, hyphens, any path of a board) and mapped to the slug the way [external IDs](#external-ids) say. `kind`
+tells a document from a board; any other kind is "not mine". `embed: false` says the provider cannot be shown in a
+page: the pane then offers "Open original link" and shows nothing. A 401/403 answer shows "Connect" instead. The
+remote browser is never started for either, and no frame or CSP restriction is lifted. An adapter without `resolve`
+keeps today's behaviour: its addresses open in the browser.
 
 ### External IDs
 

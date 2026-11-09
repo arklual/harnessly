@@ -8,6 +8,39 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The home screen's machine setup card takes clicks again: it sat in the greeting, which lets the pointer through to
+  the composer, and inherited that, so its stages, «Подробнее», «Повторить» and the safe step did nothing. The card and
+  the into-project chip take the pointer while shown; a card fading out lets it through again. A browser test presses
+  each with the mouse (GitHub #59).
+- A link of a connection or of the documents provider opens natively before the remote browser is considered: an issue
+  in the task tab through its own connection (two trackers with one key on different hosts no longer mix; the key keeps
+  its case and hyphens), a wiki page in a safe reader, a document or board by the provider's embed address. A
+  documents adapter may declare the new `resolve` capability to tell documents from boards; one without it behaves as
+  before. A refused sign-in shows a "Connect" action and an unembeddable provider "Open original link", never a
+  silently started Chrome. Click, context menu and `harnessly open` agree (GitHub #60).
+- The agent asks the runtime for its chat list again (after 30 s, doubling up to 5 min) while none came: a runtime
+  too busy to make the list in its budget answered nothing, and the backfill to the cluster waited for the next link
+  — chats stayed not caught up for an hour and more on a loaded machine.
+- A chat whose backfill a busy runtime cut (a page not given) goes on from where it stopped a minute later, the wait
+  doubling up to 15 min, while the link stays; it waited for the next link.
+- The chats the cluster holds whole without the steps of every turn (`v2.start.steps`, the cluster's migration 0054) are
+  walked again from their steps cursor with all the steps, after the other walks; their pages carry `steps.from` and
+  move only that cursor.
+- The hub's store waits out a bucket busy with the same blob (409 OperationAborted, «a conflicting conditional
+  operation is currently in progress»: two machines putting the same file at once) and finds the blob there or puts it
+  again; it answered 500, and the machine's sync of that file failed.
+- A chat backfilled to the cluster brings the steps of every turn, not only of its newest three: a walk reads pages
+  of 20 turns with their steps (`…/turns?steps=all`). A folded turn the copy holds fewer steps of than the turn counts
+  (chats backfilled before) is asked from the machine when it is there; it opened with its answer only.
+- The agent gives a page of a long chat 90 s to come whole from the runtime (it was 15 s: the first page of a chat with a
+  transcript of tens of megabytes could be cut there, and its backfill stopped on it); a cut answer is logged as
+  cut, not as «runtime answered 200».
+- A chat's backfill to the cluster goes on from its cursor after the runtime restarts: a page asked before a turn
+  older than the tail the runtime holds now reads the transcript back to that turn; it answered 404, and the chat's
+  backfill stopped there for good.
+- The runtime's read back to an old backfill cursor builds the chat's feed again only when what it read has doubled,
+  not after each 4 MB of the transcript: a walk deep into a transcript of 100 MB was quadratic and held the chat's
+  actor for minutes.
 - A space owner's sidebar no longer merges the chats of every machine of the space: the list, the search and the page's
   first machine are the person's own machines; an administered machine is named under `others` and shows its own list
   only when picked. `POST /api/machines/{id}/owner` hands a machine registered by an admin to the member it is for,

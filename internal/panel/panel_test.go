@@ -1,6 +1,7 @@
 package panel
 
 import (
+	"context"
 	"regexp"
 	"strings"
 	"sync"
@@ -523,5 +524,39 @@ func TestEveryKindOfAddressByItsExactPattern(t *testing.T) {
 		if got := targets.portTarget(in); got != want {
 			t.Errorf("portTarget(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestConnTargetRoundTripKeepsTheKeyAsWritten(t *testing.T) {
+	for _, key := range []string{"Ab-Cd-12", "x:y:z", "123"} {
+		conn, kind, got, ok := ParseConnTarget(ConnTarget("c-1", "issue", key))
+		if !ok || got != key || kind != "issue" || conn != "c-1" {
+			t.Errorf("%q round-tripped to %q %q %q %v", key, got, kind, conn, ok)
+		}
+	}
+	for _, bad := range []string{"PROJ-1", "conn:c", "conn:c:board:1", "conn::issue:1", "conn:c:issue:"} {
+		if _, _, _, ok := ParseConnTarget(bad); ok {
+			t.Errorf("%q parsed as a connection target", bad)
+		}
+	}
+}
+
+func TestClassifyAsksTheResolverBeforeTheBrowserOnly(t *testing.T) {
+	tg := targets
+	tg.Resolve = func(_ context.Context, text string) Link {
+		if strings.Contains(text, "wiki.example.com") {
+			return Link{Tab: "task", Target: ConnTarget("w", "page", "9")}
+		}
+		return Link{}
+	}
+	if tab, target := tg.Classify("https://wiki.example.com/p/9"); tab != "task" || target != "conn:w:page:9" {
+		t.Errorf("resolved link went to %q %q", tab, target)
+	}
+	if tab, _ := tg.Classify("https://other.example.com/x"); tab != "browser" {
+		t.Errorf("unclaimed link went to %q", tab)
+	}
+	// Modifier-click and fixed rules are untouched: a task key never asks the resolver.
+	if tab, _ := tg.Classify("PROJ-12"); tab != "task" {
+		t.Errorf("task key went to %q", tab)
 	}
 }

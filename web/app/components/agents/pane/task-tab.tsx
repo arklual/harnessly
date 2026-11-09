@@ -6,9 +6,11 @@ import { ArrowUpRight, CornerLeftUp, ExternalLink } from 'lucide-react';
 import MessageLink from '@/components/timeline/message-link';
 import { AssigneeAvatar, IssueState } from '@/components/agents/link-meta-parts';
 import useTask from '@/hooks/use-task';
+import useConnPage from '@/hooks/use-conn-page';
+import { parseConnTarget } from '@/lib/conn-target';
 import { issueTone, ISSUE_TONE_LABEL } from '@/lib/link-meta';
 import remarkIssueKeys from '@/lib/remark-issue-keys';
-import { isTaskKey, type ITask, type ITaskComment, type TTaskError } from '@/lib/hl-task';
+import { cleanTaskText, isTaskKey, type ITask, type ITaskComment, type TTaskError } from '@/lib/hl-task';
 import { issueUrl } from '@/lib/tracker-keys';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -19,6 +21,7 @@ interface ITaskTabProps {
   onOpenTask: (key: string, title: string | null) => void;
 }
 
+const TASK_PAGE_MAX = 60 * 1024;
 const REMARK_PLUGINS = [remarkGfm, remarkIssueKeys];
 /** The text comes from the tracker: no raw HTML (react-markdown never renders it), no pictures that would load from anywhere. */
 const MARKDOWN_COMPONENTS = { a: MessageLink, img: () => null } as Components;
@@ -190,10 +193,59 @@ const TaskView = ({ task, onOpenTask }: { task: ITask; onOpenTask: ITaskTabProps
   );
 };
 
-/** A task of the tracker as a tab of the right panel, so a click on its chip does not leave the conversation. */
+const PAGE_ERROR: Record<'not-found' | 'denied' | 'failed', string> = {
+  'not-found': t('pane.taskTab.pageNotFound'),
+  denied: t('pane.taskTab.pageDenied'),
+  failed: t('pane.taskTab.pageFailed'),
+};
+
+/** A wiki page of a connection, read in the pane: Markdown with no raw HTML and no pictures, and a way to the original. */
+const PageTab = ({ conn, id }: { conn: string; id: string }) => {
+  const [load, reload] = useConnPage(conn, id);
+  if (load.status === 'loading') return <Skeleton />;
+  if (load.status === 'error') {
+    return (
+      <div className="tw-task tw-task-error" role="alert">
+        <code className="tw-task-key">{id}</code>
+        <p>{PAGE_ERROR[load.error]}</p>
+        {load.error !== 'not-found' && (
+          <div className="tw-task-error-actions">
+            <button type="button" className="tw-task-retry" onClick={reload}>
+              {t('pane.taskTab.retry')}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  const { page } = load;
+  const original = /^https?:\/\//i.test(page.url) ? page.url : null;
+  return (
+    <article className="tw-task">
+      <h2 className="tw-task-title">{page.title || id}</h2>
+      {original && (
+        <a className="tw-task-tracker" href={original} target="_blank" rel="noopener noreferrer">
+          <ExternalLink /> {t('pane.taskTab.openOriginal')}
+        </a>
+      )}
+      <Markdown text={cleanTaskText(page.body, TASK_PAGE_MAX)} />
+    </article>
+  );
+};
+
+/** A task of the tracker as a tab of the right panel, so a click on its chip does not leave the conversation. A target
+ *  that names a connection (`conn:<id>:<issue|page>:<key>`) is read through that connection. */
 const TaskTab = ({ taskKey, onOpenTask }: ITaskTabProps) => {
-  const valid = isTaskKey(taskKey) ? taskKey : null;
-  const [load, reload] = useTask(valid);
+  const connTarget = parseConnTarget(taskKey);
+  const valid = connTarget
+    ? connTarget.kind === 'issue'
+      ? connTarget.key
+      : null
+    : isTaskKey(taskKey)
+      ? taskKey
+      : null;
+  const [load, reload] = useTask(valid, connTarget?.conn ?? null);
+  if (connTarget?.kind === 'page') return <PageTab conn={connTarget.conn} id={connTarget.key} />;
   if (!valid) return <p className="tw-rpane-muted">{t('pane.taskTab.notTaskKey')}</p>;
   if (load.status === 'loading') return <Skeleton />;
   if (load.status === 'error') {
@@ -207,9 +259,11 @@ const TaskTab = ({ taskKey, onOpenTask }: ITaskTabProps) => {
               {t('pane.taskTab.retry')}
             </button>
           )}
-          <a className="tw-task-tracker" href={issueUrl(valid)} target="_blank" rel="noopener noreferrer">
-            <ExternalLink /> {t('pane.taskTab.openInTracker')}
-          </a>
+          {!connTarget && (
+            <a className="tw-task-tracker" href={issueUrl(valid)} target="_blank" rel="noopener noreferrer">
+              <ExternalLink /> {t('pane.taskTab.openInTracker')}
+            </a>
+          )}
         </div>
       </div>
     );

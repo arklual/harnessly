@@ -1,3 +1,4 @@
+import { parseConnTarget } from '@/lib/conn-target';
 import useBoardFrame from '@/hooks/use-board-frame';
 import { gitlabHosts } from '@/lib/site';
 import { lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -180,6 +181,9 @@ export const TabTitle = ({ paneTab, cwd }: ITabTitleProps) => {
   // A board's target is its address with the key in it: never a name to show.
   if (paneTab.kind === 'artifacts' && paneTab.target && boardFrameUrlOf(paneTab.target))
     return <>{paneTab.title ?? t('pane.conversationPane.board')}</>;
+  // A task or page of a connection is named by the provider's own key.
+  const conn = paneTab.kind === 'task' ? parseConnTarget(paneTab.target) : null;
+  if (conn) return <>{paneTab.title ?? conn.key}</>;
   // A tab an agent asked for comes without a name: a merge request or a commit is named after what its address says.
   if (paneTab.target)
     return <>{paneTab.title ?? paneRequestOf(paneTab.target)?.title ?? baseName(paneTab.target)}</>;

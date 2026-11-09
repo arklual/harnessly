@@ -87,6 +87,27 @@ type Embed struct {
 	ExpiresAt time.Time `json:"expiresAt,omitempty"`
 }
 
+// Resolved is what an address of the provider's service names (the optional `resolve` capability): a document or a
+// board, by the provider's own ID. ID keeps its case and its hyphens as the provider wrote them; nothing is derived
+// from the address.
+type Resolved struct {
+	// Kind is "document" or "board".
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+	// Embed is false when the provider's service cannot be shown in a frame; the address then opens only as a link.
+	Embed *bool `json:"embed,omitempty"`
+}
+
+// Embeddable says whether the provider frames what the address names (an adapter that says nothing does).
+func (r Resolved) Embeddable() bool { return r.Embed == nil || *r.Embed }
+
+// Resolver is a Provider that tells which document or board an address of its service names. It is optional: a provider
+// without it (the built-in catalog, an adapter that does not list `resolve`) keeps the rules of the pane as they are.
+// ok is false for an address the provider does not claim; the error is a refusal (denied) or an unreachable provider.
+type Resolver interface {
+	Resolve(ctx context.Context, address string) (r Resolved, ok bool, err error)
+}
+
 // Grant gives a person or a group a role on a document.
 type Grant struct {
 	Subject string `json:"subject"`

@@ -103,6 +103,27 @@ excerpt}`; `?key=` takes a bare key of the primary tracker. `<platform>/task?key
 task card's shape. Both answer once the person connected something of their own, whatever the deployment names. The
 page's config carries `connectionHosts`, the hosts of the connections with issues or pages as they are at page load.
 
+## Opening a link
+
+A link of the chat, a chip, the context menu and `harnessly open task <url>` go through one rule, and a connection's
+link is looked at before the remote browser is. The runtime asks the connections (`Resolve`: no network call, by host
+and path), then the documents provider (`resolve`, see [documents and boards](doc-adapters.md)):
+
+- An issue opens in the pane's task tab, read through the connection that owns the link. The tab's target is
+  `conn:<connection id>:issue:<key>`, so two trackers that share a key on different hosts each open their own, and the
+  key keeps its case and hyphens. The web reads it with `<platform>/task?key=&conn=`.
+- A wiki page opens in the same tab as a reader (`conn:<id>:page:<id>`): Markdown with no raw HTML and no pictures, and
+  a link to the original page.
+- A document or board of the documents provider opens by the provider's embed address.
+- When the connection's sign-in was refused, or the provider answers 401/403, the answer is `{tab: "link", reason:
+  "connect"}` and the page shows a "Connect" action that leads to Settings → Connections. When the provider cannot be
+  embedded it is `reason: "embed"` and the action is "Open original link". Nothing is opened and the remote Chrome is
+  not started; frame and CSP restrictions are never lifted.
+- A link nobody claims, an unreachable service or a provider without `resolve` open in the browser as before. A
+  click with ctrl, cmd or the middle button keeps navigating outside.
+
+The agent's `open` command refuses a `link` answer with the same words instead of starting the browser.
+
 ## For agents
 
 ```

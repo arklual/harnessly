@@ -1152,7 +1152,7 @@
         "cwd": {"type": "string"}
       }
     },
-    "OpenTab": {"enum": ["task", "gitlab", "artifacts", "browser"]},
+    "OpenTab": {"enum": ["task", "gitlab", "artifacts", "browser", "link"]},
     "OpenChoice": {
       "type": "object",
       "required": ["tab", "target", "label", "detail"],
@@ -1171,7 +1171,8 @@
       "properties": {
         "tab": {"$ref": "#/$defs/OpenTab"},
         "target": {"type": "string", "minLength": 1},
-        "choices": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/OpenChoice"}}
+        "choices": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/OpenChoice"}},
+        "reason": {"enum": ["connect", "embed"]}
       }
     },
     "OpenedRefs": {

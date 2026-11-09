@@ -39,6 +39,8 @@ import { onOpenAttached } from '@/next/features/pane/open-attached';
 import type { MadeItem, MessageRef } from '@/next/protocol/v2';
 import { loadKindDocs } from '@/next/features/app-catalog/api';
 import { goTo, ROUTE } from '@/next/routes/routes';
+import { openPlace } from '@/next/features/pane/open-place';
+import { opensOutside, openOutside } from '@/next/features/chat/pane-sites';
 import { useSubagents } from '@/next/bindings/subagents';
 import { setPaneOpen } from '@/next/bindings/pane-open';
 import { usePaneOpenBeside } from '@/next/bindings/pane-beside';
@@ -1471,19 +1473,35 @@ export const useRightPane = (
   };
   // A place the runtime named opens in its own tab: a task, a merge request or a document, any other site in the
   // browser.
-  const openTarget = ({ tab, target }: OpenTarget) => {
-    if (tab === 'browser') {
-      handoff([{ kind: 'browser', target }]);
-      return;
-    }
-    const id = legacy.show(tab, target);
-    if (!id) {
-      toast(t('next.pane.notYet'), { tone: 'error' });
-      return;
-    }
-    setOpen(true);
-    setActive(id);
-  };
+  const openTarget = (place: OpenTarget) =>
+    openPlace(place, {
+      browser: (target) => handoff([{ kind: 'browser', target }]),
+      show: (tab, target) => legacy.show(tab, target),
+      reveal: (id) => {
+        setOpen(true);
+        setActive(id);
+      },
+      notYet: () => toast(t('next.pane.notYet'), { tone: 'error' }),
+      // Nothing to show natively and nothing to start silently: the person chooses the next step.
+      connect: () =>
+        toast(t('next.pane.linkConnect'), {
+          tone: 'error',
+          action: {
+            label: t('next.pane.linkConnectAction'),
+            onClick: () => goTo({ kind: ROUTE.settings, section: 'connections' }),
+          },
+        }),
+      original: (address) =>
+        toast(t('next.pane.linkEmbed'), {
+          tone: 'error',
+          action: {
+            label: t('next.pane.linkOriginal'),
+            onClick: () => {
+              if (opensOutside(address)) openOutside(address);
+            },
+          },
+        }),
+    });
   // A chip or a link of the feed opens where the agent's open command would put it (the runtime's rules). A ref that
   // fits several places opens the best; a merge request chip asks the person first (its own list, before this).
   const openRef = (ref: string) => {

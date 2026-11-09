@@ -1180,11 +1180,17 @@ export interface LegacyTab {
 }
 /** The tab of the right pane a chip or a link opens in (GET /api/v2/conversations/{id}/open): a tracker task, a
  *  GitLab merge request or commit, a published document or board, any other site in the browser. */
-export const OPEN_TABS = ['task', 'gitlab', 'artifacts', 'browser'] as const;
+export const OPEN_TABS = ['task', 'gitlab', 'artifacts', 'browser', 'link'] as const;
+/** Why a `link` answer opens nothing: the connection's sign-in was refused (`connect`), or the provider cannot be
+ *  shown inside a page (`embed`). The target is then the original address. */
+export const OPEN_REASONS = ['connect', 'embed'] as const;
+export type OpenReason = (typeof OPEN_REASONS)[number];
 export type OpenTab = (typeof OPEN_TABS)[number];
 export interface OpenTarget {
   tab: OpenTab;
   target: string;
+  /** Only on the `link` tab: what the person has to do instead. */
+  reason?: OpenReason;
   /** Present when the ref fits several places (`!12` in two projects): the best first, which is tab and target. */
   choices?: OpenChoice[];
 }
@@ -2660,6 +2666,7 @@ const openChoice: Decoder<OpenChoice> = object({
 const openTarget: Decoder<OpenTarget> = object(
   { tab: oneOf(OPEN_TABS), target: id },
   {
+    reason: oneOf(OPEN_REASONS),
     choices: (v, p) => {
       const choices = array(openChoice)(v, p);
       return choices.length >= 2 ? choices : fail(p, 'fewer than 2 choices');

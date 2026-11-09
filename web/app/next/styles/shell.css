@@ -1321,6 +1321,12 @@ html:has(.hx-app) body {
 .hx-stage:not([data-phase='chat']) .hx-hello__resume {
   pointer-events: auto;
 }
+/* The greeting lets the pointer through to the composer; what is pressed in it takes it back while shown (GitHub
+   issue 59): the machine's setup card and the chip of the project the next chat starts in, not while they fade out. */
+.hx-stage:not([data-phase='chat']) .hx-setup:not([data-closing='true']),
+.hx-stage:not([data-phase='chat']) .hx-hello__into:not([data-state='closing']) {
+  pointer-events: auto;
+}
 .hx-main[data-view='apps'] .hx-stage,
 .hx-main[data-view='apps'] .hx-header {
   display: none;

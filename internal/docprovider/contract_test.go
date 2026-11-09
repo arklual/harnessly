@@ -324,3 +324,52 @@ func TestPublishFailureIsAPublishError(t *testing.T) {
 		t.Fatalf("the adapter's reason is lost: %v", err)
 	}
 }
+
+func TestResolveNamesDocumentsAndBoardsByTheAdaptersID(t *testing.T) {
+	no := false
+	p := adapterOf(t, []string{"read", "resolve"}, 0, map[string]http.HandlerFunc{
+		"/v1/resolve": func(w http.ResponseWriter, r *http.Request) {
+			var in struct {
+				URL string `json:"url"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&in)
+			switch in.URL {
+			case "https://docs.example.com/app/board/Ab-Cd_9":
+				answer(Resolved{Kind: "board", ID: "Ab-Cd_9"})(w, r)
+			case "https://docs.example.com/wiki/Q3-Plan":
+				answer(Resolved{Kind: "document", ID: "Q3-Plan", Embed: &no})(w, r)
+			case "https://docs.example.com/private":
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"error":"denied"}`))
+			case "https://docs.example.com/junk":
+				answer(Resolved{Kind: "folder", ID: "x"})(w, r)
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"error":"not_found"}`))
+			}
+		},
+	})
+	ctx := context.Background()
+	r, ok, err := p.Resolve(ctx, "https://docs.example.com/app/board/Ab-Cd_9")
+	if err != nil || !ok || r.Kind != "board" || r.ID != "Ab-Cd_9" || !r.Embeddable() {
+		t.Fatalf("board: %+v %v %v", r, ok, err)
+	}
+	if r, ok, err := p.Resolve(ctx, "https://docs.example.com/wiki/Q3-Plan"); err != nil || !ok || r.Kind != "document" || r.ID != "Q3-Plan" || r.Embeddable() {
+		t.Fatalf("document that cannot be framed: %+v %v %v", r, ok, err)
+	}
+	if _, ok, err := p.Resolve(ctx, "https://docs.example.com/elsewhere"); ok || err != nil {
+		t.Fatalf("an address the adapter does not claim: %v %v", ok, err)
+	}
+	if _, ok, err := p.Resolve(ctx, "https://docs.example.com/junk"); ok || err != nil {
+		t.Fatalf("an unknown kind was taken: %v %v", ok, err)
+	}
+	if _, ok, err := p.Resolve(ctx, "https://docs.example.com/private"); ok || err == nil {
+		t.Fatalf("denied: %v %v", ok, err)
+	}
+	// An adapter that does not list the capability is never asked.
+	asked := false
+	plain := adapterOf(t, []string{"read"}, 0, map[string]http.HandlerFunc{"/v1/resolve": func(http.ResponseWriter, *http.Request) { asked = true }})
+	if _, ok, err := plain.Resolve(ctx, "https://docs.example.com/x"); ok || err != nil || asked {
+		t.Fatalf("without the capability: %v %v asked=%v", ok, err, asked)
+	}
+}

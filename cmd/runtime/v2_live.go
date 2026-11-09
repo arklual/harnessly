@@ -232,7 +232,9 @@ func newV2Live(d deps, c *core) *v2Live {
 		return madeLibrary{d: v.designly, person: v.designly.personOf(ctx)}
 	}, task: madeTaskOf(handlers.S)}.Made
 	checker := newMRChecker(handlers.S)
-	open := v2Open{record: v.rt.Record, targets: panelTargets(), mrLinks: transcriptMRs(chatSources), mr: checker.lookup, projects: checker.projects, state: &mrState{}}
+	targets := panelTargets()
+	targets.Resolve = linkResolver(connectionsFor(d), docsProviderOf(), targets)
+	open := v2Open{record: v.rt.Record, targets: targets, mrLinks: transcriptMRs(chatSources), mr: checker.lookup, projects: checker.projects, state: &mrState{}}
 	v.srv.Open = open.Open
 	v.srv.OpenAll = open.OpenAll
 	v.srv.AgentSettings = newV2AgentSettings(d)
