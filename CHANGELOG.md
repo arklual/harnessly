@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Personal settings (`/api/v2/me`, `/api/v2/me/settings`) are kept by the hub per signed-in user, with their own
+  revision and the account's e-mail and name; they were forwarded to one runtime's single settings file, so users who
+  shared a runtime overwrote each other's settings, including the main machine. The hub answers them on every route
+  (the fleet, the workspace, a machine's own address), also with the machines off, and refuses a main machine the user
+  may not open. A runtime's old settings file is not copied into any account; a runtime on its own is unchanged
+  (GitHub #61).
 - The home screen's machine setup card takes clicks again: it sat in the greeting, which lets the pointer through to
   the composer, and inherited that, so its stages, «Подробнее», «Повторить» and the safe step did nothing. The card and
   the into-project chip take the pointer while shown; a card fading out lets it through again. A browser test presses

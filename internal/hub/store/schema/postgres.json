@@ -3528,6 +3528,33 @@
         }
       ]
     },
+    "person_settings": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "settings",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ]
+    },
     "prices": {
       "columns": [
         {

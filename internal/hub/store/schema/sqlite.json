@@ -1450,12 +1450,26 @@
           "name": "created_at",
           "type": "BIGINT",
           "notNull": true
+        },
+        {
+          "name": "delivered_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "delivery_error",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
         "id"
       ],
       "indexes": [
+        {
+          "name": "doc_comments_pending",
+          "columns": [
+            "created_at"
+          ]
+        },
         {
           "name": "doc_comments_thread",
           "columns": [
@@ -1509,6 +1523,30 @@
           "name": "updated_at",
           "type": "BIGINT",
           "notNull": true
+        },
+        {
+          "name": "tab_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "session_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "agent_session_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "provider",
+          "type": "TEXT"
+        },
+        {
+          "name": "cwd",
+          "type": "TEXT"
+        },
+        {
+          "name": "bound_at",
+          "type": "BIGINT"
         }
       ],
       "primaryKey": [
@@ -1598,6 +1636,41 @@
         }
       ]
     },
+    "env_apply_pending": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "by_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ],
+      "indexes": [
+        {
+          "name": "env_apply_pending_org",
+          "columns": [
+            "org_id"
+          ]
+        }
+      ]
+    },
     "env_entries": {
       "columns": [
         {
@@ -1657,6 +1730,10 @@
         {
           "name": "position",
           "type": "INTEGER"
+        },
+        {
+          "name": "group_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -1677,6 +1754,117 @@
             "item_id"
           ]
         }
+      ]
+    },
+    "env_groups": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "layer",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hint",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "required",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "default_on",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "position",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "env_groups_org",
+          "columns": [
+            "org_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "layer",
+            "scope_id",
+            "name"
+          ]
+        }
+      ]
+    },
+    "env_person_group": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "group_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "turned_on",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "scope",
+        "group_id"
       ]
     },
     "env_person_off": {
@@ -1706,6 +1894,83 @@
         "user_id",
         "scope",
         "item_id"
+      ]
+    },
+    "env_presets": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "layer",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hint",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "group_ids",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "position",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "env_presets_org",
+          "columns": [
+            "org_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "layer",
+            "scope_id",
+            "name"
+          ]
+        }
       ]
     },
     "env_runs": {
@@ -2058,8 +2323,7 @@
       ],
       "primaryKey": [
         "owner_id"
-      ],
-      "indexes": []
+      ]
     },
     "history_turns": {
       "columns": [
@@ -3528,6 +3792,33 @@
         }
       ]
     },
+    "person_settings": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "settings",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ]
+    },
     "prices": {
       "columns": [
         {
@@ -4120,12 +4411,24 @@
         {
           "name": "org_id",
           "type": "TEXT"
+        },
+        {
+          "name": "create_key",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
         "id"
       ],
       "indexes": [
+        {
+          "name": "spaces_create_key",
+          "unique": true,
+          "columns": [
+            "created_by",
+            "create_key"
+          ]
+        },
         {
           "name": "spaces_org",
           "columns": [
@@ -4492,6 +4795,14 @@
           "columns": [
             "org_key",
             "ts"
+          ]
+        },
+        {
+          "name": "usage_calls_unpriced",
+          "columns": [
+            "org_key",
+            "provider",
+            "msg_key"
           ]
         }
       ]

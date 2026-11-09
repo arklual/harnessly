@@ -317,7 +317,8 @@ these routes answer 404 `not_enabled` (the proxy: 404 `not_found`).
 | `GET /api/me/machines` | signed in | `{machines: [{id, name, host, online, status, lastSeenAt, orgId, orgName, tenantId, tenant}]}` |
 | `GET /api/v2/machines` | signed in | the same list as the runtime's `Machine[]` (`reach`, `lastSeenAt`, `orgName`, `tenant`) |
 | `ANY /api/v2/…?machine=<id>` | signed in | the runtime's own `/api/v2/…` on that machine through its agent tunnel; sockets too |
-| `GET /api/v2/{me,search,vault,push}` | signed in | no machine named: the person's first machine that is on answers |
+| `GET /api/v2/me`, `PATCH /api/v2/me/settings` | signed in | the hub's own, never sent to a machine, whatever `?machine=` says (also `/agents/api/v2/me…` and `/m/<id>/api/v2/me…`): the signed-in user's settings, kept by the hub per user with their own revision; `email` and `name` are the account's. A new account has the default settings at revision 1. Answers as a runtime's: `{r: accepted, me}`, `conflict` (409) on a stale `rev`, `bad-request` (400) on a patch that is not settings or a `defaultMachine` the user may not open. A main machine is a preference, not access: it is checked when saved, and every call to a machine is checked again |
+| `GET /api/v2/{search,vault,push}` | signed in | no machine named: the person's first machine that is on answers |
 
 A machine is listed and proxied by the one rule of `/m/<id>/…`: the person is in its tenant (or manages the organization),
 the access list of the machine lets them in (`HUB_ACCESS_ENFORCE`), and in path mode the machine is trusted. Anything

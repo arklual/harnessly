@@ -286,6 +286,15 @@ func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User
 		s.serveMove(w, r, u)
 		return
 	}
+	if me, settings := mePath(r.URL.Path); me {
+		// The person's settings are the hub user's, whatever machine is named: they never go to a runtime.
+		if _, err := s.fleet(r.Context(), u.ID, onHub); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		s.serveMe(w, r, u, settings)
+		return
+	}
 	q := r.URL.Query()
 	id := q.Get("machine")
 	if r.URL.Path == "/api/v2/machines" && id == "" {

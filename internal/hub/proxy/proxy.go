@@ -352,6 +352,10 @@ func (s *Service) servePath(w http.ResponseWriter, r *http.Request, id string) {
 		s.logout(w, r, "")
 		return
 	}
+	if me, settings := machineMePath(r.URL.Path, id); me {
+		s.serveMe(w, r, p.User, settings)
+		return
+	}
 	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {
 		return
 	}
@@ -402,6 +406,10 @@ func (s *Service) serveRuntimeHost(w http.ResponseWriter, r *http.Request, id st
 	}
 	if r.Method == http.MethodPost && r.URL.Path == "/m/"+id+"/api/auth/logout" {
 		s.logout(w, r, p.Session.TokenHash)
+		return
+	}
+	if me, settings := machineMePath(r.URL.Path, id); me {
+		s.serveMe(w, r, p.User, settings)
 		return
 	}
 	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {

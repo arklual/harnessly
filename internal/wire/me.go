@@ -142,19 +142,7 @@ func (f *FileMe) load() Me {
 			me = saved
 		}
 	}
-	// A record from before the dictation settings has none of them.
-	if me.Settings.Voice.Engine == "" {
-		me.Settings.Voice = DefaultSettings().Voice
-	}
-	// Finished turns fold; «full» was the old default, written with every other setting, and no
-	// page offers the switch yet: a saved «full» is that default. Goes when the settings get the switch.
-	if me.Settings.Density == "full" {
-		me.Settings.Density = "compact"
-	}
-	// A record from before the shortcuts has none of them.
-	if me.Settings.Keys == nil {
-		me.Settings.Keys = map[string][]string{}
-	}
+	NormalizeSettings(&me.Settings)
 	me.Email = nil
 	if f.Name != "" {
 		n := f.Name
@@ -193,6 +181,30 @@ func (f *FileMe) Patch(rev int64, patch json.RawMessage) (Me, error) {
 		return me, err
 	}
 	return me, os.Rename(tmp, f.Path)
+}
+
+// NormalizeSettings brings a saved record up to the settings of today: what an older record lacks gets its default, and
+// a retired value is read as its successor.
+func NormalizeSettings(st *PersonSettings) {
+	// A record from before the dictation settings has none of them.
+	if st.Voice.Engine == "" {
+		st.Voice = DefaultSettings().Voice
+	}
+	// Finished turns fold; «full» was the old default, written with every other setting, and no
+	// page offers the switch yet: a saved «full» is that default. Goes when the settings get the switch.
+	if st.Density == "full" {
+		st.Density = "compact"
+	}
+	// A record from before the shortcuts has none of them.
+	if st.Keys == nil {
+		st.Keys = map[string][]string{}
+	}
+}
+
+// ApplySettingsPatch applies a patch ({"<setting>": value, …}) to the settings: ErrMeBadPatch when a key is not a
+// setting, or a value is out of its type or its limits (the whole patch is refused).
+func ApplySettingsPatch(cur PersonSettings, patch json.RawMessage) (PersonSettings, error) {
+	return applySettingsPatch(cur, patch)
 }
 
 // applySettingsPatch replaces the keys the patch names; a key that is not a setting, or a value out of its type or its
@@ -320,16 +332,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 		refuse(w, RefuseNotFound)
 		return
 	}
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	me, err := s.Me.Me()
-	if err != nil {
-		refuse(w, RefuseInternal)
-		return
-	}
-	writeJSON(w, http.StatusOK, me)
+	ServeMe(w, r, s.Me)
 }
 
 // meSettings serves PATCH /api/v2/me/settings {rev, patch}: {r: accepted, me} or refused{conflict | bad-request}.
@@ -338,6 +341,27 @@ func (s *Server) meSettings(w http.ResponseWriter, r *http.Request) {
 		refuse(w, RefuseNotFound)
 		return
 	}
+	ServeMeSettings(w, r, s.Me)
+}
+
+// ServeMe answers GET /api/v2/me from a store; the runtime serves its own person with it, and the hub serves a hub
+// user with a store of that user's settings.
+func ServeMe(w http.ResponseWriter, r *http.Request, st MeStore) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	me, err := st.Me()
+	if err != nil {
+		refuse(w, RefuseInternal)
+		return
+	}
+	writeJSON(w, http.StatusOK, me)
+}
+
+// ServeMeSettings answers PATCH /api/v2/me/settings {rev, patch} from a store: {r: accepted, me}, or refused with
+// conflict (rev is not the current one) or bad-request.
+func ServeMeSettings(w http.ResponseWriter, r *http.Request, st MeStore) {
 	if r.Method != http.MethodPatch {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -351,7 +375,7 @@ func (s *Server) meSettings(w http.ResponseWriter, r *http.Request) {
 		refuse(w, RefuseBadRequest)
 		return
 	}
-	me, err := s.Me.Patch(*body.Rev, body.Patch)
+	me, err := st.Patch(*body.Rev, body.Patch)
 	switch {
 	case errors.Is(err, ErrMeConflict):
 		refuse(w, RefuseConflict)

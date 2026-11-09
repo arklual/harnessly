@@ -127,8 +127,8 @@ func TestFleetProxyReachesTheChosenMachine(t *testing.T) {
 	if r := f.owner.Do("GET", "/api/v2/ping", nil); r.Code != 404 {
 		t.Errorf("no machine named: %s", r)
 	}
-	if r := f.owner.Do("GET", "/api/v2/me", nil); r.Code != 200 || !strings.Contains(r.String(), "runtime /api/v2/me") {
-		t.Errorf("the person's own path goes to the home machine: %s", r)
+	if r := f.owner.Do("GET", "/api/v2/me", nil); r.Code != 200 || strings.Contains(r.String(), "runtime /api/v2/me") || !strings.Contains(r.String(), "owner@example.com") {
+		t.Errorf("the person's settings are the hub's, not a machine's (HRN-890): %s", r)
 	}
 	if r := f.owner.Do("GET", "/api/v2/ping?machine=m_nothing", nil); r.Code != 404 && r.Code != 403 {
 		t.Errorf("a machine that is not there: %s", r)
