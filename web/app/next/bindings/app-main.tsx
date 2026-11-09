@@ -41,6 +41,9 @@ import { toast } from '@/next/ui/toast';
 import { appBasePath } from '@/platform/config';
 import { t } from '@/next/i18n';
 import { useAppsDebug } from '@/next/features/app-views/debug-mode';
+import { useAgentLimits } from '@/next/bindings/use-limits';
+import LimitsChip from '@/next/features/limits/limits-chip';
+import { limitsProviderOf } from '@/next/features/limits/model';
 
 interface IAppMainPageProps {
   /** The machine of the screen; the chat's own machine wins when the address names a chat. */
@@ -66,7 +69,13 @@ const ChatIsland = ({
   useConversationChannel(machine, conv);
   useCentralFeed(machine, conv);
   const items = useFeedItems(conv, machine);
-  const state = useConversation(conv)?.state.k;
+  const record = useConversation(conv);
+  const state = record?.state.k;
+  // The same limits as the full field's chip: the subscription's windows and their card.
+  const limits = useAgentLimits(
+    machine,
+    limitsProviderOf(record ? { provider: record.provider, profile: record.model?.profile } : null),
+  );
   let last: string | null = null;
   for (let i = (items?.length ?? 0) - 1; i >= 0; i -= 1) {
     const item = items?.[i];
@@ -86,6 +95,7 @@ const ChatIsland = ({
         )
       }
       onExpand={onExpand}
+      limits={limits && <LimitsChip view={limits} />}
     />
   );
 };

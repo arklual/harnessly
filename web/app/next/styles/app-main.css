@@ -884,3 +884,17 @@
     margin-top: var(--hx-space-4);
   }
 }
+/* The limits chip in the field: as tall as its round buttons, and it gives way before the words do. */
+.hx-appisland__box > .hx-lim {
+  flex: 0 1 auto;
+  align-self: center;
+}
+.hx-appisland__box > .hx-lim .hx-lim__chip {
+  max-width: 100%;
+  height: 32px;
+  overflow: hidden;
+}
+.hx-appisland__box > .hx-lim .hx-lim__pop {
+  left: auto;
+  right: -4px;
+}
