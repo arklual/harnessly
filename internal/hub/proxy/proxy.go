@@ -282,7 +282,7 @@ func (s *Service) trusted(ctx context.Context, m store.Machine) error {
 // trustedOnHub is the rule of path mode in either mode: what the machine answers runs on the hub's origin (the
 // workspace, workspace.go), so only a machine as trusted as the hub may answer.
 func (s *Service) trustedOnHub(ctx context.Context, m store.Machine) error {
-	key := m.ID + "/" + m.CreatedBy
+	key := m.ID + "/" + m.Connector()
 	s.mu.Lock()
 	until, ok := s.trust[key]
 	s.mu.Unlock()

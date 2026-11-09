@@ -420,6 +420,9 @@ export interface Machine {
   health?: MachineHealth;
   /** Only from a hub that serves the fleet (runtime.fleet): the organization the machine belongs to. */
   orgName?: string;
+  /** From a hub that serves the fleet: false for a machine the person reaches only as an administrator (#57). Its
+   *  chats stay out of the person's list; it opens when picked. Absent: the person's own. */
+  mine?: boolean;
 }
 /** Level is the worst of issues; issues are worst first, then disk, mem, cpu, and empty when ok. */
 export interface MachineHealth {
@@ -2023,7 +2026,11 @@ export type CentralState = (typeof CENTRAL_STATES)[number];
 export interface CentralList {
   /** false: the copy is off for this person (nothing is stored, nothing is served). */
   enabled: boolean;
+  /** The person's own machines: only their chats join the person's list (#57). */
   machines: { id: MachineId; name: string; state: CentralState }[];
+  /** The machines the person reaches as an administrator: named and stated, never in the person's list (#57; absent
+   *  from an older gateway). */
+  others?: { id: MachineId; name: string; state: CentralState }[];
   conversations: Conversation[];
   /** The chats continued on another machine: the source is held and the target goes on (absent from an older gateway). */
   moved?: CentralMove[];
@@ -3406,7 +3413,10 @@ const centralList: Decoder<CentralList> = object(
     machines: array(object({ id, name: str, state: centralState })),
     conversations: array(conversation),
   },
-  { moved: array(object({ machineId: id, convId, toMachineId: id, toConvId: convId })) },
+  {
+    moved: array(object({ machineId: id, convId, toMachineId: id, toConvId: convId })),
+    others: array(object({ id, name: str, state: centralState })),
+  },
 );
 const centralChat: Decoder<CentralChat> = object(
   {

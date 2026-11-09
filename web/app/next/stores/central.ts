@@ -25,7 +25,8 @@ export interface CentralView {
   moved: ReadonlySet<string>;
   /** The person's machines by the cluster's names, for a chat of a machine the page has no record of. */
   names: ReadonlyMap<MachineId, string>;
-  /** The machines the copy is on for: only their chats join the one list (their moves are the ones known). */
+  /** The person's own machines the copy is on for: only their chats join the one list (their moves are the ones
+   *  known). A machine the person reaches as an administrator is never here (#57). */
   on: ReadonlySet<MachineId>;
 }
 
@@ -71,14 +72,16 @@ export const asOffline = (c: Conversation): Conversation => ({
 export async function refreshCentral(): Promise<void> {
   const res = await getPage(gatewayPath('/history/conversations'), parseCentral.list, TIMEOUT_MS);
   if (!('ok' in res)) return;
-  const { enabled, machines, conversations, moved = [] } = res.value;
-  const off = new Set(machines.filter((m) => m.state === 'offline').map((m) => m.id));
+  const { enabled, machines, conversations, moved = [], others = [] } = res.value;
+  // #57: the machines the person administers are named and stated, but only the person's own are `on`.
+  const named = [...machines, ...others];
+  const off = new Set(named.filter((m) => m.state === 'offline').map((m) => m.id));
   batch(() => {
     centralStore.set({
       enabled,
       off,
       moved: new Set(moved.map((m) => movedKey(m.machineId, m.convId))),
-      names: new Map(machines.map((m) => [m.id, m.name])),
+      names: new Map(named.map((m) => [m.id, m.name])),
       on: new Set(machines.map((m) => m.id)),
     });
     if (!enabled) return;

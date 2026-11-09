@@ -5,14 +5,14 @@ import { hub } from '@/next/core/realtime/hub';
 import { FakeRuntime } from '@/next/core/testing/fake-runtime';
 import { resetCore } from '@/next/core/testing/reset';
 import { bootFake, fakeEnv, settle, useFakeTime } from '@/next/core/testing/setup';
-import { bootNext, bootStore, ME_FIRST_SCREEN_MS, ME_RETRY_MS, shutdownNext } from '@/next/boot';
+import { bootNext, bootStore, ME_FIRST_SCREEN_MS, ME_RETRY_MS, pickActive, shutdownNext } from '@/next/boot';
 import { connectionStore } from '@/next/stores/connection';
 import { convsLoadedStore } from '@/next/stores/conversations';
 import { machinesStore } from '@/next/stores/machines';
 import { draftsStore, setDraft } from '@/next/stores/drafts';
 import { localMeSource, meStore, type MeSource } from '@/next/stores/me';
 import { messagesStore } from '@/next/stores/messages';
-import type { ConvId } from '@/next/protocol/v2';
+import type { ConvId, Machine } from '@/next/protocol/v2';
 
 beforeEach(useFakeTime);
 afterEach(() => {
@@ -277,5 +277,16 @@ describe('whose data the page keeps', () => {
     expect(draftsStore.size).toBe(0);
     expect(machinesStore.size).toBe(0);
     expect(meStore.get().k).toBe('loading');
+  });
+});
+
+describe('the machine the page opens on (#57)', () => {
+  const m = (id: string, mine?: boolean) => ({ id, mine }) as unknown as Machine;
+  it('is the person\'s pick, else their first own machine, not one they only administer', () => {
+    expect(pickActive([m('theirs', false), m('mine', true)], null)).toBe('mine');
+    expect(pickActive([m('theirs', false), m('mine', true)], 'theirs')).toBe('theirs');
+    expect(pickActive([m('a'), m('b')], null)).toBe('a');
+    expect(pickActive([m('theirs', false)], null)).toBe('theirs');
+    expect(pickActive([], null)).toBeNull();
   });
 });

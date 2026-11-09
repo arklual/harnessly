@@ -110,6 +110,21 @@ func (r *Registry) Disable(machineID string) {
 	}
 }
 
+// Reconnect closes the machine's link as a hub that goes away does: the agent dials again at once, and the hub reads the
+// machine anew (its owner changed).
+func (r *Registry) Reconnect(machineID string) {
+	r.mu.Lock()
+	l := r.links[machineID]
+	delete(r.links, machineID)
+	r.mu.Unlock()
+	if l == nil && r.cluster != nil {
+		r.cluster.closeRemote(machineID, int(websocket.StatusGoingAway), "machine owner changed")
+	}
+	if l != nil {
+		l.Close(websocket.StatusGoingAway, "machine owner changed")
+	}
+}
+
 // Online lists the machines with a live link, sorted.
 func (r *Registry) Online() []string {
 	r.mu.Lock()

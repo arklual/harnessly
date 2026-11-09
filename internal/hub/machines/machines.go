@@ -184,6 +184,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/machines/{machineId}/trust", s.auth.Require(s.trust))
 	mux.Handle("DELETE /api/machines/{machineId}/trust", s.auth.Require(s.trust))
 	mux.Handle("POST /api/machines/{machineId}/preflight", s.auth.Require(s.rerunPreflight))
+	mux.Handle("POST /api/machines/{machineId}/owner", s.auth.Require(s.assignOwner))
 
 	s.mountOrg(mux)
 	s.mountProvision(mux)
@@ -245,6 +246,8 @@ type View struct {
 	Proxy        json.RawMessage   `json:"proxy"`
 	Env          []string          `json:"env"`
 	CreatedAt    string            `json:"createdAt"`
+	// OwnerID is the person whose own machine it is: their chats, their sidebar (#57); null for an unclaimed one.
+	OwnerID *string `json:"ownerId"`
 	// Runtime is whether the machine's page opens on this hub: ready, needs_trust (an owner of its space can allow it)
 	// or blocked (docs/hub/api.md, «Trusting a machine»).
 	Runtime string `json:"runtime"`
@@ -304,6 +307,10 @@ func (s *Service) View(ctx context.Context, m store.Machine) (View, error) {
 	if m.SpaceID != "" {
 		id := m.SpaceID
 		v.SpaceID = &id
+	}
+	if m.CreatedBy != "" {
+		owner := m.CreatedBy
+		v.OwnerID = &owner
 	}
 	if v.Runtime, err = s.runtimeState(ctx, m); err != nil {
 		return View{}, err

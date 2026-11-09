@@ -287,3 +287,14 @@ func ParseSidebar(raw json.RawMessage) (json.RawMessage, bool) {
 	}
 	return raw, true
 }
+
+// MoveOwner gives the chats a machine sent for one person to another, when the machine is assigned to them (#57): the
+// copy follows the machine's owner, nothing of it is dropped.
+func MoveOwner(ctx context.Context, db *store.DB, machineID, from, to string) (int64, error) {
+	res, err := db.Exec(ctx, `UPDATE history_conversations SET owner_id = ? WHERE machine_id = ? AND owner_id = ?`, to, machineID, from)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}

@@ -44,7 +44,11 @@ SQLite and Postgres; migration `0028_history.sql`.
 | `GET history/conversations/<id>?before=&limit=` | a page of a chat: up to 33 turns (100 at most), oldest first, the steps of the newest three |
 | `GET history/conversations/<id>/turns/<turn>/entries` | the steps of one folded turn |
 
-Only chats of machines the person may open and that the person owns are served. Older hubs answer these paths from the
+Only chats of machines the person may open and that the person owns are served. A machine the person only
+administers (a space owner sees every machine of the space) is not theirs: its chats stay out of the list and the
+search, and the list names it under `others` (`id`, `name`, `state`) so the page can offer it. Picking it shows that
+machine's own list alone, the way an admin inspects a machine; the search goes only to a machine of the person's own.
+The sidebar (projects and favorites) answers `enabled: false` to a person without a machine of their own. Older hubs answer these paths from the
 home machine; a newer agent with an older hub sends nothing (the hub never asks).
 
 ## Attachments

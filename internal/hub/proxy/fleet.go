@@ -41,6 +41,10 @@ type FleetMachine struct {
 	OrgName    string `json:"orgName"`
 	TenantID   string `json:"tenantId"`
 	Tenant     string `json:"tenant"`
+	// Mine: the machine is the person's own (they added it, or it was assigned to them). The others are there because
+	// the person administers their space or organization: they open them on purpose, their chats never join the
+	// person's own list (docs/hub/machines.md, «Personal and administered machines»).
+	Mine bool `json:"mine"`
 }
 
 // fleetOn says whether the flag is on for the space's organization.
@@ -114,7 +118,7 @@ func (s *Service) fleet(ctx context.Context, userID string, onHub bool) ([]Fleet
 			}
 			f := FleetMachine{
 				ID: m.ID, Name: m.Name, Host: m.Hostname, OrgID: sp.OrgID, OrgName: orgName[sp.OrgID],
-				TenantID: sp.ID, Tenant: sp.Name,
+				TenantID: sp.ID, Tenant: sp.Name, Mine: m.CreatedBy != "" && m.CreatedBy == userID,
 			}
 			if f.OrgName == "" {
 				f.OrgName = sp.Name
@@ -162,6 +166,7 @@ type v2Machine struct {
 	OrgID      string   `json:"orgId"`
 	OrgName    string   `json:"orgName"`
 	Tenant     string   `json:"tenant"`
+	Mine       bool     `json:"mine"`
 }
 
 func (s *Service) v2List(w http.ResponseWriter, r *http.Request, userID string, onHub bool) {
@@ -180,7 +185,7 @@ func (s *Service) v2List(w http.ResponseWriter, r *http.Request, userID string, 
 			reach = "unreachable"
 		}
 		out = append(out, v2Machine{ID: f.ID, Name: f.Name, Host: f.Host, Reach: reach, LastSeenAt: f.LastSeenAt, Agents: []string{},
-			OrgID: f.OrgID, OrgName: f.OrgName, Tenant: f.Tenant})
+			OrgID: f.OrgID, OrgName: f.OrgName, Tenant: f.Tenant, Mine: f.Mine})
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, http.StatusOK, out)
@@ -196,30 +201,53 @@ func clusterPath(p string) bool {
 	return false
 }
 
-// home is the machine the cluster's paths go to: the first one of the fleet that is on, else the first.
+// home is the machine the cluster's paths go to: the first of the person's own machines that is on, else the first of
+// them. Only a person with no machine of their own falls back on the machines they administer.
 func (s *Service) home(ctx context.Context, userID string, onHub bool) string {
+	f, ok := s.homeOf(ctx, userID, onHub)
+	if !ok {
+		return ""
+	}
+	return f.ID
+}
+
+func (s *Service) homeOf(ctx context.Context, userID string, onHub bool) (FleetMachine, bool) {
 	list, err := s.fleet(ctx, userID, onHub)
 	if err != nil || len(list) == 0 {
-		return ""
+		return FleetMachine{}, false
+	}
+	if own := personal(list); len(own) > 0 {
+		list = own
 	}
 	// a machine that is on but did not give its page a moment ago (its runtime hangs while its agent keeps the
 	// link) answers for the person only when no other machine of theirs is on.
-	first := ""
-	for _, f := range list {
+	first := -1
+	for i, f := range list {
 		if !f.Online {
 			continue
 		}
 		if !s.hangs(f.ID) {
-			return f.ID
+			return f, true
 		}
-		if first == "" {
-			first = f.ID
+		if first < 0 {
+			first = i
 		}
 	}
-	if first != "" {
-		return first
+	if first >= 0 {
+		return list[first], true
 	}
-	return list[0].ID
+	return list[0], true
+}
+
+// personal keeps the person's own machines of a fleet list.
+func personal(list []FleetMachine) []FleetMachine {
+	var out []FleetMachine
+	for _, f := range list {
+		if f.Mine {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // hangs: the machine did not give its page settings when last asked, a moment ago (machineSettings).
@@ -271,10 +299,13 @@ func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User
 	if id == "" && clusterPath(r.URL.Path) {
 		// The cluster's own paths (the person, search, the vault) have no machine in the address: the runtime of the
 		// person's first machine that is on answers them, the one a standalone runtime would.
-		if id = s.home(r.Context(), u.ID, onHub); id == "" {
+		f, ok := s.homeOf(r.Context(), u.ID, onHub)
+		// A search goes over every chat of the machine that answers it: only a machine of the person's own may.
+		if !ok || (!f.Mine && (r.URL.Path == "/api/v2/search" || strings.HasPrefix(r.URL.Path, "/api/v2/search/"))) {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
 		}
+		id = f.ID
 	}
 	if !machineID.MatchString(id) {
 		httpx.WriteError(w, r, httpx.ErrNotFound)

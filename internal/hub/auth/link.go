@@ -154,7 +154,7 @@ func (s *Service) IsInstanceAdmin(ctx context.Context, userID string) (bool, err
 // RequireTrustedMachine is the rule of a hub that has no HUB_RUNTIME_DOMAIN: a machine's page runs on the hub's own
 // origin, where its script acts with the session of whoever opens it (and the hub's CSRF checks pass: it is the same
 // origin). That is safe only for a machine as trusted as the hub itself, so such a hub opens the machines its
-// administrators connected (CreatedBy is the one who did) and no others, however open its sign-up is. With
+// administrators connected (store.Machine.Connector is the one who did, kept when the machine is handed to a member) and no others, however open its sign-up is. With
 // HUB_MACHINE_TRUST=on there is one more way in: an owner of the machine's space accepted the risk for that machine
 // (store.MachineTrust, set by POST /api/machines/{id}/trust). In subdomain mode every machine has an origin of its own
 // and the rule does not apply.
@@ -168,7 +168,7 @@ func (s *Service) RequireTrustedMachine(ctx context.Context, m store.Machine) er
 // RequireTrustedOnHub is the same rule whatever the mode: for what a machine answers on the hub's own origin even when
 // it has an origin of its own (the hub's workspace, /agents/, internal/hub/proxy/workspace.go).
 func (s *Service) RequireTrustedOnHub(ctx context.Context, m store.Machine) error {
-	admin, err := s.IsInstanceAdmin(ctx, m.CreatedBy)
+	admin, err := s.IsInstanceAdmin(ctx, m.Connector())
 	if err != nil {
 		return err
 	}

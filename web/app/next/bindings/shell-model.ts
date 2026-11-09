@@ -428,7 +428,9 @@ export function useShellModel(): IShellModel {
   // No machine is picked in the sidebar then: the card is the open chat's machine (the default one on the start page),
   // and a new chat's machine is picked in the model's popover. The projects and the favorites are the person's once
   // the cluster keeps them (below).
-  const unified = central.enabled && home !== null;
+  // #57: only on a machine of the person's own. A machine they reach as an administrator, once picked, shows its own
+  // list alone (inspecting it), and its chats never join the person's list.
+  const unified = central.enabled && home !== null && central.on.has(home);
   const here = unified ? home : active;
   // the projects and the favorites are the person's too when the cluster keeps them (profile-sidebar.ts):
   // the same folders and the same favorites whichever machine is picked, a chat in a folder whatever machine it is on.

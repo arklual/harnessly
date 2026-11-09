@@ -47,6 +47,24 @@ describe('central history', () => {
     for (const m of [...convsLoadedStore.keys()]) convsLoadedStore.delete(m);
   });
 
+  it('names the machines the person administers but keeps their chats out of the list (#57)', async () => {
+    page.getPage.mockResolvedValue({
+      ok: true,
+      value: {
+        enabled: true,
+        machines: [{ id: 'mine', name: 'Mine', state: 'online' }],
+        others: [{ id: 'theirs', name: 'Theirs', state: 'offline' }],
+        conversations: [chat('tab-1', 'mine', 5)],
+      },
+    });
+    await refreshCentral();
+    const c = centralStore.get();
+    expect([...c.on]).toEqual(['mine']);
+    expect(c.names.get('theirs')).toBe('Theirs');
+    expect(isMachineOff('theirs')).toBe(true);
+    expect(keepsHistory('theirs')).toBe(false);
+  });
+
   it('shows a chat of an off machine as stopped and not resumable', () => {
     const c = asOffline(chat('tab-1', 'a', 5));
     expect(c.state).toEqual({ k: 'stopped', since: 5, resumable: false });

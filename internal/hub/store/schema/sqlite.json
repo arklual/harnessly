@@ -2946,6 +2946,10 @@
         {
           "name": "disabled_at",
           "type": "BIGINT"
+        },
+        {
+          "name": "connected_by",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [

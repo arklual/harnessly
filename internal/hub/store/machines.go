@@ -31,20 +31,30 @@ type Machine struct {
 	TeamID string
 	// DisabledAt is when an admin switched the machine off (its link closed, its key kept); nil while it is on.
 	DisabledAt *time.Time
+	// ConnectedBy is who connected the machine when it was handed to somebody else since; "" — CreatedBy did.
+	ConnectedBy string
 }
 
-const machineCols = `id, space_id, name, hostname, os, arch, unix_user, profile, via, key_pub, enc_pub, agent_version, created_by, created_at, last_seen_at, revoked_at, info, team_id, disabled_at`
+// Connector is who connected the machine: whether it is trusted on the hub's origin is theirs to answer for.
+func (m Machine) Connector() string {
+	if m.ConnectedBy != "" {
+		return m.ConnectedBy
+	}
+	return m.CreatedBy
+}
+
+const machineCols = `id, space_id, name, hostname, os, arch, unix_user, profile, via, key_pub, enc_pub, agent_version, created_by, created_at, last_seen_at, revoked_at, info, team_id, disabled_at, connected_by`
 
 func scanMachine(row interface{ Scan(...any) error }) (Machine, error) {
 	var m Machine
-	var space, createdBy, team sql.NullString
+	var space, createdBy, team, connectedBy sql.NullString
 	var created int64
 	var seen, revoked, disabled sql.NullInt64
 	if err := row.Scan(&m.ID, &space, &m.Name, &m.Hostname, &m.OS, &m.Arch, &m.UnixUser, &m.Profile, &m.Via, &m.KeyPub, &m.EncPub,
-		&m.AgentVersion, &createdBy, &created, &seen, &revoked, &m.Info, &team, &disabled); err != nil {
+		&m.AgentVersion, &createdBy, &created, &seen, &revoked, &m.Info, &team, &disabled, &connectedBy); err != nil {
 		return Machine{}, err
 	}
-	m.SpaceID, m.CreatedBy, m.TeamID = space.String, createdBy.String, team.String
+	m.SpaceID, m.CreatedBy, m.TeamID, m.ConnectedBy = space.String, createdBy.String, team.String, connectedBy.String
 	m.CreatedAt, m.LastSeenAt, m.RevokedAt, m.DisabledAt = fromMs(created), fromNullMs(seen), fromNullMs(revoked), fromNullMs(disabled)
 	return m, nil
 }
@@ -59,9 +69,9 @@ func (s Store) CreateMachine(ctx context.Context, m *Machine) error {
 	if m.Info == "" {
 		m.Info = "{}"
 	}
-	_, err := s.q.Exec(ctx, `INSERT INTO machines (`+machineCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	_, err := s.q.Exec(ctx, `INSERT INTO machines (`+machineCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.ID, nullStr(m.SpaceID), m.Name, m.Hostname, m.OS, m.Arch, m.UnixUser, m.Profile, m.Via, m.KeyPub, m.EncPub,
-		m.AgentVersion, nullStr(m.CreatedBy), Ms(m.CreatedAt), nullMs(m.LastSeenAt), nullMs(m.RevokedAt), m.Info, nullStr(m.TeamID), nullMs(m.DisabledAt))
+		m.AgentVersion, nullStr(m.CreatedBy), Ms(m.CreatedAt), nullMs(m.LastSeenAt), nullMs(m.RevokedAt), m.Info, nullStr(m.TeamID), nullMs(m.DisabledAt), nullStr(m.ConnectedBy))
 	return err
 }
 
@@ -152,6 +162,14 @@ func (s Store) ClaimMachine(ctx context.Context, id, spaceID, userID string) (bo
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// SetMachineOwner makes a person the machine's own one: its chats are theirs from now on, its id and key stay (#57).
+// Who connected it is kept: the machine stays as trusted as it was.
+func (s Store) SetMachineOwner(ctx context.Context, id, userID string) error {
+	_, err := s.q.Exec(ctx, `UPDATE machines SET connected_by = COALESCE(connected_by, created_by), created_by = ?
+		WHERE id = ? AND revoked_at IS NULL`, userID, id)
+	return err
 }
 
 func (s Store) RenameMachine(ctx context.Context, id, name string) error {

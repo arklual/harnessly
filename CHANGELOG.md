@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A space owner's sidebar no longer merges the chats of every machine of the space: the list, the search and the page's
+  first machine are the person's own machines; an administered machine is named under `others` and shows its own list
+  only when picked. `POST /api/machines/{id}/owner` hands a machine registered by an admin to the member it is for,
+  with its copied chats (#57).
+
 ### Added
 
 - Your Claude Code memory can follow you to all your machines (opt-in: `HUB_MEMORY_SYNC=on` on the hub,

@@ -458,6 +458,20 @@ Both installers (`install.sh` for a single machine, the hub's `/install` for a h
 
 **Offline bundle.** On a machine with the internet, `scripts/make-offline-bundle.sh X.Y.Z [OUT] [linux_amd64 …]` downloads the release archives, checks them against `checksums.txt` and writes `harnessly-offline-X.Y.Z.tar`; `scripts/make-offline-bundle.sh --hub https://hub.example.com` makes the same from a hub (its `/install` and a copy of `/dl`). Copy the `.tar` over, unpack it and run `sh install.sh --offline .`. tmux and git are not in the bundle, and a hub machine still has to reach its hub to register. The bundle is a build output and is not committed.
 
+## Personal and administered machines
+
+A machine is personal: its owner is the person who registered it, and its chats, history copy, memory and agent
+sign-ins are theirs. A space owner sees every machine of the space in the inventory and may write to it, but its chats
+do not join the owner's sidebar or search; the page opens on a machine of the person's own.
+
+A machine registered by an admin for somebody else is handed over with `POST /api/machines/{id}/owner`
+(`{"userId": "…", "history": "move"|"keep"}`), for a space owner only and to a member of the machine's space. By
+default the chats the machine already copied to the hub move to the new owner; `keep` leaves them with the previous
+one. The machine's link reconnects so that new chats land with the new owner, and the change is written to the audit
+log (`machine_owner_changed`). The machine stays as trusted as it was: on a hub without `HUB_RUNTIME_DOMAIN` the
+rule «an administrator connected it» is asked of who connected it (`machines.connected_by`), not of the new owner. The
+machine answers `ownerId` in `GET /api/machines/{id}`.
+
 ## Upgrade, move and remove
 
 - **Updates by themselves**: the runtime compares its programs (`harnessly-runtime`, `harnessly-agent`, the `harnessly`

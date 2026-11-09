@@ -27,7 +27,8 @@ import (
 //	GET <platform api>/history/sidebar                                   the person's projects and favorites, with its rev
 //	PUT <platform api>/history/sidebar {baseRev, doc}                    writes it on baseRev; 409 with the current one
 //
-// The person is the session's; only chats of machines they may open and that they own are served.
+// The person is the session's; only chats they own are served, and the list and the search hold only the person's own
+// machines: a machine they reach as an administrator is named under "others" and never joins the list (#57).
 
 var (
 	historyPath = regexp.MustCompile(`^/api/[A-Za-z0-9_-]+/history/(conversations(/|$)|search$|sidebar$)`)
@@ -63,17 +64,27 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 	if err != nil {
 		list = nil // no fleet for this person: the copy is empty, not an error
 	}
+	// The copy is the person's own list: only their own machines are in it (machines, ids). The ones they reach as an
+	// administrator are named apart (others), for their state and name; their chats are never listed or searched here.
+	// A chat the person owns is still read by its address wherever it is (reachable).
 	machines := make([]historyMachine, 0, len(list))
+	others := make([]historyMachine, 0)
 	ids := make([]string, 0, len(list))
+	reachable := make([]string, 0, len(list))
 	state := map[string]string{}
 	for _, m := range list {
 		st := "offline"
 		if m.Online {
 			st = "online"
 		}
+		state[m.ID] = st
+		reachable = append(reachable, m.ID)
+		if !m.Mine {
+			others = append(others, historyMachine{ID: m.ID, Name: m.Name, State: st})
+			continue
+		}
 		machines = append(machines, historyMachine{ID: m.ID, Name: m.Name, State: st})
 		ids = append(ids, m.ID)
-		state[m.ID] = st
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	ctx := r.Context()
@@ -115,7 +126,7 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 			conversations = append(conversations, withMachine(c.Record, c.MachineID))
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"enabled": len(machines) > 0, "machines": machines, "conversations": conversations, "moved": []any{},
+			"enabled": len(machines) > 0, "machines": machines, "others": others, "conversations": conversations, "moved": []any{},
 		})
 	case len(parts) == 1:
 		q := r.URL.Query()
@@ -133,7 +144,7 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 			httpx.WriteError(w, r, httpx.Invalid("before", "a turn id"))
 			return
 		}
-		page, err := history.Read(ctx, s.db, p.User.ID, parts[0], ids, before, limit)
+		page, err := history.Read(ctx, s.db, p.User.ID, parts[0], reachable, before, limit)
 		if errors.Is(err, history.ErrNotFound) {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
@@ -148,7 +159,7 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 			"turns":        page.Turns, "entries": page.Entries, "beforeTurnId": page.BeforeTurnID,
 		})
 	case len(parts) == 4 && parts[1] == "turns" && parts[3] == "entries" && turnID.MatchString(parts[2]):
-		_, entries, err := history.TurnEntries(ctx, s.db, p.User.ID, parts[0], parts[2], ids)
+		_, entries, err := history.TurnEntries(ctx, s.db, p.User.ID, parts[0], parts[2], reachable)
 		if errors.Is(err, history.ErrNotFound) {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
@@ -159,7 +170,7 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"turnId": parts[2], "entries": entries})
 	case len(parts) == 4 && parts[1] == "entries" && parts[3] == "output" && turnID.MatchString(parts[2]):
-		page, err := history.EntryOutput(ctx, s.db, p.User.ID, parts[0], parts[2], ids)
+		page, err := history.EntryOutput(ctx, s.db, p.User.ID, parts[0], parts[2], reachable)
 		if errors.Is(err, history.ErrNotFound) {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
@@ -177,7 +188,7 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
 		}
-		page, err := history.Rewound(ctx, s.db, p.User.ID, parts[0], n, ids)
+		page, err := history.Rewound(ctx, s.db, p.User.ID, parts[0], n, reachable)
 		if errors.Is(err, history.ErrNotFound) {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
@@ -202,7 +213,7 @@ func (s *Service) serveSidebar(w http.ResponseWriter, r *http.Request, p *auth.P
 	w.Header().Set("Cache-Control", "no-store")
 	ctx := r.Context()
 	list, _ := s.fleet(ctx, p.User.ID, true)
-	if len(list) == 0 {
+	if len(personal(list)) == 0 { // the projects and favorites are of the person's own machines' chats
 		if r.Method == http.MethodPut {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return

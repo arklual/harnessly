@@ -270,7 +270,7 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     // machine's answer held the page up to 10 s on one machine that was off.
     const preferred = me.k === 'ready' ? me.me.settings.defaultMachine : null;
     const all = machines.map((m) => m.id);
-    hub.start(all, pickActive(all, preferred));
+    hub.start(all, pickActive(machines, preferred));
     for (const m of machines) {
       // A machine the list already calls unreachable is not asked: its socket says when it is back.
       if (m.reach === 'unreachable') continue;
@@ -284,8 +284,12 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
   return booted;
 }
 
-const pickActive = (ids: MachineId[], preferred: MachineId | null): MachineId | null =>
-  preferred && ids.includes(preferred) ? preferred : (ids[0] ?? null);
+/** The machine the page opens on: the person's pick, else the first of their own (#57: not one they only administer),
+ *  else the first. */
+export const pickActive = (machines: readonly Machine[], preferred: MachineId | null): MachineId | null =>
+  preferred && machines.some((m) => m.id === preferred)
+    ? preferred
+    : (machines.find((m) => m.mine !== false)?.id ?? machines[0]?.id ?? null);
 
 /** A machine whose /hello says it is an older runtime leaves the v2 machines: its socket closes. */
 function dropOutdated(m: MachineId, preferred: MachineId | null): void {
@@ -293,7 +297,8 @@ function dropOutdated(m: MachineId, preferred: MachineId | null): void {
   if (st.k !== 'ready' || !st.machines.includes(m)) return;
   const rest = st.machines.filter((id) => id !== m);
   batch(() => {
-    hub.drop(m, pickActive(rest, preferred));
+    const views = rest.map((id) => machinesStore.get(id)?.machine ?? ({ id } as Machine));
+    hub.drop(m, pickActive(views, preferred));
     set({ k: 'ready', machines: rest });
   });
 }
