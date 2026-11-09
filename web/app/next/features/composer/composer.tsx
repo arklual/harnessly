@@ -56,7 +56,7 @@ import { DictationMirror, RecordingTime, RecordingWave } from '@/next/features/c
 import { chordOf } from '@/next/features/keys/chord';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeyHint } from '@/next/features/keys/keys-help';
-import { commandsOfChord } from '@/next/features/keys/keymap';
+import { commandsOfChord, isDefault } from '@/next/features/keys/keymap';
 import { keyOverrides, useKeys } from '@/next/features/keys/use-keys';
 import '@/next/styles/ui.css';
 import '@/next/styles/composer.css';
@@ -456,11 +456,14 @@ const Composer = (props: IComposerProps) => {
     let action = keyAction(event.nativeEvent, touch, props.enterSends ?? true);
     // «Send now» is the action of the shortcuts list: whatever it is bound to sends, and ⌃↵ no longer does once it is not.
     const chord = chordOf(event.nativeEvent);
+    const overrides = keyOverrides();
     const sendNow =
       chord !== null &&
       !event.nativeEvent.isComposing &&
-      commandsOfChord(chord, keyOverrides()).some((c) => c.id === 'composer.send');
-    if (action === KEY_ACTION.sendNow && !sendNow) action = null;
+      commandsOfChord(chord, overrides).some((c) => c.id === 'composer.send');
+    // GitHub #53. While «send now» keeps its own shortcut, every Ctrl/Cmd+Enter the field promises sends now: ⌃↵ on a
+    // Mac and the keypad's Enter used to fall through and do nothing at all.
+    if (action === KEY_ACTION.sendNow && !sendNow && !isDefault('composer.send', overrides)) action = null;
     else if (sendNow && action !== KEY_ACTION.send) action = KEY_ACTION.sendNow;
     if (action === KEY_ACTION.send) {
       event.preventDefault();

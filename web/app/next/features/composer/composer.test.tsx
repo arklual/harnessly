@@ -61,6 +61,21 @@ describe('Composer while the agent works', () => {
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(onSubmit).toHaveBeenLastCalledWith('queue');
   });
+
+  it('every Ctrl/Cmd+Enter sends into the turn while «send now» keeps its shortcut (GitHub #53)', () => {
+    const onSubmit = vi.fn();
+    render(<Composer {...props({ onSubmit })} />);
+    const field = screen.getByRole('textbox');
+    for (const press of [
+      { key: 'Enter', code: 'Enter', metaKey: true },
+      { key: 'Enter', code: 'NumpadEnter', ctrlKey: true },
+      { key: 'Enter', code: 'Enter', metaKey: true, ctrlKey: true },
+    ]) {
+      onSubmit.mockClear();
+      fireEvent.keyDown(field, press);
+      expect(onSubmit, JSON.stringify(press)).toHaveBeenLastCalledWith('now');
+    }
+  });
 });
 
 describe('Composer dictation', () => {
