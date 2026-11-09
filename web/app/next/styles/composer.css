@@ -1144,13 +1144,15 @@
   .hx-composer__bar .hx-model {
     flex: none;
   }
+  /* The chip is cut, not its box: the card opens from the box and would be cut with it. */
   .hx-composer__bar .hx-lim {
     flex: 0 1 auto;
-    overflow: hidden;
   }
   .hx-composer__bar .hx-lim__chip {
     gap: 6px;
+    max-width: 100%;
     padding: 0 8px;
+    overflow: hidden;
   }
   .hx-composer__bar .hx-lim__chip > .hx-icon,
   .hx-composer__bar .hx-lim__win:not([data-least]):not(:only-of-type) {
