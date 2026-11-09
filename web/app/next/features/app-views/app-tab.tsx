@@ -1,9 +1,9 @@
-// The pane tab of an app: one of its views for the pane, in the sandboxed frame. Under it, when the person asked for
+// The pane tab of an app: one of its views for the pane, in the sandboxed frame (which stands in the page's layer of
+// kept views over the tab's place, so it runs on while the tab is out of sight: kept-frames). Under it, when the person asked for
 // it, the inspector (the rights of the app; for a dev install also the view's calls and storage, and a reload). The
 // agent's questions to the person inside the app (app.ask) are asked from here while the tab is open.
 import { useState } from 'react';
-import AppFrame from '@/next/features/app-views/app-frame';
-import { ConsentStage } from '@/next/features/app-consent/consent-ask';
+import { KeptSlot } from '@/next/features/app-views/kept-frames';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import AppAsks from '@/next/features/app-views/asks';
 import AppInspector from '@/next/features/app-views/inspector';
@@ -11,6 +11,8 @@ import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 
 interface IAppTabProps {
+  /** The pane tab: its view is kept by it while the tab is out of sight (kept-frames). */
+  tab: string;
   machine: MachineId;
   conversation: ConvId;
   /** `<app id>[/<view>]`. */
@@ -21,7 +23,7 @@ interface IAppTabProps {
   inspect?: boolean;
 }
 
-const AppTab = ({ machine, conversation, app: id, view: viewId, inspect = false }: IAppTabProps) => {
+const AppTab = ({ tab, machine, conversation, app: id, view: viewId, inspect = false }: IAppTabProps) => {
   const { list, error } = useInstalledApps(machine);
   const [reload, setReload] = useState(0);
   if (error) return <p className="hx-appview__error">{error}</p>;
@@ -31,17 +33,14 @@ const AppTab = ({ machine, conversation, app: id, view: viewId, inspect = false 
   if (!app || !view) return <p className="hx-appview__error">{t('next.appview.gone')}</p>;
   return (
     <>
-      <ConsentStage machine={machine} app={app}>
-        <AppFrame
-          machine={machine}
-          app={app}
-          view={view}
-          target="pane"
-          viewPort={list.viewPort}
-          conversation={conversation}
-          reloadToken={reload}
-        />
-      </ConsentStage>
+      <KeptSlot
+        machine={machine}
+        conversation={conversation}
+        tab={tab}
+        app={id}
+        view={viewId}
+        reload={reload}
+      />
       {inspect && (
         <AppInspector
           machine={machine}

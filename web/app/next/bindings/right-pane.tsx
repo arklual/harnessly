@@ -1038,6 +1038,7 @@ const PaneBody = (props: IPaneBodyProps) => {
       {tab?.kind === 'app' && (
         <AppTab
           key={tab.id}
+          tab={tab.id}
           machine={conv.machineId}
           conversation={conv.id}
           app={tab.app}
