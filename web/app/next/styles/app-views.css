@@ -217,3 +217,25 @@
   overflow: hidden;
   pointer-events: none;
 }
+
+/* A pane tab's app view stands in the page's layer of kept views (features/app-views/kept-frames.tsx), over this box
+   while the tab is on screen and out of sight, still running, while it is not. */
+.hx-keptslot {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.hx-keptframe {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+  pointer-events: none;
+}
+.hx-keptframe[data-shown] {
+  visibility: visible;
+  pointer-events: auto;
+}
+.hx-keptframe > .hx-consentstage {
+  flex: 1;
+}

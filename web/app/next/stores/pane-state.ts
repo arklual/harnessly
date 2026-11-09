@@ -284,6 +284,8 @@ export const chatPanes = {
   prune: (ctx: IPruneContext) => commit(pruneKept(all(), ctx)),
   /** Writes at once (tests, the page going away). */
   flush: persistNow,
+  /** Told of every change to any chat's pane (the kept app views follow their tabs). */
+  subscribe,
 };
 
 /** Forgets the page's panes (tests). */

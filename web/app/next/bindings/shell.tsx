@@ -18,6 +18,7 @@ import { appConfig } from '@/platform/config';
 import { useTheme } from '@/platform/theme';
 import { useAgentTerminal } from '@/next/bindings/agent-terminal';
 import { useRightPane } from '@/next/bindings/right-pane';
+import KeptAppFrames from '@/next/features/app-views/kept-frames';
 import { useChatBackground } from '@/next/bindings/chat-background';
 import { useCentralHistory } from '@/next/bindings/use-central';
 import { useProfileSidebarMerge } from '@/next/bindings/use-profile-sidebar';
@@ -837,6 +838,7 @@ const Shell = ({ owner }: IShellProps) => {
 
   const overlays = (
     <>
+      <KeptAppFrames />
       {projectDialog.dialog}
       {projectSettings.dialog}
       <AppConfirmHost />
