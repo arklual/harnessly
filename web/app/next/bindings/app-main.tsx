@@ -5,7 +5,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import AppAsks from '@/next/features/app-views/asks';
 import AppFrame from '@/next/features/app-views/app-frame';
+import { ConsentStage } from '@/next/features/app-consent/consent-ask';
 import { useInstalledApps } from '@/next/features/app-views/api';
+import ConsentBlock from '@/next/features/app-consent/consent-block';
 import AppInspector from '@/next/features/app-views/inspector';
 import { onOpenAppTab } from '@/next/features/app-views/open';
 import { parseAppTarget } from '@/next/features/app-views/target';
@@ -132,6 +134,9 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
   if (list === null || (conv !== null && record === undefined && !answered))
     return <div className="hx-appview__wait" aria-busy="true" />;
   if (!app) return <p className="hx-appview__error">{t('next.appmain.gone')}</p>;
+  // An app with a window that waits for consent shows the bar over it (ConsentStage); one with no window says
+  // what it waits for here.
+  if (!view && app.consent) return <ConsentBlock className="hx-consentblock--page" app={app} />;
   if (!view) return <p className="hx-appview__error">{t('next.appmain.noScreen')}</p>;
 
   const onChat = record !== undefined && conv !== null;
@@ -270,15 +275,17 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
         onFloat={(float) => place({ ...layout, float })}
         menu={menu}
         stage={
-          <AppFrame
-            machine={machine}
-            app={app}
-            view={view}
-            target={target}
-            viewPort={list.viewPort}
-            conversation={onChat ? conv : null}
-            reloadToken={reload}
-          />
+          <ConsentStage machine={machine} app={app}>
+            <AppFrame
+              machine={machine}
+              app={app}
+              view={view}
+              target={target}
+              viewPort={list.viewPort}
+              conversation={onChat ? conv : null}
+              reloadToken={reload}
+            />
+          </ConsentStage>
         }
         chat={
           onChat ? (

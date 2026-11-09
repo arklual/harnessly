@@ -58,7 +58,9 @@ func messageDoc(conv string, e wire.Entry) (msgindex.Doc, bool) {
 // size only while it followed the feed without a gap: the mark it had was the size the feed stood at before.
 func (c *conv) indexUpdate(u feed.Update) {
 	ix := c.d.Index
-	if ix == nil || c.deletedAt != 0 || c.fd == nil {
+	// While the index is read at the start, the feed does not wait for it: the transcript grew past the index's mark, so
+	// the next scan reads the conversation whole.
+	if ix == nil || ix.Loading() || c.deletedAt != 0 || c.fd == nil {
 		return
 	}
 	var docs []msgindex.Doc

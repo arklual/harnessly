@@ -226,6 +226,9 @@ type Config struct {
 	// UsageIngest (HUB_USAGE_INGEST=on) lets the hub pull the machines' spend facts (docs/hub/usage.md); off: it never
 	// asks, and the spend tables stay empty.
 	UsageIngest bool
+	// History (HUB_HISTORY, on by default) keeps the people's chats in the hub (docs/hub/history.md): the machines'
+	// agents send their runtime's chat list and feeds, and the workspace reads them from here while a machine is off.
+	History bool
 	// Peers (HUB_PEERS=on) lets the machines' agents exchange messages between their chats through the hub
 	// (docs/hub/peers.md); off: POST /agent/peers/* answer 404.
 	Peers bool
@@ -597,6 +600,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_ENV_RECOMMENDED must be on or off")
+	}
+	switch strings.ToLower(def("HUB_HISTORY", "on")) {
+	case "on", "true", "1", "yes":
+		c.History = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_HISTORY must be on or off")
 	}
 	switch strings.ToLower(def("HUB_USAGE_INGEST", "off")) {
 	case "on", "true", "1", "yes":

@@ -25,6 +25,7 @@
   "next.journal.none": "The app has done nothing dangerous yet",
   "next.journal.what.consent": "You agreed to the access",
   "next.journal.what.consent.waits": "Waits for consent",
+  "next.journal.what.consent.policy": "Rights given by the organization's rule",
   "next.journal.what.declined": "You declined the update",
   "next.journal.what.off": "Turned off",
   "next.journal.what.on": "Turned on",
@@ -51,5 +52,14 @@
   "next.journal.what.ai": "Called a model",
   "next.journal.what.agents.run": "Started an agent in a new chat",
   "next.journal.what.secrets.put": "Wrote a secret into the safe",
-  "next.inspector.deprecated": "Deprecated"
+  "next.inspector.deprecated": "Deprecated",
+  "next.consentAsk.title": "«{name}» asks for access",
+  "next.consentAsk.updateTitle": "A new version of «{name}» asks for more access",
+  "next.consentAsk.more": "{list} and {n} more",
+  "next.consentAsk.allow": "Allow",
+  "next.consentAsk.details": "Details",
+  "next.consentAsk.later": "Not now",
+  "next.consent.waitsTitle": "Waits for your consent to its access",
+  "next.consent.updateWaits": "Version {version} waits for consent to new access",
+  "next.consent.whereHint": "You agree in Apps: the app's card → «Review access»."
 }

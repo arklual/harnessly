@@ -50,6 +50,9 @@ type Runtime struct {
 	drafts      draftBook
 	draftsDirty bool
 
+	// restartLoads holds a place for each conversation reading its transcript at the start.
+	restartLoads chan struct{}
+
 	// reapMu keeps one sweep at a time; idle is what the sweeps saw of the chats idle so far (reap.go).
 	reapMu sync.Mutex
 	idle   map[string]*idleTrack
@@ -112,7 +115,7 @@ func New(d Deps) *Runtime {
 		d.Log = nopLog{}
 	}
 	return &Runtime{d: d, epoch: newID(), actors: map[string]*actor{}, bySession: map[string]string{}, ops: map[string]opRecord{}, drafts: draftBook{},
-		inflight: map[string]chan struct{}{}, stop: make(chan struct{})}
+		inflight: map[string]chan struct{}{}, stop: make(chan struct{}), restartLoads: make(chan struct{}, restartLoads)}
 }
 
 // NewInline is a runtime whose actors run on the caller's goroutine (tests).
@@ -241,7 +244,14 @@ func (r *Runtime) restore(f convFile) {
 		c.addGate(&gate{p: &p})
 	}
 	a := r.add(c)
-	_ = r.on(a, func(c *conv, now time.Time) { c.restarted(now) }) // a fresh mailbox is not full
+	_ = r.on(a, func(c *conv, now time.Time) { // a fresh mailbox is not full
+		// Every conversation reads its transcript's tail at a start: a few at a time, and each lets go of it after, so
+		// a machine of hundreds of chats does not hold them all at once (10 GB at a start, 3 GB after).
+		r.restartLoads <- struct{}{}
+		defer func() { <-r.restartLoads }()
+		c.restarted(now)
+		c.fd.Release()
+	})
 }
 
 // restarted: the actor's first turn after a start.
@@ -1351,11 +1361,11 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 
 // onProfile is the model a conversation starts with: model, with the profile on it when one is named. The profile has to
 // be one the machine knows, run through the CLI of the provider and have a key saved; the model and its effort have to
-// be ones the profile lists (ultracode stays Claude's own). Without a profile the model must not be one a profile owns:
-// a conversation on the CLI's own account asking for a vendor's model would run on the wrong account.
+// be ones the profile lists (ultracode stays Claude's own). Without a profile the model must not be a vendor's only (a
+// profile of this CLI owns it and the CLI's own account does not list it): it would run on the wrong account.
 func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) (*wire.Model, wire.RefuseCode) {
 	if profile == "" {
-		if model != nil && r.d.Profiles != nil && r.d.Profiles.OwnsModel(model.ID) {
+		if model != nil && r.d.vendorOnly(p, model.ID) {
 			return nil, wire.RefuseOptionUnknown
 		}
 		return model, ""

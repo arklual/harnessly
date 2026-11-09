@@ -1,6 +1,14 @@
 // The shell and the onboarding step on GET/POST /api/orgs, GET /api/orgs/{org} (docs/hub/orgs.md). The role is worked
 // out per scope from `me.scopes`: the same person may run one tenant and be a member of another.
-import type { Capabilities, Me, OrgList, OrgView, Scope as ApiScope } from '../../../../hub-api/orgs';
+import type {
+  AppsConsent,
+  Capabilities,
+  Me,
+  Org,
+  OrgList,
+  OrgView,
+  Scope as ApiScope,
+} from '../../../../hub-api/orgs';
 import type { Me as HubMe } from '../../../lib/types';
 import type { OnboardingApi } from '../onboarding';
 import type { ShellApi } from '../shell';
@@ -76,6 +84,14 @@ export const liveShell = (remember: (view: OrgView, scope: ApiScope) => void): S
       orgs: list.orgs.map((o) => ({ slug: o.slug, name: o.name, roleLabel: ROLE_WORD[o.role] })),
       features: view.features ?? [],
     };
+  },
+  appsConsent: async (org) => {
+    const view = await http.get<OrgView>(orgPath(org));
+    return view.org.appsConsent ?? 'ask';
+  },
+  setAppsConsent: async (org, value: AppsConsent) => {
+    const out = await http.patch<{ org: Org }>(orgPath(org), { appsConsent: value });
+    return out.org.appsConsent ?? 'ask';
   },
   looseSpaces: async () => {
     const { looseSpaces } = await http.get<OrgList>('/api/orgs');

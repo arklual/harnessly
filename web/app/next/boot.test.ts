@@ -5,7 +5,7 @@ import { hub } from '@/next/core/realtime/hub';
 import { FakeRuntime } from '@/next/core/testing/fake-runtime';
 import { resetCore } from '@/next/core/testing/reset';
 import { bootFake, fakeEnv, settle, useFakeTime } from '@/next/core/testing/setup';
-import { bootNext, ME_RETRY_MS, shutdownNext } from '@/next/boot';
+import { bootNext, bootStore, ME_RETRY_MS, shutdownNext } from '@/next/boot';
 import { connectionStore } from '@/next/stores/connection';
 import { convsLoadedStore } from '@/next/stores/conversations';
 import { machinesStore } from '@/next/stores/machines';
@@ -22,6 +22,22 @@ afterEach(() => {
 });
 
 describe('bootNext', () => {
+  it('a runtime still starting (503) is asked for its machines again, not left failed (HRN-901)', async () => {
+    const rt = new FakeRuntime();
+    rt.machinesStarting = 2;
+    await bootFake({ rt, start: false });
+    const booting = bootNext({
+      kv: () => memoryKV(),
+      lastPerson: null,
+      hub: { socket: rt.socket, env: fakeEnv(), random: () => 0.5, probe: async () => 'network' },
+    });
+    await settle();
+    await vi.advanceTimersByTimeAsync(2500);
+    const st = await booting;
+    expect(st).toEqual({ k: 'ready', machines: [rt.machineId] });
+    expect(rt.machinesStarting).toBe(0);
+  });
+
   it('me → machines → hello → a socket per v2 machine', async () => {
     const rt = new FakeRuntime();
     await bootFake({ rt, start: false });
@@ -63,10 +79,30 @@ describe('bootNext', () => {
     expect(machinesStore.get(rt.machineId)?.runtime).toBe('v2');
   });
 
-  it('a machine that answers /hello as an older runtime is «outdated» and not started', async () => {
-    const { rt, st } = await bootWithHello('older');
-    expect(st).toEqual({ k: 'ready', machines: [] });
+  it('a machine that answers /hello as an older runtime is «outdated» and its socket goes', async () => {
+    const { rt } = await bootWithHello('older');
+    await settle();
+    expect(bootStore.get()).toEqual({ k: 'ready', machines: [] });
     expect(machinesStore.get(rt.machineId)?.runtime).toBe('outdated');
+    expect(hub.client(rt.machineId)).toBeUndefined();
+  });
+
+  it('opens the sockets without waiting for /hello (HRN-902)', async () => {
+    const rt = new FakeRuntime();
+    rt.hello = 'hang';
+    await bootFake({ rt, start: false });
+    const booting = bootNext({
+      kv: () => memoryKV(),
+      lastPerson: null,
+      hub: { socket: rt.socket, env: fakeEnv(), random: () => 0.5, probe: async () => 'network' },
+    });
+    await settle();
+    await vi.advanceTimersByTimeAsync(300);
+    const st = await booting;
+    await settle();
+    expect(st).toEqual({ k: 'ready', machines: [rt.machineId] });
+    expect(connectionStore.get(rt.machineId)?.k).toBe('live');
+    expect(convsLoadedStore.has(rt.machineId)).toBe(true);
   });
 });
 

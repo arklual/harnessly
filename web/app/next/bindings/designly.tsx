@@ -30,6 +30,7 @@ import { designKey } from '@/next/features/designly/design-conv';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { toast } from '@/next/ui/toast';
+import { fetchKitCards, kitCover, type IKitCard } from '@/next/features/designly/kit/kit-api';
 import { useStartChoice } from '@/next/bindings/use-start-choice';
 import { rememberChoice } from '@/next/features/composer/start-choice';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
@@ -257,6 +258,16 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
     return () => abort.abort();
   }, [machine, restored, kitsAdded]);
 
+  // The installed kits for the library's row; without them the row is simply not there.
+  const [kitCards, setKitCards] = useState<IKitCard[] | null>(null);
+  useEffect(() => {
+    const abort = new AbortController();
+    fetchKitCards(machine, abort.signal).then(setKitCards, () => {
+      if (!abort.signal.aborted) setKitCards([]);
+    });
+    return () => abort.abort();
+  }, [machine, restored, kitsAdded]);
+
   // The agent that draws starts the way a new chat does: the person's pick, else the CLI settings file's model and
   // effort, else the last pick. A design starts through its own request, which has no backend profile.
   const { choice, agents, onPick } = useStartChoice(machine, true);
@@ -342,6 +353,15 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
         onRestoreDemo={onRestoreDemo}
         onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
         onRetry={onRetry}
+        kits={
+          kitCards
+            ? {
+                cards: kitCards,
+                cover: (k) => kitCover(machine, k),
+                onOpen: (id) => goTo({ kind: ROUTE.kit, id }),
+              }
+            : undefined
+        }
         compose={{
           machine,
           initialKind,

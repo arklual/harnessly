@@ -641,14 +641,34 @@ write_policy() {
 	track file "$POLICY"
 }
 
+# kept_env prints the KEY=VALUE lines of an env file written before (kept_env FILE OWN) whose keys are not among OWN,
+# the lines this run writes: settings the deployment added (RUNTIME_PREVIEW_DOMAIN, ...) outlive a run of the installer.
+kept_env() {
+	_kf=$(rp "$1")
+	[ -f "$_kf" ] || return 0
+	run_priv cat "$_kf" 2>/dev/null | while IFS= read -r _kl; do
+		case $_kl in '' | '#'*) continue ;; esac
+		_kk=${_kl%%=*}
+		case $_kk in '' | *[!A-Za-z0-9_]*) continue ;; esac
+		if printf '%s\n' "$2" | grep -q "^$_kk="; then continue; fi
+		printf '%s\n' "$_kl"
+	done
+}
+
 write_env_files() {
+	_rt_own=$(runtime_env)
+	_rt_kept=$(kept_env "$CONF_DIR/runtime.env" "$_rt_own")
+	_ag_own=$(agent_env)
+	_ag_kept=$(kept_env "$CONF_DIR/agent.env" "$_ag_own")
 	{
-		printf '# Written by the harnessly installer, which rewrites it when run again.\n'
-		runtime_env
+		printf '# Written by the harnessly installer. A run again rewrites the lines below and keeps the ones you add.\n'
+		printf '%s\n' "$_rt_own"
+		[ -z "$_rt_kept" ] || printf '%s\n' "$_rt_kept"
 	} | put "$CONF_DIR/runtime.env" 0644
 	{
-		printf '# Written by the harnessly installer, which rewrites it when run again. "harnessly-agent status" reads the folders here.\n'
-		agent_env
+		printf '# Written by the harnessly installer. A run again rewrites the lines below and keeps the ones you add. "harnessly-agent status" reads the folders here.\n'
+		printf '%s\n' "$_ag_own"
+		[ -z "$_ag_kept" ] || printf '%s\n' "$_ag_kept"
 	} | put "$CONF_DIR/agent.env" 0644
 	track file "$CONF_DIR/runtime.env"
 	track file "$CONF_DIR/agent.env"
@@ -1241,8 +1261,15 @@ install_full() {
 	mkd "$UNIT_DIR" 0755
 	if [ "$OS" = darwin ]; then
 		mkd "$LOG_DIR" 0755
-		runtime_env | plist io.harnessly.runtime "$BIN_DIR/harnessly-runtime" runtime | put "$UNIT_DIR/io.harnessly.runtime.plist" 0644
-		agent_env | plist io.harnessly.agent "$BIN_DIR/harnessly-agent" agent | put "$UNIT_DIR/io.harnessly.agent.plist" 0644
+		# launchd reads no env file: the plists carry the files' lines, those the installer owns and those kept.
+		{
+			printf '%s\n' "$_rt_own"
+			[ -z "$_rt_kept" ] || printf '%s\n' "$_rt_kept"
+		} | plist io.harnessly.runtime "$BIN_DIR/harnessly-runtime" runtime | put "$UNIT_DIR/io.harnessly.runtime.plist" 0644
+		{
+			printf '%s\n' "$_ag_own"
+			[ -z "$_ag_kept" ] || printf '%s\n' "$_ag_kept"
+		} | plist io.harnessly.agent "$BIN_DIR/harnessly-agent" agent | put "$UNIT_DIR/io.harnessly.agent.plist" 0644
 		track unit io.harnessly.runtime "$UNIT_DIR/io.harnessly.runtime.plist"
 		track unit io.harnessly.agent "$UNIT_DIR/io.harnessly.agent.plist"
 	else

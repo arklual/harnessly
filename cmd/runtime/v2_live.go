@@ -152,11 +152,10 @@ func newV2Live(d deps, c *core) *v2Live {
 		terminals = newV2Stopper(v, c.cfg.Tmux)
 	}
 	// The search index is a cache of the transcripts: one that cannot be opened leaves the runtime without message search.
-	index, err := msgindex.Open(filepath.Join(d.DataDir, "v2", "search"))
-	if err != nil {
+	// It is read behind the start (it holds every transcript's text, hundreds of megabytes on a busy machine).
+	index := msgindex.OpenLater(filepath.Join(d.DataDir, "v2", "search"), func(err error) {
 		agent.Log("warn", "v2: message search is off", agent.F{K: "error", V: err.Error()})
-		index = nil
-	}
+	})
 	var digest func(ctx context.Context, conv string, budget int) (wire.ChatDigest, error)
 	if index != nil {
 		digest = func(ctx context.Context, conv string, budget int) (wire.ChatDigest, error) {
@@ -377,21 +376,25 @@ func v2DefaultEffort(p wire.Provider, m catalog.Model, opts catalog.LaunchOption
 	return &we
 }
 
-// start loads what the actors wrote, takes over the Legacy tabs and their queues, and begins the sync. It returns
-// once the sockets can be served.
+// start loads what the actors wrote and begins the sync, which first takes over the Legacy tabs and their queues. It
+// returns once the sockets can be served: the saved conversations are the list at once, and the take-over (which
+// reads every tab's transcript for its title, minutes on a cold disk after a reboot) goes on behind it.
 func (v *v2Live) start(ctx context.Context) {
 	ctx, v.cancel = context.WithCancel(ctx)
 	if err := v.rt.Start(ctx); err != nil {
 		agent.Log("warn", "v2: some of the saved state is unreadable", agent.F{K: "error", V: err.Error()})
 	}
-	if n := v.importTabs(); n > 0 {
-		agent.Log("info", "v2: Legacy tabs became conversations", agent.F{K: "count", V: n})
-	}
-	v.importProjects()
 	v.ready.Store(true)
 	v.wg.Add(2)
 	go func() { defer v.wg.Done(); v.machine.run(ctx) }()
-	go func() { defer v.wg.Done(); v.syncLoop(ctx) }()
+	go func() {
+		defer v.wg.Done()
+		if n := v.importTabs(); n > 0 {
+			agent.Log("info", "v2: Legacy tabs became conversations", agent.F{K: "count", V: n})
+		}
+		v.importProjects()
+		v.syncLoop(ctx)
+	}()
 	if v.designly != nil {
 		v.wg.Add(1)
 		go func() { defer v.wg.Done(); v.designly.backfill(ctx) }()
@@ -430,17 +433,34 @@ func (v *v2Live) layoutTabs() []convo.ImportTab {
 			}
 			if it, ok := convo.TabFromLayout(t, cwd, v.c.cfg.MetaKey); ok {
 				it.LaunchUltracode = v.c.tabLaunchedUltracode(t)
-				if it.Provider == wire.ProviderClaude && it.TranscriptPath != "" {
-					if h := v.heads.Read(it.TranscriptPath); h.Title != nil && *h.Title != "" {
-						it.Title = *h.Title
-					}
-				}
 				out = append(out, it)
 			}
 		}
 	}
+	// The titles are read off the transcripts' tails, a few at a time: a hundred cold transcripts one by one took
+	// minutes after a reboot.
+	var titled sync.WaitGroup
+	slots := make(chan struct{}, headlineWorkers)
+	for i := range out {
+		it := &out[i]
+		if it.Provider != wire.ProviderClaude || it.TranscriptPath == "" {
+			continue
+		}
+		titled.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer func() { <-slots; titled.Done() }()
+			if h := v.heads.Read(it.TranscriptPath); h.Title != nil && *h.Title != "" {
+				it.Title = *h.Title
+			}
+		}()
+	}
+	titled.Wait()
 	return out
 }
+
+// headlineWorkers is how many transcripts the take-over reads at once for their titles.
+const headlineWorkers = 8
 
 // importTabs makes conversations of the agent tabs v2 does not hold yet. The messages waiting in the Legacy queue of
 // such a tab move with it: they are v2's now, and leave the Legacy queue so that only one of them types them.

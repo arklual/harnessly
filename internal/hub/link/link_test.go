@@ -430,7 +430,7 @@ func TestRevokedMachine(t *testing.T) {
 	if _, err := h.db.S().RevokeMachine(context.Background(), h.machine.ID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if conn, status, body := h.dialRaw(dialOpts{}); conn != nil || status != 403 || !strings.Contains(body, "revoked") {
+	if conn, status, body := h.dialRaw(dialOpts{}); conn != nil || status != 403 || !hubproto.IsRevokedDial([]byte(body)) {
 		t.Errorf("revoked: %d %s", status, body)
 	}
 	// A revoked machine's unsigned dial still gets the neutral answer: revocation is told to the key's holder only.

@@ -344,3 +344,41 @@ func TestSetupOffChangesHelloWithoutARestart(t *testing.T) {
 		t.Fatalf("hello after the change %v setup=%v", hello.Features, hello.Policy.Setup)
 	}
 }
+
+// The runtime's heartbeat going stale and fresh again (a start, a long run) does not cut the link: the offer has to hold
+// for relinkSettle, and then one call tells the hub.
+func TestRunnerBeatFlapDoesNotCallTheHubAgain(t *testing.T) {
+	was := relinkSettle
+	relinkSettle = 6 * time.Second
+	t.Cleanup(func() { relinkSettle = was })
+	r := startHubAgent(t, rigOptions{beforeStart: beat})
+	c := r.connect()
+	hello := decode[hubproto.Hello](t, c.mustCall("hello", nil))
+	if !slices.Contains(hello.Features, hubproto.FeatureEnvSetup) {
+		t.Fatalf("hello %v", hello.Features)
+	}
+	dataDir := filepath.Join(r.rig.Home, ".harnessly")
+	stale := func() {
+		_ = writeFileAtomic(filepath.Join(dataDir, hubproto.EnvRunnerFile), mustJSON(hubproto.EnvRunnerBeat{PID: 1, At: time.Now().Add(-3 * time.Minute).UnixMilli()}))
+	}
+	stale()
+	time.Sleep(envSetupPoll + 500*time.Millisecond) // the watcher sees it stale
+	beat(dataDir)
+	select {
+	case <-r.hub.conns:
+		t.Fatal("a heartbeat that came back within the settle time called the hub again")
+	case <-time.After(relinkSettle + envSetupPoll + time.Second):
+	}
+	// A heartbeat that stays stale is told, by one call.
+	stale()
+	again := r.hub.waitConn(relinkSettle + 3*envSetupPoll)
+	hello = decode[hubproto.Hello](t, again.mustCall("hello", nil))
+	if slices.Contains(hello.Features, hubproto.FeatureEnvSetup) {
+		t.Fatalf("hello after the heartbeat went %v", hello.Features)
+	}
+	select {
+	case <-r.hub.conns:
+		t.Fatal("the change called the hub more than once")
+	case <-time.After(envSetupPoll + time.Second):
+	}
+}

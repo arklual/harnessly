@@ -27,18 +27,30 @@ type Org struct {
 	Currency  string
 	CreatedBy string
 	CreatedAt time.Time
+	// AppsConsent is the organization's rule for apps: AppsConsentAsk, the default, or AppsConsentAuto.
+	AppsConsent string
 }
 
-const orgCols = `id, slug, name, timezone, currency, created_by, created_at`
+// The organization's rules for apps: what the machines of the organization do with the rights an app asks for.
+const (
+	AppsConsentAsk  = "ask"
+	AppsConsentAuto = "auto"
+)
+
+const orgCols = `id, slug, name, timezone, currency, created_by, created_at, apps_consent`
 
 func scanOrg(row interface{ Scan(...any) error }) (Org, error) {
 	var o Org
-	var by sql.NullString
+	var by, consent sql.NullString
 	var created int64
-	if err := row.Scan(&o.ID, &o.Slug, &o.Name, &o.Timezone, &o.Currency, &by, &created); err != nil {
+	if err := row.Scan(&o.ID, &o.Slug, &o.Name, &o.Timezone, &o.Currency, &by, &created, &consent); err != nil {
 		return Org{}, err
 	}
 	o.CreatedBy, o.CreatedAt = by.String, fromMs(created)
+	o.AppsConsent = AppsConsentAsk
+	if consent.String == AppsConsentAuto {
+		o.AppsConsent = AppsConsentAuto
+	}
 	return o, nil
 }
 
@@ -56,8 +68,11 @@ func (s Store) CreateOrg(ctx context.Context, o *Org) error {
 	if o.Currency == "" {
 		o.Currency = "RUB"
 	}
-	_, err := s.q.Exec(ctx, `INSERT INTO orgs (`+orgCols+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		o.ID, o.Slug, o.Name, o.Timezone, o.Currency, nullStr(o.CreatedBy), Ms(o.CreatedAt))
+	if o.AppsConsent != AppsConsentAuto {
+		o.AppsConsent = AppsConsentAsk
+	}
+	_, err := s.q.Exec(ctx, `INSERT INTO orgs (`+orgCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		o.ID, o.Slug, o.Name, o.Timezone, o.Currency, nullStr(o.CreatedBy), Ms(o.CreatedAt), o.AppsConsent)
 	return err
 }
 
@@ -70,7 +85,11 @@ func (s Store) OrgBySlug(ctx context.Context, slug string) (Org, error) {
 }
 
 func (s Store) UpdateOrg(ctx context.Context, o Org) error {
-	_, err := s.q.Exec(ctx, `UPDATE orgs SET name = ?, timezone = ?, currency = ? WHERE id = ?`, o.Name, o.Timezone, o.Currency, o.ID)
+	consent := AppsConsentAsk
+	if o.AppsConsent == AppsConsentAuto {
+		consent = AppsConsentAuto
+	}
+	_, err := s.q.Exec(ctx, `UPDATE orgs SET name = ?, timezone = ?, currency = ?, apps_consent = ? WHERE id = ?`, o.Name, o.Timezone, o.Currency, consent, o.ID)
 	return err
 }
 

@@ -17,6 +17,9 @@ import (
 //  5. chat — on or off in this chat (the conversation's apps), and what the chat's agent can run (Claude Code only);
 //  6. wall — whether the agent of a chat with apps runs inside the operating system's wall.
 //
+// Two more lines stand beside the layers: consent — what the app waits for the person to agree to, and where they agree
+// — and views — the errors its views reported lately (viewlog.go).
+//
 // Explain says what each layer says of one app, so «why is it not in this chat» has an answer line by line.
 
 // ExplainChat is the chat an explanation is about; nil for none (run outside a chat).
@@ -37,6 +40,8 @@ type ExplainInput struct {
 	Wall      bool
 	WallErr   error
 	ChatBytes int
+	// ViewLog are the last lines its views reported (viewlog.go), oldest first.
+	ViewLog []ViewLogLine
 }
 
 // ExplainLine is one layer's word: Layer names it, Says is what it says, Off marks the layer that keeps the app off.
@@ -83,6 +88,15 @@ func Explain(in ExplainInput) []ExplainLine {
 	} else {
 		add("team", false, "the person's own install, not the team's")
 	}
+	switch {
+	case a.NeedsConsent():
+		add("consent", true, "waits for the person's consent to %s; %s", waitingWords(a.WaitingAccess()), ConsentWhere(a.ID))
+	case a.Pending != nil:
+		add("consent", false, "version %s waits for the person's consent to %s, %s runs until then; %s", a.Pending.Version, waitingWords(a.WaitingAccess()), a.Version, ConsentWhere(a.ID))
+	}
+	if a.Off {
+		add("machine", true, "the person turned it off (Приложения → %s → «Включено»)", a.ID)
+	}
 	if len(in.Waiting) > 0 {
 		add("setup", true, "waits for secrets: %s (О приложении → настройки, or harnessly secret ask)", strings.Join(in.Waiting, ", "))
 	} else if len(m.Secrets) > 0 || len(m.Settings) > 0 {
@@ -122,6 +136,10 @@ func Explain(in ExplainInput) []ExplainLine {
 			add("chat", false, "%s", w)
 		}
 	}
+	if n := len(in.ViewLog); n > 0 {
+		// Only the count and the level: the text is the app's own words, read with app logs, marked as such there.
+		add("views", false, "%d line(s) of its views' errors, the last a %s line (harnessly app logs %s)", n, in.ViewLog[n-1].Level, a.ID)
+	}
 	switch {
 	case !in.Wall:
 		add("wall", false, "no wall on this system: the guard hook alone keeps the agent to the apps' rules")
@@ -131,4 +149,12 @@ func Explain(in ExplainInput) []ExplainLine {
 		add("wall", false, "the agent of a chat with apps runs inside the wall")
 	}
 	return out
+}
+
+// waitingWords names what waits, by the codes of the manifest.
+func waitingWords(list []Access) string {
+	if len(list) == 0 {
+		return "what it reaches"
+	}
+	return strings.Join(AccessCodes(list), ", ")
 }

@@ -125,6 +125,14 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 		s.fleetCall(w, clone, p.User, true)
 		return
 	}
+	if uploadsPath.MatchString(rest) && s.uploadsStore() != nil {
+		s.serveUploads(w, r, p, rest)
+		return
+	}
+	if s.history && historyPath.MatchString(rest) {
+		s.serveHistory(w, r, p, rest)
+		return
+	}
 	q := r.URL.Query()
 	id := q.Get("machine")
 	if id == "" || id == "local" {
@@ -262,6 +270,8 @@ func (s *Service) workspaceSettings(r *http.Request, u store.User) (map[string]a
 	delete(cfg, "basePath")
 	delete(cfg, "platformApi")
 	cfg["hubUrl"] = s.cfg.PublicURL
+	// the page puts what a person attaches into the hub's store too, and reads the chat's uploads from here.
+	cfg["centralUploads"] = s.uploadsStore() != nil
 	if link, _ := cfg["hubLink"].(string); link == "" {
 		cfg["hubLink"] = s.cfg.PublicURL
 	}

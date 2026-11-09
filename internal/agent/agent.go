@@ -445,7 +445,13 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 		enabled, _ := field[bool](req, "enabled")
 		cursors, _ := field[map[string]cursor](req, "cursors")
 		known, _ := field[map[string]int64](req, "known")
-		a.replica.start(enabled, cursors, known)
+		// a cluster that keeps where each chat's backfill stopped names the chats it does not hold whole; an
+		// older one sends no `pending`, and its chats are backfilled as before.
+		pending, ok := field[map[string]string](req, "pending")
+		if ok && pending == nil {
+			pending = map[string]string{}
+		}
+		a.replica.start(enabled, cursors, known, pending)
 		return map[string]bool{"ok": true}, nil, nil
 	case "v2.ack":
 		ch, _ := field[string](req, "ch")
@@ -647,6 +653,10 @@ func (a *Agent) runHub(ctx context.Context) error {
 		return err
 	}
 	defer a.hub.stop()
+	if a.hub.historyServed() {
+		// the chats go to the hub; nothing is sent before the hub's history.start says it keeps them.
+		a.startReplica(ctx)
+	}
 	// Run does not return before the dial loop has: a late write of agent-link.json or the audit log after stop would
 	// leave files behind (and a temp folder of a test that cannot be removed).
 	dialed := make(chan struct{})

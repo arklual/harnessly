@@ -24,6 +24,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
+	"github.com/ly-solutions/harnessly/internal/hub/history"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/hubsafe"
 	"github.com/ly-solutions/harnessly/internal/hub/ingest"
@@ -109,6 +110,8 @@ type Hub struct {
 	Machines *machines.Service
 	// Ingest pulls the machines' spend facts; nil unless HUB_USAGE_INGEST=on.
 	Ingest *ingest.Service
+	// History keeps the people's chats (HUB_HISTORY); nil when it is off.
+	History *history.Service
 	// Limits sends the machines their limit lists; nil while HUB_LIMITS_ENFORCE=off.
 	Limits *limits.Pusher
 	// EnvPush sends the machines their environment lists; nil without a feature on.
@@ -200,7 +203,12 @@ func New(o Options) (*Hub, error) {
 		h.Safe = hubsafe.New(kv, prefix, cfg.SafeRefPrefixes)
 	}
 	h.OrgEvents = events.NewMemoryBus(o.Now)
-	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents})
+	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents,
+		EnvChanged: func() {
+			if h.EnvPush != nil {
+				h.EnvPush.Kick()
+			}
+		}})
 	h.Analytics = analytics.New(analytics.Deps{DB: db, Gate: h.Orgs.Gate, Log: log, Now: o.Now, Rates: rb})
 	// A part is on for an organization when the instance switches it on for all (HUB_ENV_FEATURES, HUB_MACHINE_RESOURCES)
 	// or the organization's flags say so (features.Store: HUB_FEATURES_FORCE, the org's choice, HUB_FEATURES_DEFAULT).
@@ -288,16 +296,22 @@ func New(o Options) (*Hub, error) {
 		LinkKey: linkKey, Notice: notice,
 	})
 	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry})
+	var historySink machines.HistorySink
+	if cfg.History {
+		h.History = history.New(history.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
+		historySink = h.History
+	}
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
 		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Docs: h.Docs,
+		History: historySink,
 	})
 	h.Analytics.UseMachines(h.Machines)
 	h.Analytics.UseEvents(h.OrgEvents)
 	h.Analytics.UseFeatures(h.Features)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
-	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features, Workspace: o.Workspace})
+	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features, Workspace: o.Workspace, History: cfg.History})
 	h.Proxy = px
 	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
 	if cfg.SSH {
@@ -321,6 +335,9 @@ func New(o Options) (*Hub, error) {
 	}
 	if err := h.newStore(o); err != nil {
 		return nil, err
+	}
+	if h.Store != nil {
+		px.UseUploads(h.Store)
 	}
 
 	var page http.Handler

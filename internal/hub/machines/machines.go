@@ -53,6 +53,8 @@ type Deps struct {
 	Design DesignSink
 	// Docs answers the machines' doc.publish and doc.acl (internal/hub/docs); nil: nobody answers.
 	Docs DocsSink
+	// History keeps the machines' chats (internal/hub/history); nil: the hub takes none.
+	History HistorySink
 	// Provider runs the machines' virtual servers (docs/hub/provider.md); nil means provider.None.
 	Provider provider.Provider
 	// Publisher carries machine.op and machine.status to the organization's live channel; nil: they go to the space's
@@ -69,6 +71,13 @@ type EnvSink interface {
 	Reported(machineID string, st hubproto.EnvState)
 	// Run keeps a run of the machine's setup (the env.run event).
 	Run(machineID string, run hubproto.EnvRun)
+}
+
+// HistorySink keeps the chats a machine's agent sends (internal/hub/history).
+type HistorySink interface {
+	Connected(m store.Machine, features []string)
+	Live(ctx context.Context, m store.Machine, raw json.RawMessage)
+	Backfill(ctx context.Context, m store.Machine, raw json.RawMessage)
 }
 
 // DocsSink answers the document events of a machine's agent.
@@ -111,6 +120,7 @@ type Service struct {
 	env     EnvSink
 	design  DesignSink
 	docs    DocsSink
+	history HistorySink
 	prov    provider.Provider
 	pub     Publisher
 	gate    FeatureGate
@@ -128,7 +138,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, prov: d.Provider, pub: d.Publisher, gate: d.Features}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now

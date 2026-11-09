@@ -27,6 +27,8 @@ type pictureState struct {
 	named   map[string]namedIn
 	checked []string // the paths of the last check, in order
 	at      time.Time
+	looked  bool
+	size    int64 // the transcript's size at the last look: an unchanged one has no new text to look through
 	reading bool
 }
 
@@ -50,7 +52,7 @@ func (c *conv) namedPictures() []string {
 	p := &c.pics
 	seen := make(map[string]bool, len(p.named))
 	var out []string
-	c.fd.Messages(func(e wire.Entry) {
+	c.fd.Held(func(e wire.Entry) {
 		seen[e.ID] = true
 		n, ok := p.named[e.ID]
 		if !ok || n.rev != e.Rev {
@@ -87,6 +89,12 @@ func (c *conv) watchPictures(now time.Time) {
 	if c.d.PictureRoots == nil || c.deletedAt != 0 || c.fd == nil || p.reading || now.Sub(p.at) < picturesEvery {
 		return
 	}
+	// A released feed has nothing new to name (a new line reads it again) and its last list stands; an unchanged
+	// transcript is looked through again only for a file that came or went.
+	if c.fd.Released() || (p.looked && c.fd.Size() == p.size && now.Sub(p.at) < picturesRecheck) {
+		return
+	}
+	p.size, p.looked = c.fd.Size(), true
 	named := c.namedPictures()
 	if slices.Equal(named, p.checked) && now.Sub(p.at) < picturesRecheck {
 		return

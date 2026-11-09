@@ -25,6 +25,11 @@ vi.mock('@/lib/app-path', () => ({
   currentMachineId: () => undefined,
 }));
 vi.mock('@/next/stores/connection', () => ({ useLinkRestored: () => 0, onReconnectNow: () => undefined }));
+// The kit link is read once per project; these tests count the page's own requests.
+vi.mock('@/next/features/designly/kit/use-kit-link', () => ({
+  useKitLink: () => null,
+  boardNode: () => null,
+}));
 vi.mock('@/next/stores/tabs', () => ({
   useTabState: <T,>(_key: string, initial: T) => useState<T>(initial),
   useTabTitle: () => undefined,

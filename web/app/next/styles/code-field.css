@@ -1,5 +1,5 @@
 /* A one-time code's cells (ui/code-field.tsx): the cells in a row, a dash between the halves, one real input over them. */
-.hx-code {
+.hx-otp {
   position: relative;
   display: grid;
   grid-auto-flow: column;
@@ -7,15 +7,15 @@
   gap: 6px;
   max-width: 320px;
 }
-.hx-code__slot {
+.hx-otp__slot {
   position: relative;
   display: grid;
 }
 /* The dash sits in the gap before the second half. */
-.hx-code__slot[data-dash] {
+.hx-otp__slot[data-dash] {
   margin-left: 10px;
 }
-.hx-code__slot[data-dash]::before {
+.hx-otp__slot[data-dash]::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -25,7 +25,7 @@
   border-radius: 1px;
   background: var(--hx-border-strong);
 }
-.hx-code__cell {
+.hx-otp__cell {
   position: relative;
   display: grid;
   place-items: center;
@@ -43,68 +43,68 @@
     background 200ms var(--hx-ease-out),
     transform 200ms var(--hx-ease-out);
 }
-.hx-code__cell[data-filled] {
+.hx-otp__cell[data-filled] {
   border-color: var(--hx-fg-3);
 }
-.hx-code:focus-within .hx-code__cell[data-active] {
+.hx-otp:focus-within .hx-otp__cell[data-active] {
   border-color: var(--hx-accent);
   box-shadow: 0 0 0 3px var(--hx-accent-soft);
 }
-.hx-code:focus-within .hx-code__cell[data-active]::after {
+.hx-otp:focus-within .hx-otp__cell[data-active]::after {
   content: '';
   width: 2px;
   height: 20px;
   border-radius: 1px;
   background: var(--hx-accent);
-  animation: hx-code-caret 1s steps(1) infinite;
+  animation: hx-otp-caret 1s steps(1) infinite;
 }
-@keyframes hx-code-caret {
+@keyframes hx-otp-caret {
   50% {
     opacity: 0;
   }
 }
-.hx-code[data-state='busy'] .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__cell {
   border-color: var(--hx-accent);
-  animation: hx-code-wave 900ms var(--hx-ease-in-out) infinite;
+  animation: hx-otp-wave 900ms var(--hx-ease-in-out) infinite;
 }
-.hx-code[data-state='busy'] .hx-code__slot:nth-child(2) .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__slot:nth-child(2) .hx-otp__cell {
   animation-delay: 60ms;
 }
-.hx-code[data-state='busy'] .hx-code__slot:nth-child(3) .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__slot:nth-child(3) .hx-otp__cell {
   animation-delay: 120ms;
 }
-.hx-code[data-state='busy'] .hx-code__slot:nth-child(4) .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__slot:nth-child(4) .hx-otp__cell {
   animation-delay: 180ms;
 }
-.hx-code[data-state='busy'] .hx-code__slot:nth-child(5) .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__slot:nth-child(5) .hx-otp__cell {
   animation-delay: 240ms;
 }
-.hx-code[data-state='busy'] .hx-code__slot:nth-child(6) .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__slot:nth-child(6) .hx-otp__cell {
   animation-delay: 300ms;
 }
-.hx-code[data-state='busy'] .hx-code__slot:nth-child(7) .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__slot:nth-child(7) .hx-otp__cell {
   animation-delay: 360ms;
 }
-.hx-code[data-state='busy'] .hx-code__slot:nth-child(8) .hx-code__cell {
+.hx-otp[data-state='busy'] .hx-otp__slot:nth-child(8) .hx-otp__cell {
   animation-delay: 420ms;
 }
-@keyframes hx-code-wave {
+@keyframes hx-otp-wave {
   50% {
     transform: translateY(-3px);
   }
 }
-.hx-code[data-state='done'] .hx-code__cell {
+.hx-otp[data-state='done'] .hx-otp__cell {
   border-color: var(--hx-accent);
   background: var(--hx-accent-soft);
   color: var(--hx-accent);
 }
-.hx-code[data-state='invalid'] .hx-code__cell {
+.hx-otp[data-state='invalid'] .hx-otp__cell {
   border-color: var(--hx-danger);
 }
-.hx-code[data-state='invalid'] {
-  animation: hx-code-shake 320ms var(--hx-ease-out);
+.hx-otp[data-state='invalid'] {
+  animation: hx-otp-shake 320ms var(--hx-ease-out);
 }
-@keyframes hx-code-shake {
+@keyframes hx-otp-shake {
   25% {
     transform: translateX(-4px);
   }
@@ -112,7 +112,7 @@
     transform: translateX(4px);
   }
 }
-.hx-code__input {
+.hx-otp__input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -127,13 +127,13 @@
   letter-spacing: 0;
   cursor: text;
 }
-.hx-code__input::selection {
+.hx-otp__input::selection {
   background: transparent;
 }
 @media (prefers-reduced-motion: reduce) {
-  .hx-code[data-state='busy'] .hx-code__cell,
-  .hx-code[data-state='invalid'],
-  .hx-code:focus-within .hx-code__cell[data-active]::after {
+  .hx-otp[data-state='busy'] .hx-otp__cell,
+  .hx-otp[data-state='invalid'],
+  .hx-otp:focus-within .hx-otp__cell[data-active]::after {
     animation: none;
   }
 }

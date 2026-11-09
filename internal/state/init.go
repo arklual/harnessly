@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
@@ -13,6 +14,14 @@ import (
 // files when there is none), a default layout for a workspace without one, and each layout checked against tmux:
 // a missing agent tab's session is started again and a session of the workspace that no tab names becomes a tab.
 func (s *Store) Init() error {
+	if err := s.InitLayouts(); err != nil {
+		return err
+	}
+	return s.RestoreSessions()
+}
+
+// InitLayouts is Init's first half, the files alone: the workspace list is there, made or migrated.
+func (s *Store) InitLayouts() error {
 	if err := os.MkdirAll(filepath.Join(s.cfg.DataDir, "workspaces"), 0o777); err != nil {
 		return err
 	}
@@ -33,6 +42,15 @@ func (s *Store) Init() error {
 		}
 	}
 	s.wsLock.Unlock()
+	return nil
+}
+
+// RestoreSessions is Init's second half: each layout checked against tmux. After a reboot it starts every agent tab's
+// session again, which takes seconds for a hundred tabs; the runtime's start does the rest of its work first.
+func (s *Store) RestoreSessions() error {
+	s.wsLock.Lock()
+	data := s.readWorkspaces()
+	s.wsLock.Unlock()
 	list := workspacesOf(data)
 	if len(list) == 0 {
 		return nil
@@ -45,6 +63,9 @@ func (s *Store) Init() error {
 	}
 	return nil
 }
+
+// sessionWorkers is how many tmux sessions Init starts at once.
+const sessionWorkers = 8
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
@@ -98,7 +119,8 @@ func (s *Store) checkWorkspace(ws *jsvalue.Object, sessions []string) error {
 	for _, sess := range relevantOf(layout) {
 		present[sess] = true
 	}
-	restarted := false
+	type missing struct{ name, cwd string }
+	var gone []missing
 	for _, t := range allTabs(root(layout)) {
 		if p, _ := t.Get("panelType"); p == webBrowser {
 			continue
@@ -108,10 +130,32 @@ func (s *Store) checkWorkspace(ws *jsvalue.Object, sessions []string) error {
 			if cwd == "" {
 				cwd = firstDir
 			}
-			if err := s.cfg.Tmux.CreateSession(t.String("sessionName"), cols, rows, cwd); err != nil {
+			gone = append(gone, missing{t.String("sessionName"), cwd})
+		}
+	}
+	// After a reboot every tab's session is gone: a hundred of them one by one held the start for seconds. The first
+	// starts the server, the rest go sessionWorkers at a time.
+	restarted := len(gone) > 0
+	if restarted {
+		if err := s.cfg.Tmux.CreateSession(gone[0].name, cols, rows, gone[0].cwd); err != nil {
+			return err
+		}
+		errs := make([]error, len(gone))
+		sem := make(chan struct{}, sessionWorkers)
+		var wg sync.WaitGroup
+		for i, m := range gone[1:] {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func() {
+				defer func() { <-sem; wg.Done() }()
+				errs[i+1] = s.cfg.Tmux.CreateSession(m.name, cols, rows, m.cwd)
+			}()
+		}
+		wg.Wait()
+		for _, err := range errs {
+			if err != nil {
 				return err
 			}
-			restarted = true
 		}
 	}
 

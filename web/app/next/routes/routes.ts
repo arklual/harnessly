@@ -9,6 +9,7 @@ export const ROUTE = {
   designlyNew: 'designlyNew',
   videoNew: 'videoNew',
   site: 'site',
+  kit: 'kit',
   appDoc: 'appDoc',
   invite: 'invite',
   manage: 'manage',
@@ -68,6 +69,9 @@ export type TRoute =
       access?: TAccessFocus;
       edit?: boolean;
     }
+  /** A kit's screen: `/designly/kit/:id`, `?v=` the version (the newest without it), `?theme=` the theme,
+      `?node=` the node the camera starts on, `?chat=` the chat it was opened from («Отправить в чат» goes there). */
+  | { kind: typeof ROUTE.kit; id: string; version?: string; theme?: string; node?: string; chat?: string }
   /** A document of a type an installed app adds, opened in the app's editor: `/designly/doc/:id`, `?chat=` the chat
       it was opened from (its mode is that chat's), `?edit=1` the editing mode. */
   | { kind: typeof ROUTE.appDoc; id: string; chat?: string; edit?: boolean }
@@ -100,6 +104,7 @@ const DESIGNLY_NEW_RE = /^\/designly\/new\/slides\/?$/;
 const VIDEO_NEW_RE = /^\/designly\/new\/video\/?$/;
 const SITE_RE = /^\/design(?:ly)?\/([a-z0-9][a-z0-9-]{0,62})\/?$/;
 const APP_DOC_RE = /^\/designly\/doc\/([a-z0-9][a-z0-9-]{0,62})\/?$/;
+const KIT_RE = /^\/designly\/kit\/([a-z0-9][a-z0-9-]{0,62})\/?$/;
 const INVITE_RE = /^\/design(?:ly)?\/invite\/([A-Za-z0-9_-]{8,200})\/?$/;
 const MANAGE_RE = /^\/manage\/?$/;
 const STATS_RE = /^\/stats\/?$/;
@@ -139,6 +144,21 @@ export const parseRoute = (path: string): TRoute => {
   if (DESIGNLY_RE.test(pathname)) return { kind: ROUTE.designly };
   if (DESIGNLY_NEW_RE.test(pathname)) return { kind: ROUTE.designlyNew };
   if (VIDEO_NEW_RE.test(pathname)) return { kind: ROUTE.videoNew };
+  const kit = KIT_RE.exec(pathname);
+  if (kit?.[1]) {
+    const version = queryParam(path, 'v');
+    const theme = queryParam(path, 'theme');
+    const node = queryParam(path, 'node');
+    const chat = queryParam(path, 'chat');
+    return {
+      kind: ROUTE.kit,
+      id: kit[1],
+      ...(version ? { version } : {}),
+      ...(theme ? { theme } : {}),
+      ...(node ? { node } : {}),
+      ...(chat ? { chat } : {}),
+    };
+  }
   if (MANAGE_RE.test(pathname)) return { kind: ROUTE.manage };
   if (STATS_RE.test(pathname)) return { kind: ROUTE.stats };
   if (EFFICIENCY_RE.test(pathname)) return { kind: ROUTE.efficiency };
@@ -222,6 +242,14 @@ export const routePath = (route: TRoute): string => {
       if (route.access) query.set('access', route.access);
       if (route.edit) query.set('edit', '1');
       return query.size > 0 ? `/designly/${route.id}?${query}` : `/designly/${route.id}`;
+    }
+    case ROUTE.kit: {
+      const query = new URLSearchParams();
+      if (route.version) query.set('v', route.version);
+      if (route.theme) query.set('theme', route.theme);
+      if (route.node) query.set('node', route.node);
+      if (route.chat) query.set('chat', route.chat);
+      return query.size > 0 ? `/designly/kit/${route.id}?${query}` : `/designly/kit/${route.id}`;
     }
     case ROUTE.appDoc: {
       const query = new URLSearchParams();

@@ -318,3 +318,36 @@ echo recovered`, map[string]string{
 		t.Fatal(out)
 	}
 }
+
+// RUNTIME_* given to the installer go into the env file, so every later start of the service reads them, and
+// the launchd job, which reads no env file, carries them.
+func TestRootInstallerKeepsGivenRuntimeEnv(t *testing.T) {
+	out, _ := installerFunctions(t, `parse_args
+OS=linux
+export RUNTIME_PREVIEW_DOMAIN='first.example.com'
+export RUNTIME_GATE_LISTEN=0.0.0.0:1
+write_env_file
+export RUNTIME_PREVIEW_DOMAIN='preview.example.com'
+export RUNTIME_PREVIEW_ID='box-1'
+write_env_file
+unset RUNTIME_PREVIEW_DOMAIN RUNTIME_PREVIEW_ID RUNTIME_GATE_LISTEN
+write_env_file
+cat "$ENV_FILE"
+echo ---
+env_file_runtime
+echo ---
+start_launchd
+cat "$PLIST"`, map[string]string{"launchctl": "exit 0"})
+	file, rest, _ := strings.Cut(out, "---\n")
+	lines, plist, _ := strings.Cut(rest, "---\n")
+	if strings.Count(file, "RUNTIME_PREVIEW_DOMAIN=") != 1 || !strings.Contains(file, `RUNTIME_PREVIEW_DOMAIN="preview.example.com"`) ||
+		!strings.Contains(file, `RUNTIME_PREVIEW_ID="box-1"`) || strings.Contains(file, "RUNTIME_GATE_LISTEN") {
+		t.Fatalf("env file:\n%s", file)
+	}
+	if !strings.Contains(lines, "RUNTIME_PREVIEW_DOMAIN=preview.example.com\n") || !strings.Contains(lines, "RUNTIME_PREVIEW_ID=box-1\n") {
+		t.Fatalf("env_file_runtime:\n%s", lines)
+	}
+	if !strings.Contains(plist, "<key>RUNTIME_PREVIEW_DOMAIN</key><string>preview.example.com</string>") {
+		t.Fatalf("plist:\n%s", plist)
+	}
+}

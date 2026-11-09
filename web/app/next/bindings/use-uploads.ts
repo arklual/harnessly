@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   newUploadSession,
   UPLOAD_FAILURE,
+  keepInHub,
   uploadFile,
   type IUploadSession,
   type UploadOutcome,
@@ -15,6 +16,8 @@ import type { ComposerAttachment } from '@/next/features/composer/types';
 import type { AttachmentRef, MachineId } from '@/next/protocol/v2';
 import { draftsStore, setDraft, type DraftKey } from '@/next/stores/drafts';
 import { limitsOf } from '@/next/stores/machines';
+import { connectionStore } from '@/next/stores/connection';
+import { appConfig } from '@/platform/config';
 import { t } from '@/next/i18n';
 
 interface ILocal {
@@ -109,19 +112,23 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       }
       const mark = { at: performance.now(), sent: 0, speed: 0 };
       const session = rowSession(id);
-      void uploadFile(machine, file, (sent) => progressOf(id, sent, mark), abort.signal, session).then(
-        (outcome) => {
-          controllers.current.delete(id);
-          if (outcome.ok) {
-            setLocal((rows) => rows.filter((r) => r.id !== id));
-            sessions.current.delete(id);
-            const have = draftsStore.get(key) ?? { text: '', attachments: [] };
-            setDraft(key, { ...have, attachments: [...have.attachments, outcome.ref] });
-          } else if (outcome.code !== UPLOAD_FAILURE.aborted) {
-            fail(id, failureText(outcome));
-          }
-        },
-      );
+      // a machine that is off gets the file later: it goes into the hub now, and the machine takes it from
+      // there when the message leaves the outbox.
+      const offline = appConfig().centralUploads && connectionStore.get(machine)?.k !== 'live';
+      const road = offline
+        ? keepInHub(machine, file, (sent) => progressOf(id, sent, mark))
+        : uploadFile(machine, file, (sent) => progressOf(id, sent, mark), abort.signal, session);
+      void road.then((outcome) => {
+        controllers.current.delete(id);
+        if (outcome.ok) {
+          setLocal((rows) => rows.filter((r) => r.id !== id));
+          sessions.current.delete(id);
+          const have = draftsStore.get(key) ?? { text: '', attachments: [] };
+          setDraft(key, { ...have, attachments: [...have.attachments, outcome.ref] });
+        } else if (outcome.code !== UPLOAD_FAILURE.aborted) {
+          fail(id, failureText(outcome));
+        }
+      });
     },
     [machine, key, fail, progressOf, rowSession],
   );

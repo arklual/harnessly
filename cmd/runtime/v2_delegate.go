@@ -121,8 +121,11 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		t := delegation.Tools{S: v.delegation, Caller: id, Why: why}
 		hand := delivery.Tools{Access: access}
 		pics := imagegen.Tools{S: imageJobs(v.d), Caller: id, Why: why, Allowed: func(p string) bool { return saveFolderOK(access, p, v.d.WorkspaceRoot, sharedProjects) }, Readable: pictureReadable(v.d, access)}
-		if id != "" {
-			hand.Handed = func(info delivery.Info) { v.openDelivered(id, info) }
+		hand.Handed = func(info delivery.Info) {
+			keepDelivered(info)
+			if id != "" {
+				v.openDelivered(id, info)
+			}
 		}
 		if rec, ok := v.rt.Record(id); ok {
 			t.Provider = rec.Provider

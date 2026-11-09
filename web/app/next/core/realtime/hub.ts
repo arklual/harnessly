@@ -132,6 +132,23 @@ class Hub {
     };
   }
 
+  /** Lets a machine's socket go (an older runtime): the active and home machines move to next when they were it. */
+  drop(m: MachineId, next: MachineId | null): void {
+    const c = this.clients.get(m);
+    if (!c) return;
+    batch(() => {
+      for (const release of this.held.get(m) ?? []) release();
+      this.held.delete(m);
+      c.stop();
+      this.clients.delete(m);
+      if (homeMachineStore.get() === m) homeMachineStore.set(next);
+      if (activeMachineStore.get() === m) {
+        activeMachineStore.set(null);
+        this.setActive(next);
+      }
+    });
+  }
+
   reconnectNow(m: MachineId): void {
     this.clients.get(m)?.reconnectNow();
   }

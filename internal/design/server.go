@@ -378,6 +378,10 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 		l.serveKit(w, r, segments[1:], port, head)
 		return
 	}
+	if area == "kitv" {
+		l.serveKitView(w, r, q, segments[1:], head)
+		return
+	}
 	if area != "a" || !IsLibraryID(ref) {
 		sendHTML(w, 404, l.notFoundPage(), head)
 		return

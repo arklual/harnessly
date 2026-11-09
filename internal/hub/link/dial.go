@@ -22,7 +22,7 @@ import (
 
 var (
 	errBadDial     = httpx.New(http.StatusUnauthorized, "unauthenticated", "Подпись не принята")
-	errRevoked     = httpx.New(http.StatusForbidden, "forbidden", "Машина отозвана").With("reason", "revoked")
+	errRevoked     = httpx.New(http.StatusForbidden, "forbidden", "Машина отозвана").With("reason", hubproto.RevokedReason)
 	errDialFlooded = httpx.RateLimited(60)
 	// errDisabled is a dial of a machine an administrator switched off: not a 403, which would make the agent stop
 	// dialing until it is restarted; it keeps trying and gets in once the machine is switched on.

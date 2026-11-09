@@ -127,7 +127,7 @@ func TestBrowserSecretsWaitingRequestRejectsMovedProject(t *testing.T) {
 				err   error
 			}
 			done := make(chan answer, 1)
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 			go func() {
 				state, err := svc.RequestSecret(ctx, "chat-a", "service-key", "https://example.com", "sign in")

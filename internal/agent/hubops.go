@@ -53,6 +53,34 @@ func provider(req map[string]json.RawMessage) (string, error) {
 	return "", invalid("provider must be claude or codex")
 }
 
+// opHistory is history.start and history.ack: the hub's copy of the chats, the same replica as a cluster's.
+func (h *hub) opHistory(op string, req map[string]json.RawMessage) (any, func(), error) {
+	if !h.historyServed() {
+		return nil, nil, hubproto.Errf(hubproto.CodeUnsupported, "%s: this link reads no chats", op)
+	}
+	if op == hubproto.OpHistoryAck {
+		ch, _ := field[string](req, "ch")
+		epoch, _ := field[string](req, "epoch")
+		ackSeq, _ := field[int64](req, "ackSeq")
+		gap, _ := field[bool](req, "gap")
+		h.a.replica.ack(ch, epoch, ackSeq, gap)
+		return empty(), nil, nil
+	}
+	enabled, _ := field[bool](req, "enabled")
+	in, _ := field[map[string]hubproto.HistoryCursor](req, "cursors")
+	known, _ := field[map[string]int64](req, "known")
+	pending, _ := field[map[string]string](req, "pending")
+	if pending == nil {
+		pending = map[string]string{} // a hub always keeps the cursors
+	}
+	cursors := make(map[string]cursor, len(in))
+	for ch, c := range in {
+		cursors[ch] = cursor{Epoch: c.Epoch, Seq: c.Seq}
+	}
+	h.a.replica.start(enabled, cursors, known, pending)
+	return empty(), nil, nil
+}
+
 // allow is the policy's yes or no for an operation; a no is recorded and answered.
 func (h *hub) allow(op string, ok bool, what string) error {
 	if ok {
@@ -144,6 +172,8 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	case hubproto.OpPeersDeliver, hubproto.OpPeersDirectory:
 		// Served on an observe link only when the operator opted in with AGENT_HUB_PEERS=on.
 		return h.opPeers(op, req)
+	case hubproto.OpHistoryStart, hubproto.OpHistoryAck:
+		return h.opHistory(op, req)
 	case hubproto.OpDocResult, hubproto.OpDocsDeliver:
 		// Served on an observe link only when the operator opted in with AGENT_HUB_DOCS=on (hubdocs.go).
 		return h.opDocs(op, req)

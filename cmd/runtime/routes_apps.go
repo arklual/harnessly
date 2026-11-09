@@ -91,6 +91,8 @@ type appView struct {
 	Access []apps.Access `json:"access"`
 	// Consent: the install waits for the person to agree to all of Access (a first install nobody clicked through).
 	Consent bool `json:"consent,omitempty"`
+	// AskedIn is the chat whose agent installed what waits for consent: its card shows there.
+	AskedIn string `json:"askedIn,omitempty"`
 	// Pending is a newer version that reaches more and waits for the person's word; its Access is only what it adds.
 	Pending *pendingView `json:"pending,omitempty"`
 	// Off: the person turned the app off with its switch.
@@ -192,9 +194,12 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 		}
 	}
 	v.InstructionsBytes = apps.InstructionsBytes(a)
-	pkg, _ := apps.CachedPackage(a.Dir)
-	v.Access = apps.AccessOf(a.Manifest, pkg)
+	// What the install reaches now: a dev install's folder as it is, where its consent is read from too.
+	v.Access = a.AccessNow()
 	v.Consent, v.Off, v.Source = a.NeedsConsent(), a.Off, a.Source
+	if a.WaitsConsent() {
+		v.AskedIn = a.AskedIn
+	}
 	if p := a.Pending; p != nil {
 		next, _ := apps.CachedPackage(p.Dir)
 		granted := apps.AccessKeys(v.Access)
@@ -381,13 +386,19 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		var b struct {
 			Dir string `json:"dir"`
 			Dev bool   `json:"dev"`
+			// Session is the CLI's tab: the chat whose agent installs, where the consent card shows.
+			Session string `json:"session"`
 		}
 		if !readSecretBody(r, &b) || !strings.HasPrefix(b.Dir, "/") {
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
 		// The CLI is the person's shell and every agent's: what the app reaches waits for a click in the page.
-		got, problems, err := reg.Install(b.Dir, apps.InstallOptions{Dev: b.Dev, HostVersion: version, Consent: apps.ConsentAsk})
+		askedIn := ""
+		if b.Session != "" && chats.ofSession != nil {
+			askedIn = chats.ofSession(b.Session)
+		}
+		got, problems, err := reg.Install(b.Dir, apps.InstallOptions{Dev: b.Dev, HostVersion: version, Consent: apps.ConsentAsk, AskedIn: askedIn})
 		if problems == nil {
 			problems = apps.Problems{}
 		}
@@ -419,7 +430,8 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			}
 			_ = reg.Journal(got.ID, apps.JournalEntry{What: "consent.waits", Class: apps.ClassHigh, OK: true, Detail: detail})
 		}
-		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, true), "problems": problems, "waitsConsent": got.WaitsConsent()})
+		byPolicy := !got.WaitsConsent() && got.Grant != nil && got.Grant.Policy
+		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, true), "problems": problems, "waitsConsent": got.WaitsConsent(), "consentPolicy": byPolicy})
 	}
 
 	remove := func(w http.ResponseWriter, r *http.Request) {
@@ -637,6 +649,12 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
+		// An app that waits for the person's consent cannot be turned on in a chat: the answer says what it waits for and
+		// where the person gives the word.
+		if a, err := reg.Find(b.ID); b.On && err == nil && a.NeedsConsent() {
+			secretJSON(w, http.StatusConflict, map[string]any{"error": "consent", "access": apps.AccessCodes(a.WaitingAccess()), "where": apps.ConsentWhere(b.ID)})
+			return
+		}
 		conv := chats.ofSession(b.Session)
 		if conv == "" {
 			secretJSON(w, http.StatusNotFound, map[string]string{"error": "no-chat"})
@@ -697,8 +715,10 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			return
 		}
 		in := apps.ExplainInput{ID: id, HostVersion: version}
-		if a, err := reg.Get(id); err == nil {
+		// Every install, a dev one that waits for consent and one turned off too: explain says why it is off.
+		if a, err := reg.Find(id); err == nil {
 			in.App = &a
+			in.ViewLog, _ = reg.ViewLog(id, apps.ViewLogMax)
 			if a.Manifest != nil && len(a.Manifest.Secrets) > 0 {
 				store := safeFor(d).store.Local // an app's secrets stay in the file
 				in.Waiting = a.Manifest.WaitingFor(func(name string) bool { return store.HasApp(a.ID, name) })
@@ -734,6 +754,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	routes = append(routes, appPublicRoutes(d, reg, version)...)
 	routes = append(routes, appShareRoutes(d, reg, guests, version)...)
 	routes = append(routes, appConsentRoutes(d, reg)...)
+	routes = append(routes, appViewLogRoutes(d, reg)...)
 	routes = append(routes, appMentionRoutes(d, reg, chats)...)
 	routes = append(routes, appHookRoutes(d, reg, chats)...)
 	routes = append(routes, []gate.Route{

@@ -34,9 +34,12 @@ and on in the page. A copy from `app install` never sees later edits: reinstall 
 | Question | Where |
 | --- | --- |
 | Is the package valid? | `harnessly app validate DIR --strict` names the field |
-| Why is the app not on in this chat? | `harnessly app explain <id>` in the chat's tab: the machine, the team, the setup, how it turns on, the chat and the wall, line by line; `✗` marks the layer that keeps it off |
+| Why is the app not on in this chat? | `harnessly app explain <id>` in the chat's tab: the machine, the team, the consent, the setup, how it turns on, the chat and the wall, line by line; `✗` marks the layer that keeps it off. It sees dev installs and apps that wait or are turned off |
+| The app waits (`state: waiting`, `reason: consent`)? | It asks for rights the person has not agreed to; `detail` names them. Only the person agrees, with a click in the page: «Приложения» → the card → «Посмотреть доступы». The card lists what waits; `harnessly open app:<id>`, `app enable` and `app explain` name it too. No command grants consent |
+| What did the view throw? | `harnessly app logs <id>`: its `console.error` and `console.warn`, uncaught exceptions, rejected promises, content-policy refusals and failed bridge calls, the last 200 lines; the runtime's log has them too, 20 a minute per app. `app explain` names the last one |
 | Which bridge calls did the view make? Which failed? | «Отладка», for a dev install: under the view in the pane, or in «…» on `/apps/<id>`. Method, right, `ok` or the code, and storage keys per scope |
-| Console of the view | The browser's own DevTools: inspect the frame. `preview_console` does not capture a view's console |
+| Console of the view | `harnessly app logs <id>` while the view is open in a page; all of it in the browser's own DevTools (inspect the frame). `preview_console` does not capture a view's console |
+| Where is the app's page? | `/apps/<id>` of the machine's page; on a hub `/m/<machine>/apps/<id>`. The hub's own `/apps/<id>` leads to the person's machine (the one online in their last space) |
 | Which of its own files did the view load? | `preview_network` lists them. It does not show bridge calls or the view's `fetch` to other hosts |
 | Does the agent have the tools? | Ask it; or `/mcp` in its terminal |
 | Was a tool call refused by a rule? | The refusal in the chat names the rule. `harnessly hook app-guard --policy <file>` decides one call by hand |
@@ -109,6 +112,7 @@ The view gets only the runtime's error word. The longer reason is in the runtime
 | `not-on` | 403 | The app is off in that chat | Turn it on from the page |
 | `use-page` | 409 | `app disable` from a tab in a chat with apps | The person uses the page's switch |
 | `no-chat` | 404 | `app enable` from a tab with no known chat | Run it in the chat's tab, or use the page |
+| `consent` | 409 | `app enable` of an app that waits for the person's consent; `access` lists what | The person agrees in «Приложения» |
 | `agent_cannot_change_apps` | 403 | The agent of a chat with apps tried to change apps | The person does it, or use a chat without apps |
 | `agent_outside_the_wall` | 403 | The agent's route is off its list (new tabs, peers, terminal) | Do it outside a chat with apps |
 | `kind-taken` | 409 | Another installed app adds this document type | Rename the type |
@@ -126,6 +130,7 @@ The view gets only the runtime's error word. The longer reason is in the runtime
 | --- | --- |
 | The view's own `fetch('data.json')` or font is 401 | The opaque origin sends no cookie with CORS-mode loads: use a classic script that sets a global |
 | Edits to permissions change nothing | Run `app dev` again |
+| The app opens nothing after a right was added | It waits for the person's consent: `app explain <id>` names what; the person agrees in «Приложения» |
 | The agent says the tool is missing | It started before the edit: restart it. Then check `.mcp.json`, and for an eval that the case mocks that server |
 | `Edit(docs/*)` does not stop an edit | Claude sends absolute paths, and `Edit` does not cover `Write` |
 | An `allow` rule does not stop the prompts | `allow` grants nothing |

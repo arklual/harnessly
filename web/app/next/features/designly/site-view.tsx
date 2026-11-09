@@ -247,6 +247,8 @@ export interface ISiteViewProps {
   full?: boolean;
   /** Set where the gateway keeps the project's access and the person has something to do there. */
   access?: ISiteAccess;
+  /** The kit the project is made from: its chip on the bar, before the share button. */
+  kit?: ReactNode;
   /** «Скачать» (project-downloads.tsx) on the bar, in «Ещё», on a page's row and tab: the project of the pages. */
   downloads?: Omit<IProjectDownloadsOf, 'board'>;
   /** The page's preview slot, whose record DevTools read; without it the panel is not offered. */
@@ -399,6 +401,7 @@ const SiteView = ({
   pane,
   toolPane = null,
   access,
+  kit,
   devtools,
   memoryKey,
   viewSeed,
@@ -1832,6 +1835,7 @@ const SiteView = ({
                 }
               />
             )}
+            {kit}
             {(pane || access) && (
               <button
                 type="button"

@@ -40,7 +40,8 @@ func StateIn(a Installed, safe bool, host string, packageErr error, secrets, con
 	case a.Muted || a.Off:
 		return AppState{State: StateDisabled, Reason: ReasonOff}
 	case a.NeedsConsent():
-		return AppState{State: StateWaiting, Reason: ReasonConsent}
+		// The detail names what waits: the codes of the manifest, as the author wrote them.
+		return AppState{State: StateWaiting, Reason: ReasonConsent, Detail: strings.Join(AccessCodes(a.WaitingAccess()), ", ")}
 	case safe && !SafeAllows(a):
 		return AppState{State: StateDisabled, Reason: ReasonSafe}
 	case a.Manifest == nil:

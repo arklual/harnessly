@@ -9,7 +9,7 @@ interface IDeliveryCardProps {
   output: TurnOutput;
   index: number;
   onOpen?: (output: TurnOutput) => void;
-  downloadUrl?: (path: string) => string;
+  downloadUrl?: (path: string, output?: TurnOutput) => string;
 }
 
 const iconOf = (mime: string | undefined): string => {
@@ -37,7 +37,7 @@ const DeliveryCard = ({ output, index, onOpen, downloadUrl }: IDeliveryCardProps
       </span>
     </>
   );
-  const href = downloadUrl?.(output.ref);
+  const href = downloadUrl?.(output.ref, output);
   return (
     <div className="hx-file hx-file--delivery" data-j={index}>
       {onOpen ? (

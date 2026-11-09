@@ -73,19 +73,29 @@ export async function refreshCentral(): Promise<void> {
     if (!enabled) return;
     const byMachine = new Map<MachineId, Conversation[]>();
     for (const c of conversations) {
-      if (!off.has(c.machineId) || connectionStore.get(c.machineId)?.k === 'live') continue;
+      if (!drawsFromCopy(c.machineId, off)) continue;
       byMachine.set(c.machineId, [...(byMachine.get(c.machineId) ?? []), c]);
     }
     for (const [machine, list] of byMachine) {
+      // Stopped only where nothing can run them; a machine that is starting or live keeps the copy's look until its list.
+      const stopped = off.has(machine) && connectionStore.get(machine)?.k !== 'live';
       for (const c of list) {
         const have = conversationsStore.get(c.id);
         if (have && have.lastActivityAt > c.lastActivityAt) continue;
-        conversationsStore.set(c.id, asOffline(c));
+        conversationsStore.set(c.id, stopped ? asOffline(c) : c);
       }
       if (!convsLoadedStore.has(machine)) convsCachedStore.set(machine, true);
     }
   });
 }
+
+/** Whether a machine's chats are drawn from the copy: it is off by the cluster's word, or its own list has not come
+ *  on this page yet (a machine that is starting, hung or only just switched off, which the cluster names offline
+ *  45 s later). A live link's list is the machine's own word and replaces the copy as it comes. */
+const drawsFromCopy = (m: MachineId, off: ReadonlySet<MachineId>): boolean => {
+  if (connectionStore.get(m)?.k === 'live' && convsLoadedStore.has(m)) return false;
+  return off.has(m) || !convsLoadedStore.has(m);
+};
 
 export function loadCentralChat(
   conv: string,

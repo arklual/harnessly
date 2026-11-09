@@ -68,6 +68,9 @@ type Deps struct {
 	// Workspace is the runtime's built page (web/dist): the hub serves it at /agents/ for the fleet (workspace.go). nil
 	// leaves /agents/ to the hub's page.
 	Workspace fs.FS
+	// History: the workspace's chat history is read from the hub's copy (internal/hub/history, history.go); false leaves
+	// it to the home machine.
+	History bool
 }
 
 // Interceptor answers some requests of a signed-in person to a machine itself; false lets them through to it.
@@ -89,6 +92,8 @@ type Service struct {
 	design  Interceptor
 	gate    FeatureGate
 	web     fs.FS
+	history bool
+	uploads Uploads
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
@@ -116,7 +121,7 @@ type grantCall struct {
 // New makes the proxy.
 func New(d Deps) *Service {
 	s := &Service{
-		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace,
+		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History,
 		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
 		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}

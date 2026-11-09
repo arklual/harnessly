@@ -102,11 +102,12 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
   harnessly app dev [DIR]           install the folder itself for development: a chat started after an edit gets it
   harnessly app install [DIR]       install a copy of the package on this machine
   harnessly app list | remove ID    the installed apps; uninstall one
-  harnessly app enable|disable ID
+  harnessly app enable|disable ID    turn an app on or off in this chat (the agent gets it when it starts next)
   harnessly app connect ID CONNECTION [--off]
-                                    turn an app on or off in this chat (the agent gets it when it starts next)
-  harnessly app explain ID          why the app is on or off here, layer by layer: machine, team, setup, activation,
-                                    this chat, the wall; ✗ marks the layer that keeps it off
+                                    the person agrees that the app uses their connection (Settings → Connections), or takes it back
+  harnessly app explain ID          why the app is on or off here, layer by layer: machine, team, consent, setup,
+                                    activation, this chat, the wall, its views' errors; ✗ marks what keeps it off
+  harnessly app logs ID [--limit N] what its views reported: console errors, exceptions, failed bridge calls
   harnessly app publish [DIR] --channel dev|beta|stable [--team]
                                     publish a new, immutable version on a channel (--team: also to the team's catalog)
   harnessly app promote VERSION --channel beta|stable | rollback --channel C | channels [ID]
@@ -136,6 +137,13 @@ SECRETS (the safe of this machine: tokens and keys the person put in, outside th
   harnessly secret file NAME [--ttl 15m]
                                     print the path of a short-lived file (0600) with the value, for a tool that wants
                                     a path. There is no command that prints a value.
+
+HEAVY CHECKS (the machine is shared with other agents and people's chats)
+  harnessly heavy --help            go build/test, vitest, playwright, tsc and eslint wait for one of the machine's
+                                    few slots; "the machine is busy" (exit 75) means go on without the check or
+                                    leave it to CI, not run it again
+  harnessly heavy stats [--since 24h] [--json]
+                                    how many heavy checks ran, waited for a slot, were refused
 
 TRACKERS AND WIKIS (the person's Jira, Confluence, YouTrack, Linear, GitLab, GitHub…, connected in Settings → Connections)
   harnessly connections             what is connected: id, product, name, address, capabilities, state, primary
@@ -258,7 +266,7 @@ Deliver only a file the person asked to receive ("put it in a zip", "send me the
 changed: those stay in the Files tab and make no card. The file must lie inside the workspace (or /tmp).
 Run it again after you change the file, to hand over the new version.
 `,
-	"app": `harnessly app new|validate|dev|install|list|remove|enable|disable
+	"app": `harnessly app new|validate|dev|install|list|remove|enable|disable|explain|logs
 
 An app is a package: a Claude Code plugin (instructions.md, skills/, commands/, .mcp.json) plus the manifest
 harnessly/app.json that says where it works (targets: chat, pane, app, sinopia.<kind>), what it may do (permissions)
@@ -271,6 +279,12 @@ and what the agent of a chat gets while it is on (agent: instructions, skills, m
   harnessly app install ./cashback      # a copy: later edits do not reach it
   harnessly app enable acme.cashback    # in the chat this tab runs
   harnessly app list --json
+  harnessly app explain example.app     # why it is on or off, layer by layer
+  harnessly app logs example.app        # what its views reported: console errors, exceptions, failed calls
+
+An app with any right waits for the person's consent after app dev or app install from the CLI: only the person's click
+in harnessly's page gives it («Приложения» → the app → «Посмотреть доступы»); no command does, since agents run the CLI
+too. The app's own screen is the page's address /apps/<id> (on a hub: /m/<machine>/apps/<id>).
 
 Versions are immutable and live on channels. An eval scenario is a file evals/<name>.json:
   {"prompt": "…", "runs": 3, "baseline": true,

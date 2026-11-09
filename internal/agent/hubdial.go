@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"io"
 	"math/rand/v2"
 	"net/http"
 	"strconv"
@@ -92,8 +93,16 @@ func (h *hub) dialOnce(ctx context.Context, pause *time.Duration) (time.Duration
 			h.setLink(false, "the hub did not accept this machine's signature: check the clock, or the machine was removed")
 			return hubRejectedPause, false
 		case http.StatusForbidden:
-			h.revoke()
-			return 0, true
+			// Only the hub's own refusal of a revoked machine ends the calls; a 403 of a proxy or a firewall in front of
+			// the hub is passing trouble, retried with the usual backoff.
+			body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+			if hubproto.IsRevokedDial(body) {
+				h.revoke()
+				return 0, true
+			}
+			Log("warn", "the hub's address answered 403 without the hub's revocation; calling again", F{"server", res.Header.Get("Server")})
+			h.setLink(false, "the hub's address refused the call (HTTP 403, not a revocation): calling again")
+			return 0, false
 		case hubproto.StatusUpgradeAgent:
 			Log("warn", "the hub needs a newer harnessly-agent than this one; update it")
 			h.setLink(false, "the hub needs a newer harnessly-agent")

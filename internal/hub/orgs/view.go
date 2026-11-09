@@ -23,6 +23,8 @@ type OrgView struct {
 	Timezone  string `json:"timezone"`
 	Currency  string `json:"currency"`
 	CreatedAt string `json:"createdAt"`
+	// AppsConsent is the rule for apps on the organization's machines: "ask" (the default) or "auto".
+	AppsConsent string `json:"appsConsent"`
 }
 
 type TenantView struct {
@@ -76,7 +78,7 @@ type View struct {
 }
 
 func orgView(o store.Org) OrgView {
-	return OrgView{ID: o.ID, Slug: o.Slug, Name: o.Name, Timezone: o.Timezone, Currency: o.Currency, CreatedAt: httpx.Time(o.CreatedAt)}
+	return OrgView{ID: o.ID, Slug: o.Slug, Name: o.Name, Timezone: o.Timezone, Currency: o.Currency, CreatedAt: httpx.Time(o.CreatedAt), AppsConsent: o.AppsConsent}
 }
 
 func grantView(g store.RoleGrant) GrantView {

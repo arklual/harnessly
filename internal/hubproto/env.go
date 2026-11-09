@@ -39,12 +39,36 @@ const (
 	EnvKindDoc   = "doc"
 )
 
+// The organization's rule for apps: AppsConsentAsk, the default, leaves an app's rights to the person's click;
+// AppsConsentAuto gives an app every right it asks for at once («Не спрашивать разрешений»). Only a machine whose hello has
+// FeatureEnvAppsConsent is sent the rule, and only AppsConsentAuto is sent: an older agent would take a hash it does not
+// know for a broken list, and a list without the field is the rule ask.
+const (
+	AppsConsentAsk  = "ask"
+	AppsConsentAuto = "auto"
+	// FeatureEnvAppsConsent is in `hello` when the agent keeps EnvSet.AppsConsent and hands it to its runtime.
+	FeatureEnvAppsConsent = "environment.apps-consent"
+)
+
 // EnvSet replaces the machine's whole list. Rev grows on the hub with every change of the machine's list; Hash is
-// EnvHash(Items), so the machine can tell whether it holds the same list without comparing it.
+// EnvSetHash(EnvHash(Items), AppsConsent), so the machine can tell whether it holds the same list without comparing it.
 type EnvSet struct {
 	Rev   int64     `json:"rev"`
 	Hash  string    `json:"hash"`
 	Items []EnvItem `json:"items"`
+	// AppsConsent is the organization's rule for apps: AppsConsentAuto, or absent for AppsConsentAsk.
+	AppsConsent string `json:"appsConsent,omitempty"`
+}
+
+// EnvSetHash is the hash of a list (itemsHash, its EnvHash) with the organization's rule for apps. The rule ask (or none)
+// leaves the hash of the items as it is, so a machine that never had the rule holds the same hash as before; the rule
+// auto makes another one, so a change of the rule reaches the machine the way a change of the list does.
+func EnvSetHash(itemsHash, appsConsent string) string {
+	if appsConsent != AppsConsentAuto {
+		return itemsHash
+	}
+	sum := sha256.Sum256([]byte(itemsHash + "\nappsConsent=" + AppsConsentAuto))
+	return hex.EncodeToString(sum[:])
 }
 
 // EnvItem is one item of the list. Source is the item's JSON from the catalog, without a secret: a secret is named in

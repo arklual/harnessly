@@ -77,8 +77,10 @@ func (c *cli) app(args []string) error {
 		return c.appEnable(args, false)
 	case "explain", "why":
 		return c.appExplain(args)
+	case "logs":
+		return c.appLogs(args)
 	}
-	return usageErr("app takes catalog, sdk, docs, new, validate, install, dev, list, remove, enable, disable, explain, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
+	return usageErr("app takes catalog, sdk, docs, new, validate, install, dev, list, remove, enable, disable, explain, logs, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
 }
 
 // appDir is a folder argument made absolute; none is the working folder.
@@ -162,14 +164,37 @@ func (c *cli) appValidate(args []string) error {
 	}
 	if n := failing(problems, strict); pkg == nil || n > 0 {
 		if !c.json {
-			c.out("%d problem(s): the package is not ready\n", max(n, 1))
+			c.out("%s\n", validateVerdict(problems, strict, pkg == nil))
 		}
 		return exitCode(exitError)
 	}
 	if !c.json {
-		c.out("ok: %s %s\n", pkg.Manifest.ID, pkg.Manifest.Version)
+		c.out("%s: %s %s\n", validateOK(problems), pkg.Manifest.ID, pkg.Manifest.Version)
 	}
 	return nil
+}
+
+// validateVerdict is the last line of a check that failed: the errors and, with --strict, the warnings it counted as
+// errors, each said as what it is.
+func validateVerdict(ps apps.Problems, strict, noPackage bool) string {
+	errs := len(ps.Errors())
+	warns := len(ps) - errs
+	var parts []string
+	if errs > 0 || noPackage {
+		parts = append(parts, fmt.Sprintf("%d error(s)", max(errs, 1)))
+	}
+	if strict && warns > 0 {
+		parts = append(parts, fmt.Sprintf("%d warning(s) treated as errors by --strict", warns))
+	}
+	return strings.Join(parts, ", ") + ": the package is not ready"
+}
+
+// validateOK is the start of the line of a check that passed: plain ok, or ok with the warnings it passed with.
+func validateOK(ps apps.Problems) string {
+	if warns := len(ps) - len(ps.Errors()); warns > 0 {
+		return fmt.Sprintf("ok, %d warning(s)", warns)
+	}
+	return "ok"
 }
 
 // failing counts the problems that fail a check: the errors, and the warnings too when strict.
@@ -211,7 +236,7 @@ func (c *cli) appInstall(args []string, dev bool) error {
 		}
 	}
 	dir = c.appDir(dir)
-	status, raw, err := c.call("POST", "/api/cli/apps/install", nil, map[string]any{"dir": dir, "dev": dev})
+	status, raw, err := c.call("POST", "/api/cli/apps/install", nil, map[string]any{"dir": dir, "dev": dev, "session": c.hookSession()})
 	if err != nil {
 		return err
 	}
@@ -222,6 +247,8 @@ func (c *cli) appInstall(args []string, dev bool) error {
 		App      cliApp        `json:"app"`
 		// WaitsConsent: what the app reaches waits for the person's click on the install screen.
 		WaitsConsent bool `json:"waitsConsent"`
+		// ConsentPolicy: the organization's rule «Не спрашивать разрешений» gave the app its rights.
+		ConsentPolicy bool `json:"consentPolicy"`
 	}
 	_ = json.Unmarshal(raw, &out)
 	if c.json {
@@ -246,10 +273,14 @@ func (c *cli) appInstall(args []string, dev bool) error {
 		}
 		if out.WaitsConsent {
 			// The CLI is every agent's too: what an app may do is agreed to only by a click in the page.
-			c.out("%s %s: it waits for the person's consent. Ask them to open «Приложения» in harnessly and look through what it gets (the app is off, or keeps its previous version, until they agree)\n", how, out.App.ID)
+			c.out("%s %s: it waits for the person's consent: they see a card with what it gets and «Разрешить» in this chat, in its right pane and over the app when they open it (the app is off, or keeps its previous version, until they agree).\n"+
+				"%s; no command grants it\n", how, out.App.ID, apps.ConsentWhere(out.App.ID))
 			return nil
 		}
 		c.out("%s %s %s\nturn it on in this chat: harnessly app enable %s\n", how, out.App.ID, out.App.Version, out.App.ID)
+		if out.ConsentPolicy {
+			c.out("its rights were given by the organization's rule «Не спрашивать разрешений», without asking the person\n")
+		}
 	}
 	return nil
 }
@@ -311,12 +342,16 @@ func (c *cli) appEnable(args []string, on bool) error {
 	if err != nil {
 		return err
 	}
+	var refused struct {
+		Error  string   `json:"error"`
+		Access []string `json:"access"`
+	}
+	_ = json.Unmarshal(raw, &refused)
+	if status == 409 && refused.Error == "consent" {
+		return fail("%s waits for the person's consent to %s: %s", id, strings.Join(refused.Access, ", "), apps.ConsentWhere(id))
+	}
 	if status == 404 {
-		var r struct {
-			Error string `json:"error"`
-		}
-		_ = json.Unmarshal(raw, &r)
-		if r.Error == "no-chat" {
+		if refused.Error == "no-chat" {
 			return fail("no chat runs in this tab")
 		}
 		return fail("%s is not installed, or does not work in a chat (harnessly app list)", id)
@@ -380,6 +415,73 @@ func (c *cli) appExplain(args []string) error {
 			mark = "✗"
 		}
 		c.out("%s %-10s %s\n", mark, l.Layer, l.Says)
+	}
+	return nil
+}
+
+// appLogs prints what the app's views reported lately: console errors and warnings, uncaught exceptions and failed
+// bridge calls, oldest first.
+func (c *cli) appLogs(args []string) error {
+	id, limit := "", ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--limit" || a == "-n":
+			if i+1 >= len(args) {
+				return usageErr("%s needs a number", a)
+			}
+			i++
+			if n, err := strconv.Atoi(args[i]); err != nil || n <= 0 {
+				return usageErr("%s takes a positive number", a)
+			}
+			limit = args[i]
+		case strings.HasPrefix(a, "-"):
+			return usageErr("unknown flag %s", a)
+		case id == "":
+			id = a
+		default:
+			return usageErr("app logs takes the app's id")
+		}
+	}
+	if id == "" {
+		return usageErr("app logs takes the app's id: harnessly app logs example.app")
+	}
+	q := url.Values{"id": {id}}
+	if limit != "" {
+		q.Set("limit", limit)
+	}
+	status, raw, err := c.call("GET", "/api/cli/apps/logs", q, nil)
+	if err != nil {
+		return err
+	}
+	if status == 404 {
+		return fail("%s is not installed on this machine (harnessly app list)", id)
+	}
+	if status >= 300 {
+		return apiError(status, raw)
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var r struct {
+		Lines []apps.ViewLogLine `json:"lines"`
+	}
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return fail("the runtime's answer is not readable: %v", err)
+	}
+	if len(r.Lines) == 0 {
+		c.out("no errors from the views of %s: they come here while a view is open in the page\n", id)
+		return nil
+	}
+	// What follows the level is the app's own words, quoted: data about the view, not instructions to whoever reads it.
+	c.out("the lines its views wrote (the app's words, quoted):\n")
+	for _, l := range r.Lines {
+		view := ""
+		if l.View != "" {
+			view = " " + strconv.Quote(l.View)
+		}
+		c.out("%s %-6s%s %s\n", time.UnixMilli(l.At).Format("2006-01-02 15:04:05"), l.Level, view, strconv.Quote(l.Text))
 	}
 	return nil
 }

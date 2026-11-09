@@ -59,6 +59,17 @@ export const toolView = (tool: string): { icon: TIconName; label: string } => {
   return { icon: 'square-terminal', label: tool.replace(/^mcp__(\w+)__/, '$1 · ') };
 };
 
+/** The runtime's step of a command the person typed: «/compact», or «/! ls» for a bash-mode line («! ls»). */
+const SHELL_LINE = '/!';
+
+/** How a step reads: a bash-mode line the person typed runs a command, as the agent's own Bash does. */
+export const stepView = (entry: ToolEntry): { icon: TIconName; label: string; detail: string } => {
+  const shell =
+    entry.tool === 'command' && (entry.summary === SHELL_LINE || entry.summary.startsWith(`${SHELL_LINE} `));
+  if (!shell) return { ...toolView(entry.tool), detail: entry.summary };
+  return { ...toolView('Bash'), detail: entry.summary.slice(SHELL_LINE.length).trim() };
+};
+
 /** The line of a refused call: an app's hook stopped it, or a rule of an app (or of the chat's apps) did. */
 const guardLabel = (denial: IGuardDenial, label: string): string => {
   if (denial.rule === 'hook') return t('next.tool.hookStopped', { app: denial.app });
@@ -109,7 +120,7 @@ const HookOffHere = ({ app }: { app: string }) => {
 const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
   const [open, setOpen] = useState(false);
   const seen = useSeen(open);
-  const { icon, label } = toolView(entry.tool);
+  const { icon, label, detail } = stepView(entry);
   const denial = entry.ok === false ? parseGuardDenial(entry.output?.text) : null;
   const text = denial ? denial.reason : entry.output?.text;
   const guardText = denial === null ? null : guardLabel(denial, label);
@@ -141,7 +152,7 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
         ) : (
           <>
             <span className="hx-tool__label">{label}</span>
-            <code className="hx-tool__detail">{entry.summary}</code>
+            <code className="hx-tool__detail">{detail}</code>
           </>
         )}
         <span className="hx-spacer" />

@@ -447,7 +447,7 @@ HTML page «Машина не на связи» with status 502.
 | `GET /dl/manifest.json` | | `{ version, files: { "<name>": { sha256, size } } }`, names `runtime-<os>-<arch>`, `agent-<os>-<arch>` for linux/darwin × amd64/arm64 |
 | `GET /dl/{name}` | | the binary (`application/octet-stream`), from `HUB_DIST_DIR` |
 | `POST /agent/register` | `RegisterRequest` | 201 `RegisterResponse`; 410 `expired`, 400, 429 |
-| `GET /agent/v1` | WebSocket upgrade with the signed `Authorization` header | 101; 401 bad signature/unknown key/old time/replayed nonce; 403 revoked; 426 agent older than `HUB_MIN_AGENT_VERSION` |
+| `GET /agent/v1` | WebSocket upgrade with the signed `Authorization` header | 101; 401 bad signature/unknown key/old time/replayed nonce; 403 revoked (`forbidden` with `details.reason: "revoked"`; only this, or the close code 4010, stops the agent dialing: a 403 without it, as a proxy may answer, is retried with the usual backoff); 426 agent older than `HUB_MIN_AGENT_VERSION` |
 | `POST /agent/peers/send`, `POST /agent/peers/directory` | signed like the dial, under `harnessly-agent-peers-v1` | messages between machines, [peers.md](peers.md); 404 unless `HUB_PEERS=on` |
 | `DELETE /agent/v1` | the machine removes itself: an `Authorization` header made like the dial's, signed under the domain `harnessly-agent-unlink-v1` (a dial's signature does not do) | 204 (revoked as `DELETE /api/machines/{id}` does: link closed with 4010, `machineRemoved` event); 401 bad signature/unknown key/old time/replayed nonce; 403 already revoked |
 
@@ -911,6 +911,7 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_SECRET_KEY` | | at least 32 characters: seals the spaces' SSH keys; empty: a `secret_key` file in `HUB_DATA_DIR` |
 | `HUB_ORGS` | `off` | organizations, tenants and teams ([orgs.md](orgs.md)): `off` — the schema is there, the hub behaves as before; `shadow` — the new endpoints answer instance administrators only (checking, `hub seed`); `on` — everyone |
 | `HUB_ENV_FEATURES` | | environment and catalog ([environment.md](environment.md)): `env`, `catalog` (comma separated) or `all`; empty — off, the endpoints answer 404 `not_enabled` and no machine gets a list. Needs `HUB_ORGS` other than `off`; tool numbers need `HUB_USAGE_INGEST=on` |
+| `HUB_HISTORY` | `on` | the people's chats in the hub ([history.md](history.md)): the machines' agents send their chat list and feeds, and the workspace reads them from here while a machine is off; `off`: the hub takes no chat and the workspace asks the home machine |
 | `HUB_USAGE_INGEST` | `off` | `on`: the hub pulls the machines' spend facts ([usage.md](usage.md)) and keeps the price list; `off`: it never asks |
 | `HUB_MR_SOURCE_GITLAB_URL` | | GitLab (`https://git.example.com`) whose merged merge requests the hub polls for the KPI «деньги на MR», «время до MR», «MR на человека» ([analytics.md](analytics.md)); empty — nothing is polled. Needs the next two |
 | `HUB_MR_SOURCE_GITLAB_GROUPS` | | comma separated group paths to poll (`team,team/sub`), subgroups included |

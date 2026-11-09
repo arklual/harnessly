@@ -3,6 +3,7 @@ package status
 import (
 	"context"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
@@ -159,6 +160,33 @@ func (m *Manager) layoutTabs() ([]scannedTab, map[string]tmux.PaneInfo, bool) {
 	return out, panes, ok
 }
 
+// scanWorkers is how many tabs the scan reads at once.
+const scanWorkers = 8
+
+// eachLimited calls fn(i) for every i in [0, n), at most limit at a time, and returns when all returned.
+func eachLimited(n, limit int, fn func(i int)) {
+	if n == 0 {
+		return
+	}
+	limit = max(1, min(limit, n))
+	next := make(chan int)
+	var wg sync.WaitGroup
+	wg.Add(limit)
+	for range limit {
+		go func() {
+			defer wg.Done()
+			for i := range next {
+				fn(i)
+			}
+		}()
+	}
+	for i := range n {
+		next <- i
+	}
+	close(next)
+	wg.Wait()
+}
+
 // scanAll rebuilds every entry from the layouts. A rescan (tmux reset) tells the sockets the new picture, which the
 // old runtime did not.
 func (m *Manager) scanAll() {
@@ -169,15 +197,18 @@ func (m *Manager) scanAll() {
 		status string
 		ports  []int
 	}
-	var ready []prepared
-	for _, st := range tabs {
+	// Each tab's look (its processes, its transcript's tail) is independent of the others': a pool reads them, since
+	// one by one a hundred tabs on a cold disk took minutes. The order of the tabs stays the layouts'.
+	ready := make([]prepared, len(tabs))
+	eachLimited(len(tabs), scanWorkers, func(i int) {
+		st := tabs[i]
 		p := m.d.Providers[providerOfPanel(st.tab.PanelType)]
 		pr := prepared{st: st, md: m.readMetadata(st.pane, p, &st.tab), status: "idle", ports: []int{}}
 		if p == nil {
 			pr.status, pr.ports = m.terminalStatus(st.pane)
 		}
-		ready = append(ready, pr)
-	}
+		ready[i] = pr
+	})
 	m.mu.Lock()
 	rescan := m.scanned
 	m.watch.closeAll()

@@ -47,7 +47,7 @@ const paceOf = (status: string): TPace | null => {
 };
 
 const FIXED: Record<
-  Exclude<TRoute['kind'], 'chat' | 'site' | 'app' | 'appDoc'>,
+  Exclude<TRoute['kind'], 'chat' | 'site' | 'app' | 'appDoc' | 'kit'>,
   { icon: string; title: () => string }
 > = {
   [ROUTE.home]: { icon: 'house', title: () => t('next.tabs.home') },
@@ -87,6 +87,8 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
     return { id: tab.id, title: tab.title ?? route.id, icon: 'blocks', busy: null, attention: false };
   if (route.kind === ROUTE.site)
     return { id: tab.id, title: tab.title ?? route.id, icon: 'pen-tool', busy: null, attention: false };
+  if (route.kind === ROUTE.kit)
+    return { id: tab.id, title: tab.title ?? route.id, icon: 'palette', busy: null, attention: false };
   const fixed = FIXED[route.kind];
   return { id: tab.id, title: fixed.title(), icon: fixed.icon, busy: null, attention: false };
 };

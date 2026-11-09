@@ -35,3 +35,15 @@ describe('a path in inline code', () => {
     expect(screen.getByText('docs/other.md').tagName).toBe('CODE');
   });
 });
+
+// the copy button of a code block keeps its word on one line, and a narrow block keeps its name for the icon.
+describe('a code block', () => {
+  it('names its copy button and keeps its word apart from the icon', () => {
+    const { container } = render(<Markdown md={'```\n! cd ~/projects\n```'} />);
+    const button = container.querySelector('.hx-code__copy');
+    const word = button?.querySelector('.hx-code__copy-text')?.textContent;
+    expect(word).toBeTruthy();
+    expect(button?.getAttribute('aria-label')).toBe(word);
+    expect(container.querySelector('.hx-code__lang')).not.toBeNull();
+  });
+});

@@ -18,6 +18,7 @@ import { FileShareButton } from '@/next/features/filedoc/file-share';
 import ToolPane, { TOOLS_TAB, type IPaneTab } from '@/next/features/pane/tool-pane';
 import ToolsLauncher, { type ITool, type IToolGroup } from '@/next/features/pane/tools-launcher';
 import MadeBlock from '@/next/features/pane/made-block';
+import { ConsentAsks } from '@/next/features/app-consent/consent-ask';
 import { heldTools, quietTools, toolOfRequest } from '@/next/features/pane/tools-order';
 import { useChatMade } from '@/next/bindings/chat-made';
 import BrowserTab from '@/next/bindings/browser-tab';
@@ -989,13 +990,16 @@ const PaneBody = (props: IPaneBodyProps) => {
           groups={groups}
           ready={made.holds !== null}
           head={
-            <MadeBlock
-              cards={made.cards}
-              onOpen={(card) => {
-                const item = made.open(card);
-                if (item) props.onOpenMade(item);
-              }}
-            />
+            <>
+              <ConsentAsks machine={conv.machineId} conversation={conv.id} variant="pane" />
+              <MadeBlock
+                cards={made.cards}
+                onOpen={(card) => {
+                  const item = made.open(card);
+                  if (item) props.onOpenMade(item);
+                }}
+              />
+            </>
           }
           onOpen={openTool}
           onAddress={(address) => {

@@ -1027,3 +1027,35 @@ func TestHeartbeatIsWritten(t *testing.T) {
 		t.Fatalf("%s %v", raw, err)
 	}
 }
+
+// The heartbeat is written while Tick is busy (a run of minutes): Run keeps it on its own.
+func TestHeartbeatGoesOnWhileARunWorks(t *testing.T) {
+	var mu sync.Mutex
+	clock := time.Now()
+	r := &Runner{LinkDir: t.TempDir(), Now: func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		clock = clock.Add(hubproto.EnvRunnerBeatEvery) // every look is a beat later
+		return clock
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go r.beatLoop(ctx, 5*time.Millisecond)
+	read := func() int64 {
+		raw, err := os.ReadFile(filepath.Join(r.LinkDir, hubproto.EnvRunnerFile))
+		var b hubproto.EnvRunnerBeat
+		if err != nil || json.Unmarshal(raw, &b) != nil {
+			return 0
+		}
+		return b.At
+	}
+	first := int64(0)
+	for until := time.Now().Add(5 * time.Second); time.Now().Before(until); time.Sleep(10 * time.Millisecond) {
+		if at := read(); first == 0 {
+			first = at
+		} else if at > first {
+			return
+		}
+	}
+	t.Fatal("the heartbeat was not rewritten without a Tick")
+}

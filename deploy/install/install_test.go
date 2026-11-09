@@ -360,6 +360,35 @@ func TestInstallDirProfile(t *testing.T) {
 	mustNotContain(t, "manifest", man, "hx_secretcode42")
 }
 
+// a run again of the installer (an update, a re-registration) keeps the lines the deployment added to the
+// services' env files, and rewrites only those it writes itself.
+func TestInstallAgainKeepsAddedEnvLines(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	if r := e.run(nil, "--token", "hx_one", "--profile", "dir", "--wait", "2"); r.code != 0 {
+		t.Fatalf("%s\n%s", r.out, r.err)
+	}
+	rtFile := e.path("/etc/harnessly/runtime.env")
+	added := e.read(rtFile) + "RUNTIME_PREVIEW_DOMAIN=preview.example.com\nRUNTIME_PREVIEW_MODE=origins\n# a note\n"
+	if err := os.WriteFile(rtFile, []byte(added), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agFile := e.path("/etc/harnessly/agent.env")
+	if err := os.WriteFile(agFile, []byte(e.read(agFile)+"AGENT_EXTRA=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := e.run([]string{"FAKE_USER_HOME=/var/lib/harnessly", "FAKE_LISTEN=127.0.0.1:18022 127.0.0.1:18023"}, "--token", "hx_two", "--profile", "dir", "--wait", "2"); r.code != 0 {
+		t.Fatalf("%s\n%s", r.out, r.err)
+	}
+	rt := e.read(rtFile)
+	mustContain(t, "runtime.env", rt, "RUNTIME_PREVIEW_DOMAIN=preview.example.com\n", "RUNTIME_PREVIEW_MODE=path\n", "RUNTIME_GATE_LISTEN=127.0.0.1:18022\n")
+	mustNotContain(t, "runtime.env", rt, "RUNTIME_PREVIEW_MODE=origins", "# a note")
+	if n := strings.Count(rt, "RUNTIME_PREVIEW_DOMAIN="); n != 1 {
+		t.Errorf("RUNTIME_PREVIEW_DOMAIN %d times:\n%s", n, rt)
+	}
+	mustContain(t, "agent.env", e.read(agFile), "AGENT_EXTRA=1\n")
+}
+
 func TestInstallAgainKeepsThePolicyAndTheManifest(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)

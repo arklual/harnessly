@@ -127,6 +127,26 @@ func appConsentRoutes(d deps, reg *apps.Registry) []gate.Route {
 		secretJSON(w, http.StatusOK, map[string]any{"id": b.ID, "on": b.On})
 	}
 
+	// asks: the apps that wait for the person's word, light (no view server, no states): what the chat's card, its
+	// right pane and the app's own window read, and read again while the page is seen.
+	asks := func(w http.ResponseWriter, r *http.Request) {
+		if !pageOK(w, r, http.MethodGet) {
+			return
+		}
+		installed, err := reg.ListAll()
+		if err != nil {
+			failed(w, err)
+			return
+		}
+		out := []appView{}
+		for _, a := range installed {
+			if !a.Muted && a.WaitsConsent() {
+				out = append(out, viewOfApp(a, false))
+			}
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"apps": out})
+	}
+
 	journal := func(w http.ResponseWriter, r *http.Request) {
 		if !pageOK(w, r, http.MethodGet) {
 			return
@@ -152,6 +172,8 @@ func appConsentRoutes(d deps, reg *apps.Registry) []gate.Route {
 		{Match: is("/agents" + platformAPI + "/apps/decline"), Handler: http.HandlerFunc(decline)},
 		{Match: is(platformAPI + "/apps/switch"), Handler: http.HandlerFunc(toggle)},
 		{Match: is("/agents" + platformAPI + "/apps/switch"), Handler: http.HandlerFunc(toggle)},
+		{Match: is(platformAPI + "/apps/consent/asks"), Handler: http.HandlerFunc(asks)},
+		{Match: is("/agents" + platformAPI + "/apps/consent/asks"), Handler: http.HandlerFunc(asks)},
 		{Match: is(platformAPI + "/apps/journal"), Handler: http.HandlerFunc(journal)},
 		{Match: is("/agents" + platformAPI + "/apps/journal"), Handler: http.HandlerFunc(journal)},
 	}

@@ -74,6 +74,8 @@ type hub struct {
 	relink chan struct{}
 	// setupSaid is what the last `hello` offered of the setup (setupOffered at that time).
 	setupSaid bool
+	// relinkWait is the settle timer of a relink asked for (relinkSoon); nil when none is waiting.
+	relinkWait *time.Timer
 
 	// Set by start.
 	ctx      context.Context
@@ -296,6 +298,52 @@ func (h *hub) emit(event, key string, value any) {
 	}
 }
 
+// emitHistory sends a frame of the chat replica (replica.go) to the hub links that asked for the chats, under the
+// names of protocol 2 (hubproto.EventHistoryEvents, EventHistoryBackfill).
+func (h *hub) emitHistory(ev any) {
+	var name string
+	var frame any
+	switch e := ev.(type) {
+	case evV2Events:
+		name = hubproto.EventHistoryEvents
+		frame = hubproto.HistoryEvents{Ch: e.Ch, Epoch: e.Epoch, FromSeq: e.FromSeq, Reset: e.Reset, Events: e.Events}
+	case evV2Backfill:
+		name = hubproto.EventHistoryBackfill
+		frame = hubproto.HistoryBackfill{Ch: e.Ch, Events: e.Events}
+	default:
+		return
+	}
+	var links []*link
+	for _, l := range h.hubLinks() {
+		if l.wants(name) {
+			links = append(links, l)
+		}
+	}
+	if len(links) == 0 {
+		return
+	}
+	raw, err := json.Marshal(frame)
+	if err != nil {
+		return
+	}
+	var body map[string]json.RawMessage
+	if json.Unmarshal(raw, &body) != nil {
+		return
+	}
+	body["event"], _ = json.Marshal(name)
+	out, err := marshal(body)
+	if err != nil {
+		Log("error", "event not encoded", F{"event", name}, F{"error", err.Error()})
+		return
+	}
+	for _, l := range links {
+		l.sendText(out)
+	}
+}
+
+// historyServed: the agent reads the runtime's chats for the hub (a hub's own machine with a runtime next to it).
+func (h *hub) historyServed() bool { return h.a.cfg.RuntimePort != 0 && !h.observe }
+
 // setLink records whether the link is up, and why not when it is not.
 func (h *hub) setLink(linked bool, note string) {
 	h.stateMu.Lock()
@@ -350,7 +398,7 @@ func (h *hub) linkDown(l *link) {
 // onPolicy: the policy file changed. The hub is told, and what was open under a wider policy is closed.
 func (h *hub) onPolicy(old, now hubproto.Policy) {
 	if h.writeSetupAllow() { // a narrowing reaches the runtime at once, not at the watcher's next look
-		h.setupChanged()
+		h.setupChanged(false)
 	}
 	h.audit.Record("policy.changed", true, map[string]any{"policy": now})
 	Log("info", "policy changed", F{"source", now.Source})
@@ -432,7 +480,8 @@ func (h *hub) hello() hubproto.Hello {
 	if h.usage != nil {
 		features = append(features, hubproto.FeatureUsage)
 	}
-	features = append(features, hubproto.FeatureEnvironment)
+	// The organization's rule for apps rides on env.set; the runtime reads it from the list's file.
+	features = append(features, hubproto.FeatureEnvironment, hubproto.FeatureEnvAppsConsent)
 	// The runtime ships in the same release and does the setup; an own link takes it only under the policy's `setup`.
 	offered := h.setupOffered()
 	if offered {
@@ -452,6 +501,9 @@ func (h *hub) hello() hubproto.Hello {
 	}
 	if h.designServed() {
 		features = append(features, hubproto.FeatureDesignAccess)
+	}
+	if h.historyServed() {
+		features = append(features, hubproto.FeatureHistory)
 	}
 	if h.docsServed() {
 		features = append(features, hubproto.FeatureDocs)

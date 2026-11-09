@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/heavy"
 	"github.com/ly-solutions/harnessly/internal/panel"
 )
 
@@ -81,6 +82,10 @@ func fail(format string, a ...any) error { return userError{fmt.Sprintf(format, 
 
 // Run executes one command line (without the program name) and returns the exit code.
 func Run(args []string, env Env) int {
+	// The launchers of heavy checks pass the tool's own arguments (tsc -w, --json): none of them is a global flag.
+	if len(args) > 0 && args[0] == "heavy" {
+		return heavy.Run(args[1:], heavy.Env{Getenv: env.Getenv, Environ: env.Environ, Stdin: env.Stdin, Stdout: env.Stdout, Stderr: env.Stderr})
+	}
 	if env.Getenv == nil {
 		env.Getenv = os.Getenv
 	}

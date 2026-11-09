@@ -193,3 +193,70 @@ func BenchmarkSearch(b *testing.B) {
 		ix.Search("деплой сервис", Options{})
 	}
 }
+
+func TestOpenLaterReadsTheLogBehindAndSearchWaitsForIt(t *testing.T) {
+	ix, dir := open(t)
+	ix.Put(Doc{Conv: "a", Entry: "1", At: 1, Role: RoleUser, Text: "kept before the restart"})
+	ix.Mark("a", 10)
+	ix.Close()
+
+	later := OpenLater(dir, func(err error) { t.Errorf("failed: %v", err) })
+	t.Cleanup(func() { later.Close() })
+	if hits := later.Search("restart", Options{}); len(hits) != 1 || hits[0].Conv != "a" {
+		t.Fatalf("search after the start: %+v", hits)
+	}
+	if size, ok := later.Size("a"); !ok || size != 10 {
+		t.Fatalf("mark: %d %v", size, ok)
+	}
+	if later.Loading() {
+		t.Fatal("still loading after a search")
+	}
+	later.Put(Doc{Conv: "b", Entry: "2", At: 2, Role: RoleAgent, Text: "written after"})
+	if hits := later.Search("written", Options{}); len(hits) != 1 {
+		t.Fatalf("put after the load: %+v", hits)
+	}
+}
+
+func TestWhileLoadingPutAndMarkKeepNothingAndDoNotWait(t *testing.T) {
+	ix, _ := open(t)
+	// as OpenLater holds it while it reads
+	ix.mu.Lock()
+	ix.loading.Store(true)
+	done := make(chan struct{})
+	go func() {
+		ix.Put(Doc{Conv: "a", Entry: "1", At: 1, Role: RoleUser, Text: "lost"})
+		ix.Mark("a", 5)
+		close(done)
+	}()
+	<-done
+	if !ix.Loading() {
+		t.Fatal("not loading")
+	}
+	ix.loading.Store(false)
+	ix.mu.Unlock()
+	if n := ix.Count(); n != 0 {
+		t.Fatalf("kept %d while loading", n)
+	}
+	if _, ok := ix.Size("a"); ok {
+		t.Fatal("marked while loading")
+	}
+}
+
+func TestOpenLaterReportsAnIndexItCannotKeep(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	failed := make(chan error, 1)
+	ix := OpenLater(file, func(err error) { failed <- err })
+	if hits := ix.Search("anything", Options{}); hits != nil {
+		t.Fatalf("%+v", hits)
+	}
+	if err := <-failed; err == nil {
+		t.Fatal("no error")
+	}
+	ix.Put(Doc{Conv: "a", Entry: "1", At: 1, Role: RoleUser, Text: "nowhere to go"})
+	if n := ix.Count(); n != 0 {
+		t.Fatalf("kept %d without a log", n)
+	}
+}

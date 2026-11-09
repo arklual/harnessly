@@ -10,6 +10,7 @@ import { Skeleton } from '@/next/ui/skeleton';
 import { APP_REASON, APP_STATE, type IInstalledApp } from '@/next/features/app-views/api';
 import AccessList from '@/next/features/app-consent/access-list';
 import ConsentSheet from '@/next/features/app-consent/consent-sheet';
+import ConsentBlock from '@/next/features/app-consent/consent-block';
 import type { ITeamState } from '@/next/features/app-catalog/use-team';
 import { ROW_ACTION, rowsOf, type ICatalogRow } from '@/next/features/app-catalog/model';
 import { t } from '@/next/i18n';
@@ -276,6 +277,12 @@ const AppDetails = ({
           <p className="hx-appteam__fail" role="status">
             {reasonOf(app)}
           </p>
+        )}
+        {app.pending !== undefined && (
+          // What a waiting update adds, as the runtime reads it; a first install's is the «Доступы» below.
+          <div className="hx-appsheet__sec">
+            <ConsentBlock app={app} />
+          </div>
         )}
         {waitsConsent(app) && onReview && (
           <div className="hx-appsheet__sec">

@@ -14,6 +14,7 @@ export const org = obj({
   timezone: str,
   currency: lit('RUB', 'USD'),
   createdAt: time,
+  appsConsent: opt(lit('ask', 'auto')),
 });
 export const tenant = obj({ id: str, slug: str, name: str, orgId: str, createdAt: time, memberCount: num });
 export const team = obj({

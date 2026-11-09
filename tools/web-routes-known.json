@@ -5,6 +5,10 @@
     { "path": "/api/platform/vault", "capability": "vault", "task": "HRN-737", "note": "password safe; a gateway route. Shown only with RUNTIME_WEB_FEATURES=vault." },
     { "path": "/api/platform/history/conversations", "capability": "history", "task": "HRN-737", "note": "central conversation history (gatewayPath in next/stores/central.ts): a gateway route." },
     { "path": "/api/platform/voice/takes", "capability": "voice-cloud", "task": "HRN-737", "note": "cloud voice takes: a gateway route." },
-    { "path": "/api/fs", "capability": "disk", "task": "HRN-737", "note": "the disk screen (hl-disk-api.ts, hl-disk-uploader.ts): /api/fs/* has no route in the public runtime." }
+    { "path": "/api/fs", "capability": "disk", "task": "HRN-737", "note": "the disk screen (hl-disk-api.ts, hl-disk-uploader.ts): /api/fs/* has no route in the public runtime." },
+    { "path": "/api/platform/uploads/files", "capability": "history", "task": "HRN-879", "note": "uploads mirrored on the gateway; called only with centralUploads, which the public hub and runtime keep off." },
+    { "path": "/api/platform/uploads/blobs", "capability": "history", "task": "HRN-879", "note": "the bytes of a mirrored upload on the gateway; only with centralUploads." },
+    { "path": "/api/platform/uploads/refs", "capability": "history", "task": "HRN-879", "note": "an upload's reference to its hash on the gateway; only with centralUploads." },
+    { "path": "/api/platform/uploads/delivered", "capability": "history", "task": "HRN-879", "note": "an agent's handed-over file kept on the gateway; only with centralUploads." }
   ]
 }

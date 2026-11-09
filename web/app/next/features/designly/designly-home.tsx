@@ -69,6 +69,7 @@ import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import Swap from '@/next/ui/swap';
 import { HSCROLL_DIR, useHScroll } from '@/next/ui/use-h-scroll';
 import type { IDesignSystem } from '@/next/features/designly/api';
+import KitShelf, { type IKitShelf } from '@/next/features/designly/kit/kit-shelf';
 import {
   DESIGN_SCOPE,
   DESIGN_SCOPES,
@@ -171,6 +172,8 @@ export interface IDesignlyHomeProps {
   /** Where a project is started; null is the library alone (the right pane's: its chat is the field). */
   compose: IDesignlyCompose | null;
   /** What the machine lacks for designs, with the command that fixes it; null when nothing is missing. */
+  /** The installed kits, shown above the library's root; absent where kits are not offered. */
+  kits?: IKitShelf;
 }
 
 export interface IDesignlyVoice {
@@ -835,6 +838,7 @@ const DesignlyHome = ({
   onOpen,
   onRetry,
   compose,
+  kits,
 }: IDesignlyHomeProps) => {
   const [pinning, setPinning] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -1132,6 +1136,7 @@ const DesignlyHome = ({
           />
         )}
 
+        {!trashOpen && kits && !searching && here === '' && <KitShelf {...kits} />}
         {!trashOpen && organizer && !searching && here !== '' && (
           <Crumbs folders={folders} current={here} onOpen={openFolder} />
         )}

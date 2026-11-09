@@ -55,7 +55,10 @@ export const navOf = (
       label: scope === 'org' ? 'Организация' : 'Тенант',
       items: [overview, analytics, ...tools, machines, item('teams', 'Команды', 'users', 'teams')],
     },
-    { label: 'Настройки', items: [...env, accounts] },
+    {
+      label: 'Настройки',
+      items: [...env, accounts, item('settings', 'Организация', 'settings-2', 'settings')],
+    },
   ];
 };
 
@@ -63,7 +66,9 @@ export const navOf = (
 export const hxSectionsOf = (role: Role, features: readonly string[]): Section[] => {
   const env: Section[] = features.includes('env') ? ['env'] : [];
   const tools: Section[] = features.includes('ui.hx.live') ? ['efficiency', 'tools'] : [];
+  // The organization's own settings are its admin's only.
+  const settings: Section[] = role === 'admin' ? ['settings'] : [];
   return role === 'member'
     ? ['overview', 'analytics', 'machines', ...tools, ...env]
-    : ['overview', 'analytics', 'machines', 'teams', 'team', 'accounts', ...tools, ...env];
+    : ['overview', 'analytics', 'machines', 'teams', 'team', 'accounts', ...tools, ...env, ...settings];
 };

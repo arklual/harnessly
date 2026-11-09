@@ -57,7 +57,7 @@ const CodeField = ({
 
   return (
     <div
-      className="hx-code"
+      className="hx-otp"
       data-state={state}
       onPointerDown={(event) => {
         if (locked) return;
@@ -67,9 +67,9 @@ const CodeField = ({
       }}
     >
       {Array.from({ length }, (_, i) => (
-        <span key={i} className="hx-code__slot" data-dash={i === dash || undefined}>
+        <span key={i} className="hx-otp__slot" data-dash={i === dash || undefined}>
           <span
-            className="hx-code__cell"
+            className="hx-otp__cell"
             data-filled={i < value.length || undefined}
             data-active={(i === value.length && !locked) || undefined}
           >
@@ -79,7 +79,7 @@ const CodeField = ({
       ))}
       <input
         ref={setRef}
-        className="hx-code__input"
+        className="hx-otp__input"
         type="text"
         inputMode="numeric"
         pattern="[0-9]*"

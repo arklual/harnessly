@@ -21,12 +21,19 @@ import (
 // not stored yet; what it no longer has, it sends again from the pages of the runtime (`v2.backfill`).
 //
 // Nothing is sent, and nothing is kept, until the cluster says `v2.start{enabled:true}` (the `central-history` switch).
+//
+// a chat is backfilled whole, by a cursor the cluster keeps. `v2.start.pending` names the chats the cluster does
+// not hold whole yet, each with the turn its backfill stopped before ("" for one never read); the agent walks each of
+// them from there to its first turn, and every page it sends says where it was read from (`history.from`), so the
+// cluster moves the cursor and, on the page with no older turn, marks the chat whole. A walk cut short (the link went,
+// the runtime restarted) goes on from the cursor next time. A cluster without `pending` gets the old backfill.
 const (
 	replicaBuffer    = 5000 // events kept per channel while the cluster has not stored them
 	replicaInflight  = 2000 // events sent per channel that the cluster has not acknowledged
 	replicaBatch     = 200  // events in one frame
 	replicaConvBatch = 100  // chat records in one backfill frame
-	replicaPages     = 40   // pages of turns read for a chat the cluster has never seen
+	replicaPages     = 40   // pages of turns read for a chat the cluster has never seen (a cluster without cursors)
+	replicaWalkPages = 2000 // pages of one chat walked in one go by its cursor: 200 000 turns, a guard against a loop
 	replicaPause     = 150 * time.Millisecond
 )
 
@@ -81,12 +88,18 @@ type replica struct {
 	chans      map[string]*replicaChan
 	cursors    map[string]cursor
 	known      map[string]int64
-	generation int // a new `v2.start` or a new runtime epoch starts a new backfill; the old one stops
+	pending    map[string]string // nil: the cluster keeps no backfill cursors (an older one)
+	generation int               // a new `v2.start` or a new runtime epoch starts a new backfill; the old one stops
 }
 
 func newReplica(a *Agent) *replica {
 	return &replica{
-		emit:      func(ev any) { a.broadcast(ev) },
+		emit: func(ev any) {
+			a.broadcast(ev)
+			if a.hub != nil && !a.hub.observe {
+				a.hub.emitHistory(ev) // HRN-879: a hub keeps the chats as a cluster does
+			}
+		},
 		connected: a.connected,
 		askConvs:  func() {},
 		pause:     replicaPause,
@@ -95,10 +108,10 @@ func newReplica(a *Agent) *replica {
 }
 
 // start is `v2.start`: the switch, where the cluster's copy stands per channel, and the revision of each chat it holds.
-func (r *replica) start(enabled bool, cursors map[string]cursor, known map[string]int64) {
+func (r *replica) start(enabled bool, cursors map[string]cursor, known map[string]int64, pending map[string]string) {
 	r.mu.Lock()
 	r.enabled = enabled
-	r.cursors, r.known = cursors, known
+	r.cursors, r.known, r.pending = cursors, known, pending
 	r.generation++
 	r.chans = map[string]*replicaChan{}
 	r.mu.Unlock()
@@ -223,7 +236,7 @@ func (r *replica) flushLocked(ch string, c *replicaChan) {
 func (r *replica) convs(records []json.RawMessage) {
 	r.mu.Lock()
 	generation := r.generation
-	known := r.known
+	known, pending := r.known, r.pending
 	enabled := r.enabled
 	r.mu.Unlock()
 	if !enabled || !r.connected() {
@@ -233,7 +246,7 @@ func (r *replica) convs(records []json.RawMessage) {
 		ID  string `json:"id"`
 		Rev int64  `json:"rev"`
 	}
-	var changed, fresh []string
+	var heads []head
 	for start := 0; start < len(records); start += replicaConvBatch {
 		end := min(start+replicaConvBatch, len(records))
 		events := make([]json.RawMessage, 0, end-start)
@@ -244,16 +257,53 @@ func (r *replica) convs(records []json.RawMessage) {
 			}
 			ev, _ := json.Marshal(map[string]json.RawMessage{"type": json.RawMessage(`"conversation_upsert"`), "conv": rec})
 			events = append(events, ev)
-			if rev, ok := known[h.ID]; !ok {
-				fresh = append(fresh, h.ID)
-			} else if rev != h.Rev {
-				changed = append(changed, h.ID)
-			}
+			heads = append(heads, h)
 		}
 		r.emit(evV2Backfill{Event: "v2.backfill", Ch: "convs", Events: events})
 	}
-	// The chats the cluster has never seen first, whole; the changed ones by their newest page.
-	go r.backfill(generation, fresh, changed)
+	var jobs []backfillJob
+	if pending == nil {
+		// An older cluster: the chats it has never seen first, whole as far as replicaPages; the changed ones by their newest page.
+		var newest []backfillJob
+		for _, h := range heads {
+			if rev, ok := known[h.ID]; !ok {
+				jobs = append(jobs, backfillJob{id: h.ID, pages: replicaPages})
+			} else if rev != h.Rev {
+				newest = append(newest, backfillJob{id: h.ID, pages: 1})
+			}
+		}
+		jobs = append(jobs, newest...)
+	} else {
+		// The changed chats' newest pages first (cheap, and what people open), then the walks: the chats the cluster has
+		// never seen, then the ones whose backfill stopped part way.
+		var newest, fresh, rest []backfillJob
+		for _, h := range heads {
+			rev, seen := known[h.ID]
+			from, open := pending[h.ID]
+			switch {
+			case !seen:
+				fresh = append(fresh, backfillJob{id: h.ID, pages: replicaWalkPages, walk: true})
+			case open:
+				if rev != h.Rev && from != "" {
+					newest = append(newest, backfillJob{id: h.ID, pages: 1})
+				}
+				rest = append(rest, backfillJob{id: h.ID, from: from, pages: replicaWalkPages, walk: true})
+			case rev != h.Rev:
+				newest = append(newest, backfillJob{id: h.ID, pages: 1})
+			}
+		}
+		jobs = append(append(newest, fresh...), rest...)
+	}
+	go r.backfill(generation, jobs)
+}
+
+// backfillJob is one chat to read: from the turn `from` is before ("" for the newest), at most `pages` pages; a walk
+// marks its pages so the cluster moves the chat's cursor.
+type backfillJob struct {
+	id    string
+	from  string
+	pages int
+	walk  bool
 }
 
 func (r *replica) current(generation int) bool {
@@ -264,27 +314,23 @@ func (r *replica) current(generation int) bool {
 
 // backfill reads the pages of turns of the chats the cluster lacks and hands them over as `feed_reset` events, one chat at
 // a time with a pause between: the machine is somebody's working machine.
-func (r *replica) backfill(generation int, fresh, changed []string) {
-	for _, id := range append(append([]string{}, fresh...), changed...) {
-		whole := false
-		for _, f := range fresh {
-			whole = whole || f == id
-		}
+func (r *replica) backfill(generation int, jobs []backfillJob) {
+	for _, job := range jobs {
 		if !r.current(generation) {
 			return
 		}
-		r.backfillChat(generation, id, whole)
+		r.backfillChat(generation, job)
 		time.Sleep(r.pause)
 	}
 }
 
-func (r *replica) backfillChat(generation int, id string, whole bool) {
-	ch := "conv:" + id
-	before := ""
-	for page := 0; page < replicaPages; page++ {
-		raw, err := r.pages(id, before, 100)
+func (r *replica) backfillChat(generation int, job backfillJob) {
+	ch := "conv:" + job.id
+	before := job.from
+	for page := 0; page < job.pages; page++ {
+		raw, err := r.pages(job.id, before, 100)
 		if err != nil {
-			Log("warn", "chat page not read for the cluster", F{"conv", id}, F{"error", err.Error()})
+			Log("warn", "chat page not read for the cluster", F{"conv", job.id}, F{"error", err.Error()})
 			return
 		}
 		var p struct {
@@ -295,20 +341,36 @@ func (r *replica) backfillChat(generation int, id string, whole bool) {
 			return
 		}
 		ev, ok := feedReset(raw)
+		if ok && job.walk {
+			ev, ok = markWalk(ev, before)
+		}
 		if !ok || !r.current(generation) {
 			return
 		}
 		r.emit(evV2Backfill{Event: "v2.backfill", Ch: ch, Events: []json.RawMessage{ev}})
-		if page == 0 {
+		if before == "" {
 			// A page holds a folded turn as its first entry and its answer; the steps of the newest turns are read apart.
-			r.backfillSteps(generation, id, p.Turns)
+			r.backfillSteps(generation, job.id, p.Turns)
 		}
-		if !whole || p.BeforeTurnID == nil {
+		if p.BeforeTurnID == nil || *p.BeforeTurnID == "" || *p.BeforeTurnID == before {
 			return
 		}
 		before = *p.BeforeTurnID
 		time.Sleep(r.pause)
 	}
+}
+
+// markWalk says on a page of a walk where it was read from: the cluster moves the chat's cursor from `from` to the page's
+// `beforeTurnId`, and a page with none is the chat's first.
+func markWalk(ev json.RawMessage, from string) (json.RawMessage, bool) {
+	var p map[string]json.RawMessage
+	if json.Unmarshal(ev, &p) != nil {
+		return nil, false
+	}
+	mark, _ := json.Marshal(map[string]string{"from": from})
+	p["history"] = mark
+	out, err := json.Marshal(p)
+	return out, err == nil
 }
 
 func (r *replica) backfillSteps(generation int, id string, turns []json.RawMessage) {

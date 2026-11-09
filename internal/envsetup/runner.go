@@ -30,6 +30,9 @@ func (r *Runner) Run(ctx context.Context) {
 	}
 	t := time.NewTicker(poll)
 	defer t.Stop()
+	// The heartbeat goes on while a run works: a run of minutes (an apply after a reboot) left it stale, the agent
+	// stopped offering the setup and called the hub again, twice per run, and every call cut the page's streams.
+	go r.beatLoop(ctx, poll)
 	for {
 		r.Tick(ctx)
 		select {
@@ -116,8 +119,24 @@ func (r *Runner) retryDue(st hubproto.EnvSetupState) bool {
 	return false
 }
 
+// beatLoop keeps the heartbeat fresh until ctx ends, whatever Tick is busy with.
+func (r *Runner) beatLoop(ctx context.Context, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			r.beat()
+		}
+	}
+}
+
 // beat writes the runtime's heartbeat (hubproto.EnvRunnerFile) every 30 seconds.
 func (r *Runner) beat() {
+	r.beatMu.Lock()
+	defer r.beatMu.Unlock()
 	now := r.now()
 	if !r.lastBeat.IsZero() && now.Sub(r.lastBeat) < hubproto.EnvRunnerBeatEvery {
 		return

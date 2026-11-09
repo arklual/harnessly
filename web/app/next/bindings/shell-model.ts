@@ -437,10 +437,13 @@ export function useShellModel(): IShellModel {
   const sharedOn = shared !== null;
   const projectIndex = useMemo(() => (shared ? profileProjectOf(shared) : null), [shared]);
   const own = useConversationList(here);
+  // The one list draws as soon as any machine's list is there (its own, the browser's copy, the cluster's): a home
+  // machine that is off or starting held the whole sidebar until the cluster called it offline.
+  const anyList = useConversationList(null);
   const every = useEveryChat();
   const convs = useMemo(
-    () => own && (unified && here ? oneListOf(every, here, central) : own),
-    [own, unified, here, every, central],
+    () => (unified && here ? anyList && oneListOf(every, here, central) : own),
+    [own, anyList, unified, here, every, central],
   );
   const chatMachines = useMemo(() => [...new Set((convs ?? []).map((c) => c.machineId))].sort(), [convs]);
   const moveOn = useMoveEnabledOn(chatMachines);

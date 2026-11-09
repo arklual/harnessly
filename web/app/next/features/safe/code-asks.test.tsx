@@ -34,7 +34,7 @@ describe('CodeField', () => {
     expect(input.getAttribute('inputmode')).toBe('numeric');
     fireEvent.change(input, { target: { value: '40' } });
     expect(onComplete).not.toHaveBeenCalled();
-    expect(container.querySelectorAll('.hx-code__cell[data-filled]').length).toBe(2);
+    expect(container.querySelectorAll('.hx-otp__cell[data-filled]').length).toBe(2);
     fireEvent.change(input, { target: { value: '407 193' } });
     expect(onComplete).toHaveBeenCalledExactlyOnceWith('407193');
     expect(input.value).toBe('407193');

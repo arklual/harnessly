@@ -113,6 +113,7 @@ import { useWorkingDesigns } from '@/next/bindings/working-designs';
 import { useDesignBound } from '@/next/bindings/design-conv';
 import { designKey } from '@/next/features/designly/design-conv';
 import DesignlySite from '@/next/bindings/designly-site';
+import KitPage from '@/next/bindings/kit-page';
 import SiteWait from '@/next/features/designly/site-wait';
 import InviteAccept from '@/next/features/designly/access/invite-accept';
 import { useProjectDialog, useProjectSettingsDialog, useResumeDialog } from '@/next/bindings/shell-dialogs';
@@ -239,6 +240,7 @@ const sidebarView = (route: TRoute) => {
     route.kind === ROUTE.designlyNew ||
     route.kind === ROUTE.videoNew ||
     route.kind === ROUTE.site ||
+    route.kind === ROUTE.kit ||
     route.kind === ROUTE.appDoc ||
     route.kind === ROUTE.invite
   )
@@ -293,7 +295,7 @@ const Shell = ({ owner }: IShellProps) => {
   const currentId = route.kind === ROUTE.chat ? route.id : null;
   // The sidebar folded for a design opened full screen opens again once the design is left: an app's document opened
   // full screen («развернуть» from the pane) is such a design too.
-  const onSite = route.kind === ROUTE.site || route.kind === ROUTE.appDoc;
+  const onSite = route.kind === ROUTE.site || route.kind === ROUTE.appDoc || route.kind === ROUTE.kit;
   useEffect(() => {
     if (!onSite) restoreRailAfterDesign();
   }, [onSite]);
@@ -942,7 +944,9 @@ const Shell = ({ owner }: IShellProps) => {
 
   const headerMachine = {
     card: model.machine,
-    others: model.otherMachines,
+    // Every other machine of the person, also where the chats of all machines are one list: the header's
+    // card is where a machine is picked and its state seen, so it lists them all with their health.
+    others: model.startMachines.filter((m) => m.id !== model.machine?.id),
     onPick: pickMachine,
     onManage: () => openScreen({ kind: ROUTE.settings, section: 'machines' }),
     reveal: machineReveal,
@@ -971,6 +975,7 @@ const Shell = ({ owner }: IShellProps) => {
         route.kind !== ROUTE.learn &&
         route.kind !== ROUTE.app &&
         route.kind !== ROUTE.appDoc &&
+        route.kind !== ROUTE.kit &&
         route.kind !== ROUTE.settings && (
           <ChatHeader
             chat={chat}
@@ -1113,6 +1118,14 @@ const Shell = ({ owner }: IShellProps) => {
           onMode={(edit) =>
             goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true })
           }
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
+      )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.kit && model.active && (
+        <KitPage
+          key={`${model.active}/${route.id}/${route.version ?? ''}/${route.theme ?? ''}`}
+          machine={model.active}
+          route={route}
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}

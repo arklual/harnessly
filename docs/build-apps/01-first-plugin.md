@@ -11,6 +11,11 @@ harnessly app dev ./review             # install the folder itself, so your edit
 harnessly app enable acme.review       # in the chat this tab runs; or «+» in the field, then «Приложение»
 ```
 
+An app that asks for any right waits for the person after `app dev`: it is off until they agree to what it reaches with a
+click in harnessly's page («Приложения» → the app's card → «Посмотреть доступы»). No command grants it, since every agent
+runs the CLI too; `app explain` and `app enable` say what it waits for. This first plugin asks for nothing, so it is on
+at once.
+
 An agent at rest stops at once and the next message brings it back with the app. An agent at work keeps what it had until its
 terminal stops. The scaffold writes:
 

@@ -35,7 +35,7 @@ import {
 import type { TurnOutput } from '@/next/features/chat/types';
 import NowBlock from '@/next/features/chat/now';
 import WaitingLine from '@/next/features/chat/waiting';
-import TurnView, { type ITurnHandlers } from '@/next/features/chat/turn';
+import TurnView, { openByDefault, type ITurnHandlers } from '@/next/features/chat/turn';
 import type { FeedDensity, FeedItem, Ms, RefInfo, RefKind } from '@/next/features/chat/types';
 import AutoLine from '@/next/features/chat/auto-line';
 import ClearedLine from '@/next/features/chat/cleared-line';
@@ -142,7 +142,7 @@ export interface IFeedProps extends THandlers {
   /** Which kinds of what a turn made get a card (Settings); everything but the plain files when not given. */
   shown?: TShownKinds;
   /** Where a file the agent handed over is saved from. */
-  downloadUrl?: (path: string) => string;
+  downloadUrl?: (path: string, output?: TurnOutput) => string;
   /** The chat the chips ask where a merge request opens; without it they ask nothing. */
   /** What stands over the bottom of the feed: questions, queue, composer. */
   dock?: ReactNode;
@@ -627,7 +627,7 @@ const Feed = (props: IFeedProps) => {
       shown,
       onOpen: (output) => latest.current.onOpenOutput?.(output),
       onOpenFile: (path) => latest.current.onOpenFile?.(path),
-      downloadUrl: (path) => latest.current.downloadUrl?.(path) ?? '',
+      downloadUrl: (path, output) => latest.current.downloadUrl?.(path, output) ?? '',
       onShareFile: canShare ? (path) => latest.current.onShareFile?.(path) : undefined,
     }),
     [shown, canShare],
@@ -688,7 +688,7 @@ const Feed = (props: IFeedProps) => {
                     <Row
                       key={rowKey(item)}
                       item={item}
-                      open={item.kind === 'turn' && (density === 'full') !== toggled.has(item.key)}
+                      open={item.kind === 'turn' && openByDefault(item, density) !== toggled.has(item.key)}
                       enter={isNew(item, enterAfter)}
                       offline={offline}
                       machineName={machineName}

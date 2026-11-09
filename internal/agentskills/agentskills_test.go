@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -415,5 +416,69 @@ func TestBrowserOperatorNamesTheRuntimeServer(t *testing.T) {
 	}
 	if strings.Contains(def, "__TOOLS__") || strings.Contains(def, "mcp__harnessly__") {
 		t.Error("the tools are not named for the server")
+	}
+}
+
+func TestHeavyLaunchersRunTheToolThroughHarnessly(t *testing.T) {
+	d := newDirs(t)
+	root := t.TempDir()
+	hl := filepath.Join(root, "harnessly")
+	if err := os.WriteFile(hl, []byte("#!/bin/sh\necho \"harnessly $*\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A go of the person's own (a hand-made launcher) stays.
+	_ = os.MkdirAll(d.bin, 0o755)
+	_ = os.WriteFile(filepath.Join(d.bin, "go"), []byte("#!/bin/sh\necho mine\n"), 0o755)
+	o := d.opts(false, false)
+	o.Harnessly, o.Heavy = hl, true
+	res, err := Provision(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read(t, filepath.Join(d.bin, "go")) != "#!/bin/sh\necho mine\n" || len(res.Kept) != 1 {
+		t.Errorf("the person's go was replaced; kept %v", res.Kept)
+	}
+	for _, tool := range []string{"vitest", "playwright", "tsc", "eslint", "npx"} {
+		if st, err := os.Stat(filepath.Join(d.bin, tool)); err != nil || st.Mode().Perm() != 0o755 {
+			t.Fatalf("no launcher for %s: %v", tool, err)
+		}
+	}
+	run := func(env []string, args ...string) (string, int) {
+		cmd := exec.Command("/bin/sh", append([]string{filepath.Join(d.bin, "tsc")}, args...)...)
+		cmd.Env = env
+		out, err := cmd.CombinedOutput()
+		code := 0
+		if err != nil {
+			code = cmd.ProcessState.ExitCode()
+		}
+		return string(out), code
+	}
+	if out, _ := run([]string{"PATH=" + d.bin + ":/usr/bin:/bin"}, "--noEmit", "-p", "a b"); out != "harnessly heavy --skip "+d.bin+" tsc --noEmit -p a b\n" {
+		t.Errorf("launcher ran %q", out)
+	}
+
+	// harnessly is gone: the real tool runs as if there were no launcher.
+	_ = os.Remove(hl)
+	realDir := filepath.Join(root, "real")
+	_ = os.MkdirAll(realDir, 0o755)
+	_ = os.WriteFile(filepath.Join(realDir, "tsc"), []byte("#!/bin/sh\necho \"real $*\"\n"), 0o755)
+	if out, _ := run([]string{"PATH=" + d.bin + ":" + realDir + ":/usr/bin:/bin"}, "-v"); out != "real -v\n" {
+		t.Errorf("without harnessly the launcher ran %q", out)
+	}
+	// …and with no real tool it says so instead of starting itself again.
+	if out, code := run([]string{"PATH=" + d.bin + "/:/usr/bin:/bin"}, "-v"); code != 127 || !strings.Contains(out, "not installed") {
+		t.Errorf("exit %d, %q", code, out)
+	}
+}
+
+func TestNoHeavyLaunchersWhenOff(t *testing.T) {
+	d := newDirs(t)
+	o := d.opts(false, false)
+	o.Harnessly = "/nonexistent/harnessly"
+	if _, err := Provision(o); err != nil {
+		t.Fatal(err)
+	}
+	if exists(filepath.Join(d.bin, "tsc")) {
+		t.Error("launchers written while Heavy is off")
 	}
 }

@@ -38,6 +38,8 @@ import { useTabState, useTabTitle } from '@/next/stores/tabs';
 import { useChatPaneView } from '@/next/stores/pane-state';
 import { modeKindOf, modeStateKey, useDesignMode } from '@/next/features/designly/design-mode';
 import { goTo, ROUTE, routePath, type TAccessFocus } from '@/next/routes/routes';
+import KitChip from '@/next/features/designly/kit/kit-chip';
+import { useKitLink } from '@/next/features/designly/kit/use-kit-link';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
 import { changeDeck, useDeck } from '@/next/stores/deck';
@@ -170,6 +172,8 @@ const DesignlySiteBody = ({
   });
   const [project, setProject] = useState<IProject | null>(start.project);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The kit the project is made from: its chip on the bar, «Из кита» on a picked element, «Показать макет».
+  const kitLink = useKitLink(machine, id);
   // The design's own tabs and their history belong to the window's tab, in a pane to the chat beside it: switching
   // back finds the same page.
   const paneConv = pane?.conv ?? null;
@@ -673,6 +677,21 @@ const DesignlySiteBody = ({
           sendBoardError(words);
         }
       : undefined;
+  const kitChip =
+    kitLink && !pane ? (
+      <KitChip
+        link={kitLink}
+        onOpen={() =>
+          goTo({
+            kind: ROUTE.kit,
+            id: kitLink.kit,
+            theme: kitLink.theme,
+            ...(kitLink.version ? { version: kitLink.version } : {}),
+          })
+        }
+      />
+    ) : null;
+
   const modeButton: ISiteMode | undefined = (() => {
     if (pane || !onMode) return undefined;
     const state = t(modeStateKey(modeKindOf(project?.design.kind), editing));
@@ -765,6 +784,7 @@ const DesignlySiteBody = ({
       toolPane={viewing ? null : toolPane}
       mode={modeButton}
       access={shareButton}
+      kit={kitChip}
       devtools={viewing ? undefined : { machine, slot: slotOrigin, artifact: id }}
       images={!viewing && mayEdit && project ? { machine, artifact: id } : undefined}
       downloads={project ? { machine, artifact: id, archives: mayEdit } : undefined}
@@ -792,6 +812,8 @@ const DesignlySiteBody = ({
       onBoardError,
       pane: pane && { onBack: pane.onBack },
       access: shareButton,
+      kit: kitChip,
+      kitLink,
       viewing,
       mode: modeButton,
       mayEdit,

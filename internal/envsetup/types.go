@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hubproto"
@@ -75,7 +76,9 @@ type Runner struct {
 	waited     []string
 	waitedHash string
 	lastPrune  time.Time
-	lastBeat   time.Time
+	// beatMu keeps the heartbeat's own goroutine (Run) and Tick from writing it twice at once.
+	beatMu   sync.Mutex
+	lastBeat time.Time
 }
 
 const (

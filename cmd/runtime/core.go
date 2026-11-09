@@ -223,8 +223,8 @@ func (c *core) promptService() *prompts.Service {
 	return c.prompts
 }
 
-// start runs the core: the stores cross-check the layouts against tmux, the keeper scans every tab, and the limits,
-// background work and idle sleep start.
+// start runs the core: the stores cross-check the layouts against tmux, the page's channel serves the saved
+// conversations, the keeper scans every tab, and the limits, background work and idle sleep start.
 func (c *core) start() {
 	c.mu.Lock()
 	if c.m != nil {
@@ -234,7 +234,9 @@ func (c *core) start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 	c.mu.Unlock()
-	if err := c.store.Init(); err != nil {
+	// The layouts' files first; their tmux sessions, which a reboot took and a hundred tabs need seconds to start again,
+	// come once the page's channel is up (below).
+	if err := c.store.InitLayouts(); err != nil {
 		agent.Log("warn", "core: layout init failed", agent.F{K: "err", V: err.Error()})
 	}
 	if c.cfg.Standalone {
@@ -290,12 +292,19 @@ func (c *core) start() {
 	if c.resumeAtStart.Load() && c.launcher != nil {
 		c.launcher.RememberStartStates()
 	}
-	m.Start(ctx)
+	// The page's channel comes up first, on the conversations saved at the last stop: the list and the feeds are there
+	// at once, and the tabs' states arrive as the keeper's scan reads them (after a reboot that scan reads ~100 cold
+	// transcripts, and the page waited minutes for it).
 	if c.v2d != nil && v2Enabled() {
 		v := newV2Live(*c.v2d, c)
 		v.start(ctx)
 		c.v2.Store(v)
 	}
+	// The keeper scans the tabs once their sessions are there again.
+	if err := c.store.RestoreSessions(); err != nil {
+		agent.Log("warn", "core: layout init failed", agent.F{K: "err", V: err.Error()})
+	}
+	m.Start(ctx)
 	go c.runLimits(ctx, m)
 	go sleeper.Run(ctx, 0, sleepReport)
 	if c.reload != nil {

@@ -4,7 +4,7 @@ import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 import { Button, EmptyState, Spinner } from '@kit';
 
 import { type ApiError } from './lib/api';
-import { useApi } from './lib/env';
+import { useApi, useEnv } from './lib/env';
 import { errorText } from './lib/errors';
 import { t } from './lib/i18n';
 import { Link, matchRoute, navigate, Redirect, useLocation } from './lib/router';
@@ -30,6 +30,7 @@ import { orgLanding, orgStepDue, orgStepOn } from './org/step';
 import type { OrgList } from '../hub-api/orgs';
 import { OrgRoutes } from './org/routes';
 import { PlainPage } from './ui/frame';
+import { appPathOn, machineForApp } from './lib/app-address';
 
 const ROUTES = [
   '/',
@@ -48,6 +49,7 @@ const ROUTES = [
   '/o/:org/:scope/:section',
   '/s/:slug/sites/new',
   '/s/:slug/sites/:name',
+  '/apps/:app',
 ] as const;
 
 const LAST_SPACE = 'hl-hub-space';
@@ -187,6 +189,49 @@ const Landing = () => {
   return <Loading />;
 };
 
+/** `/apps/<id>`: the app's page lives on a machine; the person's machine in their last space opens it. */
+const AppRedirect = ({ app, search }: { app: string; search: string }) => {
+  const api = useApi();
+  const env = useEnv();
+  const { me } = useSession();
+  const [none, setNone] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const ref = me?.spaces.find((s) => s.slug === lastSpace()) ?? me?.spaces[0];
+      try {
+        if (!ref) throw new Error('no space');
+        const { space } = await api.spaces.bySlug(ref.slug);
+        const { machines } = await api.machines.list(space.id);
+        const id = machineForApp(machines);
+        if (!id) throw new Error('no machine');
+        const { url } = await api.machines.open(id, appPathOn(id, app, search));
+        if (alive) env.assign(url);
+      } catch {
+        if (alive) setNone(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [api, env, me, app, search]);
+  if (!none) return <Loading />;
+  return (
+    <PlainPage>
+      <EmptyState
+        title={t('appRedirect.title')}
+        actions={
+          <Link to="/" className="hub-link">
+            {t('space.toHome')}
+          </Link>
+        }
+      >
+        {t('appRedirect.text', { path: appPathOn('<machine>', app) })}
+      </EmptyState>
+    </PlainPage>
+  );
+};
+
 const SETUP = {
   machines: <MachinesScreen />,
   agents: <AgentsScreen />,
@@ -292,6 +337,7 @@ const Routes = () => {
     );
   }
   if (route === '/settings') return <AccountScreen />;
+  if (route === '/apps/:app') return <AppRedirect app={params.app ?? ''} search={search} />;
   if (route === '/browser/:machineId') return <BrowserScreen machineId={params.machineId ?? ''} />;
   if (route === '/o/:org' || route === '/o/:org/:scope' || route === '/o/:org/:scope/:section') {
     return <OrgRoutes org={params.org ?? ''} scope={params.scope} section={params.section} />;

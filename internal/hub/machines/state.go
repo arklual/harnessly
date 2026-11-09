@@ -125,6 +125,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	if s.design != nil && slices.Contains(hello.Features, hubproto.FeatureDesignAccess) {
 		events = append(slices.Clone(events), hubproto.EventDesign)
 	}
+	if s.history != nil && slices.Contains(hello.Features, hubproto.FeatureHistory) {
+		events = append(slices.Clone(events), hubproto.EventHistoryEvents, hubproto.EventHistoryBackfill)
+	}
 	if _, err := s.reg.Do(ctx, m.ID, hubproto.OpLinkSubscribe, map[string]any{"events": events}, callTimeout); err != nil {
 		s.log.Warn("events not subscribed", "machine", m.ID, "error", err)
 	}
@@ -139,6 +142,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	}
 	if s.design != nil {
 		s.design.Connected(m, hello.Features)
+	}
+	if s.history != nil {
+		s.history.Connected(m, hello.Features)
 	}
 	if _, err := s.RunPreflight(ctx, m); err != nil {
 		s.log.Info("first preflight failed", "machine", m.ID, "error", err)
@@ -234,6 +240,14 @@ func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 	case hubproto.EventDocPublish, hubproto.EventDocACL, hubproto.EventDocBound, hubproto.EventDocReply:
 		if s.docs != nil {
 			s.docs.Event(l, m, ev)
+		}
+	case hubproto.EventHistoryEvents:
+		if s.history != nil {
+			s.history.Live(ctx, m, ev.Raw)
+		}
+	case hubproto.EventHistoryBackfill:
+		if s.history != nil {
+			s.history.Backfill(ctx, m, ev.Raw)
 		}
 	case hubproto.EventUsageAvailable:
 		if s.usage != nil {

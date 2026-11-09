@@ -190,7 +190,10 @@ run up to 64 KB. A card the agent shows or changes on its own is a widget (`harn
 
 ### The app as the main thing
 
-`/apps/<id>?chat=<conv>` shows the app's `app`-target view on the whole page and the chat it works in beside it. The
+`/apps/<id>?chat=<conv>` shows the app's `app`-target view on the whole page and the chat it works in beside it (the
+address is the machine page's: on a hub it is `/m/<machine>/apps/<id>`, and the hub's own `/apps/<id>` leads to the
+person's machine). An app that waits for the person's consent shows there what it waits for, and where the person
+agrees, instead of its view. The
 chat stands in one of three places, chosen with the switch in the page's head and kept for the viewer: a column at the
 left, a window over the app (moved by its head, grown by its corner), or only its field at the foot with the agent's last
 line over it. The pane's «во всю ширину» on an app tab opens this page; its back arrow returns to the chat. Without

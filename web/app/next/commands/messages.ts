@@ -14,6 +14,7 @@ import { uuidv7 } from '@/next/core/ids';
 import { batch } from '@/next/core/store';
 import { startMessageStatus } from '@/next/commands/message-status';
 import { runCommand, type OpHandle } from '@/next/commands/run';
+import { anyKept, takeKept } from '@/next/commands/uploads';
 import { connectionStore } from '@/next/stores/connection';
 import { limitsOf } from '@/next/stores/machines';
 import { conversationsStore } from '@/next/stores/conversations';
@@ -130,6 +131,15 @@ async function submit(clientId: ClientId): Promise<void> {
   if (!m || m.rev > 0 || !m.conversationId || inFlight.has(clientId)) return;
   inFlight.add(clientId);
   try {
+    // what was attached while the machine was off is in the hub; the machine takes it before the message goes.
+    // A message without them goes in the same frame, as before.
+    const attachments = anyKept(m.attachments)
+      ? await takeKept(m.machineId, m.attachments)
+      : [...m.attachments];
+    if (!attachments) {
+      scheduleResend(clientId);
+      return;
+    }
     const handle = runCommand(
       m.machineId,
       'send',
@@ -137,7 +147,7 @@ async function submit(clientId: ClientId): Promise<void> {
         clientId,
         conversationId: m.conversationId,
         text: m.text,
-        attachmentIds: m.attachments.map((a) => a.id),
+        attachmentIds: attachments.map((a) => a.id),
         mode: m.mode,
         kind: m.kind,
         ...(m.refs && m.refs.length > 0 ? { refs: m.refs } : {}),

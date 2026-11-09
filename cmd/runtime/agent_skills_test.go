@@ -161,3 +161,24 @@ func TestAgentBrowserWorkspacePrompt(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkspacePromptAsksForFewChecks(t *testing.T) {
+	clearServices(t)
+	for _, provider := range []string{"claude", "codex"} {
+		text, _ := workspacePrompts().Text(provider, "ws-1")
+		for _, want := range []string{"Checks on a shared machine", "end of the task", "only the package or test", "leave the full run to CI",
+			"people's chats", "not a reason to run the command again"} {
+			if !strings.Contains(text, want) {
+				t.Errorf("%s prompt lacks %q", provider, want)
+			}
+		}
+	}
+}
+
+func TestHeavyLaunchersOn(t *testing.T) {
+	for v, want := range map[string]bool{"": true, "on": true, "off": false, "0": false, "No": false} {
+		if got := heavyLaunchersOn(func(string) string { return v }); got != want {
+			t.Errorf("RUNTIME_HEAVY_LAUNCHERS=%q: %v", v, got)
+		}
+	}
+}

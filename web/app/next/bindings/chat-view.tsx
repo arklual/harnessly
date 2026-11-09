@@ -422,7 +422,7 @@ const ChatView = ({
                           onOpenOutput={onOpenOutput}
                           onShareFile={(path) => setSharing({ path, open: true })}
                           shown={shown}
-                          downloadUrl={(path) => downloadUrl(machine, path)}
+                          downloadUrl={(path, output) => downloadUrl(machine, path, output)}
                           onOpenRef={
                             onOpenFile || onOpenRef
                               ? (kind, label, href) => {

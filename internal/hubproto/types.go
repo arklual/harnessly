@@ -1,6 +1,7 @@
 package hubproto
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -16,6 +17,22 @@ const (
 	CloseProtocolOld   = 4012 // the agent's protocol is too old: the agent waits an hour
 	StatusUpgradeAgent = 426  // the HTTP answer to a dial of an agent older than the hub's minimum
 )
+
+// RevokedReason is details.reason of the hub's 403 to a dial of a revoked machine: {"error":"forbidden",
+// "details":{"reason":"revoked"}}. A 403 without it is not the hub's word (a proxy, a firewall in front of it).
+const RevokedReason = "revoked"
+
+// IsRevokedDial says whether body, the answer to a dial, is the hub's structured refusal of a revoked machine. Only that,
+// or the close code CloseRevoked, makes an agent stop dialing: a bare 403 is retried with the usual backoff.
+func IsRevokedDial(body []byte) bool {
+	var b struct {
+		Error   string `json:"error"`
+		Details struct {
+			Reason string `json:"reason"`
+		} `json:"details"`
+	}
+	return json.Unmarshal(body, &b) == nil && b.Error == "forbidden" && b.Details.Reason == RevokedReason
+}
 
 // Profile is the isolation the machine was connected with.
 type Profile string

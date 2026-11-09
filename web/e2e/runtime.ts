@@ -19,6 +19,9 @@ export interface Runtime {
   socket: string;
   log: string;
   stop: () => Promise<void>;
+  /** Stops the runtime and its tmux server, as a reboot does, runs `between` (the disk's cache let go, say) and starts
+   *  the same runtime on the same home again. Resolves with the moment the new process was spawned (Date.now()). */
+  restart: (between?: () => void) => Promise<number>;
 }
 
 export function freePort(): Promise<number> {
@@ -112,17 +115,20 @@ export async function startRuntime(
     RUNTIME_LOCALE: 'en',
     RUNTIME_AGENT_NICE: '10',
     RUNTIME_GATE_COUNT_SECONDS: '3600',
+    // The merge request smoke runs the release binaries, whose version is a real one: no asking GitHub.
+    RUNTIME_UPDATE_CHECK: '0',
     ...opts.env,
   };
   // A page built since the binary was (pnpm build) is served from disk.
   if (process.env.RUNTIME_WEB_DIR) env.RUNTIME_WEB_DIR = resolve(process.env.RUNTIME_WEB_DIR);
   const log = join(root, 'runtime.log');
   const out = openSync(log, 'a');
-  const child: ChildProcess = spawn(binary, [], { env, stdio: ['ignore', out, out], detached: true });
+  const launch = () => spawn(binary, [], { env, stdio: ['ignore', out, out], detached: true });
+  let child: ChildProcess = launch();
   const url = `http://127.0.0.1:${port}`;
   await waitFor(`${url}/api/health`, 30_000);
 
-  const stop = async () => {
+  const halt = async () => {
     if (child.exitCode === null) {
       child.kill('SIGTERM');
       await new Promise((r) => {
@@ -136,6 +142,9 @@ export async function startRuntime(
         });
       });
     }
+  };
+  const stop = async () => {
+    await halt();
     // The panes' shells write into the temporary home as they exit: the server goes, then its panes, then the files.
     const tmuxEnv: NodeJS.ProcessEnv = { ...process.env, TMUX_TMPDIR: tmuxDir };
     delete tmuxEnv.TMUX;
@@ -157,5 +166,19 @@ export async function startRuntime(
     }
     if (!process.env.E2E_KEEP) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   };
-  return { url, root, home, socket, log, stop };
+  const restart = async (between?: () => void) => {
+    await halt();
+    const tmuxEnv: NodeJS.ProcessEnv = { ...process.env, TMUX_TMPDIR: tmuxDir };
+    delete tmuxEnv.TMUX;
+    try {
+      execFileSync('tmux', ['-L', socket, 'kill-server'], { env: tmuxEnv, stdio: 'ignore' });
+    } catch {
+      // no server left
+    }
+    between?.();
+    const at = Date.now();
+    child = launch();
+    return at;
+  };
+  return { url, root, home, socket, log, stop, restart };
 }

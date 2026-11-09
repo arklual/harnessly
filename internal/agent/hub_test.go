@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -169,9 +170,13 @@ type fakeHub struct {
 	headers []http.Header
 	// reject answers the dial with this status instead of upgrading; 0 upgrades.
 	reject atomic.Int32
-	dials  atomic.Int32
-	conns  chan *hubConn
-	ctx    context.Context
+	// rejectBody is the body of a rejection (none when nil); rejectLeft, when above 0, is how many dials are rejected
+	// before the door opens again.
+	rejectBody atomic.Pointer[string]
+	rejectLeft atomic.Int32
+	dials      atomic.Int32
+	conns      chan *hubConn
+	ctx        context.Context
 }
 
 func newFakeHub(t *testing.T, pub ed25519.PublicKey, machineID string) *fakeHub {
@@ -189,6 +194,15 @@ func newFakeHub(t *testing.T, pub ed25519.PublicKey, machineID string) *fakeHub 
 		f.headers = append(f.headers, r.Header.Clone())
 		f.mu.Unlock()
 		if code := int(f.reject.Load()); code != 0 {
+			if f.rejectLeft.Load() > 0 && f.rejectLeft.Add(-1) == 0 {
+				f.reject.Store(0)
+			}
+			if b := f.rejectBody.Load(); b != nil {
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.WriteHeader(code)
+				_, _ = io.WriteString(w, *b)
+				return
+			}
 			w.WriteHeader(code)
 			return
 		}
@@ -980,9 +994,30 @@ func TestHubDialRulesOfTheHub(t *testing.T) {
 			t.Errorf("audit %s", r.audit())
 		}
 	})
+	// Only the hub's structured refusal is a revocation: a bare 403 (a proxy, a firewall) is called again.
 	t.Run("revoked by 403", func(t *testing.T) {
-		r := startHubAgentRejected(t, 403)
+		body := `{"error":"forbidden","message":"Машина отозвана","details":{"reason":"revoked"}}`
+		r := startHubAgent(t, rigOptions{before: func(h *fakeHub) { h.reject.Store(403); h.rejectBody.Store(&body) }})
 		waitStops(t, r)
+		if !strings.Contains(r.audit(), `"op":"revoked"`) {
+			t.Errorf("audit %s", r.audit())
+		}
+	})
+	t.Run("a bare 403 is retried", func(t *testing.T) {
+		r := startHubAgent(t, rigOptions{before: func(h *fakeHub) { h.reject.Store(403); h.rejectLeft.Store(1) }})
+		c := r.connect()
+		c.mustCall("hello", nil)
+		if n := r.hub.dials.Load(); n != 2 {
+			t.Errorf("%d dials", n)
+		}
+		if strings.Contains(r.audit(), `"op":"revoked"`) {
+			t.Errorf("revoked on a bare 403: %s", r.audit())
+		}
+	})
+	t.Run("a 403 of another kind is retried", func(t *testing.T) {
+		body := `{"error":"forbidden","message":"nope"}`
+		r := startHubAgent(t, rigOptions{before: func(h *fakeHub) { h.reject.Store(403); h.rejectBody.Store(&body); h.rejectLeft.Store(1) }})
+		r.connect().mustCall("hello", nil)
 	})
 	// 4012 and 426: too old; an hour's wait.
 	t.Run("too old by close code", func(t *testing.T) {
@@ -1169,6 +1204,46 @@ func TestHubModeReadsNoTranscripts(t *testing.T) {
 		if strings.Contains(string(ev["event"]), "transcripts") {
 			t.Errorf("a transcript event on a hub link: %s", ev)
 		}
+	}
+}
+
+// a hub's own machine offers its chats; nothing goes before the hub's history.start, and then the replica's
+// frames reach the hub link that asked for them under protocol 2's names.
+func TestHubModeSendsTheChatsOnceTheHubKeepsThem(t *testing.T) {
+	r := startHubAgent(t, rigOptions{})
+	c := r.connect()
+	hello := decode[hubproto.Hello](t, c.mustCall("hello", nil))
+	if !contains(hello.Features, hubproto.FeatureHistory) {
+		t.Fatalf("a hub's machine with a runtime does not offer its chats: %v", hello.Features)
+	}
+	c.mustCall(hubproto.OpLinkSubscribe, map[string]any{"events": []string{hubproto.EventHistoryEvents, hubproto.EventHistoryBackfill}})
+	rep := r.agent.replica
+	rep.hello("ep-1")
+	rep.event("convs", 1, json.RawMessage(`{"type":"conversation_upsert","conv":{"id":"tab-a","rev":1}}`))
+	time.Sleep(200 * time.Millisecond)
+	c.mu.Lock()
+	for _, ev := range c.events {
+		if strings.HasPrefix(string(ev["event"]), `"history.`) {
+			t.Errorf("a chat went before history.start: %s", ev["event"])
+		}
+	}
+	c.mu.Unlock()
+	c.mustCall(hubproto.OpHistoryStart, map[string]any{"enabled": true, "cursors": map[string]any{}, "known": map[string]any{}, "pending": map[string]any{}})
+	rep.hello("ep-1")
+	rep.event("convs", 1, json.RawMessage(`{"type":"conversation_upsert","conv":{"id":"tab-a","rev":1}}`))
+	ev, _ := c.waitEvent(hubproto.EventHistoryEvents, 0, 10*time.Second)
+	if ev == nil {
+		t.Fatal("no history.events")
+	}
+	if string(ev["ch"]) != `"convs"` || string(ev["fromSeq"]) != "1" || string(ev["epoch"]) != `"ep-1"` {
+		t.Errorf("history.events %v", ev)
+	}
+	c.mustCall(hubproto.OpHistoryAck, map[string]any{"ch": "convs", "epoch": "ep-1", "ackSeq": 1})
+	rep.mu.Lock()
+	acked := rep.chans["convs"].acked
+	rep.mu.Unlock()
+	if acked != 1 {
+		t.Errorf("the hub's ack was not taken: %d", acked)
 	}
 }
 

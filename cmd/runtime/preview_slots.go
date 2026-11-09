@@ -75,8 +75,8 @@ var standaloneSlots *previewSlots
 
 // listenPreviewSlots binds the slot listeners: RUNTIME_PREVIEW_LISTEN names the first (host:port, the rest follow it),
 // "off" opens none; by default they take the ports after the gate's own on its host. A port that is taken costs the
-// preview, never the runtime.
-func listenPreviewSlots(gateListen string, gatePort int) *previewSlots {
+// preview, never the runtime. dataDir keeps the id of the slots' names (slotPublicOrigins).
+func listenPreviewSlots(gateListen string, gatePort int, dataDir string) *previewSlots {
 	asked := strings.TrimSpace(os.Getenv("RUNTIME_PREVIEW_LISTEN"))
 	mode := previewModeSetting()
 	if mode == "path" {
@@ -118,7 +118,15 @@ func listenPreviewSlots(gateListen string, gatePort int) *previewSlots {
 		s.listeners = append(s.listeners, ln)
 		s.ports = append(s.ports, ln.Addr().(*net.TCPAddr).Port)
 	}
-	if raw := os.Getenv("RUNTIME_PREVIEW_PUBLIC_ORIGINS"); raw != "" {
+	s.public = slotPublicOrigins(dataDir)
+	return s
+}
+
+// slotPublicOrigins are the slots' origins behind a reverse proxy, in slot order, or nil: RUNTIME_PREVIEW_PUBLIC_ORIGINS
+// when it lists 8, else https://s<n>-<id>.<RUNTIME_PREVIEW_DOMAIN> (internal/preview/origins.go), the same on every
+// start whatever started the runtime.
+func slotPublicOrigins(dataDir string) []string {
+	if raw := os.Getenv("RUNTIME_PREVIEW_PUBLIC_ORIGINS"); strings.TrimSpace(raw) != "" {
 		list := splitList(raw)
 		ok := len(list) == previewSlotCount
 		for i, o := range list {
@@ -127,13 +135,68 @@ func listenPreviewSlots(gateListen string, gatePort int) *previewSlots {
 			ok = ok && previewOriginRe.MatchString(o)
 		}
 		if ok {
-			s.public = list
-		} else {
-			agent.Log("warn", "preview: RUNTIME_PREVIEW_PUBLIC_ORIGINS needs 8 origins; the slots use the app's host",
-				agent.F{K: "value", V: raw})
+			return list
 		}
+		agent.Log("warn", "preview: RUNTIME_PREVIEW_PUBLIC_ORIGINS needs 8 origins; the slots use the app's host",
+			agent.F{K: "value", V: raw})
+		return nil
 	}
-	return s
+	raw := os.Getenv("RUNTIME_PREVIEW_DOMAIN")
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	domain, err := preview.NormalizeDomain(raw)
+	if err != nil {
+		agent.Log("warn", "preview: RUNTIME_PREVIEW_DOMAIN is not a domain; the slots use the app's host", agent.F{K: "error", V: err.Error()})
+		return nil
+	}
+	machine := ""
+	if m, err := agent.LoadMachine(env("AGENT_MACHINE_FILE", agent.DefaultMachineFile(dataDir))); err == nil {
+		machine = m.MachineID
+	}
+	id, err := preview.PreviewID(os.Getenv("RUNTIME_PREVIEW_ID"), machine, dataDir)
+	if err != nil {
+		agent.Log("warn", "preview: no id for the slots' names; the slots use the app's host", agent.F{K: "error", V: err.Error()})
+		return nil
+	}
+	list := preview.DomainOrigins(domain, id, previewSlotCount)
+	agent.Log("info", "preview: the slots' origins come from RUNTIME_PREVIEW_DOMAIN", agent.F{K: "origins", V: strings.Join(list, ",")})
+	return list
+}
+
+// previewOriginChecks resolves the slots' names with the system resolver against this machine's own addresses.
+func previewOriginChecks(ctx context.Context, origins []string) []preview.OriginCheck {
+	return preview.CheckOrigins(ctx, origins, preview.SystemLookup, preview.SelfAddresses(os.Getenv("RUNTIME_PREVIEW_SELF_IPS")))
+}
+
+// previewCheck is the answer of GET /api/cli/preview/check (harnessly doctor preview).
+type previewCheck struct {
+	// Mode is RUNTIME_PREVIEW_MODE; Source says where the origins came from: "list", "domain" or "" when there are none.
+	Mode    string                `json:"mode"`
+	Source  string                `json:"source"`
+	Domain  string                `json:"domain,omitempty"`
+	Origins []preview.OriginCheck `json:"origins"`
+	Hint    string                `json:"hint,omitempty"`
+}
+
+func previewCheckReport(ctx context.Context, origins []string) previewCheck {
+	out := previewCheck{Mode: previewModeSetting(), Origins: []preview.OriginCheck{}}
+	if standaloneSlots == nil {
+		out.Mode = "off"
+	}
+	switch {
+	case strings.TrimSpace(os.Getenv("RUNTIME_PREVIEW_PUBLIC_ORIGINS")) != "":
+		out.Source = "list"
+	case strings.TrimSpace(os.Getenv("RUNTIME_PREVIEW_DOMAIN")) != "":
+		out.Source = "domain"
+		out.Domain, _ = preview.NormalizeDomain(os.Getenv("RUNTIME_PREVIEW_DOMAIN"))
+	}
+	if len(origins) == 0 {
+		return out
+	}
+	out.Origins = previewOriginChecks(ctx, origins)
+	out.Hint = preview.OriginsHint(out.Origins)
+	return out
 }
 
 var previewOriginRe = regexp.MustCompile(`^https?://(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)

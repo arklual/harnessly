@@ -428,6 +428,8 @@
   "next.settings.checks.disk.hint": "Models and updates will not fit. Free and needed:",
   "next.settings.checks.apps_boundary": "The agent of a chat with apps is not walled off from their files",
   "next.settings.checks.apps_boundary.hint": "Without bubblewrap only the chat's rules keep the agent of a chat with apps out: a script or python can write into the apps' folder. Install or allow it:",
+  "next.settings.checks.preview_dns": "The preview names do not resolve",
+  "next.settings.checks.preview_dns.hint": "The panel cannot open a view over https although the preview listens here. Add them to DNS (a wildcard record to this machine or its reverse proxy), then check:",
   "next.settings.checks.pane_shell": "A tab's empty terminal is not recognised",
   "next.settings.checks.pane_shell.hint": "An agent that exited or crashed is not restarted in its tab",
   "next.settings.checks.pane_program": "A running agent is not recognised",

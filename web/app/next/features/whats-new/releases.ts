@@ -13,6 +13,22 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-09k',
+    items: [
+      { key: 'kitCanvas', icon: 'palette' },
+      { key: 'kitInProject', icon: 'presentation' },
+    ],
+  },
+  {
+    id: '2026-11-09c',
+    items: [
+      { key: 'bashLine', icon: 'square-terminal' },
+      { key: 'stoppedTurn', icon: 'circle-stop' },
+      { key: 'appConsent', icon: 'shield-check' },
+      { key: 'previewPathAssets', icon: 'palette' },
+    ],
+  },
+  {
     id: '2026-11-09b',
     items: [
       { key: 'codeAsk', icon: 'key-round' },

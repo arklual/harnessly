@@ -1,12 +1,14 @@
 #!/bin/sh
 # Prints the Go packages of shard $1 of $2 (1-based): the heaviest first, each to the lightest shard so far, by the
 # weights in go-test-weights.txt (a package without one weighs 3). Plain round-robin left one job a minute longer
-# than the others.
+# than the others. With a third argument, only the packages that file lists (affected-go.sh; `./...` is all of them).
 set -eu
 index=${1:?shard index}
 total=${2:?shard count}
+only=${3:-}
 dir=$(dirname "$0")
-go list ./... | awk -v n="$total" -v i="$index" -v wf="$dir/go-test-weights.txt" '
+packages() { if [ -n "$only" ] && [ "$(cat "$only")" != ./... ]; then cat "$only"; else go list ./...; fi; }
+packages | awk -v n="$total" -v i="$index" -v wf="$dir/go-test-weights.txt" '
   BEGIN { while ((getline line < wf) > 0) { if (line ~ /^#/ || line == "") continue; split(line, f, " "); w[f[1]] = f[2] } }
   { pkgs[NR] = $0; p = $0; sub(/^github.com\/ly-solutions\/harnessly\/?/, "", p); wt[NR] = (p in w) ? w[p] : 3; idx[NR] = NR }
   END {

@@ -63,6 +63,9 @@ export const en: Record<Key, Entry> = {
   'menu.signOut': 'Sign out',
   'notFound.title': 'There is no such page',
   'notFound.text': 'Check the address or go back to the start.',
+  'appRedirect.title': 'The app opens on a machine',
+  'appRedirect.text':
+    "An app's page lives on its machine's page: {path}. Connect a machine to the space, or open that address.",
   'session.failed': 'Could not reach the hub',
   'landing.orgsFailed': 'The hub did not answer. Press Retry or reload the page in a minute.',
 

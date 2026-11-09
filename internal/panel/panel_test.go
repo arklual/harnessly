@@ -425,6 +425,25 @@ func TestApps(t *testing.T) {
 	}
 }
 
+// an app that waits for consent says so, not «no such app».
+func TestAppWhyNot(t *testing.T) {
+	withApps := targets
+	withApps.AppRef = func(string) string { return "" }
+	withApps.AppWhyNot = func(text string) string {
+		if text == "example.waits" {
+			return "example.waits waits for the person's consent to its access: ai; the person agrees in harnessly's page"
+		}
+		return ""
+	}
+	_, err := withApps.Parse(open("app", "example.waits"))
+	if !strings.Contains(err, "waits for the person's consent: ai") && !strings.Contains(err, "waits for the person's consent to its access: ai") {
+		t.Errorf("waiting app: %q", err)
+	}
+	if _, err := withApps.Parse(open("app", "example.other")); strings.Contains(err, "consent") || err == "" {
+		t.Errorf("unknown app: %q", err)
+	}
+}
+
 func TestAutoAndReloadTravel(t *testing.T) {
 	got := string(jsvalue.Stringify(Command{Kind: "open", Tab: "artifacts", Target: "/agents/docs/a", Auto: true, Reload: true}.JSON(), ""))
 	if got != `{"kind":"open","tab":"artifacts","target":"/agents/docs/a","auto":true,"reload":true}` {

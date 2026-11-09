@@ -246,6 +246,7 @@ func monthOf(s string) (time.Month, bool) {
 // LimitEnd is the usage limit a turn ends on ("" the open one): its last entry is the agent's notice of the limit.
 // The notice's words come with it.
 func (f *Feed) LimitEnd(id string) (Limit, string, bool) {
+	f.ensure()
 	if id == "" {
 		id = f.b.openID()
 	}

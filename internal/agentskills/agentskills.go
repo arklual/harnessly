@@ -8,6 +8,7 @@
 //	<codex home>/skills/harnessly/<name>      Codex user skills
 //	<data folder>/agent-skills/tools          the artifacts command line client
 //	<bin folder>/{artifacts,boards}           launchers on the PATH of the agents' shells
+//	<bin folder>/{go,vitest,tsc,…}            launchers of heavy checks (internal/heavy)
 //
 // Each root keeps a manifest of what was written. A file is rewritten only when it is unchanged since harnessly wrote
 // it; one the person made or edited stays, and is reported. A skill that is no longer wanted (its server was removed)
@@ -28,6 +29,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/heavy"
 	"github.com/ly-solutions/harnessly/skills"
 )
 
@@ -38,6 +40,9 @@ type Options struct {
 	DataDir, CodexHome, BinDir string
 	// Harnessly is the harnessly executable to link as <BinDir>/harnessly when nothing is there; "" links none.
 	Harnessly string
+	// Heavy puts the launchers of heavy checks (go, vitest, playwright, tsc, eslint, npx) into BinDir: they run the tool
+	// through `harnessly heavy`, which shares the machine's few slots between agents. It needs Harnessly.
+	Heavy bool
 	// Boards and Artifacts say whether those servers are configured.
 	Boards, Artifacts bool
 	// MCPServer is the name the runtime's MCP server has for the agents (RUNTIME_MCP_SERVER); "" is harnessly. The
@@ -193,6 +198,11 @@ func Provision(o Options) (Result, error) {
 				bin["boards"] = file{data: data, mode: 0o755}
 			}
 		}
+		if o.Heavy && o.Harnessly != "" {
+			for _, tool := range heavy.Tools {
+				bin[tool] = file{data: []byte(heavyLauncher(o.Harnessly, o.BinDir, tool)), mode: 0o755}
+			}
+		}
 		sync(o.BinDir, filepath.Join(o.DataDir, "agent-skills", "bin-managed.json"), bin)
 		if o.Harnessly != "" {
 			linkHarnessly(o.BinDir, o.Harnessly)
@@ -213,6 +223,19 @@ func linkHarnessly(bin, target string) {
 	if os.MkdirAll(bin, 0o755) == nil {
 		_ = os.Symlink(target, link)
 	}
+}
+
+// heavyLauncher is <bin>/<tool>: the tool through `harnessly heavy`, or the real tool when harnessly is gone.
+func heavyLauncher(harnessly, bin, tool string) string {
+	return "#!/bin/sh\n" +
+		"# Installed by harnessly (" + heavy.Marker + "): heavy checks share the machine's few slots. See `harnessly heavy --help`.\n" +
+		"h=" + shellQuote(harnessly) + "\n" +
+		"if [ -x \"$h\" ]; then exec \"$h\" heavy --skip " + shellQuote(bin) + " " + tool + " \"$@\"; fi\n" +
+		"if [ -n \"$HARNESSLY_HEAVY_FALLBACK\" ]; then echo \"" + tool + ": not installed (only harnessly's launcher is on PATH)\" >&2; exit 127; fi\n" +
+		"PATH=$(printf '%s' \"$PATH\" | tr ':' '\\n' | grep -vxF " + shellQuote(bin) + " | paste -sd: -)\n" +
+		"HARNESSLY_HEAVY_FALLBACK=1\n" +
+		"export PATH HARNESSLY_HEAVY_FALLBACK\n" +
+		"exec " + tool + " \"$@\"\n"
 }
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

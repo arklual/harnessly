@@ -1,0 +1,28 @@
+.hx-codeblocks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 32px;
+  min-height: 100vh;
+  padding: 32px 16px;
+  background: var(--hx-bg);
+}
+.hx-codeblocks__col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hx-codeblocks__col[data-width='desktop'] {
+  width: 720px;
+}
+.hx-codeblocks__col[data-width='column'] {
+  width: 320px;
+}
+.hx-codeblocks__col[data-width='narrow'] {
+  width: 220px;
+}
+.hx-codeblocks__ttl {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}

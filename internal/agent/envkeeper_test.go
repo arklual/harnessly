@@ -211,3 +211,46 @@ func TestHubEnvSetOverTheLink(t *testing.T) {
 		t.Errorf("audit %s", a)
 	}
 }
+
+// The organization's rule for apps rides on env.set: the agent keeps it beside the list for the runtime, says
+// the hash of both to the hub, and a change of the rule alone applies nothing again.
+func TestEnvKeeperKeepsTheAppsRule(t *testing.T) {
+	dir := t.TempDir()
+	k := newEnvKeeper(dir)
+	items := envItems()
+	plain := hubproto.EnvHash(items)
+	if _, err := k.Set(hubproto.EnvSet{Rev: 1, Hash: plain, Items: items}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.Set(hubproto.EnvSet{Rev: 2, Hash: plain, Items: items, AppsConsent: hubproto.AppsConsentAuto}); err == nil {
+		t.Fatal("the rule auto under the items' hash was taken")
+	}
+	auto := hubproto.EnvSetHash(plain, hubproto.AppsConsentAuto)
+	st, err := k.Set(hubproto.EnvSet{Rev: 2, Hash: auto, Items: items, AppsConsent: hubproto.AppsConsentAuto})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rev, hash := k.Held(); st.Hash != auto || rev != 2 || hash != auto {
+		t.Fatalf("held %d %q, state %q; want %q", rev, hash, st.Hash, auto)
+	}
+	var file struct {
+		Hash        string `json:"hash"`
+		AppsConsent string `json:"appsConsent"`
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, "environment.json"))
+	if err := json.Unmarshal(raw, &file); err != nil || file.Hash != plain || file.AppsConsent != hubproto.AppsConsentAuto {
+		t.Fatalf("the file keeps the items' hash for the setup and the rule for the runtime: %s", raw)
+	}
+	// Read again after a restart, then turned off: the hash is the items' again.
+	k2 := newEnvKeeper(dir)
+	if _, hash := k2.Held(); hash != auto {
+		t.Fatalf("after a restart the rule is held: %q", hash)
+	}
+	if st, err = k2.Set(hubproto.EnvSet{Rev: 3, Hash: plain, Items: items}); err != nil || st.Hash != plain {
+		t.Fatalf("the rule turned off: %+v %v", st, err)
+	}
+	raw, _ = os.ReadFile(filepath.Join(dir, "environment.json"))
+	if strings.Contains(string(raw), "appsConsent") {
+		t.Fatalf("the rule ask is not kept in the file: %s", raw)
+	}
+}

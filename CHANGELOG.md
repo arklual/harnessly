@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Heavy checks share the machine: launchers named `go`, `vitest`, `playwright`, `tsc`, `eslint` and `npx` on the agents'
+  `PATH` run builds, tests, type checks and linters through `harnessly heavy`, which gives them one of the machine's
+  few slots (by its cores), runs them gently and, when the machine stays busy, tells the agent to go on without the check
+  (exit 75). `harnessly heavy stats` counts the calls that waited and were refused; the workspace prompt asks agents
+  to check once, at the end, only what they changed (`RUNTIME_HEAVY_LAUNCHERS`).
 - The fleet's workspace on a standalone hub (`runtime.fleet`): the hub carries the runtime's page and serves it at
   `/agents/` with the home machine's settings; `/agents/api/v2/…` is the fleet, every other API call goes to
   `?machine=<id>` or the home machine, so Sinopia and the platform API work across machines too. The hub page's
@@ -259,6 +264,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A restart no longer loses the runtime's `RUNTIME_*` settings. `install.sh` keeps the `RUNTIME_*` variables
+  it was given in `~/.config/harnessly/env` (before, only the first start, which inherited them from the installer's
+  shell, had them) and passes them to the launchd job; the hub machine's installer keeps the lines added to
+  `runtime.env` and `agent.env` instead of rewriting the files. `RUNTIME_PREVIEW_DOMAIN` (and `RUNTIME_PREVIEW_ID`)
+  name the preview slots' origins `https://s<n>-<id>.<domain>` when no explicit list is given, the same on every start.
+  `harnessly doctor preview` and the machine check `preview_dns` say when those names do not resolve (NXDOMAIN).
 - A new Sinopia project takes a brief of up to 20,000 characters, not 4,000: a dictated brief ran past the old bound
   and the person saw a bare «brief: too long». A longer one is refused in their words, with a hint to attach the text as
   a file.

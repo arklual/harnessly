@@ -35,6 +35,8 @@ export interface IDeckBarProps {
   playBlocked: string | null;
   /** Absent: the person may not share this deck. */
   onShare?: () => void;
+  /** The kit's chip, before the share button. */
+  kit?: ReactNode;
   shareOn: boolean;
   onMore: () => void;
   moreOn: boolean;
@@ -153,6 +155,7 @@ const DeckBar = (p: IDeckBarProps) => {
           </>
         )}
       </div>
+      {(edit || link) && p.kit}
       <span className="hx-deck-grow" />
       {edit && (
         <>

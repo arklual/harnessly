@@ -13,7 +13,14 @@ import CopyButton from '@/next/features/chat/copy-button';
 import UserMessage from '@/next/features/chat/user-message';
 import Outputs from '@/next/features/chat/outputs';
 import DelegationCards from '@/next/features/chat/delegation-card';
-import type { Entry, TurnFailureCode, TurnItem, UserEntry } from '@/next/features/chat/types';
+import type {
+  Entry,
+  FeedDensity,
+  FeedItem,
+  TurnFailureCode,
+  TurnItem,
+  UserEntry,
+} from '@/next/features/chat/types';
 import Icon from '@/next/ui/icon';
 import { Skeleton, useDelayed } from '@/next/ui/skeleton';
 import Spinner from '@/next/ui/spinner';
@@ -175,6 +182,13 @@ export const splitAtMessages = (steps: Entry[]): { parts: Entry[][]; messages: U
   return { parts, messages };
 };
 
+/**
+ * Whether a turn is unfolded before the person folds or unfolds it: every turn in the full density; a turn the person
+ * stopped in any, so what the agent thought and wrote up to the stop stays in view under «Остановлено».
+ */
+export const openByDefault = (item: FeedItem, density: FeedDensity): boolean =>
+  density === 'full' || (item.kind === 'turn' && item.turn.status === 'interrupted');
+
 interface ITurnViewProps {
   item: TurnItem;
   open: boolean;
@@ -192,20 +206,21 @@ const TurnView = ({ item, open, machineName, handlers }: ITurnViewProps) => {
   const flows = live ? [] : worked.filter(isWorkflowCall);
   const expanded = live || open;
   const seen = useSeen(expanded);
-  // A turn whose steps loaded empty has nothing to unfold: no «0 actions» header over a skeleton that never fills.
-  const [loadedEmpty, setLoadedEmpty] = useState(false);
-  const hasWork = live
-    ? (steps?.length ?? 0) > 0
-    : (turn.stepCount - (item.woke ? 1 : 0) > 0 && !loadedEmpty) || worked.length > 0;
+  // Once the turn's page has loaded, what it holds is all there is: a turn whose steps loaded empty has nothing to
+  // unfold (no «0 actions» header over a skeleton that never fills), and a partial one is not asked for again.
+  const [loaded, setLoaded] = useState(false);
+  // The answer is drawn under the work, not in it: a turn whose only step is its answer has no work to unfold.
+  const unshown = turn.stepCount - (item.woke ? 1 : 0) - (item.answer ? 1 : 0);
+  const hasWork = live ? (steps?.length ?? 0) > 0 : (unshown > 0 && !loaded) || worked.length > 0;
   const toggle = () => handlers.onToggle(turn.id);
-  // Steps load whenever the turn is unfolded without them: by a tap, or open from the start (the last turn).
+  // Steps load whenever the turn is unfolded without them all: by a tap, or open from the start (the last turn).
   const { onLoadSteps } = handlers;
-  const needSteps = expanded && hasWork && steps === null;
+  const needSteps = expanded && hasWork && !loaded && (steps === null || item.partial === true);
   useEffect(() => {
     if (!needSteps || !onLoadSteps) return;
     let gone = false;
-    void onLoadSteps(turn.id).then((loaded) => {
-      if (loaded && !gone) setLoadedEmpty(true);
+    void onLoadSteps(turn.id).then((ok) => {
+      if (ok && !gone) setLoaded(true);
     });
     return () => {
       gone = true;

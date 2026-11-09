@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -297,17 +298,33 @@ func (b *builder) add(o *jsvalue.Object, offset int64) step {
 		b.approval(&s, o, id, at, offset)
 	case "slash-command":
 		summary := strings.TrimSpace("/" + str(o, "name") + " " + str(o, "args"))
-		e := wire.Entry{ID: id, At: at, Rev: 1, T: wire.EntryTool, ToolUseID: id, Tool: "command", Summary: summary}
+		line := CommandLine(str(o, "name"), str(o, "args"))
+		cmdID := id
+		if str(o, "name") == ShellCommand && b.open == nil {
+			// A bash-mode line typed between turns is the person's message: it opens a turn of its own (the
+			// agent answers it), its line as the opener and the command with its output as the turn's step. Outside
+			// any turn the page draws nothing of it, and the message on its way went with its signal.
+			if next, ok := siblingID(id); ok {
+				b.endTurn(&s, at, wire.TurnDone)
+				b.late = nil
+				b.openTurn(&s, id, at)
+				b.open.sure = true
+				b.push(&s, wire.Entry{ID: id, At: at, Rev: 1, T: wire.EntryUser, Text: line}, offset)
+				s.signals = append(s.signals, Signal{K: SignalTurnOpened, EntryID: id, TurnID: id, Offset: offset, At: at})
+				cmdID = next
+			}
+		}
+		e := wire.Entry{ID: cmdID, At: at, Rev: 1, T: wire.EntryTool, ToolUseID: cmdID, Tool: "command", Summary: summary}
 		if out, ok := o.Get("output"); ok {
 			text, _ := out.(string)
-			e.Output, e.OK = b.output(id, text), okOf(!truthy(o, "isError"))
+			e.Output, e.OK = b.output(cmdID, text), okOf(!truthy(o, "isError"))
 		}
 		b.push(&s, e, offset)
 		// A command the person typed is the user line of a message too: no prompt-submit hook fires for a bash-mode line
 		// («! cmd»), and its record in the transcript is this entry, not a user message — the message on its way is taken
 		// by its words, as it was typed.
 		s.signals = append(s.signals, Signal{K: SignalUser, EntryID: id, TurnID: b.openID(), Offset: offset, At: at,
-			Text: CommandLine(str(o, "name"), str(o, "args"))})
+			Text: line})
 	case "command-output":
 		text := str(o, "output")
 		if i := b.commandForOutput(); i >= 0 {
@@ -345,6 +362,20 @@ func (b *builder) injected(s *step, e wire.Entry, queued bool, offset int64) {
 }
 
 func okOf(ok bool) *bool { return &ok }
+
+// siblingID is the id after id on the same transcript line («c:<uuid>#0» → «c:<uuid>#1»): a second entry a line makes
+// of itself. False for an id that is not a transcript line's.
+func siblingID(id string) (string, bool) {
+	line, k, ok := strings.Cut(id, "#")
+	if !ok || !strings.HasPrefix(line, "c:") {
+		return "", false
+	}
+	n, err := strconv.Atoi(k)
+	if err != nil {
+		return "", false
+	}
+	return line + "#" + strconv.Itoa(n+1), true
+}
 
 func summaryText(o *jsvalue.Object) string {
 	v, _ := o.Get("summary")

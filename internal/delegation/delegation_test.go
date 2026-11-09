@@ -540,6 +540,31 @@ func TestPauseIsAnsweredWithAReminderNotAWake(t *testing.T) {
 	}
 }
 
+// A chat held on its usage limit is not reminded: each reminder would be one more refusal. It goes on by
+// itself at the reset, and the turn it ends then is judged as any.
+func TestAChatHeldOnItsLimitIsNotReminded(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	r.convs.finish(child, "You've hit your 5-hour limit · resets 2:20am (UTC)")
+	rec := mustRecord(t, r.convs, child)
+	reset := wire.Ms(1_800_000_000_000)
+	rec.Limited = &wire.LimitHold{Provider: wire.ProviderClaude, ResetsAt: &reset}
+	r.svc.Observe(rec)
+	r.svc.Observe(rec)
+	if told := r.convs.told[child]; len(told) != 0 {
+		t.Fatalf("a held chat was reminded: %v", told)
+	}
+	if len(r.convs.sent["tab-root"]) != 0 {
+		t.Fatalf("a held chat woke the parent: %v", r.convs.sent["tab-root"])
+	}
+	r.convs.finish(child, "Done after the reset.\n\n"+MarkDone)
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if len(r.convs.sent["tab-root"]) != 1 {
+		t.Fatalf("wake-ups after the reset: %v", r.convs.sent["tab-root"])
+	}
+}
+
 // A chat that keeps pausing is reminded MaxNudges times, then the parent hears it stopped without an answer.
 func TestRemindersRunOutAndTheParentIsToldSo(t *testing.T) {
 	r := newTestRig(t)

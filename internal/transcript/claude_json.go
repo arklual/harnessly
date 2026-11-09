@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+	"unique"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
@@ -71,7 +72,7 @@ func (p *jsonParser) value() (any, error) {
 			if p.i >= len(p.s) || p.s[p.i] != '"' {
 				return nil, errJSON
 			}
-			k, err := p.str()
+			k, err := p.key()
 			if err != nil {
 				return nil, err
 			}
@@ -189,7 +190,27 @@ func hex4(s string) (rune, bool) {
 	return rune(n), err == nil
 }
 
+// key is an object's key: the same few words on every line, kept once for the whole runtime instead of a copy each.
+func (p *jsonParser) key() (string, error) {
+	k, _, err := p.text()
+	if err != nil {
+		return "", err
+	}
+	return unique.Make(k).Value(), nil // Make keeps a copy of a string it has not seen
+}
+
+// str is a string value, its own copy: a value kept from a transcript (an id, a time, a model) as a slice of the
+// text held the whole read alive, megabytes of JSONL per conversation.
 func (p *jsonParser) str() (string, error) {
+	s, sliced, err := p.text()
+	if sliced {
+		s = strings.Clone(s)
+	}
+	return s, err
+}
+
+// text is a string as read; sliced: it is a slice of the text (it had no escapes), not a string of its own.
+func (p *jsonParser) text() (s string, sliced bool, err error) {
 	p.i++
 	start := p.i
 	for p.i < len(p.s) {
@@ -197,13 +218,13 @@ func (p *jsonParser) str() (string, error) {
 		if c == '"' {
 			s := p.s[start:p.i]
 			p.i++
-			return s, nil
+			return s, true, nil
 		}
 		if c == '\\' {
 			break
 		}
 		if c < 0x20 {
-			return "", errJSON
+			return "", false, errJSON
 		}
 		p.i++
 	}
@@ -214,16 +235,16 @@ func (p *jsonParser) str() (string, error) {
 		switch {
 		case c == '"':
 			p.i++
-			return b.String(), nil
+			return b.String(), false, nil
 		case c < 0x20:
-			return "", errJSON
+			return "", false, errJSON
 		case c != '\\':
 			b.WriteByte(c)
 			p.i++
 			continue
 		}
 		if p.i+1 >= len(p.s) {
-			return "", errJSON
+			return "", false, errJSON
 		}
 		e := p.s[p.i+1]
 		p.i += 2
@@ -243,7 +264,7 @@ func (p *jsonParser) str() (string, error) {
 		case 'u':
 			r, ok := hex4(p.s[p.i:])
 			if !ok {
-				return "", errJSON
+				return "", false, errJSON
 			}
 			p.i += 4
 			if utf16.IsSurrogate(r) {
@@ -258,8 +279,8 @@ func (p *jsonParser) str() (string, error) {
 			}
 			b.WriteRune(r)
 		default:
-			return "", errJSON
+			return "", false, errJSON
 		}
 	}
-	return "", errJSON
+	return "", false, errJSON
 }

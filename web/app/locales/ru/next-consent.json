@@ -25,6 +25,7 @@
   "next.journal.none": "Приложение пока не делало ничего опасного",
   "next.journal.what.consent": "Вы согласились на доступы",
   "next.journal.what.consent.waits": "Ждёт согласия",
+  "next.journal.what.consent.policy": "Права выданы по правилу организации",
   "next.journal.what.declined": "Вы отказались от обновления",
   "next.journal.what.off": "Выключено",
   "next.journal.what.on": "Включено",
@@ -51,5 +52,14 @@
   "next.journal.what.ai": "Вызвана модель",
   "next.journal.what.agents.run": "Запущен агент в новом чате",
   "next.journal.what.secrets.put": "Записан секрет в сейф",
-  "next.inspector.deprecated": "Устаревшее"
+  "next.inspector.deprecated": "Устаревшее",
+  "next.consentAsk.title": "«{name}» просит доступ",
+  "next.consentAsk.updateTitle": "Новая версия «{name}» просит больше доступа",
+  "next.consentAsk.more": "{list} и ещё {n}",
+  "next.consentAsk.allow": "Разрешить",
+  "next.consentAsk.details": "Подробнее",
+  "next.consentAsk.later": "Не сейчас",
+  "next.consent.waitsTitle": "Ждёт вашего согласия на доступы",
+  "next.consent.updateWaits": "Версия {version} ждёт согласия на новые доступы",
+  "next.consent.whereHint": "Согласиться можно в «Приложениях»: карточка приложения → «Посмотреть доступы»."
 }

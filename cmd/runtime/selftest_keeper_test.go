@@ -147,3 +147,35 @@ func TestVersionOrder(t *testing.T) {
 		t.Fatal("version order")
 	}
 }
+
+// one failed run of the terminal's self-test is tried again before the state the rollout reads says fail;
+// a machine that fails twice is failing.
+func TestKeeperTriesTheTerminalAgainBeforeFailing(t *testing.T) {
+	bad := []machineCheck{{ID: "pane_program", Detail: "вместо sleep видно «bash»"}}
+	good := []machineCheck{{ID: "pane_shell", OK: true}, {ID: "pane_program", OK: true}, {ID: "pane_keys", OK: true}}
+	for name, tc := range map[string]struct {
+		runs  [][]machineCheck
+		state string
+		tries int
+	}{
+		"passes":          {[][]machineCheck{good}, "pass", 1},
+		"a loaded moment": {[][]machineCheck{bad, good}, "pass", 2},
+		"fails twice":     {[][]machineCheck{bad, bad}, "fail", 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			k := &keeper{state: "pending", judged: map[string]bool{}, alerted: map[string]time.Time{}}
+			var slept []time.Duration
+			tries := 0
+			k.runTerminal = func() []machineCheck { tries++; return tc.runs[tries-1] }
+			k.sleep = func(d time.Duration) { slept = append(slept, d) }
+			k.alarm = func(string, string) {}
+			k.terminal()
+			if k.Selftest() != tc.state || tries != tc.tries {
+				t.Fatalf("state %s after %d runs, want %s after %d", k.Selftest(), tries, tc.state, tc.tries)
+			}
+			if tc.tries == 2 && (len(slept) != 1 || slept[0] != keeperTerminalRetry) {
+				t.Fatalf("slept %v before trying again", slept)
+			}
+		})
+	}
+}

@@ -23,7 +23,10 @@ packages). [`install.sh`](../install.sh):
 - installs `tmux` and `git` with `apt`, `dnf`, `yum`, `zypper`, `pacman`, `apk` or `brew` when they are missing
   (`--no-deps` only checks);
 - writes the settings to `~/.config/harnessly/env` and starts the runtime as a systemd user service with
-  lingering on Linux, a launchd agent on macOS, or a background process when neither is there, on `127.0.0.1:8022`;
+  lingering on Linux, a launchd agent on macOS, or a background process when neither is there, on `127.0.0.1:8022`.
+  `RUNTIME_*` variables given to the installer (`curl … | RUNTIME_PREVIEW_DOMAIN=preview.example.com sh`) are written to
+  that file too, so every later start has them: a restart by the service manager, the supervisor or after an update,
+  not only the first start that inherited them from the installer's shell;
 - waits for `/api/health` and prints the address, and on a machine reached over SSH the `ssh -L` command for your
   computer.
 
@@ -464,6 +467,32 @@ compose, keep the published slot ports on 127.0.0.1 and let only Caddy reach the
 
 The Helm chart does not route the slots yet: the pod listens on `8023`–`8030`, and a Service port and an Ingress host
 per slot, with `RUNTIME_PREVIEW_PUBLIC_ORIGINS` in `extraEnv`, are yours to add.
+
+#### Preview domains
+
+Instead of listing the eight origins, name the domain they live under and let the runtime name them:
+
+```sh
+RUNTIME_PREVIEW_DOMAIN=preview.example.com
+```
+
+The slots are then `https://s1-<id>.preview.example.com` … `https://s8-<id>.preview.example.com`. The id is
+`RUNTIME_PREVIEW_ID` when set, else the hub's machine id, else one the runtime makes on its first start and keeps in
+`<data>/preview-id`: every restart, whatever starts it, names the same slots. The runtime logs the list at start
+(`preview: the slots' origins come from RUNTIME_PREVIEW_DOMAIN`). `RUNTIME_PREVIEW_PUBLIC_ORIGINS`, when set, wins.
+
+What the deployment adds:
+
+- **DNS.** A wildcard record `*.preview.example.com` (or one record per slot) pointing to this machine or to the reverse
+  proxy in front of it. Without it the names answer NXDOMAIN, the browser cannot load a slot, and the panel shows no
+  view over https although the slots listen locally.
+- **TLS and routing.** A wildcard certificate for `*.preview.example.com`, and the proxy sending `s<n>-<id>.preview.example.com`
+  to the slot's port (`8023` + n − 1 by default) with the `Host` header kept.
+
+Check it on the machine with `harnessly doctor preview`: it asks the running runtime for its slots' origins, resolves
+each name and exits 1 when one does not resolve. A name that resolves to an address of another machine is reported, not
+failed: a balancer may stand there; behind NAT name the public address in `RUNTIME_PREVIEW_SELF_IPS`. Settings →
+General → Machine check shows the same failure.
 
 ### The preview without subdomains (one host, one certificate)
 

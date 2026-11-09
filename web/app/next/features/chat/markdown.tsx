@@ -62,14 +62,24 @@ const CodeBlock = ({ lang, text }: { lang: string; text: string }) => {
     });
   };
   const shown = open ? lines : lines.slice(0, CODE_FOLD_LINES);
+  const word = copied ? t('next.code.copied') : t('next.code.copy');
   return (
     <div className="hx-code" data-collapsed={long ? String(!open) : undefined}>
       <div className="hx-code__head">
-        <span>{lang || t('next.code.text')}</span>
+        <span className="hx-code__lang">{lang || t('next.code.text')}</span>
         <span className="hx-spacer" />
-        <button type="button" className="hx-code__copy" data-copied={copied || undefined} onClick={copy}>
+        <button
+          type="button"
+          className="hx-code__copy hx-tipped"
+          data-copied={copied || undefined}
+          aria-label={word}
+          onClick={copy}
+        >
           <Icon name={copied ? 'check' : 'copy'} size="sm" />
-          {copied ? t('next.code.copied') : t('next.code.copy')}
+          <span className="hx-code__copy-text">{word}</span>
+          <span className="hx-tip" data-pos="below" data-align="end" aria-hidden="true">
+            {word}
+          </span>
         </button>
       </div>
       <div className="hx-code__body">

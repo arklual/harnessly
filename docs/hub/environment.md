@@ -353,6 +353,18 @@ rev; a list whose hash does not match its items is refused (`invalid`). An obser
 accepts `env.set` too and keeps the list in its own folder (`<data>/hub/`); its budget, tunnel and policy stay closed.
 Item ids must match `[A-Za-z0-9_-]{1,64}`, at most 500 items, a source at most 256 KiB.
 
+**The rule for apps** (`Org.appsConsent`). An organization's admin switches «Не спрашивать разрешений у
+приложений» on the organization's screen (`PATCH /api/orgs/{org}` `{appsConsent: 'auto' | 'ask'}`, a person's session
+only: no machine's or agent's token reaches the orgs API). The rule rides on `env.set` as `appsConsent: 'auto'` to an
+agent whose `hello.features` has `environment.apps-consent`; then `hash` is `hubproto.EnvSetHash(EnvHash(items),
+'auto')`, so a change of the rule reaches the machine the way a change of the list does. The rule `ask` is not sent and
+leaves the hash of the items, so an older agent (which neither has the feature nor knows the field) and a new one
+without the rule go on asking. The agent keeps `appsConsent` in `environment.json` beside the list (the file's `hash`
+stays the items', as the setup reads it); the runtime reads it from every link folder. When one link says `auto`, an
+install, an update or a dev edit that would wait for the person gets its rights at once (the journal line
+`consent.policy` with the version), and what waited is granted when the rule comes on. Turned off, it takes nothing
+back; new asks wait for the person again. A machine without a hub has no such file and asks.
+
 The agent writes the list as a Claude plugin `hub-environment` in `<link folder>/environment/claude-plugin`
 (`hubproto.EnvPluginDir`): a skill with a body becomes `skills/<itemId>/SKILL.md`; a document, a repository or a reference
 becomes a reference skill that tells the chat where to look; an MCP server goes to `.mcp.json`, its secrets as

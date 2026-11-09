@@ -26,7 +26,9 @@ import (
 // the machine checks of Settings.
 
 const (
-	selftestShellWait = 15 * time.Second // a login shell on a loaded machine
+	// selftestShellWait is how long a new pane's login shell may take to read what is typed: its rc files run first,
+	// and on a machine busy starting a hundred tabs that took longer than a step's wait.
+	selftestShellWait = 45 * time.Second
 	selftestStepWait  = 8 * time.Second
 	selftestPoll      = 200 * time.Millisecond
 	selftestAfterBoot = 15 * time.Second
@@ -68,6 +70,12 @@ func (s selftest) waitFor(ctx context.Context, wait time.Duration, cond func() b
 	}
 }
 
+// selftestReady is what the shell prints when it reads input; selftestReadyTyped is the word as typed, which prints it.
+const (
+	selftestReady      = "hs-shell-ready"
+	selftestReadyTyped = "hs-shell-''ready"
+)
+
 func selftestName(prefix string) string {
 	var b [4]byte
 	_, _ = rand.Read(b[:])
@@ -106,6 +114,20 @@ func (s selftest) run(ctx context.Context) []machineCheck {
 		shell.Detail = "в пустой панели видно «" + seen + "», а не оболочку"
 	case raw != seen:
 		shell.Detail = "tmux отвечает «" + raw + "», рантайм видит «" + seen + "» по /proc"
+	}
+	// The shell is in the foreground from its first instant, before its rc files have run; what is typed then waits
+	// for them. A line it answers says it reads input now, so the program's step below times the program alone: on
+	// 1.187.10 a slow rc under load used up that step's wait and the release was taken back. The mark is
+	// split by quotes so that the echo of the typed line is not taken for the answer.
+	if shell.OK {
+		if err := s.panes.SendKeys(name, "echo "+selftestReadyTyped); err != nil {
+			shell.OK, shell.Detail = false, "команда не ушла в панель: "+err.Error()
+		} else if !s.waitFor(ctx, selftestShellWait, func() bool {
+			screen, _ := s.panes.Capture(name)
+			return strings.Contains(screen, selftestReady)
+		}) {
+			shell.OK, shell.Detail = false, "оболочка в панели не ответила на ввод"
+		}
 	}
 	if !shell.OK {
 		skipped(&program)

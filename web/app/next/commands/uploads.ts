@@ -5,7 +5,8 @@
 // `IUploadSession`, so «Повторить» goes on from the bytes the machine has. XHR, because only it reports how much of a
 // chunk has left.
 import { deviceId } from '@/next/core/device';
-import { machineApi } from '@/next/core/net/machine';
+import { gatewayPath, machineApi } from '@/next/core/net/machine';
+import { appConfig } from '@/platform/config';
 import {
   DEVICE_HEADER,
   parsePage,
@@ -18,12 +19,137 @@ import {
 const UPLOAD_ID = /(?:^|\/)(up_[A-Z2-7]+)(?:\.[a-z0-9]{1,8})?$/;
 
 /** Where the picture of an attachment is on its machine; null for one the runtime did not take as an upload. */
-export const uploadSrc = (m: MachineId, item: { id: string }): string | null => {
+export const uploadSrc = (m: MachineId, item: { id: string; mime?: string }): string | null => {
   // A picture pasted into the agent's own terminal lives in the transcript itself.
   if (item.id.startsWith('data:image/')) return item.id;
+  const kept = keptSha(item.id);
+  if (kept) {
+    const type = item.mime ? `&type=${encodeURIComponent(item.mime)}` : '';
+    return `${gatewayPath(`/uploads/blobs/${kept}`)}?machine=${encodeURIComponent(m)}${type}`;
+  }
   const id = UPLOAD_ID.exec(item.id)?.[1];
-  return id ? machineApi(m).http(`/uploads/${id}`) : null;
+  if (!id) return null;
+  // under a hub the upload is read from the hub's store (it sends the machine's copy on for older ones).
+  if (appConfig().centralUploads)
+    return `${gatewayPath(`/uploads/files/${id}`)}?machine=${encodeURIComponent(m)}`;
+  return machineApi(m).http(`/uploads/${id}`);
 };
+
+/** The largest file the page hashes and puts into the hub's store: a hash needs the whole file in memory. */
+export const MIRROR_MAX_BYTES = 64 * 1024 * 1024;
+
+const hex = (buf: ArrayBuffer) =>
+  [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+/**
+ * Puts what the machine took into the hub's store as well: the bytes under their sha256, then which upload of
+ * the machine they are. The chat then reads it from the hub, with the machine off too. Best effort: a failure leaves the
+ * upload on the machine only, as before, and is not the person's to see.
+ */
+export async function mirrorUpload(m: MachineId, file: Blob, ref: AttachmentRef): Promise<boolean> {
+  const id = UPLOAD_ID.exec(ref.id)?.[1];
+  if (
+    !appConfig().centralUploads ||
+    !id ||
+    file.size > MIRROR_MAX_BYTES ||
+    typeof crypto === 'undefined' ||
+    !crypto.subtle
+  )
+    return false;
+  try {
+    const sha = hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+    const q = `?machine=${encodeURIComponent(m)}`;
+    const put = await fetch(`${gatewayPath(`/uploads/blobs/${sha}`)}${q}`, {
+      method: 'PUT',
+      body: file,
+      credentials: 'same-origin',
+    });
+    if (!put.ok) return false;
+    const named = await fetch(`${gatewayPath(`/uploads/refs/${id}`)}${q}`, {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sha256: sha, mime: ref.mime, name: ref.name, size: file.size }),
+    });
+    return named.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * An attachment put into the hub while its machine was off: `hub:<sha256>`. The message waits in the outbox,
+ * and when the machine is back it takes its copy from the hub (takeKept) before the message goes.
+ */
+const KEPT = /^hub:([0-9a-f]{64})$/;
+export const keptSha = (id: string): string | null => KEPT.exec(id)?.[1] ?? null;
+
+const IMAGE_MIMES: ReadonlySet<string> = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+/** Puts a file into the hub's store for a machine that is off; the attachment names it by its hash. */
+export async function keepInHub(
+  m: MachineId,
+  file: Blob & { name?: string },
+  onProgress: (done: number, total: number) => void,
+): Promise<UploadOutcome> {
+  if (file.size > MIRROR_MAX_BYTES) return { ok: false, code: UPLOAD_FAILURE.tooLarge };
+  if (typeof crypto === 'undefined' || !crypto.subtle) return { ok: false, code: UPLOAD_FAILURE.network };
+  const name = file.name || `paste-${Date.now()}.${file.type.split('/')[1] || 'bin'}`;
+  const mime = file.type || 'application/octet-stream';
+  try {
+    const sha = hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+    const put = await fetch(`${gatewayPath(`/uploads/blobs/${sha}`)}?machine=${encodeURIComponent(m)}`, {
+      method: 'PUT',
+      body: file,
+      credentials: 'same-origin',
+    });
+    if (!put.ok) return { ok: false, code: UPLOAD_FAILURE.http };
+    onProgress(file.size, file.size);
+    return {
+      ok: true,
+      ref: { id: `hub:${sha}`, name, kind: IMAGE_MIMES.has(mime) ? 'image' : 'file', mime },
+    };
+  } catch {
+    return { ok: false, code: UPLOAD_FAILURE.network };
+  }
+}
+
+/**
+ * The attachments as the machine knows them: one kept in the hub is read from there (the hub gives it only to the
+ * person who put it) and uploaded to the machine as any other file, which names it in the hub too. null when that
+ * cannot be done now: the message waits and goes again.
+ */
+/** Whether any attachment is kept in the hub: only then does a message wait for takeKept before it goes. */
+export function anyKept(attachments: readonly AttachmentRef[]): boolean {
+  return attachments.some((a) => keptSha(a.id));
+}
+
+export async function takeKept(
+  m: MachineId,
+  attachments: readonly AttachmentRef[],
+): Promise<AttachmentRef[] | null> {
+  const out: AttachmentRef[] = [];
+  for (const a of attachments) {
+    const sha = keptSha(a.id);
+    if (!sha) {
+      out.push(a);
+      continue;
+    }
+    try {
+      const res = await fetch(`${gatewayPath(`/uploads/blobs/${sha}`)}?machine=${encodeURIComponent(m)}`, {
+        credentials: 'same-origin',
+      });
+      if (!res.ok) return null;
+      const file = new File([await res.blob()], a.name, { type: a.mime });
+      const sent = await uploadFile(m, file, () => undefined);
+      if (!sent.ok) return null;
+      out.push(sent.ref);
+    } catch {
+      return null;
+    }
+  }
+  return out;
+}
 
 export const UPLOAD_FAILURE = {
   network: 'network',
@@ -265,6 +391,7 @@ export async function uploadFile(
       try {
         const ref = parsePage.upload(closed.body);
         session.id = null;
+        void mirrorUpload(m, file, ref);
         return { ok: true, ref };
       } catch {
         return { ok: false, code: UPLOAD_FAILURE.http };

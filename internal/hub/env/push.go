@@ -156,6 +156,8 @@ func (p *Pusher) Connected(machineID string, hello hubproto.Hello) {
 	p.extra[machineID] = Extra{
 		Claude: p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvClaude),
 		Apps:   p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvApps),
+		// The rule for apps does not need the setup: the runtime reads it from the list's file.
+		AppsConsent: slices.Contains(hello.Features, hubproto.FeatureEnvAppsConsent),
 	}
 	if slices.Contains(hello.Features, hubproto.FeatureEnvironment) {
 		p.held[machineID] = hello.EnvHash
@@ -309,7 +311,8 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 	setup, ex := p.setup[machineID], p.extra[machineID]
 	p.mu.Unlock()
 	items := MachineItems(w, sp.ID, m.TeamID, m.CreatedBy, setup, ex)
-	hash := hubproto.EnvHash(items)
+	consent := AppsConsentFor(w.org, ex)
+	hash := hubproto.EnvSetHash(hubproto.EnvHash(items), consent)
 	if !ok || held == hash {
 		return nil
 	}
@@ -317,7 +320,7 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 	if err != nil && !store.IsNotFound(err) {
 		return err
 	}
-	if last.SentRev == 0 && held == "" && len(items) == 0 {
+	if last.SentRev == 0 && held == "" && len(items) == 0 && consent == "" {
 		return nil // nothing was ever put in, and the machine holds nothing
 	}
 	rev := last.SentRev
@@ -325,7 +328,7 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 		rev++
 	}
 	var res hubproto.EnvState
-	if err := p.reg.DoInto(ctx, machineID, hubproto.OpEnvSet, hubproto.EnvSet{Rev: rev, Hash: hash, Items: items}, &res, 30*time.Second); err != nil {
+	if err := p.reg.DoInto(ctx, machineID, hubproto.OpEnvSet, hubproto.EnvSet{Rev: rev, Hash: hash, Items: items, AppsConsent: consent}, &res, 30*time.Second); err != nil {
 		return err
 	}
 	if err := st.SaveEnvSent(ctx, machineID, rev, hash, p.now()); err != nil {
@@ -343,10 +346,22 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 type Extra struct {
 	Claude bool
 	Apps   bool
+	// AppsConsent: the machine keeps the organization's rule for apps (hubproto.FeatureEnvAppsConsent).
+	AppsConsent bool
 }
 
 // All is every kind: a list as the newest agent would hold it.
-var All = Extra{Claude: true, Apps: true}
+var All = Extra{Claude: true, Apps: true, AppsConsent: true}
+
+// AppsConsentFor is the rule for apps a machine is sent: hubproto.AppsConsentAuto when the organization gives apps their
+// rights without asking and the machine keeps the rule, else "" (ask: the field is not sent, and the hash is the
+// items' alone, as an older agent checks it).
+func AppsConsentFor(o store.Org, ex Extra) string {
+	if ex.AppsConsent && o.AppsConsent == store.AppsConsentAuto {
+		return hubproto.AppsConsentAuto
+	}
+	return ""
+}
 
 // ExtraOf says which extra kinds a machine does.
 func (p *Pusher) ExtraOf(machineID string) Extra {

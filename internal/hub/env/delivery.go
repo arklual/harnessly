@@ -141,15 +141,15 @@ func (s *Service) machineListMemo(w *world, spaceID string, m store.Machine, mem
 	if len(w.groups) > 0 {
 		owner = m.CreatedBy // with groups the list depends on the owner's choices
 	}
-	key := fmt.Sprintf("%s/%s/%s/%t/%t/%t/%t", spaceID, m.TeamID, owner, setup, known, ex.Claude, ex.Apps)
+	key := fmt.Sprintf("%s/%s/%s/%t/%t/%t/%t/%t", spaceID, m.TeamID, owner, setup, known, ex.Claude, ex.Apps, ex.AppsConsent)
 	if v, ok := memo[key]; ok {
 		return v
 	}
 	items := MachineItems(w, spaceID, m.TeamID, owner, setup, ex)
-	out := wantList{items: items, hashes: []string{hubproto.EnvHash(items)}}
+	out := wantList{items: items, hashes: []string{hubproto.EnvSetHash(hubproto.EnvHash(items), AppsConsentFor(w.org, ex))}}
 	if !known {
 		full := MachineItems(w, spaceID, m.TeamID, owner, true, All)
-		out.hashes = append(out.hashes, hubproto.EnvHash(full))
+		out.hashes = append(out.hashes, hubproto.EnvSetHash(hubproto.EnvHash(full), AppsConsentFor(w.org, All)))
 		if len(items) == 0 {
 			out.items = full
 		}

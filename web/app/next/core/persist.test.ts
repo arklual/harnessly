@@ -187,3 +187,51 @@ describe('the chat cache', () => {
     held();
   });
 });
+
+describe('the kept list (HRN-902)', () => {
+  const conv = (id: string, machineId: string) =>
+    ({
+      id,
+      machineId,
+      title: id,
+      lastActivityAt: 1,
+      pinned: false,
+    }) as unknown as import('@/next/protocol/v2').Conversation;
+
+  it('keeps every machine whose own list came, and draws them all on the next load', async () => {
+    const { conversationsStore, convsCachedStore, convsLoadedStore } =
+      await import('@/next/stores/conversations');
+    const kv = memoryKV();
+    // A page of an older version kept only its active machine's list, under one key.
+    await kv.set('convs', 'list', {
+      machineId: 'c',
+      conversations: [conv('tab-c1', 'c')],
+      projects: [],
+      defaultCwd: null,
+    });
+    persistence = startPersistence(kv);
+    await persistence.ready;
+    expect(convsCachedStore.has('c')).toBe(true);
+    batch(() => {
+      conversationsStore.set('tab-a1' as ConvId, conv('tab-a1', 'a'));
+      conversationsStore.set('tab-b1' as ConvId, conv('tab-b1', 'b'));
+      convsLoadedStore.set('a', true);
+      convsLoadedStore.set('b', true);
+    });
+    await vi.advanceTimersByTimeAsync(1500);
+    await persistence.flushNow();
+    const kept = kv.dump().convs;
+    expect([...kept.keys()]).toEqual(expect.arrayContaining(['list:a', 'list:b']));
+    // The older page's one list went once each machine's was written.
+    expect([...kept.keys()]).not.toContain('list');
+
+    persistence.stop();
+    resetCore();
+    persistence = startPersistence(kv);
+    await persistence.ready;
+    expect(convsCachedStore.has('a') && convsCachedStore.has('b')).toBe(true);
+    expect(conversationsStore.has('tab-a1' as ConvId) && conversationsStore.has('tab-b1' as ConvId)).toBe(
+      true,
+    );
+  });
+});

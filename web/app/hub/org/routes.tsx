@@ -26,6 +26,7 @@ const SECTIONS: readonly Section[] = [
   'accounts',
   'tools',
   'efficiency',
+  'settings',
 ];
 
 // The new hub of the board «Хаб» behind the organization's `ui.hx` feature; its code and styles load only then.

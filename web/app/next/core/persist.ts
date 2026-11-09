@@ -34,7 +34,6 @@ import {
 import { draftsStore, emptyDraft, type Draft, type DraftKey } from '@/next/stores/drafts';
 import { stashStore, type StashItem } from '@/next/stores/stash';
 import { draftBaseStore, type DraftBase } from '@/next/stores/draft-sync';
-import { activeMachineStore } from '@/next/stores/machines';
 import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
 import {
   convMessagesStore,
@@ -136,7 +135,9 @@ export interface CachedList {
   projects: Project[];
   defaultCwd: string | null;
 }
+/** The key of the one list an older page kept (the active machine's); now each machine's is under listKeyOf. */
 const LIST_KEY = 'list';
+const listKeyOf = (m: MachineId): string => `${LIST_KEY}:${m}`;
 
 /** A draft as IndexedDB keeps it: the field and, once the machine has it, the revision its text came from. */
 type KeptDraft = Draft & { base?: Omit<DraftBase, 'attachments'> & Partial<Pick<DraftBase, 'attachments'>> };
@@ -214,10 +215,10 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
   const enableOutbox = () => (outboxLoaded ??= loadOutbox().catch(() => {}));
 
   const ready = (async () => {
-    const [drafts, feeds, list, stashed] = await Promise.all([
+    const [drafts, feeds, lists, stashed] = await Promise.all([
       kv.all<KeptDraft>('drafts'),
       kv.all<KeptFeed>('feeds'),
-      kv.get<CachedList>('convs', LIST_KEY),
+      kv.all<CachedList>('convs'),
       kv.all<StashItem[]>('stash'),
     ]);
     if (o.outbox !== false) await enableOutbox();
@@ -246,7 +247,10 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
         setResume(f.machineId, `conv:${f.convId}`, cachedResume(f));
         touchConversation(f.convId);
       }
-      if (list) importList(list);
+      // Each machine's own key first; an older page's one list only for a machine that has none.
+      for (const [k, l] of lists) if (k !== LIST_KEY && l?.machineId) importList(l);
+      const legacy = lists.find(([k]) => k === LIST_KEY)?.[1];
+      if (legacy?.machineId && !convsCachedStore.has(legacy.machineId)) importList(legacy);
       // A draft put aside before the page opened; one put aside since is the newer word.
       for (const [k, items] of stashed)
         if (!stashStore.has(k as DraftKey) && Array.isArray(items) && items.length > 0)
@@ -279,8 +283,15 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
 
   const writeList = () => {
     listTimer = null;
-    const list = exportList();
-    track(list ? kv.set('convs', LIST_KEY, list) : Promise.resolve());
+    const lists = exportLists();
+    if (lists.length === 0) return;
+    // One key per machine; the one list of an older page (the active machine's) goes once they are written.
+    track(
+      Promise.all([
+        ...lists.map((l) => kv.set('convs', listKeyOf(l.machineId), l)),
+        kv.del('convs', LIST_KEY),
+      ]).then(() => undefined),
+    );
   };
   const scheduleList = () => {
     if (listTimer !== null) return;
@@ -361,18 +372,26 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
 }
 
 /**
- * The list to keep: the active machine's, once that machine itself has answered with it (a list that was only the
- * cache is not written back as if it were fresh).
+ * The lists to keep: every machine's whose machine itself has answered with it (a list that was only the cache is not
+ * written back as if it were fresh). Every machine's, not only the active one's: a machine that is off next time still
+ * draws its chats at once.
  */
-function exportList(): CachedList | null {
-  const machine = activeMachineStore.get();
-  if (!machine || !convsLoadedStore.has(machine)) return null;
-  const conversations = [...conversationsStore.values()]
-    .filter((c) => c.machineId === machine)
-    .sort(byActivity)
-    .slice(0, STORED_LIST);
-  const projects = [...projectsStore.values()].filter((p) => p.machineId === machine);
-  return { machineId: machine, conversations, projects, defaultCwd: defaultCwdStore.get(machine) ?? null };
+function exportLists(): CachedList[] {
+  const out: CachedList[] = [];
+  for (const machine of convsLoadedStore.keys()) {
+    const conversations = [...conversationsStore.values()]
+      .filter((c) => c.machineId === machine)
+      .sort(byActivity)
+      .slice(0, STORED_LIST);
+    const projects = [...projectsStore.values()].filter((p) => p.machineId === machine);
+    out.push({
+      machineId: machine,
+      conversations,
+      projects,
+      defaultCwd: defaultCwdStore.get(machine) ?? null,
+    });
+  }
+  return out;
 }
 
 /** Puts the kept list where the machine's snapshot will, marked as the cache's until that snapshot replaces it. */

@@ -23,6 +23,8 @@ const kitHelp = `harnessly design kit install <id> <version> <tarball-or-url> [-
 harnessly design kit list [--dir DIR]
 harnessly design kit export <id> [--version V] [--out FILE] [--with-sources] [--accept-restricted] [--dir DIR]
 harnessly design kit import <file-or-url> [--as-id ID] [--as-version V] [--dry-run] [--dir DIR] [--header 'Name: value']
+harnessly design kit search <id> <words…> [--theme T] [--version V] [--dir DIR]
+harnessly design kit show <id> <node> [--theme T] [--version V] [--dir DIR]
 
 A UI kit is installed once by version and boards load it from /kit/<id>/<version>/... instead of carrying a copy.
 
@@ -43,6 +45,10 @@ A UI kit is installed once by version and boards load it from /kit/<id>/<version
             (--as-version) or as a copy under another id (--as-id). The same export again does nothing.
             --dry-run checks and reports, and changes nothing.
 
+  search    find layouts, components, icons, colours of a kit's canvas by name, description, purpose, a colour's hex
+            or a layout's number: the same index the kit screen's search (⌘K) uses. Prints node, kind, title, place.
+  show      one node of the canvas (from search): its description, props, variants, slots, and how to call it.
+
 The kits folder is --dir, else $RUNTIME_DESIGN_KITS_DIR, else design-kits in the runtime's data folder (the same
 default the runtime serves from).
 `
@@ -50,7 +56,7 @@ default the runtime serves from).
 // designKit is "design kit ..."; args are what follows "kit".
 func (c *cli) designKit(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design kit takes: install|list|export|import")
+		return usageErr("design kit takes: install|list|export|import|search|show")
 	}
 	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
 		c.out("%s", kitHelp)
@@ -68,6 +74,10 @@ func (c *cli) designKit(args []string) error {
 		return c.kitExport(opt, pos)
 	case "import":
 		return c.kitImport(opt, pos)
+	case "search":
+		return c.kitSearch(opt, pos)
+	case "show":
+		return c.kitShow(opt, pos)
 	case "list", "ls":
 		if len(pos) != 0 {
 			return usageErr("design kit list takes no arguments, got %q", pos[0])
@@ -83,6 +93,7 @@ type kitOptions struct {
 	headers []string
 
 	version, out, asID, asVersion string
+	theme                         string
 	withSources, acceptRestricted bool
 	dryRun                        bool
 }
@@ -123,6 +134,8 @@ func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
 			o.out, err = value()
 		case "as-id":
 			o.asID, err = value()
+		case "theme":
+			o.theme, err = value()
 		case "as-version":
 			o.asVersion, err = value()
 		case "dir":

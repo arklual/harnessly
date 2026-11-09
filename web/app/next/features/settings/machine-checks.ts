@@ -36,6 +36,7 @@ export const KNOWN_CHECKS = [
   'voice_download',
   'disk',
   'apps_boundary',
+  'preview_dns',
   'pane_shell',
   'pane_program',
   'pane_keys',

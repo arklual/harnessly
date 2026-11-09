@@ -126,7 +126,9 @@ export class FakeRuntime {
   /** Commands hang without an answer (the fetch never resolves) while set. */
   hang = false;
   /** How /hello answers: v2, not at all (network), or as an older runtime does — its page, not v2's JSON. */
-  hello: 'v2' | 'network' | 'older' = 'v2';
+  hello: 'v2' | 'network' | 'older' | 'hang' = 'v2';
+  /** How many times /machines answers 503 first, as a runtime that is still starting. */
+  machinesStarting = 0;
   /** The next n commands are done by the runtime but their answers are lost on the way back. */
   loseAnswers = 0;
   /** How long a request takes to reach the runtime, on the (fake) timers. */
@@ -352,6 +354,8 @@ export class FakeRuntime {
     const u = new URL(url, 'http://fake');
     const path = u.pathname.replace(/^.*\/api\/v2/, '');
     if (path === '/hello' && this.hello === 'network') throw new TypeError('Failed to fetch');
+    // A machine that took the connection and went silent: the answer never comes.
+    if (path === '/hello' && this.hello === 'hang') return new Promise<Response>(() => {});
     if (path === '/hello' && this.hello === 'older') return new Response('<!doctype html>', { status: 200 });
     if (path === '/hello')
       return json({
@@ -359,6 +363,10 @@ export class FakeRuntime {
         version: this.welcome.machine.runtime?.version ?? '1',
         features: this.welcome.features,
       });
+    if (path === '/machines' && this.machinesStarting > 0) {
+      this.machinesStarting--;
+      return json({ r: 'refused', code: 'timeout' }, 503);
+    }
     if (path === '/machines') return json([this.machine]);
     if (path === '/me') return json({ r: 'refused', code: 'not-found' }, 404);
     if (path.startsWith('/cmd/')) {

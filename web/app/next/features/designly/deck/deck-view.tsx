@@ -8,6 +8,9 @@ import { tourSignal } from '@/next/stores/tour';
 import { placeOf } from '@/next/features/keys/chord';
 import { pressKey } from '@/next/features/designly/sdk/keys';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { kitFileUrl, type IKitLink } from '@/next/features/designly/kit/kit-api';
+import KitOrigin from '@/next/features/designly/kit/kit-origin';
+import { boardNode } from '@/next/features/designly/kit/use-kit-link';
 import type { ISiteAccess, ISiteMode, ISiteStage } from '@/next/features/designly/site-view';
 import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
@@ -145,6 +148,10 @@ export interface IDeckViewProps {
   /** Set in the right pane beside a chat: the compact column (`data-embed`), its chat is the host's. */
   pane?: { onBack: () => void };
   access?: ISiteAccess;
+  /** The kit the deck is made from: its chip on the bar. */
+  kit?: ReactNode;
+  /** The kit's nodes on the deck's slides: «Из кита», «Открыть в ките», «Показать макет» over the slide on screen. */
+  kitLink?: IKitLink | null;
   /** The deck is looked at, as a guest of its link sees it (the `link` screen), until the editing is asked for. */
   viewing?: boolean;
   /** A board's error card sends its error to the design's chat (switching to editing); absent: it only copies. */
@@ -312,6 +319,7 @@ const DeckView = (props: IDeckViewProps) => {
   useEffect(() => tourSignal(`deck:screen:${screen}`), [screen]);
   const current = boards[index] ?? null;
   const slide = deck?.slides.find((s) => s.path === current?.path) ?? deck?.slides[index] ?? null;
+  const kitNode = boardNode(props.kitLink ?? null, slide?.path ?? current?.path ?? null);
   const n = index + 1;
   // The agent of the deck's chat at work: blank slides are being made, not left empty.
   const busy = stage?.busy === true;
@@ -915,6 +923,7 @@ const DeckView = (props: IDeckViewProps) => {
         onRec={() => onKey(DECK_KEY.rec)}
         playBlocked={playBlock === null ? null : t(playBlock)}
         onShare={onShare}
+        kit={props.kit}
         shareOn={pop === POP.share}
         onMore={() => togglePop(POP.menu)}
         moreOn={pop === POP.menu}
@@ -984,6 +993,32 @@ const DeckView = (props: IDeckViewProps) => {
         onReload={props.onReload}
         overlay={
           <>
+            {props.kitLink && kitNode && hold === null && !phone && !picking && (
+              <KitOrigin
+                key={kitNode}
+                link={props.kitLink}
+                node={kitNode}
+                shotUrl={(path) =>
+                  kitFileUrl(
+                    machine,
+                    props.kitLink?.kit ?? '',
+                    props.kitLink?.version || props.kitLink?.latest || '',
+                    path,
+                  )
+                }
+                onOpen={(node) => {
+                  const link = props.kitLink;
+                  if (!link) return;
+                  goTo({
+                    kind: ROUTE.kit,
+                    id: link.kit,
+                    theme: link.theme,
+                    node,
+                    ...(link.version ? { version: link.version } : {}),
+                  });
+                }}
+              />
+            )}
             {commentable && hold === null && (
               <DeckCommentLayer
                 artifact={id}

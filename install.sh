@@ -624,8 +624,37 @@ EOF
 		data_value=$(printf '%s' "$AGENT_DATA_DIR" | sed 's/[\\"$`]/\\&/g')
 		printf '\nAGENT_DATA_DIR="%s"\n' "$data_value" >>"$ENV_FILE"
 	fi
+	# RUNTIME_* settings given to the installer (RUNTIME_PREVIEW_DOMAIN=... sh install.sh) are kept in the env file:
+	# every later start reads them there (the service manager, the supervisor, the restart after an update), not only
+	# the first one, which inherited them from this shell.
+	given_runtime_env | while IFS= read -r line; do
+		set_env_line "${line%%=*}" "${line#*=}"
+	done
 	umask 022
 }
+
+# given_runtime_env prints the RUNTIME_*=value lines of the installer's environment, but those the service sets itself.
+given_runtime_env() {
+	env | grep -E '^RUNTIME_[A-Z0-9_]+=' | grep -Ev '^RUNTIME_(GATE_LISTEN|GATE_UPSTREAM|APP_BASE_PATH)=' || true
+}
+
+# set_env_line puts KEY="value" into the env file in place of the key's earlier lines.
+set_env_line() {
+	_tmp="$ENV_FILE.new.$$"
+	grep -Ev "^[[:space:]]*(export[[:space:]]+)?$1=" "$ENV_FILE" >"$_tmp" || true
+	printf '%s="%s"\n' "$1" "$(printf '%s' "$2" | sed 's/[\\"$`]/\\&/g')" >>"$_tmp"
+	mv "$_tmp" "$ENV_FILE"
+}
+
+# env_file_runtime prints the RUNTIME_*=value lines the env file sets, for launchd, which reads no env file.
+env_file_runtime() {
+	[ -f "$ENV_FILE" ] || return 0
+	# shellcheck disable=SC1090
+	(set -a && . "$ENV_FILE" >/dev/null 2>&1 && env) | grep -E '^RUNTIME_[A-Z0-9_]+=' |
+		grep -Ev '^RUNTIME_(GATE_LISTEN|GATE_UPSTREAM|APP_BASE_PATH)=' || true
+}
+
+xml_escape() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 
 systemd_quote() { printf '%s' "$1" | sed 's/[\\"]/\\&/g; s/%/%%/g'; }
 # EnvironmentFile= takes the path as is (quotes would become part of it); only % needs escaping there.
@@ -688,6 +717,7 @@ start_launchd() {
     <key>RUNTIME_APP_BASE_PATH</key><string>/</string>
     <key>PATH</key><string>$BIN:/opt/homebrew/bin:/usr/local/bin:$PATH</string>
 $(net_lines | while IFS='=' read -r k v; do printf '    <key>%s</key><string>%s</string>\n' "$k" "$v"; done)
+$(env_file_runtime | while IFS= read -r line; do printf '    <key>%s</key><string>%s</string>\n' "${line%%=*}" "$(xml_escape "${line#*=}")"; done)
   </dict>
   <key>WorkingDirectory</key><string>$HOME</string>
   <key>RunAtLoad</key><true/>

@@ -23,28 +23,7 @@ import (
 // under /agents/__pv/<n>-<key>/ of the runtime's own origin, the page comes sandboxed with its root-absolute addresses
 // under the prefix, its cookies scoped there, and nothing it sends reaches the runtime's API.
 func TestPreviewByPathEndToEnd(t *testing.T) {
-	if testing.Short() {
-		t.Skip("builds and runs the runtime")
-	}
-	if _, err := exec.LookPath("tmux"); err != nil {
-		t.Skip("no tmux")
-	}
-	goBin, err := exec.LookPath("go")
-	if err != nil {
-		t.Skip("no go")
-	}
-	root := t.TempDir()
-	bin := filepath.Join(root, "runtime")
-	if out, err := exec.Command(goBin, "build", "-o", bin, ".").CombinedOutput(); err != nil {
-		t.Fatalf("build: %v\n%s", err, out)
-	}
-	home := filepath.Join(root, "home")
-	data := filepath.Join(home, ".acme-ai")
-	tmuxDir := filepath.Join(root, "tmux")
-	for _, d := range []string{home, tmuxDir} {
-		_ = os.MkdirAll(d, 0o700)
-	}
-	bridge := filepath.Join(root, "bridge.js")
+	bridge := filepath.Join(t.TempDir(), "bridge.js")
 	_ = os.WriteFile(bridge, []byte("/* the page bridge */"), 0o644)
 
 	// A dev server as Vite and Angular serve one: root-absolute modules, a base href, a style with url(), an API that
@@ -73,43 +52,7 @@ func TestPreviewByPathEndToEnd(t *testing.T) {
 	defer dev.Close()
 	devPort := portOf(strings.TrimPrefix(dev.URL, "http://"))
 
-	socket := "hs-test-pvp-" + strconv.Itoa(os.Getpid())
-	port := freePort(t)
-	base := "http://127.0.0.1:" + strconv.Itoa(port)
-	env := []string{
-		"HOME=" + home, "USER=agent", "LOGNAME=agent", "SHELL=/bin/bash", "LANG=C.UTF-8", "TMUX_TMPDIR=" + tmuxDir,
-		"PATH=/usr/local/bin:/usr/bin:/bin", "RUNTIME_GATE_LISTEN=127.0.0.1:" + strconv.Itoa(port), "RUNTIME_GATE_UPSTREAM=",
-		"AGENT_DATA_DIR=" + data, "RUNTIME_TMUX_SOCKET=" + socket, "RUNTIME_SESSION_PREFIX=hs-", "RUNTIME_GATE_COUNT_SECONDS=3600",
-		"RUNTIME_PREVIEW_MODE=path", "RUNTIME_PREVIEW_BRIDGE_FILE=" + bridge,
-	}
-	logFile, _ := os.Create(filepath.Join(root, "gate.log"))
-	defer logFile.Close()
-	gate := exec.Command(bin)
-	gate.Env, gate.Stdout, gate.Stderr = env, logFile, logFile
-	gate.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if err := gate.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = gate.Process.Signal(syscall.SIGTERM)
-		done := make(chan struct{})
-		go func() { _ = gate.Wait(); close(done) }()
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			_ = gate.Process.Kill()
-			<-done
-		}
-		kill := exec.Command("tmux", "-L", socket, "kill-server")
-		kill.Env = env
-		_ = kill.Run()
-		if t.Failed() {
-			raw, _ := os.ReadFile(filepath.Join(root, "gate.log"))
-			t.Logf("gate log:\n%s", tail(string(raw), 6000))
-		}
-	})
-
-	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	base, session, client := startPathRuntime(t, bridge)
 	type answer struct {
 		code   int
 		body   string
@@ -129,17 +72,6 @@ func TestPreviewByPathEndToEnd(t *testing.T) {
 		raw, _ := io.ReadAll(res.Body)
 		return answer{res.StatusCode, string(raw), res.Header}
 	}
-	for deadline := time.Now().Add(30 * time.Second); do("GET", base+"/api/health", "", nil).code != 200; time.Sleep(200 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatal("the runtime did not come up")
-		}
-	}
-	var config struct {
-		AuthSecret string `json:"authSecret"`
-	}
-	raw, _ := os.ReadFile(filepath.Join(data, "config.json"))
-	_ = json.Unmarshal(raw, &config)
-	session := "session-token=" + agent.SignHS256([]byte(config.AuthSecret), "user", "", time.Hour)
 	page := http.Header{"Cookie": {session}, "Origin": {base}, "Content-Type": {"application/json"}}
 
 	body := `{"target":{"kind":"port","port":` + strconv.Itoa(devPort) + `},"slot":1,"path":"/users/7?x=1"}`
@@ -247,4 +179,87 @@ func TestPreviewByPathEndToEnd(t *testing.T) {
 	if a := do("GET", o2.Origin+"/__tk/storage", "", opaque); a.body != `{"theme":"dark"}` {
 		t.Fatalf("storage after a new open: %s", a.body)
 	}
+}
+
+// startPathRuntime builds and starts a standalone runtime whose previews go by path, with the page bridge from
+// bridgeFile: its address, a signed-in session cookie and a client that follows no redirects.
+func startPathRuntime(t *testing.T, bridgeFile string) (string, string, *http.Client) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("builds and runs the runtime")
+	}
+	if _, err := exec.LookPath("tmux"); err != nil {
+		t.Skip("no tmux")
+	}
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("no go")
+	}
+	root := t.TempDir()
+	bin := filepath.Join(root, "runtime")
+	if out, err := exec.Command(goBin, "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Fatalf("build: %v\n%s", err, out)
+	}
+	home := filepath.Join(root, "home")
+	data := filepath.Join(home, ".acme-ai")
+	tmuxDir := filepath.Join(root, "tmux")
+	for _, d := range []string{home, tmuxDir} {
+		_ = os.MkdirAll(d, 0o700)
+	}
+
+	port := freePort(t)
+	socket := "hs-test-pvp-" + strconv.Itoa(os.Getpid()) + "-" + strconv.Itoa(port)
+	base := "http://127.0.0.1:" + strconv.Itoa(port)
+	env := []string{
+		"HOME=" + home, "USER=agent", "LOGNAME=agent", "SHELL=/bin/bash", "LANG=C.UTF-8", "TMUX_TMPDIR=" + tmuxDir,
+		"PATH=/usr/local/bin:/usr/bin:/bin", "RUNTIME_GATE_LISTEN=127.0.0.1:" + strconv.Itoa(port), "RUNTIME_GATE_UPSTREAM=",
+		"AGENT_DATA_DIR=" + data, "RUNTIME_TMUX_SOCKET=" + socket, "RUNTIME_SESSION_PREFIX=hs-", "RUNTIME_GATE_COUNT_SECONDS=3600",
+		"RUNTIME_PREVIEW_MODE=path", "RUNTIME_PREVIEW_BRIDGE_FILE=" + bridgeFile,
+	}
+	logFile, _ := os.Create(filepath.Join(root, "gate.log"))
+	defer logFile.Close()
+	gate := exec.Command(bin)
+	gate.Env, gate.Stdout, gate.Stderr = env, logFile, logFile
+	gate.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := gate.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = gate.Process.Signal(syscall.SIGTERM)
+		done := make(chan struct{})
+		go func() { _ = gate.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			_ = gate.Process.Kill()
+			<-done
+		}
+		kill := exec.Command("tmux", "-L", socket, "kill-server")
+		kill.Env = env
+		_ = kill.Run()
+		if t.Failed() {
+			raw, _ := os.ReadFile(filepath.Join(root, "gate.log"))
+			t.Logf("gate log:\n%s", tail(string(raw), 6000))
+		}
+	})
+
+	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(200 * time.Millisecond) {
+		if res, err := client.Get(base + "/api/health"); err == nil {
+			_ = res.Body.Close()
+			if res.StatusCode == 200 {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the runtime did not come up")
+		}
+	}
+	var config struct {
+		AuthSecret string `json:"authSecret"`
+	}
+	raw, _ := os.ReadFile(filepath.Join(data, "config.json"))
+	_ = json.Unmarshal(raw, &config)
+	session := "session-token=" + agent.SignHS256([]byte(config.AuthSecret), "user", "", time.Hour)
+	return base, session, client
 }

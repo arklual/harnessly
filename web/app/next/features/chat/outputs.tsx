@@ -29,7 +29,7 @@ export interface IOutputsContext {
   /** A plain file of the turn, in the pane's Files. */
   onOpenFile?: (path: string) => void;
   /** Where a file the agent handed over is saved from; without it the card has only its viewer. */
-  downloadUrl?: (path: string) => string;
+  downloadUrl?: (path: string, output?: TurnOutput) => string;
   /** «Поделиться» of a document of the turn that is a file of the chat's folder. */
   onShareFile?: (path: string) => void;
 }

@@ -1848,6 +1848,245 @@
         "machine_id"
       ]
     },
+    "history_conversations": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "conv_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "record",
+          "type": "text"
+        },
+        {
+          "name": "rev",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "seq",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "last_prompt_ms",
+          "type": "bigint"
+        },
+        {
+          "name": "last_activity_ms",
+          "type": "bigint"
+        },
+        {
+          "name": "deleted_at",
+          "type": "bigint"
+        },
+        {
+          "name": "history_before",
+          "type": "text"
+        },
+        {
+          "name": "history_done",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "conv_id"
+      ],
+      "indexes": [
+        {
+          "name": "history_conversations_conv",
+          "columns": [
+            "conv_id"
+          ]
+        },
+        {
+          "name": "history_conversations_owner",
+          "columns": [
+            "owner_id",
+            "last_prompt_ms"
+          ]
+        }
+      ]
+    },
+    "history_cursors": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "ch",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "epoch",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "seq",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "ch"
+      ]
+    },
+    "history_entries": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "conv_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "entry_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "turn_id",
+          "type": "text"
+        },
+        {
+          "name": "at_ms",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "ord",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "conv_id",
+        "entry_id"
+      ],
+      "indexes": [
+        {
+          "name": "history_entries_time",
+          "columns": [
+            "machine_id",
+            "conv_id",
+            "at_ms",
+            "ord"
+          ]
+        },
+        {
+          "name": "history_entries_turn",
+          "columns": [
+            "machine_id",
+            "conv_id",
+            "turn_id",
+            "at_ms",
+            "ord"
+          ]
+        }
+      ]
+    },
+    "history_turns": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "conv_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "turn_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "started_ms",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "ended_ms",
+          "type": "bigint"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "conv_id",
+        "turn_id"
+      ],
+      "indexes": [
+        {
+          "name": "history_turns_page",
+          "columns": [
+            "machine_id",
+            "conv_id",
+            "started_ms",
+            "turn_id"
+          ]
+        }
+      ]
+    },
     "identities": {
       "columns": [
         {
@@ -3043,6 +3282,10 @@
           "name": "created_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "apps_consent",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -3888,6 +4131,84 @@
             "day"
           ]
         }
+      ]
+    },
+    "upload_owners": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "sha256",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "sha256",
+        "owner_id"
+      ]
+    },
+    "upload_refs": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "upload_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "sha256",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "mime",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "size",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "upload_id",
+        "owner_id"
       ]
     },
     "usage_calls": {

@@ -46,8 +46,21 @@ const LOCAL: Machine = {
   agents: [],
 };
 
-async function loadMachines(): Promise<Machine[] | 'signed-out' | { code: 'timeout' | 'network' | 'http' }> {
-  const res = await getPage(clusterApi('/machines'), (v) => v as Machine[], 10000);
+/** How long a runtime that is still starting (503) is let be before /machines is asked again. */
+const STARTING_RETRY_MS = 1000;
+
+async function loadMachines(
+  gone: () => boolean = () => false,
+): Promise<Machine[] | 'signed-out' | { code: 'timeout' | 'network' | 'http' }> {
+  let res = await getPage(clusterApi('/machines'), (v) => v as Machine[], 10000);
+  // A standalone runtime answers 503 ({r:'refused',code:'timeout'}) while its core starts: the kept list is drawn
+  // meanwhile, and the machines are asked again until it answers.
+  const starting = (r: typeof res) =>
+    !('ok' in r) && (r.r === 'refused' ? r.code === 'timeout' : r.code === 'http' && r.status === 503);
+  while (starting(res) && !gone()) {
+    await new Promise((resolve) => setTimeout(resolve, STARTING_RETRY_MS));
+    res = await getPage(clusterApi('/machines'), (v) => v as Machine[], 10000);
+  }
   if ('ok' in res) return Array.isArray(res.value) ? res.value : [LOCAL];
   // Standalone, or a gateway before stage E: no fleet list, the runtime that served the page is the one machine.
   if (res.r === 'refused') return res.code === 'not-found' ? [LOCAL] : { code: 'http' };
@@ -62,9 +75,12 @@ async function loadMachines(): Promise<Machine[] | 'signed-out' | { code: 'timeo
 async function checkRuntime(m: MachineId): Promise<boolean> {
   const res = await getPage(machineApi(m).http('/hello'), parsePage.hello, 10000);
   const outdated = isOutdated(res);
-  machinesStore.patch(m, (v) =>
-    v ? { ...v, runtime: outdated ? 'outdated' : 'ok' in res ? 'v2' : 'unknown' } : v,
-  );
+  // A /hello that did not answer says nothing new: the socket, which opens beside it, may have told already.
+  machinesStore.patch(m, (v) => {
+    if (!v) return v;
+    if (outdated) return { ...v, runtime: 'outdated' };
+    return 'ok' in res ? { ...v, runtime: 'v2' } : v;
+  });
   return !outdated;
 }
 
@@ -196,7 +212,8 @@ function retryMe(mine: number, openKV: (person: string) => KV): void {
   schedule();
 }
 
-/** Starts v2 once per page: cache of the last person → me → (their outbox) → machines → sockets. */
+/** Starts v2 once per page: cache of the last person → me → (their outbox) → machines → sockets (each machine's
+ *  /hello behind them). */
 export function bootNext(o: BootOptions = {}): Promise<BootState> {
   const mine = generation;
   const gone = () => mine !== generation;
@@ -214,6 +231,8 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     }
     setMeSource(o.me ?? httpMeSource());
     if (gone()) return bootStore.get();
+    // The person's machines are asked alongside me: one after the other cost the first screen a round trip.
+    const machinesAsked = loadMachines(gone);
     const me = await loadMe();
     if (gone()) return bootStore.get();
     if (me.k === 'signed-out') return signOut(me);
@@ -221,21 +240,42 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     // me did not answer as it should (a runtime restarting, a reply that is not a record): the machines still load,
     // and me is asked again until it answers; its person's outbox starts then, without a reload.
     else retryMe(mine, openKV);
-    const machines = await loadMachines();
+    const machines = await machinesAsked;
     if (gone()) return bootStore.get();
     if (machines === 'signed-out') return set({ k: 'signed-out' });
     if (!Array.isArray(machines)) return set({ k: 'failed', code: machines.code });
     batch(() => putMachines(machines));
-    const v2 = (
-      await Promise.all(machines.map(async (m) => ((await checkRuntime(m.id)) ? m.id : null)))
-    ).filter((id): id is MachineId => id !== null);
-    if (gone()) return bootStore.get();
     if (o.hub) hub.configure(o.hub);
+    // Every machine's socket opens at once; /hello is asked of each on its own, behind them. Waiting for every
+    // machine's answer held the page up to 10 s on one machine that was off.
     const preferred = me.k === 'ready' ? me.me.settings.defaultMachine : null;
-    hub.start(v2, preferred && v2.includes(preferred) ? preferred : (v2[0] ?? null));
-    return set({ k: 'ready', machines: v2 });
+    const all = machines.map((m) => m.id);
+    hub.start(all, pickActive(all, preferred));
+    for (const m of machines) {
+      // A machine the list already calls unreachable is not asked: its socket says when it is back.
+      if (m.reach === 'unreachable') continue;
+      void checkRuntime(m.id).then((v2) => {
+        if (v2 || gone()) return;
+        dropOutdated(m.id, preferred);
+      });
+    }
+    return set({ k: 'ready', machines: all });
   })();
   return booted;
+}
+
+const pickActive = (ids: MachineId[], preferred: MachineId | null): MachineId | null =>
+  preferred && ids.includes(preferred) ? preferred : (ids[0] ?? null);
+
+/** A machine whose /hello says it is an older runtime leaves the v2 machines: its socket closes. */
+function dropOutdated(m: MachineId, preferred: MachineId | null): void {
+  const st = bootStore.get();
+  if (st.k !== 'ready' || !st.machines.includes(m)) return;
+  const rest = st.machines.filter((id) => id !== m);
+  batch(() => {
+    hub.drop(m, pickActive(rest, preferred));
+    set({ k: 'ready', machines: rest });
+  });
 }
 
 /** The page lets this person go (sign-out, another account): sockets, outbox, cache and stores. */

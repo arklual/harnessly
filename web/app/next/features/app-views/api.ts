@@ -1,6 +1,6 @@
 // What the page asks the runtime for the apps' views (cmd/runtime/routes_apps.go, routes_apps_bridge.go): the installed
 // apps with their views, and the two calls of a view that reach the machine, storage and tools.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { postJson, runtimeJson, RuntimeError } from '@/next/core/net/runtime-json';
 import type { MachineId } from '@/next/protocol/v2';
@@ -116,6 +116,8 @@ export interface IInstalledApp {
   access?: IAccess[];
   /** The install waits for the person to agree to all of `access`. */
   consent?: boolean;
+  /** The chat whose agent installed what waits for consent: its card shows there. */
+  askedIn?: string;
   /** A newer version that reaches more waits for the person's word; its `access` is only what it adds. */
   pending?: { version: string; access: IAccess[] };
   /** The person turned the app off with its switch. */
@@ -172,6 +174,21 @@ export const consentApp = (
 /** «Отмена»: a waiting update is dropped (the running version stays); a first install that waited is removed. */
 export const declineApp = (m: MachineId, id: string): Promise<{ removed: boolean }> =>
   runtimeJson<{ removed: boolean }>(m, platformPath('/apps/decline'), postJson({ id }));
+
+/** One line a view reported: its console, an exception, a failed bridge call. */
+export interface IViewLogLine {
+  at: number;
+  level: 'error' | 'warn' | 'bridge';
+  text: string;
+}
+
+/** Hands what a view reported to the machine, where `harnessly app logs` and the runtime's log read it. */
+export const reportViewLog = (
+  m: MachineId,
+  id: string,
+  view: string,
+  lines: readonly IViewLogLine[],
+): Promise<unknown> => runtimeJson(m, platformPath('/apps/view-log'), postJson({ id, view, lines }));
 
 /** The switch of an app: off, it starts nowhere and its views' calls are refused at once. */
 export const switchApp = (m: MachineId, id: string, on: boolean): Promise<unknown> =>
@@ -609,8 +626,64 @@ export const answerAppAsk = async (m: MachineId, id: string, answer: string | nu
 
 const lists = new Map<MachineId, Promise<IInstalledApps>>();
 
+/** How many times each machine's list was read again: a consent given in one place shows in every other. */
+const rereads = new Map<MachineId, number>();
+const rereadListeners = new Set<() => void>();
+const onReread = (f: () => void) => {
+  rereadListeners.add(f);
+  return () => {
+    rereadListeners.delete(f);
+  };
+};
+
+/** Read the machine's installed apps again, for every screen that shows them (after a consent, by a watch). */
+export const refreshInstalledApps = (m: MachineId): void => {
+  lists.delete(m);
+  rereads.set(m, (rereads.get(m) ?? 0) + 1);
+  for (const f of rereadListeners) f();
+};
+
+/** The apps that wait for the person's word, light: no view server is started for it. */
+export const loadConsentApps = async (m: MachineId): Promise<IInstalledApp[]> =>
+  (await runtimeJson<{ apps: IInstalledApp[] }>(m, platformPath('/apps/consent/asks'))).apps;
+
+/** How often a screen that shows consent asks reads them again, while the page is seen. */
+const CONSENT_WATCH_MS = 15_000;
+
 /**
- * The installed apps of a machine: null while they load. One read per machine until `reload`. `enabled: false` asks
+ * The apps of a machine that wait for consent: null until the first answer (or on a machine without the route). Read
+ * again with every refreshInstalledApps and, with `watch`, every few seconds while the page is seen, so an agent's
+ * install shows without a reload.
+ */
+export const useConsentApps = (m: MachineId, enabled = true, watch = false): IInstalledApp[] | null => {
+  const reread = useSyncExternalStore(onReread, () => rereads.get(m) ?? 0);
+  const [state, setState] = useState<{ m: MachineId; apps: IInstalledApp[] } | null>(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    // A machine without the route, or one that does not answer now, keeps what was shown: the next read tries again.
+    loadConsentApps(m).then(
+      (apps) => live && setState({ m, apps }),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [m, enabled, reread, tick]);
+  useEffect(() => {
+    if (!enabled || !watch) return;
+    const timer = setInterval(() => {
+      if (!document.hidden) setTick((n) => n + 1);
+    }, CONSENT_WATCH_MS);
+    return () => clearInterval(timer);
+  }, [m, enabled, watch]);
+  return enabled && state?.m === m ? state.apps : null;
+};
+
+/**
+ * The installed apps of a machine: null while they load. One read per machine until `reload` or a
+ * refreshInstalledApps; a read again keeps the list it had on screen until the new one comes. `enabled: false` asks
  * nothing (a read starts the view server on the machine, so a screen that may have no use for the list waits for one).
  */
 export const useInstalledApps = (
@@ -619,11 +692,13 @@ export const useInstalledApps = (
   enabled = true,
 ): { list: IInstalledApps | null; error: string | null } => {
   const [state, setState] = useState<{
+    m: MachineId;
     key: string;
     list: IInstalledApps | null;
     error: string | null;
   } | null>(null);
-  const key = `${m}|${reload}`;
+  const reread = useSyncExternalStore(onReread, () => rereads.get(m) ?? 0);
+  const key = `${m}|${reload}|${reread}`;
   useEffect(() => {
     if (!enabled) return;
     let live = true;
@@ -631,17 +706,22 @@ export const useInstalledApps = (
     const asked = lists.get(m) ?? loadInstalledApps(m);
     lists.set(m, asked);
     asked.then(
-      (list) => live && setState({ key, list, error: null }),
+      (list) => live && setState({ m, key, list, error: null }),
       (e: Error) => {
         lists.delete(m);
-        if (live) setState({ key, list: null, error: e.message });
+        if (live) setState({ m, key, list: null, error: e.message });
       },
     );
     return () => {
       live = false;
     };
   }, [m, reload, key, enabled]);
-  return enabled && state?.key === key ? state : { list: null, error: null };
+  if (!enabled || state === null) return { list: null, error: null };
+  if (state.key === key) return state;
+  // Read again for the same machine and `reload`: the old list stays until the new one comes, so nothing flickers.
+  return state.m === m && state.key.startsWith(`${m}|${reload}|`) && state.list !== null
+    ? { list: state.list, error: null }
+    : { list: null, error: null };
 };
 
 /** One setting of an app, as its form draws it (internal/apps/setup.go). */

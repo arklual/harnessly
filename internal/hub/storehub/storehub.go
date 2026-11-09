@@ -11,8 +11,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,6 +156,28 @@ func (s *Store) Server() *filestore.Server { return s.srv }
 func (s *Store) Mount(mux *http.ServeMux) {
 	mux.Handle("POST "+hubproto.StorePath, httpx.Handler(s.session))
 	mux.Handle(hubproto.StoreAPIPath+"/v1/", http.StripPrefix(hubproto.StoreAPIPath, s.srv.Handler()))
+}
+
+// HasBlob, OpenBlob and PutBlob reach a collection's contents from inside the hub (the workspace's uploads,
+// HRN-879): a blob is the same bytes under its sha256 whoever put it, and PutBlob refuses bytes that hash otherwise.
+func (s *Store) HasBlob(ctx context.Context, spaceID, kind, sha string) (bool, error) {
+	if !filestore.ValidSha(sha) {
+		return false, nil
+	}
+	return s.blobs.Has(ctx, s.Room(spaceID, kind), sha)
+}
+
+// OpenBlob opens a blob of a space's collection (os.ErrNotExist when it is not there).
+func (s *Store) OpenBlob(ctx context.Context, spaceID, kind, sha string) (io.ReadCloser, error) {
+	if !filestore.ValidSha(sha) {
+		return nil, os.ErrNotExist
+	}
+	return s.blobs.Open(ctx, s.Room(spaceID, kind), sha)
+}
+
+// PutBlob stores bytes in a space's collection under their sha256.
+func (s *Store) PutBlob(ctx context.Context, spaceID, kind, sha string, r io.Reader) error {
+	return s.blobs.Put(ctx, s.Room(spaceID, kind), sha, r)
 }
 
 // Room is the room of a space's collection.

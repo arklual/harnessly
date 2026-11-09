@@ -28,6 +28,7 @@ func Whole(conv string, provider wire.Provider, src Source) []WholeTurn {
 
 // Records are the records of the turns the feed holds, oldest first.
 func (f *Feed) Records() []wire.Turn {
+	f.ensure()
 	out := make([]wire.Turn, len(f.b.turns))
 	for i, t := range f.b.turns {
 		out[i] = t.rec

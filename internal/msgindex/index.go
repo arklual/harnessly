@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Roles of a message.
@@ -69,17 +70,19 @@ type key struct{ conv, entry string }
 
 // Index is safe for concurrent use. A nil *Index finds nothing and keeps nothing.
 type Index struct {
-	mu     sync.RWMutex
-	path   string
-	f      *os.File
-	end    int64
-	docs   []doc
-	byKey  map[key]uint32
-	terms  map[string][]uint32
-	sorted []string
-	dirty  bool
-	convs  map[string]*convState
-	dead   int
+	mu sync.RWMutex
+	// loading is set while OpenLater reads the log, with mu held for it.
+	loading atomic.Bool
+	path    string
+	f       *os.File
+	end     int64
+	docs    []doc
+	byKey   map[key]uint32
+	terms   map[string][]uint32
+	sorted  []string
+	dirty   bool
+	convs   map[string]*convState
+	dead    int
 }
 
 type convState struct {
@@ -95,27 +98,62 @@ func Open(dir string) (*Index, error) {
 		return nil, err
 	}
 	ix := &Index{path: filepath.Join(dir, "messages.jsonl")}
+	if err := ix.openLocked(); err != nil {
+		return nil, err
+	}
+	return ix, nil
+}
+
+// OpenLater returns at once and reads the log behind (hundreds of megabytes take seconds on a cold disk, and the
+// runtime's start does not wait for them). Until it is read, Search, Size and the others wait for it, while Put and
+// Mark keep nothing: a chat's feed checks Loading and leaves its messages to the next full read. An index that cannot
+// be kept is reported to fail and stays empty.
+func OpenLater(dir string, fail func(error)) *Index {
+	ix := &Index{path: filepath.Join(dir, "messages.jsonl")}
+	ix.reset()
+	ix.mu.Lock()
+	ix.loading.Store(true)
+	go func() {
+		defer ix.mu.Unlock()
+		defer ix.loading.Store(false)
+		err := os.MkdirAll(dir, 0o700)
+		if err == nil {
+			err = ix.openLocked()
+		}
+		if err != nil {
+			ix.reset()
+			if fail != nil {
+				fail(err)
+			}
+		}
+	}()
+	return ix
+}
+
+// Loading says the log is still being read (OpenLater).
+func (ix *Index) Loading() bool { return ix != nil && ix.loading.Load() }
+
+func (ix *Index) openLocked() error {
 	ix.reset()
 	if err := ix.load(); err != nil {
-		return nil, err
+		return err
 	}
 	if ix.needsCompaction() {
 		if err := ix.compactLocked(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	f, err := os.OpenFile(ix.path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	ix.f = f
 	st, err := f.Stat()
 	if err != nil {
 		f.Close()
-		return nil, err
+		return err
 	}
-	ix.end = st.Size()
-	return ix, nil
+	ix.f, ix.end = f, st.Size()
+	return nil
 }
 
 func (ix *Index) reset() {
@@ -283,7 +321,7 @@ func (ix *Index) append(ls []line) {
 // Put keeps messages of one conversation, replacing those it has under the same entry; one that did not change is
 // skipped.
 func (ix *Index) Put(docs ...Doc) {
-	if ix == nil || len(docs) == 0 {
+	if ix == nil || len(docs) == 0 || ix.loading.Load() {
 		return
 	}
 	ix.mu.Lock()
@@ -342,7 +380,7 @@ func (ix *Index) Replace(conv string, size int64, docs []Doc) {
 // Mark says that the messages of the conversation were taken up to size bytes of its transcript, without a message
 // changing (live entries keep it current).
 func (ix *Index) Mark(conv string, size int64) {
-	if ix == nil {
+	if ix == nil || ix.loading.Load() {
 		return
 	}
 	ix.mu.Lock()

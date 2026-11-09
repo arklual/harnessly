@@ -1,0 +1,883 @@
+/* The kit screen: a tree on the left, one canvas in the middle, what is picked on the right. The canvas paints
+   itself (kit-draw.ts reads the --kit-* tones from here); the live pages lie over it at the cells the camera brings near. */
+.hx-kit {
+  --kit-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --kit-side-w: 248px;
+  --kit-panel-w: 320px;
+  --kit-canvas: var(--hx-bg-canvas);
+  --kit-frame: var(--hx-bg-window);
+  --kit-frame-line: var(--hx-border);
+  --kit-title: var(--hx-fg-1);
+  --kit-caption: var(--hx-fg-2);
+  --kit-sub: var(--hx-fg-3);
+  --kit-card: var(--hx-bg-raised);
+  --kit-card-line: var(--hx-border);
+  --kit-select: var(--hx-accent);
+  --kit-hover: var(--hx-border-strong);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--hx-bg-window);
+  color: var(--hx-fg-1);
+}
+.hx-kit--wait {
+  align-items: center;
+  justify-content: center;
+}
+
+/* The head: back, the tree's toggle, where you are, the theme and the search. */
+.hx-kit__head {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: var(--hx-header-h);
+  padding: 0 var(--hx-space-3);
+  border-bottom: 1px solid var(--hx-border);
+}
+.hx-kit__side-toggle {
+  display: none;
+}
+.hx-kit__crumbs {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.hx-kit__crumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+.hx-kit__crumb[data-root] {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-kit__crumb[aria-current] {
+  color: var(--hx-fg-1);
+  cursor: default;
+}
+button.hx-kit__crumb:hover {
+  color: var(--hx-fg-1);
+}
+.hx-kit__ver {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.hx-kit__sep {
+  color: var(--hx-fg-3);
+}
+.hx-kit__search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  height: var(--hx-control-sm);
+  padding: 0 var(--hx-space-2) 0 var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--hx-dur-sm) var(--hx-ease-out),
+    color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-kit__search:hover {
+  border-color: var(--hx-border-strong);
+  color: var(--hx-fg-2);
+}
+.hx-kit__search kbd {
+  font: inherit;
+  font-size: 11px;
+  color: var(--hx-fg-3);
+}
+
+.hx-kit__body {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--kit-side-w) minmax(0, 1fr) var(--kit-panel-w);
+  flex: 1;
+  min-height: 0;
+}
+.hx-kit__side {
+  display: flex;
+  min-height: 0;
+  border-right: 1px solid var(--hx-border);
+  background: var(--hx-bg-window);
+}
+.hx-kit__main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--kit-canvas);
+}
+.hx-kit__zoom {
+  position: absolute;
+  right: var(--hx-space-3);
+  bottom: var(--hx-space-3);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-sm);
+}
+.hx-kit__pct {
+  min-width: 52px;
+  padding: 0 var(--hx-space-1);
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.hx-kit__pct:hover {
+  color: var(--hx-fg-1);
+}
+
+/* The tree: a virtual list of fixed rows; --row places a row, --depth indents it. */
+.hx-kit-tree {
+  --tree-row: 30px;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--hx-space-2) 0;
+  outline: none;
+}
+.hx-kit-tree__space {
+  position: relative;
+  height: calc(var(--rows, 0) * var(--tree-row));
+}
+.hx-kit-tree__row {
+  position: absolute;
+  top: calc(var(--row, 0) * var(--tree-row));
+  left: var(--hx-space-2);
+  right: var(--hx-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-1);
+  height: var(--tree-row);
+  padding: 0 var(--hx-space-2) 0 calc(var(--hx-space-1) + var(--depth, 0) * 14px);
+  border-radius: var(--hx-radius-sm);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  user-select: none;
+}
+.hx-kit-tree__row:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-kit-tree__row[aria-selected='true'] {
+  background: var(--hx-accent-soft);
+  color: var(--hx-fg-1);
+}
+.hx-kit-tree:focus-visible .hx-kit-tree__row[aria-selected='true'] {
+  box-shadow: inset 0 0 0 1px var(--hx-focus);
+}
+.hx-kit-tree__twist {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-kit-tree__twist svg {
+  transition: transform var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-kit-tree__twist[data-open] svg {
+  transform: rotate(90deg);
+}
+.hx-kit-tree__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-kit-tree__count {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The canvas and the live pages over it: a page is drawn at its own width and scaled into its cell. */
+.hx-kit-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  outline: none;
+  touch-action: none;
+  cursor: default;
+}
+.hx-kit-canvas[data-panning] {
+  cursor: grabbing;
+}
+.hx-kit-canvas__paint {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hx-kit-live {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--lw);
+  height: var(--lh);
+  border: 0;
+  background: transparent;
+  transform: translate(var(--lx), var(--ly)) scale(var(--ls));
+  transform-origin: 0 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-kit-live[data-ready] {
+  opacity: 1;
+}
+.hx-kit-live[data-off] {
+  visibility: hidden;
+  transition: none;
+}
+/* The frame that enters the preview slot once: there, never seen. */
+.hx-kit-enter {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The panel: what is picked, its parameters, how to call it, where it is used. */
+.hx-kit-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--hx-border);
+  background: var(--hx-bg-window);
+}
+.hx-kit-panel__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  padding: var(--hx-space-4) var(--hx-space-4) var(--hx-space-2);
+}
+.hx-kit-panel__place {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-kit-panel__name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--hx-weight-semibold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.hx-kit-panel__empty {
+  margin: 0;
+  padding: var(--hx-space-4);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+.hx-kit-panel__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+}
+.hx-kit-panel__sec + .hx-kit-panel__sec {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-kit-panel__h {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-kit-panel__text {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+.hx-kit-panel__text code {
+  font-family: var(--hx-font-mono);
+  color: var(--hx-fg-1);
+}
+.hx-kit-panel__muted {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-kit-panel__shot {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  cursor: zoom-in;
+  transition: border-color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-kit-panel__shot:hover {
+  border-color: var(--hx-border-strong);
+}
+.hx-kit-panel__shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hx-kit-panel__swatches {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-kit-swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  width: 100%;
+  padding: var(--hx-space-1);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: copy;
+}
+.hx-kit-swatch:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-kit-swatch__chip {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--hx-radius-sm);
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px var(--hx-border);
+}
+.hx-kit-swatch__mode {
+  flex: 1;
+}
+.hx-kit-panel__type {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  margin: 0;
+  font-family: var(--ff), var(--hx-font-ui);
+  font-size: min(var(--fs), 40px);
+  font-weight: var(--fw);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.hx-kit-panel__type small {
+  font-family: var(--hx-font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--hx-fg-3);
+}
+.hx-kit-panel__asset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: var(--hx-space-4);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+}
+.hx-kit-panel__asset[data-dark] {
+  background: var(--hx-p-gray-900);
+}
+.hx-kit-panel__asset img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+}
+.hx-kit-panel__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-top: auto;
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border-top: 1px solid var(--hx-border);
+  background: var(--hx-bg-window);
+}
+
+/* Parameters: a name, its field, its kind. */
+.hx-kit-props {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  margin: 0;
+}
+.hx-kit-props__row {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.8fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: var(--hx-space-1) var(--hx-space-2);
+}
+.hx-kit-props__row dt {
+  padding-top: 6px;
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}
+.hx-kit-props__row dt code {
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+}
+.hx-kit-props__row dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+.hx-kit-props__type {
+  color: var(--hx-fg-3);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.hx-kit-input {
+  width: 100%;
+  height: var(--hx-control-sm);
+  padding: 0 var(--hx-space-2);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  transition: border-color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-kit-input:hover {
+  border-color: var(--hx-border-strong);
+}
+.hx-kit-input:focus-visible {
+  outline: none;
+  border-color: var(--hx-focus);
+}
+.hx-kit-preview {
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+}
+.hx-kit-preview[data-wide] {
+  aspect-ratio: 16 / 9;
+}
+.hx-kit-preview iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.hx-kit-code {
+  margin: 0;
+  padding: var(--hx-space-3);
+  overflow-x: auto;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+.hx-kit-uses {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-kit-uses button,
+.hx-kit-insert__list button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-kit-uses button:hover,
+.hx-kit-insert__list button:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-kit-uses small {
+  color: var(--hx-fg-3);
+  font-size: 12px;
+}
+.hx-kit-insert {
+  min-width: 220px;
+  max-width: 300px;
+  padding: var(--hx-space-2);
+}
+.hx-kit-insert__title {
+  margin: 0;
+  padding: var(--hx-space-1) var(--hx-space-2) var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: 12px;
+}
+.hx-kit-insert__list {
+  max-height: 280px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+/* One layout alone and large, over the canvas; it comes and leaves with a fade and a small scale. */
+.hx-kit-single {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-6);
+  container-type: size;
+  background: var(--kit-canvas);
+  animation: hx-kit-single-in var(--hx-dur-md) var(--kit-ease) backwards;
+}
+.hx-kit-single[data-state='closing'] {
+  animation: hx-kit-single-out 180ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+.hx-kit-single__stage {
+  position: relative;
+  width: min(100cqw - 2 * var(--hx-space-6), (100cqh - 120px) * var(--ar-n));
+  aspect-ratio: var(--ar);
+  overflow: hidden;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-md);
+}
+.hx-kit-single__shot,
+.hx-kit-single__live {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.hx-kit-single__shot {
+  object-fit: cover;
+}
+.hx-kit-single__live {
+  opacity: 0;
+  transition: opacity var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-kit-single__live[data-ready] {
+  opacity: 1;
+}
+.hx-kit-single__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  max-width: 100%;
+}
+.hx-kit-single__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-kit-single__pos {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+@keyframes hx-kit-single-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes hx-kit-single-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+/* Narrower: the panel tightens; narrower still, the tree becomes a drawer over the canvas and the panel a sheet. */
+@media (max-width: 1200px) {
+  .hx-kit {
+    --kit-side-w: 220px;
+    --kit-panel-w: 288px;
+  }
+}
+@media (max-width: 900px) {
+  .hx-kit__side-toggle {
+    display: inline-flex;
+  }
+  .hx-kit__search span {
+    display: none;
+  }
+  .hx-kit__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .hx-kit__side {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 4;
+    width: min(var(--kit-side-w), 80vw);
+    box-shadow: var(--hx-shadow-overlay);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform var(--hx-dur-md) var(--kit-ease),
+      visibility 0s linear var(--hx-dur-md);
+  }
+  .hx-kit[data-side] .hx-kit__side {
+    transform: none;
+    visibility: visible;
+    transition:
+      transform var(--hx-dur-md) var(--kit-ease),
+      visibility 0s;
+  }
+  .hx-kit-panel {
+    max-height: 45vh;
+    border-left: 0;
+    border-top: 1px solid var(--hx-border);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-kit-single,
+  .hx-kit-single[data-state='closing'] {
+    animation-duration: 1ms;
+  }
+}
+
+/* The library's row of kits. */
+.hx-kit-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  margin-bottom: var(--hx-space-6);
+}
+.hx-kit-shelf__h {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-kit-shelf__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--hx-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-kit-shelf__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-kit-shelf__shot {
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  margin-bottom: var(--hx-space-1);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  transition:
+    border-color var(--hx-dur-sm) var(--hx-ease-out),
+    transform var(--hx-dur-md) var(--kit-ease, var(--hx-ease-out));
+}
+.hx-kit-shelf__card:hover .hx-kit-shelf__shot {
+  border-color: var(--hx-border-strong);
+  transform: translateY(-2px);
+}
+.hx-kit-shelf__shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hx-kit-shelf__title {
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-kit-shelf__meta {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+
+/* The project's kit on its bar. */
+.hx-kit-chip {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: baseline;
+  gap: var(--hx-space-2);
+  height: var(--hx-control-sm);
+  padding: 0 var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: calc(var(--hx-control-sm) - 2px);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--hx-dur-sm) var(--hx-ease-out),
+    color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-kit-chip:hover {
+  border-color: var(--hx-border-strong);
+  color: var(--hx-fg-1);
+}
+.hx-kit-chip__note {
+  color: var(--hx-fg-3);
+}
+@media (max-width: 720px) {
+  .hx-kit-chip__note {
+    display: none;
+  }
+}
+
+/* What a board took from the kit, over the slide: a quiet line at its corner, the source layout laid over to compare. */
+.hx-kit-origin {
+  position: absolute;
+  left: var(--hx-space-2);
+  bottom: var(--hx-space-2);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-1);
+  max-width: calc(100% - 2 * var(--hx-space-2));
+  padding: 2px 2px 2px var(--hx-space-3);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-sm);
+  color: var(--hx-fg-2);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-deck__slide:hover .hx-kit-origin,
+.hx-kit-origin:focus-within,
+.hx-kit-origin:has([aria-pressed='true']) {
+  opacity: 1;
+}
+.hx-kit-origin__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-kit-origin__btn {
+  flex: none;
+  height: 24px;
+  padding: 0 var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  cursor: pointer;
+}
+.hx-kit-origin__btn:hover,
+.hx-kit-origin__btn[aria-pressed='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-kit-origin__layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+  pointer-events: none;
+  animation: hx-kit-layer-in var(--hx-dur-sm) var(--hx-ease-out) backwards;
+}
+.hx-kit-origin__layer[data-state='closing'] {
+  animation: hx-kit-layer-out 160ms var(--hx-ease-out) forwards;
+}
+@keyframes hx-kit-layer-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-kit-layer-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The deck's bar is full of its own controls: below this width the chip would squeeze the project's name to nothing,
+   so it steps aside there (the slide's «Из кита» line still leads to the kit). */
+@container (max-width: 1240px) {
+  .hx-deck__bar .hx-kit-chip {
+    display: none;
+  }
+}

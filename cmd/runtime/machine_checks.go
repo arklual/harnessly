@@ -22,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/basepkg"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/preview"
 	"github.com/ly-solutions/harnessly/internal/selfupdate"
 	"github.com/ly-solutions/harnessly/internal/voice/engine"
 )
@@ -86,6 +87,11 @@ type machineProbe struct {
 	AppsBoundary func() (applies bool, err error)
 	// ReadFile reads a file of the machine (a sysctl under /proc/sys).
 	ReadFile func(string) ([]byte, error)
+	// PreviewOrigins are the preview slots' public origins (RUNTIME_PREVIEW_PUBLIC_ORIGINS or RUNTIME_PREVIEW_DOMAIN);
+	// nil when the preview goes by ports or by path, where there is no name to resolve.
+	PreviewOrigins func() []string
+	// PreviewDNS resolves the slots' names (preview.CheckOrigins).
+	PreviewDNS func(ctx context.Context, origins []string) []preview.OriginCheck
 }
 
 // pkgInstall is the command that installs an item of the base package here (internal/basepkg: one list for the checks,
@@ -340,7 +346,42 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 		}
 		add(disk)
 	}
+
+	if c := p.previewCheck(ctx); c != nil {
+		add(*c)
+	}
 	return out
+}
+
+// previewCheck is the preview_dns check, nil when the slots have no public names.
+func (p machineProbe) previewCheck(ctx context.Context) *machineCheck {
+	if p.PreviewOrigins == nil || p.PreviewDNS == nil {
+		return nil
+	}
+	origins := p.PreviewOrigins()
+	if len(origins) == 0 {
+		return nil
+	}
+	c := previewDNSCheck(p.PreviewDNS(ctx, origins))
+	return &c
+}
+
+// previewDNSCheck: the slots' names resolve. A name that does not (NXDOMAIN) leaves the panel without a view over https
+// although the slots listen here. A name of another address is in order: a reverse proxy may stand there.
+func previewDNSCheck(checks []preview.OriginCheck) machineCheck {
+	c := machineCheck{ID: "preview_dns", OK: true, Title: "preview DNS"}
+	var bad []string
+	for _, o := range checks {
+		if o.State == preview.OriginNotFound || o.State == preview.OriginError {
+			bad = append(bad, o.Host)
+		}
+	}
+	if len(bad) > 0 {
+		c.OK = false
+		c.Detail = strings.Join(bad, ", ") + ": " + preview.OriginsHint(checks)
+		c.FixCommand = "harnessly doctor preview"
+	}
+	return c
 }
 
 // boundaryFix is the command that lets bwrap make the wall: the package, or the setting of the kernel that refuses the
@@ -580,6 +621,24 @@ func machineCheckRoutes(d deps, self *selfupdate.Updater) []gate.Route {
 				}
 				probe.Invalidate()
 				answer(w, r)
+			}),
+		},
+		{
+			// harnessly doctor preview: the slots' origins this runtime uses and what DNS says of each.
+			Match: func(r *http.Request) bool { return pathIs(r, "/api/cli/preview/check") },
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if d.CLI == nil || !d.CLI.OK(r) {
+					peerJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden"})
+					return
+				}
+				if r.Method != http.MethodGet {
+					w.Header().Set("Allow", "GET")
+					peerJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+					return
+				}
+				ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+				defer cancel()
+				peerJSON(w, http.StatusOK, previewCheckReport(ctx, probe.PreviewOrigins()))
 			}),
 		},
 	}

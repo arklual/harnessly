@@ -804,6 +804,10 @@ func (p *Proxy) deliver(w *trackedWriter, r *http.Request, c *Claim, rt *route, 
 			kind = "html"
 		}
 		rr := newRootPathRewriter(out, kind, basePath)
+		if html && isDocumentRequest(r) {
+			// The bridge takes the prefix off the document's URL: its relative addresses resolve here (bridge-path.ts).
+			rr.docPath = rt.path
+		}
 		out, closers = rr, append(closers, rr)
 	}
 	if plan.rewrite {

@@ -47,6 +47,8 @@ type Deps struct {
 	Features *features.Store
 	// Events is the bus of the organizations' live stream; nil: there is none.
 	Events events.OrgBus
+	// EnvChanged runs after a setting the machines' environment lists carry changed (the rule for apps); nil: nothing.
+	EnvChanged func()
 }
 
 // Service is the organizations side of the hub.
@@ -59,6 +61,7 @@ type Service struct {
 	now  func() time.Time
 
 	onLimits func()
+	onEnv    func()
 	rates    *rates.Book
 	features *features.Store
 	bus      events.OrgBus
@@ -66,7 +69,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, rates: d.Rates, features: d.Features, bus: d.Events}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, onEnv: d.EnvChanged, rates: d.Rates, features: d.Features, bus: d.Events}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -353,6 +356,9 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		Name     *string
 		Timezone *string
 		Currency *string
+		// AppsConsent is the rule for apps: "ask" or "auto" («Не спрашивать разрешений»). It is the
+		// organization's admin's, by a person's session: Gate lets no machine's or agent's token in.
+		AppsConsent *string
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -387,10 +393,16 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		}
 		next.Currency = *req.Currency
 	}
+	if req.AppsConsent != nil {
+		if *req.AppsConsent != store.AppsConsentAsk && *req.AppsConsent != store.AppsConsentAuto {
+			return httpx.Invalid("appsConsent", "Правило — ask или auto")
+		}
+		next.AppsConsent = *req.AppsConsent
+	}
 	for _, f := range []struct {
 		key      string
 		was, now string
-	}{{"name", o.Name, next.Name}, {"timezone", o.Timezone, next.Timezone}, {"currency", o.Currency, next.Currency}} {
+	}{{"name", o.Name, next.Name}, {"timezone", o.Timezone, next.Timezone}, {"currency", o.Currency, next.Currency}, {"appsConsent", o.AppsConsent, next.AppsConsent}} {
 		if f.was != f.now {
 			before[f.key], after[f.key] = f.was, f.now
 		}
@@ -405,6 +417,9 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		})
 		if err != nil {
 			return err
+		}
+		if next.AppsConsent != o.AppsConsent && s.onEnv != nil {
+			s.onEnv() // the machines' lists carry the rule: they get it now
 		}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"org": orgView(next)})

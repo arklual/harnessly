@@ -16,7 +16,12 @@ export type Org = {
   timezone: string;
   currency: 'RUB' | 'USD';
   createdAt: string;
+  /** The rule for apps on the organization's machines; absent on an older hub, which means `ask`. */
+  appsConsent?: AppsConsent;
 };
+
+/** `ask`: an app's rights wait for the person's click; `auto`: «Не спрашивать разрешений». */
+export type AppsConsent = 'ask' | 'auto';
 
 export type Tenant = {
   id: string;

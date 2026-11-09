@@ -245,6 +245,11 @@ export interface TurnItem {
   note: NoticeEntry | null;
   /** The steps without the answer; null: not loaded yet (older turns arrive with their answer only). */
   steps: Entry[] | null;
+  /**
+   * A finished turn holds only some of its steps (the snapshot kept the newest of a long turn): unfolded, the rest
+   * loads. Absent when it holds them all or none.
+   */
+  partial?: boolean;
   /** The agent's last reply, shown under the folded work (turn.answerEntryId). */
   answer: SayEntry | null;
   now: Now | null;

@@ -22,6 +22,7 @@ import (
 	browsertools "github.com/ly-solutions/harnessly/internal/agentbrowser/tools"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/browser"
 	"github.com/ly-solutions/harnessly/internal/envsetup"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -493,6 +494,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(askRoutes(d, ref.c)...)
 	f.Add(secretRoutes(d, ref.c)...)
 	setupRunners := envSetupRunners(d, os.Getenv("AGENT_HUB_OBSERVE_FILE"), cfg.Version)
+	// The organization's rule for apps comes with the hub's list (apps_consent_policy.go).
+	apps.Open(d.DataDir).SetConsentPolicy(newAppsConsentPolicy(hubLinkDirs(d.DataDir, os.Getenv("AGENT_HUB_OBSERVE_FILE"))).On)
 	f.Add(envSetupRoutes(d, setupRunners)...)
 	f.Add(basepkgRoutes(d)...)
 	f.Add(connectionRoutes(d)...)
@@ -561,6 +564,7 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+	profileOnSignal(filepath.Join(cfg.DataDir, "debug"))
 	if err := run(ctx, cfg); err != nil {
 		fail(err)
 	}
@@ -577,7 +581,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	var alone *standalone
 	standaloneSlots = nil
 	if cfg.Standalone() {
-		standaloneSlots = listenPreviewSlots(cfg.Listen, portOf(cfg.Listen))
+		standaloneSlots = listenPreviewSlots(cfg.Listen, portOf(cfg.Listen), cfg.DataDir)
 		if portOf(cfg.Listen) == 0 {
 			cfg.Listen = ln.Addr().String()
 		}
@@ -604,6 +608,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	f.startUpdateCheck(ctx)
 	f.startEnvSetup(ctx)
+	go watchAppsConsent(ctx, apps.Open(cfg.DataDir), appsPolicyEvery)
 	defer f.startStore(ctx, cfg)()
 	go watchBasepkg(ctx, cfg.DataDir)
 	// A GPT switch left on brings its proxy up again.

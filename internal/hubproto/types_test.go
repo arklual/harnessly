@@ -74,3 +74,19 @@ func TestProfileAndVia(t *testing.T) {
 		t.Error("validity")
 	}
 }
+
+func TestIsRevokedDial(t *testing.T) {
+	for body, want := range map[string]bool{
+		`{"error":"forbidden","message":"Машина отозвана","details":{"reason":"revoked"}}`: true,
+		`{"error":"forbidden","message":"nope"}`:                                           false,
+		`{"error":"cross_site","details":{"reason":"revoked"}}`:                            false,
+		`{"error":"forbidden","details":{"reason":"disabled"}}`:                            false,
+		`<html><body>403 Forbidden</body></html>`:                                          false,
+		`revoked`: false,
+		``:        false,
+	} {
+		if got := IsRevokedDial([]byte(body)); got != want {
+			t.Errorf("%q: %v", body, got)
+		}
+	}
+}

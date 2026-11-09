@@ -27,6 +27,134 @@ export const withoutPrefix = (path: string, prefix: string): string => {
   return path.startsWith(`${prefix}/`) ? path.slice(prefix.length) : path;
 };
 
+/** Attributes that hold an address, of any element (data= of an <object> only, srcset as a list of candidates). */
+const MARKUP_URL_ATTRS = new Set(['src', 'href', 'action', 'formaction', 'poster', 'background', 'manifest']);
+const MARKUP_SRCSET = new Set(['srcset', 'imagesrcset']);
+/** Elements whose text the parser does not read as markup: what they hold is a script's or a style's, not addresses. */
+const RAW_TEXT = new Set([
+  'script',
+  'style',
+  'textarea',
+  'title',
+  'xmp',
+  'iframe',
+  'noembed',
+  'noframes',
+  'noscript',
+]);
+const SPACE = /[\t\n\f\r ]/;
+
+/** `fix` on each candidate's address of a srcset, read as the browser reads one (a data: address keeps its commas). */
+export const rewriteSrcset = (value: string, fix: (raw: string) => string): string => {
+  let out = '';
+  let i = 0;
+  while (i < value.length) {
+    let j = i;
+    while (j < value.length && (SPACE.test(value[j]) || value[j] === ',')) j++;
+    out += value.slice(i, j);
+    if ((i = j) >= value.length) break;
+    while (j < value.length && !SPACE.test(value[j])) j++;
+    const addr = value.slice(i, j).replace(/,+$/, '');
+    out += fix(addr) + value.slice(i + addr.length, j);
+    i = j;
+    if (value[j - 1] === ',') continue;
+    for (let depth = 0; j < value.length && (value[j] !== ',' || depth > 0); j++) {
+      if (value[j] === '(') depth++;
+      else if (value[j] === ')') depth--;
+    }
+    out += value.slice(i, j);
+    i = j;
+  }
+  return out;
+};
+
+/**
+ * The addresses of markup the parser inserts (`document.write`): each start tag's address attributes go through `fix`,
+ * quoted or not; comments, the text of scripts and styles, and anything that is not a tag stay as written. A tag cut
+ * off at the end of the markup stays as it is.
+ */
+export const rewriteMarkup = (html: string, fix: (raw: string) => string): string => {
+  const tagName = /<([a-zA-Z][^\t\n\f\r />]*)/y;
+  const spaces = /[\t\n\f\r /]*/y;
+  const attrName = /[^\t\n\f\r />][^\t\n\f\r />=]*/y;
+  const equals = /[\t\n\f\r ]*=[\t\n\f\r ]*/y;
+  const unquoted = /[^\t\n\f\r >]+/y;
+  const at = (re: RegExp, from: number) => {
+    re.lastIndex = from;
+    return re.exec(html) ? re.lastIndex : from;
+  };
+  let out = '';
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) return out + html.slice(i);
+    out += html.slice(i, lt);
+    i = lt;
+    if (html.startsWith('<!--', i)) {
+      const end = html.indexOf('-->', i + 4);
+      const stop = end < 0 ? html.length : end + 3;
+      out += html.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    tagName.lastIndex = i;
+    const name = tagName.exec(html)?.[1].toLowerCase();
+    if (!name) {
+      out += '<';
+      i += 1;
+      continue;
+    }
+    let j = tagName.lastIndex;
+    let tag = html.slice(i, j);
+    let closed = false;
+    while (j < html.length) {
+      const k = at(spaces, j);
+      tag += html.slice(j, k);
+      j = k;
+      if (html[j] === '>') {
+        tag += '>';
+        j += 1;
+        closed = true;
+        break;
+      }
+      const nameEnd = at(attrName, j);
+      if (nameEnd === j) break;
+      const attr = html.slice(j, nameEnd).toLowerCase();
+      tag += html.slice(j, nameEnd);
+      j = nameEnd;
+      const eq = at(equals, j);
+      if (eq === j) continue;
+      tag += html.slice(j, eq);
+      j = eq;
+      const quote = html[j] === '"' || html[j] === "'" ? html[j] : '';
+      const start = quote ? j + 1 : j;
+      const end = quote ? html.indexOf(quote, start) : at(unquoted, j);
+      if (end < 0) {
+        tag += html.slice(j);
+        j = html.length;
+        break;
+      }
+      const raw = html.slice(start, end);
+      let value = raw;
+      if (MARKUP_URL_ATTRS.has(attr) || (attr === 'data' && name === 'object')) value = fix(raw);
+      else if (MARKUP_SRCSET.has(attr)) value = rewriteSrcset(raw, fix);
+      tag += quote + value + quote;
+      j = quote ? end + 1 : end;
+    }
+    out += tag;
+    i = j;
+    if (closed && RAW_TEXT.has(name)) {
+      const close = new RegExp(`</${name}[\\t\\n\\f\\r />]`, 'ig');
+      close.lastIndex = i;
+      const found = close.exec(html);
+      const stop = found ? found.index : html.length;
+      out += html.slice(i, stop);
+      i = stop;
+    }
+  }
+  return out;
+};
+
 interface IStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -261,6 +389,35 @@ export const installPathMode = (win: any, doc: any, prefix: string): void => {
     Wrapped.prototype = Native.prototype;
     Object.setPrototypeOf(Wrapped, Native);
     win[name] = Wrapped;
+  }
+
+  // Markup the parser inserts (document.write, writeln) loads past the element hooks below: its addresses get the
+  // prefix before it is written, relative ones resolved against the document's base (the path without the prefix).
+  // A fragment, an address of another host and one that has the prefix are left as written.
+  const Doc = win.Document?.prototype;
+  for (const name of ['write', 'writeln'] as const) {
+    const native = Doc?.[name];
+    if (typeof native !== 'function') continue;
+    Doc[name] = function (this: any, ...parts: unknown[]) {
+      // TrustedHTML and anything else that is not a string goes as it came.
+      if (!parts.length || parts.some((part) => typeof part !== 'string')) return native.apply(this, parts);
+      const at = (this?.baseURI as string) || base();
+      const markupFix = (raw: string) => {
+        const value = raw.trim();
+        if (!value || value.startsWith('#')) return raw;
+        let url: URL;
+        try {
+          url = new URL(value, at);
+        } catch {
+          return raw;
+        }
+        if (url.origin !== origin || url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))
+          return raw;
+        const lead = raw.slice(0, raw.indexOf(value));
+        return lead + withPrefix(value, prefix, at, origin) + raw.slice(lead.length + value.length);
+      };
+      return native.call(this, rewriteMarkup((parts as string[]).join(''), markupFix));
+    };
   }
 
   // Addresses a script gives to elements: src, href and action of the host get the prefix.

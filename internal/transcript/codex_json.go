@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+	"unique"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
@@ -56,7 +57,11 @@ func (p *codexJSON) value() (any, bool) {
 	case c == '[':
 		return p.array()
 	case c == '"':
-		s, ok := p.str()
+		// A copy, not a slice of the line: a kept value held the whole read alive.
+		s, sliced, ok := p.text()
+		if sliced {
+			s = strings.Clone(s)
+		}
 		return s, ok
 	case c == 't':
 		return p.lit("true", true)
@@ -83,10 +88,11 @@ func (p *codexJSON) object() (any, bool) {
 		if p.i >= len(p.s) || p.s[p.i] != '"' {
 			return nil, false
 		}
-		k, ok := p.str()
+		k, _, ok := p.text()
 		if !ok {
 			return nil, false
 		}
+		k = unique.Make(k).Value() // the same few keys on every line, kept once
 		p.space()
 		if p.i >= len(p.s) || p.s[p.i] != ':' {
 			return nil, false
@@ -215,7 +221,8 @@ func codexHex4(s string) (rune, bool) {
 	return r, true
 }
 
-func (p *codexJSON) str() (string, bool) {
+// text is a string as read; sliced: it is a slice of the line (it had no escapes), not a string of its own.
+func (p *codexJSON) text() (s string, sliced bool, ok bool) {
 	p.i++
 	start := p.i
 	for p.i < len(p.s) {
@@ -223,13 +230,13 @@ func (p *codexJSON) str() (string, bool) {
 		if c == '"' {
 			s := p.s[start:p.i]
 			p.i++
-			return s, true
+			return s, true, true
 		}
 		if c == '\\' {
 			break
 		}
 		if c < 0x20 {
-			return "", false
+			return "", false, false
 		}
 		p.i++
 	}
@@ -240,16 +247,16 @@ func (p *codexJSON) str() (string, bool) {
 		switch {
 		case c == '"':
 			p.i++
-			return b.String(), true
+			return b.String(), false, true
 		case c < 0x20:
-			return "", false
+			return "", false, false
 		case c != '\\':
 			b.WriteByte(c)
 			p.i++
 			continue
 		}
 		if p.i+1 >= len(p.s) {
-			return "", false
+			return "", false, false
 		}
 		e := p.s[p.i+1]
 		p.i += 2
@@ -269,7 +276,7 @@ func (p *codexJSON) str() (string, bool) {
 		case 'u':
 			r, ok := codexHex4(p.s[p.i:])
 			if !ok {
-				return "", false
+				return "", false, false
 			}
 			p.i += 4
 			if utf16.IsSurrogate(r) {
@@ -284,8 +291,8 @@ func (p *codexJSON) str() (string, bool) {
 			}
 			b.WriteRune(r)
 		default:
-			return "", false
+			return "", false, false
 		}
 	}
-	return "", false
+	return "", false, false
 }

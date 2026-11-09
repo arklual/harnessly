@@ -1,4 +1,12 @@
 {
+  "next.whatsNew.2026-11-09c.bashLine.title": "Commands with «!» stay in the chat",
+  "next.whatsNew.2026-11-09c.bashLine.text": "A command you run with «!» stays in the feed with its output and the agent's reply, after a reload too.",
+  "next.whatsNew.2026-11-09c.stoppedTurn.title": "A stopped turn stays",
+  "next.whatsNew.2026-11-09c.stoppedTurn.text": "When you stop the agent, its thinking and text stay in place marked «Stopped», and any folded turn unfolds in full.",
+  "next.whatsNew.2026-11-09c.appConsent.title": "App permissions where you are",
+  "next.whatsNew.2026-11-09c.appConsent.text": "When an agent installs an app that needs access, an «Allow» card shows in the chat and its right pane, and an open app shows it over its window. One click and it runs.",
+  "next.whatsNew.2026-11-09c.previewPathAssets.title": "Previews by path come with their styles and scripts",
+  "next.whatsNew.2026-11-09c.previewPathAssets.text": "When a preview opens by path (one harnessly address for the whole company), the page now loads the styles, scripts and pictures it names by relative addresses, and the dependencies its loader writes with document.write. Before, it could open unstyled or blank.",
   "next.whatsNew.2026-11-09b.codeAsk.title": "2FA and SMS codes, right in the panel",
   "next.whatsNew.2026-11-09b.codeAsk.text": "When an agent needs a one-time code (npm publish, a bank sign-in), «Waiting for a code» appears under the subagents: what it is for and how long the agent still waits. The code never goes through the chat and is kept nowhere.",
   "next.whatsNew.2026-11-09b.codeField.title": "Six cells, sent on the last digit",
@@ -533,5 +541,9 @@
   "next.whatsNew.2026-11-07za.machinePick.title": "Switch machines even when one is down",
   "next.whatsNew.2026-11-07za.machinePick.text": "A new chat starts on the first machine that answers, and the model and machine picker stays in the field. When none answers, the field says so.",
   "next.whatsNew.2026-11-07za.machineStatus.title": "The machine's status is always in the chat header",
-  "next.whatsNew.2026-11-07za.machineStatus.text": "Its icon shows even when all is well: hover it for the name and state."
+  "next.whatsNew.2026-11-07za.machineStatus.text": "Its icon shows even when all is well: hover it for the name and state.",
+  "next.whatsNew.2026-11-09k.kitCanvas.title": "A kit on one canvas",
+  "next.whatsNew.2026-11-09k.kitCanvas.text": "Every kit in the library has its own screen: a tree on the left, all components, layouts and icons on one canvas, search on ⌘K. On the right: parameters with a live preview, how to call it, insert into a board and send to chat.",
+  "next.whatsNew.2026-11-09k.kitInProject.title": "A project knows its kit",
+  "next.whatsNew.2026-11-09k.kitInProject.text": "The project bar shows the kit and its version, a slide from the kit has «Open in the kit» and «Show the layout», and the kit shows where each layout is used."
 }

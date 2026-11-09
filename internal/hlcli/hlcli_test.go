@@ -102,6 +102,15 @@ func (f *fakeRuntime) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"ok":true,"applied":true,"message":"opened for the person"}`))
 	case r.URL.Path == "/api/cli/deliver":
 		_, _ = w.Write([]byte(`{"ok":true,"message":"Delivered notes.md\nhttps://delivered.harnessly.invalid/file"}`))
+	case r.URL.Path == "/api/cli/apps/logs" && r.URL.Query().Get("id") == "example.quiet":
+		_, _ = w.Write([]byte(`{"id":"example.quiet","lines":[]}`))
+	case r.URL.Path == "/api/cli/apps/logs":
+		_, _ = w.Write([]byte(`{"id":"example.app","lines":[{"at":1700000000000,"level":"error","view":"main","text":"TypeError: x is undefined"}]}`))
+	case r.URL.Path == "/api/cli/apps/enable" && body["id"] == "example.waits":
+		w.WriteHeader(409)
+		_, _ = w.Write([]byte(`{"error":"consent","access":["ai","secrets:token"],"where":"x"}`))
+	case r.URL.Path == "/api/cli/apps/install":
+		_, _ = w.Write([]byte(`{"app":{"id":"example.app","version":"0.1.0","dev":true},"problems":[],"waitsConsent":true}`))
 	case r.URL.Path == "/api/cli/api-guide":
 		w.Header().Set("Content-Type", "text/markdown")
 		_, _ = w.Write([]byte("# API\n"))

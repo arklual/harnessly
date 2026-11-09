@@ -16,6 +16,7 @@ type Point struct {
 // RewindPoint is the turn turnID as a rewind's point; ok false when the transcript has no such turn or a person's
 // message did not open it. Older turns than the feed holds are read until it is found.
 func (f *Feed) RewindPoint(turnID string) (Point, bool) {
+	f.ensure()
 	i, ok := f.find(turnID)
 	if !ok {
 		return Point{}, false
@@ -36,6 +37,7 @@ func (f *Feed) RewindPoint(turnID string) (Point, bool) {
 // From is the turns from turnID to the end, by their faces (the message that opened each and its answer), at most
 // limit of the newest; ok false when the transcript has no such turn.
 func (f *Feed) From(turnID string, limit int) (wire.TurnsPage, bool) {
+	f.ensure()
 	i, ok := f.find(turnID)
 	if !ok {
 		return wire.TurnsPage{}, false

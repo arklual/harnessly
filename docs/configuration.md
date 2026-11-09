@@ -224,6 +224,8 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_PREVIEW_LISTEN` | standalone only: `host:port` of the first of the 8 preview slot listeners, the other 7 take the next ports (default: the gate's host and the 8 ports after its port, so `8023`–`8030` next to `8022`); `off` turns the preview off. See [the preview without a gateway](deploy.md#the-preview-without-a-gateway) |
 | `RUNTIME_PREVIEW_MODE` | standalone only: how the preview's slots are reached — `auto` (default: public origins when named, the slot ports for a plain-http page, else by path), `ports`, `origins`, or `path`: under `<base>/__pv/<slot>-<key>/` of the page's own origin, no extra names, ports or certificates. See [the preview without subdomains](deploy.md#the-preview-without-subdomains-one-host-one-certificate) |
 | `RUNTIME_PREVIEW_PUBLIC_ORIGINS` | standalone only: the 8 origins a reverse proxy serves the slots at, comma-separated, in slot order (`https://p1.example.com,...`); needed when the page is opened over https |
+| `RUNTIME_PREVIEW_DOMAIN` | standalone only: the domain the slots' origins live under; without `RUNTIME_PREVIEW_PUBLIC_ORIGINS` the slots are `https://s1-<id>.<domain>` … `https://s8-<id>.<domain>`. Needs a wildcard DNS record and certificate; `harnessly doctor preview` checks the names resolve. See [preview domains](deploy.md#preview-domains) |
+| `RUNTIME_PREVIEW_ID` | the `<id>` of those names (lowercase letters, digits, dashes; default: the hub's machine id, else one made on the first start and kept in `<data>/preview-id`) |
 | `RUNTIME_WORKTREES_ROOT` | the git worktrees folder whose dev servers the pane lists (default `~/.worktrees`) |
 
 ### Voice
@@ -327,6 +329,7 @@ the `harnessly` skill always, `boards` with `RUNTIME_BOARDS_URL`, `artifacts` wi
 | Variable | Meaning |
 | --- | --- |
 | `RUNTIME_AGENT_SKILLS` | `off` (also `0`, `false`, `no`, `none`) installs nothing, loads no skills plugin into Claude and adds no `PATH` folder; anything else, or unset, installs them |
+| `RUNTIME_HEAVY_LAUNCHERS` | `off` (also `0`, `false`, `no`, `none`) writes no launchers of heavy checks; anything else, or unset, puts `go`, `vitest`, `playwright`, `tsc`, `eslint` and `npx` into `RUNTIME_AGENT_BIN_DIR` (while the agent skills are on). A heavy call (`go build/test/vet/install`, `vitest`, `playwright test`, `tsc`, `eslint`, `npx` of those) takes one of the machine's shared slots (1 up to 4 cores, 2 up to 16, one per 8 above), runs under `nice`/`ionice` with `GOMAXPROCS=2` and `-p=2`, waits up to 15 minutes for a slot and then exits with 75 and tells the agent to go on without the check. A file of the person's own under those names stays. The launchers read `HARNESSLY_HEAVY=off`, `HARNESSLY_HEAVY_SLOTS`, `HARNESSLY_HEAVY_WAIT` and `HARNESSLY_HEAVY_DIR` (default `/var/lib/harnessly-heavy` when it exists, else `/tmp/harnessly-heavy`); `harnessly heavy stats` counts the calls that ran, waited and were refused |
 | `RUNTIME_AGENT_BIN_DIR` | where the `artifacts`, `boards` and `harnessly` launchers go (default `~/.local/bin`, which login shells put on the `PATH` when it exists) |
 | `CODEX_HOME` | Codex's folder (default `~/.codex`); its user skills go to `$CODEX_HOME/skills/harnessly/` |
 

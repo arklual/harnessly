@@ -15,6 +15,9 @@ const nowThought = 200
 // Now is what the agent does in the open turn this moment: its latest thought, the tool call still running, the live
 // reply off the screen (word, "" none). Nil outside a turn.
 func (f *Feed) Now(word string, at wire.Ms) *wire.Now {
+	if f.rel != nil {
+		return nil // a released feed has no open turn
+	}
 	id := f.b.openID()
 	if id == "" {
 		return nil

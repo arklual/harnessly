@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import usePoller from '@/hooks/use-poller';
 import { useHlMachines } from '@/hooks/use-hl-machines';
 import { currentMachineId } from '@/lib/app-path';
@@ -124,6 +124,12 @@ const useDesignLibrary = (tabId: string | null, enabled: boolean, front: boolean
 
 export type TDesignLibrary = ReturnType<typeof useDesignLibrary>;
 
+/** The last list each machine gave on this page, by slotOf: drawn at once while it is asked again. */
+const keptLibraries = new Map<string, IMachineLibrary>();
+const slotOf = (target: IFleetTarget): string => target.machineId ?? '';
+const keptOf = (targets: IFleetTarget[]): IMachineLibrary[] =>
+  targets.flatMap((target) => keptLibraries.get(slotOf(target)) ?? []);
+
 /** A machine that has not answered in this long is shown from its last list and named as not answering. */
 const MACHINE_TIMEOUT_MS = 8_000;
 
@@ -164,49 +170,60 @@ export const useFleetDesignLibrary = () => {
   const key = targets
     ? `design-library:fleet:${targets.map((target) => `${target.machineId ?? ''}${target.available ? '' : '!'}`).join(',')}`
     : null;
-  const [state, setState] = useState<TFleetLibraryState>({ kind: 'loading' });
-  const kept = useRef(new Map<string, IMachineLibrary>());
+  // The last list of every machine is drawn at once, also after the section was left and opened again; a machine
+  // still being asked keeps it until it answers.
+  const [state, setState] = useState<TFleetLibraryState>(() => {
+    const libraries = targets ? keptOf(targets) : [];
+    return libraries.length > 0
+      ? { kind: 'ready', projects: mergeLibraries(libraries, pageMachine), unreachable: [] }
+      : { kind: 'loading' };
+  });
 
   const { refresh } = usePoller(
     key,
     async (signal) => {
       if (!targets) return;
-      const answers = await Promise.all(
+      // Each machine is drawn as it answers: a slow or hung one does not hold the others (Promise.all held the list
+      // until the last machine answered or its 8 s ran out, on every poll).
+      const asked = new Set<string>();
+      const failed = new Set<string>();
+      const publish = (final: boolean) => {
+        if (signal.aborted) return;
+        const libraries = keptOf(targets);
+        const unreachable = targets
+          .filter((target) => failed.has(slotOf(target)) || (final && !asked.has(slotOf(target))))
+          .map((target) => target.machineName ?? target.machineId ?? t('hooks.useDesignLibrary.machine'));
+        if (libraries.length === 0) {
+          if (final) setState({ kind: 'error', message: t('hooks.useDesignLibrary.noMachineAnswered') });
+          return;
+        }
+        setState({ kind: 'ready', projects: mergeLibraries(libraries, pageMachine), unreachable });
+      };
+      await Promise.allSettled(
         targets.map(async (target) => {
-          if (!target.available) return { target, data: null };
+          const slot = slotOf(target);
+          if (!target.available) {
+            failed.add(slot);
+            return;
+          }
           try {
             const data = await fetchDesignLibrary(target.machineId, null, {
               signal: AbortSignal.any([signal, AbortSignal.timeout(MACHINE_TIMEOUT_MS)]),
             });
-            return { target, data };
+            asked.add(slot);
+            keptLibraries.set(slot, { machineId: target.machineId, machineName: target.machineName, data });
+            rememberTitles(data);
+            libraryPorts.add(data.port);
+            if (target.machineId === pageMachine) rememberPort(data.port);
           } catch {
-            return { target, data: null };
+            failed.add(slot);
           }
+          publish(false);
         }),
       );
+      publish(true);
       if (signal.aborted) return;
-      const libraries: IMachineLibrary[] = [];
-      const unreachable: string[] = [];
-      for (const { target, data } of answers) {
-        const slot = target.machineId ?? '';
-        if (data) {
-          const library = { machineId: target.machineId, machineName: target.machineName, data };
-          kept.current.set(slot, library);
-          libraries.push(library);
-          rememberTitles(data);
-          libraryPorts.add(data.port);
-          if (target.machineId === pageMachine) rememberPort(data.port);
-        } else {
-          unreachable.push(target.machineName ?? target.machineId ?? t('hooks.useDesignLibrary.machine'));
-          const last = kept.current.get(slot);
-          if (last) libraries.push(last);
-        }
-      }
-      if (libraries.length === 0) {
-        setState({ kind: 'error', message: t('hooks.useDesignLibrary.noMachineAnswered') });
-        throw new Error('design library: no machine answered');
-      }
-      setState({ kind: 'ready', projects: mergeLibraries(libraries, pageMachine), unreachable });
+      if (keptOf(targets).length === 0) throw new Error('design library: no machine answered');
     },
     { intervalMs: POLL.frontMs, maxBackoffMs: POLL.maxBackoffMs },
   );

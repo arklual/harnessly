@@ -53,6 +53,9 @@ type Installed struct {
 	Pending *Installed `json:"pending,omitempty"`
 	// Off: the person turned the app off (the switch of its card); it starts nowhere until it is turned on.
 	Off bool `json:"off,omitempty"`
+	// AskedIn is the chat whose agent installed or updated the app last: its consent card shows there and in
+	// that chat's right pane. "" for an install from outside a chat.
+	AskedIn string `json:"askedIn,omitempty"`
 }
 
 type registryBody struct {
@@ -68,6 +71,8 @@ type Registry struct {
 	onTeamChange func()
 	// onPublicChange is told, without blocking, that this machine put an app in the public catalog.
 	onPublicChange func()
+	// consentPolicy says whether the organization's rule gives apps their rights without asking (consent.go).
+	consentPolicy func() bool
 }
 
 // OnPublicChange sets what is called after PublishPublic. It is not called for a list applied from the platform.
@@ -200,6 +205,20 @@ func (r *Registry) Get(id string) (Installed, error) {
 	return Installed{}, ErrNotInstalled
 }
 
+// Find is one installed app whatever its state: turned off, or waiting for the person's consent (Get skips those).
+func (r *Registry) Find(id string) (Installed, error) {
+	all, err := r.ListAll()
+	if err != nil {
+		return Installed{}, err
+	}
+	for _, a := range all {
+		if a.ID == id {
+			return a, nil
+		}
+	}
+	return Installed{}, ErrNotInstalled
+}
+
 // InstallOptions say how to install.
 type InstallOptions struct {
 	// Dev points the install at the folder instead of copying it.
@@ -217,6 +236,8 @@ type InstallOptions struct {
 	Consent ConsentFrom
 	// Granted are the keys the install screen listed, with ConsentGiven; nil grants all the package reaches.
 	Granted []string
+	// AskedIn is the chat the install was made from; "" keeps the chat an earlier install was made from.
+	AskedIn string
 }
 
 // Install checks the package in dir and installs it, replacing an installed version of the same app. The problems are
@@ -245,6 +266,9 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if opt.Consent == ConsentAsk && r.policyOnLocked() {
+		opt.Consent = ConsentPolicy // the organization's rule stands for the person's word (consent.go)
+	}
 	list, err := r.read()
 	if err != nil {
 		return Installed{}, ps, err
@@ -306,12 +330,19 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 	}
 
 	at := now().UnixMilli()
+	if opt.Consent == ConsentPolicy && len(wants) > 0 && (old == nil || old.WaitsConsent() || !covered(wants, old.granted())) {
+		_ = r.Journal(m.ID, JournalEntry{At: at, What: JournalConsentPolicy, Class: ClassHigh, OK: true, Detail: m.Version})
+	}
 	source := pkg.Dir
 	if opt.Source != "" {
 		source = opt.Source
 	}
 	entry := Installed{ID: m.ID, Version: m.Version, Dir: target, Source: source, Dev: opt.Dev, Channel: opt.Channel, InstalledAt: at, UpdatedAt: at, Manifest: m, Wants: wants}
 	entry.Grant = grantFor(opt.Consent, old, wants, at)
+	entry.AskedIn = opt.AskedIn
+	if entry.AskedIn == "" && old != nil {
+		entry.AskedIn = old.AskedIn
+	}
 	if opt.Consent == ConsentGiven && opt.Granted != nil {
 		entry.Grant.Keys = slices.Clone(opt.Granted)
 	}
@@ -321,6 +352,9 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 		}
 		entry.Grant = nil
 		old.Pending = &entry
+		if opt.AskedIn != "" {
+			old.AskedIn = opt.AskedIn
+		}
 		if err := r.write(list); err != nil {
 			return Installed{}, ps, err
 		}
@@ -528,6 +562,34 @@ func (r *Registry) PaneRef(text string) string {
 		if contains(v.Targets, TargetPane) {
 			return id + "/" + v.ID
 		}
+	}
+	return ""
+}
+
+// PaneWhyNot says why an app the text names opens no pane view, when the reason is the app's own state and not a wrong
+// name: it waits for the person's consent (with what it waits for and where to give it), or the person turned it off.
+// "" when the app is not installed or the reason is the view itself.
+func (r *Registry) PaneWhyNot(text string) string {
+	id, _, _ := strings.Cut(text, "/")
+	all, err := r.ListAll()
+	if err != nil {
+		return ""
+	}
+	for _, a := range all {
+		if a.ID != id {
+			continue
+		}
+		switch {
+		case a.NeedsConsent():
+			what := strings.Join(AccessCodes(a.WaitingAccess()), ", ")
+			if what == "" {
+				what = "what it reaches"
+			}
+			return id + " waits for the person's consent to its access: " + what + "; " + ConsentWhere(id)
+		case a.Off || a.Muted:
+			return id + " is turned off by the person: «Приложения» → " + id + " → «Включено»"
+		}
+		return ""
 	}
 	return ""
 }

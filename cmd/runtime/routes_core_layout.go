@@ -166,12 +166,19 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 	access := workspaceAccess(d)
 	deps.Browser = c.browserTool(d)
 	deps.Deliver = func(path, title string) (delivery.Info, *delivery.Refusal) {
-		return delivery.Describe(access, path, title)
+		info, refusal := delivery.Describe(access, path, title)
+		if refusal == nil {
+			keepDelivered(info)
+		}
+		return info, refusal
 	}
 	// "open design <id|path|title>" names a design of this machine's library.
 	deps.Targets.DesignRef = designAPI(d).L.RefOf
 	// "open app <id>[/<view>]" names a pane view of an installed app.
-	deps.Targets.AppRef = apps.Open(d.DataDir).PaneRef
+	appReg := apps.Open(d.DataDir)
+	deps.Targets.AppRef = appReg.PaneRef
+	// …and an app that waits for consent or is turned off says so instead of «no such app».
+	deps.Targets.AppWhyNot = appReg.PaneWhyNot
 	main, shadow := layoutapi.Routes(deps)
 	routes := []gate.Route{{Slice: "core", Match: main.Match, Handler: main.Handler}}
 	return append(routes, f.AsBodyRoutes(gate.BodyRoute{Slice: "core", Match: shadow.Match, Serve: shadow.Handler.ServeHTTP})...)

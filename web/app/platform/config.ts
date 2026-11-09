@@ -61,6 +61,9 @@ export interface IAppConfig {
   hubUrl: string | null;
   /** Where the «Хаб» link leads (RUNTIME_HUB_LINK, else hubUrl), no trailing slash. It says nothing of who signs in. */
   hubLink: string | null;
+  /** the hub keeps the chats' uploads (its store): what a person attaches goes there too, and the chat's
+   *  pictures and files are read from there, the machine on or off. Set by the hub's workspace; false elsewhere. */
+  centralUploads: boolean;
 }
 
 const DEFAULTS: IAppConfig = {
@@ -93,6 +96,7 @@ const DEFAULTS: IAppConfig = {
   launchDefaultsKey: 'launchDefaults',
   hubUrl: null,
   hubLink: null,
+  centralUploads: false,
 };
 
 let cached: IAppConfig | null = null;
@@ -136,6 +140,7 @@ export const appConfig = (): IAppConfig => {
     platformApi: (read.platformApi ?? platformMeta ?? DEFAULTS.platformApi).replace(/\/+$/, ''),
     hubUrl: typeof read.hubUrl === 'string' && read.hubUrl ? read.hubUrl.replace(/\/+$/, '') : null,
     hubLink: typeof read.hubLink === 'string' && read.hubLink ? read.hubLink.replace(/\/+$/, '') : null,
+    centralUploads: read.centralUploads === true,
   };
   return cached;
 };

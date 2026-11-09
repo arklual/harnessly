@@ -60,6 +60,9 @@ type Targets struct {
 	// AppRef is the canonical "<app id>[/<view>]" of an installed app's pane view that a text names, "" for none; nil:
 	// the machine has no apps and "open app" takes no target.
 	AppRef func(text string) string
+	// AppWhyNot says why an installed app the text names opens no pane view when it is the app's state (it waits for
+	// the person's consent, it is turned off), "" otherwise; nil says nothing more than the hint.
+	AppWhyNot func(text string) string
 }
 
 func (t Targets) readerPath() string {
@@ -468,6 +471,11 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 	case appRef:
 		if t.AppRef != nil && clean(text) {
 			c = t.AppRef(jsvalue.TrimJS(text))
+			if c == "" && t.AppWhyNot != nil {
+				if why := t.AppWhyNot(jsvalue.TrimJS(text)); why != "" {
+					return Command{}, "open app: " + why
+				}
+			}
 		}
 	}
 	if c == "" {

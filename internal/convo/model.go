@@ -308,7 +308,7 @@ func (c *conv) modelFits(m wire.ModelCmd) wire.RefuseCode {
 		}
 		return ""
 	}
-	if c.d.Profiles != nil && c.d.Profiles.OwnsModel(m.Model) {
+	if c.d.vendorOnly(c.rec.Provider, m.Model) {
 		return wire.RefuseOptionUnknown
 	}
 	if c.d.Models == nil {
@@ -338,4 +338,18 @@ func modelRefusal(err error) wire.RefuseCode {
 		return wire.RefuseOptionUnknown
 	}
 	return wire.RefuseInternal
+}
+
+// vendorOnly: the model is a vendor's that only a profile reaches: a profile owns the id (configured or not, of either
+// CLI) and the provider's own account does not list it. Codex signed in with ChatGPT lists the GPT ids the built-in GPT
+// profile has too: those run on the account. A conversation of p without a profile is not started on a vendor-only
+// model nor switched to it, so that it does not run on the wrong account.
+func (d *Deps) vendorOnly(p wire.Provider, model string) bool {
+	if d.Profiles == nil || !d.Profiles.OwnsModel(model) {
+		return false
+	}
+	if d.Models != nil && slices.ContainsFunc(d.Models(p), func(x wire.AgentModel) bool { return x.ID == model }) {
+		return false
+	}
+	return true
 }

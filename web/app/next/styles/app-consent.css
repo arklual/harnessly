@@ -170,3 +170,151 @@
 .hx-journal [data-ok='false'] {
   color: var(--hx-danger);
 }
+
+/* The consent where the person is: a card over the chat's field, in its right pane and over the app's own
+   window. The name of the app is the largest; what it gets under it; «Разрешить» the one loud button. */
+.hx-consentasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+}
+.hx-consentasks:empty {
+  display: none;
+}
+.hx-consentasks[data-variant='dock'] {
+  margin-bottom: var(--hx-space-2);
+}
+.hx-consentasks[data-variant='pane'] {
+  margin-bottom: var(--hx-space-3);
+}
+.hx-consentask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-sm);
+  animation: hx-consentask-in var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-consentask[data-state='closing'] {
+  animation: hx-consentask-out 180ms var(--hx-ease-out) forwards;
+}
+@keyframes hx-consentask-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
+@keyframes hx-consentask-out {
+  to {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+}
+.hx-consentask__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.hx-consentask__tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+}
+.hx-consentask__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-consentask__title {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.hx-consentask__what {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}
+.hx-consentask__threat {
+  color: var(--hx-warning);
+  font-size: var(--hx-text-sm);
+}
+.hx-consentask__fail {
+  margin: 0;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+}
+.hx-consentask__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--hx-space-2);
+}
+/* Over the app's window: the bar stands at its top right, the window (an update's running version) under it. */
+.hx-consentstage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.hx-consentstage > .hx-appview {
+  flex: 1;
+  min-height: 0;
+}
+.hx-consentstage__empty {
+  flex: 1;
+  min-height: 160px;
+}
+.hx-consentstage__bar {
+  position: absolute;
+  top: var(--hx-space-3);
+  right: var(--hx-space-3);
+  left: var(--hx-space-3);
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.hx-consentstage__bar .hx-consentask {
+  width: min(380px, 100%);
+  pointer-events: auto;
+  box-shadow: var(--hx-shadow-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-consentask,
+  .hx-consentask[data-state='closing'] {
+    animation-duration: 1ms;
+  }
+}
+/* The waiting access of an installed app, with «Разрешить» and «Отклонить» under it: in the card's details
+   and, centred, on the app's own page in place of its view. */
+.hx-consentblock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+.hx-consentblock__h {
+  margin: 0;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-consentblock--page {
+  width: min(520px, 100%);
+  margin: var(--hx-space-6) auto;
+  padding: var(--hx-space-5);
+  box-sizing: border-box;
+}

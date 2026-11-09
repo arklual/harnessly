@@ -3,7 +3,16 @@
 
 export type Role = 'admin' | 'lead' | 'member';
 export type Section =
-  'overview' | 'analytics' | 'machines' | 'teams' | 'team' | 'env' | 'accounts' | 'tools' | 'efficiency';
+  | 'overview'
+  | 'analytics'
+  | 'machines'
+  | 'teams'
+  | 'team'
+  | 'env'
+  | 'accounts'
+  | 'tools'
+  | 'efficiency'
+  | 'settings';
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Админ организации',

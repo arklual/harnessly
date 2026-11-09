@@ -91,3 +91,22 @@ func TestEnvHash(t *testing.T) {
 		t.Error("no source is an empty object")
 	}
 }
+
+// The organization's rule for apps takes part in the hash only when it is auto: a list with the rule ask holds
+// the hash an older agent computes, and a change of the rule changes the hash the way a change of the list does.
+func TestEnvSetHashCarriesTheAppsRule(t *testing.T) {
+	items := EnvHash(envItems())
+	if EnvSetHash(items, "") != items || EnvSetHash(items, AppsConsentAsk) != items {
+		t.Fatal("the rule ask must leave the items' hash as it is")
+	}
+	auto := EnvSetHash(items, AppsConsentAuto)
+	if auto == items || len(auto) != 64 {
+		t.Fatalf("the rule auto must change the hash: %q", auto)
+	}
+	if EnvSetHash(items, AppsConsentAuto) != auto {
+		t.Fatal("the hash must be stable")
+	}
+	if EnvSetHash(EnvHash(nil), AppsConsentAuto) == auto {
+		t.Fatal("another list with the same rule must hash otherwise")
+	}
+}

@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"os"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/storelink"
@@ -46,6 +51,7 @@ func (f *runtimeGate) startStore(ctx context.Context, cfg gate.Config) func() {
 		agent.Log("warn", "store not linked, the data stays as it is", agent.F{K: "error", V: err.Error()})
 		return func() {}
 	}
+	linked.Store(f.store)
 	if f.store == nil || f.library == nil {
 		return func() {}
 	}
@@ -60,4 +66,38 @@ func (f *runtimeGate) startStore(ctx context.Context, cfg gate.Config) func() {
 		<-done
 		f.store.Close()
 	}
+}
+
+// linked is the runtime's store link for what is put into it outside a route's own deps (the files the agent hands over).
+var linked atomic.Pointer[storelink.Link]
+
+// deliveredMax is the largest handed-over file put into the hub's store; a bigger one is read from the machine only.
+const deliveredMax = 64 << 20
+
+// keepDelivered puts a file the agent handed over into the `files` collection of the hub's store by its sha256
+// (docs/hub/history.md): the chat's card then reads it from the hub, the machine on or off. Only under a hub,
+// in the background and best effort; bytes that no longer hash to what the card says are left alone.
+func keepDelivered(info delivery.Info) {
+	l := linked.Load()
+	if l == nil || l.Kind() != storelink.KindHub || len(info.SHA256) != 64 || info.Size <= 0 || info.Size > deliveredMax {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		c := l.Client(filestore.KindFiles)
+		if ok, err := c.HasBlob(ctx, info.SHA256); err == nil && ok {
+			return
+		}
+		data, err := os.ReadFile(info.Path)
+		if err != nil || int64(len(data)) > deliveredMax {
+			return
+		}
+		if sum := sha256.Sum256(data); hex.EncodeToString(sum[:]) != info.SHA256 {
+			return
+		}
+		if err := c.PutBlob(ctx, info.SHA256, data); err != nil {
+			agent.Log("info", "a handed-over file is not in the hub's store", agent.F{K: "error", V: err.Error()})
+		}
+	}()
 }

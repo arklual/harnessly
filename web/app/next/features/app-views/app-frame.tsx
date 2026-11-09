@@ -34,6 +34,7 @@ import {
   type TTarget,
 } from '@/next/features/app-views/bridge';
 import { logCall, logKey } from '@/next/features/app-views/bridge-log';
+import { bridgeLine, consoleLine, queueViewLog } from '@/next/features/app-views/view-log-report';
 import { pageOffer } from '@/next/features/app-views/page-tools';
 import { askConfirm } from '@/next/features/app-views/confirm';
 import { hostKeys } from '@/next/features/app-views/host-keys';
@@ -475,8 +476,14 @@ const AppFrame = ({
     // A remote view speaks from its own origin, and is answered only there.
     const remoteOrigin = remote && src !== null ? new URL(src).origin : null;
     const key = logKey(app.id, chat);
-    host.debugLog = (level, text) =>
-      logCall(key, { method: `console.${level}`, permission: '', ok: false, message: text, at: Date.now() });
+    // What the view reports goes to the debug section here and to the machine, where the CLI reads it.
+    const report = (line: ReturnType<typeof bridgeLine>) =>
+      line && queueViewLog(machine, app.id, view.id, line);
+    host.debugLog = (level, text) => {
+      const at = Date.now();
+      logCall(key, { method: `console.${level}`, permission: '', ok: false, message: text, at });
+      report(consoleLine(level, text, at));
+    };
     const b = new AppBridge({
       frame: () => frame.contentWindow,
       origin: remoteOrigin ?? OPAQUE,
@@ -488,6 +495,7 @@ const AppFrame = ({
       ...(nonce === null ? {} : { nonce }),
       onCall: (entry) => {
         logCall(key, entry);
+        report(bridgeLine(entry));
         latest.current.onBridgeCall?.(entry);
       },
     });
@@ -505,6 +513,12 @@ const AppFrame = ({
           ok: false,
           code: 'host_unavailable',
           message: t('next.inspector.noHandshake', { s: HANDSHAKE_WAIT_MS / 1000 }),
+          at: Date.now(),
+        });
+      if (!b.ready && bridge.current === b)
+        report({
+          level: 'bridge',
+          text: `ui/initialize — host_unavailable: no handshake in ${HANDSHAKE_WAIT_MS / 1000} s`,
           at: Date.now(),
         });
     }, HANDSHAKE_WAIT_MS);
@@ -536,6 +550,7 @@ const AppFrame = ({
     frameId,
     remote,
     src,
+    view.id,
   ]);
 
   // `storage`: a key of the app's storage was written (by the agent, another view of the app, the view itself), told at

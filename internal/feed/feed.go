@@ -140,6 +140,9 @@ type Feed struct {
 	more   bool
 	size   int64
 	loaded bool
+	// rel is what the feed keeps while released (release.go); uses counts its reads beyond a look's summary.
+	rel  *releasedFeed
+	uses int
 }
 
 type raw struct {
@@ -178,6 +181,7 @@ func Everything(conv string, provider wire.Provider, src Source, size int64) *Fe
 // A windowed source is read from its end by bytes: the window doubles until it holds TailTurns turns, TailEntries
 // entries or the whole file, so the newest turns are there at once however large the transcript is.
 func (f *Feed) Load() Update {
+	f.rel = nil
 	w, ok := f.src.(windowed)
 	if !ok {
 		return f.loadFrom(f.src.Tail(f.tail))
@@ -205,6 +209,10 @@ func (f *Feed) loadFrom(c transcript.Chunk) Update {
 func (f *Feed) Poll() Update {
 	if !f.loaded {
 		return f.Load()
+	}
+	if f.rel != nil {
+		u, _ := f.pollReleased()
+		return u
 	}
 	from := f.size
 	inc := f.src.Since()
@@ -277,6 +285,9 @@ func (f *Feed) apply(u *Update, s step) {
 
 // PendingTool is the open turn's latest tool call still without its result: the call a permission prompt is about.
 func (f *Feed) PendingTool() (wire.Entry, bool) {
+	if f.rel != nil {
+		return wire.Entry{}, false // a released feed has no open turn
+	}
 	id := f.b.openID()
 	if id == "" {
 		return wire.Entry{}, false
@@ -295,6 +306,7 @@ func (f *Feed) Size() int64 { return f.size }
 
 // Entry is one entry by its id.
 func (f *Feed) Entry(id string) (wire.Entry, bool) {
+	f.ensure()
 	i, ok := f.b.byID[id]
 	if !ok {
 		return wire.Entry{}, false
@@ -304,6 +316,21 @@ func (f *Feed) Entry(id string) (wire.Entry, bool) {
 
 // Messages calls fn with each of the person's messages and the agent's answers (user and say entries), oldest first.
 func (f *Feed) Messages(fn func(wire.Entry)) {
+	f.ensure()
+	f.held(fn)
+}
+
+// Held is Messages over what the feed holds now, without reading a released feed again or counting a use: a look the
+// actor makes by itself on the clock must not keep an idle chat's transcript in memory. False when released.
+func (f *Feed) Held(fn func(wire.Entry)) bool {
+	if f.rel != nil {
+		return false
+	}
+	f.held(fn)
+	return true
+}
+
+func (f *Feed) held(fn func(wire.Entry)) {
 	for _, e := range f.b.entries {
 		if e.T == wire.EntryUser || e.T == wire.EntrySay {
 			fn(e)
@@ -313,6 +340,7 @@ func (f *Feed) Messages(fn func(wire.Entry)) {
 
 // SetClientID marks a user entry as the page's message.
 func (f *Feed) SetClientID(entryID, clientID string) (wire.Entry, bool) {
+	f.ensure()
 	i, ok := f.b.byID[entryID]
 	if !ok || f.b.entries[i].T != wire.EntryUser {
 		return wire.Entry{}, false
@@ -328,16 +356,32 @@ func (f *Feed) SetClientID(entryID, clientID string) (wire.Entry, bool) {
 }
 
 // Context is the tokens the agent's last answer was asked with, 0 when its transcript does not say.
-func (f *Feed) Context() int64 { return f.b.context }
+func (f *Feed) Context() int64 {
+	if f.rel != nil {
+		return f.rel.context
+	}
+	return f.b.context
+}
 
 // Model is the model the agent last answered with, "" when its transcript does not say.
-func (f *Feed) Model() string { return f.b.model }
+func (f *Feed) Model() string {
+	if f.rel != nil {
+		return f.rel.model
+	}
+	return f.b.model
+}
 
 // OpenTurn is the turn still running in the transcript, "" none.
-func (f *Feed) OpenTurn() string { return f.b.openID() }
+func (f *Feed) OpenTurn() string {
+	if f.rel != nil {
+		return ""
+	}
+	return f.b.openID()
+}
 
 // Turn is a turn's record by its id.
 func (f *Feed) Turn(id string) (wire.Turn, bool) {
+	f.ensure()
 	i, ok := f.b.byTurn[id]
 	if !ok {
 		return wire.Turn{}, false
@@ -348,6 +392,7 @@ func (f *Feed) Turn(id string) (wire.Turn, bool) {
 // EndTurn ends a turn the transcript left open (a stop hook ahead of its line, a failure, an interrupt): the record
 // as it is now. Ending one already ended changes nothing, but a failure the transcript ended as done.
 func (f *Feed) EndTurn(id string, st wire.TurnStatus, failure *wire.TurnFailure, at wire.Ms) (wire.Turn, bool) {
+	f.ensure()
 	i, ok := f.b.byTurn[id]
 	if !ok {
 		return wire.Turn{}, false
@@ -359,6 +404,22 @@ func (f *Feed) EndTurn(id string, st wire.TurnStatus, failure *wire.TurnFailure,
 	e := end{st, failure, at}
 	f.ends[id] = e
 	f.end(id, e)
+	return f.b.turns[i].rec, true
+}
+
+// Refail names again why a failed turn failed: its last lines came after it ended (Claude fires StopFailure before its
+// refusal is on the transcript). The record as it is now; false when the turn did not fail.
+func (f *Feed) Refail(id string, failure *wire.TurnFailure) (wire.Turn, bool) {
+	f.ensure()
+	i, ok := f.b.byTurn[id]
+	if !ok || f.b.turns[i].rec.Status != wire.TurnFailed {
+		return wire.Turn{}, false
+	}
+	if e, ok := f.ends[id]; ok {
+		e.failure = failure
+		f.ends[id] = e
+	}
+	f.b.turns[i].rec.Failure = failure
 	return f.b.turns[i].rec, true
 }
 
@@ -392,6 +453,7 @@ func (f *Feed) end(id string, e end) {
 // ErrorEnd is the error a turn ends on ("" the open one): its last line is the agent's own error notice (a call to
 // its model refused: the login expired, the service failed). A turn that stops on it answered nothing, it failed.
 func (f *Feed) ErrorEnd(id string) (string, bool) {
+	f.ensure()
 	if id == "" {
 		id = f.b.openID()
 	}
@@ -413,6 +475,7 @@ func (f *Feed) ErrorEnd(id string) (string, bool) {
 // Resume opens again a turn the runtime ended on silence that the transcript has not ended: the agent was working
 // all along (its spinner off the screen) and writes on. The record as it is now; false when it is not that turn.
 func (f *Feed) Resume(id string) (wire.Turn, bool) {
+	f.ensure()
 	i, ok := f.b.byTurn[id]
 	if !ok || f.b.late != f.b.turns[i] || f.b.open != nil {
 		return wire.Turn{}, false
@@ -430,6 +493,7 @@ func (f *Feed) Resume(id string) (wire.Turn, bool) {
 // FindUser is the first user entry whose line is at or after offset, or (an entry read before its offset was known)
 // written at or after at: the message typed then.
 func (f *Feed) FindUser(offset int64, at wire.Ms) (string, bool) {
+	f.ensure()
 	for i, e := range f.b.entries {
 		if e.T != wire.EntryUser || e.ClientID != nil {
 			continue
@@ -444,6 +508,7 @@ func (f *Feed) FindUser(offset int64, at wire.Ms) (string, bool) {
 // FindUserText is FindUser for one message: the first user entry at or after offset (or written at or after at) that
 // carries its text, or its start when Claude cut the paste short. An entry of someone else — the person typing into the terminal, another tool — is never taken for it.
 func (f *Feed) FindUserText(offset int64, at wire.Ms, text string) (string, bool) {
+	f.ensure()
 	for i, e := range f.b.entries {
 		if line := commandLineOf(e); line != "" {
 			// A command the person typed («! cmd», «/compact») is written as its command entry, not a user message.
@@ -467,6 +532,7 @@ const clockSkew = 2000
 // Snapshot is the last turns as a conv snapshot holds them: up to turns full records, oldest first, the steps of the
 // last three and the answer entry of each older one; before is the cursor for older turns.
 func (f *Feed) Snapshot(turns int) (ts []wire.Turn, es []wire.Entry, before *string) {
+	f.ensure()
 	return f.page(len(f.b.turns), turns, 3)
 }
 
@@ -535,6 +601,7 @@ func (f *Feed) page(end, limit, full int) ([]wire.Turn, []wire.Entry, *string) {
 // After is what follows an entry: the entries after it and the turns they touch. ok is false when the feed does not
 // have the entry.
 func (f *Feed) After(entryID string) (ts []wire.Turn, es []wire.Entry, ok bool) {
+	f.ensure()
 	i, has := f.b.byID[entryID]
 	if !has {
 		return nil, nil, false
@@ -554,6 +621,7 @@ func (f *Feed) After(entryID string) (ts []wire.Turn, es []wire.Entry, ok bool) 
 // Turns is the page of turns before a turn ("" from the end), at most limit, oldest first, with their answer
 // entries. Older turns than the feed holds are read from the transcript first.
 func (f *Feed) Turns(before string, limit int) (wire.TurnsPage, bool) {
+	f.ensure()
 	end := len(f.b.turns)
 	if before != "" {
 		i, ok := f.b.byTurn[before]
@@ -611,6 +679,7 @@ func (f *Feed) before() transcript.Chunk {
 
 // TurnEntries is every entry of one turn.
 func (f *Feed) TurnEntries(turnID string) (wire.EntriesPage, bool) {
+	f.ensure()
 	i, ok := f.b.byTurn[turnID]
 	if !ok {
 		return wire.EntriesPage{}, false
@@ -624,6 +693,7 @@ func (f *Feed) TurnEntries(turnID string) (wire.EntriesPage, bool) {
 
 // Output is the whole output of a tool entry.
 func (f *Feed) Output(entryID string) (wire.OutputPage, bool) {
+	f.ensure()
 	e, ok := f.Entry(entryID)
 	if !ok || e.T != wire.EntryTool {
 		return wire.OutputPage{}, false
@@ -633,6 +703,7 @@ func (f *Feed) Output(entryID string) (wire.OutputPage, bool) {
 
 // Touched is whether a turn of the feed wrote, edited or read the file at this path, as the transcript names it.
 func (f *Feed) Touched(p string) bool {
+	f.ensure()
 	for _, t := range f.b.turns {
 		for _, file := range t.rec.Files {
 			if file.Path == p {
@@ -645,6 +716,7 @@ func (f *Feed) Touched(p string) bool {
 
 // Delivered is the sha256 the agent's latest hand-over of the file at this path vouched for (deliver_file's card).
 func (f *Feed) Delivered(p string) (string, bool) {
+	f.ensure()
 	sum, ok := "", false
 	for _, t := range f.b.turns {
 		for _, o := range t.rec.Outputs {
@@ -657,10 +729,22 @@ func (f *Feed) Delivered(p string) (string, bool) {
 }
 
 // Tasks is the agent's task list as the entries read so far make it, in the order the tasks were made.
-func (f *Feed) Tasks() []wire.Task { return f.b.tasks.all() }
+func (f *Feed) Tasks() []wire.Task {
+	if f.rel != nil {
+		return slices.Clone(f.rel.tasks)
+	}
+	return f.b.tasks.all()
+}
 
 // LastTurn is the newest turn's record, nil before any.
 func (f *Feed) LastTurn() *wire.Turn {
+	if f.rel != nil {
+		if f.rel.lastTurn == nil {
+			return nil
+		}
+		t := *f.rel.lastTurn
+		return &t
+	}
 	if len(f.b.turns) == 0 {
 		return nil
 	}
@@ -670,6 +754,9 @@ func (f *Feed) LastTurn() *wire.Turn {
 
 // Snippet is the first SnippetMax characters of a turn's answer.
 func (f *Feed) Snippet(t wire.Turn) string {
+	if f.rel != nil && f.rel.lastTurn != nil && f.rel.lastTurn.ID == t.ID {
+		return f.rel.snippet
+	}
 	if t.AnswerEntryID == nil {
 		return ""
 	}

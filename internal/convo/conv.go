@@ -22,6 +22,10 @@ import (
 )
 
 const (
+	// FeedKept is how long the feed of a chat nobody reads keeps what it read (releaseQuietFeed).
+	FeedKept = 5 * time.Minute
+	// restartLoads is how many conversations read their transcripts at once at a start.
+	restartLoads = 4
 	// LookEvery is how often an actor looks at its pane and reads its transcript when nothing told it to.
 	LookEvery = time.Second
 	// LookStarting is how often a starting agent's pane is looked at: the moment it can take the first message is
@@ -87,6 +91,9 @@ type conv struct {
 	rec         wire.Conversation
 	box         *outbox.Box
 	fd          *feed.Feed
+	// fdUses and fdUsedAt are the feed's reads as last seen and when they last grew (releaseQuietFeed).
+	fdUses   int
+	fdUsedAt time.Time
 	// handoffArtifact is private context used by the first prompt. It stays through launch and delivery retries, and is
 	// released only when that prompt's turn is terminal. Both fields are persisted for the same behavior after restart.
 	handoffArtifact, handoffArtifactClientID string
@@ -519,7 +526,7 @@ func (c *conv) endTurn(id string, st wire.TurnStatus, failure *wire.TurnFailure,
 	}
 	var limit *feed.Limit
 	if id != "" && id != c.terminalFailureTurn {
-		st, failure, limit = c.limitEnd(id, st, failure)
+		st, failure, limit = c.limitEnd(id, st, failure, now)
 	}
 	if limit != nil {
 		// Paused before the effects wake the queue: what waits goes after the reset, not into the refusal.
@@ -638,6 +645,9 @@ func (c *conv) read(now time.Time) {
 		c.quietSince = time.Time{}
 	}
 	c.feedUpdate(u, true, now)
+	if len(u.Steps) > 0 {
+		c.lateLimit(now)
+	}
 	c.handable.Store(c.probe.HandOver || c.handOverTool())
 }
 
@@ -1645,12 +1655,39 @@ func (c *conv) tick(now time.Time) {
 	c.watchMeta(now)
 	c.watchPictures(now)
 	c.watchTitle(now)
+	c.releaseQuietFeed(now)
 	c.flush(now, false)
 }
 
-// wake is when the actor next has something to do by the clock, at most LookEvery away.
+// releaseQuietFeed lets the feed go of what it read once nobody has read it for FeedKept: the looks of an
+// idle chat ask only what the released feed keeps, and the next page or message reads the transcript again.
+func (c *conv) releaseQuietFeed(now time.Time) {
+	if c.fd == nil || c.fd.Released() {
+		return
+	}
+	if u := c.fd.Uses(); u != c.fdUses || c.fdUsedAt.IsZero() {
+		c.fdUses, c.fdUsedAt = u, now
+		return
+	}
+	if now.Sub(c.fdUsedAt) >= FeedKept && c.fd.Release() {
+		c.fdUsedAt = time.Time{}
+	}
+}
+
+// clockEvery is how often the clock turns for nothing in particular: every second for a chat that may move, as seldom as
+// it is looked at for one stopped or gone — 276 gone and 101 stopped chats of one account turning every second were a
+// CPU of the runtime. A deadline, a timer or a message still wakes it on time.
+func (c *conv) clockEvery() time.Duration {
+	switch c.rec.State.K {
+	case wire.StateStopped, wire.StateGone, wire.StateLaunchFailed:
+		return c.lookEvery()
+	}
+	return LookEvery
+}
+
+// wake is when the actor next has something to do by the clock, at most clockEvery away.
 func (c *conv) wake(now time.Time) time.Time {
-	next := now.Add(LookEvery)
+	next := now.Add(c.clockEvery())
 	consider := func(t time.Time) {
 		if !t.IsZero() && t.Before(next) {
 			next = t

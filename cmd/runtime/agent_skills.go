@@ -59,6 +59,7 @@ func provisionAgentSkills(dataDir string) {
 		DataDir: dataDir, CodexHome: codexHomeDir(home), BinDir: agentBinDir(home),
 		Boards: integ.BoardsURL != "", Artifacts: integ.ArtifactsURL != "",
 		MCPServer: env("RUNTIME_MCP_SERVER", "harnessly"),
+		Heavy:     heavyLaunchersOn(os.Getenv),
 	}
 	if exe, err := os.Executable(); err == nil {
 		opts.Harnessly = filepath.Join(filepath.Dir(exe), "harnessly")
@@ -73,6 +74,16 @@ func provisionAgentSkills(dataDir string) {
 	if res.Changed() {
 		agent.Log("info", "agent skills installed", agent.F{K: "written", V: len(res.Written)}, agent.F{K: "removed", V: len(res.Removed)})
 	}
+}
+
+// heavyLaunchersOn reads RUNTIME_HEAVY_LAUNCHERS: anything but off, 0, false, no or none puts the launchers of heavy
+// checks on the agents' PATH (see internal/heavy).
+func heavyLaunchersOn(getenv func(string) string) bool {
+	switch strings.ToLower(strings.TrimSpace(getenv("RUNTIME_HEAVY_LAUNCHERS"))) {
+	case "off", "0", "false", "no", "none":
+		return false
+	}
+	return true
 }
 
 // skillsPluginDir is the Claude plugin folder, "" while the skills are off.
@@ -145,6 +156,7 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"images as `data:` URIs; it has no network access and your scripts do not run in it. Keep a diagram to what fits on a screen. " +
 		"A link to a document or board alone on its line shows as a card.\n\n")
 	b.WriteString(delegationPromptText(agentName))
+	b.WriteString(checksPromptText)
 	if integ.ArtifactsURL != "" || integ.BoardsURL != "" {
 		b.WriteString("## Documents and boards\n\n")
 		if integ.ArtifactsURL != "" {
@@ -169,6 +181,15 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString(". Read a skill before its first use in a conversation.\n")
 	return b.String()
 }
+
+// checksPromptText is how to run builds, tests and linters on a machine other agents and people share.
+const checksPromptText = "## Checks on a shared machine\n\n" +
+	"The machine is shared: other agents run on it, and so do people's chats, which slow down when it is loaded. CI runs the full checks anyway.\n\n" +
+	"- Check once, in one batch at the end of the task, not after every edit.\n" +
+	"- Run only the package or test you changed (`go test ./internal/x -run TestY`, `vitest run src/y.test.ts`), not the whole suite.\n" +
+	"- When you can go on without a check, go on, and leave the full run to CI.\n" +
+	"- Builds, tests, tsc and eslint wait for one of the machine's few slots. \"The machine is busy\" (exit 75) is not a reason to run the " +
+	"command again: go on without that check, or leave it to CI and say so.\n\n"
 
 // delegationPromptText is when to hand work to another agent through the MCP server's delegation tools, and when to keep
 // it in the agent's own session.

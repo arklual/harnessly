@@ -1201,6 +1201,9 @@
   --c-fg: #e8e8ec;
   --c-dim: #7d7d89;
   --c-ok: #3fcf9a;
+  display: block;
+  container: hx-code / inline-size;
+  min-width: 0;
   border-radius: var(--hx-radius-lg);
   overflow: hidden;
   background: var(--c-bg);
@@ -1210,6 +1213,7 @@
   display: flex;
   align-items: center;
   gap: var(--hx-space-3);
+  min-width: 0;
   height: 44px;
   padding: 0 var(--hx-space-3) 0 var(--hx-space-5);
   background: var(--c-head);
@@ -1217,10 +1221,20 @@
   font-family: var(--hx-font-mono);
   font-size: var(--hx-text-xs);
 }
+.hx-code__lang {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The button keeps its size and its word on one line; on a narrow block only the icon stays (the label is its name). */
 .hx-code__copy {
+  position: relative;
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: var(--hx-space-2);
+  white-space: nowrap;
   height: 30px;
   padding: 0 var(--hx-space-3);
   border: 0;
@@ -1237,6 +1251,26 @@
 }
 .hx-code__copy[data-copied='true'] {
   color: var(--c-ok);
+}
+/* The hint names the button only where its word is hidden. */
+.hx-code .hx-code__copy > .hx-tip {
+  display: none;
+}
+@container hx-code (max-width: 260px) {
+  .hx-code__copy {
+    padding: 0 var(--hx-space-2);
+  }
+  .hx-code .hx-code__copy > .hx-tip {
+    display: inline-flex;
+  }
+  .hx-code__copy-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 .hx-code__copy[data-copied='true'] .hx-icon {
   animation: hx-check var(--hx-dur-md) var(--hx-ease-spring) both;

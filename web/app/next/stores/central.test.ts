@@ -6,7 +6,7 @@ vi.mock('@/next/core/net/machine', () => ({ gatewayPath: (p: string) => `/agents
 
 import { asOffline, centralStore, isMachineOff, movedKey, refreshCentral } from '@/next/stores/central';
 import { connectionStore } from '@/next/stores/connection';
-import { conversationsStore, convsCachedStore } from '@/next/stores/conversations';
+import { conversationsStore, convsCachedStore, convsLoadedStore } from '@/next/stores/conversations';
 import type { Conversation } from '@/next/protocol/v2';
 
 const chat = (id: string, machineId: string, at: number) =>
@@ -37,6 +37,7 @@ describe('central history', () => {
     for (const id of [...conversationsStore.keys()]) conversationsStore.delete(id);
     for (const m of [...connectionStore.keys()]) connectionStore.delete(m);
     for (const m of [...convsCachedStore.keys()]) convsCachedStore.delete(m);
+    for (const m of [...convsLoadedStore.keys()]) convsLoadedStore.delete(m);
   });
 
   it('shows a chat of an off machine as stopped and not resumable', () => {
@@ -45,7 +46,9 @@ describe('central history', () => {
     expect(c.queue.count).toBe(0);
   });
 
-  it('puts only the chats of off machines into the list', async () => {
+  it('puts the chats of off machines into the list, not those of a machine whose own list is here', async () => {
+    connectionStore.set('b', { k: 'live' } as never);
+    convsLoadedStore.set('b', true);
     answer(true, ['a'], [chat('tab-1', 'a', 5), chat('tab-2', 'b', 6)]);
     await refreshCentral();
     expect(conversationsStore.get('tab-1')?.state.k).toBe('stopped');
@@ -55,8 +58,19 @@ describe('central history', () => {
     expect(isMachineOff('b')).toBe(false);
   });
 
+  it('draws a machine the cluster still calls online from the copy until its own list comes (HRN-902)', async () => {
+    connectionStore.set('b', { k: 'connecting' } as never);
+    answer(true, [], [chat('tab-2', 'b', 6)]);
+    await refreshCentral();
+    // As the copy has it, not stopped: the machine may only be starting.
+    expect(conversationsStore.get('tab-2')?.state.k).toBe('idle');
+    expect(convsCachedStore.has('b')).toBe(true);
+    expect(isMachineOff('b')).toBe(false);
+  });
+
   it('leaves a machine with a live link to itself', async () => {
     connectionStore.set('a', { k: 'live' } as never);
+    convsLoadedStore.set('a', true);
     answer(true, ['a'], [chat('tab-1', 'a', 5)]);
     await refreshCentral();
     expect(conversationsStore.get('tab-1')).toBeUndefined();

@@ -32,6 +32,7 @@ import (
 
 const (
 	keeperTerminalEvery = 30 * time.Minute
+	keeperTerminalRetry = 30 * time.Second
 	keeperAgentEvery    = 6 * time.Hour
 	keeperClaudePoll    = time.Minute
 	keeperAlertQuiet    = 6 * time.Hour
@@ -53,6 +54,9 @@ type keeper struct {
 	// try runs the agent's scenario on a Claude binary (agentOn); a test brings its own.
 	try   func(binary string) []machineCheck
 	alarm func(key, text string) // alert; a test brings its own
+	// runTerminal runs the terminal's self-test once, sleep waits before it is tried again; nil: the real ones.
+	runTerminal func() []machineCheck
+	sleep       func(time.Duration)
 }
 
 var selfKeeper = &keeper{state: "pending", judged: map[string]bool{}, alerted: map[string]time.Time{}}
@@ -92,12 +96,31 @@ func (k *keeper) alert(key, text string) {
 	}
 }
 
-func (k *keeper) terminal() {
+// terminalOnce runs the terminal's self-test once.
+func (k *keeper) terminalOnce() []machineCheck {
+	if k.runTerminal != nil {
+		return k.runTerminal()
+	}
 	k.run.Lock()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	checks := newSelftest(k.d.Tmux).run(ctx)
-	cancel()
-	k.run.Unlock()
+	defer k.run.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	return newSelftest(k.d.Tmux).run(ctx)
+}
+
+func (k *keeper) terminal() {
+	checks := k.terminalOnce()
+	if bad := selftestFailed(checks); bad != "" {
+		// A failed run is tried again after a pause before the state says fail: the rollout takes a release back on
+		// it, and the first run after a start shares the machine with every tab coming back.
+		agent.Log("warn", "selftest failed once; trying again", agent.F{K: "failed", V: bad})
+		sleep := k.sleep
+		if sleep == nil {
+			sleep = time.Sleep
+		}
+		sleep(keeperTerminalRetry)
+		checks = k.terminalOnce()
+	}
 	prev := k.Selftest()
 	k.setTerminal(checks)
 	if bad := selftestFailed(checks); bad != "" {

@@ -310,7 +310,11 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
       get: (id: string) => get<{ machine: Machine }>(`/api/machines/${enc(id)}`),
       rename: (id: string, name: string) => patch<{ machine: Machine }>(`/api/machines/${enc(id)}`, { name }),
       remove: (id: string) => del(`/api/machines/${enc(id)}`),
-      open: (id: string) => get<{ url: string }>(`/api/machines/${enc(id)}/open`),
+      // path: an address under the machine's page to open (`/m/<id>/…`), else its start.
+      open: (id: string, path?: string) =>
+        get<{ url: string }>(
+          `/api/machines/${enc(id)}/open${path ? `?${new URLSearchParams({ path }).toString()}` : ''}`,
+        ),
       preflight: (id: string) => post<{ preflight: PreflightReport }>(`/api/machines/${enc(id)}/preflight`),
     },
 

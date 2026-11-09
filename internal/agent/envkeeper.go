@@ -34,12 +34,23 @@ const (
 // envItemID is what an item id looks like; it names a folder, so nothing else is let through.
 var envItemID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
-// envHeld is the file: the list and how it went.
+// envHeld is the file: the list and how it went. Hash is the hash of the items (EnvHash), as the runtime's setup reads it;
+// AppsConsent is the organization's rule for apps, which the runtime reads from here too ("" for ask). The hub is
+// told the hash of both (hubproto.EnvSetHash).
 type envHeld struct {
-	Rev     int64                 `json:"rev"`
-	Hash    string                `json:"hash"`
-	Items   []hubproto.EnvItem    `json:"items"`
-	Applied []hubproto.EnvApplied `json:"applied"`
+	Rev         int64                 `json:"rev"`
+	Hash        string                `json:"hash"`
+	AppsConsent string                `json:"appsConsent,omitempty"`
+	Items       []hubproto.EnvItem    `json:"items"`
+	Applied     []hubproto.EnvApplied `json:"applied"`
+}
+
+// setHash is the hash the hub knows the list by: the items' with the rule for apps; "" before the first list.
+func (h envHeld) setHash() string {
+	if h.Hash == "" {
+		return ""
+	}
+	return hubproto.EnvSetHash(h.Hash, h.AppsConsent)
 }
 
 // envKeeper is the list the agent holds.
@@ -80,7 +91,7 @@ func newEnvKeeper(dataDir string) *envKeeper {
 func (k *envKeeper) Held() (int64, string) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	return k.held.Rev, k.held.Hash
+	return k.held.Rev, k.held.setHash()
 }
 
 // State is what the hub is told: the list held and how each item went.
@@ -95,7 +106,7 @@ func (k *envKeeper) stateLocked() hubproto.EnvState {
 	if applied == nil {
 		applied = []hubproto.EnvApplied{}
 	}
-	return hubproto.EnvState{Rev: k.held.Rev, Hash: k.held.Hash, Applied: applied}
+	return hubproto.EnvState{Rev: k.held.Rev, Hash: k.held.setHash(), Applied: applied}
 }
 
 // Set keeps set and applies it. The list is on disk before it counts; an item that cannot be applied does not fail the
@@ -104,19 +115,27 @@ func (k *envKeeper) Set(set hubproto.EnvSet) (hubproto.EnvState, error) {
 	if len(set.Items) > envMaxItems {
 		return hubproto.EnvState{}, fmt.Errorf("too many items")
 	}
-	if hubproto.EnvHash(set.Items) != set.Hash {
+	itemsHash := hubproto.EnvHash(set.Items)
+	if hubproto.EnvSetHash(itemsHash, set.AppsConsent) != set.Hash {
 		return hubproto.EnvState{}, fmt.Errorf("the hash is not the list's")
+	}
+	consent := ""
+	if set.AppsConsent == hubproto.AppsConsentAuto {
+		consent = hubproto.AppsConsentAuto
 	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	if set.Hash == k.held.Hash && k.held.Rev != 0 {
-		k.held.Rev = set.Rev // the same list under a newer revision
+	if itemsHash == k.held.Hash && k.held.Rev != 0 {
+		// The same list under a newer revision, or with another rule for apps: nothing to apply again.
+		old := k.held
+		k.held.Rev, k.held.AppsConsent = set.Rev, consent
 		if err := k.saveLocked(); err != nil {
+			k.held = old
 			return hubproto.EnvState{}, err
 		}
 		return k.stateLocked(), nil
 	}
-	next := envHeld{Rev: set.Rev, Hash: set.Hash, Items: set.Items}
+	next := envHeld{Rev: set.Rev, Hash: itemsHash, AppsConsent: consent, Items: set.Items}
 	next.Applied = k.apply(set.Items)
 	old := k.held
 	k.held = next
@@ -456,10 +475,11 @@ func (h *hub) opEnvSet(req map[string]json.RawMessage) (any, func(), error) {
 	rev, _ := field[int64](req, "rev")
 	hash, _ := field[string](req, "hash")
 	items, _ := field[[]hubproto.EnvItem](req, "items")
+	appsConsent, _ := field[string](req, "appsConsent")
 	if rev <= 0 {
 		return nil, nil, invalid("rev must be a positive number")
 	}
-	st, err := h.environment.Set(hubproto.EnvSet{Rev: rev, Hash: hash, Items: items})
+	st, err := h.environment.Set(hubproto.EnvSet{Rev: rev, Hash: hash, Items: items, AppsConsent: appsConsent})
 	if err != nil {
 		return nil, nil, invalid("the environment list was not taken: %v", err)
 	}

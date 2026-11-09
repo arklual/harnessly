@@ -41,6 +41,7 @@ services:
       # The right pane's browser: 8 preview slots from this port on (docs/deploy.md, "The preview without a gateway").
       RUNTIME_PREVIEW_LISTEN: 0.0.0.0:${HARNESSLY_PREVIEW_PORT:-8023}
       RUNTIME_PREVIEW_PUBLIC_ORIGINS: ${HARNESSLY_PREVIEW_PUBLIC_ORIGINS:-}
+      RUNTIME_PREVIEW_DOMAIN: ${HARNESSLY_PREVIEW_DOMAIN:-}
       RUNTIME_OWNER_NAME: ${HARNESSLY_OWNER_NAME:-}
       # The initial password that signs in to the setup, after which the real one is chosen. Empty: the runtime makes one
       # at start and prints it (docker compose logs harnessly | grep -i password).

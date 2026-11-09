@@ -3,6 +3,7 @@
 // agent's questions to the person inside the app (app.ask) are asked from here while the tab is open.
 import { useState } from 'react';
 import AppFrame from '@/next/features/app-views/app-frame';
+import { ConsentStage } from '@/next/features/app-consent/consent-ask';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import AppAsks from '@/next/features/app-views/asks';
 import AppInspector from '@/next/features/app-views/inspector';
@@ -30,15 +31,17 @@ const AppTab = ({ machine, conversation, app: id, view: viewId, inspect = false 
   if (!app || !view) return <p className="hx-appview__error">{t('next.appview.gone')}</p>;
   return (
     <>
-      <AppFrame
-        machine={machine}
-        app={app}
-        view={view}
-        target="pane"
-        viewPort={list.viewPort}
-        conversation={conversation}
-        reloadToken={reload}
-      />
+      <ConsentStage machine={machine} app={app}>
+        <AppFrame
+          machine={machine}
+          app={app}
+          view={view}
+          target="pane"
+          viewPort={list.viewPort}
+          conversation={conversation}
+          reloadToken={reload}
+        />
+      </ConsentStage>
       {inspect && (
         <AppInspector
           machine={machine}

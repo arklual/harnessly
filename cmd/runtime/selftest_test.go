@@ -31,6 +31,10 @@ type fakePanes struct {
 	createErr  error
 	stuckShell string // the foreground never leaves this
 	keysLost   bool
+	// rcLooks is how many looks at the pane its shell's rc files take: the shell is in the foreground at once, and what
+	// is typed before they end waits for them. queued holds those lines.
+	rcLooks int
+	queued  []string
 }
 
 func (f *fakePanes) Names() tmux.Names { return tmux.Names{Prefix: "hs-"} }
@@ -55,18 +59,47 @@ func (f *fakePanes) Display(string, string) (string, bool) {
 	}
 	return f.fg, true
 }
-func (f *fakePanes) PaneCurrentCommand(string) string { f.mu.Lock(); defer f.mu.Unlock(); return f.fg }
+func (f *fakePanes) PaneCurrentCommand(string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.look()
+	return f.fg
+}
+
+// look is one look at the pane: it is also the time the rc files take.
+func (f *fakePanes) look() {
+	if f.rcLooks == 0 {
+		return
+	}
+	if f.rcLooks--; f.rcLooks == 0 {
+		for _, l := range f.queued {
+			f.typeLine(l)
+		}
+		f.queued = nil
+	}
+}
+
 func (f *fakePanes) SendKeys(_ string, line string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.rcLooks > 0 {
+		f.queued = append(f.queued, line)
+		return nil
+	}
+	f.typeLine(line)
+	return nil
+}
+
+func (f *fakePanes) typeLine(line string) {
 	switch {
 	case f.stuckShell != "":
+	case line == "echo "+selftestReadyTyped:
+		f.screen += "$ " + line + "\n" + selftestReady + "\n"
 	case line == "sleep 30":
 		f.fg = "sleep"
 	case strings.HasPrefix(line, "read hs_answer"):
 		f.waitRead = true
 	}
-	return nil
 }
 func (f *fakePanes) SendRawKeys(_ string, keys string) error {
 	f.mu.Lock()
@@ -88,6 +121,7 @@ func (f *fakePanes) SendRawKeys(_ string, keys string) error {
 func (f *fakePanes) Capture(string) (string, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.look()
 	return f.screen, true
 }
 
@@ -135,10 +169,11 @@ func TestSelftestFailures(t *testing.T) {
 		panes  *fakePanes
 		failed string // the first check that fails; the ones after it are not tried
 	}{
-		"no pane":        {&fakePanes{createErr: errors.New("server exited")}, "pane_shell"},
-		"wrapper seen":   {&fakePanes{fg: "nice"}, "pane_shell"},
-		"program unseen": {&fakePanes{stuckShell: "zsh"}, "pane_program"},
-		"keys lost":      {&fakePanes{keysLost: true}, "pane_program"}, // Ctrl-C is lost first
+		"no pane":           {&fakePanes{createErr: errors.New("server exited")}, "pane_shell"},
+		"wrapper seen":      {&fakePanes{fg: "nice"}, "pane_shell"},
+		"program unseen":    {&fakePanes{stuckShell: "zsh"}, "pane_shell"}, // it answers nothing typed
+		"shell never reads": {&fakePanes{rcLooks: 1 << 30}, "pane_shell"},
+		"keys lost":         {&fakePanes{keysLost: true}, "pane_program"}, // Ctrl-C is lost first
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := selftestByID(fakeSelftest(tc.panes).run(context.Background()))
@@ -149,6 +184,25 @@ func TestSelftestFailures(t *testing.T) {
 				t.Fatal("the throwaway pane was left behind")
 			}
 		})
+	}
+}
+
+// on 1.187.10 the shell's rc files ran ~10 s under the load of a start; the line typed waited for them, and
+// the program's step (8 s) failed. The shell's step waits until the shell answers, and the program's step is the
+// program's alone.
+func TestSelftestWaitsForASlowShell(t *testing.T) {
+	looks := int(12*time.Second/selftestPoll) + 5 // longer than a step's wait, shorter than the shell's
+	p := &fakePanes{fg: "bash", rcLooks: looks}
+	checks := fakeSelftest(p).run(context.Background())
+	if bad := selftestFailed(checks); bad != "" {
+		t.Fatalf("a shell slow to start failed the self-test: %s", bad)
+	}
+}
+
+// The typed line's own echo is not the shell's answer: a shell that never reads fails, though the line is on screen.
+func TestSelftestTypedEchoIsNotTheAnswer(t *testing.T) {
+	if strings.Contains("echo "+selftestReadyTyped, selftestReady) {
+		t.Fatal("the typed line holds the answer it waits for")
 	}
 }
 

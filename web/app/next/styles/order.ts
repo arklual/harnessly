@@ -34,6 +34,7 @@ import '@/next/styles/sinopia.css';
 import '@/next/styles/delegation.css';
 import '@/next/styles/artifacts.css';
 import '@/next/styles/designly.css';
+import '@/next/styles/kit.css';
 import '@/next/styles/annotate.css';
 import '@/next/styles/tab-annotations.css';
 import '@/next/styles/questions.css';

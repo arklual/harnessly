@@ -430,6 +430,8 @@
   "next.settings.checks.disk.hint": "Модели и обновления не поместятся. Свободно и нужно:",
   "next.settings.checks.apps_boundary": "Агент чата с приложениями не отделён от их файлов",
   "next.settings.checks.apps_boundary.hint": "Без bubblewrap агента чата с приложениями удерживают только правила чата: скрипт или python может записать в папку приложений. Поставьте или разрешите его:",
+  "next.settings.checks.preview_dns": "Имена превью не находятся в DNS",
+  "next.settings.checks.preview_dns.hint": "Панель не откроет view по https, хотя превью на машине слушает. Добавьте их в DNS (wildcard-запись на эту машину или её обратный прокси), затем проверьте:",
   "next.settings.checks.pane_shell": "Пустой терминал вкладки не распознаётся",
   "next.settings.checks.pane_shell.hint": "Агент, который закрылся или упал, не перезапустится в своей вкладке сам",
   "next.settings.checks.pane_program": "Запущенный агент не распознаётся",

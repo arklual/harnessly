@@ -39,15 +39,24 @@ func (c *conv) autoOn() (limit, restart bool) {
 	return limit && !c.onProfile(), restart
 }
 
-// limitEnd turns the end of a turn into a failure on the usage limit when its last line is the agent's notice of it.
-func (c *conv) limitEnd(id string, st wire.TurnStatus, failure *wire.TurnFailure) (wire.TurnStatus, *wire.TurnFailure, *feed.Limit) {
+// limitEnd turns the end of a turn into a failure on the usage limit when its last line is the agent's notice of it,
+// or when it failed while the limits say the plan ran out (the composer's «5ч 0%»): Claude fires StopFailure before
+// its refusal is on the transcript, and the hook does not say why the turn failed.
+func (c *conv) limitEnd(id string, st wire.TurnStatus, failure *wire.TurnFailure, now time.Time) (wire.TurnStatus, *wire.TurnFailure, *feed.Limit) {
 	if st == wire.TurnInterrupted {
 		return st, failure, nil
 	}
 	l, detail, ok := c.fd.LimitEnd(id)
 	if !ok {
-		return st, failure, nil
+		if l, ok = c.exhausted(st, failure, now); !ok {
+			return st, failure, nil
+		}
 	}
+	return wire.TurnFailed, limitFailure(l, detail), &l
+}
+
+// limitFailure is a turn's failure on the usage limit l, with the notice's words.
+func limitFailure(l feed.Limit, detail string) *wire.TurnFailure {
 	f := &wire.TurnFailure{Code: wire.TurnFailedRateLimit}
 	if detail != "" {
 		f.Detail = &detail
@@ -56,7 +65,55 @@ func (c *conv) limitEnd(id string, st wire.TurnStatus, failure *wire.TurnFailure
 		at := l.ResetsAt
 		f.RetryAt = &at
 	}
-	return wire.TurnFailed, f, &l
+	return f
+}
+
+// exhausted is the limit a turn that failed for no reason it names ran into: the limits the plan last reported say it
+// ran out and reset later. A vendor's limits are not the plan's; a failure with a cause of its own (the context, the
+// agent gone) is that cause.
+func (c *conv) exhausted(st wire.TurnStatus, failure *wire.TurnFailure, now time.Time) (feed.Limit, bool) {
+	if st != wire.TurnFailed || c.d.LimitReset == nil || c.onProfile() {
+		return feed.Limit{}, false
+	}
+	if failure != nil && failure.Code != wire.TurnFailedUnknown && failure.Code != wire.TurnFailedApiError &&
+		failure.Code != wire.TurnFailedRateLimit {
+		return feed.Limit{}, false
+	}
+	reset := c.d.LimitReset(c.rec.Provider, now)
+	if reset <= ms(now) {
+		return feed.Limit{}, false
+	}
+	return feed.Limit{Window: wire.LimitOther, ResetsAt: reset}, true
+}
+
+// lateLimit holds a chat whose failed turn shows its limit only now: the refusal came onto the transcript after the
+// StopFailure ended the turn. The turn's failure is named again, and the chat waits for the reset.
+func (c *conv) lateLimit(now time.Time) {
+	if c.rec.Limited != nil || c.rec.State.K == wire.StateWorking {
+		return
+	}
+	t := c.fd.LastTurn()
+	if t == nil || t.Status != wire.TurnFailed || t.ID == c.terminalFailureTurn ||
+		t.Failure != nil && t.Failure.Code == wire.TurnFailedRateLimit {
+		return
+	}
+	if t.EndedAt == nil || now.Sub(time.UnixMilli(*t.EndedAt)) > LimitScreenFresh {
+		return
+	}
+	for _, a := range c.rec.AutoContinues {
+		if a.At > *t.EndedAt {
+			return // the chat went on after that turn
+		}
+	}
+	l, detail, ok := c.fd.LimitEnd(t.ID)
+	if !ok {
+		return
+	}
+	if ended, ok := c.fd.Refail(t.ID, limitFailure(l, detail)); ok {
+		c.emit(wire.TurnFailedEv{Turn: ended})
+	}
+	c.hold(l, now)
+	c.lastTurn()
 }
 
 // hold keeps the chat on its usage limit: the queue waits for the reset, and the runtime goes on by itself then

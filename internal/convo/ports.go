@@ -46,8 +46,9 @@ type Profiles interface {
 	Lookup(id string) (via wire.Provider, configured bool, models []string, ok bool)
 	// Model is the capability record a choice's effort is checked against.
 	Model(profile, model string) (wire.AgentModel, bool)
-	// OwnsModel says whether the id is a model of some profile: a conversation on the CLI's own account is not started on
-	// it or switched to it.
+	// OwnsModel says whether the id is a model of some profile, configured or not. A conversation on the CLI's own account
+	// is not started on it or switched to it unless that account lists the id too (Deps.vendorOnly): Codex signed in with
+	// ChatGPT has the ids of the built-in GPT profile as its own.
 	OwnsModel(model string) bool
 	// Window is the context window of a model of the profile, in tokens; 0 when the profile or the model is not known.
 	Window(profile, model string) int

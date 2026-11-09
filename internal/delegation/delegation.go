@@ -631,6 +631,11 @@ func (s *Service) judge(rec wire.Conversation, page Page) (held, proceed bool) {
 		s.Book.Update(rec.ID, func(p *Page) { p.Judged = key })
 		return true, true
 	}
+	if rec.Limited != nil {
+		// Held on its usage limit: the chat goes on by itself at the reset; a reminder now is one more
+		// refusal, and the turn is judged once the chat ends one after the reset.
+		return false, false
+	}
 	if !page.Contract || rec.LastTurn.Status == wire.TurnInterrupted {
 		// Chats from before the rules, and a turn the person cut with Esc, are taken as they end.
 		s.Book.Update(rec.ID, func(p *Page) { p.Judged, p.HeldAt = key, 0 })

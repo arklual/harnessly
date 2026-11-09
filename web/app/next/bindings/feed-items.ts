@@ -471,13 +471,19 @@ export class ItemsBuilder {
     const woke = promptEntry?.t === 'subagent' ? promptEntry : null;
     const peer = promptEntry?.t === 'peer' ? promptEntry : null;
     const note = promptEntry?.t === 'notice' ? promptEntry : null;
-    const entries = view.entryIds
+    const held = view.entryIds
       .filter((x) => x !== id && x !== turn.answerEntryId)
       .map((x) => entryStore.get(key(this.conv, x)))
       .filter((e): e is Entry => e !== undefined);
+    // The steps the turn counts that the page holds: its opener when an agent's return woke it, its answer, the rest
+    // but the person's messages steered into it (no step of the count).
+    const counted = held.filter((e) => e.t !== 'user').length + (woke ? 1 : 0) + (answer ? 1 : 0);
+    const partial = turn.status !== 'live' && held.length > 0 && counted < turn.stepCount;
+    // «Stopped» is said under the turn (TurnEnd): the transcript's interrupt line is no step to draw.
+    const entries: Entry[] = held.filter((e) => e.t !== 'interrupt');
     entries.push(...this.unmarkedGates(id, entries));
     // A finished turn that has steps but none loaded yet is folded with its answer only: they load when it unfolds.
-    const notLoaded = turn.status !== 'live' && turn.stepCount - (woke ? 1 : 0) > 0 && entries.length === 0;
+    const notLoaded = turn.status !== 'live' && turn.stepCount - (woke ? 1 : 0) > 0 && held.length === 0;
     const steps = notLoaded ? null : entries;
     const nowOfTurn = now && now.turnId === id ? now : null;
     const wait = stalled ? 'machine' : null;
@@ -516,6 +522,7 @@ export class ItemsBuilder {
       now: nowOfTurn,
       wait,
       endNote: null,
+      ...(partial && { partial }),
       ...(auto && { auto }),
       ...(cleared && { cleared }),
     };

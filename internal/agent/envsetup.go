@@ -103,7 +103,9 @@ func (h *hub) writeSetupAllow() bool {
 // setupChanged: whether the machine may be set up, or how the runtime did, changed. The items' outcomes are worked out
 // again and the hub told; when what `hello` offers changed too, the link calls again so the hub hears the new features
 // (it sends the setup kinds only to a machine that offers them).
-func (h *hub) setupChanged() {
+// settle is false for the operator's word (the policy): the link calls again at once. A change of the runtime's
+// heartbeat waits for relinkSettle.
+func (h *hub) setupChanged(settle bool) {
 	if h.environment.Reapply() {
 		h.emit(hubproto.EventEnvState, "state", h.environment.State())
 	}
@@ -111,11 +113,43 @@ func (h *hub) setupChanged() {
 	said := h.setupSaid
 	h.mu.Unlock()
 	if h.setupOffered() != said {
+		h.relinkSoon(settle)
+	}
+}
+
+// relinkSettle is how long a change of what this machine offers must hold before the link calls the hub again. Every
+// call cuts the streams the pages read through the link; a runtime that starts, or one busy with a long run, flips the
+// offer back and forth, and six calls in seven minutes after a reboot left the chats unreadable.
+var relinkSettle = 30 * time.Second
+
+// relinkSoon asks for one call of the hub once the offer has settled: the changes until then are told by that one
+// call, and none at all when the offer is back to what the last `hello` said.
+func (h *hub) relinkSoon(settle bool) {
+	wait := relinkSettle
+	if !settle {
+		wait = 0
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.relinkWait != nil {
+		if wait == 0 {
+			h.relinkWait.Reset(0)
+		}
+		return
+	}
+	h.relinkWait = time.AfterFunc(wait, func() {
+		h.mu.Lock()
+		h.relinkWait = nil
+		said := h.setupSaid
+		h.mu.Unlock()
+		if h.setupOffered() == said {
+			return
+		}
 		select {
 		case h.relink <- struct{}{}:
 		default:
 		}
-	}
+	})
 }
 
 func mustMarshal(v any) []byte { raw, _ := json.Marshal(v); return raw }
@@ -132,13 +166,14 @@ func (h *hub) watchEnvSetup(ctx context.Context) {
 			return
 		case <-t.C:
 		}
-		changed := h.writeSetupAllow()
+		allowed := h.writeSetupAllow()
+		beat := false
 		if alive := h.runnerAlive(); alive != h.environment.aliveSeen {
-			h.environment.aliveSeen, changed = alive, true
+			h.environment.aliveSeen, beat = alive, true
 		}
-		if sig := h.environment.setupFileSig(); sig != last || changed {
+		if sig := h.environment.setupFileSig(); sig != last || allowed || beat {
 			last = sig
-			h.setupChanged()
+			h.setupChanged(!allowed)
 		}
 		h.shipRuns(false)
 	}

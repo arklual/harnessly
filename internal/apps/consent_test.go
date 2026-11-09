@@ -379,3 +379,33 @@ func TestDevFolderReadFailsClosed(t *testing.T) {
 		t.Fatal("an unreadable dev folder must wait, not run with what it had")
 	}
 }
+
+// The chat whose agent installed an app is where its consent card shows: an install from a chat names it, an
+// update from outside a chat keeps it, an update that grows from another chat moves it there.
+func TestConsentRemembersTheChatThatAsked(t *testing.T) {
+	r := &Registry{Root: t.TempDir()}
+	got, _, err := r.Install(pkgWith(t, "example.files", "1.0.0", "files.read:src/**"), InstallOptions{Consent: ConsentAsk, AskedIn: "chat-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AskedIn != "chat-a" {
+		t.Fatalf("askedIn %q, want chat-a", got.AskedIn)
+	}
+	if _, err := r.Consent("example.files", "1.0.0", got.Wants, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err = r.Install(pkgWith(t, "example.files", "1.1.0", "files.read:src/**"), InstallOptions{Consent: ConsentAsk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AskedIn != "chat-a" {
+		t.Fatalf("an update from outside a chat dropped the chat: %q", got.AskedIn)
+	}
+	got, _, err = r.Install(pkgWith(t, "example.files", "1.2.0", "files.read:src/**", "files.write:src/**"), InstallOptions{Consent: ConsentAsk, AskedIn: "chat-b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Pending == nil || got.AskedIn != "chat-b" {
+		t.Fatalf("a growing update from chat-b: pending %v, askedIn %q", got.Pending != nil, got.AskedIn)
+	}
+}

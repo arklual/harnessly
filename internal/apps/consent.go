@@ -17,6 +17,11 @@ import (
 //   - an update that reaches no more goes on as before, a narrowing silently.
 //
 // Installs made before consent was asked keep what they had (Grant nil): rights are never taken back after the fact.
+//
+// The organization's rule «Не спрашивать разрешений» stands for the person's word: with it on (SetConsentPolicy
+// says so), what would wait gets its rights at once, and what waited when the rule came on is granted by GrantWaiting.
+// The rule comes only from the hub, where only the organization's admin changes it by a person's session, so an agent
+// cannot turn it on from the machine. Turned off, it takes nothing back: the next asks wait for the person again.
 
 // ConsentFrom is whose word an install carries.
 type ConsentFrom int
@@ -29,12 +34,91 @@ const (
 	ConsentGiven
 	// ConsentAsk: nobody agreed yet (the CLI, a channel's sync): rights not agreed before wait for the person.
 	ConsentAsk
+	// ConsentPolicy: the organization's rule gives the app what it asks for (an install that would be ConsentAsk while
+	// the rule is on). The journal says so: consent.policy.
+	ConsentPolicy
 )
+
+// JournalConsentPolicy is the journal's line of rights given by the organization's rule; its detail is the version.
+const JournalConsentPolicy = "consent.policy"
 
 // Grant is what the person agreed to.
 type Grant struct {
 	Keys []string `json:"keys"`
 	At   int64    `json:"at"`
+	// Policy: the rights were given by the organization's rule, not by a click.
+	Policy bool `json:"policy,omitempty"`
+}
+
+// SetConsentPolicy sets what says whether the organization's rule «Не спрашивать разрешений» is on; nil (the default,
+// a machine without a hub) asks the person. It is called with the registry's lock held, so it must not use the registry.
+func (r *Registry) SetConsentPolicy(on func() bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.consentPolicy = on
+}
+
+func (r *Registry) policyOnLocked() bool { return r.consentPolicy != nil && r.consentPolicy() }
+
+// GrantWaiting gives what waits for the person its rights by the organization's rule: a pending update takes the place
+// of the running version, a first install or a dev folder that grew is turned on. It is called when the rule comes on
+// and, while it is on, for the dev folders that grow; with the rule off it does nothing. Each grant is in the journal.
+func (r *Registry) GrantWaiting(now time.Time) ([]Installed, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.policyOnLocked() {
+		return nil, nil
+	}
+	list, err := r.read()
+	if err != nil {
+		return nil, err
+	}
+	at := now.UnixMilli()
+	var granted []Installed
+	var dropped [][2]Installed
+	for i, a := range list {
+		switch {
+		case a.Pending != nil:
+			wants, ok := a.Pending.wants()
+			if !ok {
+				continue
+			}
+			next := *a.Pending
+			next.InstalledAt, next.Off, next.AskedIn = a.InstalledAt, a.Off, a.AskedIn
+			if a.Version != next.Version {
+				next.Previous = a.Version
+			} else {
+				next.Previous = a.Previous
+			}
+			next.Wants = wants
+			next.Grant = &Grant{Keys: slices.Clone(wants), At: at, Policy: true}
+			list[i] = next
+			granted = append(granted, next)
+			dropped = append(dropped, [2]Installed{a, next})
+		case a.NeedsConsent():
+			wants, ok := a.wants()
+			if !ok {
+				continue
+			}
+			a.Wants = wants
+			a.Grant = &Grant{Keys: slices.Clone(wants), At: at, Policy: true}
+			list[i] = a
+			granted = append(granted, a)
+		}
+	}
+	if len(granted) == 0 {
+		return nil, nil
+	}
+	if err := r.write(list); err != nil {
+		return nil, err
+	}
+	for _, d := range dropped {
+		r.dropCopy(d[0], d[1])
+	}
+	for _, a := range granted {
+		_ = r.Journal(a.ID, JournalEntry{At: at, What: JournalConsentPolicy, Class: ClassHigh, OK: true, Detail: a.Version})
+	}
+	return granted, nil
 }
 
 var (
@@ -108,6 +192,8 @@ func grantFor(from ConsentFrom, old *Installed, wants []string, at int64) *Grant
 	switch from {
 	case ConsentGiven:
 		return &Grant{Keys: slices.Clone(wants), At: at}
+	case ConsentPolicy:
+		return &Grant{Keys: slices.Clone(wants), At: at, Policy: true}
 	case ConsentAsk:
 		if old == nil {
 			if len(wants) == 0 {
@@ -225,4 +311,57 @@ func (r *Registry) SetOff(id string, off bool) error {
 	}
 	list[i].Off = off
 	return r.write(list)
+}
+
+// LiveManifest is the manifest the install runs now: a dev install's folder as it is (the author edits it after the
+// install, and NeedsConsent reads it from there), any other install the manifest it was installed with. A dev folder
+// that cannot be read leaves the installed one.
+func (a Installed) LiveManifest() *Manifest {
+	if a.Dev {
+		if pkg, _ := CachedPackage(a.Dir); pkg != nil && pkg.Manifest != nil {
+			return pkg.Manifest
+		}
+	}
+	return a.Manifest
+}
+
+// AccessNow is everything the install reaches now, as the install screen lists it: what a click on it grants. It is
+// read from where NeedsConsent reads, so the screen never shows less than the consent asks for.
+func (a Installed) AccessNow() []Access {
+	pkg, _ := CachedPackage(a.Dir)
+	return AccessOf(a.LiveManifest(), pkg)
+}
+
+// WaitingAccess is what waits for the person's word: what an install kept off reaches beyond what was granted, or
+// what a waiting update adds; empty when nothing waits.
+func (a Installed) WaitingAccess() []Access {
+	switch {
+	case a.NeedsConsent():
+		granted := []string{}
+		if a.Grant != nil {
+			granted = a.Grant.Keys
+		} else if a.Dev && a.Wants != nil {
+			granted = a.Wants
+		}
+		return NewAccess(a.AccessNow(), granted)
+	case a.Pending != nil:
+		next, _ := CachedPackage(a.Pending.Dir)
+		return NewAccess(AccessOf(a.Pending.LiveManifest(), next), a.granted())
+	}
+	return []Access{}
+}
+
+// AccessCodes are the codes of a list, as the manifest writes them: what a line of the CLI names.
+func AccessCodes(list []Access) []string {
+	out := make([]string, 0, len(list))
+	for _, x := range list {
+		out = append(out, x.Code)
+	}
+	return out
+}
+
+// ConsentWhere says where the person gives the word an app waits for: only a click of theirs in the host's page, since
+// the CLI is every agent's too.
+func ConsentWhere(id string) string {
+	return "the person agrees in harnessly's page: «Приложения» → " + id + " → «Посмотреть доступы»"
 }
