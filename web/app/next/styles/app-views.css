@@ -239,3 +239,8 @@
 .hx-keptframe > .hx-consentstage {
   flex: 1;
 }
+/* On the app's page the view's box has rounded corners: the view over it keeps them. */
+.hx-keptframe[data-target='app'] {
+  border-radius: calc(var(--hx-radius-lg) - 1px);
+  overflow: hidden;
+}
