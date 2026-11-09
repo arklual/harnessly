@@ -193,14 +193,86 @@
   display: flex;
   flex-direction: column;
 }
+/* The window grows by any edge or corner: thin strips along the edges, squares at the corners, over what is inside
+   (the chat's field at the foot would cover them otherwise). The corner at the foot on the right shows a grip. */
 .hx-appmain__float-size {
   position: absolute;
+  z-index: 20;
+  touch-action: none;
+}
+.hx-appmain__float-size[data-edge='n'],
+.hx-appmain__float-size[data-edge='s'] {
+  left: 14px;
+  right: 14px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.hx-appmain__float-size[data-edge='e'],
+.hx-appmain__float-size[data-edge='w'] {
+  top: 14px;
+  bottom: 14px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.hx-appmain__float-size[data-edge='n'] {
+  top: 0;
+}
+.hx-appmain__float-size[data-edge='s'] {
+  bottom: 0;
+}
+.hx-appmain__float-size[data-edge='e'] {
+  right: 0;
+}
+.hx-appmain__float-size[data-edge='w'] {
+  left: 0;
+}
+.hx-appmain__float-size[data-edge='ne'],
+.hx-appmain__float-size[data-edge='nw'],
+.hx-appmain__float-size[data-edge='se'],
+.hx-appmain__float-size[data-edge='sw'] {
+  width: 16px;
+  height: 16px;
+}
+.hx-appmain__float-size[data-edge='ne'] {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.hx-appmain__float-size[data-edge='nw'] {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.hx-appmain__float-size[data-edge='se'] {
   right: 0;
   bottom: 0;
-  width: 18px;
-  height: 18px;
   cursor: nwse-resize;
-  touch-action: none;
+}
+.hx-appmain__float-size[data-edge='sw'] {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+/* the grip: two short diagonal strokes in the corner */
+.hx-appmain__float-size[data-edge='se']::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(
+    135deg,
+    transparent 0 45%,
+    var(--hx-fg-3) 45% 55%,
+    transparent 55% 70%,
+    var(--hx-fg-3) 70% 80%,
+    transparent 80%
+  );
+  opacity: 0.6;
+}
+.hx-appmain__float-size[data-edge='se']:hover::after {
+  opacity: 1;
 }
 
 /* the chat's field alone, at the foot */

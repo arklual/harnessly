@@ -6,6 +6,7 @@ import {
   FLOAT_MIN,
   parseLayout,
   PLACEMENT,
+  resizeFloat,
   withPlacement,
 } from '@/next/features/app-main/placement';
 
@@ -68,5 +69,21 @@ describe('withPlacement', () => {
     expect(
       withPlacement({ placement: PLACEMENT.float, float: null }, PLACEMENT.left, SECTION).float,
     ).toBeNull();
+  });
+});
+
+describe('resizeFloat', () => {
+  const section = { width: 1200, height: 800 };
+  const f = { x: 400, y: 100, w: 400, h: 400 };
+  it('grows by the right and the foot, keeping the other edges', () => {
+    expect(resizeFloat(f, 'se', 50, 30, section)).toEqual({ x: 400, y: 100, w: 450, h: 430 });
+  });
+  it('grows by the left and the top, the right and the foot staying where they were', () => {
+    expect(resizeFloat(f, 'nw', -50, -40, section)).toEqual({ x: 350, y: 60, w: 450, h: 440 });
+  });
+  it('stops at the minimum size and at the section', () => {
+    expect(resizeFloat(f, 'w', 300, 0, section)).toEqual({ x: 500, y: 100, w: 300, h: 400 });
+    expect(resizeFloat(f, 'n', 0, -500, section)).toEqual({ x: 400, y: 12, w: 400, h: 488 });
+    expect(resizeFloat(f, 'e', 2000, 0, section)).toEqual({ x: 400, y: 100, w: 788, h: 400 });
   });
 });
