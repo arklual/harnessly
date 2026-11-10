@@ -233,7 +233,7 @@ func TestV2FilesOpenAFileATurnTouchedOutsideTheFolder(t *testing.T) {
 	}
 }
 
-// HRN-630: a file handed over with deliver_file opens from its card although it lies outside the folder (in /tmp); no
+// a file handed over with deliver_file opens from its card although it lies outside the folder (in /tmp); no
 // other file there does, and neither does the file once a link or other bytes took its place.
 func TestV2FilesOpenADeliveredFileOutsideTheFolder(t *testing.T) {
 	cwd, tmp := t.TempDir(), t.TempDir()

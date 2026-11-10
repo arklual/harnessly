@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// HRN-879: the cluster's copy gets a tool's whole output, so «show all» opens with the machine off.
+// the cluster's copy gets a tool's whole output, so «show all» opens with the machine off.
 func TestReplicaSendsTheWholeOutputOfACutToolOnce(t *testing.T) {
 	g := newReplicaRig(t)
 	g.r.outQ = make(chan outputJob, outputQueue)

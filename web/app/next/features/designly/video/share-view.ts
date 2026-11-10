@@ -41,10 +41,10 @@ export const readVideoLinkView = (view: unknown): { stats: boolean; format: TVid
   return { stats: view.stats === true, format: format as TVideoFormat | null };
 };
 
-/** The video starts by itself on the guest page (muted, as browsers allow it) — the link's «Автозапуск» (HRN-675). */
+/** The video starts by itself on the guest page (muted, as browsers allow it) — the link's «Автозапуск». */
 export const autoplayOn = (view: unknown): boolean => isRecord(view) && view.autoplay === true;
 
-/** Comments show on the timeline unless the link turned them off (HRN-675); an older link has them. */
+/** Comments show on the timeline unless the link turned them off; an older link has them. */
 export const timelineCommentsOn = (view: unknown): boolean => !isRecord(view) || view.tlComments !== false;
 
 /** The format a guest starts in: the link's, if it is published; else 16:9 when it is; else the first published one. Null when nothing is. */

@@ -1,4 +1,4 @@
-// The SDK of a builtin app (HRN-808): an app of the host's own (Sinopia) runs in the host's page, not in a frame, and
+// The SDK of a builtin app: an app of the host's own (Sinopia) runs in the host's page, not in a frame, and
 // reaches the host only through this — the bridge's own methods, rights and checks, called in the same process. Its
 // manifest (internal/apps/builtin/<app>/harnessly/app.json, read here from surface.gen.ts) names its rights, and a
 // method it has no right to is refused the same way a frame's is.

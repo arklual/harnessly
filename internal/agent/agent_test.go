@@ -196,7 +196,7 @@ func TestStatePut(t *testing.T) {
 	if res, err := s.Put("keybindings.json", `{"k":1}`, nil, "", false); err != nil || !res.Written {
 		t.Fatalf("owned file: %+v %v", res, err)
 	}
-	// HRN-882: the pins and projects are the cluster's: its copy lands where the runtime reads them.
+	// the pins and projects are the cluster's: its copy lands where the runtime reads them.
 	if res, err := s.Put(OrganizerFile, `{"version":1,"pins":["chat:abcdefgh"]}`, nil, "", false); err != nil || !res.Written {
 		t.Fatalf("the organizer: %+v %v", res, err)
 	}

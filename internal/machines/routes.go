@@ -62,7 +62,7 @@ type Health struct {
 	// Alive says whether the runtime as a whole is up (the previous runtime answers on its port): a runtime that is
 	// down must look down to the rollout and the cluster.
 	Alive func() bool
-	// Selftest is the machine's self-test: pending, pass or fail (HRN-795); nil leaves it out.
+	// Selftest is the machine's self-test: pending, pass or fail; nil leaves it out.
 	Selftest func() string
 }
 

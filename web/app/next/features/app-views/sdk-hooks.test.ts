@@ -1,4 +1,4 @@
-// The agent's hooks of an app (HRN-852): the SDK in a frame, the real bridge; the view's word on the agent's call goes
+// The agent's hooks of an app: the SDK in a frame, the real bridge; the view's word on the agent's call goes
 // back as the call's answer, the first stop wins, contexts add up, and the view acts in the agent's turn meanwhile.
 import { describe, expect, it, vi } from 'vitest';
 import { AppBridge, type IBridgeHandlers, type IViewContext } from '@/next/features/app-views/bridge';

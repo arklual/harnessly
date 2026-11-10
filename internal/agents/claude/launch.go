@@ -179,7 +179,7 @@ var ClaudePermissionModes = map[wire.PermissionMode]string{
 	wire.PermissionBypass: "bypassPermissions",
 }
 
-// permissionFlags are how the launch's Claude asks before it acts. A launch that names a permission mode (HRN-945)
+// permissionFlags are how the launch's Claude asks before it acts. A launch that names a permission mode
 // starts in it with --permission-mode, whatever the person's settings say (a `defaultMode` of theirs used to start a
 // chat in plan mode). Never with --allow-dangerously-skip-permissions: Claude Code counts such a session as started
 // with bypass, and its plan mode then «won't ask before most edits or commands». Without a mode the machine's default
@@ -306,7 +306,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	settings := c.HooksPath
 	// settingsFile is the same file unquoted, for the apps' file to extend.
 	settingsFile := c.HooksPath
-	// lineEnv are the profile's own words of the launch line's environment (the GPT chat's pane header, HRN-945).
+	// lineEnv are the profile's own words of the launch line's environment (the GPT chat's pane header).
 	lineEnv := ""
 	if launch != nil && launch.Profile != "" {
 		// The profile's settings file is the hooks file plus the vendor's address, models and key helper. Claude Code
@@ -340,7 +340,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 		}
 		settings, settingsFile = path, path
 	}
-	// Fast mode is a setting too (HRN-945): a launch that names its modes says it either way, so a `fastMode` the person's
+	// Fast mode is a setting too: a launch that names its modes says it either way, so a `fastMode` the person's
 	// own settings keep (Claude Code saves /fast there) does not decide it. A profile's model has no fast mode.
 	if launch != nil && launch.Profile == "" && (launch.Fast || launch.Permission != "") {
 		path, err := FastSettings(settingsFile, launch.Fast)
@@ -431,7 +431,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	return strings.Join(parts, " "), strings.TrimSpace(lineEnv + " " + apps.Env + " " + apps.Wrap), nil
 }
 
-// journalLaunch writes down an agent's launch with the MCP servers it is given, by their names (HRN-976): an agent
+// journalLaunch writes down an agent's launch with the MCP servers it is given, by their names: an agent
 // that misses a tool reads in the journal whether it got the server at all.
 func journalLaunch(launch *agents.Launch, configs ...string) {
 	var names []string

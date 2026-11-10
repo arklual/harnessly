@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { CELLS, startStack, type CellName, type Stack } from './stack';
 
-// One person's whole way through the hub, on a real hub, agent and runtime (HRN-761): sign up, an organization and its
+// One person's whole way through the hub, on a real hub, agent and runtime: sign up, an organization and its
 // tenant, a team, an invitation to a second person, a machine connected by code, its page opened, a first chat with a
 // stand-in for the agent, sign out and in again, a switch between organizations. The same steps in every cell of the
 // matrix (E2E_CELL); what a cell does not have (organizations off, no provider) is said, not passed silently.

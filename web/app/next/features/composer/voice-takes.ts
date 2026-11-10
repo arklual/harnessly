@@ -218,7 +218,7 @@ export const dropTake = (id: string) => {
 
 /**
  * Whether a take waits over the field of `scope`: the one it was recorded in. A take kept before takes had a field waits
- * over the start page's (`home`), not over every chat of the machine (HRN-674).
+ * over the start page's (`home`), not over every chat of the machine.
  */
 export const takeIn = (take: VoiceTake, scope: string | null, home: string): boolean => {
   if (scope === null) return false;

@@ -24,6 +24,8 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "sandbox-exec:", err)
 		os.Exit(1)
 	}
+	// The tests hold the permissions as they are when on; the ones of the switch turn them off (permissions_test.go).
+	SetPermissions(true)
 	os.Exit(m.Run())
 }
 
@@ -502,7 +504,7 @@ func TestSSHConfigMask(t *testing.T) {
 	}
 }
 
-// HRN-621. A launch line waiting in its file runs outside the wall: an agent must not reach it.
+// A launch line waiting in its file runs outside the wall: an agent must not reach it.
 func TestSealHidesWaitingLaunchLines(t *testing.T) {
 	if slices.Contains(dataReadonly, "launch-lines") || slices.Contains(dataWritable, "launch-lines") {
 		t.Fatal("launch-lines is on the seal's list")

@@ -1,4 +1,4 @@
-// How a phone or a tablet of an open design is drawn (HRN-674): its case, the status bar, and whether the page is touched
+// How a phone or a tablet of an open design is drawn: its case, the status bar, and whether the page is touched
 // rather than pointed at (no hover, as on the device). The person's own choice for every design, kept per browser; the
 // browser's bars and the turn are the design's own (view-memory.ts).
 import { useSyncExternalStore } from 'react';

@@ -1,6 +1,6 @@
 // The chat's folder (.hx-disk): crumbs from the folder's root, folders first, then files; a text file opens in place
 // in the editor the binding hands over, the crumbs lead back. What cannot be shown (a picture, a binary) says why.
-// Any entry is saved from its row, the folder on screen as one zip, and several picked entries as one zip (HRN-679).
+// Any entry is saved from its row, the folder on screen as one zip, and several picked entries as one zip.
 // «Машина» is the same list over the whole workspace (what «Диск» was): absolute paths, crumbs up to the place the
 // folder lies in, and above them the places themselves. Files are sent into the folder on screen, picked or dropped.
 import {

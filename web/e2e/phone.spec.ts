@@ -1,4 +1,4 @@
-// The interface on a phone (390 px, touch) on a runtime of its own (HRN-510): a video project opened in the chat's pane
+// The interface on a phone (390 px, touch) on a runtime of its own: a video project opened in the chat's pane
 // draws its player and its scenes, the pane's strip is one row of equal chips, the tools home keeps its search field
 // opaque over what scrolls under it, and «Сделано в этом чате» names its documents and shows each once.
 import { execFileSync } from 'node:child_process';

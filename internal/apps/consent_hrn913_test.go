@@ -23,7 +23,7 @@ func growRights(t *testing.T, dir string, rights ...string) {
 	}
 }
 
-// HRN-913: a dev install that asked for nothing and then gained a right in its folder waits, and its screen lists the
+// a dev install that asked for nothing and then gained a right in its folder waits, and its screen lists the
 // right it waits for (it listed nothing: the manifest kept at install time), so the click on it is taken.
 func TestDevGrownScreenShowsWhatWaits(t *testing.T) {
 	r := &Registry{Root: t.TempDir()}

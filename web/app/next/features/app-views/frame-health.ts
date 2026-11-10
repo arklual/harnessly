@@ -1,7 +1,7 @@
 // Is an app's view up? The frame's `load` says only that some document arrived (a 404 page loads too, a script that
 // failed leaves a loaded, empty page), so «готово» is the SDK's handshake, and nothing else. Three states: the frame
 // loads, the view is ready, or it did not start, with the reason in words. Pure, so the machine is tested apart from
-// the frame (HRN-922).
+// the frame.
 
 /** How long a view has to make its handshake before it is called «не запустилось». */
 export const HANDSHAKE_WAIT_MS = 8000;

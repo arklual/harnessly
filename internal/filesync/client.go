@@ -131,7 +131,7 @@ func (c *Client) GetBlob(ctx context.Context, sha string, w io.Writer) error {
 }
 
 // ErrRefused is a write the store does not take from this machine: the path is in a project none of the machine's
-// people may edit (HRN-880).
+// people may edit.
 var ErrRefused = errors.New("the store refuses this machine's write")
 
 // Commit asks for a new revision; a stale base answers Conflict with the current revision.
@@ -172,6 +172,20 @@ func (c *Client) Changes(ctx context.Context, since int64, wait time.Duration) (
 	}
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	return out, err
+}
+
+// Keys is the room key of a profile room as wrapped for each member that has it.
+func (c *Client) Keys(ctx context.Context) ([]filestore.WrappedKey, error) {
+	resp, err := c.do(ctx, http.MethodGet, "/keys", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, failure(resp)
+	}
+	var out filestore.WrappedKeys
+	return out.Keys, json.NewDecoder(resp.Body).Decode(&out)
 }
 
 // Current is the latest revision of a path, nil when the path never existed.

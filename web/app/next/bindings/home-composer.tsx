@@ -75,7 +75,7 @@ interface IHomeComposerProps {
   onCreated: (id: ConvId) => void;
   /** The machine the chat starts on, picked in the model's popover; its agents are this machine's. */
   machines?: IModelPickerProps['machine'];
-  /** Not one of the person's machines answers: a warning over the field (HRN-870). */
+  /** Not one of the person's machines answers: a warning over the field. */
   allMachinesOff?: boolean;
   /** Over the field, inside the dock: the greeting, which stays over the field's top edge however the dock moves. */
   above?: ReactNode;

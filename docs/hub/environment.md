@@ -353,7 +353,7 @@ rev; a list whose hash does not match its items is refused (`invalid`). An obser
 accepts `env.set` too and keeps the list in its own folder (`<data>/hub/`); its budget, tunnel and policy stay closed.
 Item ids must match `[A-Za-z0-9_-]{1,64}`, at most 500 items, a source at most 256 KiB.
 
-**The rule for apps** (`Org.appsConsent`, HRN-915). An organization's admin switches «Не спрашивать разрешений у
+**The rule for apps** (`Org.appsConsent`). An organization's admin switches «Не спрашивать разрешений у
 приложений» on the organization's screen (`PATCH /api/orgs/{org}` `{appsConsent: 'auto' | 'ask'}`, a person's session
 only: no machine's or agent's token reaches the orgs API). The rule rides on `env.set` as `appsConsent: 'auto'` to an
 agent whose `hello.features` has `environment.apps-consent`; then `hash` is `hubproto.EnvSetHash(EnvHash(items),

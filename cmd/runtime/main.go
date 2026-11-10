@@ -135,7 +135,7 @@ type runtimeGate struct {
 	envSetup []*envsetup.Runner
 	// library is the folder of the Sinopia library, store the store it syncs with (nil: none, docs/hub/store.md).
 	library func() string
-	// revisions makes the store's revisions the Sinopia library's history (HRN-880).
+	// revisions makes the store's revisions the Sinopia library's history.
 	revisions func(design.Revisions)
 	store     *storelink.Link
 }
@@ -193,7 +193,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	})
 	tmuxNames = tm
 	hooks := hookConfigFromEnv(configFile)
-	// HRN-621: off the seal's list (internal/apps/seal.go), so no wall shows it.
+	// off the seal's list (internal/apps/seal.go), so no wall shows it.
 	agents.SetLineDir(filepath.Join(cfg.DataDir, "launch-lines"))
 	pusher := newSharedPusher(cfg.DataDir, hooks)
 	ref.c = newCore(coreConfig{DataDir: cfg.DataDir, Home: home, Tmux: tm, Term: terms,
@@ -477,7 +477,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	liveBrowser := newLiveBrowser(d)
 	defer liveBrowser.Close()
 	f.Add(liveBrowserRoutes(d, liveBrowser)...)
-	// Before the JSON routes: the GET stream of the apps' MCP server shares the MCP route's path (HRN-975).
+	// Before the JSON routes: the GET stream of the apps' MCP server shares the MCP route's path.
 	f.Add(appToolStreamRoutes(d)...)
 	for _, group := range routeGroups {
 		f.Add(f.AsRoutes(group(d)...)...)
@@ -577,6 +577,8 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
+	// The apps' permissions, off unless RUNTIME_APPS_PERMISSIONS=on (internal/apps permissions.go).
+	apps.PermissionsFromEnv()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	profileOnSignal(filepath.Join(cfg.DataDir, "debug"))
@@ -608,7 +610,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		defer alone.stop()
 		alone.files(port, nil)
 	}
-	// The journal first: the routes built next write to it (HRN-976).
+	// The journal first: the routes built next write to it.
 	if jl := openJournal(cfg.DataDir); jl != nil {
 		defer jl.Close()
 	}
@@ -637,7 +639,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	terms := f.terms
 	var confined http.Handler = confineAgentToken(&gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}, f)
-	// Every request of the runtime passes the journal (HRN-976): a failure, a change or a slow read is a line of it.
+	// Every request of the runtime passes the journal: a failure, a change or a slow read is a line of it.
 	confined = journal.HTTP(confined, journal.HTTPOptions{Quiet: journalQuiet})
 	handler := confined
 	if cfg.Standalone() {

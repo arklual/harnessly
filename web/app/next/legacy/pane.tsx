@@ -46,7 +46,7 @@ const TOOLS = [
 ] as const satisfies readonly { kind: TPaneTabKind; group: string }[];
 
 /** Legacy's tabs the design has no place for: one left open in Legacy does not come over. «Диск» is the pane's «Файлы»
- *  on the machine now (HRN-679). */
+ *  on the machine now. */
 const GONE: ReadonlySet<TPaneTabKind> = new Set(['overview', 'design', 'app', 'disk']);
 
 /** Legacy's tabs the new pane has tools of its own for: what Legacy's pane gets for them is handed over. */

@@ -253,7 +253,7 @@ func (o *OpLog) Clear() {
 }
 
 // journalCmd tells the journal's line of a command its op, the chat it is about and, for a refusal, its code: a refusal
-// answers 200, and is a warning of the journal still (HRN-976).
+// answers 200, and is a warning of the journal still.
 func journalCmd(ctx context.Context, op Op, body []byte, res CmdResult) {
 	if journal.ScopeOf(ctx) == nil {
 		return

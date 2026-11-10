@@ -2,7 +2,7 @@ package wire
 
 import "slices"
 
-// PermissionMode is how an agent asks before it acts, as the chat's picker offers it (HRN-945):
+// PermissionMode is how an agent asks before it acts, as the chat's picker offers it:
 //
 //   - plan: it plans and changes nothing until the plan is accepted (Claude Code's `plan`, Codex's Plan mode);
 //   - ask: it asks before edits and commands (Claude Code's `default`, Codex's `untrusted` approvals);

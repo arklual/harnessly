@@ -2,7 +2,7 @@
 
 A dictation recorded in the composer is a *take*. The browser keeps it while it is live; once it is over (recognized or
 failed) the page also sends it to the hub, so a recording outlives the browser and the machine and shows in «Записи» on
-every device of the person (HRN-989). The recognition itself is the runtime's: its recognition service, the built-in
+every device of the person. The recognition itself is the runtime's: its recognition service, the built-in
 whisper engine or a cloud engine ([../voice.md](../voice.md)); the hub only keeps what was recorded and said.
 
 Off by default: `HUB_VOICE_TAKES=on`. Off, the routes below answer 404 and the page reads that as «not here», as on a

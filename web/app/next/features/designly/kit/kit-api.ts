@@ -1,4 +1,4 @@
-// The kit screen over the runtime (HRN-897): the kits with a canvas, a theme's canvas (internal/designkit/canvas.go,
+// The kit screen over the runtime: the kits with a canvas, a theme's canvas (internal/designkit/canvas.go,
 // the same shapes), the kit's files and prepared atlases, a template as a project, where a kit is used and which kit
 // a project is built on.
 import { platformPath, runtimePath } from '@/next/core/net/machine';

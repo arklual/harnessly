@@ -75,7 +75,7 @@ func ForAnyShell(line string) string {
 }
 
 // longLine is the most bytes of a line that is typed as it is. A shell takes typed keys one by one and redraws the line
-// for each: 7 KB (the wall of a chat with apps, HRN-621) took zsh 13 s and more, a launch counts as failed after 15 s, and
+// for each: 7 KB (the wall of a chat with apps) took zsh 13 s and more, a launch counts as failed after 15 s, and
 // typed before the shell's line editor is up the terminal's own 4 KB limit loses the line and its Enter.
 const longLine = 1 << 10
 

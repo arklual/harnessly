@@ -9,7 +9,7 @@ import (
 )
 
 // summarize asks the cheap model, once a turn, for a few lines on what the agent did in the conversation's last turn
-// (HRN-957). The answer is accepted at once; the lines come later on the record as its recap, as Claude's own «while you
+// The answer is accepted at once; the lines come later on the record as its recap, as Claude's own «while you
 // were away» does, and stand like it until the person writes again. A recap Claude wrote after the turn ended is kept:
 // the model is not asked for what is there.
 func (c *conv) summarize(turnID string, now time.Time) wire.CmdResult {

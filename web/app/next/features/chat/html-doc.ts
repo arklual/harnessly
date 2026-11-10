@@ -18,7 +18,7 @@ export const isFrameHeight = (data: unknown, key: string): data is IFrameHeight 
   typeof (data as IFrameHeight).height === 'number' &&
   Number.isFinite((data as IFrameHeight).height);
 
-/** What the frame reports besides its height: a request or style the policy blocked, or an error (HRN-922). */
+/** What the frame reports besides its height: a request or style the policy blocked, or an error. */
 export interface IFrameIssue {
   hxFrame: string;
   issue: string;

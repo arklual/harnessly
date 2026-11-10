@@ -1,4 +1,4 @@
-// The one dialog's view of a resource (HRN-675), read when asked: null while it is read, `absent` where the gateway does
+// The one dialog's view of a resource, read when asked: null while it is read, `absent` where the gateway does
 // not answer the new API (the older dialog stays then).
 import { useCallback, useEffect, useState } from 'react';
 import {

@@ -171,7 +171,7 @@ export const useFleetDesignLibrary = () => {
     ? `design-library:fleet:${targets.map((target) => `${target.machineId ?? ''}${target.available ? '' : '!'}`).join(',')}`
     : null;
   // The last list of every machine is drawn at once, also after the section was left and opened again; a machine
-  // still being asked keeps it until it answers (HRN-902).
+  // still being asked keeps it until it answers.
   const [state, setState] = useState<TFleetLibraryState>(() => {
     const libraries = targets ? keptOf(targets) : [];
     return libraries.length > 0

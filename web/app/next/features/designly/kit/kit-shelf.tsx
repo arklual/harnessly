@@ -1,4 +1,4 @@
-// The library's row of kits (HRN-897): a card per theme of a kit (a kit of several brands shows each with its own
+// The library's row of kits: a card per theme of a kit (a kit of several brands shows each with its own
 // cover), or per kit when it is one theme; a click opens the kit screen on that theme.
 import type { IKitShelfCard } from '@/next/features/designly/kit/kit-api';
 import { plural, t } from '@/next/i18n';

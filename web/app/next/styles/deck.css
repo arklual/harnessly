@@ -383,7 +383,19 @@
 .hx-deck__frame[data-on='1'] {
   opacity: 1;
 }
-/* The slide while its board loads (HRN-900): a skeleton of the slide with a spinner, until the board says it is drawn
+/* The slide on top is over the one under it and the ones loaded ahead; only it takes the pointer. */
+.hx-deck__frame[data-top='1'] {
+  z-index: 1;
+}
+.hx-deck__frame[data-top='0'] {
+  pointer-events: none;
+}
+/* A slide whose board was drawn before its turn only has to fade in, not wait: a short turn. */
+.hx-deck__frame[data-quick='1'] {
+  transition-duration: 140ms;
+  transition-timing-function: var(--hx-ease-out);
+}
+/* The slide while its board loads: a skeleton of the slide with a spinner, until the board says it is drawn
    (fonts, pictures, videos in); it fades out as the slide fades in. */
 .hx-deck__slide[data-loading] {
   background: var(--hx-bg-raised);

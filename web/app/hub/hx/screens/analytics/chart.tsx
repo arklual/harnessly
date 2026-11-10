@@ -43,7 +43,7 @@ const unitOf = (format: KpiFormat): VizUnit =>
     ? { kind: 'currency', currency: 'RUB' }
     : UNIT[format];
 
-/** A money line in the currency shown, so the axis and the hover agree with the tiles (HRN-670). */
+/** A money line in the currency shown, so the axis and the hover agree with the tiles. */
 const shownLine = (format: KpiFormat, values: Values): Values => {
   if (format !== 'usd' || shownOfUsd(1) === null) return values;
   return values.map((v) => (v === null ? null : (shownOfUsd(v) ?? v)));

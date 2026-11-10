@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// The journal of an app (HRN-849): every action of a high or critical class (Loud), and every change of what the app
+// The journal of an app: every action of a high or critical class (Loud), and every change of what the app
 // may do — the person's consent, an update waiting for it, the switch. One JSON line per entry in
 // <registry>/journal/<id>.jsonl, read by the app's inspector. It says what was done, never a value: no secret, no file's
 // text, no message.

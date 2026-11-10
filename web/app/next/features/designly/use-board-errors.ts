@@ -1,4 +1,4 @@
-// The board errors of a deck and a video (HRN-862): their boards are frames of their own, not the site view's one frame,
+// The board errors of a deck and a video: their boards are frames of their own, not the site view's one frame,
 // but the board's error card is the same, and so is its «Отправить в чат». This listens to the frames' `tk:board-error`,
 // hands the words to the host (which switches to editing, opens the chat and sends) and answers the board: whether
 // there is a chat (`tk:board-chat`), and that the error is in it (`tk:board-error-ack`).

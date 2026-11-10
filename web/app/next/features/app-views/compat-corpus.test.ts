@@ -1,4 +1,4 @@
-// The corpus of old apps (fixtures/compat/README.md, HRN-849): views written for earlier versions of harnessly run as
+// The corpus of old apps (fixtures/compat/README.md): views written for earlier versions of harnessly run as
 // they are against today's bridge, shim and SDK. Every view must shake hands; the page-tools check must still offer its
 // tools. A red test here means an update of the host broke an app that worked: fix the host, never the app.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

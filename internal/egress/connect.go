@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// HRN-968. Through the company's proxy a call used to go by the host's name, and the proxy resolved it: a name that
+// Through the company's proxy a call used to go by the host's name, and the proxy resolved it: a name that
 // resolves to a private address or to the cloud's metadata (169.254.169.254) reached it, since only an address literal
 // was judged. Now the machine resolves the name itself, every address it gets must pass the direct rule, and the tunnel
 // (CONNECT) is opened to the checked address, so what the proxy reaches is what was judged. A host the admin listed as

@@ -33,7 +33,7 @@ type Session struct {
 	// Nonce is what the view's own document carries (a meta tag the view server writes into its pages) and the bridge
 	// asks for in ui/initialize: a document the frame navigated to never saw it.
 	Nonce string
-	// Trace is the journal's trace of the page's action that mounted the view (HRN-976): the view server's lines of the
+	// Trace is the journal's trace of the page's action that mounted the view: the view server's lines of the
 	// session carry it, so a file the view could not load reads in one chain with the page's lines.
 	Trace string
 

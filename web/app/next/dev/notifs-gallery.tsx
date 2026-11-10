@@ -3,6 +3,7 @@
 //
 //   ?dev=notifs                    a mock window of the app (chats, a chat, its field) and the buttons in its side
 //   &set=pile                      a code, a question and a permission at once; &set=one a question
+//   &set=drops                     every kind put away into the drops of the right column, long names among them
 //   &open=1                        the card open
 //   &place=top-right|…             where it stands (the middle of the top edge by default); the side switches it
 //   &settings=1                    Settings → Notifications under the buttons
@@ -22,13 +23,9 @@ import { NOTICE_PLACES, type TNoticePlace } from '@/next/stores/notices';
 import { ToastHost, toast } from '@/next/ui/toast';
 import Drops from '@/next/features/smart-notice/drops';
 import { fly, snap } from '@/next/features/smart-notice/fly';
-import '@/next/styles/tokens.css';
-import '@/next/styles/motion.css';
-import '@/next/styles/icons.css';
-import '@/next/styles/ui.css';
-import '@/next/styles/base.css';
-import '@/next/styles/settings.css';
-import '@/next/styles/code-field.css';
+// The chat's own stylesheets in the chat's order: a class of another feature that happens to share a name shows here
+// as it does in a chat (composer.css once laid its file-drop hint over the drops).
+import '@/next/styles/order';
 import '@/next/dev/notifs-gallery.css';
 
 const params = new URLSearchParams(window.location.search);
@@ -48,7 +45,7 @@ const NEWS: ReadonlySet<TSmartKind> = new Set([SMART_KIND.done, SMART_KIND.faile
 const twoFrames = (run: () => void) => requestAnimationFrame(() => requestAnimationFrame(run));
 const CHATS = ['Лендинг кофейни', 'Миграция базы', 'Публикация пакета', 'Меню на сайте', 'Отчёт за октябрь'];
 
-type TSample = 'question' | 'permission' | 'code' | 'machine' | 'done' | 'failed';
+type TSample = 'question' | 'permission' | 'code' | 'machine' | 'long' | 'done' | 'failed';
 
 const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { detail: TSmartDetail }> = {
   question: {
@@ -86,8 +83,8 @@ const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { deta
   machine: {
     kind: SMART_KIND.machine,
     chatId: null,
-    icon: 'memory-stick',
-    title: 'Моя ВМ',
+    icon: 'hard-drive',
+    title: 'dev-machine',
     text: 'Машина не справляется',
     detail: {
       k: 'machine',
@@ -104,6 +101,18 @@ const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { deta
         },
         { key: 'chrome', icon: 'app-window', name: 'chrome', text: 'программа', stoppable: true },
       ],
+    },
+  },
+  long: {
+    kind: SMART_KIND.question,
+    chatId: 'tab-f',
+    icon: 'message-square-text',
+    title: 'Синхронизация файлов с машины в облачное хранилище и обратно',
+    text: 'Какие папки держать в синхронизации, а какие оставить только на машине?',
+    detail: {
+      k: 'question',
+      text: 'Какие папки держать в синхронизации, а какие оставить только на машине? В node_modules и .cache — сотни тысяч файлов.',
+      options: ['Всё, кроме node_modules и .cache', 'Только исходники', 'Спросить по каждой папке'],
     },
   },
   done: {
@@ -153,10 +162,16 @@ const made = (sample: TSample): TGalleryItem => {
 
 const byRank = (list: readonly TGalleryItem[]) => [...list].sort((a, b) => RANK[a.kind] - RANK[b.kind]);
 
-/** What the page starts with: `&set=pile` a code, a question and a permission, `&set=one` a question. */
+/** Every kind that waits, put away into a drop: the long names show how a line ends. */
+const DROP_SAMPLES: readonly TSample[] = ['machine', 'code', 'permission', 'question', 'long'];
+const allDrops = () => byRank(DROP_SAMPLES.map(made));
+
+/** What the page starts with: `&set=pile` a code, a question and a permission, `&set=one` a question, `&set=drops`
+ *  every waiting kind in the drops. */
 const firstItems = (): readonly TGalleryItem[] => {
   const set = params.get('set');
   if (set === 'pile') return byRank((['question', 'permission', 'code'] as const).map(made));
+  if (set === 'drops') return allDrops();
   if (set === 'one') return [made('question')];
   return [];
 };
@@ -167,7 +182,9 @@ const Gallery = () => {
   const [mainKey, setMainKey] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [place, setPlace] = useState<TNoticePlace>(FIRST_PLACE);
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(
+    () => new Set(params.get('set') === 'drops' ? items.map((i) => i.key) : []),
+  );
   const [arriving, setArriving] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [held, setHeld] = useState(false);
@@ -184,6 +201,11 @@ const Gallery = () => {
     window.history.replaceState(null, '', url);
   };
   const pile = () => setItems(byRank((['question', 'permission', 'code'] as const).map(made)));
+  const putAway = () => {
+    const list = allDrops();
+    setItems(list);
+    setHidden(new Set(list.map((i) => i.key)));
+  };
 
   // Over the field: the middle of the mock chat's field, a little above it.
   useLayoutEffect(() => {
@@ -311,6 +333,9 @@ const Gallery = () => {
           ))}
           <button type="button" className="hx-ng__btn" data-testid="pile" onClick={pile}>
             стопка
+          </button>
+          <button type="button" className="hx-ng__btn" data-testid="drops" onClick={putAway}>
+            капли
           </button>
           <button type="button" className="hx-ng__btn" data-testid="clear" onClick={() => setItems([])}>
             clear

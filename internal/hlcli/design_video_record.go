@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/design"
 )
 
-// `design video record` (HRN-627): plays a script of actions in a headless browser, frame by frame on the page's own clock,
+// `design video record`: plays a script of actions in a headless browser, frame by frame on the page's own clock,
 // and keeps the clip and the log in the project's records/ folder. It works on the library's folder itself, so it needs
 // the browser, ffmpeg and the project on this machine, not the runtime.
 

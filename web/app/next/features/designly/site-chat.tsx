@@ -121,7 +121,7 @@ const useMenu = () => {
 
 /**
  * Where the design's chat stands, named in words: the place it is in now, and on hover (or a press) the list of the
- * places with what each one is (HRN-673).
+ * places with what each one is.
  */
 export const ChatPlacement = ({ mode, onMode }: { mode: TSiteMode; onMode: (mode: TSiteMode) => void }) => {
   const { open, setOpen, menu, root } = useMenu();

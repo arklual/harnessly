@@ -58,7 +58,7 @@ type AppLauncher interface {
 }
 
 // HostMCPLauncher is an AppLauncher that gives a Claude Code chat without apps the host's app server all the same
-// (HRN-975): quiet until an app turns on in the chat, then the app's tools come to the running agent.
+// quiet until an app turns on in the chat, then the app's tools come to the running agent.
 type HostMCPLauncher interface {
 	// HostMCP is the server's --mcp-config file; "" for none.
 	HostMCP() (string, error)
@@ -206,7 +206,7 @@ func CheckLaunch(l *Launch) error {
 	}
 	if l.Profile != "" {
 		// A profile needs a model and takes no ultracode (Anthropic's). Its launcher checks the effort against this
-		// model's own list. Fast mode on a profile is the vendor's fast tier, which the profile's proxy asks for (HRN-945):
+		// model's own list. Fast mode on a profile is the vendor's fast tier, which the profile's proxy asks for:
 		// nothing on the launch line turns it.
 		if !ProfileIDRe.MatchString(l.Profile) || l.Model == nil || *l.Model == "" || l.Ultracode {
 			return ErrLaunchProfile
@@ -432,7 +432,7 @@ func BareAgentArgs(content, panelType string) (string, bool) {
 }
 
 // ActiveApps is what a launcher may say about the apps a launch names: which of them are installed and on now. A chat
-// whose app was removed, or one started in safe mode (HRN-700), starts with what is left — with none left, as a chat
+// whose app was removed, or one started in safe mode, starts with what is left — with none left, as a chat
 // with no apps at all, wall included.
 type ActiveApps interface {
 	Active(ids []string) []string

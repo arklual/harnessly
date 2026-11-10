@@ -648,7 +648,7 @@ func (s *previewSlots) ownOrigin(r *http.Request, slot int) string {
 func (s *previewSlots) slotHandler(slot int) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// A refusal of the slot is a line of the journal, with the app view's chat and trace when the path names a
-		// live session (HRN-976): a view whose scripts the slot refused reads in one chain with the page's lines.
+		// live session: a view whose scripts the slot refused reads in one chain with the page's lines.
 		previewDeny := func(w http.ResponseWriter, status int, text string) {
 			journalSlotDenial(r, slot, status, text)
 			previewDeny(w, status, text)
@@ -1002,7 +1002,7 @@ func (s *previewSession) showsAppViews() bool {
 	return port != 0 && s.target.Kind == "port" && int64(s.target.Port) == port
 }
 
-// journalSlotDenial writes down a request a preview slot refused (HRN-976).
+// journalSlotDenial writes down a request a preview slot refused.
 func journalSlotDenial(r *http.Request, slot, status int, text string) {
 	e := journal.Entry{Level: journal.Warn, Source: journal.SourceRuntime, Event: "preview.slot", Method: r.Method,
 		URL: r.URL.Path, Status: status, Text: text, View: "slot " + strconv.Itoa(slot)}

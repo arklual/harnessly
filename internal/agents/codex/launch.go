@@ -552,7 +552,7 @@ func MCPURL(port int, path string) string {
 	return "http://127.0.0.1:" + strconv.Itoa(port) + path
 }
 
-// permissionArgs are how the launch's Codex asks before it acts. A launch that names a permission mode (HRN-945) gets
+// permissionArgs are how the launch's Codex asks before it acts. A launch that names a permission mode gets
 // it whatever the machine's default:
 //
 //   - bypass: --yolo, nothing asked and no sandbox;
@@ -597,7 +597,7 @@ func (c LaunchConfig) permissionArgs(launch *agents.Launch) []string {
 	return nil
 }
 
-// FastArgs are the service tier of a launch that chose it (HRN-945): `fast` when it is on; `default` when a launch
+// FastArgs are the service tier of a launch that chose it: `fast` when it is on; `default` when a launch
 // that names its modes has it off, so a `service_tier = "fast"` of the person's config does not turn it on. A launch
 // that names no mode leaves the config alone.
 func FastArgs(launch *agents.Launch) []string {

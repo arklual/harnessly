@@ -533,7 +533,7 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 		return previewBytes(r, 400, mcpserver.ParseError(), previewNoStore())
 	}
 	// The journal learns the calling chat when a toolset finds it by the connection (callerCache.of), and writes down
-	// every tool call with how long it took (HRN-976).
+	// every tool call with how long it took.
 	ctx, _ := journal.WithScope(r.Context(), r.Header.Get(journal.TraceHeader), "")
 	r = r.WithContext(ctx)
 	// An agent inside the wall reads only its own chat's lines; the person's agents, the whole journal.

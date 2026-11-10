@@ -32,7 +32,7 @@ type StoreSession struct {
 	Path string `json:"path"`
 	// Collections are the kinds this machine may open.
 	Collections []string `json:"collections"`
-	// Person names the machine's person in the apps collection (HRN-898): their user areas are
+	// Person names the machine's person in the apps collection: their user areas are
 	// storage/<app>/user/<Person>.json, which no other person's machine sees. "" from a hub that names nobody (an
 	// older one, or a machine nobody made): the user areas stay on the machine.
 	Person string `json:"person,omitempty"`
@@ -48,7 +48,7 @@ func VerifyStore(pub ed25519.PublicKey, a DialAuth, host string, now time.Time) 
 	return verifyHeader(StoreDomain, pub, a, host, now)
 }
 
-// SpaceApp is an app installed for a space as the hub lists it from the store (GET /api/spaces/{id}/apps, HRN-898):
+// SpaceApp is an app installed for a space as the hub lists it from the store (GET /api/spaces/{id}/apps):
 // the hub serves its view to the space's members at Path with every machine off.
 type SpaceApp struct {
 	ID      string   `json:"id"`

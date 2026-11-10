@@ -35,9 +35,10 @@ func TestDeckRoutesAreRegistered(t *testing.T) {
 			t.Errorf("%s: %d JSON and %d body routes match, want one %s route", p, jsonHits, bodyHits, kind)
 		}
 	}
-	// The pictures of a design (design/image, design/image/file) and the kit transfer (design/kit/import, design/kit/export) are registered beside the deck's.
+	// The pictures of a design (design/image, design/image/file) and the kit transfer (design/kit/import, design/kit/export), the pack transfer (design/pack/import, design/pack/export) are registered beside the deck's.
 	pictures := map[string]string{platformAPI + "/design/image": "json", platformAPI + "/design/image/file": "body",
 		platformAPI + "/design/kit/import": "body", platformAPI + "/design/kit/export": "body",
+		platformAPI + "/design/pack/import": "body", platformAPI + "/design/pack/export": "body",
 		platformAPI + "/design/kit/layouts": "json", platformAPI + "/design/kit/fonts": "json"}
 	for p, kind := range pictures {
 		r := httptest.NewRequest(http.MethodGet, p+"?artifact=acme", nil)

@@ -1,4 +1,4 @@
-// The chat's events a view can hear (events:<kind>, HRN-850), from what the page already holds of the chat: the
+// The chat's events a view can hear (events:<kind>), from what the page already holds of the chat: the
 // agent's state for the end of a turn, the feed's entries for a tool call and a message. Only what happened is told,
 // never what was said or passed: the view reads the chat with chat.read when it holds that right.
 import type { ConvId, Entry } from '@/next/protocol/v2';

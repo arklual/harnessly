@@ -1,4 +1,4 @@
-// The machine's door for the agent's actions on the pane's browser (HRN-678): the page waits for the next action of a
+// The machine's door for the agent's actions on the pane's browser: the page waits for the next action of a
 // chat (a long poll the machine holds up to 10 s) and says how it ended.
 import { runtimePath } from '@/next/core/net/machine';
 import type { ConvId, MachineId } from '@/next/protocol/v2';

@@ -39,7 +39,7 @@ const workspaceBase = "/agents"
 // workspaceConfigTTL is how long the home machine's page settings are believed.
 const workspaceConfigTTL = time.Minute
 
-// HRN-879: the page waits on the home machine's settings at most workspaceSettingsWait, and a machine that did not give
+// the page waits on the home machine's settings at most workspaceSettingsWait, and a machine that did not give
 // them is not asked again for workspaceMissTTL: a home machine whose agent keeps its link while its runtime hangs held
 // every load of /agents/ for the whole wait. The settings it gave before are kept meanwhile.
 const (
@@ -293,7 +293,7 @@ func (s *Service) workspaceSettings(r *http.Request, u store.User) (map[string]a
 	delete(cfg, "basePath")
 	delete(cfg, "platformApi")
 	cfg["hubUrl"] = s.cfg.PublicURL
-	// HRN-879: the page puts what a person attaches into the hub's store too, and reads the chat's uploads from here.
+	// the page puts what a person attaches into the hub's store too, and reads the chat's uploads from here.
 	cfg["centralUploads"] = s.uploadsStore() != nil
 	if link, _ := cfg["hubLink"].(string); link == "" {
 		cfg["hubLink"] = s.cfg.PublicURL

@@ -1,4 +1,4 @@
-// How fast Sinopia opens a document and answers on its canvas (HRN-808, the criterion of moving Sinopia onto the app
+// How fast Sinopia opens a document and answers on its canvas (the criterion of moving Sinopia onto the app
 // platform): the same scenario is run against two builds and the numbers are compared. It runs only when asked
 // (SINOPIA_PERF=<file to write the numbers to>); RUNTIME_BIN, HARNESSLY_BIN and RUNTIME_WEB_DIR name the build.
 //

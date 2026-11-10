@@ -19,7 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// The message queue of a machine that is off (docs/hub/offline-prompts.md, HRN-879): what a person writes to it waits in
+// The message queue of a machine that is off (docs/hub/offline-prompts.md): what a person writes to it waits in
 // the hub, shows on every device of theirs, and the hub hands it to the machine's runtime once the machine is back. The
 // API is the cluster gateway's (src/cluster/offline-prompts.ts), under the workspace's platform API:
 //

@@ -644,7 +644,7 @@ const Feed = (props: IFeedProps) => {
   const refContext = useMemo<IRefContext>(
     () => ({
       refs: props.refs ?? {},
-      // No opener, no «Open» buttons: a button that opens nothing is worse than none (HRN-675).
+      // No opener, no «Open» buttons: a button that opens nothing is worse than none.
       onOpen: canOpenRef
         ? (kind, label, href) => {
             latest.current.onOpenRef?.(kind, label, href);

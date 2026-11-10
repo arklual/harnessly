@@ -220,7 +220,7 @@ func TestMoveTenant(t *testing.T) {
 	}
 }
 
-// HRN-762: an organization made with a tenant name has its first tenant at once, the creator owns it, and a blank name
+// an organization made with a tenant name has its first tenant at once, the creator owns it, and a blank name
 // gets the default; without the field the organization is made as before.
 func TestCreateMakesTheFirstTenant(t *testing.T) {
 	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"))

@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/usagefeed"
 )
 
-// The fast mode of a GPT chat through Claude Code (HRN-945): the GPT relay asks the ChatGPT backend for the fast tier
+// The fast mode of a GPT chat through Claude Code: the GPT relay asks the ChatGPT backend for the fast tier
 // on the requests of a chat in fast mode (providers.GPTProxy). The two answers it needs come from here.
 
 // codexFastTier says whether a model has the fast tier, by Codex's model cache: the same list a Codex chat's fast

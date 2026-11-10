@@ -51,10 +51,12 @@ const (
 	KindFiles   = "files"
 	KindHandoff = "handoff"
 	KindApps    = "apps"
+	// KindProfile is a person's Claude Code profile (Profile): one room per person, not per space.
+	KindProfile = "profile"
 )
 
 // Kinds are the collection kinds a hub serves, in a stable order.
-var Kinds = []string{KindDesign, KindUploads, KindFiles, KindHandoff, KindApps}
+var Kinds = []string{KindDesign, KindUploads, KindFiles, KindHandoff, KindApps, KindProfile}
 
 // KnownKind tells whether a collection kind is one the hub serves.
 func KnownKind(kind string) bool {
@@ -71,6 +73,9 @@ func KnownKind(kind string) bool {
 func PolicyFor(room string) Policy {
 	if room == KindDesign || strings.HasPrefix(room, KindDesign+"-") {
 		return Design{}
+	}
+	if room == KindProfile || strings.HasPrefix(room, KindProfile+"-") {
+		return Profile{}
 	}
 	return Files{}
 }

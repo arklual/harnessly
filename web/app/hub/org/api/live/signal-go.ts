@@ -1,4 +1,4 @@
-// Where the button of a signal leads (HRN-661): the hub's action names the thing it is about, and every kind opens the
+// Where the button of a signal leads: the hub's action names the thing it is about, and every kind opens the
 // card of that thing on its screen, not just the screen. One table for «Обзор» and «Аналитика».
 import type { Signal as ApiSignal } from '../../../../hub-api/analytics';
 import type { SignalGo } from '../overview';

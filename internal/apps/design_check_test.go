@@ -8,7 +8,7 @@ import (
 )
 
 // The design check warns of what makes a view look foreign, with the file and line, and leaves alone what is fine:
-// tokens, var() fallbacks, comments, dependencies (HRN-695).
+// tokens, var() fallbacks, comments, dependencies.
 func TestDesignProblems(t *testing.T) {
 	dir := t.TempDir()
 	write := func(rel, text string) {

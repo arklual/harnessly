@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/designkit"
 )
 
-// A link to the kit's view carries the props in its address: none of them may become a script's way in (HRN-897).
+// A link to the kit's view carries the props in its address: none of them may become a script's way in.
 func TestPlayBoardWritesNoHandlerFromTheAddress(t *testing.T) {
 	c := &designkit.Canvas{Namespace: "Kit", Groups: []designkit.ComponentGroup{{ID: "g", Components: []designkit.Component{{
 		ID: "Button", Name: "Button",

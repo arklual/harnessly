@@ -1,4 +1,4 @@
-// The onboarding step «Организация» (HRN-536): POST /api/orgs makes the organization and moves the chosen spaces in
+// The onboarding step «Организация»: POST /api/orgs makes the organization and moves the chosen spaces in
 // (docs/hub/orgs.md); GET /api/orgs lists `looseSpaces`, the person's spaces that are in no organization.
 export interface LooseSpace {
   id: string;

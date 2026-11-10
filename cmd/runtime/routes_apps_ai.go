@@ -16,7 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// What an app spends of the person's model (HRN-853), each within its budget of the day (internal/apps spend.go):
+// What an app spends of the person's model, each within its budget of the day (internal/apps spend.go):
 //
 //	POST <platform>/apps/ai          ai: one answer of a model, no tools → {text, usd, spentToday, budget}
 //	POST <platform>/apps/agents/run  agents.run: a task in a new chat under the app's chat → {id}

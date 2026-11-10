@@ -109,7 +109,7 @@ export interface IDesignCard {
   owner: DesignOwner | null;
   /** The person may edit it, so may delete it. */
   canDelete?: boolean;
-  /** The person's folder it lies in; null or absent at the top (HRN-860). */
+  /** The person's folder it lies in; null or absent at the top. */
   folder?: string | null;
   /** The design system or kit it was built on, when the project recorded one. */
   system?: { id: string; label: string } | null;
@@ -163,16 +163,16 @@ export interface IDesignlyHomeProps {
   onPin: (id: string, pinned: boolean) => Promise<void>;
   /** Moves a project to the trash; resolves once the machine did, rejects (the caller says why) when it did not. */
   onDelete?: (id: string) => Promise<void>;
-  /** Folders, moving and the trash (HRN-860); absent where the machine cannot lay the library out. */
+  /** Folders, moving and the trash; absent where the machine cannot lay the library out. */
   organizer?: ILibraryOrganizer;
-  /** Copies back the demo projects the library no longer has (HRN-813); resolves once the list has them. */
+  /** Copies back the demo projects the library no longer has; resolves once the list has them. */
   onRestoreDemo?: () => Promise<void>;
   onOpen: (id: string) => void;
   onRetry: () => void;
   /** Where a project is started; null is the library alone (the right pane's: its chat is the field). */
   compose: IDesignlyCompose | null;
   /** What the machine lacks for designs, with the command that fixes it; null when nothing is missing. */
-  /** The installed kits (HRN-897), shown above the library's root; absent where kits are not offered. */
+  /** The installed kits, shown above the library's root; absent where kits are not offered. */
   kits?: IKitShelf;
 }
 
@@ -844,7 +844,7 @@ const DesignlyHome = ({
   const [restoring, setRestoring] = useState(false);
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ILibraryFilters>(NO_FILTERS);
-  // The folder open ('' is the library itself), the trash, the selection and the dialogs (HRN-860).
+  // The folder open ('' is the library itself), the trash, the selection and the dialogs.
   const [folder, setFolder] = useState('');
   const [trashOpen, setTrashOpen] = useState(false);
   const [selecting, setSelecting] = useState(false);
@@ -923,7 +923,7 @@ const DesignlyHome = ({
     [cards],
   );
 
-  // The tour's lessons lead to the demo projects: the library says where each lies and what hides it (HRN-862), and
+  // The tour's lessons lead to the demo projects: the library says where each lies and what hides it, and
   // lets the tour clear the view or copy the demo back. Only the library page does (the pane's has no lessons).
   const lessons = compose !== null;
   const restoreNow = useStableFn(async () => {

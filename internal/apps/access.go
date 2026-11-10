@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// What an app reaches, as the person agrees to it (HRN-849): every right of its manifest, every secret, host, server of
+// What an app reaches, as the person agrees to it: every right of its manifest, every secret, host, server of
 // its own and part of a plugin it carries, each with its class of risk and a line in the person's words. The install
 // screen lists them, the consent remembers their keys, and an update that adds a key waits for the person's word.
 

@@ -1,4 +1,4 @@
-// Our menu in place of the browser's (HRN-962): a right click, a two-finger tap, the menu key or a held finger opens it
+// Our menu in place of the browser's: a right click, a two-finger tap, the menu key or a held finger opens it
 // at the point it was asked from, in the one look of every menu (MenuPanel: black, from the point, a sheet on the phone).
 // The browser's own menu stays where it is the person's tool: a field, selected text, a link, a picture, a frame.
 import { Menu } from '@base-ui/react/menu';

@@ -2,7 +2,7 @@ package apps
 
 import "strings"
 
-// The state of an installed app with its reason (HRN-693): the person sees why an app does nothing, not only that it
+// The state of an installed app with its reason: the person sees why an app does nothing, not only that it
 // is installed.
 const (
 	StateReady    = "ready"
@@ -40,7 +40,7 @@ func StateIn(a Installed, safe bool, host string, packageErr error, secrets, con
 	case a.Muted || a.Off:
 		return AppState{State: StateDisabled, Reason: ReasonOff}
 	case a.NeedsConsent():
-		// The detail names what waits (HRN-913): the codes of the manifest, as the author wrote them.
+		// The detail names what waits: the codes of the manifest, as the author wrote them.
 		return AppState{State: StateWaiting, Reason: ReasonConsent, Detail: strings.Join(AccessCodes(a.WaitingAccess()), ", ")}
 	case safe && !SafeAllows(a):
 		return AppState{State: StateDisabled, Reason: ReasonSafe}

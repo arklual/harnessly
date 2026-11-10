@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// HRN-842: a chat made for a check is marked a test chat, from its creation or by conversation.test; the mark rides the
+// a chat made for a check is marked a test chat, from its creation or by conversation.test; the mark rides the
 // record, is taken off by the same command, survives a restart, and a chat not found is refused.
 // testOf is the Test mark of a chat as the list of conversations has it.
 func testOf(t *testing.T, r *rig, id string) bool {

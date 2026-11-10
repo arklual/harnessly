@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
-// What the person is looking at in a video's player, and what the agent asks the player to do (HRN-580). The page reports
+// What the person is looking at in a video's player, and what the agent asks the player to do. The page reports
 // its playhead and takes the commands in one short poll, so nothing here outlives the runtime and no new channel is
 // needed. The person comes first: a command that arrives right after they moved the player is only offered to them.
 

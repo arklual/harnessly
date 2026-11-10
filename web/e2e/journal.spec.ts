@@ -1,4 +1,4 @@
-// The machine's journal on a real runtime (HRN-976): an app's view that loads is in `harnessly logs` with its times, and
+// The machine's journal on a real runtime: an app's view that loads is in `harnessly logs` with its times, and
 // a view whose SDK never reaches the machine (a gateway answers 401 for /__hl/, the runtime sees nothing) is an error
 // with its chain and its cause: the card says it, and the agent reads it without the person's DevTools. A view whose
 // SDK the preview's DevTools block is the same, told by the runtime itself.

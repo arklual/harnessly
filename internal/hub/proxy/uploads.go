@@ -23,7 +23,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// The workspace's uploads in the hub's store (docs/hub/history.md, HRN-879): what a person puts into a chat goes to the
+// The workspace's uploads in the hub's store (docs/hub/history.md): what a person puts into a chat goes to the
 // machine as before, and the page puts the same bytes into the `uploads` collection of the machine's space, by their
 // sha256, with the id the machine gave them. The chat's pictures and files are then read from the hub, with the
 // machine on or off; an upload the hub has not got (older than this, or put while it was off) is read from the machine.

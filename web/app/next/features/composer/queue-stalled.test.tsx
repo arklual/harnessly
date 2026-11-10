@@ -54,3 +54,21 @@ describe('Queue row of a message the agent did not take', () => {
     expect(screen.getByRole('button', { name: /Retry/ })).toBeTruthy();
   });
 });
+
+describe('Queue row of a message another agent sent', () => {
+  it('says who wrote and shows the words, not the envelope, and cannot be taken into the field', () => {
+    show([
+      {
+        clientId: 'peer-pm_1',
+        text: '<peer-message id="pm_1" person="roman" machine="dev-department" chat="Релиз хаба" ref="dev-department/tab-abc">\nпроверь миграции\n</peer-message>',
+        attachments: [],
+        state: { k: 'queued', position: 2, reason: 'agent-busy' },
+      },
+    ]);
+    expect(screen.getByText('проверь миграции')).toBeTruthy();
+    expect(screen.getByText('dev-department · Релиз хаба')).toBeTruthy();
+    expect(document.querySelector('.hx-queue__row')?.textContent).not.toContain('peer-message');
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove from the queue' })).toBeTruthy();
+  });
+});

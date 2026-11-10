@@ -24,7 +24,7 @@ type API struct {
 	// Session: the request carries a page session. CLIToken: it carries the runtime's cli-token.
 	Session, CLIToken func(*http.Request) bool
 	// Person is the address of the person whose page session made the request ("" when unknown: no session, a
-	// session that names no address, the machine agent's own). The owner of what they make (HRN-675).
+	// session that names no address, the machine agent's own). The owner of what they make.
 	Person func(*http.Request) string
 	// MachineAgent: the request is the machine agent's own (the access snapshot is taken from nobody else).
 	MachineAgent func(*http.Request) bool

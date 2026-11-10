@@ -1,4 +1,4 @@
-// The old space address of a tenant (HRN-625): a space that is a tenant of an organization lives in the organization
+// The old space address of a tenant: a space that is a tenant of an organization lives in the organization
 // hub, so `/s/<slug>…` leads there. Spaces with no organization keep the old screens. The decision is made on the hub's
 // own answer (GET /api/orgs, GET /api/orgs/{org}), never on a guess from the address.
 import type { OrgList, OrgView } from '../../hub-api/orgs';

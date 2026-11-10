@@ -260,7 +260,7 @@ func (m *countingMachine) looks() int {
 	return m.looked
 }
 
-// HRN-659: a starting agent is looked at every LookStarting, not every LookEvery, so the moment it can take the first
+// a starting agent is looked at every LookStarting, not every LookEvery, so the moment it can take the first
 // message is not missed by up to a second; the conversations at rest keep their slower pace.
 func TestAStartingAgentIsLookedAtOften(t *testing.T) {
 	dir := t.TempDir()

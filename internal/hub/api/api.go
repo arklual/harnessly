@@ -130,7 +130,7 @@ type Hub struct {
 	Proxy   *proxy.Service
 	// Docs is the documents and boards of the installation (HUB_DOCS).
 	Docs *docs.Service
-	// Efficiency serves the figures of the «Эффективность» screen behind the organization flag (HRN-972).
+	// Efficiency serves the figures of the «Эффективность» screen behind the organization flag.
 	Efficiency *efficiency.Service
 	// Automations is the rules and runs of the installation (HUB_AUTOMATIONS).
 	Automations *automations.Service
@@ -154,7 +154,7 @@ type Hub struct {
 	appTokens *appTokens
 	// Store keeps the spaces' collections the machines sync with (docs/hub/store.md); nil when HUB_STORE=off.
 	Store *storehub.Store
-	// Migration is the journal of the move of the machines' data into the store (docs/migrations, HRN-883); nil with
+	// Migration is the journal of the move of the machines' data into the store (docs/migrations); nil with
 	// the store off.
 	Migration *migration.Service
 
@@ -399,13 +399,13 @@ func New(o Options) (*Hub, error) {
 			}
 			h.Migration.UseSidebars(h.db, func() int64 { return now().UnixMilli() })
 		}
-		// HRN-881: guest links read their projects from the store, put into folders of the hub; no machine takes part.
+		// guest links read their projects from the store, put into folders of the hub; no machine takes part.
 		if DesignView != nil {
 			if v := DesignView(h.Store, cfg.DataDir, o.Workspace, log); v != nil {
 				h.Design.UseView(v)
 			}
 		}
-		// HRN-898: an app's guest link opens from the store, with the machine that made it off.
+		// an app's guest link opens from the store, with the machine that made it off.
 		if AppsView != nil && appsView == nil {
 			appsView = AppsView(h.Store, cfg.DataDir, log)
 		}

@@ -9,6 +9,7 @@ import AttachmentThumb from '@/next/ui/attachment-thumb';
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { readAnnotated } from '@/next/features/designly/annotation';
 import { attachedOf, REF_ICON, refKey } from '@/next/features/chat/attached';
+import { parsePeer, type IPeerMessage } from '@/next/features/chat/peer';
 import type { LaunchFailure, MessageRef } from '@/next/protocol/v2';
 import { NoteLine } from '@/next/features/designly/note-chip';
 import type { MessageFailure } from '@/next/features/chat/types';
@@ -45,6 +46,10 @@ const RefLine = ({ refs }: { refs: readonly MessageRef[] }) => (
     ))}
   </>
 );
+
+/** «dev-department · Релиз хаба»: the machine (or the owner, when it has no name) and the chat that wrote. */
+const peerFrom = (peer: IPeerMessage): string =>
+  [peer.machine || peer.person, peer.chat].filter((part) => part && part.length > 0).join(' · ');
 
 /** A row folds away, and the whole stack when its last row goes, as long as hx-fold in composer.css. */
 const ROW_EXIT_MS = 320;
@@ -146,7 +151,11 @@ const Row = ({
   // Where the words stood when the row went: a bubble that takes the message into the feed flies out of this place.
   // A design's notes ride in the text as `<annotation>` blocks for the agent; the row shows the words and a line per note.
   // The places attached to it ride in the text as an `<attached>` block: the row shows a line of their names.
-  const placed = useMemo(() => attachedOf(row.text, row.refs), [row.text, row.refs]);
+  // Another agent's message waits in the same line as the person's, in its envelope: the row says who wrote and shows
+  // the words, never the tag, and has no pencil — its text is not the person's to take into the field.
+  const peer = useMemo(() => parsePeer(row.text), [row.text]);
+  const body = peer ? peer.text : row.text;
+  const placed = useMemo(() => attachedOf(body, row.refs), [body, row.refs]);
   const { text: words, notes } = useMemo(() => readAnnotated(placed.text), [placed.text]);
   useLayoutEffect(() => {
     if (leaving && mainRef.current) noteExit(row.clientId, boxOf(mainRef.current), words);
@@ -207,6 +216,12 @@ const Row = ({
       )}
       <span ref={mainRef} className="hx-queue__main">
         <span className="hx-queue__text">
+          {peer && (
+            <span className="hx-queue__from" title={t('next.queue.fromAgent')}>
+              <Icon name="messages-square" size="sm" />
+              {peerFrom(peer) || t('next.queue.fromAgent')}
+            </span>
+          )}
           {(words || (notes.length === 0 && placed.refs.length === 0)) && (
             <span>{words || t('next.queue.attachmentsOnly')}</span>
           )}
@@ -266,7 +281,7 @@ const Row = ({
           </button>
         </Tooltip>
       )}
-      {state === 'queued' && onEdit && (
+      {state === 'queued' && onEdit && !peer && (
         <Tooltip label={t('next.queue.edit')}>
           <button
             type="button"

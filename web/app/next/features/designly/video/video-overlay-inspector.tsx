@@ -1,4 +1,4 @@
-// The inspector of the selected overlay (HRN-653): a slim bar under the picture with its look (kind, way in, way out,
+// The inspector of the selected overlay: a slim bar under the picture with its look (kind, way in, way out,
 // theme) and «Удалить». The pickers are our own lists in a popover; the bar leaves with an animation (a closing phase).
 import { useState } from 'react';
 import { kindPatch } from '@/next/features/designly/video/overlays-model';

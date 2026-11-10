@@ -1,4 +1,4 @@
-/* The kit screen's editing mode (HRN-903): the draft's chat docked on the left of the tree, the head's «Только
+/* The kit screen's editing mode: the draft's chat docked on the left of the tree, the head's «Только
    просмотр», settings and «Редактировать» / «Опубликовать версию». */
 .hx-kit[data-chat] {
   --kit-chat-w: 372px;

@@ -1,4 +1,4 @@
-// The overlay layer over the picture (HRN-653): while the mode is on and the player is paused, every overlay that is on
+// The overlay layer over the picture: while the mode is on and the player is paused, every overlay that is on
 // screen at the playhead has a box. A click selects, a drag moves, the corner resizes, a callout's point is dragged
 // too, a double click types the text in place (Enter and a click away save, Esc cancels), Del removes. What the
 // runtime draws underneath follows the drag (the player sends it the draft); the save is on release.

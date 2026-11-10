@@ -1,4 +1,4 @@
-// The head row of what a pane tab shows under its tab (HRN-674): one row, where it is on the left (the crumbs, the
+// The head row of what a pane tab shows under its tab: one row, where it is on the left (the crumbs, the
 // folders shrink first), what is done with it on the right. A view inside puts its own controls into the same row
 // through `HeadTools` (the switch of the view of a text file, the save state of a Word file), so a tab never stacks a
 // row of its own for one or two buttons.

@@ -299,7 +299,7 @@ const keepAppsFolded = (folded: boolean) => {
   }
 };
 
-/** The last apps that are on in chats; all the installed ones open from «Приложения» itself (HRN-843). */
+/** The last apps that are on in chats; all the installed ones open from «Приложения» itself. */
 const APP_ROWS = 3;
 const AppRows = ({ apps }: { apps: ISidebarApps }) => (
   <>
@@ -356,7 +356,7 @@ const DesignRows = ({
   );
 };
 
-/** «Ещё»: the rest of the places, in a menu beside the item — not a list that pushes the chats down (HRN-843). */
+/** «Ещё»: the rest of the places, in a menu beside the item — not a list that pushes the chats down. */
 const MoreMenu = ({ items }: { items: readonly IMoreItem[] }) => {
   const menuActions = useMenuActions();
   const current = items.some((item) => item.current);

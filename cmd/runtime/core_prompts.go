@@ -160,7 +160,7 @@ func (w *promptWiring) LaunchChosen(session string, applied prompts.Applied) {
 	if len(current.Apps) > 0 {
 		launch.Set("apps", launchpkg.AppsJSON(current.Apps))
 	}
-	// And its fast and permission modes (HRN-945).
+	// And its fast and permission modes.
 	if current.Fast {
 		launch.Set("fast", true)
 	}

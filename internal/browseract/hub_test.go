@@ -95,7 +95,7 @@ func TestBusyAndTimeoutAndAsking(t *testing.T) {
 }
 
 // The person takes longer than one call: the call ends with «asking», the next one waits for the answer, then sends
-// its own action (HRN-681).
+// its own action.
 func TestAskingOutlivesTheCallAndTheNextCallWaits(t *testing.T) {
 	h := fastHub()
 	h.Poll(context.Background(), "c1")

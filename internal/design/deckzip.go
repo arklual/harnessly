@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// Archives of a project (HRN-679): «ZIP проекта» is its project/ folder (the boards with everything they load), «Весь
+// Archives of a project: «ZIP проекта» is its project/ folder (the boards with everything they load), «Весь
 // проект» is what makes the project whole elsewhere: the description, the pages, notes and comments (meta/) and the
 // boards. The service folders (names starting with a dot: recordings, exports, thumbnails, the agent's notes) stay
 // out, as do files that look like credentials; a link is followed only to a file inside the project itself.

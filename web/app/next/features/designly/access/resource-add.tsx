@@ -1,4 +1,4 @@
-// «Добавить людей или команды» (HRN-675): the field asks the directory as the person types and offers people and
+// «Добавить людей или команды»: the field asks the directory as the person types and offers people and
 // teams under it; a pick becomes a chip, Backspace in the empty field takes the last chip back, an address typed in
 // full is offered as «Пригласить <почта>». With chips, one role for all of them and «Пригласить» come in at the end:
 // each chip is given that role in turn, and the field empties once the gateway has answered.

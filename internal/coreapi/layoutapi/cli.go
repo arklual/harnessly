@@ -158,7 +158,7 @@ func (a *api) cliTabs(c *call) {
 }
 
 // cliDelegate hands an agent tab's first message to a chat nested under the chat of the asking terminal, as delegate_task
-// does (HRN-828): the person sees it under that chat, and it can be read, waited for and woken on. It answers and returns
+// does: the person sees it under that chat, and it can be read, waited for and woken on. It answers and returns
 // true when it did (or was refused); false leaves the tab to be made the old way, with the reason on c.noParent when the
 // caller asked from a terminal that is no chat's.
 func (a *api) cliDelegate(c *call, provider, panelType, workspaceID string, prompt, model, effort, name any) bool {
@@ -580,7 +580,7 @@ func (a *api) cliPanel(c *call) {
 			c.fail(429, tooOften())
 			return
 		}
-		// Each address opens once: the same `open` within paneauto.RepeatWindow is answered, not asked again (HRN-943).
+		// Each address opens once: the same `open` within paneauto.RepeatWindow is answered, not asked again.
 		if id := paneauto.Repeated(a.d.Intents, tabID, command, time.Now()); id != "" {
 			what := locale.Pick("Tab \""+command.Tab+"\"", "Вкладка «"+command.Tab+"»")
 			if command.Target != "" {

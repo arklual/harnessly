@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { RELEASES } from '../app/next/features/whats-new/releases';
 import { startStack, type Stack } from './stack';
 
-// HRN-883: a machine of an older install, its data still on its disk (the files people put into chats, the handoff
+// a machine of an older install, its data still on its disk (the files people put into chats, the handoff
 // notes), connects to a hub that keeps a store. Its runtime moves the data into the hub (docs/migrations/0001-data-to-hub.md),
 // the hub keeps the journal, «Машины» shows how far it is. One object is broken (a folder where a file should be): the
 // move stops on it with its code, the card offers «Повторить» and «Продолжить с агентом», the agent's chat opens with

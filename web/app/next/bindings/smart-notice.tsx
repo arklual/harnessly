@@ -336,11 +336,11 @@ const SmartNoticeHost = ({
       settings.cards
         ? orderItems([
             ...itemsOfCodes(codes.asks, codes.skew),
-            ...itemsOfMachines(machineNotices),
+            ...(settings.machine ? itemsOfMachines(machineNotices) : []),
             ...itemsOfNotices(notices, byId, now, keep),
           ])
         : [],
-    [settings.cards, codes.asks, codes.skew, machineNotices, notices, byId, now, keep],
+    [settings.cards, settings.machine, codes.asks, codes.skew, machineNotices, notices, byId, now, keep],
   );
   const items = useMemo(() => all.filter((item) => !hidden.has(item.key)), [all, hidden]);
 
@@ -434,7 +434,8 @@ const SmartNoticeHost = ({
     const keys = new Set(machineNotices.map((n) => n.alert.key));
     const before = sickHeard.current;
     sickHeard.current = keys;
-    if (before === null || document.visibilityState !== 'visible' || !settings.cards) return;
+    if (before === null || document.visibilityState !== 'visible' || !settings.cards || !settings.machine)
+      return;
     const fresh = machineNotices.find((n) => !before.has(n.alert.key));
     if (fresh && soundOn(settings, 'urgent') && firstToPing(`machine:${fresh.alert.key}`))
       playSound('urgent');

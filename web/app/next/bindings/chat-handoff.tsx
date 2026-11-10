@@ -61,7 +61,7 @@ const openChat = (id: string) => goTo({ kind: ROUTE.chat, id });
 
 /**
  * Where a chat this one gives way to (another model, a fork) opens: its own page, or, for a chat inside a design, the
- * design's column, so the person stays on the design (HRN-673).
+ * design's column, so the person stays on the design.
  */
 export const ChatOpener = createContext<(id: string) => void>(openChat);
 const isConvId = (id: string): id is ConvId => id.startsWith('tab-');

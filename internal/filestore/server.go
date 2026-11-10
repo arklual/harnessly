@@ -33,7 +33,7 @@ type Access struct {
 	Member string
 	Room   string
 	// Sees, when set, is which paths of the room the caller may read: the others are left out of its changes and
-	// answer 404 (HRN-880: a machine gets only the design projects its people have a role in). Nil: the whole room.
+	// answer 404 (a machine gets only the design projects its people have a role in). Nil: the whole room.
 	Sees func(path string) bool
 	// Writes, when set, is which paths the caller may change; a commit outside them is 403. Nil: whatever it sees.
 	Writes func(path string) bool
@@ -151,6 +151,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+prefix+"/leases", s.room(s.leases))
 	mux.HandleFunc("POST "+prefix+"/leases", s.room(s.leaseTake))
 	mux.HandleFunc("POST "+prefix+"/leases/release", s.room(s.leaseRelease))
+	mux.HandleFunc("GET "+prefix+"/keys", s.room(s.keys))
 	return mux
 }
 
@@ -439,6 +440,36 @@ func (s *Server) snapshot(w http.ResponseWriter, r *http.Request, c caller) {
 }
 
 // leases lists the live leases of the room.
+// keys lists the room key as wrapped for each member of a profile room (design-sync's machines): a machine of
+// the person that still has a design-sync identity opens the one wrapped for it and keeps the key in the hub's safe.
+// Each is sealed to its member's age identity, so the list gives nothing to anyone else.
+func (s *Server) keys(w http.ResponseWriter, r *http.Request, c caller) {
+	if r.PathValue("collection") != KindProfile {
+		http.NotFound(w, r)
+		return
+	}
+	ms, err := c.store.meta.Members(r.Context())
+	if err != nil {
+		http.Error(w, "cannot read members", http.StatusInternalServerError)
+		return
+	}
+	out := WrappedKeys{Keys: []WrappedKey{}}
+	for _, m := range ms {
+		if !m.HasKey {
+			continue
+		}
+		k, err := c.store.meta.Key(r.Context(), m.Name)
+		if err != nil {
+			http.Error(w, "cannot read keys", http.StatusInternalServerError)
+			return
+		}
+		if k != "" {
+			out.Keys = append(out.Keys, WrappedKey{Member: m.Name, Wrapped: k})
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (s *Server) leases(w http.ResponseWriter, r *http.Request, c caller) {
 	ls, err := c.store.meta.Leases(r.Context(), time.Now().UnixMilli())
 	if err != nil {

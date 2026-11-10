@@ -49,7 +49,7 @@ func storeOptions(cfg gate.Config) (storelink.Options, error) {
 
 // machineFiles are where the runtime's hub machine may be named, in order: its own machine.json (a hub's machine), then
 // the observe link of an agent that also serves a cluster (AGENT_HUB_OBSERVE_FILE, `<data>/hub/machine.json`): such
-// a runtime is a hub's machine as well, and its library syncs with that hub's store (HRN-880), not a store of its own.
+// a runtime is a hub's machine as well, and its library syncs with that hub's store, not a store of its own.
 func machineFiles(dataDir string) []string {
 	if f := os.Getenv("AGENT_MACHINE_FILE"); f != "" {
 		return []string{f}
@@ -89,9 +89,14 @@ func (f *runtimeGate) startStore(ctx context.Context, cfg gate.Config) func() {
 		return func() {}
 	}
 	linked.Store(f.store)
-	stopApps := startAppsCenter(ctx, f.store, cfg.DataDir)
+	stopAppsCenter := startAppsCenter(ctx, f.store, cfg.DataDir)
+	stopProfile := startProfileSync(ctx, f.store, cfg.DataDir)
 	stopMove := f.startMove(ctx, f.store, cfg.DataDir)
-	stopApps = func(apps func()) func() { return func() { stopMove(); apps() } }(stopApps)
+	stopApps := func() {
+		stopMove()
+		stopProfile()
+		stopAppsCenter()
+	}
 	if f.store == nil || f.library == nil || !librarySynced() {
 		return stopApps
 	}
@@ -113,7 +118,7 @@ func (f *runtimeGate) startStore(ctx context.Context, cfg gate.Config) func() {
 	}
 }
 
-// startAppsCenter keeps the apps' user, space, chat and doc areas and the team's apps in the hub's store (HRN-898):
+// startAppsCenter keeps the apps' user, space, chat and doc areas and the team's apps in the hub's store:
 // the same on every machine of the space and there with this one off. Only under a hub; on a machine of its own they
 // stay on its disk.
 func startAppsCenter(ctx context.Context, l *storelink.Link, dataDir string) func() {
@@ -165,7 +170,7 @@ var linked atomic.Pointer[storelink.Link]
 const deliveredMax = 64 << 20
 
 // keepDelivered puts a file the agent handed over into the `files` collection of the hub's store by its sha256
-// (HRN-879, docs/hub/history.md): the chat's card then reads it from the hub, the machine on or off. Only under a hub,
+// (docs/hub/history.md): the chat's card then reads it from the hub, the machine on or off. Only under a hub,
 // in the background and best effort; bytes that no longer hash to what the card says are left alone.
 func keepDelivered(info delivery.Info) {
 	l := linked.Load()

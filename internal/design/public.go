@@ -489,16 +489,7 @@ func (a *API) servePublic(w http.ResponseWriter, r *http.Request, project string
 		return
 	case PublicGuestDir:
 		if len(segments) == 2 && segments[1] == "client.js" {
-			body := []byte(a.L.clientScript())
-			h := w.Header()
-			h.Set("Content-Type", "text/javascript; charset=utf-8")
-			h.Set("Content-Length", strconv.Itoa(len(body)))
-			h.Set("Cache-Control", "private, max-age=300")
-			h.Set("X-Content-Type-Options", "nosniff")
-			w.WriteHeader(200)
-			if !head {
-				_, _ = w.Write(body)
-			}
+			serveLibScript(w, r, a.L.clientScript(), "", "private, max-age=300", head)
 			return
 		}
 		publicText(w, 404, "Not found")
@@ -619,7 +610,14 @@ func (a *API) servePublic(w http.ResponseWriter, r *http.Request, project string
 		}
 		return
 	}
-	if !a.L.servePublicStatic(w, r, f, st, file, typ, strings.ToLower(extname(file)), publicCachePolicy(r, FileVersion(st)), head) {
+	ext := strings.ToLower(extname(file))
+	policy := publicCachePolicy(r, FileVersion(st))
+	// A guest's engine asks for a component file translated, as the owner's does (compile.go).
+	if wantsCompiled(r.URL.Query(), ext) && st.Size() <= PublicFileLimit &&
+		a.L.serveCompiledFrom(w, r, "public-open\n"+file, file, st, policy, head, func() ([]byte, error) { return readPublicFile(f, PublicFileLimit) }) {
+		return
+	}
+	if !a.L.servePublicStatic(w, r, f, st, file, typ, ext, policy, head) {
 		publicText(w, 404, "Not found")
 	}
 }

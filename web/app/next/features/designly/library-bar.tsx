@@ -1,4 +1,4 @@
-// The library's tools in the toolbar's one row (HRN-873, was a second row of chips in HRN-860): a filter button whose menu
+// The library's tools in the toolbar's one row (was a second row of chips in HRN-860): a filter button whose menu
 // holds the kind, «Недавние», the design system and the sort, and a «⋯» with the person's own tools (a new folder,
 // select, the trash). A dot on the filter says something other than the default is chosen.
 import { Menu } from '@base-ui/react/menu';

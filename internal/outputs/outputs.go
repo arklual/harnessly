@@ -158,7 +158,7 @@ func artifactOf(cfg Config, pub *jsvalue.Object, links []string) []wire.TurnOutp
 }
 
 // opened is what `harnessly open <link>` showed: a page of the catalogue (a document of the reader among them), a
-// merge request, a stand or a dev server of the machine. Any other site makes no card: it is no stand (HRN-943, a
+// merge request, a stand or a dev server of the machine. Any other site makes no card: it is no stand (a
 // document opened through the reader was a «stand» card).
 func opened(cfg Config, link string) (wire.TurnOutput, bool) {
 	switch {

@@ -46,7 +46,7 @@ on a request. Until the first result `ready` is `false` and `render.checking` is
   that stops matching fails the build instead of drawing with another Chromium.
 - **The machine installer** (`install.sh`, profile `dir`) carries the same values (the hub serves the script alone;
   a test fails when they differ) and pins them on Debian bookworm. On other systems it installs what the package manager
-  has and the doctor's `versions` step says how it differs. The full installer is a separate task (HRN-742).
+  has and the doctor's `versions` step says how it differs. The full installer is a separate task.
 - **CI** installs the pinned set on a bookworm base and runs `harnessly doctor render` (job `render-doctor`).
 
 To move a pin: change the value in `versions.env` and in `install.sh`, raise `RENDER_KIT_REV`, let `render-doctor` pass.

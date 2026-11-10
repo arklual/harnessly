@@ -387,7 +387,7 @@ func (s *Store) TabLaunch(tab *jsvalue.Object) *jsvalue.Object {
 }
 
 // SetTabLaunchModes writes the fast and permission modes a tab's next launch starts in (launch.fast and
-// launch.permission of its metadata, HRN-945), keeping the rest of the launch; off and "" remove them. A tab with no
+// launch.permission of its metadata), keeping the rest of the launch; off and "" remove them. A tab with no
 // launch choice gets one of no model and no effort.
 func (s *Store) SetTabLaunchModes(sessionName string, fast bool, permission string) error {
 	return s.mutateTab(sessionName, func(tab *jsvalue.Object) bool {
@@ -417,7 +417,7 @@ func (s *Store) SetTabLaunchModes(sessionName string, fast bool, permission stri
 	})
 }
 
-// TabLaunchFast says whether the tab of a session starts in fast mode (launch.fast of its metadata, HRN-945): what a
+// TabLaunchFast says whether the tab of a session starts in fast mode (launch.fast of its metadata): what a
 // GPT chat's relay reads on each request. ok is false when no tab has the session.
 func (s *Store) TabLaunchFast(sessionName string) (fast, ok bool) {
 	wsID, _, _, valid := s.cfg.Tmux.ParseSessionName(sessionName)

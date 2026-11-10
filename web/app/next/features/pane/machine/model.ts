@@ -1,7 +1,7 @@
 // What the Machine tool draws, from what the machine says: the design's numbers (lib/hx, Главная.dc.html) with the
 // real figures in them. Pure: the view gets finished tiles, charts and rows.
 import { plural, t } from '@/next/i18n';
-import type { DiskPartId, MachineProc, MachineStats } from '@/next/protocol/v2';
+import type { DiskPartId, HealthMetric, MachineHealth, MachineProc, MachineStats } from '@/next/protocol/v2';
 import {
   bytes,
   bytesParts,
@@ -15,7 +15,6 @@ import {
   rate,
   rateParts,
   stack,
-  tone,
   TONE,
   type IHeatCell,
   type IKpi,
@@ -33,12 +32,17 @@ const SPARK_POINTS = 14;
 /** The change in the processor's tile is against this many points back (ten minutes). */
 const DELTA_BACK = 5;
 
-/** Where a level turns from fine to loaded to overloaded, per cent. */
-const CPU_LEVELS = { warn: 55, bad: 85 } as const;
-const MEM_LEVELS = { warn: 85, bad: 93 } as const;
-const DISK_LEVELS = { warn: 90, bad: 97 } as const;
+/** The tone of a level of the runtime's verdict (machines/health.go): the tab says what the plate, the sidebar and the
+ *  notification centre say, with no lines of its own. */
+const TONE_OF_HEALTH = { ok: TONE.ok, warn: TONE.warn, critical: TONE.bad } as const;
 
-const LEVEL_RANK = { ok: 0, warn: 1, bad: 2 } as const satisfies Record<TTone, number>;
+/** The processor's line on the chart: where the runtime starts to call it loaded (machines/health.go, cpuWarnPct). */
+const CPU_LINE = 90;
+
+const metricTone = (health: MachineHealth, metric: HealthMetric): TTone => {
+  const issue = health.issues.find((i) => i.metric === metric);
+  return issue ? TONE_OF_HEALTH[issue.level] : TONE.ok;
+};
 
 /** The palette slot of each series, as the design gives them. */
 const SLOT = { cpu: 1, rx: 2, mem: 3, disk: 4, tx: 6 } as const;
@@ -61,7 +65,8 @@ export interface IProcRow {
 }
 
 export interface IMachineModel {
-  level: { tone: TTone; text: string };
+  /** The runtime's verdict in words; null from a runtime that does not judge its health. */
+  level: { tone: TTone; text: string } | null;
   kpis: IKpi[];
   load: { legend: { label: string; slot: number }[]; plot: IPlot };
   cores: IHeatCell[];
@@ -75,9 +80,6 @@ export interface IMachineModel {
 }
 
 const share = (x: number) => Math.round(x * 100);
-
-const worst = (...levels: TTone[]): TTone =>
-  levels.reduce((a, b) => (LEVEL_RANK[b] > LEVEL_RANK[a] ? b : a), TONE.ok);
 
 const levelText = (level: TTone): string => t(`next.machine.level.${level}`);
 
@@ -132,7 +134,7 @@ export const procRow = (proc: MachineProc, index: number): IProcRow => {
   };
 };
 
-export const buildMachine = (stats: MachineStats): IMachineModel => {
+export const buildMachine = (stats: MachineStats, health: MachineHealth | null): IMachineModel => {
   const history = stats.history;
   const to = history.length ? history[history.length - 1].at : stats.at;
   const from = to - SPAN_MS;
@@ -147,11 +149,13 @@ export const buildMachine = (stats: MachineStats): IMachineModel => {
   const mem = stats.mem.total > 0 ? share(stats.mem.used / stats.mem.total) : 0;
   const diskTotal = stats.disk.total;
   const diskUsed = diskTotal > 0 ? share((diskTotal - stats.disk.free) / diskTotal) : 0;
-  const level = worst(
-    tone(cpu, CPU_LEVELS.warn, CPU_LEVELS.bad),
-    tone(mem, MEM_LEVELS.warn, MEM_LEVELS.bad),
-    tone(diskUsed, DISK_LEVELS.warn, DISK_LEVELS.bad),
-  );
+  const level = health ? TONE_OF_HEALTH[health.level] : null;
+  const toneOf = (metric: HealthMetric) => (health ? metricTone(health, metric) : undefined);
+  // The memory and the disk keep their palette colour until the verdict names them.
+  const issueTone = (metric: HealthMetric) => {
+    const tone = toneOf(metric);
+    return tone === TONE.ok ? undefined : tone;
+  };
 
   const netNow = rateParts(stats.net.rx);
   const kpis: IKpi[] = [
@@ -168,7 +172,7 @@ export const buildMachine = (stats: MachineStats): IMachineModel => {
       spark: cpuH.slice(-SPARK_POINTS),
       sparkMin: 0,
       sparkMax: 100,
-      tone: tone(cpu, CPU_LEVELS.warn, CPU_LEVELS.bad),
+      tone: toneOf('cpu'),
     }),
     kpi({
       label: t('next.machine.mem'),
@@ -180,6 +184,7 @@ export const buildMachine = (stats: MachineStats): IMachineModel => {
       sparkMin: 0,
       sparkMax: 100,
       slot: SLOT.mem,
+      tone: issueTone('mem'),
     }),
     ...(diskTotal > 0
       ? [
@@ -190,6 +195,7 @@ export const buildMachine = (stats: MachineStats): IMachineModel => {
             index: 2,
             sub: t('next.machine.free', { size: bytes(stats.disk.free) }),
             slot: SLOT.disk,
+            tone: issueTone('disk'),
           }),
         ]
       : []),
@@ -238,7 +244,7 @@ export const buildMachine = (stats: MachineStats): IMachineModel => {
       : null;
 
   return {
-    level: { tone: level, text: levelText(level) },
+    level: level === null ? null : { tone: level, text: levelText(level) },
     kpis,
     load: {
       legend: loadSeries.map((s) => ({ label: s.name, slot: s.slot })),
@@ -253,7 +259,7 @@ export const buildMachine = (stats: MachineStats): IMachineModel => {
         max: 100,
         yTicks: 5,
         yFormat: percent,
-        refs: [{ value: CPU_LEVELS.bad, label: t('next.machine.limit', { n: CPU_LEVELS.bad }) }],
+        refs: [{ value: CPU_LINE, label: t('next.machine.limit', { n: CPU_LINE }) }],
       }),
     },
     cores: heat(

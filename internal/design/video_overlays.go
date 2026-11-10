@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 )
 
-// The overlay layer of a scene (HRN-653): titles, lower thirds, callouts, highlights, key caps, counters and badges that
+// The overlay layer of a scene: titles, lower thirds, callouts, highlights, key caps, counters and badges that
 // are drawn over the scene's board (or over a recorded interface) as a pure function of time. They are a declarative list
 // in meta/scenes/<pageId>.json, so a person edits them in the player and an agent through the CLI or the MCP tools, and
 // neither needs the board's HTML. video-runtime.js draws them in the live player and in the render alike.

@@ -2,7 +2,7 @@ package apps
 
 import "strings"
 
-// LoadCheck is what `harnessly app check` and the agent's app_check tool answer (HRN-920): did the app's view load in
+// LoadCheck is what `harnessly app check` and the agent's app_check tool answer: did the app's view load in
 // a browser of the machine, how long its handshake took, and every line the load wrote to the app's log.
 type LoadCheck struct {
 	App  string `json:"app"`

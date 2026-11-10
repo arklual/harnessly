@@ -1,4 +1,4 @@
-// What the library shows from its cards (HRN-860): the filters that combine with the search, the sorts, and the folders
+// What the library shows from its cards: the filters that combine with the search, the sorts, and the folders
 // as a tree one level deep. Pure, so the screen only draws what it answers.
 import type { IDesignCard, TDesignKind } from '@/next/features/designly/designly-home';
 import type { IFolder } from '@/next/features/designly/api';
@@ -75,7 +75,7 @@ export const folderChoices = (folders: readonly IFolder[]): { folder: IFolder; d
     ...childrenOf(folders, top.id).map((sub) => ({ folder: sub, depth: 1 as const })),
   ]);
 
-/** The demo projects every library starts with (HRN-813); the tour's lessons are about them. */
+/** The demo projects every library starts with; the tour's lessons are about them. */
 export const DEMO_IDS = ['relay-site', 'relay-deck', 'relay-video', 'relay-ds'] as const;
 
 /** The next click on the way to a card (the tour's), by what the library shows now. */

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BridgeError, targetAllowed, type TAppKeyHandlers } from '@/next/features/app-views/bridge';
 import { connectBuiltin } from '@/next/features/app-views/builtin-app';
 
-// A builtin app (HRN-808) reaches the host through the bridge in the page's own process: the same methods, the rights
+// A builtin app reaches the host through the bridge in the page's own process: the same methods, the rights
 // of its manifest, the same refusals.
 describe('connectBuiltin', () => {
   it('sends to the chat through ui/message, under the right its manifest has', async () => {

@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 )
 
-// The agent's tools over a scene's overlay layer (HRN-653). They are the CLI's twins: the same store, the same rule that
+// The agent's tools over a scene's overlay layer. They are the CLI's twins: the same store, the same rule that
 // a person's edit wins unless the agent says force.
 
 func videoEnum(desc string, values ...string) *jsvalue.Object {

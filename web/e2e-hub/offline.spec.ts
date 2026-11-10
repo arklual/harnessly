@@ -117,7 +117,7 @@ test('2. a chat is made while the machine is on, and the hub keeps it', async ()
   await expect(page.getByText('Fake agent reply: hello from the machine').first()).toBeVisible({
     timeout: 90_000,
   });
-  // A tool whose output is past the 4 KB an event carries (HRN-879).
+  // A tool whose output is past the 4 KB an event carries.
   await box.fill('bigoutput please');
   await box.press('Enter');
   await expect(page.getByText('Fake agent reply: bigoutput please').first()).toBeVisible({

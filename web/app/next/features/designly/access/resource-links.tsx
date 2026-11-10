@@ -1,4 +1,4 @@
-// «Ссылки без входа» of the one dialog (HRN-675, stage «г»): a link of its own for each recipient, view or comment,
+// «Ссылки без входа» of the one dialog (stage «г»): a link of its own for each recipient, view or comment,
 // never edit. The list says for whom, what it allows, until when and whether it was opened; a link's menu copies it
 // (or gives it a new address where the old one was not kept), changes it, switches it off or on again. A link is run
 // by its maker or by a manager: someone else's link has no menu (the gateway refuses it anyway). The screen of a link

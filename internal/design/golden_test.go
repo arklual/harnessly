@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -291,6 +292,8 @@ func newGoldenRig(t *testing.T) *goldenRig {
 	return &goldenRig{g: g, root: root, lib: lib, l: l, a: a, term: term, now: &now, subs: &subs, statuses: &statuses, pushed: &pushed, removed: &removed, routes: routes}
 }
 
+var clientVersionRe = regexp.MustCompile(regexp.QuoteMeta(scriptPath) + `\?v=[0-9a-f]{16}`)
+
 func TestGoldenRoutes(t *testing.T) {
 	rig := newGoldenRig(t)
 	g, root, lib, l, term, routes := rig.g, rig.root, rig.lib, rig.l, rig.term, rig.routes
@@ -351,7 +354,10 @@ func TestGoldenRoutes(t *testing.T) {
 			et := res.Header.Get("ETag")
 			supportVersion = et[3 : len(et)-1]
 		}
-		answer := scrub(jscompat.DecodeUTF8(got))
+		// The board script's address carries its version, which the reference runtime's did not.
+		decoded := jscompat.DecodeUTF8(got)
+		versioned := clientVersionRe.ReplaceAllString(decoded, scriptPath)
+		answer := scrub(versioned)
 		if req.Server == "api" {
 			answer = portRe.ReplaceAllString(answer, `"port":0`)
 		}
@@ -366,6 +372,9 @@ func TestGoldenRoutes(t *testing.T) {
 			}
 			if k == "content-length" && req.Server == "api" {
 				continue
+			}
+			if k == "content-length" && versioned != decoded {
+				gotH = strconv.Itoa(len(got) - (len(decoded) - len(versioned)))
 			}
 			if gotH != want {
 				t.Errorf("#%d %s %s: header %s %q, want %q", i, req.Method, url, k, gotH, want)

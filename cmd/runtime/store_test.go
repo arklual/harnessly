@@ -46,7 +46,7 @@ func TestStoreOptions(t *testing.T) {
 	if k := kind(alone); k != "" {
 		t.Errorf("paired with a cluster's agent: %q", k)
 	}
-	// HRN-880: a cluster's agent that also keeps an observe link to a hub (<data>/hub/machine.json) makes its runtime a
+	// a cluster's agent that also keeps an observe link to a hub (<data>/hub/machine.json) makes its runtime a
 	// hub's machine: the library syncs with that hub's store, not a store of its own.
 	observed := gate.Config{DataDir: t.TempDir()}
 	if err := m.Save(filepath.Join(observed.DataDir, "hub", "machine.json")); err != nil {

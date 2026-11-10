@@ -1,4 +1,4 @@
-// The chat's apps that work in the background (the right `background`, HRN-852): while the chat is open, each such app
+// The chat's apps that work in the background (the right `background`): while the chat is open, each such app
 // that is on in it, agreed to and not switched off keeps its first pane view running hidden, so its hooks hear the
 // agent and its events arrive without the person opening the view. The view is told it is not visible.
 import AppFrame from '@/next/features/app-views/app-frame';

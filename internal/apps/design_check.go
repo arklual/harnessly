@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// The design check of `harnessly app validate` (HRN-695): warnings, never errors, about what makes a view look foreign
+// The design check of `harnessly app validate`: warnings, never errors, about what makes a view look foreign
 // in the pane — an inline style, a native <select>, a colour written out instead of a --t-* token (the view then misses
 // the theme). --strict counts them, as it does every warning.
 

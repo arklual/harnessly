@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/storelink"
 )
 
-// The organization's rule for apps «Не спрашивать разрешений» (HRN-915) is its admin's, by a person's session: a
+// The organization's rule for apps «Не спрашивать разрешений» is its admin's, by a person's session: a
 // machine's signature or a session of its store (what an agent on the machine can reach) does not change it.
 func TestAppsConsentRuleIsTheAdminsBySession(t *testing.T) {
 	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"))

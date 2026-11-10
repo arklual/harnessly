@@ -445,13 +445,13 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 		enabled, _ := field[bool](req, "enabled")
 		cursors, _ := field[map[string]cursor](req, "cursors")
 		known, _ := field[map[string]int64](req, "known")
-		// HRN-879: a cluster that keeps where each chat's backfill stopped names the chats it does not hold whole; an
+		// a cluster that keeps where each chat's backfill stopped names the chats it does not hold whole; an
 		// older one sends no `pending`, and its chats are backfilled as before.
 		pending, ok := field[map[string]string](req, "pending")
 		if ok && pending == nil {
 			pending = map[string]string{}
 		}
-		// HRN-879: the chats held whole whose steps are not all in the cluster, by their steps cursor; none from an older one.
+		// the chats held whole whose steps are not all in the cluster, by their steps cursor; none from an older one.
 		steps, _ := field[map[string]string](req, "steps")
 		a.replica.startWith(enabled, cursors, known, pending, steps)
 		return map[string]bool{"ok": true}, nil, nil
@@ -656,7 +656,7 @@ func (a *Agent) runHub(ctx context.Context) error {
 	}
 	defer a.hub.stop()
 	if a.hub.historyServed() {
-		// HRN-879: the chats go to the hub; nothing is sent before the hub's history.start says it keeps them.
+		// the chats go to the hub; nothing is sent before the hub's history.start says it keeps them.
 		a.startReplica(ctx)
 	}
 	// Run does not return before the dial loop has: a late write of agent-link.json or the audit log after stop would

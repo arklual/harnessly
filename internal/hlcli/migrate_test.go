@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// HRN-883: harnessly migrate reads and steers the runtime's move; --json is the runtime's answer as it is.
+// harnessly migrate reads and steers the runtime's move; --json is the runtime's answer as it is.
 func TestMigrateCommands(t *testing.T) {
 	status := `{"migration":"0001-data-to-hub","total":420,"verified":412,"failed":8,"doc":"docs/migrations/0001-data-to-hub.md","hub":"on",
 "failures":[{"kind":"uploads","object":"up_2","state":"failed","code":"MIG-READ","error":"permission denied","attempts":2}]}`

@@ -319,7 +319,7 @@ echo recovered`, map[string]string{
 	}
 }
 
-// HRN-914: RUNTIME_* given to the installer go into the env file, so every later start of the service reads them, and
+// RUNTIME_* given to the installer go into the env file, so every later start of the service reads them, and
 // the launchd job, which reads no env file, carries them.
 func TestRootInstallerKeepsGivenRuntimeEnv(t *testing.T) {
 	out, _ := installerFunctions(t, `parse_args

@@ -20,7 +20,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
-// HRN-881. A hand edit made in Sinopia's editor of a deck or a video (its settings, a slide's notes, an element moved
+// A hand edit made in Sinopia's editor of a deck or a video (its settings, a slide's notes, an element moved
 // on a slide, a comment) is saved through the hub: the hub keeps a working copy of the project as the store has it,
 // runs the runtime's own handler of the edit on it, and commits every file the handler changed on top of the revision
 // it was read at. Nobody's machine takes part; the machines of the space take the new revision as they take any other.

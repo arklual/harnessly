@@ -1,4 +1,4 @@
-// The player's side of the agent's view tools (HRN-580): every moment it tells the runtime where the person is and takes
+// The player's side of the agent's view tools: every moment it tells the runtime where the person is and takes
 // what the agent asked. The person comes first: right after they moved the player the runtime only offers a command, and
 // the offer waits for their press.
 import { useCallback, useEffect, useRef, useState } from 'react';

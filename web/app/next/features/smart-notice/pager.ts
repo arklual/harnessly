@@ -1,4 +1,4 @@
-// Paging the stack of smart notices under a finger, a trackpad and a wheel (HRN-985). The stack has one continuous
+// Paging the stack of smart notices under a finger, a trackpad and a wheel. The stack has one continuous
 // position: 0 is the front plate at rest, +1 the next one in front, −1 the one before. While a gesture leads, the
 // position is the finger's travel towards the plate's edge over one page, so the plate it holds goes with it one to one
 // and the plates behind come forward by the same share (scale, offset, shade, all continuous). Let go, a spring carries

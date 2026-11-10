@@ -148,7 +148,7 @@ func TestVersionOrder(t *testing.T) {
 	}
 }
 
-// HRN-901: one failed run of the terminal's self-test is tried again before the state the rollout reads says fail;
+// one failed run of the terminal's self-test is tried again before the state the rollout reads says fail;
 // a machine that fails twice is failing.
 func TestKeeperTriesTheTerminalAgainBeforeFailing(t *testing.T) {
 	bad := []machineCheck{{ID: "pane_program", Detail: "вместо sleep видно «bash»"}}

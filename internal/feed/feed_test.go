@@ -279,7 +279,7 @@ func TestAfterAnEntry(t *testing.T) {
 	}
 }
 
-// HRN-879: after the newest entry nothing is new, yet the newest turn comes as it is now: a page drawn from the
+// after the newest entry nothing is new, yet the newest turn comes as it is now: a page drawn from the
 // cluster's copy saw it running and has to learn it ended.
 func TestAfterTheNewestEntryTheTurnStillComes(t *testing.T) {
 	path := write(t, conversation(3))
@@ -578,7 +578,7 @@ func TestAToolCallLoggedTwiceIsOneStep(t *testing.T) {
 	}
 }
 
-// HRN-879: a page asked before a turn older than the tail the feed holds (the cluster's cursor of a walk, kept across a
+// a page asked before a turn older than the tail the feed holds (the cluster's cursor of a walk, kept across a
 // restart of the runtime) reads the transcript back to that turn instead of answering that there is no such turn.
 func TestAPageBeforeATurnOlderThanTheTailIsRead(t *testing.T) {
 	path := write(t, conversation(40))
@@ -607,7 +607,7 @@ func TestAPageBeforeATurnOlderThanTheTailIsRead(t *testing.T) {
 }
 
 // The walk to a cursor deep in the transcript builds the feed again only when what it holds has doubled, not once per
-// window read: with a build per window, 200 windows were 200 builds over a growing feed, on the chat's actor (HRN-879).
+// window read: with a build per window, 200 windows were 200 builds over a growing feed, on the chat's actor.
 func TestTheWalkToAnOldCursorBuildsTheFeedFewTimes(t *testing.T) {
 	path := write(t, conversation(400))
 	whole := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})
@@ -645,7 +645,7 @@ func TestTheWalkToAnOldCursorBuildsTheFeedFewTimes(t *testing.T) {
 	}
 }
 
-// A page with steps carries the steps of every turn in it; the plain page only those of its newest (HRN-879).
+// A page with steps carries the steps of every turn in it; the plain page only those of its newest.
 func TestAPageWithStepsCarriesTheStepsOfEveryTurn(t *testing.T) {
 	path := write(t, conversation(5))
 	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})

@@ -19,7 +19,7 @@ var ErrVoiceUnavailable = errors.New("voice: not available on this machine")
 const VoiceBodyMax = 20 << 20
 
 // VoiceBudget is how long a recording may take to come and to be recognized: it is recognized piece by piece, some
-// seconds for each quarter of a minute, so a long one takes minutes on a busy machine (HRN-674).
+// seconds for each quarter of a minute, so a long one takes minutes on a busy machine.
 const VoiceBudget = 5 * time.Minute
 
 // VoiceLangs are the languages a recording may be recognized in; "" is ru.

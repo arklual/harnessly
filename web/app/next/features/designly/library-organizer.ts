@@ -1,6 +1,6 @@
 import type { IFolder, ITrashItem } from '@/next/features/designly/api';
 
-/** What the library screen is given to lay projects out and to delete them (HRN-860); every call resolves once the machine did. */
+/** What the library screen is given to lay projects out and to delete them; every call resolves once the machine did. */
 export interface ILibraryOrganizer {
   folders: readonly IFolder[];
   onFolderSave: (input: { id?: string; name: string; parent?: string }) => Promise<void>;

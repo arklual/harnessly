@@ -26,7 +26,7 @@ type Wire struct {
 	CAPem   string   `json:"caPem,omitempty"`
 	Proxy   string   `json:"proxy,omitempty"`
 	NoProxy []string `json:"noProxy,omitempty"`
-	// Publishers are the keys an app package may be signed with (HRN-966); RequireSigned makes a signature from one of
+	// Publishers are the keys an app package may be signed with; RequireSigned makes a signature from one of
 	// them the condition of an install.
 	Publishers    []Publisher `json:"publishers,omitempty"`
 	RequireSigned bool        `json:"requireSigned,omitempty"`

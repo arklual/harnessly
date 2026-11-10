@@ -14,7 +14,7 @@ import (
 )
 
 // The page reports a view's tools for a chat the app is on in; the runtime keeps only what the app's rights open, takes
-// the agent's call to the page once and brings the view's answer back (HRN-808).
+// the agent's call to the page once and brings the view's answer back.
 func TestAppPageRoutes(t *testing.T) {
 	call, _ := appRig(t)
 	cli := map[string]string{"x-cli-token": "tok"}
@@ -79,7 +79,7 @@ func TestAppPageRoutes(t *testing.T) {
 	if code, _ := call("POST", platformAPI+"/apps/page-tools", `{"conversation":"tab-9","apps":[]}`, page); code != http.StatusNotFound {
 		t.Fatalf("unknown chat: %d", code)
 	}
-	// Sinopia is the host's own (HRN-808): its page offers tools and its screen in a chat it is on in no list of.
+	// Sinopia is the host's own: its page offers tools and its screen in a chat it is on in no list of.
 	builtin := `{"conversation":"tab-2","apps":[{"app":"harnessly.sinopia","tools":[{"name":"show_board","description":"Show"}],"context":{"board":{"number":2}}}]}`
 	if code, body := call("POST", platformAPI+"/apps/page-tools", builtin, page); code != http.StatusOK || !strings.Contains(body, `"kept":1`) {
 		t.Fatalf("builtin report: %d %s", code, body)

@@ -1,4 +1,4 @@
-// The one access API of every kind of resource (HRN-675): <gateway>/access/{kind}/{id}, what the one «Поделиться»
+// The one access API of every kind of resource: <gateway>/access/{kind}/{id}, what the one «Поделиться»
 // answers to. The shapes are the gateway's (its access types). A gateway that does not know the route
 // yet answers nothing usable: `fetchView` says null and the caller keeps the older dialog. Every change waits for the
 // gateway and answers with the resource's fresh view.
@@ -29,7 +29,7 @@ export interface IResourceRequest {
   createdAt: string;
 }
 
-/** A link without sign-in (HRN-675, stage «г»): its own for each recipient, view or comment, never edit. */
+/** A link without sign-in (stage «г»): its own for each recipient, view or comment, never edit. */
 export interface IAccessLink {
   id: string;
   forWhom: string;

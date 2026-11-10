@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
-// The keeper of the self-test (HRN-795): when the tests run, what the machine is told, and the Claude Code gate.
+// The keeper of the self-test: when the tests run, what the machine is told, and the Claude Code gate.
 //
 // The terminal's self-test runs a while after the start and every 30 minutes; its state is in /api/health for the
 // rollout, which takes a release back when it fails (host-activate.sh).
@@ -112,7 +112,7 @@ func (k *keeper) terminal() {
 	checks := k.terminalOnce()
 	if bad := selftestFailed(checks); bad != "" {
 		// A failed run is tried again after a pause before the state says fail: the rollout takes a release back on
-		// it, and the first run after a start shares the machine with every tab coming back (HRN-901).
+		// it, and the first run after a start shares the machine with every tab coming back.
 		agent.Log("warn", "selftest failed once; trying again", agent.F{K: "failed", V: bad})
 		sleep := k.sleep
 		if sleep == nil {

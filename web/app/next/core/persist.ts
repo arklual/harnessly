@@ -374,7 +374,7 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
 /**
  * The lists to keep: every machine's whose machine itself has answered with it (a list that was only the cache is not
  * written back as if it were fresh). Every machine's, not only the active one's: a machine that is off next time still
- * draws its chats at once (HRN-902).
+ * draws its chats at once.
  */
 function exportLists(): CachedList[] {
   const out: CachedList[] = [];

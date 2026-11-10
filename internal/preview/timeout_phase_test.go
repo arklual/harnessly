@@ -56,7 +56,7 @@ func TestTimeoutSaysWhereItStood(t *testing.T) {
 		if w.Code != 504 || !strings.Contains(w.Body.String(), c.want) {
 			t.Errorf("%s: %d %q, want 504 with %q", name, w.Code, w.Body.String(), c.want)
 		}
-		// The page in the frame tells the tab, which opens the site in the machine's own browser (HRN-684).
+		// The page in the frame tells the tab, which opens the site in the machine's own browser.
 		if !strings.Contains(w.Body.String(), "type: 'tk:failed'") || !strings.Contains(w.Header().Get("Content-Security-Policy"), "'nonce-") {
 			t.Errorf("%s: the failure page does not tell the tab: %q", name, w.Body.String())
 		}

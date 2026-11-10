@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -304,7 +305,10 @@ type ImportOptions struct {
 	Force bool
 	// UpstreamRelease is the current release of Claude Design; a kit not tested on it gets a warning.
 	UpstreamRelease string
-	Now             func() time.Time
+	// Assume are kits counted as installed when the kit's requirements are checked: a pack installs its kits in
+	// order, and a dry run of one kit must not fail on a parent the same pack brings.
+	Assume []Require
+	Now    func() time.Time
 }
 
 // ImportResult of Import.
@@ -365,7 +369,7 @@ func Import(dir string, src io.Reader, opt ImportOptions) (ImportResult, error) 
 	}
 	var missing []string
 	for _, r := range m.Requires {
-		if Resolve(dir, r.ID, r.Version, nil) == "" {
+		if Resolve(dir, r.ID, r.Version, nil) == "" && !slices.Contains(opt.Assume, r) {
 			missing = append(missing, r.ID+" "+r.Version)
 		}
 	}

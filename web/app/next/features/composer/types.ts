@@ -65,13 +65,13 @@ export type DockNotice =
       onDrop: () => Promise<unknown>;
     }
   /**
-   * The move of the chat's machine's data into the hub stopped on objects with errors (HRN-883): try again, or hand it
+   * The move of the chat's machine's data into the hub stopped on objects with errors: try again, or hand it
    * to an agent on that machine.
    */
   | { kind: 'move'; line: string; codes: string; onRetry: () => Promise<unknown>; onAgent: () => void }
   /** The machine of the chat has been switched off for a while: what is written waits for it and goes by itself. */
   | { kind: 'off'; machine: string }
-  /** A new chat has no machine to start on: every one of the person's is down (HRN-870). */
+  /** A new chat has no machine to start on: every one of the person's is down. */
   | { kind: 'noMachines' }
   | { kind: 'machine'; machine: string; onStop: () => Promise<unknown> }
   /** The key of the chat's vendor was removed: it can be added again or the chat continued in another model. */

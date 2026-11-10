@@ -157,7 +157,7 @@ const ChatRow = ({
   const [menuMount, setMenuMount] = useState<TMenuMount>(MENU_MOUNT.none);
   /** A right click opened the menu at this point; null when «…» did. */
   const [menuAt, setMenuAt] = useState<IMenuPoint | null>(null);
-  /** The title is cut short in the row: the pointer on it shows it whole, over the row (HRN-843). */
+  /** The title is cut short in the row: the pointer on it shows it whole, over the row. */
   const [cut, setCut] = useState(false);
   const look = chat.status === CHAT_STATUS.none ? null : STATUS_LOOK[chat.status];
   const busy = pending !== undefined;

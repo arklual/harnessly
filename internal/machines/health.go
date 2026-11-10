@@ -10,8 +10,10 @@ import (
 )
 
 // The machine's health: whether its disk, memory or CPU is about to break the work on it. The runtime judges it itself,
-// so every page and the cluster read one verdict. Each metric keeps its own level with a margin to leave it, so a value
-// on the line does not flap; CPU is judged over a window, never one sample.
+// so every page and the cluster read one verdict: the smart notice, the sidebar's card and the Machine tab say the same.
+// Each metric keeps its own level with a margin to leave it, so a value on the line does not flap; CPU and swap-in are
+// judged over a window, never one sample; and a level is said only once it held: a short burst (the load of a busy
+// machine jumps from 9 to 24 within a minute) comes and goes unsaid.
 
 const gib = float64(1 << 30)
 
@@ -32,6 +34,10 @@ type healthTable struct {
 	// CPU: the busy share over the last cpuWindow, warn only; left below cpuExitPct.
 	cpuWarnPct, cpuExitPct float64
 	cpuWindow              time.Duration
+	// Swap-in is the rate over the last swapWindow.
+	swapWindow time.Duration
+	// A metric comes to a worse level once it held riseAfter, and back to a better one once that held fallAfter.
+	riseAfter, fallAfter time.Duration
 }
 
 // HealthLimits are the lines of the health, the only table of them: the pages show what the runtime judged.
@@ -47,6 +53,9 @@ var HealthLimits = healthTable{
 	cpuWarnPct:     90,
 	cpuExitPct:     80,
 	cpuWindow:      2 * time.Minute,
+	swapWindow:     30 * time.Second,
+	riseAfter:      20 * time.Second,
+	fallAfter:      time.Minute,
 }
 
 // HealthDeps is what the health reads; tests give it a /proc and a disk of their own.
@@ -64,13 +73,26 @@ type cpuAt struct {
 	ticks cpuTicks
 }
 
+type swapAt struct {
+	at    time.Time
+	pages float64
+}
+
+// heldLevel is a metric's level as said, and the level its figures point to since when, until that held long enough.
+type heldLevel struct {
+	said     wire.HealthLevel
+	next     wire.HealthLevel
+	nextFrom time.Time
+}
+
 // HealthMonitor samples the metrics and keeps their levels; one goroutine calls Sample.
 type HealthMonitor struct {
-	d      HealthDeps
+	d HealthDeps
+	// levels are what the figures say now (with their margins); said is what held and is told.
 	levels map[wire.HealthMetric]wire.HealthLevel
+	said   map[wire.HealthMetric]*heldLevel
 	cpu    []cpuAt
-	swapIn *float64
-	swapAt time.Time
+	swap   []swapAt
 	level  wire.HealthLevel
 	since  time.Time
 }
@@ -85,7 +107,7 @@ func NewHealthMonitor(d HealthDeps) *HealthMonitor {
 	if d.Disk == nil {
 		d.Disk = diskBytes
 	}
-	return &HealthMonitor{d: d, levels: map[wire.HealthMetric]wire.HealthLevel{}}
+	return &HealthMonitor{d: d, levels: map[wire.HealthMetric]wire.HealthLevel{}, said: map[wire.HealthMetric]*heldLevel{}}
 }
 
 func diskBytes(path string) (total, free float64, err error) {
@@ -119,10 +141,43 @@ func (h *HealthMonitor) Sample() wire.MachineHealth {
 			}
 		}
 	}
+	for _, m := range wire.HealthMetrics {
+		h.hold(m, now)
+	}
 	return h.verdict(now)
 }
 
-// swapInRate is the pages swapped in per second since the previous sample; nil without one.
+var levelRankOf = map[wire.HealthLevel]int{wire.HealthOK: 0, wire.HealthWarn: 1, wire.HealthCritical: 2}
+
+// hold brings the said level of a metric to what its figures say once they said it for riseAfter (worse) or fallAfter
+// (better), all the while.
+func (h *HealthMonitor) hold(m wire.HealthMetric, now time.Time) {
+	s := h.said[m]
+	if s == nil {
+		s = &heldLevel{said: wire.HealthOK, next: wire.HealthOK}
+		h.said[m] = s
+	}
+	at := h.levels[m]
+	if at == "" {
+		at = wire.HealthOK
+	}
+	if at == s.said {
+		s.next = s.said
+		return
+	}
+	if at != s.next {
+		s.next, s.nextFrom = at, now
+	}
+	after := HealthLimits.fallAfter
+	if levelRankOf[at] > levelRankOf[s.said] {
+		after = HealthLimits.riseAfter
+	}
+	if now.Sub(s.nextFrom) >= after {
+		s.said = at
+	}
+}
+
+// swapInRate is the pages swapped in per second over the last swapWindow; nil until the history is that long.
 func (h *HealthMonitor) swapInRate(now time.Time) *float64 {
 	raw, ok := h.read("vmstat")
 	if !ok {
@@ -132,13 +187,23 @@ func (h *HealthMonitor) swapInRate(now time.Time) *float64 {
 	if !ok {
 		return nil
 	}
-	prev, prevAt := h.swapIn, h.swapAt
-	h.swapIn, h.swapAt = &v, now
-	seconds := now.Sub(prevAt).Seconds()
-	if prev == nil || seconds <= 0 {
+	h.swap = append(h.swap, swapAt{now, v})
+	edge := now.Add(-HealthLimits.swapWindow)
+	base := -1
+	for i, s := range h.swap {
+		if !s.at.After(edge) {
+			base = i
+		}
+	}
+	if base < 0 {
 		return nil
 	}
-	rate := max(0, v-*prev) / seconds
+	h.swap = h.swap[base:]
+	seconds := now.Sub(h.swap[0].at).Seconds()
+	if seconds <= 0 {
+		return nil
+	}
+	rate := max(0, v-h.swap[0].pages) / seconds
 	return &rate
 }
 
@@ -163,7 +228,7 @@ func (h *HealthMonitor) verdict(now time.Time) wire.MachineHealth {
 	out := wire.MachineHealth{Level: wire.HealthOK, Issues: []wire.HealthIssue{}}
 	for _, worst := range []wire.HealthLevel{wire.HealthCritical, wire.HealthWarn} {
 		for _, m := range wire.HealthMetrics {
-			if h.levels[m] == worst {
+			if s := h.said[m]; s != nil && s.said == worst {
 				out.Issues = append(out.Issues, wire.HealthIssue{Metric: m, Level: worst})
 			}
 		}

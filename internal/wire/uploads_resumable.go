@@ -17,7 +17,7 @@ import (
 	"unicode/utf8"
 )
 
-// Uploads of any size in chunks (HRN-826), on the same store as the one-shot PUT: the page opens a session
+// Uploads of any size in chunks, on the same store as the one-shot PUT: the page opens a session
 // (POST /uploads {name,size,type}), sends the file in chunks (PATCH /uploads/{id} with Upload-Offset), asks where the
 // machine is after a break (HEAD /uploads/{id}) and closes it (POST /uploads/{id}/complete), which renames the
 // temporary file into place and answers the AttachmentRef. Nothing is held in memory: a chunk goes from the socket to

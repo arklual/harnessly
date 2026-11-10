@@ -13,7 +13,7 @@ export interface IMachinesSectionProps {
   failed?: { reason: string; onRetry: () => void | Promise<unknown> } | null;
   busy: ReadonlySet<string>;
   onMakeMain: (id: string) => void;
-  /** What goes under a machine's row: the move of its data into the hub while there is one (HRN-883). */
+  /** What goes under a machine's row: the move of its data into the hub while there is one. */
   below?: (row: IMachineRow) => ReactNode;
 }
 

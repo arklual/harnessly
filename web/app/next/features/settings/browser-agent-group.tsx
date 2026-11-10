@@ -1,5 +1,5 @@
 // «Агент в браузере» (Settings → General): the sites the person blocked for the agent in the pane's browser. Anywhere
-// else the agent acts without asking, and the person sees its cursor (HRN-681). Kept in this browser
+// else the agent acts without asking, and the person sees its cursor. Kept in this browser
 // (stores/browser-agent.ts).
 import { useId, useState } from 'react';
 import { FormError, Group, Row, SetButton } from '@/next/features/settings/rows';

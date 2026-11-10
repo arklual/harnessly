@@ -1,4 +1,4 @@
-// «Версии» of a project (HRN-903): the points of its history (each finished edit, by a person or an agent) and the
+// «Версии» of a project: the points of its history (each finished edit, by a person or an agent) and the
 // versions the person named. A version opens read only (with the kit it was on), is compared with the project as it
 // is (the boards that changed, the page side by side) and is restored; what is there now is saved first, so a restore
 // is undone the same way. Shown in looking and in editing; saving and restoring need the right to edit.

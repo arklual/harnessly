@@ -33,7 +33,7 @@ func (r *rig) assertHeld(reset time.Time) *wire.LimitHold {
 	return h
 }
 
-// HRN-916: Claude's StopFailure comes before the refusal is on the transcript (the hook says no more than that the
+// Claude's StopFailure comes before the refusal is on the transcript (the hook says no more than that the
 // turn failed). The turn first reads as failed for no known reason; the refusal read a moment later holds the chat
 // until the reset, and it goes on by itself then.
 func TestLimitReadAfterTheStopFailureHoldsTheChat(t *testing.T) {

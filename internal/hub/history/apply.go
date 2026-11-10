@@ -1,4 +1,4 @@
-// Package history keeps the person's chats in the hub (docs/hub/history.md, HRN-879): the chat list and every chat's
+// Package history keeps the person's chats in the hub (docs/hub/history.md): the chat list and every chat's
 // feed, written from the frames a machine's agent sends of its runtime's conversation channels (`convs`, `conv:<id>`)
 // and read by the chat's owner while the machine is on or off. The model is a closed cluster's copy of the chats: a
 // channel's events carry a seq of the runtime's epoch and a cursor says how far each channel is applied; a backfill
@@ -336,7 +336,7 @@ func applyConvEvent(ctx context.Context, q store.Q, o Owner, conv, kind string, 
 
 // leaveTurns: a live `feed_reset` is the machine putting the chat on another transcript (a rewind or its undo), the
 // newest turns of the feed as it is now. A stored turn from the oldest of them on that is not among them fell out of the
-// feed: it is marked as left after the newest turn kept (” when none was kept), as the rewind's mark names it (HRN-879).
+// feed: it is marked as left after the newest turn kept (” when none was kept), as the rewind's mark names it.
 func leaveTurns(ctx context.Context, q store.Q, o Owner, conv string, turns []json.RawMessage) error {
 	type kept struct {
 		id      string

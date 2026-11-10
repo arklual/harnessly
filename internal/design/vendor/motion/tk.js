@@ -1,4 +1,4 @@
-// Motion presets for a video's board (HRN-576): one vocabulary of movement on top of GSAP. Load it after gsap.min.js and
+// Motion presets for a video's board: one vocabulary of movement on top of GSAP. Load it after gsap.min.js and
 // call it inside tkVideo.motion. Every call adds to one timeline at a time you give, so the frame stays a function of t.
 //   tk.enter(target, {at, from: 'up'|'down'|'left'|'right'|'scale'|'fade'|'mask', dur, stagger, ease})
 //   tk.exit(target, {at, to: 'up'|'down'|'left'|'right'|'scale'|'fade', dur, ease})

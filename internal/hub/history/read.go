@@ -66,7 +66,7 @@ type Page struct {
 	Turns        []json.RawMessage `json:"turns"`
 	Entries      []json.RawMessage `json:"entries"`
 	BeforeTurnID *string           `json:"beforeTurnId"`
-	// Complete: the copy holds the chat back to its first turn (history_done, HRN-879). Until then the oldest turn kept
+	// Complete: the copy holds the chat back to its first turn (history_done). Until then the oldest turn kept
 	// still offers more, and a page past what is kept comes back empty and incomplete: the page asks the machine for
 	// the rest when it is there, instead of taking a cut feed for the whole one.
 	Complete bool `json:"complete"`

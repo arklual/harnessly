@@ -53,7 +53,7 @@ const Rights = ({
 }: {
   access?: readonly IAccess[];
   permissions: readonly string[];
-  /** HRN-965: every access the app is given can be taken back alone. */
+  /** every access the app is given can be taken back alone. */
   revoke?: IRevoke;
 }) => {
   if (access) return <AccessList access={access} revoke={revoke} />;
@@ -136,6 +136,8 @@ const AppAboutPage = ({
   }
 
   const waiting = app !== null && waitsConsent(app);
+  // with the machine's permissions off there are no rights to show and no install screen.
+  const permissionsOff = list?.permissionsOff === true;
   const sheet = ask && (
     <ConsentSheet
       open={asking}
@@ -265,31 +267,33 @@ const AppAboutPage = ({
           preview={preview}
           can={abilitiesOf(app)}
           rights={
-            <>
-              {app.pending !== undefined && <ConsentBlock app={app} />}
-              <Rights
-                access={app.access}
-                permissions={app.permissions}
-                revoke={
-                  !app.env && !row && app.granted
-                    ? {
-                        granted: app.granted,
-                        onRevoke: async (key) => {
-                          await revokeAccess(machine, app.id, key);
-                          onChanged();
-                        },
-                      }
-                    : undefined
-                }
-              />
-              {app.mcpServers.length > 0 && (
-                <ul className="hx-apppage__chips">
-                  {app.mcpServers.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
-              )}
-            </>
+            permissionsOff ? null : (
+              <>
+                {app.pending !== undefined && <ConsentBlock app={app} />}
+                <Rights
+                  access={app.access}
+                  permissions={app.permissions}
+                  revoke={
+                    !app.env && !row && app.granted
+                      ? {
+                          granted: app.granted,
+                          onRevoke: async (key) => {
+                            await revokeAccess(machine, app.id, key);
+                            onChanged();
+                          },
+                        }
+                      : undefined
+                  }
+                />
+                {app.mcpServers.length > 0 && (
+                  <ul className="hx-apppage__chips">
+                    {app.mcpServers.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )
           }
           manage={manage}
           journal={app.dev ? <Journal machine={machine} app={app.id} /> : null}
@@ -317,13 +321,15 @@ const AppAboutPage = ({
         variant="primary"
         busy={catalog.busy === entry.id}
         onClick={() =>
-          askFor({
-            id: entry.id,
-            entry: offered ?? undefined,
-            app: { name: entry.name, version: entry.version, source: t('next.apppublic.title') },
-            access: offered ? accessOfEntry(offered) : [],
-            update: false,
-          })
+          permissionsOff && offered
+            ? void catalog.install(offered)
+            : askFor({
+                id: entry.id,
+                entry: offered ?? undefined,
+                app: { name: entry.name, version: entry.version, source: t('next.apppublic.title') },
+                access: offered ? accessOfEntry(offered) : [],
+                update: false,
+              })
         }
       >
         {t('next.apppublic.install')}
@@ -344,14 +350,16 @@ const AppAboutPage = ({
         preview={null}
         can={[]}
         rights={
-          <>
-            <Rights access={entry.check?.access} permissions={entry.permissions} />
-            {failure && (
-              <p className="hx-appteam__fail" role="alert">
-                {failure}
-              </p>
-            )}
-          </>
+          permissionsOff && !failure ? null : (
+            <>
+              {!permissionsOff && <Rights access={entry.check?.access} permissions={entry.permissions} />}
+              {failure && (
+                <p className="hx-appteam__fail" role="alert">
+                  {failure}
+                </p>
+              )}
+            </>
+          )
         }
         manage={null}
         journal={null}

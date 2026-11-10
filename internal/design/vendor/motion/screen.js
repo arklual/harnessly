@@ -1,4 +1,4 @@
-// A recording of an interface in a scene (HRN-627). `harnessly design video record` shoots a site at twice the pixels of the
+// A recording of an interface in a scene. `harnessly design video record` shoots a site at twice the pixels of the
 // final video and writes a clip and a log; this draws them into the scene as a function of the scene's time: the clip is
 // sought frame by frame, a cursor is drawn over it along the logged path, a click rings, and the camera drives to the place
 // of a click or of typing and back. The window, the cursor, the camera and the time are all drawn here, so none of them needs

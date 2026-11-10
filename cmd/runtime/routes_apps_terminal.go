@@ -17,7 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
-// The terminals of the apps (HRN-852): a shell of an app's own on a pty in the chat's folder inside the agent's wall
+// The terminals of the apps: a shell of an app's own on a pty in the chat's folder inside the agent's wall
 // (terminal.pty, internal/apps pty.go), and what the chat's terminals show (terminal.read).
 //
 // The person's page holds the socket of an app's terminal and carries its bytes to the view and back: binary frames

@@ -26,7 +26,7 @@ type tallPane struct {
 
 func (p *tallPane) CaptureTall(string) (string, bool) { p.calls++; return p.tall, p.tall != "" }
 
-// HRN-647: Claude 2.1.316's plan approval as it really is, whole and at six lines.
+// Claude 2.1.316's plan approval as it really is, whole and at six lines.
 func TestPlanDialogOfClaude2316(t *testing.T) {
 	whole := Read(tuiFile(t, "claude-2.1.316-plan.ansi.txt"), wire.ProviderClaude)
 	if whole.Menu != MenuPlan || len(whole.Options) != 3 {

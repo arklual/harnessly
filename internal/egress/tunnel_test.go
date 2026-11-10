@@ -84,7 +84,7 @@ func tunnelProxy(t *testing.T) (*url.URL, func() []string) {
 	}
 }
 
-// HRN-968: a name that resolves to the cloud's metadata or to a private address does not pass through the proxy:
+// a name that resolves to the cloud's metadata or to a private address does not pass through the proxy:
 // the machine resolves it, the direct rule judges every address, and the proxy is not asked.
 func TestANameThatResolvesToAClosedAddressDoesNotPassThroughTheProxy(t *testing.T) {
 	asked := resolveAs(t, map[string][]string{
@@ -108,7 +108,7 @@ func TestANameThatResolvesToAClosedAddressDoesNotPassThroughTheProxy(t *testing.
 	}
 }
 
-// HRN-968: the tunnel is opened to the address that was checked, not to the name the proxy would resolve again.
+// the tunnel is opened to the address that was checked, not to the name the proxy would resolve again.
 func TestTheTunnelGoesToTheCheckedAddress(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, r.Host)
@@ -142,7 +142,7 @@ func TestTheTunnelGoesToTheCheckedAddress(t *testing.T) {
 	}
 }
 
-// HRN-968: a host that is a number in any but the canonical form is refused before the resolver and the proxy.
+// a host that is a number in any but the canonical form is refused before the resolver and the proxy.
 func TestANumericHostMustBeACanonicalAddress(t *testing.T) {
 	asked := resolveAs(t, nil)
 	p := Policy{}

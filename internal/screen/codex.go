@@ -235,7 +235,7 @@ func noSpace(s string) string {
 var imageSourceRE = re(`\[Image:\s*source:[^\]]*\]`)
 
 // PicturesOnly: a user entry of the transcript holds picture references and nothing else — the entry of a message of
-// pictures alone, which has no words to be known by (HRN-841).
+// pictures alone, which has no words to be known by.
 func PicturesOnly(entry string) bool {
 	if !claudeImageRE.MatchString(entry) && !imageSourceRE.MatchString(entry) {
 		return false

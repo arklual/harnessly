@@ -35,7 +35,7 @@ func stringsOf(v any, out *[]string) {
 	}
 }
 
-// HRN-901: the strings read from a transcript line are their own, not slices of the text: a feed keeping one id of a
+// the strings read from a transcript line are their own, not slices of the text: a feed keeping one id of a
 // read held the whole read (4 MB and more of JSONL per conversation, 3 GB on a machine) alive.
 func TestParsedStringsDoNotHoldTheText(t *testing.T) {
 	text := strings.Repeat(" ", 1<<10) + `{"type":"assistant","uuid":"u-1","message":{"model":"claude-opus","content":[{"type":"text","text":"plain"},{"type":"text","text":"esc\naped"}]}}`

@@ -186,7 +186,7 @@ const CLOCK_MS = 60_000;
 const RailFrame = (props: Omit<IAppFrameProps, 'rail'>) => <AppFrame {...props} rail={useRail()} />;
 
 /**
- * The right pane opening on a narrow window folds the open sidebar, and its shutting opens it again (HRN-674). Its own
+ * The right pane opening on a narrow window folds the open sidebar, and its shutting opens it again. Its own
  * component, so that the pane's opening draws nothing of the shell.
  */
 const RailFollowsPane = () => {
@@ -610,7 +610,7 @@ const Shell = ({ owner }: IShellProps) => {
       ? [{ ...moreAll[1]!, onSelect: () => window.location.assign(hubEntry), current: false }]
       : []
     : moreAll;
-  // HRN-842: test chats stay out of the list; the item that shows them is there while there are any (or they are shown).
+  // test chats stay out of the list; the item that shows them is there while there are any (or they are shown).
   const testItem: readonly IMoreItem[] =
     showTests || hasTestChats(model.chats)
       ? [
@@ -985,7 +985,7 @@ const Shell = ({ owner }: IShellProps) => {
 
   const headerMachine = {
     card: model.machine,
-    // Every other machine of the person, also where the chats of all machines are one list (HRN-906): the header's
+    // Every other machine of the person, also where the chats of all machines are one list: the header's
     // card is where a machine is picked and its state seen, so it lists them all with their health.
     others: model.startMachines.filter((m) => m.id !== model.machine?.id),
     onPick: pickMachine,

@@ -584,11 +584,13 @@
     var jsx = /\.(jsx|tsx)$/i.test(file);
     var kind = jsx ? 'jsx' : 'js';
     console.info(LOG + ' x-import: loading ' + file + ' (' + kind + ')');
-    filesLoading[file] = fetch(resourceUrl(file)).then(function (response) {
+    filesLoading[file] = fetch(compiledUrl(resourceUrl(file))).then(function (response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.text();
     }).then(function (source) {
-      return (jsx || /^\s*export\s/m.test(source) ? ensureBabel() : Promise.resolve()).then(function () {
+      // The library server translated it already: nothing to fetch Babel for.
+      var translated = COMPILED_MARK.test(source);
+      return (!translated && (jsx || /^\s*export\s/m.test(source)) ? ensureBabel() : Promise.resolve()).then(function () {
         var before = new Set(Object.getOwnPropertyNames(window));
         var exported = runComponentFile(source, file);
         var added = Object.getOwnPropertyNames(window).filter(function (key) { return !before.has(key); });
@@ -601,11 +603,24 @@
     return filesLoading[file];
   }
 
+  // A server of the library answers <file>?tkc=1 with the file translated (JSX, types, exports), its first line saying
+  // how to run it: /*tk-compiled:script*/ or /*tk-compiled:cjs*/. Any other server ignores the query and sends the
+  // source, which is then translated here as before.
+  var COMPILED_MARK = /^\/\*tk-compiled:(script|cjs)\*\/\n/;
+
+  function compiledUrl(url) {
+    if (/^(data|blob):/i.test(url)) return url;
+    var hash = url.indexOf('#');
+    var base = hash < 0 ? url : url.slice(0, hash);
+    return base + (base.indexOf('?') < 0 ? '?' : '&') + 'tkc=1' + (hash < 0 ? '' : url.slice(hash));
+  }
+
   // A component file runs in the page's global scope, as a classic script would; its exports, if any, land on window.
   function runComponentFile(source, file) {
-    var usesExports = /^\s*export\s/m.test(source);
+    var mark = COMPILED_MARK.exec(source);
+    var usesExports = mark ? mark[1] === 'cjs' : /^\s*export\s/m.test(source);
     var code = source;
-    if (window.Babel && (/\.(jsx|tsx)$/i.test(file) || usesExports)) {
+    if (!mark && window.Babel && (/\.(jsx|tsx)$/i.test(file) || usesExports)) {
       var options = { presets: ['react'], filename: file, sourceType: 'module', compact: false };
       if (/\.tsx$/i.test(file)) options.presets.push('typescript');
       if (usesExports) options.plugins = ['transform-modules-commonjs'];

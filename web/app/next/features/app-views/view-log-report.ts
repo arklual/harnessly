@@ -1,4 +1,4 @@
-// What a view reported, handed to the machine (HRN-913): its console errors and warnings, uncaught exceptions, rejected
+// What a view reported, handed to the machine: its console errors and warnings, uncaught exceptions, rejected
 // promises and failed bridge calls go to the runtime, where `harnessly app logs <id>`, `app explain` and the runtime's
 // own log read them. Gathered for a moment and sent in one request; bounded, so a view that throws in a loop costs a
 // few requests and no more.

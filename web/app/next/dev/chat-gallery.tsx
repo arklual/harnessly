@@ -1210,7 +1210,14 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
     build: (now) => ({
       items: [...history(now), liveTurn(now)],
       mode: 'working',
-      queue: [queued('И проверь свёртку на чате из 300 сообщений'), queued('Потом обнови README')],
+      queue: [
+        queued('И проверь свёртку на чате из 300 сообщений'),
+        // Another agent's message waits in the same line: the row names its machine and chat, not the envelope.
+        queued(
+          '<peer-message id="pm_1f23" person="roman" machine="dev-department" chat="Релиз хаба" ref="dev-department/tab-abc">\nМиграции хаба влиты, можно ребейзить ветку\n</peer-message>',
+        ),
+        queued('Потом обнови README'),
+      ],
     }),
   },
   notes: {

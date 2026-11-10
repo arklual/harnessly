@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// seedAccess installs a small app and gives it a grant of every kind of key (HRN-965): rights, network, frames, the
+// seedAccess installs a small app and gives it a grant of every kind of key: rights, network, frames, the
 // app's own servers, secrets and parts of a plugin.
 func seedAccess(t *testing.T, id string, keys []string) *Registry {
 	t.Helper()

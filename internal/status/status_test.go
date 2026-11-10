@@ -447,7 +447,7 @@ func TestPollAddsAndRemovesTabsAndCoalesces(t *testing.T) {
 	}
 }
 
-// HRN-659: a Claude started from the tab's terminal (`claude -p` in the agent's Bash) inherits its tmux session and
+// a Claude started from the tab's terminal (`claude -p` in the agent's Bash) inherits its tmux session and
 // hooks. Its hooks name its own session, which is not the one the pane's agent goes by: they leave the tab as it was.
 // The agent's own hooks move it, a new session of the agent itself after /clear too, and a hook of an older script
 // that names no session is taken as before.

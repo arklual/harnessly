@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// HRN-879: the hub's copy keeps a tool's whole output, pages carry its first 4 KB as the machine's do, and
+// the hub's copy keeps a tool's whole output, pages carry its first 4 KB as the machine's do, and
 // `…/entries/<id>/output` gives it whole — with the machine off.
 func TestTheCopyKeepsAToolsWholeOutputAndPagesCarryItsHead(t *testing.T) {
 	ctx, db := context.Background(), openDB(t)

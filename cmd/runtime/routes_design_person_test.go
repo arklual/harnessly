@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// HRN-675: only an address in the page session names a person; the machine agent's own session and no session name none.
+// only an address in the page session names a person; the machine agent's own session and no session name none.
 func TestSessionPersonIsTheAddressOfTheSession(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	for sub, want := range map[any]string{

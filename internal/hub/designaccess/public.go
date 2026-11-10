@@ -143,7 +143,7 @@ func (s *Service) guestToken(ctx context.Context, machine string, req hubproto.D
 // errRuntime is the machine answering what the hub did not ask for: a guest gets «the owner's machine is unavailable».
 var errRuntime = errors.New("machine answer out of scope")
 
-// fetch reads design-public/<project>/<sub>: from the hub's store when it has the project (HRN-881), else from the
+// fetch reads design-public/<project>/<sub>: from the hub's store when it has the project, else from the
 // machine with a token of the given scope.
 func (s *Service) fetch(ctx context.Context, machine string, req hubproto.DesignPublicTokenRequest, segs []string, r *http.Request, pass ...string) (*http.Response, error) {
 	if res, done, err := s.fromStore(ctx, machine, req, segs, r, pass); done {
@@ -755,7 +755,7 @@ func (s *Service) guestFile(w http.ResponseWriter, r *http.Request, g guestReq) 
 }
 
 // guestCache is how long a guest's browser keeps a file of the link: a link pinned to a store revision reads contents
-// that never change (HRN-881), so they are kept for good; anything else for a moment, as before.
+// that never change, so they are kept for good; anything else for a moment, as before.
 func guestCache(g guestReq, other string) string {
 	if g.l.Version == "pinned" {
 		if _, ok := storerev.Of(g.scope().Rev); ok {

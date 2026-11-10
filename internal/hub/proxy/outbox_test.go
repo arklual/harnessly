@@ -78,7 +78,7 @@ func listOutbox(t *testing.T, p *hubtest.Person, machine, tab string) []outboxIt
 	return out.Items
 }
 
-// HRN-879: a message written to a machine that is off waits in the hub, shows for its owner only, and is handed to the
+// a message written to a machine that is off waits in the hub, shows for its owner only, and is handed to the
 // machine, as the page wrote it, once the machine is back.
 func TestOutboxKeepsMessagesForAMachineThatIsOff(t *testing.T) {
 	s := hubtest.New(t, withWorkspace, fleetOn)

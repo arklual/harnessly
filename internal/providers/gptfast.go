@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// The fast mode of a GPT chat (HRN-945). Claude Code's /fast is Anthropic's alone, so a GPT chat's fast mode lives in
+// The fast mode of a GPT chat. Claude Code's /fast is Anthropic's alone, so a GPT chat's fast mode lives in
 // the relay instead: each request of the chat says which tmux pane it comes from, and while that pane's chat is in fast
 // mode the relay asks the ChatGPT backend for the fast tier, as `service_tier = "fast"` makes the Codex CLI do. The
 // mode is read on every request, so turning it needs no restart of the agent.

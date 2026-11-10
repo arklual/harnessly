@@ -9,7 +9,7 @@ import (
 	"github.com/creack/pty"
 )
 
-// A terminal of an app (terminal.pty, HRN-852): a shell on a pty of its own, in the chat's folder, inside the same wall
+// A terminal of an app (terminal.pty): a shell on a pty of its own, in the chat's folder, inside the same wall
 // as the app's commands (run.go): the person's keys and the runtime's state are not there, nor any secret of its
 // environment. The person's page carries its bytes between the view and the runtime; the runtime never reads them.
 

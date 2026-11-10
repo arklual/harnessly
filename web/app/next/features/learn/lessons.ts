@@ -1,4 +1,4 @@
-// The lessons of «Обучение» (HRN-792): each one a short film recorded from the real interface (e2e/lesson-videos.spec.ts)
+// The lessons of «Обучение»: each one a short film recorded from the real interface (e2e/lesson-videos.spec.ts)
 // and a hands-on tour of the same name (features/tour/tracks.ts). The films are the preview; the tour is the lesson.
 // Texts live in next-learn.json: `<id>.title`, `<id>.desc` and `<id>.c<n>` for the n-th chapter.
 

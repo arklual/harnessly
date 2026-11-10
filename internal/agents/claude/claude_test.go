@@ -560,7 +560,7 @@ func TestDetectThroughTheAppsSandbox(t *testing.T) {
 	}
 }
 
-// HRN-659: the sessions a pane's Claude goes by are its pid file's (rewritten on /clear) and its --resume's; a Claude
+// the sessions a pane's Claude goes by are its pid file's (rewritten on /clear) and its --resume's; a Claude
 // started from inside it (the agent's Bash running `claude -p`) is deeper and does not count.
 func TestSessionIDsOfThePaneClaude(t *testing.T) {
 	home := t.TempDir()
@@ -588,7 +588,7 @@ func TestSessionIDsOfThePaneClaude(t *testing.T) {
 	}
 }
 
-// The live hook of the apps runs on UserPromptSubmit only, after the status hook (HRN-975).
+// The live hook of the apps runs on UserPromptSubmit only, after the status hook.
 func TestHookSettingsWithTheAppsLiveHook(t *testing.T) {
 	c := HookSettingsConfig{StatusHook: "/h/s.sh", Statusline: "/h/l.sh", AppsLiveHook: "'/bin/harnessly' hook app-context --live"}
 	var got struct {

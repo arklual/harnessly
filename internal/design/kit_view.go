@@ -124,7 +124,7 @@ func (l *Library) serveKitFile(w http.ResponseWriter, r *http.Request, file stri
 
 // declaredProps are the prop names the kit declares for component comp: its own props and those its templates' layouts
 // set. Only these go into the board's attributes: the props come from the address, and the board's engine reads an
-// attribute as a prop under several spellings (kebab, sc-camel-), some of which load code (HRN-897).
+// attribute as a prop under several spellings (kebab, sc-camel-), some of which load code.
 func declaredProps(c *designkit.Canvas, comp string) map[string]bool {
 	out := map[string]bool{}
 	for _, g := range c.Groups {

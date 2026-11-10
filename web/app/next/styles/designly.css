@@ -927,7 +927,7 @@
       opacity 220ms ease,
       margin 420ms var(--dl-ease);
   }
-  /* The tabs and the two tool buttons fill the phone's row: the heading gives way (HRN-873). */
+  /* The tabs and the two tool buttons fill the phone's row: the heading gives way. */
   .hx-dl__heading,
   .hx-dl[data-stuck='true'] .hx-dl__heading {
     max-width: 0;
@@ -1136,7 +1136,7 @@
 
 /* What the machine lacks for designs (the board engine, a browser, ffmpeg) and the command that fixes it. */
 
-/* Library: filters, folders, selection, the trash (HRN-860). */
+/* Library: filters, folders, selection, the trash. */
 .hx-dl__chip {
   display: inline-flex;
   align-items: center;

@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preview"
 )
 
-// The live browser (HRN-680): a headless Chrome of the machine for the outside sites the proxy cannot carry, shown in
+// The live browser: a headless Chrome of the machine for the outside sites the proxy cannot carry, shown in
 // the pane's browser tab as a screencast over /api/browser/live. The pane decides which sites go here (browser-tab.tsx:
 // the machine's servers and the team's own sites stay with the proxy).
 

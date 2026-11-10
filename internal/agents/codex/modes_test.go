@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// HRN-945: Codex starts in the permission mode and the service tier the chat chose; without them its config stands.
+// Codex starts in the permission mode and the service tier the chat chose; without them its config stands.
 func TestCodexStartsInItsPermissionAndFastModes(t *testing.T) {
 	c := LaunchConfig{Hooks: &HookConfig{Script: "/data/codex-hook.sh", UserConfig: filepath.Join(t.TempDir(), "none.toml")}, MCP: testMCP,
 		SkipPermissions: func() bool { return true }}

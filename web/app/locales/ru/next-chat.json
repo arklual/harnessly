@@ -166,6 +166,7 @@
   "next.queue.failReturned": "вернулось в поле ввода терминала",
   "next.queue.failStuck": "Не удалось отправить · застряло в поле агента",
   "next.queue.failed": "Не удалось отправить",
+  "next.queue.fromAgent": "от другого агента",
   "next.queue.label": "Очередь сообщений",
   "next.queue.limit": "ждёт лимит",
   "next.message.pasted": "Вставленный текст",

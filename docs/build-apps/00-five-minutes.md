@@ -68,8 +68,10 @@ harnessly app enable acme.board
   (`/assets/app.js`) leaves the session out and the file comes back 401. `validate` warns when it finds one in `ui/`.
 - Module scripts, `fetch` of the view's own files and fonts work from host 0.16.198: the files are served with the session in the path
   and answer CORS to the opaque origin of the frame. Before that, only classic scripts loaded.
-- Types of `window.harnessly` are in `src/app-sdk.d.ts` (a copy of `/__hl/app-sdk.d.ts`). The npm package `@harnessly/app-sdk` carries
-  the same types and the ES module, for a bundler that imports it: `import { connect } from '@harnessly/app-sdk'`.
+- Types of `window.harnessly` are in `src/app-sdk.d.ts` (a copy of `/__hl/app-sdk.d.ts`). The package `@harnessly/app-sdk` carries
+  the same types and the ES module, for a bundler that imports it: `import { connect } from '@harnessly/app-sdk'`. It is not on npm:
+  it lives in [the repository](https://github.com/ly-solutions/harnessly) (`internal/apps/sdk`); `scripts/app-sdk-package.sh` builds it
+  into `dist/app-sdk-npm`, and `npm install <path>/dist/app-sdk-npm` adds it to your app.
 - Nothing leaves the view without `network` in the manifest (a `fetch` of an outside address is refused, see [Backend](03-backend.md)).
   Only what is in `ui/` is served: keep the source in `src/`, outside.
 

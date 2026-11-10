@@ -174,12 +174,12 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 	}
 	// "open design <id|path|title>" names a design of this machine's library.
 	deps.Targets.DesignRef = designAPI(d).L.RefOf
-	// An address a connection or the documents provider reads opens in its tab, as the person's click does (HRN-890).
+	// An address a connection or the documents provider reads opens in its tab, as the person's click does.
 	deps.Targets.Resolve = linkResolver(connectionsFor(d), docsProviderOf(), deps.Targets)
 	// "open app <id>[/<view>]" names a pane view of an installed app.
 	appReg := apps.Open(d.DataDir)
 	deps.Targets.AppRef = appReg.PaneRef
-	// …and an app that waits for consent or is turned off says so instead of «no such app» (HRN-913).
+	// …and an app that waits for consent or is turned off says so instead of «no such app».
 	deps.Targets.AppWhyNot = appReg.PaneWhyNot
 	main, shadow := layoutapi.Routes(deps)
 	routes := []gate.Route{{Slice: "core", Match: main.Match, Handler: main.Handler}}

@@ -1,4 +1,4 @@
-// The install screen (HRN-849), the one place where an app gets what it reaches: who and from where, the warning that
+// The install screen, the one place where an app gets what it reaches: who and from where, the warning that
 // apps are not checked, everything the app reaches in words from the most dangerous down, «Установить» and «Отмена».
 // An update shows the same with only what it adds, marked «новое»; without the person's word the old version keeps
 // running. No «accept all without looking» and no unticking of single lines: an app is made for its set.

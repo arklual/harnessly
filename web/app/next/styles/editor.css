@@ -270,7 +270,7 @@ html[data-theme='dark'] {
   background: var(--hx-warning);
 }
 
-/* A JSON file as a tree (HRN-679). */
+/* A JSON file as a tree. */
 .hx-jtree {
   font-family: var(--hx-font-mono);
   font-size: 12.5px;
@@ -359,7 +359,7 @@ button.hx-jtree__row:hover {
   color: var(--hx-danger);
 }
 
-/* The diff over the editor (HRN-679): its bar, then both sides or one text with the changes marked. */
+/* The diff over the editor: its bar, then both sides or one text with the changes marked. */
 .hx-fed__diff {
   position: absolute;
   inset: 0;

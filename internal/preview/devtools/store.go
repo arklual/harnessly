@@ -149,7 +149,7 @@ type Store struct {
 	links  map[string]*link
 
 	// OnFailed, when set, is told every request that failed (blocked, an error, 4xx or 5xx) and OnError every console
-	// error, as they are recorded (the machine's journal, HRN-976). They are called under the store's lock: they must
+	// error, as they are recorded (the machine's journal). They are called under the store's lock: they must
 	// not block or call back into the store.
 	OnFailed func(slot string, e NetworkEntry)
 	OnError  func(slot string, e ConsoleEntry)

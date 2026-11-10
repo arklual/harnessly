@@ -17,7 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/filestore"
 )
 
-// HRN-898. Under a hub the user, space, chat and doc areas are in the space's apps collection of the hub's store. When
+// Under a hub the user, space, chat and doc areas are in the space's apps collection of the hub's store. When
 // the runtime links to it, the areas it kept on its disk go there first (the move), then the views read and write the
 // store, and every machine of the space hears of the others' writes through the store's changes.
 //

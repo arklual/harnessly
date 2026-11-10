@@ -9,7 +9,7 @@ import (
 )
 
 // A deployment that requires the wall (RUNTIME_APPS_REQUIRE_WALL) does not start a chat with apps where the wall cannot
-// be made, and says why and how to put it right; without the flag the chat starts without it, as before (HRN-798).
+// be made, and says why and how to put it right; without the flag the chat starts without it, as before.
 func TestLauncherRequireWall(t *testing.T) {
 	data := t.TempDir()
 	reg := &Registry{Root: filepath.Join(data, "apps")}

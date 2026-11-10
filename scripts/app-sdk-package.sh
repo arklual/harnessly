@@ -1,7 +1,8 @@
 #!/bin/sh
 # Builds the npm package @harnessly/app-sdk (the app SDK's types and ES module) from internal/apps/sdk into a folder.
 #   scripts/app-sdk-package.sh [OUT_DIR] [VERSION]     OUT_DIR defaults to dist/app-sdk-npm, VERSION to the latest v* tag
-# It never publishes: the CI job app-sdk-npm (manual, on a tag) runs `npm publish` on the folder with the project's NPM_TOKEN.
+# The package is not published to npm: it lives in this repository (github.com/ly-solutions/harnessly). Build the folder and
+# install it from there: npm install <path>/dist/app-sdk-npm.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 out=${1:-"$root/dist/app-sdk-npm"}

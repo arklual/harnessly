@@ -40,7 +40,7 @@ type Server struct {
 	// Name is the name the server announces.
 	Name string
 	Sets []Toolset
-	// OnCall, when set, is told every tool call with how long it took and its result (the journal, HRN-976).
+	// OnCall, when set, is told every tool call with how long it took and its result (the journal).
 	OnCall func(ctx context.Context, tool string, took time.Duration, result *jsvalue.Object)
 	// ListChanged says the server tells its clients when its tools change (notifications/tools/list_changed on the GET
 	// stream of Streamable HTTP, which the server's route keeps), so they ask tools/list again.

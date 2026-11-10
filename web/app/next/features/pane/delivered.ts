@@ -9,7 +9,7 @@ import type { MachineId } from '@/next/protocol/v2';
 const route = (m: MachineId, query: string) => runtimePath(platformPath(`/file-preview?${query}`), m);
 const enc = encodeURIComponent;
 
-/** The file for the pane. A machine that is not live has the hub answer instead (HRN-879): a file the agent handed
+/** The file for the pane. A machine that is not live has the hub answer instead: a file the agent handed
  *  over in the person's chat is read from the hub's store by its path; anything else is sent on to the machine. */
 export const previewUrl = (m: MachineId, path: string) => {
   if (appConfig().centralUploads && connectionStore.get(m)?.k !== 'live')
@@ -25,7 +25,7 @@ export interface IKeptFile {
 
 const SHA256 = /^[0-9a-f]{64}$/;
 
-/** A handed-over file from the hub's store, by its sha256 (HRN-879): it reads with the machine off, and the hub sends
+/** A handed-over file from the hub's store, by its sha256: it reads with the machine off, and the hub sends
  *  one it has not got to the machine's preview of the path. null when there is no store to read it from. */
 const keptUrl = (
   m: MachineId,

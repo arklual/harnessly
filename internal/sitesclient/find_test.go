@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// HRN-675: «Поделиться» finds the site made from its project among the machine's sites, by origin only.
+// «Поделиться» finds the site made from its project among the machine's sites, by origin only.
 func TestFindByOriginTakesOnlyTheProjectsSite(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/sites/{space}", func(w http.ResponseWriter, r *http.Request) {

@@ -135,7 +135,7 @@ const flushOnHidden = () => {
 };
 
 /**
- * How long the first screen waits for me before it draws the machines (HRN-879). me is the home machine's answer; a
+ * How long the first screen waits for me before it draws the machines. me is the home machine's answer; a
  * home machine whose agent keeps its link while its runtime hangs answered it late or never, and a fresh device, with
  * nothing kept to draw, stayed blank for that long. The list and the chats are the hub's; me comes when it comes.
  */
@@ -230,7 +230,7 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', flushOnHide);
       document.addEventListener('visibilitychange', flushOnHidden);
-      // The machine's journal of what the page does and where it fails (HRN-976).
+      // The machine's journal of what the page does and where it fails.
       stopJournal = startJournal();
     }
     const openKV = o.kv ?? ((person: string) => idbKV(dbNameOf(person)));
@@ -271,7 +271,7 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     batch(() => putMachines(machines));
     if (o.hub) hub.configure(o.hub);
     // Every machine's socket opens at once; /hello is asked of each on its own, behind them. Waiting for every
-    // machine's answer held the page up to 10 s on one machine that was off (HRN-902).
+    // machine's answer held the page up to 10 s on one machine that was off.
     const preferred = me.k === 'ready' ? me.me.settings.defaultMachine : null;
     const all = machines.map((m) => m.id);
     hub.start(all, pickActive(machines, preferred));

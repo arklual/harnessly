@@ -35,7 +35,7 @@ func TestVideoBoardGetsTheRuntime(t *testing.T) {
 		return w.Body.String()
 	}
 	for _, id := range []string{"deck", "site"} {
-		want := strings.Replace(board, "<head>", "<head>"+resourcesScript()+`<script data-artifact="`+id+`" src="/__lib/client.js"></script>`, 1)
+		want := strings.Replace(board, "<head>", "<head>"+resourcesScript()+`<script data-artifact="`+id+`" src="`+l.clientSrc()+`"></script>`, 1)
 		if got := get("/a/" + id + "/p/One.dc.html"); got != want {
 			t.Errorf("%s board changed:\n%s", id, got)
 		}
@@ -43,7 +43,7 @@ func TestVideoBoardGetsTheRuntime(t *testing.T) {
 	got := get("/a/clip/p/One.dc.html")
 	tag := strings.Index(got, `<script src="`+videoRuntimePath+`"></script>`)
 	engine := strings.Index(got, `src="./support.js`)
-	client := strings.Index(got, `src="/__lib/client.js"`)
+	client := strings.Index(got, `src="`+l.clientSrc()+`"`)
 	if tag < 0 || engine < 0 || tag > engine || client > tag {
 		t.Errorf("the video board has no runtime before its engine:\n%s", got)
 	}

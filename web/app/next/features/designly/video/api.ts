@@ -46,7 +46,7 @@ const must = <T>(v: T | null): T => {
   return v;
 };
 
-// ---- what the person sees and what the agent asks of the player (HRN-580)
+// ---- what the person sees and what the agent asks of the player
 
 export interface IVideoViewCmd {
   seq: number;
@@ -179,7 +179,7 @@ export const videoRenderJob = async (
 export const videoFileHref = (m: MachineId, artifact: string, format: TVideoFormat) =>
   runtimePath(video(`/file?${q({ artifact, format })}`), m);
 
-// ---- the overlay layer (HRN-653)
+// ---- the overlay layer
 
 /** What a call to the overlay route may name: the overlay's fields (a null clears an optional one). */
 export type TVideoOverlayPatch = Record<string, unknown>;

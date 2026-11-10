@@ -131,6 +131,20 @@ not shipped with the runtime; without one a new project is refused (see [the boa
 new project gets `meta/` with the release new projects start on (`legacy` without releases); a template's own
 `meta/project.json` settings (release, kits, tailwind) are kept, its pages never are.
 
+## Component files are translated by the library
+
+A board's component file (`<x-import … from="lib/card.jsx">`: `.jsx`, `.tsx`, `.ts`, or a `.js` with exports) is
+translated by the library server, not in the browser. The built-in engine asks for `<file>?tkc=1`; the server answers
+with the code translated by esbuild (JSX into `React.createElement`, types dropped, exports as CommonJS), its first
+line saying how to run it (`/*tk-compiled:script*/` or `/*tk-compiled:cjs*/`). The translation is kept by the file's
+version, so an edit is the next request's new code and nothing else is redone. The page no longer fetches Babel
+standalone (3 MB) or runs it on every load.
+
+Nothing else changes for a board. A server that does not know the query (an older runtime, a plain static host), an
+engine that does not send it (the vendor's), a file with nothing to translate, and a file that does not compile all end
+in the source being sent as before and translated in the browser, where a syntax error is reported the way it always
+was. Guest links get the same answer through the public path.
+
 ## Speed
 
 How fast a board loads is measured, not guessed:
@@ -198,3 +212,30 @@ The public-specific fault was the missing transforms and static response path: t
 99.9%, and React/ReactDOM stopped depending on unpkg. It was not the remaining wall-clock bottleneck. On this shared
 machine the timings stayed within run-to-run noise and still followed the board's sequential wrapper, engine and page
 script execution described above; optimizing that board boot is separate from the public transport fix.
+
+### Turning a deck's slides
+
+A deck is a board per slide, and the editor turns a slide by putting the next board in a frame. Two scripts measure it,
+both on a runtime of their own (see above) whose library is a copy of the deck's project:
+
+```
+node web/scripts/board-load.mjs --deck <slide 1 url> <slide 2 url> [--edit <slide 2 file>] [--runs 7]
+node web/scripts/deck-turn.mjs <runtime url> <project id> [--runs 6] [--edit <slide 2 file>] [--settle 3000] [--tunnel]
+```
+
+`board-load.mjs --deck` is the library alone: a slide is a page of its own address in one browser context (what a frame
+does), seen when its board is drawn as the stage reads it (`#dc-root` filled, fonts and pictures in, two frames on):
+`open` (nothing cached), `turn` (slide 2 after slide 1: its own board cold, the kit's files cached), `turn-warm` (slide 2
+again), `turn-edit` (slide 2's file changed). `deck-turn.mjs` is the real editor in the runtime's page: the time, in the
+page's clock, from the arrow key to the new slide's frame on screen (`data-top` and `data-on`), after the slide on screen
+has rested `--settle` ms (the time the neighbours have to load); `--tunnel` throttles to the hub tunnel's ~1.3 MB/s and
+40 ms.
+
+Numbers of 09.11.2026, the `kit-deck-tbank-light` copy (18 slides, the Т-Банк kit's 44 MB theme), headless Chrome on a
+shared machine at load average 3-4, medians of 6-7 runs, `main` at `8cc88698` (before any change of the turn):
+
+| ms | open | turn (cold) | turn-warm | turn-edit |
+|---|---:|---:|---:|---:|
+| library alone, `board-load.mjs --deck` | 692 | 506 | 268 | 267 |
+| editor, `deck-turn.mjs` | 2225 | 188 | 183 | 180 |
+| editor, `deck-turn.mjs --tunnel` | 2816 | 675 | 195 | 197 |

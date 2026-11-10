@@ -1,4 +1,4 @@
-// Package resaccess is the one model of «who may open a resource» for the hub (HRN-973, docs/hub/resource-access.md):
+// Package resaccess is the one model of «who may open a resource» for the hub (docs/hub/resource-access.md):
 // a resource is (kind, id) — a document, a design or an app — with an owner, a level for its home team, people and teams
 // with a role until a date, requests for access, an access log and guest links that open it without signing in.
 //

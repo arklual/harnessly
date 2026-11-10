@@ -12,7 +12,7 @@ import (
 
 // harnessly app catalog: the places an app works in, the kinds of contribution, the rights and the bridge methods
 // they open, from the same table the manifest check reads (internal/apps/surface.go). An agent writing an app asks
-// here instead of guessing names from the docs (HRN-692).
+// here instead of guessing names from the docs.
 func (c *cli) appCatalog(args []string) error {
 	section := ""
 	if len(args) > 1 {

@@ -2,7 +2,7 @@
 // follows one to one (the shift goes into --sn-dx/--sn-dy on the host and moves the shape, nothing re-renders); let
 // go, it settles. Sideways it leaves (with the speed it was thrown at) or springs back, and the next plate of the stack
 // rises into its place. Up and down the direction decides by the first pixels and stays: on a folded stack it pages,
-// the whole stack following the finger one to one and springing on when let go (pager.ts, HRN-985); on one plate,
+// the whole stack following the finger one to one and springing on when let go (pager.ts); on one plate,
 // away from its edge opens it and back towards it folds it (an open card into the line, an announcement into the line
 // too; it never hides). A long press (or the right button) opens the menu of actions. On a trackpad two fingers
 // sideways sweep the front plate aside, up and down they page the stack as a finger does; a pinch out opens and a pinch

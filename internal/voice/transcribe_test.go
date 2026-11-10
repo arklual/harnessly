@@ -93,7 +93,7 @@ func TestTranscribeOnAMachineWithoutDictation(t *testing.T) {
 	}
 }
 
-// HRN-674: a long recording given to the service whole took minutes and held its one inference thread; it is
+// a long recording given to the service whole took minutes and held its one inference thread; it is
 // recognized in pieces of at most segmentMax, every piece a dictation of its own, the texts joined in order.
 func TestTranscribeALongRecordingInPieces(t *testing.T) {
 	real, err := exec.LookPath("ffmpeg")

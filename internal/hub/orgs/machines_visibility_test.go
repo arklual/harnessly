@@ -9,7 +9,7 @@ import (
 )
 
 // seen says whether any list the person can read names the machine: the tenant's list, the organization's inventory and
-// the fleet. Every member reads the first two (HRN-970: the organization's list refused people without a role).
+// the fleet. Every member reads the first two (the organization's list refused people without a role).
 func (ac accessCase) seen(t *testing.T, p *hubtest.Person) (inList, inOrg, inFleet bool) {
 	t.Helper()
 	r := p.Do("GET", "/api/spaces/"+ac.tenant+"/machines", nil)

@@ -22,7 +22,7 @@ import (
 //
 // Nothing is sent, and nothing is kept, until the cluster says `v2.start{enabled:true}` (the `central-history` switch).
 //
-// HRN-879: a chat is backfilled whole, by a cursor the cluster keeps. `v2.start.pending` names the chats the cluster does
+// a chat is backfilled whole, by a cursor the cluster keeps. `v2.start.pending` names the chats the cluster does
 // not hold whole yet, each with the turn its backfill stopped before ("" for one never read); the agent walks each of
 // them from there to its first turn, and every page it sends says where it was read from (`history.from`), so the
 // cluster moves the cursor and, on the page with no older turn, marks the chat whole. A walk cut short (the link went,
@@ -38,12 +38,12 @@ const (
 	replicaPause     = 150 * time.Millisecond
 	// replicaConvsWait is how long the agent waits for the runtime's chat list before it asks again, doubled up to
 	// replicaConvsWaitMax: a runtime too busy to make the list in its budget only logs it and answers nothing, and the
-	// backfill of the cluster waited for the next link (an hour and more on a loaded machine, HRN-879).
+	// backfill of the cluster waited for the next link (an hour and more on a loaded machine).
 	replicaConvsWait    = 30 * time.Second
 	replicaConvsWaitMax = 5 * time.Minute
 	// replicaRetryWait is how long a chat whose page the runtime did not give waits before its backfill goes on from
 	// where it stopped, doubled up to replicaRetryWaitMax: a backfill runs when a link starts, and a chat cut by one
-	// busy answer stayed behind until the next link (HRN-879).
+	// busy answer stayed behind until the next link.
 	replicaRetryWait    = time.Minute
 	replicaRetryWaitMax = 15 * time.Minute
 )
@@ -138,7 +138,7 @@ func (r *replica) start(enabled bool, cursors map[string]cursor, known map[strin
 }
 
 // startWith is start with `v2.start.steps`: the chats the cluster holds whole but not with the steps of every turn,
-// each with where their steps walk stands (HRN-879).
+// each with where their steps walk stands.
 func (r *replica) startWith(enabled bool, cursors map[string]cursor, known map[string]int64, pending, steps map[string]string) {
 	r.mu.Lock()
 	r.enabled = enabled
@@ -623,7 +623,7 @@ func (r *replica) frame(data []byte) {
 
 // runtimePageTO is how long a page of the runtime may take to read: the first page of a long chat makes the runtime
 // read its whole transcript (tens of megabytes), which can take longer than a command's runtimeCallTO; a page cut there
-// stopped the chat's backfill (HRN-879).
+// stopped the chat's backfill.
 const runtimePageTO = 90 * time.Second
 
 // runtimeGet reads a page of the runtime over loopback, as a page would with its session.

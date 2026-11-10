@@ -93,7 +93,7 @@ const readDeck = (v: unknown): IGuestDeck | null => {
 export const mediaBaseOf = (filesBase: string): string =>
   filesBase.endsWith('/f/') ? `${filesBase.slice(0, -2)}m/` : './m/';
 
-/** The live link's stream of the project's revisions, beside the files (`/s/<token>/f/` → `/s/<token>/events`, HRN-881). */
+/** The live link's stream of the project's revisions, beside the files (`/s/<token>/f/` → `/s/<token>/events`). */
 export const eventsUrlOf = (filesBase: string): string =>
   filesBase.endsWith('/f/') ? `${filesBase.slice(0, -2)}events` : './events';
 

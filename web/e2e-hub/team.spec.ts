@@ -36,13 +36,13 @@ test.describe.configure({ mode: 'serial' });
 // Organizations with teams live in the hosted service and in a company's own hub; the other cells have none.
 test.skip(!['cloud', 'selfhosted'].includes(cell) || !CELLS[cell], `no organizations in cell ${cell}`);
 
-// The public hub's features (k8s-infra environments/harnessly-hub/prod/values.yaml), unless a run asks for others.
+// The public hub's features (the prod values of the hub), unless a run asks for others.
 const features = process.env.E2E_FEATURES ?? 'ui.hx,env,catalog,machine.resources,org.events';
 
 let stack: Stack;
 test.beforeAll(async () => {
   test.setTimeout(600_000);
-  stack = await startStack(cell, { HUB_FEATURES_DEFAULT: features });
+  stack = await startStack(cell, { HUB_FEATURES_DEFAULT: features, HUB_ACCESS_ENFORCE: 'on' });
 });
 test.afterAll(async () => {
   mkdirSync('e2e-hub-results', { recursive: true });
@@ -492,7 +492,7 @@ test('6. the machine shared with the team only: the plain member loses it, the t
       who: p.name,
       screen: 'api',
       action: 'open a team-only machine',
-      ok: p === member ? r === 200 : true,
+      ok: p === member ? r === 200 : r === 403,
       detail: `status ${r}`,
     });
   }

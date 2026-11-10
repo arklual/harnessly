@@ -1,4 +1,4 @@
-// Package efficiency is the hub's side of the «Эффективность» screen (HRN-972): collectors that take facts from outside
+// Package efficiency is the hub's side of the «Эффективность» screen: collectors that take facts from outside
 // sources through one provider interface, the facts stored in the hub's database, and the figures computed from them on
 // read. Addresses and tokens of a source are configuration; nothing here names a particular installation.
 package efficiency

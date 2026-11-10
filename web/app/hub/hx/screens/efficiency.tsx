@@ -1,4 +1,4 @@
-// The «Эффективность» screen (HRN-676): the price of a merged MR, what moves it, where the money is lost, what changed
+// The «Эффективность» screen: the price of a merged MR, what moves it, where the money is lost, what changed
 // and what is worth switching on. One screen for the scale the viewer's address names (a person, a team, the organization).
 // It is built on what the hub's analytics already tells; what it does not have yet (the split by stream, a limit window
 // before the hub began to keep cycles) is said on the screen, never drawn from nothing. Comes with the lively hub (`ui.hx.live`).
@@ -29,7 +29,7 @@ import { chartKey, createStore, dataKey, useAnswer } from './analytics/store';
 import { Tile } from './analytics/tiles';
 import '../styles/efficiency.css';
 
-/** The metrics under the price, as the spec names them (HRN-676): what makes a merged MR expensive. */
+/** The metrics under the price, as the spec names them: what makes a merged MR expensive. */
 const DRIVERS: readonly KpiId[] = [
   'reread',
   'sessionStart',

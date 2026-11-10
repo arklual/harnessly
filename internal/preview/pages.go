@@ -39,7 +39,7 @@ func statusPage(status int, text string) string {
 
 // failedPage: the site could not be fetched through the proxy (a reset, a timeout, a certificate). Inside a slot frame
 // the page tells the preview island as it loads (tk:failed), so the island can open the site in the machine's own
-// browser instead (HRN-684); on its own it is the status page.
+// browser instead; on its own it is the status page.
 func failedPage(status int, text, parentOrigin, nonce string) string {
 	if parentOrigin == "" {
 		return statusPage(status, text)

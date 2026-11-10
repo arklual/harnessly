@@ -31,7 +31,7 @@ export interface INotice {
   text: string;
   at: number;
   /**
-   * A finished turn's summary (HRN-957): 2–4 lines of plain text, one per line («\n» between them), on what the agent
+   * A finished turn's summary: 2–4 lines of plain text, one per line («\n» between them), on what the agent
    * did — the cheap model's, or Claude's own recap written after the turn. Absent until it comes, and when Settings
    * turn summaries off; `text` stays the answer's start either way.
    */
@@ -192,8 +192,10 @@ export interface INotifySettings {
   system: boolean;
   /** The smart notice in the window; off, a notice only counts in the tab's title and sounds. */
   cards: boolean;
+  /** A machine that cannot cope (the runtime's critical health) comes as a notice. */
+  machine: boolean;
   place: TNoticePlace;
-  /** A finished turn comes with a few lines on what was done, from the cheapest model (HRN-957). */
+  /** A finished turn comes with a few lines on what was done, from the cheapest model. */
   summary: boolean;
 }
 
@@ -203,6 +205,7 @@ export const DEFAULT_NOTIFY: INotifySettings = {
   sounds: { wait: true, urgent: true, done: false },
   system: false,
   cards: true,
+  machine: true,
   place: 'bottom-center',
   summary: true,
 } as const;
@@ -240,6 +243,7 @@ export const parseNotify = (raw: string | null): INotifySettings => {
       system: typeof s.system === 'boolean' ? s.system : DEFAULT_NOTIFY.system,
       // Settings no longer turn the smart notice off: one turned off before comes back, or it could never be turned on.
       cards: versionOf(s) >= 3 && typeof s.cards === 'boolean' ? s.cards : DEFAULT_NOTIFY.cards,
+      machine: typeof s.machine === 'boolean' ? s.machine : DEFAULT_NOTIFY.machine,
       place: savedPlace(s),
       summary: typeof s.summary === 'boolean' ? s.summary : DEFAULT_NOTIFY.summary,
     };

@@ -5,7 +5,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { startRuntime, type Runtime } from './runtime';
 
-// Settings → Skills and MCP, «From the organization» (HRN-767): what the hub handed the machine, as the machine
+// Settings → Skills and MCP, «From the organization»: what the hub handed the machine, as the machine
 // agent holds it in environment.json (the runtime reads that file), with the layer, the pin and the status of each.
 // E2E_SHOTS=<dir> also saves the block's pictures: both themes, 1440 and 390 px wide.
 let rt: Runtime;

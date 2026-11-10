@@ -46,7 +46,7 @@ type designlyState struct {
 	Pinned map[string]bool            `json:"pinned"`
 	// CreatedFrom is, by conversation id, the design the conversation was started from: a new project's first chat or
 	// a new chat of the design's own column. Only this and the chat's own edits of the design's files make it one of the
-	// design's chats (HRN-675): its folder, a design named in a message or opened from the chat do not. The links of
+	// design's chats: its folder, a design named in a message or opened from the chat do not. The links of
 	// the older rule (attachedDesigns, the folder) are not read, and the next write of the file drops them.
 	CreatedFrom map[string]string `json:"createdFrom,omitempty"`
 }
@@ -391,7 +391,7 @@ func (d *v2Designly) systemLine(sys, person string) (string, bool) {
 }
 
 // recordSystem notes on the project the design system or kit it is built on, for the library's filter; a failed write
-// only costs the project its place in that filter (HRN-860).
+// only costs the project its place in that filter.
 func (d *v2Designly) recordSystem(project, sys, person string) {
 	for _, s := range d.systems(person) {
 		if s.info.ID != sys {
@@ -455,7 +455,7 @@ func (d *v2Designly) Pin(ctx context.Context, id string, pinned bool) error {
 
 // Line is a design attached to a message of conversation conv (convo.Refs): where the project is and the rules a
 // design dialog works by. Naming a design is no work on it: the chat joins the design's chats only once it edits its
-// files (HRN-675).
+// files.
 func (d *v2Designly) Line(conv string, r wire.MessageRef) (string, wire.RefuseCode) {
 	lib := d.api.L
 	art, rules, _, err := lib.PrepareDialog(r.ID)
@@ -530,7 +530,7 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 				item.Boards = append(item.Boards, wire.DesignBoard{Title: title, Path: b.Path})
 			}
 		}
-		// The chats started from the design, then the ones that edited its files (HRN-675).
+		// The chats started from the design, then the ones that edited its files.
 		for _, c := range convs.Conversations {
 			if st.CreatedFrom[c.ID] == a.ID {
 				item.Convs = append(item.Convs, c.ID)

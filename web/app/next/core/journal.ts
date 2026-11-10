@@ -1,4 +1,4 @@
-// The page's part of the machine's journal (HRN-976): navigation, key clicks, the page's requests to the runtime (a
+// The page's part of the machine's journal: navigation, key clicks, the page's requests to the runtime (a
 // failure, a change, a slow read — with status and time), console errors, uncaught exceptions, files that did not load
 // and refusals of the content policy, and what the apps' views and Sinopia report. Lines gather for a moment and go to
 // the runtime of the machine in one request (POST <platform>/journal), where `harnessly logs` and the MCP tool

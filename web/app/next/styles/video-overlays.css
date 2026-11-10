@@ -1,4 +1,4 @@
-/* The overlay layer's editing (HRN-653): hx-ovl* over the picture, hx-ovl-insp* under it, the strips of the timeline. */
+/* The overlay layer's editing: hx-ovl* over the picture, hx-ovl-insp* under it, the strips of the timeline. */
 
 /* The layer over the picture: boxes by fractions of the frame (--x --y --w --h), set by the component. */
 .hx-ovl {

@@ -230,7 +230,7 @@ const AppFrame = ({
   // The frame's key, by a name the bridge's effect does not shadow.
   const frameKey = key;
   // One trace for everything of this mount, from the page's ask for a session through the slot and the view server
-  // to the view's calls, so `harnessly logs` reads one chain (HRN-976).
+  // to the view's calls, so `harnessly logs` reads one chain.
   const mountRef = useRef<{ key: string; trace: string; at: number } | null>(null);
   // Read in effects only: the first effect of a mount makes it.
   const mountOf = useCallback((k: string) => {
@@ -418,7 +418,7 @@ const AppFrame = ({
     return () => window.clearInterval(timer);
   }, [machine, session]);
 
-  // What the page sees of the frame itself (HRN-976): when its first document loaded, and a refusal of the page's own
+  // What the page sees of the frame itself: when its first document loaded, and a refusal of the page's own
   // policy. When the machine never saw the view's request, these are what the card can tell.
   const frameSeen = useRef<IFrameSeen | null>(null);
   useEffect(() => {
@@ -629,7 +629,7 @@ const AppFrame = ({
     // A remote view speaks from its own origin, and is answered only there.
     const remoteOrigin = remote && src !== null ? new URL(src).origin : null;
     const key = logKey(app.id, chat);
-    // What the view reports goes to the debug section here and to the machine, where the CLI reads it (HRN-913).
+    // What the view reports goes to the debug section here and to the machine, where the CLI reads it.
     const report = (line: ReturnType<typeof bridgeLine>) =>
       line && queueViewLog(machine, app.id, view.id, line);
     const jsrc = journalSource(app.id);
@@ -683,7 +683,7 @@ const AppFrame = ({
     const onMessage = (event: MessageEvent) => void b.onMessage(event);
     window.addEventListener('message', onMessage);
     // A view that never connects shows nothing of why: the debug section says so, with the cause the machine's journal
-    // knows (a file the slot refused, a request the preview blocked), and the card shows that cause too (HRN-976).
+    // knows (a file the slot refused, a request the preview blocked), and the card shows that cause too.
     const watchdog = window.setTimeout(() => {
       if (b.ready || bridge.current !== b) return;
       const known = seen.current?.key === mount.key ? seen.current.failure.detail : '';
@@ -805,8 +805,8 @@ const AppFrame = ({
         message,
         at,
       });
-      // The same line goes to the machine, where `harnessly app logs` reads it (HRN-913), and to the machine's
-      // journal with the file's address and the mount's trace, where `harnessly logs` reads it (HRN-976).
+      // The same line goes to the machine, where `harnessly app logs` reads it, and to the machine's
+      // journal with the file's address and the mount's trace, where `harnessly logs` reads it.
       queueViewLog(machine, app.id, view.id, { level: 'error', text: message, at });
       journal(
         {

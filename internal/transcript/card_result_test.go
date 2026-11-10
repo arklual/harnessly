@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// An app's card reaches the feed whole (HRN-644): a tool result of 20 KB that names a view is kept as compact JSON, as a
+// An app's card reaches the feed whole: a tool result of 20 KB that names a view is kept as compact JSON, as a
 // Claude Code transcript writes an MCP tool's result (a text item with the JSON), not cut to a first line of 100.
 func TestCardResultKeepsAWholeCard(t *testing.T) {
 	rows := make([]map[string]any, 0, 200)

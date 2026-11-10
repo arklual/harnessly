@@ -1,4 +1,4 @@
-// A link without sign-in as its screen edits it (HRN-675, stage «г»): the form, what it sends to the gateway and the
+// A link without sign-in as its screen edits it (stage «г»): the form, what it sends to the gateway and the
 // line a link shows in the list. One model for every kind; what differs is what «Скачивание» and «Ещё» hold:
 // a design — how it opens (computer or phone), its pages, the version; a deck — how it opens, from which slide, the
 // speaker's notes, counting, its PDF; a video — the format (only where both are built), autoplay, comments on the

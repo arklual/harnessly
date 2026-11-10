@@ -1,4 +1,4 @@
-// What an installed app waits for the person to agree to (HRN-913), shown where they see the app: its card's details
+// What an installed app waits for the person to agree to, shown where they see the app: its card's details
 // in «Приложения» and its own page. The real waiting access, as the runtime reads it where the consent is checked —
 // not the manifest's rights as they were at install. Only a showing: the word itself is the install screen's.
 import AccessList from '@/next/features/app-consent/access-list';

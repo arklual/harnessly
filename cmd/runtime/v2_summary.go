@@ -15,10 +15,10 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// A turn's summary for the notification «готово» (HRN-957): a few lines from the cheapest model on what the agent did,
+// A turn's summary for the notification «готово»: a few lines from the cheapest model on what the agent did,
 // read from the person's message and the agent's replies only — the tools' input and output never go in. Claude runs
 // on Haiku in a folder of its own and keeps its session there, so its cost is in the machine's spend like any call of
-// Claude (HRN-899); Codex runs as for a title. The calls take the machine's one slot with the titles.
+// Claude; Codex runs as for a title. The calls take the machine's one slot with the titles.
 
 const (
 	summaryCallTimeout   = 90 * time.Second

@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 )
 
-// «Найти в файлах» of «Файлы» (HRN-679): the lines of the text files under a folder that hold a piece of text. The walk
+// «Найти в файлах» of «Файлы»: the lines of the text files under a folder that hold a piece of text. The walk
 // is the «@» picker's: no .git, node_modules or build folders, no folders starting with a dot, no files that look like
 // credentials, and no links (a link to a folder is not entered, a link to a file is not read). A file that is too big
 // or not text is passed over; the search stops at a number of lines or of files, or when its time is up, and says so.

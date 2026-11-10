@@ -40,7 +40,7 @@ const (
 	TargetApp  = "app"
 )
 
-// The slots of the interface an extension fills (HRN-753): a view in a sandboxed frame at a place the page declares, or,
+// The slots of the interface an extension fills: a view in a sandboxed frame at a place the page declares, or,
 // for branding, a few declared values. With the runtime's HARNESSLY_UI_SLOTS off the page shows none of them.
 const (
 	TargetSettings     = "settings"      // a page in the settings
@@ -111,7 +111,7 @@ type Network struct {
 	Resources []string `json:"resources,omitempty"`
 	Frames    []string `json:"frames,omitempty"`
 	Reason    string   `json:"reason,omitempty"`
-	// ClientCert is the app's own certificate for mutual TLS to its own backend (HRN-966): the name of one of its secrets,
+	// ClientCert is the app's own certificate for mutual TLS to its own backend: the name of one of its secrets,
 	// which holds the certificate and its key as PEM. The key is in the machine's safe, never in the manifest.
 	ClientCert *ClientCert `json:"clientCert,omitempty"`
 }

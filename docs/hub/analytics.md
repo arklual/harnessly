@@ -112,7 +112,7 @@ machine, an invitation, a KPI, a chat, a model; a `raise_limit` of a team or a t
 `team:<id>` or `tenant:<id>`), so a button can go to it without knowing the variant; the other fields are the variant's
 own.
 
-As built (HRN-633):
+As built:
 
 - The nine rules after `over_80` and `budget_runs_out` are about the organization as a whole and are found only by
   the background checker, not by a screen read: the screens show what the checker kept. The checker runs for the
@@ -134,7 +134,7 @@ As built (HRN-633):
 ## Today and efficiency
 
 `GET …/overview` carries two more blocks, both counted from the same sessions and hourly rows as the rest of the screen
-(HRN-633). `today` is «Сегодня», `efficiency` is «Эффективность». Fixtures: `overview-admin.json`, `overview-lead.json`.
+. `today` is «Сегодня», `efficiency` is «Эффективность». Fixtures: `overview-admin.json`, `overview-lead.json`.
 
 ```
 "today": {"day": "2026-10-31", "spend": {"paid": {"usd": 86.4, "shown": 7041.6}, "list": {"usd": 104.2, "shown": 8492.3}, "tokens": 18400000}, "active": {"people": 3, "of": 4}, "tasks": {"closed": 5, "inWork": 2}, "sparks": {"spend": [{"day": "2026-10-18", "value": 52.1}, {"day": "2026-10-19", "value": 61.0}, {"day": "2026-10-20", "value": 48.3}, {"day": "2026-10-21", "value": 0}, {"day": "2026-10-22", "value": 0}, {"day": "2026-10-23", "value": 35.7}, {"day": "2026-10-24", "value": 72.4}, {"day": "2026-10-25", "value": 66.9}, {"day": "2026-10-26", "value": 58.2}, {"day": "2026-10-27", "value": 71.0}, {"day": "2026-10-28", "value": 64.4}, {"day": "2026-10-29", "value": 80.3}, {"day": "2026-10-30", "value": 95.1}, {"day": "2026-10-31", "value": 86.4}], "active": [{"day": "2026-10-18", "value": 3}, {"day": "2026-10-19", "value": 4}, {"day": "2026-10-20", "value": 4}, {"day": "2026-10-21", "value": 0}, {"day": "2026-10-22", "value": 0}, {"day": "2026-10-23", "value": 2}, {"day": "2026-10-24", "value": 4}, {"day": "2026-10-25", "value": 4}, {"day": "2026-10-26", "value": 3}, {"day": "2026-10-27", "value": 4}, {"day": "2026-10-28", "value": 4}, {"day": "2026-10-29", "value": 4}, {"day": "2026-10-30", "value": 4}, {"day": "2026-10-31", "value": 3}], "tasks": [{"day": "2026-10-18", "value": 3}, {"day": "2026-10-19", "value": 4}, {"day": "2026-10-20", "value": 2}, {"day": "2026-10-21", "value": 0}, {"day": "2026-10-22", "value": 0}, {"day": "2026-10-23", "value": 1}, {"day": "2026-10-24", "value": 5}, {"day": "2026-10-25", "value": 4}, {"day": "2026-10-26", "value": 3}, {"day": "2026-10-27", "value": 6}, {"day": "2026-10-28", "value": 4}, {"day": "2026-10-29", "value": 5}, {"day": "2026-10-30", "value": 7}, {"day": "2026-10-31", "value": 5}]}}
@@ -460,7 +460,7 @@ Every signed-in person, in any organization or none; only their own sessions.
 The agent app's «Управление» screen keeps its local history (`/api/platform/stats` of the runtime) and adds these with
 the «на сервере учтено до …» line.
 
-As built (HRN-590):
+As built:
 
 - Days are cut in the zone of `?org=`, of the person's only organization, or `Europe/Moscow`.
 - `paid` is computed at read time from the hourly rollup: a subscription's fee × the row's `list` ÷ everyone's `list` on
@@ -472,9 +472,9 @@ As built (HRN-590):
 - The endpoints follow `HUB_ORGS` like the rest of the organizations' API (404 when off, instance admins only in
   `shadow`).
 
-As built (HRN-613): the organization's `…/overview`, `…/spend`, `…/kpis`, `…/changes` and `…/waste`, and the rate.
+As built: the organization's `…/overview`, `…/spend`, `…/kpis`, `…/changes` and `…/waste`, and the rate.
 
-As built (HRN-613, machines):
+As built (machines):
 
 - `…/machines` lists the machines of the scope's tenants (a team scope: the machines in that team), those with problems
   first, then by name. A row is computed from what the hub holds: `status` from the link, `lastActiveAt` and
@@ -482,7 +482,7 @@ As built (HRN-613, machines):
   minutes), `people` from those sessions of the last 30 days, `access` from the new `machine_access` table (migration
   `0010_machines.sql`; empty means the whole tenant). `opensRuntime` is false when the machine's last policy refused
   runtime sessions (a machine the hub only watches): the page hides «Открыть» and `…/open` answers 409 `observe_only`
-  (HRN-814).
+ .
 - Problems: `disabled` (alone, when the machine is switched off), `offline` (seen once, no link now), `idle_week` (no
   chat for 7 days; not for a machine that never connected), `agent_old` (below `HUB_MIN_AGENT_VERSION`), `disk_low`
   (the last preflight reported less than 10% or 5 GiB free), `login_expired` (an installed agent reports
@@ -619,7 +619,7 @@ As built (HRN-613, machines):
   `oversized_model` are gone.
 
 
-## Limit windows (HRN-786)
+## Limit windows
 
 `GET /api/orgs/{org}/limit-windows?scope=&from=&to=` (money; the period as in `…/spend`) answers
 `LimitWindowsResponse = { scope, period, accounts: AccountWindows[] }`. An account is a subscription of the organization

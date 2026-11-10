@@ -101,6 +101,8 @@
   "next.notices.settings.show.broken.hint": "Ход упал или упёрся в лимит подписки. 4 секунды",
   "next.notices.settings.show.done": "Готово",
   "next.notices.settings.show.done.hint": "Агент закончил ход. 4 секунды",
+  "next.notices.settings.show.machine": "Машина не справляется",
+  "next.notices.settings.show.machine.hint": "Память или диск на исходе. Висит, пока не станет лучше",
   "next.notices.settings.sounds": "Звуки",
   "next.notices.settings.hidden": "Когда окно не видно",
   "next.notices.settings.key": "Клавиша",

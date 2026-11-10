@@ -783,7 +783,7 @@ done_message() {
 # profiles only say what is missing. HARNESSLY_DESIGN_TOOLS=0 skips both. The board engine is built in; the vendor's
 # optional one is never installed from here: the owner fetches it with their own account (harnessly design engine fetch).
 
-# The render kit's pins (HRN-744): the same values as deploy/renderkit/versions.env (a test keeps them equal). The hub
+# The render kit's pins: the same values as deploy/renderkit/versions.env (a test keeps them equal). The hub
 # serves this script alone, so it carries them. They are apt version patterns; dnf and pacman have no such pins, and
 # there the installer only names what is missing. `harnessly doctor render` says whether the result draws.
 # shellcheck disable=SC2034 # REV is read by people and by the test, not by the script

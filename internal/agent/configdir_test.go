@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/proc"
 )
 
-// HRN-674: the person's shell gives claude and codex CLAUDE_CONFIG_DIR and CODEX_HOME, the agent's service does not.
+// the person's shell gives claude and codex CLAUDE_CONFIG_DIR and CODEX_HOME, the agent's service does not.
 // The agent lists and serves the transcripts there too, and keeps the folders after the CLIs exit.
 func TestRootsFollowTheCLIsEnvironment(t *testing.T) {
 	home, other := t.TempDir(), t.TempDir()

@@ -113,7 +113,7 @@ export const planIntents = (
 };
 
 /**
- * What opens the pane by itself (HRN-943, docs/pane-opening.md):
+ * What opens the pane by itself (docs/pane-opening.md):
  *
  * | trigger                                              | what the person sees                               |
  * |------------------------------------------------------|----------------------------------------------------|

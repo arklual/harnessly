@@ -180,7 +180,7 @@ describe('guest host', () => {
     );
   });
 
-  // HRN-898: the same page serves a member of a space at the hub with every machine off: the scope the view names goes
+  // the same page serves a member of a space at the hub with every machine off: the scope the view names goes
   // to the hub, which keeps the person's own area and the space's; the view is told it is not a guest.
   it("sends a member's scope to the hub and says what needs a machine", async () => {
     const calls: Record<string, unknown>[] = [];

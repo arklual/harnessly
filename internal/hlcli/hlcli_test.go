@@ -290,7 +290,7 @@ func TestTabCommandsUseTheOwnWorkspace(t *testing.T) {
 	}
 }
 
-// tab create --prompt names the terminal it runs in, so the runtime can nest the agent under that chat (HRN-828), and says
+// tab create --prompt names the terminal it runs in, so the runtime can nest the agent under that chat, and says
 // what it did.
 func TestTabCreateWithAPromptSaysItNestedTheChat(t *testing.T) {
 	f := newFake(t)

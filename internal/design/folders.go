@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// Folders of the library (HRN-860). A folder is a way to lay projects out, not a right: who sees a project is the access
+// Folders of the library. A folder is a way to lay projects out, not a right: who sees a project is the access
 // snapshot's, and a folder changes none of it. The layout is personal: it is kept per person in <library>/.folders/, so
 // a project the team shares sits in another folder (or none) for each teammate, and the same person's other runtimes on
 // this library read the same layout. It is not the hub's: the hub knows who may open a project, not how each person

@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 )
 
-// HRN-851: a view runs commands of the chat's folder only with terminal.run and inside its masks, processes only with
+// a view runs commands of the chat's folder only with terminal.run and inside its masks, processes only with
 // process, in a chat the app is on in; every run is journaled.
 func TestAppRunRoute(t *testing.T) {
 	call, conv := appRig(t)

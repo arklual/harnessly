@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preview"
 )
 
-// HRN-914: without RUNTIME_PREVIEW_PUBLIC_ORIGINS the slots' origins come from RUNTIME_PREVIEW_DOMAIN and an id that
+// without RUNTIME_PREVIEW_PUBLIC_ORIGINS the slots' origins come from RUNTIME_PREVIEW_DOMAIN and an id that
 // stays the same across starts.
 func TestSlotOriginsFromDomain(t *testing.T) {
 	dir := t.TempDir()

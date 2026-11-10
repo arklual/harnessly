@@ -246,7 +246,7 @@ func (r *Runtime) restore(f convFile) {
 	a := r.add(c)
 	_ = r.on(a, func(c *conv, now time.Time) { // a fresh mailbox is not full
 		// Every conversation reads its transcript's tail at a start: a few at a time, and each lets go of it after, so
-		// a machine of hundreds of chats does not hold them all at once (HRN-901: 10 GB at a start, 3 GB after).
+		// a machine of hundreds of chats does not hold them all at once (10 GB at a start, 3 GB after).
 		r.restartLoads <- struct{}{}
 		defer func() { <-r.restartLoads }()
 		c.restarted(now)
@@ -357,7 +357,7 @@ func (r *Runtime) loop(a *actor) {
 			c.save(now, false)
 			a.publish()
 			if w := c.wake(r.d.Clock.Now()); !w.After(now) {
-				// The turn did not move the time it woke for: something holds it that the clock does not (HRN-969). The
+				// The turn did not move the time it woke for: something holds it that the clock does not. The
 				// next turn waits a little rather than none — a time of the actor that never moves would be a core.
 				if !spun {
 					r.d.Log.Warn("conversation clock due again right after its turn; slowed", "conv", c.rec.ID)
@@ -405,7 +405,7 @@ func (r *Runtime) on(a *actor, f func(c *conv, now time.Time)) error {
 }
 
 // spinPause is how long an actor waits when its clock is due again right after a turn: a deadline nothing moves
-// costs four turns a second, not a core (HRN-969).
+// costs four turns a second, not a core.
 const spinPause = 250 * time.Millisecond
 
 // MailWait is how long a message that needs no answer waits for room in a full mailbox before it is dropped.

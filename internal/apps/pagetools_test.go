@@ -99,7 +99,7 @@ func TestPageReportFollowsRights(t *testing.T) {
 	}
 }
 
-// HRN-851: while the agent's call of a view's tool waits, and for AgentAfter after the view answers it, the app is the
+// while the agent's call of a view's tool waits, and for AgentAfter after the view answers it, the app is the
 // agent's doing in that chat; another app or another chat is not.
 func TestPageToolsSayWhileTheAgentDrivesAnApp(t *testing.T) {
 	p := NewPageTools()
@@ -151,7 +151,7 @@ func TestPageToolsSayWhileTheAgentDrivesAnApp(t *testing.T) {
 	}
 }
 
-// Sinopia is the host's own (HRN-808): its page tools and its screen reach the agent of the chat the document is open
+// Sinopia is the host's own: its page tools and its screen reach the agent of the chat the document is open
 // beside, with no install of it in the chat; an app that is off is still left out.
 func TestBuiltinPageToolsNeedNoInstall(t *testing.T) {
 	pages := NewPageTools()

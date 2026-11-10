@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import { buildMachine, procRow } from '@/next/features/pane/machine/model';
 import { procKey } from '@/next/features/pane/machine/api';
-import type { MachineProc, MachineSample, MachineStats } from '@/next/protocol/v2';
+import type { MachineHealth, MachineProc, MachineSample, MachineStats } from '@/next/protocol/v2';
 
 beforeAll(() => pinLocale('ru'));
 
@@ -56,9 +56,16 @@ const proc = (patch: Partial<MachineProc> = {}): MachineProc => ({
   ...patch,
 });
 
+const health = (level: MachineHealth['level'], issues: MachineHealth['issues']): MachineHealth => ({
+  level,
+  since: 0,
+  issues,
+});
+const OK = health('ok', []);
+
 describe('buildMachine', () => {
   it('shows the four tiles in the design order with the real figures', () => {
-    const m = buildMachine(stats());
+    const m = buildMachine(stats(), OK);
     expect(m.kpis.map((k) => k.label)).toEqual(['Процессор', 'Память', 'Диск', 'Сеть']);
     expect(m.kpis[0]).toMatchObject({ value: '38', unit: '%', sub: '4 ядра' });
     expect(m.kpis[1]).toMatchObject({ value: '50', sub: '8 из 16 ГБ' });
@@ -67,20 +74,28 @@ describe('buildMachine', () => {
   });
 
   it('compares the processor with ten minutes ago, and has no change when the hour is short', () => {
-    const m = buildMachine(stats());
+    const m = buildMachine(stats(), OK);
     expect(m.kpis[0].delta).toMatchObject({ dir: 'up', tone: 'bad' });
-    expect(buildMachine(stats({ history: [sample(1, 0.3), sample(0, 0.4)] })).kpis[0].delta).toBeNull();
+    expect(buildMachine(stats({ history: [sample(1, 0.3), sample(0, 0.4)] }), OK).kpis[0].delta).toBeNull();
   });
 
-  it('says the level by the worst of the processor, the memory and the disk', () => {
-    expect(buildMachine(stats()).level.tone).toBe('ok');
-    expect(buildMachine(stats({ cpu: 0.6 })).level).toEqual({ tone: 'warn', text: 'Машина под нагрузкой' });
-    expect(buildMachine(stats({ cpu: 0.9 })).level.tone).toBe('bad');
-    expect(buildMachine(stats({ mem: { used: 15.8 * GB, total: 16 * GB } })).level.tone).toBe('bad');
+  it('says the level the runtime judged, whatever the figures, as the plate and the sidebar say it', () => {
+    expect(buildMachine(stats({ cpu: 0.95 }), OK).level).toEqual({ tone: 'ok', text: 'Нагрузка в норме' });
+    expect(buildMachine(stats(), health('warn', [{ metric: 'cpu', level: 'warn' }])).level).toEqual({
+      tone: 'warn',
+      text: 'Машина под нагрузкой',
+    });
+    const full = buildMachine(stats(), health('critical', [{ metric: 'mem', level: 'critical' }]));
+    expect(full.level?.tone).toBe('bad');
+    expect(full.kpis[1].vars.c).toBe('var(--hx-danger)');
+  });
+
+  it('says no level when the runtime does not judge its health', () => {
+    expect(buildMachine(stats(), null).level).toBeNull();
   });
 
   it('draws one cell per core and an hour of load ending at the right edge', () => {
-    const m = buildMachine(stats());
+    const m = buildMachine(stats(), OK);
     expect(m.cores).toHaveLength(4);
     expect(m.load.plot.cols.at(-1)?.vars.x).toBe('100%');
     expect(m.load.plot.cols[0].title).toBe('−12 мин');
@@ -91,23 +106,23 @@ describe('buildMachine', () => {
   });
 
   it('leaves out the parts that are empty and sums the disk to its title', () => {
-    const disk = buildMachine(stats()).disk;
+    const disk = buildMachine(stats(), OK).disk;
     expect(disk?.title).toBe('Диск · 120 ГБ');
     expect(disk?.parts.map((p) => p.id)).toEqual(['workspace', 'caches', 'other', 'free']);
     expect(disk?.note).toBeNull();
   });
 
   it('says so while the folders are not counted or were counted in part', () => {
-    expect(buildMachine(stats({ disk: { ...stats().disk, measuredAt: null } })).disk?.note).toContain(
+    expect(buildMachine(stats({ disk: { ...stats().disk, measuredAt: null } }), OK).disk?.note).toContain(
       'считается',
     );
-    expect(buildMachine(stats({ disk: { ...stats().disk, partial: true } })).disk?.note).toContain(
+    expect(buildMachine(stats({ disk: { ...stats().disk, partial: true } }), OK).disk?.note).toContain(
       'не до конца',
     );
   });
 
   it('has no disk tile or bar when the filesystem could not be read', () => {
-    const m = buildMachine(stats({ disk: { ...stats().disk, total: 0, free: 0, parts: [] } }));
+    const m = buildMachine(stats({ disk: { ...stats().disk, total: 0, free: 0, parts: [] } }), OK);
     expect(m.disk).toBeNull();
     expect(m.kpis.map((k) => k.label)).not.toContain('Диск');
   });

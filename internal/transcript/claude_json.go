@@ -200,7 +200,7 @@ func (p *jsonParser) key() (string, error) {
 }
 
 // str is a string value, its own copy: a value kept from a transcript (an id, a time, a model) as a slice of the
-// text held the whole read alive, megabytes of JSONL per conversation (HRN-901).
+// text held the whole read alive, megabytes of JSONL per conversation.
 func (p *jsonParser) str() (string, error) {
 	s, sliced, err := p.text()
 	if sliced {
@@ -217,7 +217,7 @@ func (p *jsonParser) text() (s string, sliced bool, err error) {
 		c := p.s[p.i]
 		if c == '"' {
 			// A copy, not a slice of the line: a slice would keep the whole read (megabytes of the transcript) alive
-			// for as long as the feed keeps any id or key of it (HRN-901).
+			// for as long as the feed keeps any id or key of it.
 			s := strings.Clone(p.s[start:p.i])
 			p.i++
 			return s, true, nil

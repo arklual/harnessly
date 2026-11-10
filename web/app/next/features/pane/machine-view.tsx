@@ -9,7 +9,7 @@ import type { TPending } from '@/next/ui/use-pending-list';
 import Icon from '@/next/ui/icon';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import Swap from '@/next/ui/swap';
-import type { MachineProc, MachineStats } from '@/next/protocol/v2';
+import type { MachineHealth, MachineProc, MachineStats } from '@/next/protocol/v2';
 import { procKey } from '@/next/features/pane/machine/api';
 import { slot, type IKpi, type IPlot } from '@/next/features/pane/machine/charts';
 import { buildMachine, procRow } from '@/next/features/pane/machine/model';
@@ -25,6 +25,8 @@ export interface IMachineViewProps {
   name: string;
   /** null while it loads. */
   stats: MachineStats | null;
+  /** The runtime's verdict, the one the plate and the sidebar say; null from a runtime that does not judge it. */
+  health: MachineHealth | null;
   error: string | null;
   onRetry: () => void;
   /** The processes being stopped, by key. */
@@ -150,8 +152,8 @@ const Loading = () => (
   </div>
 );
 
-const MachineView = ({ name, stats, error, onRetry, pending, hidden, onStop }: IMachineViewProps) => {
-  const model = useMemo(() => (stats ? buildMachine(stats) : null), [stats]);
+const MachineView = ({ name, stats, health, error, onRetry, pending, hidden, onStop }: IMachineViewProps) => {
+  const model = useMemo(() => (stats ? buildMachine(stats, health) : null), [stats, health]);
   const procs = useMemo(
     () => (stats ? stats.procs.filter((x) => !hidden.has(procKey(x))) : []),
     [stats, hidden],
@@ -162,8 +164,12 @@ const MachineView = ({ name, stats, error, onRetry, pending, hidden, onStop }: I
   const body = model && (
     <div className="hx-mach">
       <div className="hx-tv__sum">
-        <span className="hx-lvl" data-tone={model.level.tone} />
-        <span className="hx-tv__name">{model.level.text}</span>
+        {model.level && (
+          <>
+            <span className="hx-lvl" data-tone={model.level.tone} />
+            <span className="hx-tv__name">{model.level.text}</span>
+          </>
+        )}
         <span className="hx-spacer" />
         <span className="hx-tv__muted">{name}</span>
       </div>

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// The organization's rule «Не спрашивать разрешений» (HRN-915).
+// The organization's rule «Не спрашивать разрешений».
 
 func policyRegistry(t *testing.T) (*Registry, *atomic.Bool) {
 	t.Helper()

@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sessions"
 )
 
-// HRN-674: on a Coder workspace the person's shell sets CLAUDE_CONFIG_DIR and ~/.claude does not exist. The pane's
+// on a Coder workspace the person's shell sets CLAUDE_CONFIG_DIR and ~/.claude does not exist. The pane's
 // Claude keeps its pid file and its transcript under that folder: the detector must find both there, or the chat
 // waits for its first answer forever.
 func TestDetectFollowsClaudeConfigDirOfTheProcess(t *testing.T) {

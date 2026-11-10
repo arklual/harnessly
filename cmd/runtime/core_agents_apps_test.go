@@ -8,7 +8,7 @@ import (
 )
 
 // A tab started by the CLI (harnessly tab create) gets the apps on in every chat, as a chat started from the page does;
-// a request with apps of its own, and Codex, are left as they are (HRN-790).
+// a request with apps of its own, and Codex, are left as they are.
 func TestWithAlwaysApps(t *testing.T) {
 	always := func() []string { return []string{"acme.meter"} }
 	if got := withAlwaysApps("claude", nil, always); got == nil || !slices.Equal(got.Apps, []string{"acme.meter"}) {

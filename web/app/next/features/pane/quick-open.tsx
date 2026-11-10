@@ -1,4 +1,4 @@
-// «Перейти к файлу» (⌘P) of «Файлы» (HRN-679): a field over the list, the files of the folder whose paths match what
+// «Перейти к файлу» (⌘P) of «Файлы»: a field over the list, the files of the folder whose paths match what
 // is typed (letters in order, as the «@» of the chat field finds them), arrows to move, Enter to open, Esc to leave.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import Icon from '@/next/ui/icon';

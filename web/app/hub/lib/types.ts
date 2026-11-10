@@ -9,7 +9,7 @@ export type Provider = 'claude' | 'codex' | 'gemini';
 
 export type SpaceRef = { id: string; slug: string; name: string; role: Role };
 export type Space = SpaceRef & { createdAt: string; onboardingStep: OnboardingStep };
-/** An app installed for a space, as the hub's store has it (HRN-898); `path` is its page at the hub, none without a
+/** An app installed for a space, as the hub's store has it; `path` is its page at the hub, none without a
  * view for the app target. */
 export type SpaceApp = { id: string; name: string; version: string; targets: string[]; path?: string };
 

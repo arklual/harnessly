@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// HRN-647: a terminal docked under the chat leaves Claude a few lines, and its dialog shows one option or two.
+// a terminal docked under the chat leaves Claude a few lines, and its dialog shows one option or two.
 func TestFindMenuInALowWindow(t *testing.T) {
 	for name, c := range map[string]struct {
 		pane    string

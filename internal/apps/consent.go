@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// The person's consent (HRN-849). What an app reaches is decided once, on the install screen of the host's page, by a
+// The person's consent. What an app reaches is decided once, on the install screen of the host's page, by a
 // click of the person: an agent cannot give an app rights, through the CLI or a channel, since it can drive both. So an
 // install the person did not click through waits:
 //
@@ -18,7 +18,7 @@ import (
 //
 // Installs made before consent was asked keep what they had (Grant nil): rights are never taken back after the fact.
 //
-// The organization's rule «Не спрашивать разрешений» (HRN-915) stands for the person's word: with it on (SetConsentPolicy
+// The organization's rule «Не спрашивать разрешений» stands for the person's word: with it on (SetConsentPolicy
 // says so), what would wait gets its rights at once, and what waited when the rule came on is granted by GrantWaiting.
 // The rule comes only from the hub, where only the organization's admin changes it by a person's session, so an agent
 // cannot turn it on from the machine. Turned off, it takes nothing back: the next asks wait for the person again.
@@ -164,6 +164,11 @@ func (a Installed) wants() (keys []string, ok bool) {
 
 // NeedsConsent: the install reaches what the person did not agree to, so it is kept off.
 func (a Installed) NeedsConsent() bool {
+	if !PermissionsOn() {
+		// The permissions are off: an installed app works. No grant is written for it, so with the
+		// permissions back on what it reaches waits for the person as before.
+		return false
+	}
 	if a.Grant == nil && !(a.Dev && a.Wants != nil) {
 		// Installed before consent (or by the host itself): it keeps its rights.
 		return false
@@ -269,7 +274,7 @@ func (r *Registry) Consent(id, version string, shown []string, now time.Time) (I
 	return Installed{}, ErrNoConsentWaiting
 }
 
-// Revoke takes one access back (HRN-965): the key leaves the grant, so the app reaches it no more. What the app
+// Revoke takes one access back: the key leaves the grant, so the app reaches it no more. What the app
 // still wants is then not covered, and it waits for the person's word like a first install: it is kept off, its
 // views' calls are refused at once (Get), and the card offers «Разрешить» again. It works for every kind of key:
 // perm:, net:, frame:, server:, secret: and part:. A host's install or one from before consent had no grant: it is
@@ -366,7 +371,7 @@ func (a Installed) LiveManifest() *Manifest {
 }
 
 // AccessNow is everything the install reaches now, as the install screen lists it: what a click on it grants. It is
-// read from where NeedsConsent reads, so the screen never shows less than the consent asks for (HRN-913).
+// read from where NeedsConsent reads, so the screen never shows less than the consent asks for.
 func (a Installed) AccessNow() []Access {
 	pkg, _ := CachedPackage(a.Dir)
 	return AccessOf(a.LiveManifest(), pkg)
@@ -401,7 +406,7 @@ func AccessCodes(list []Access) []string {
 }
 
 // ConsentWhere says where the person gives the word an app waits for: only a click of theirs in the host's page, since
-// the CLI is every agent's too (HRN-849).
+// the CLI is every agent's too.
 func ConsentWhere(id string) string {
 	return "the person agrees in harnessly's page: «Приложения» → " + id + " → «Посмотреть доступы»"
 }

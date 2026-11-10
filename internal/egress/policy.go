@@ -1,5 +1,5 @@
 // The policy side of egress is the one rule for what leaves a machine over HTTP on behalf of apps and Connections inside a
-// company network (HRN-920, item 10): the company's root certificates, the proxy with its exceptions, a client
+// company network (item 10): the company's root certificates, the proxy with its exceptions, a client
 // certificate for mutual TLS, and the internal host names that may be private. One policy, one transport builder, and
 // one way to say why a call was refused.
 
@@ -226,7 +226,7 @@ func RefusedHint(host string, addr netip.Addr, internalListed bool) string {
 }
 
 // Transport builds the transport for a call to host. Direct, it dials under direct (the control that checks the address
-// the name resolved to, at the dial). Through the proxy it opens the tunnel itself (connect.go, HRN-968): the name is
+// the name resolved to, at the dial). Through the proxy it opens the tunnel itself (connect.go): the name is
 // resolved here, every address passes direct, and the CONNECT goes to the checked address; the proxy, which the admin
 // named and which may be on a private address, is dialed with only link-local addresses refused. TLS has the policy's
 // roots and certificate; Header is not touched.

@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// What «Файлы» changes in a folder (HRN-679): a new empty file, a new name for an entry in the same folder, and an
+// What «Файлы» changes in a folder: a new empty file, a new name for an entry in the same folder, and an
 // entry moved to the trash (the system's, as a file manager does it: it can be put back). The caller has checked the
 // folder; the names are checked here. A link is renamed or trashed itself, never what it leads to.
 

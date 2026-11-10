@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// chatRoutes is the CLI's `harnessly chat test` (HRN-842) and `harnessly chat delete` (HRN-520): the mark of a test chat, set through the same command the
+// chatRoutes is the CLI's `harnessly chat test` and `harnessly chat delete`: the mark of a test chat, set through the same command the
 // page sends. The chat is named by its id, or by the tmux session of the calling tab ("current").
 func chatRoutes(d deps, chats appChats) []gate.Route {
 	test := func(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-// The hub's journey in a browser (HRN-761): e2e-hub/journey.spec.ts on a real hub, agent and runtime, one cell of the
+// The hub's journey in a browser: e2e-hub/journey.spec.ts on a real hub, agent and runtime, one cell of the
 // matrix per run (E2E_CELL=cloud|selfhosted|installer|dev), and e2e-hub/live.spec.ts, the read-only run against the
 // hubs that are up (E2E_LIVE_* variables). The browser maps the machines' test domain (run.test) to loopback itself.
 export default defineConfig({

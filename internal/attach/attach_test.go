@@ -91,7 +91,7 @@ func TestUploadItemKeepsTheNameInItsQuotes(t *testing.T) {
 	}
 }
 
-// HRN-841. A text is long by its UTF-16 length or by its lines; its head stays short and ends at a line or a word.
+// A text is long by its UTF-16 length or by its lines; its head stays short and ends at a line or a word.
 func TestLongTextAndItsHead(t *testing.T) {
 	if IsLongText(strings.Repeat("а", LongTextUnits)) || !IsLongText(strings.Repeat("а", LongTextUnits+1)) {
 		t.Fatal("by length")

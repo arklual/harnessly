@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// chat is `harnessly chat test ID|current [--off]` (HRN-842): the mark of a test chat, which the sidebar leaves out.
+// chat is `harnessly chat test ID|current [--off]`: the mark of a test chat, which the sidebar leaves out.
 func (c *cli) chat(args []string) error {
 	if len(args) > 0 && args[0] == "delete" {
 		return c.chatDelete(args[1:])

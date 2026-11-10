@@ -4,6 +4,8 @@ import (
 	"os"
 	"syscall"
 	"testing"
+
+	"github.com/ly-solutions/harnessly/internal/apps"
 )
 
 // The goldens of the files the previous runtime left were taken under the fleet's umask 077 (its units run with
@@ -19,6 +21,8 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	syscall.Umask(0o077)
+	// The tests hold the apps' permissions as they are when on; permissions_off_test.go turns them off.
+	apps.SetPermissions(true)
 	// The goldens are the previous runtime's answers, which were in Russian.
 	os.Setenv("RUNTIME_LOCALE", "ru")
 	os.Exit(m.Run())

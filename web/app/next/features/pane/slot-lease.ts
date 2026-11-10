@@ -1,5 +1,5 @@
 // Which preview slot a browser tab uses. A slot is one cookie, so two tabs on one slot take each other's page over.
-// Every tab holds a slot of its own (ports 1–6, sites 7–8); when all are held, the one used least recently is taken
+// Every tab holds a slot of its own (ports 2, 3, 5, 6, sites 7–8; 1 and 4 are the design library's); when all are held, the one used least recently is taken
 // from its tab, which asks again when it is looked at. A page that keeps a fixed slot (a design's board) pins it: the
 // leases go round it, or the next app view or tab would take the board's cookie and the board would turn into a 404.
 
@@ -9,6 +9,17 @@ export const SLOTS: Readonly<Record<TSlotKind, readonly number[]>> = {
   port: [1, 2, 3, 4, 5, 6],
   site: [7, 8],
 };
+
+/**
+ * The slots of the design library's server: the page of a design (and the kit page) in a window of its own,
+ * and in the chat's pane. Only `pin` gives them out: no tab or app view leases them, even while no design is open. The
+ * runtime wipes a slot's cache and storage when it shows another target than the cookie's last (preview_slots.go,
+ * enter), so a slot that the library shares with a dev server's tab loses every board's cached engine and kit files at
+ * each switch; a slot of its own only ever shows the library, and the wipe never comes.
+ */
+export const LIBRARY_PAGE_SLOT = 1;
+export const LIBRARY_PANE_SLOT = 4;
+const RESERVED: readonly number[] = [LIBRARY_PAGE_SLOT, LIBRARY_PANE_SLOT];
 
 interface IHold {
   tab: string;
@@ -52,7 +63,7 @@ export const createSlotLeases = (clock: () => number = Date.now): ISlotLeases =>
     }
     // The address moved from a port to a site (or back): the old slot is of no use to this tab.
     if (mine) holds.delete(mine[0]);
-    const pool = SLOTS[kind];
+    const pool = SLOTS[kind].filter((slot) => !RESERVED.includes(slot));
     const free = pool.find((slot) => !holds.has(slot));
     if (free !== undefined) {
       holds.set(free, { tab, kind, at: stamp(), pinned: false });

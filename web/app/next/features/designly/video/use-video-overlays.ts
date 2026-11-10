@@ -1,4 +1,4 @@
-// The person's edit of a scene's overlay layer (HRN-653). A drag or a typed text is shown at once as a draft; the save is
+// The person's edit of a scene's overlay layer. A drag or a typed text is shown at once as a draft; the save is
 // pessimistic: the draft goes away when the runtime has answered, and on a refusal it goes back to what was and a short
 // sentence says so. The agent's changes come in the way every change of the scene does (the 3 s read of the video).
 import { useCallback, useEffect, useRef, useState } from 'react';

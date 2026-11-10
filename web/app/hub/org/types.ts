@@ -1,4 +1,4 @@
-// Shared shapes of the organization hub (HRN-531): who is looking, at which scope, which sections they get. The data
+// Shared shapes of the organization hub: who is looking, at which scope, which sections they get. The data
 // of each section lives next to its API (org/api/<section>.ts).
 
 export type Role = 'admin' | 'lead' | 'member';

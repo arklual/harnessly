@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// The tools a view of an app offers from its page (HRN-808, tools.page), and what it publishes for the agent to read
+// The tools a view of an app offers from its page (tools.page), and what it publishes for the agent to read
 // (context.publish). A view registers them with hl.tools.register or the standard navigator.modelContext.registerTool;
 // the page that shows the view reports them here while the view is up, and the agent of the chat lists them with the
 // host tool page_tools and calls one with page_call. A call waits here until the page takes it, hands it to the view's
@@ -63,7 +63,7 @@ type PageReport struct {
 	App     string          `json:"app"`
 	Tools   []PageTool      `json:"tools"`
 	Context json.RawMessage `json:"context,omitempty"`
-	// Hooks: a view of the app hears the agent's tool calls before they run (hooks.agent, HRN-852).
+	// Hooks: a view of the app hears the agent's tool calls before they run (hooks.agent).
 	Hooks bool `json:"hooks,omitempty"`
 }
 
@@ -108,7 +108,7 @@ type PageTools struct {
 }
 
 // AgentAfter is how long after a view answers the agent's call of its tool the view's loud calls still count as the
-// agent's (HRN-851): the page asks the person about them, and the runtime runs them only with the person's yes.
+// agent's: the page asks the person about them, and the runtime runs them only with the person's yes.
 const AgentAfter = 30 * time.Second
 
 func NewPageTools() *PageTools {

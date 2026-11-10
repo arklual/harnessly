@@ -2,7 +2,7 @@ package hubproto
 
 import "encoding/json"
 
-// The person's chats in the hub (docs/hub/history.md, HRN-879): the agent forwards the events of the runtime's
+// The person's chats in the hub (docs/hub/history.md): the agent forwards the events of the runtime's
 // conversation channels (`convs`, `conv:<id>`) to the hub, and the hub keeps the chat list and every chat's feed, so
 // the list and the history open while the machine is off. The same model as a closed cluster's copy: a channel's events
 // carry a seq of the runtime's epoch and the hub says how far it stored them (`history.ack`); what the agent no longer

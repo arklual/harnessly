@@ -47,7 +47,7 @@ export interface IAppPageProps {
   /** The app running, for a look; null when it cannot run now. */
   preview: ReactNode;
   can: readonly string[];
-  /** «Что ему можно»: the rights (the access list). */
+  /** «Что ему можно»: the rights (the access list); null hides the section (the machine's permissions are off). */
   rights: ReactNode;
   /** The switches of an app the person can turn off or on. */
   manage: ReactNode;
@@ -133,10 +133,12 @@ const AppPage = (props: IAppPageProps) => {
               </div>
             )}
             <div className="hx-apppage__side">
-              <section className="hx-apppage__sec">
-                <h2 className="hx-apppage__h2">{t('next.consent.access')}</h2>
-                {props.rights}
-              </section>
+              {props.rights !== null && (
+                <section className="hx-apppage__sec">
+                  <h2 className="hx-apppage__h2">{t('next.consent.access')}</h2>
+                  {props.rights}
+                </section>
+              )}
               {props.manage !== null && <section className="hx-apppage__sec">{props.manage}</section>}
               {(props.version || props.by) && (
                 <p className="hx-apppage__meta">

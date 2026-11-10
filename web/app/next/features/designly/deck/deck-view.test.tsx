@@ -204,6 +204,23 @@ describe('deck shell', () => {
     expect(onGo).toHaveBeenLastCalledWith('s1.dc.html');
   });
 
+  it('loads the neighbouring slides out of sight once the slide on screen is drawn, and not while a recording runs', () => {
+    view();
+    const first = document.querySelector<HTMLIFrameElement>('.hx-deck__frame')!;
+    expect(document.querySelectorAll('.hx-deck__frame')).toHaveLength(1);
+    fireEvent.load(first);
+    fromBoard({ type: 'tk:deck-ready', w: 1920, h: 1080, steps: 0 });
+    const sources = [...document.querySelectorAll<HTMLIFrameElement>('.hx-deck__frame')].map((f) =>
+      f.getAttribute('src'),
+    );
+    expect(sources).toEqual([
+      'https://slot.example/s2.dc.html',
+      'https://slot.example/s1.dc.html',
+      'https://slot.example/s3.dc.html',
+    ]);
+    expect(document.querySelectorAll('.hx-deck__frame[data-top="0"][data-on="0"]')).toHaveLength(2);
+  });
+
   it('shows the toolbar over a selected text and hides it while picking a place to comment', () => {
     view();
     fromBoard({

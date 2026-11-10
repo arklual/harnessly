@@ -18,7 +18,7 @@ Every space has its own collections; a machine reaches only the ones of the spac
 | `uploads` | files people put into a chat, pictures and attachments |
 | `files` | any other file an agent or a person keeps |
 | `handoff` | what one machine passes to another |
-| `apps` | the files of a space's apps: their storage areas under `storage/` (HRN-898, docs/apps.md); a machine sees only its own person's user and chat areas; the team's apps (`team/`), the guest links (`guests/<person>/`) and their packages (`bundles/`) |
+| `apps` | the files of a space's apps: their storage areas under `storage/` (docs/apps.md); a machine sees only its own person's user and chat areas; the team's apps (`team/`), the guest links (`guests/<person>/`) and their packages (`bundles/`) |
 
 `design` takes only the files of a library (no executables, no tool configuration). The others take any relative path.
 A collection is a room of the store named `<collection>-<space id>`.
@@ -131,8 +131,30 @@ The store reuses the hub's database and bucket settings and has none of its own 
 | `HUB_STORE_S3_BUCKET` | `HUB_S3_BUCKET` | another bucket of the same S3 for the blobs |
 | `HUB_STORE_S3_PREFIX` | `<HUB_S3_PREFIX>store/` | where in the bucket the blobs are; a blob is `<prefix>rooms/<room>/blobs/<sha[:2]>/<sha>` |
 | `HUB_STORE_LEGACY_SPACE` | not set | a space's slug: its library is the room `design` itself, the one a design-sync center kept |
+| `HUB_STORE_PROFILE_ROOMS` | not set | `<user id>=profile-sergey,<user id>=profile-rsk`: the rooms a design-sync center kept people's Claude profiles in, bound by user id (not by email, which an account may merely claim); the person's machines sync those instead of `profile-<user id>` |
 
 `hub check-config` prints where the store is.
+
+## The Claude profile
+
+A person's Claude Code profile is a collection of its own, `profile`, and one room per person whatever space the
+machine is in: `profile-<user id>`, or the design-sync room `HUB_STORE_PROFILE_ROOMS` binds to their user id. Only the
+machines the person made open it; a machine nobody made opens none. The room holds `~/.claude/settings.json`,
+`CLAUDE.md`, `keybindings.json` and the `skills`, `agents`, `commands`, `rules`, `output-styles` and `hooks` folders;
+never a secret: `.gitconfig`, glab's config and the `RUNTIME_SECRET_CONFIG_DIRS` folders stay out (`.config` is never
+walked), as do files that
+look like keys (`.env`, `*.pem`, `*.key`), and the settings' environment variables named or valued like a token stay on
+each machine. Secrets go through the hub's safe.
+
+The contents are sealed on the machine (XChaCha20-Poly1305, the path bound in) with the room key, which the hub's safe
+keeps in the person's folder as `profile-room-key`: the hub's store never sees a profile in clear. A design-sync room
+keeps its key: the first machine of the person that still has design-sync's identity
+(`agent-*/identity.age` in the folder `RUNTIME_PROFILE_STATE_DIR` names) opens the key wrapped for it (`GET …/collections/profile/keys`)
+and puts it in the safe; a room nobody keyed and that holds nothing gets a new key.
+
+A runtime syncs the profile with `RUNTIME_PROFILE_SYNC=hub` (the machine's profile sets it with `profileSync: hub`, and
+host-activate then stops design-sync's `design-sync-profile-*` units). It installs and updates the plugins the settings
+enable with `claude plugin …` and has the open Claude tabs reload them.
 
 ## An existing design-sync center
 

@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	compressible = map[string]bool{".js": true, ".mjs": true, ".jsx": true, ".css": true, ".json": true, ".svg": true, ".txt": true}
+	compressible = map[string]bool{".js": true, ".mjs": true, ".jsx": true, ".ts": true, ".tsx": true, ".css": true, ".json": true, ".svg": true, ".txt": true}
 	fontExt      = map[string]bool{".woff": true, ".woff2": true, ".ttf": true, ".otf": true}
 	imageExt     = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".avif": true, ".ico": true, ".svg": true}
 )
@@ -56,6 +56,8 @@ type server struct {
 	ln   net.Listener
 	srv  *http.Server
 	gz   gzipCache
+	// compiled are the component files translated for the engine (compile.go).
+	compiled compileCache
 }
 
 // EnsureServer starts the library server on first use and returns its port; every caller gets the same one. The
@@ -72,16 +74,28 @@ func (l *Library) EnsureServer() (int, error) {
 	if s.ln != nil {
 		return s.port, nil
 	}
-	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(l.cfg.Port))
-	if err != nil {
+	// The port the last run ended up on comes first: the preferred one is often taken (another runtime of the
+	// machine has it), the server then takes any free port, and a port that changes with every start sends a page that
+	// outlived the restart, with the library read it keeps, to a server that is gone («Сервер на порту N не отвечает»
+	// until the page is loaded again). The preferred port after it, then any free one.
+	var ln net.Listener
+	var err error
+	for i, want := range []int{l.rememberedPort(), l.cfg.Port, 0} {
+		if want == 0 && i < 2 {
+			continue
+		}
+		if ln, err = net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(want)); err == nil {
+			break
+		}
 		if !errors.Is(err, syscall.EADDRINUSE) {
 			return 0, err
 		}
-		if ln, err = net.Listen("tcp", "127.0.0.1:0"); err != nil {
-			return 0, err
-		}
+	}
+	if ln == nil {
+		return 0, err
 	}
 	s.ln, s.port = ln, ln.Addr().(*net.TCPAddr).Port
+	l.rememberPort(s.port)
 	s.srv = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { l.serveLibrary(w, r, s.port) }),
 		ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = s.srv.Serve(ln) }()
@@ -117,6 +131,8 @@ func (l *Library) StopServer() {
 	l.mu.Unlock()
 	if s != nil && s.srv != nil {
 		_ = s.srv.Close()
+		// Serve may not have taken the listener yet when it is closed at once: the port is let go either way.
+		_ = s.ln.Close()
 	}
 	l.bgStarts.Wait()
 	l.StopBackground()
@@ -280,7 +296,7 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 		w.WriteHeader(204)
 		return
 	case scriptPath:
-		send(w, 200, "text/javascript; charset=utf-8", []byte(l.clientScript()), head, "Cache-Control", "public, max-age=300")
+		serveLibScript(w, r, l.clientScript(), immutable, "public, max-age=300", head)
 		return
 	case videoRuntimePath:
 		send(w, 200, "text/javascript; charset=utf-8", []byte(l.text("video-runtime.js")), head, "Cache-Control", "public, max-age=300")
@@ -462,7 +478,12 @@ func withClient(source, id string) string { return withClientOf(source, id, fals
 // withClientOf is withClient that, for a board of a video project, also puts the scene's runtime in, before the board's
 // engine: the runtime replaces the clock before any script of the board runs.
 func withClientOf(source, id string, video bool) string {
-	tag := resourcesScript() + `<script data-artifact="` + id + `" src="` + scriptPath + `"></script>`
+	return withClientAt(source, id, video, scriptPath)
+}
+
+// withClientAt is withClientOf with the board script at src (its address with a version, Library.clientSrc).
+func withClientAt(source, id string, video bool, src string) string {
+	tag := resourcesScript() + `<script data-artifact="` + id + `" src="` + src + `"></script>`
 	if video {
 		tag += `<script src="` + videoRuntimePath + `"></script>`
 	}
@@ -699,10 +720,10 @@ func (l *Library) serveFileAs(w http.ResponseWriter, r *http.Request, q url.Valu
 		}
 		versioned := withAssetVersionsOf(jscompat.DecodeUTF8(src), filepath.Dir(file), root, l.engineSwap(id), missing, l.hashed)
 		if readOnly {
-			send(w, 200, typ, []byte(withReadOnlyClient(versioned, id)), head)
+			send(w, 200, typ, []byte(withReadOnlyClient(versioned, id, l.clientSrc())), head)
 			return
 		}
-		send(w, 200, typ, []byte(withClientOf(versioned, id, l.IsVideo(id))), head)
+		send(w, 200, typ, []byte(withClientAt(versioned, id, l.IsVideo(id), l.clientSrc())), head)
 		return
 	}
 	st, err := os.Stat(file)
@@ -714,13 +735,16 @@ func (l *Library) serveFileAs(w http.ResponseWriter, r *http.Request, q url.Valu
 	if readOnly {
 		policy = "no-cache"
 	}
+	if wantsCompiled(q, ext) && l.serveCompiled(w, r, file, st, policy, head) {
+		return
+	}
 	l.serveStatic(w, r, file, st, typ, ext, policy, head)
 }
 
 // withReadOnlyClient is withClient with the board script in guest mode: the page shows, follows nothing and edits
-// nothing.
-func withReadOnlyClient(source, id string) string {
-	tag := resourcesScript() + `<script data-artifact="` + id + `" data-guest="1" src="` + scriptPath + `"></script>`
+// nothing. src is the board script's address with its version (Library.clientSrc).
+func withReadOnlyClient(source, id, src string) string {
+	tag := resourcesScript() + `<script data-artifact="` + id + `" data-guest="1" src="` + src + `"></script>`
 	if m := headTag.FindString(source); m != "" {
 		return strings.Replace(source, m, m+tag, 1)
 	}
@@ -743,7 +767,7 @@ func (l *Library) serveStatic(w http.ResponseWriter, r *http.Request, file strin
 		return
 	}
 	if strings.HasPrefix(typ, "video/") {
-		// a clip is read by seeking (a recording of an interface in a scene, HRN-627): the browser asks for ranges
+		// a clip is read by seeking (a recording of an interface in a scene): the browser asks for ranges
 		f, err := os.Open(file)
 		if err != nil {
 			w.WriteHeader(404)
@@ -915,4 +939,37 @@ func (l *Library) goneBoardRedirect(ref string, segments []string) (string, bool
 		return "/a/" + EncodeURIComponent(ref) + "/", true
 	}
 	return BoardHref(ref, a.Boards[0].Path), true
+}
+
+// ServerPortFile is where the library server keeps the port it listened on, in the data directory.
+const ServerPortFile = "design-port"
+
+// rememberedPort is the port the last run's server ended up on, while the preferred port is the one it was started
+// with; 0 when there is none (a first run, another preferred port, no data directory).
+func (l *Library) rememberedPort() int {
+	if l.cfg.DataDir == "" {
+		return 0
+	}
+	raw, err := os.ReadFile(filepath.Join(l.cfg.DataDir, ServerPortFile))
+	if err != nil {
+		return 0
+	}
+	f := strings.Fields(string(raw))
+	if len(f) != 2 || f[0] != strconv.Itoa(l.cfg.Port) {
+		return 0
+	}
+	n, err := strconv.Atoi(f[1])
+	if err != nil || n < 1024 || n > 65535 {
+		return 0
+	}
+	return n
+}
+
+// rememberPort keeps the port for the next start; a failure only means the next start takes any free port.
+func (l *Library) rememberPort(port int) {
+	if l.cfg.DataDir == "" || port == l.rememberedPort() {
+		return
+	}
+	_ = os.MkdirAll(l.cfg.DataDir, 0o700)
+	_ = os.WriteFile(filepath.Join(l.cfg.DataDir, ServerPortFile), []byte(strconv.Itoa(l.cfg.Port)+" "+strconv.Itoa(port)+"\n"), 0o600)
 }

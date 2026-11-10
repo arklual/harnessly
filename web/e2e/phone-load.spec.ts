@@ -1,4 +1,4 @@
-// How «Сделано в этом чате» loads on a phone over a slow network (HRN-510): the tools home is opened cold and again
+// How «Сделано в этом чате» loads on a phone over a slow network: the tools home is opened cold and again
 // warm with several documents, boards and pictures, and the layout shifts (CLS) and what is on screen at 0.3 s, 1 s and
 // 3 s are recorded. Titles come late and one by one on purpose (each link answers after its own pause).
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';

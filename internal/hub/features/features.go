@@ -35,7 +35,7 @@ const (
 	// SecretsVault is the hub's safe: the machines of the organization keep their secrets on the hub's server
 	// (HUB_SECRETS_VAULT_*, docs/safe.md).
 	SecretsVault = "secrets.vault"
-	// Efficiency is the «Эффективность» screen's figures: GET /api/orgs/{org}/efficiency/summary (HRN-972).
+	// Efficiency is the «Эффективность» screen's figures: GET /api/orgs/{org}/efficiency/summary.
 	Efficiency = "efficiency"
 )
 

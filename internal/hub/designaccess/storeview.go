@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// StoreGrant is what a machine's copy of its space's design library may do with one recorded project (HRN-880): see it
+// StoreGrant is what a machine's copy of its space's design library may do with one recorded project: see it
 // (its files come to the machine) and edit it (the machine's writes to it are taken).
 type StoreGrant struct {
 	See, Edit bool
@@ -47,7 +47,7 @@ func (s *Service) StoreView(ctx context.Context, m store.Machine) (map[string]St
 	return out, nil
 }
 
-// RecordFromStore records a project whose owner file reached the store before the hub had a row for it (HRN-880): the
+// RecordFromStore records a project whose owner file reached the store before the hub had a row for it: the
 // person the file names when they may open the machine that sent it, otherwise the machine's person, owns it; a
 // personal file (v2, private) makes a personal project, an older or claimed one an open one, as the design events do.
 // True when a row was made.

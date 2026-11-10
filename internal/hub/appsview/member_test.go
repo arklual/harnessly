@@ -16,7 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/storelink"
 )
 
-// HRN-898: an app installed for a space opens at the hub for a member with every machine off: the page and the view's
+// an app installed for a space opens at the hub for a member with every machine off: the page and the view's
 // files from the package the team keeps in the store, the person's own area and the space's in the store; what needs
 // a machine (a chat's area, the install's) is refused, and an app the space did not install is not there.
 func TestASpaceAppOpensForAMemberFromTheStore(t *testing.T) {

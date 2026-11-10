@@ -85,7 +85,7 @@ export default tseslint.config(
     },
   },
   {
-    // Sinopia is a builtin app (HRN-808): the editor (features/designly, app-views/sinopia) reaches the host through its
+    // Sinopia is a builtin app: the editor (features/designly, app-views/sinopia) reaches the host through its
     // SDK in the page — the chat, toasts, keys and windows go through app-views/sinopia/host.ts and its adapters in
     // features/designly/sdk — not through the host's modules. Extend the list as more of the editor moves.
     files: ['app/next/features/app-views/sinopia/**/*.{ts,tsx}', 'app/next/features/designly/**/*.{ts,tsx}'],

@@ -1,4 +1,4 @@
-// When the hub asks a person to make an organization (HRN-536). The step shows once after the release, only when the
+// When the hub asks a person to make an organization. The step shows once after the release, only when the
 // instance has HUB_ORGS=on, the person owns a space and has no organization; «Позже» puts it off and nothing about
 // their machines changes.
 import type { OrgList } from '../../hub-api/orgs';

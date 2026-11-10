@@ -1,4 +1,4 @@
-// The page of the machine's live browser (HRN-680): its pictures drawn on a canvas as they come over the tab's socket,
+// The page of the machine's live browser: its pictures drawn on a canvas as they come over the tab's socket,
 // the person's pointer, keys, wheel and paste sent back. The page runs on the machine; here is only its picture.
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -23,7 +23,7 @@ export interface ILiveControl {
   back: () => void;
   forward: () => void;
   reload: () => void;
-  /** The agent's action, run by the machine on the page (HRN-683); null when no answer came in time. */
+  /** The agent's action, run by the machine on the page; null when no answer came in time. */
   act: (message: IFrameAct, timeoutMs: number) => Promise<ILiveActed | null>;
 }
 
@@ -93,7 +93,7 @@ const LiveView = ({ machine, tab, url, size, theme, onPage, onControl, onBox }: 
     socket.current = ws;
     let drawing = false;
     let pending: ArrayBuffer | null = null;
-    // Every picture is answered once it is drawn or dropped: the machine keeps at most two on the way (HRN-711).
+    // Every picture is answered once it is drawn or dropped: the machine keeps at most two on the way.
     const ack = () => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'ack' }));
     };
@@ -316,7 +316,7 @@ const LiveView = ({ machine, tab, url, size, theme, onPage, onControl, onBox }: 
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    // A trackpad gives many small turns a frame: they add up and go once per frame (HRN-711).
+    // A trackpad gives many small turns a frame: they add up and go once per frame.
     let turn: { x: number; y: number; dx: number; dy: number; m: number } | null = null;
     let frame = 0;
     const flush = () => {

@@ -16,7 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// Apps turned on in a chat whose agent already runs (HRN-975, internal/apps live.go): which of them the agent can use
+// Apps turned on in a chat whose agent already runs (internal/apps live.go): which of them the agent can use
 // as it runs, what its next turn is told of them, and whether a change of a chat's apps needs a new start of its agent.
 
 // liveApps answers for the chats of this runtime; liveAppsOf is the one the routes, the host tools and the chats share.
@@ -58,7 +58,7 @@ func (l *liveApps) refusal(app string, launched []string) string {
 	if err != nil || pkg.Manifest == nil {
 		return app + " is not installed"
 	}
-	if l.requireWall && len(launched) == 0 {
+	if l.requireWall && apps.PermissionsOn() && len(launched) == 0 {
 		// A launch with apps has the wall or does not start (Launcher.RequireWall); one without them has none.
 		return apps.WallRefusal(pkg.Manifest.Name)
 	}
@@ -190,7 +190,7 @@ const appToolsWatch = time.Second
 
 // appToolStreamRoutes: GET on the runtime's MCP route with ?server=harnessly-app is the Streamable HTTP stream the
 // client opens after initialize. The server tells it there that its tools changed (notifications/tools/list_changed)
-// when the apps on in the chat change, so the running agent asks tools/list again and has the apps' tools (HRN-975).
+// when the apps on in the chat change, so the running agent asks tools/list again and has the apps' tools.
 // The stream stays open with a comment every 15 s; a caller the runtime cannot place in a chat gets 405, which the
 // client takes for "no stream".
 func appToolStreamRoutes(d deps) []gate.Route {

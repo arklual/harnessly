@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/journal"
 )
 
-// The errors of an app's views (HRN-913): what the SDK catches in a view (console.error and console.warn, uncaught
+// The errors of an app's views: what the SDK catches in a view (console.error and console.warn, uncaught
 // exceptions, rejected promises, refusals of the content policy) and the bridge calls that failed. The page sends them
 // here while a view runs, the runtime keeps the last ones of each app in <registry>/viewlog/<id>.jsonl, and
 // `harnessly app logs <id>` and `harnessly app explain <id>` read them. A hint for the author, bounded in size: never a
@@ -33,7 +33,7 @@ const (
 	ViewLogError  = "error"
 	ViewLogWarn   = "warn"
 	ViewLogBridge = "bridge"
-	// The host's own lines (HRN-920): a file of a view the server refused, a call of the app's MCP backend that failed,
+	// The host's own lines: a file of a view the server refused, a call of the app's MCP backend that failed,
 	// and the steps of a load (a view opened, its handshake answered, no handshake in time).
 	ViewLogServe = "serve"
 	ViewLogMCP   = "mcp"
@@ -63,7 +63,7 @@ func ValidViewLevel(level string) bool {
 func ViewLogFailure(l ViewLogLine) bool { return l.Level != ViewLogLoad && l.Level != ViewLogWarn }
 
 // LogEvent adds one line of the host's own to an app's log; a failure to write it is not the caller's concern. The
-// line goes to the machine's journal too (HRN-976).
+// line goes to the machine's journal too.
 func (r *Registry) LogEvent(id, view, level, text string) {
 	r.logEvent(id, view, level, text, journal.Entry{})
 }

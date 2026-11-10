@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// A launch keeps only the apps that are installed; in safe mode none but a pinned one (HRN-700).
+// A launch keeps only the apps that are installed; in safe mode none but a pinned one.
 func TestLauncherActiveAppsAndSafeMode(t *testing.T) {
 	reg := Open(t.TempDir())
 	pkg := filepath.Join(t.TempDir(), "demo")

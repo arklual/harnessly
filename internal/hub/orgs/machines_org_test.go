@@ -81,7 +81,7 @@ func TestMachinesList(t *testing.T) {
 	if ts := v.machinesList(t, v.anna, "?scope=tenant:"+v.tenant); len(ts) != 1 || ts[0].Name != "Рабочая" {
 		t.Errorf("tenant scope: %+v", ts)
 	}
-	// A lead's screen is their team, and a machine of the whole tenant is one they may open too (HRN-970: the lead's
+	// A lead's screen is their team, and a machine of the whole tenant is one they may open too (the lead's
 	// «Машины» said «0 машин» while a member of the same tenant saw the machine). The admin's team view stays the team.
 	if ts := v.machinesList(t, v.boris, "?scope=team:"+v.team.ID); len(ts) != 1 || ts[0].Name != "Рабочая" || ts[0].TeamID != nil {
 		t.Errorf("lead, tenant machine in the team scope: %+v", ts)
@@ -106,7 +106,7 @@ func TestMachinesList(t *testing.T) {
 	}
 
 	// Who sees what: a member and a lead without an organization role see the machines of their own tenants only,
-	// never the other tenant's (HRN-970: a person put in a team saw no machine until they were made a lead).
+	// never the other tenant's (a person put in a team saw no machine until they were made a lead).
 	for _, p := range []*hubtest.Person{v.vera, v.boris} {
 		if ms := v.machinesList(t, p, ""); len(ms) != 1 || ms[0].Name != "Рабочая" {
 			t.Errorf("%s on the organization: %+v", p.Email, ms)

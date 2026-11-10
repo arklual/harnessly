@@ -1,4 +1,4 @@
-// Package journal is the machine's journal of what happened along the whole way of a request (HRN-976): the page
+// Package journal is the machine's journal of what happened along the whole way of a request: the page
 // (navigation, key clicks, its requests to the runtime, console errors, uncaught exceptions, files that did not load),
 // the runtime (requests that failed or changed something, MCP tool calls, app lifecycle, agent launches), the apps'
 // views and Sinopia (what their SDK and bridge saw). One trace id goes from the page through the runtime into a view and

@@ -71,7 +71,7 @@ var (
 	durRe = regexp.MustCompile(`("endedAt":NOW,"durationMs":)\d+`)
 )
 
-// HRN-901: a released feed holds nothing read, answers a look's questions without reading, and any other read builds
+// a released feed holds nothing read, answers a look's questions without reading, and any other read builds
 // it again as it was, on every recorded transcript, read whole and read from a window with a page back.
 func TestReleasedFeedIsTheSameFeed(t *testing.T) {
 	for path, open := range recorded(t) {
@@ -192,7 +192,7 @@ func firstDiff(want, got string) string {
 }
 
 // The actor's own looks on the clock (the pictures a chat names) must not keep an idle chat's transcript in memory:
-// Held neither reads a released feed again nor counts a use (HRN-901).
+// Held neither reads a released feed again nor counts a use.
 func TestHeldLeavesAReleasedFeedAlone(t *testing.T) {
 	path := write(t, conversation(3))
 	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path})

@@ -439,7 +439,7 @@ export function applyConvSnapshot(
 }
 
 /**
- * HRN-879. The cluster's copy of a chat, drawn as soon as it comes, whatever the machine does (spec v10: reading goes
+ * The cluster's copy of a chat, drawn as soon as it comes, whatever the machine does (spec v10: reading goes
  * through the hub, the machine is only for what is live). It never goes over what the machine itself said: a feed
  * the machine's snapshot already filled keeps it, and the machine's snapshot that comes after replaces it as usual.
  */

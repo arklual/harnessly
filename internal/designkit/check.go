@@ -36,6 +36,11 @@ type CheckReport struct {
 	Themes     []string  `json:"themes"`
 	Components int       `json:"components"`
 	Problems   []Problem `json:"problems"`
+	// Readiness is how far each component is built out (readiness.go); Level is the kit's, the lowest of its
+	// components (-1: a component has no code yet), Next what that component lacks.
+	Level     int                  `json:"level"`
+	Next      string               `json:"next"`
+	Readiness []ComponentReadiness `json:"readiness"`
 }
 
 // Errors counts the problems that make the kit unfit to pack.
@@ -66,8 +71,10 @@ var propTypes = map[string]bool{"enum": true, "boolean": true, "number": true, "
 	"node": true, "function": true, "object": true, "array": true}
 
 type checker struct {
-	root string
-	rep  *CheckReport
+	root   string
+	rep    *CheckReport
+	themes int
+	cur    map[string]*compFacts // the components of the theme being checked, for the readiness
 }
 
 // add reports a problem of rule id (rules.go): the registry gives its level.
@@ -101,7 +108,7 @@ func Check(root string) (*CheckReport, error) {
 	if !st.IsDir() {
 		return nil, fmt.Errorf("%s is not a folder", root)
 	}
-	k := &checker{root: root, rep: &CheckReport{Themes: []string{}, Problems: []Problem{}}}
+	k := &checker{root: root, rep: &CheckReport{Themes: []string{}, Problems: []Problem{}, Level: -1, Readiness: []ComponentReadiness{}}}
 	folders := map[string]string{}
 	if raw, ok := k.read("kit.json"); ok {
 		var kf kitFile
@@ -127,6 +134,7 @@ func Check(root string) (*CheckReport, error) {
 	} else {
 		folders["default"] = ""
 	}
+	k.themes = len(folders)
 	ids := make([]string, 0, len(folders))
 	for id := range folders {
 		ids = append(ids, id)
@@ -161,6 +169,10 @@ type checkComponent struct {
 	Thumb       string          `json:"thumb"`
 	Part        json.RawMessage `json:"part"`
 	Keywords    json.RawMessage `json:"keywords"`
+	Code        json.RawMessage `json:"code"`
+	Preset      json.RawMessage `json:"preset"`
+	Status      json.RawMessage `json:"status"`
+	ReplacedBy  json.RawMessage `json:"replacedBy"`
 }
 
 func (k *checker) theme(folder string) {
@@ -178,7 +190,7 @@ func (k *checker) theme(folder string) {
 	}
 	var all map[string]json.RawMessage
 	_ = json.Unmarshal(raw, &all)
-	k.identity(mf, all)
+	omitted := k.identity(mf, all)
 	if strings.TrimSpace(m.Title) == "" {
 		k.add("index.title", mf, "no title: the kit screen shows the id instead")
 	}
@@ -198,8 +210,10 @@ func (k *checker) theme(folder string) {
 	}
 	k.tokens(folder)
 
+	k.cur = map[string]*compFacts{}
 	comps := k.groups(folder, mf, m.Groups)
 	k.rep.Components += comps
+	k.readiness(folder, omitted)
 	k.assets(folder, mf, m.AssetGroups)
 	k.templates(folder, mf, m.Templates)
 	if comps == 0 && len(m.AssetGroups) == 0 && len(m.Templates) == 0 {
@@ -211,18 +225,21 @@ func (k *checker) theme(folder string) {
 }
 
 // identity: the member holding the kit's id and version, the one install checks the archive against.
-func (k *checker) identity(mf string, all map[string]json.RawMessage) {
+func (k *checker) identity(mf string, all map[string]json.RawMessage) map[string]bool {
 	found := false
+	omitted := map[string]bool{}
 	for name, member := range all {
 		var own struct {
-			ID      string `json:"id"`
-			Version string `json:"version"`
-			Source  string `json:"source"`
+			kitFields
+			Source string `json:"source"`
 		}
 		if json.Unmarshal(member, &own) != nil || own.ID == "" || own.Version == "" {
 			continue
 		}
 		found = true
+		for o := range k.recordFields(mf, name, own.kitFields) {
+			omitted[o] = true
+		}
 		if !ValidID(own.ID) {
 			k.add("identity.id", mf, "%s.id %q: lower case letters, digits and -, 63 at most", name, own.ID)
 		}
@@ -236,6 +253,7 @@ func (k *checker) identity(mf string, all map[string]json.RawMessage) {
 	if !found {
 		k.add("identity.missing", mf, `no kit record: add "kit": {"id": "<id>", "version": "<x.y.z>", "source": "library|draft"}`)
 	}
+	return omitted
 }
 
 func (k *checker) groups(folder, mf string, raw json.RawMessage) int {
@@ -317,6 +335,14 @@ func (k *checker) component(folder, mf, where, id string, c checkComponent, desc
 	}
 	part := k.part(mf, where, id, c.Part, all)
 	k.keywords(mf, where, c.Keywords)
+	k.status(mf, where, id, c.Status, c.ReplacedBy, all)
+	facts := &compFacts{code: k.code(mf, where, c.Code), isPart: part != ""}
+	k.cur[id] = facts
+	if target, has := k.presetOf(mf, where, id, c.Preset, all); has {
+		// A preset is a name for another component with fixed props: that component carries the picture and the card.
+		facts.preset, facts.isPreset = target, true
+		return
+	}
 	if c.Thumb != "" && !k.exists(path.Join(folder, c.Thumb)) {
 		k.add("component.thumb", mf, "%s: thumb %s is not in the kit (harnessly design kit render <folder> --shots writes it)", where, c.Thumb)
 	}
@@ -356,6 +382,7 @@ func (k *checker) component(folder, mf, where, id string, c checkComponent, desc
 		k.add("component.no-sample", mf, "%s: no sample or variants: the canvas shows it as a name only (or mark it a part: \"part\": \"<Parent>\" or \"provider\")", where)
 	}
 
+	facts.sample = len(c.Sample) > 0 || len(c.Variants) > 0
 	card := path.Join(folder, "components", strings.ReplaceAll(id, ".", "/"), "README.md")
 	body, ok := k.read(card)
 	if !ok {
@@ -363,6 +390,9 @@ func (k *checker) component(folder, mf, where, id string, c checkComponent, desc
 		return
 	}
 	text := string(body)
+	facts.card = true
+	facts.whenNot = regexp.MustCompile(`(?im)^#+\s*(when not|когда не)`).MatchString(text)
+	facts.example = strings.Contains(text, "component-from-global-scope")
 	first := cardSummary(text)
 	if first == "" {
 		k.add("card.summary", card, "no summary: the first sentence after the title says what the component is for")
@@ -520,6 +550,7 @@ func (k *checker) tokens(folder string) {
 				Name  string          `json:"name"`
 				Value json.RawMessage `json:"value"`
 				Usage string          `json:"usage"`
+				Var   json.RawMessage `json:"var"`
 			} `json:"tokens"`
 		}
 		if json.Unmarshal(body, &list) != nil || list.Tokens == nil {
@@ -540,6 +571,7 @@ func (k *checker) tokens(folder string) {
 				k.add("tokens.duplicate", tf, "%s: %s is also in %s; a name is used once across families", family, t.Name, prev)
 			}
 			names[t.Name] = family
+			k.tokenVar(tf, family, t.Name, t.Var)
 			if strings.TrimSpace(t.Usage) == "" {
 				noUsage++
 			}

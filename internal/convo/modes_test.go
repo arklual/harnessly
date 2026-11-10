@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// HRN-945: the fast mode and the permission mode of a running Claude change like ultracode, at the same safe moment
+// the fast mode and the permission mode of a running Claude change like ultracode, at the same safe moment
 // and after it: «/fast on|off», then shift+tab round the modes until the footer says the one asked for.
 
 func fastModels(wire.Provider) []wire.AgentModel {

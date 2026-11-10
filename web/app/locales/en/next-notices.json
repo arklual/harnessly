@@ -99,6 +99,8 @@
   "next.notices.settings.show.broken.hint": "A turn failed or hit the subscription limit. 4 seconds",
   "next.notices.settings.show.done": "Done",
   "next.notices.settings.show.done.hint": "The agent finished its turn. 4 seconds",
+  "next.notices.settings.show.machine": "Machine can’t cope",
+  "next.notices.settings.show.machine.hint": "Memory or disk runs out. Stays until it gets better",
   "next.notices.settings.sounds": "Sounds",
   "next.notices.settings.hidden": "When the window is out of sight",
   "next.notices.settings.key": "Shortcut",

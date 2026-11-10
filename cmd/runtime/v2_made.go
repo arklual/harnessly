@@ -203,7 +203,7 @@ func (m madeLibrary) Tied(rec wire.Conversation) []string {
 	lib := m.d.api.L
 	st := m.d.state()
 	var ids []string
-	// The design the chat was started from and the ones it edited (HRN-675), as the design's own list counts them.
+	// The design the chat was started from and the ones it edited, as the design's own list counts them.
 	if id, ok := st.CreatedFrom[rec.ID]; ok && lib.ReadArtifact(id) != nil {
 		ids = append(ids, id)
 	}

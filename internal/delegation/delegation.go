@@ -182,7 +182,7 @@ type Task struct {
 	Title string
 	// Notify wakes the caller with the result when the chat finishes a turn.
 	Notify bool
-	// Test makes the chat a test chat: the sidebar leaves it out (HRN-842).
+	// Test makes the chat a test chat: the sidebar leaves it out.
 	Test bool
 }
 
@@ -632,7 +632,7 @@ func (s *Service) judge(rec wire.Conversation, page Page) (held, proceed bool) {
 		return true, true
 	}
 	if rec.Limited != nil {
-		// Held on its usage limit (HRN-916): the chat goes on by itself at the reset; a reminder now is one more
+		// Held on its usage limit: the chat goes on by itself at the reset; a reminder now is one more
 		// refusal, and the turn is judged once the chat ends one after the reset.
 		return false, false
 	}

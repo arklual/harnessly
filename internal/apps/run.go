@@ -18,7 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
-// terminal.run and process (HRN-851): an app runs a command in the chat's folder and gets its exit code and output, or
+// terminal.run and process: an app runs a command in the chat's folder and gets its exit code and output, or
 // starts a long one (a dev server, a watcher) and stops it later. Every command runs inside the same wall as the agent
 // of the chat (boundary.go: bwrap, then the runtime's sandbox-exec for Landlock and seccomp), in a namespace of
 // processes of its own (what it leaves behind dies with it), with no secret in its environment, the person's key

@@ -19,7 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// The person's dictation recordings («Записи» of the composer, docs/hub/voice-takes.md, HRN-989): what the browser keeps
+// The person's dictation recordings («Записи» of the composer, docs/hub/voice-takes.md): what the browser keeps
 // goes here once a take is over, so it outlives the browser and the machine. The audio is kept voiceAudioKept, the text
 // for good. The API is the cluster gateway's (src/cluster/voice-takes.ts), under the workspace's platform API, and only
 // ever of the signed-in person's own takes (HUB_VOICE_TAKES; off: 404, the page reads it as «not here»):

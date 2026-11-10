@@ -15,8 +15,9 @@ import {
   type TNoticeSound,
 } from '@/next/stores/notices';
 
-/** What the page shows as one switch: «Сломалось» is a failed turn and a turn that hit the limit. */
-export const NOTICE_SHOW = ['waiting', 'broken', 'done'] as const;
+/** What the page shows as one switch: «Сломалось» is a failed turn and a turn that hit the limit, «Машина» a machine
+ *  that cannot cope. */
+export const NOTICE_SHOW = ['waiting', 'broken', 'done', 'machine'] as const;
 export type TNoticeShow = (typeof NOTICE_SHOW)[number];
 
 /** The places in three choices: by the field (the middle of the bottom edge), along the top, in a bottom corner. */
@@ -66,6 +67,7 @@ const SYSTEM_HINT: Record<TSystemPermission, string> = {
 /** Whether a switch of the page is on: «Сломалось» is on while either of its kinds is. */
 export const showOn = (settings: INotifySettings, show: TNoticeShow): boolean => {
   if (show === 'broken') return settings.kinds.failed || settings.kinds.limit;
+  if (show === 'machine') return settings.machine;
   return settings.kinds[show];
 };
 

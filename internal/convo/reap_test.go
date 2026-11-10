@@ -471,7 +471,7 @@ func TestAppsChangeStopsAnAgentAtRest(t *testing.T) {
 	}
 }
 
-// An agent that takes the apps as it runs (AppsLive, HRN-975) is left running: its tools come live, its words on the
+// An agent that takes the apps as it runs (AppsLive) is left running: its tools come live, its words on the
 // next turn. One that cannot is stopped at rest as before.
 func TestAppsChangeLiveKeepsTheAgent(t *testing.T) {
 	r := newReapRig(t)

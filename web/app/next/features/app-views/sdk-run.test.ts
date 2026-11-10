@@ -1,4 +1,4 @@
-// Commands, processes and the pane's browser (HRN-851): the SDK in a frame, the real bridge, the shim; and the agent
+// Commands, processes and the pane's browser: the SDK in a frame, the real bridge, the shim; and the agent
 // that does not get more through an app than the person allowed.
 import { describe, expect, it, vi } from 'vitest';
 import { AppBridge, type IBridgeHandlers, type IViewContext } from '@/next/features/app-views/bridge';

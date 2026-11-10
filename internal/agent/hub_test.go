@@ -1207,7 +1207,7 @@ func TestHubModeReadsNoTranscripts(t *testing.T) {
 	}
 }
 
-// HRN-879: a hub's own machine offers its chats; nothing goes before the hub's history.start, and then the replica's
+// a hub's own machine offers its chats; nothing goes before the hub's history.start, and then the replica's
 // frames reach the hub link that asked for them under protocol 2's names.
 func TestHubModeSendsTheChatsOnceTheHubKeepsThem(t *testing.T) {
 	r := startHubAgent(t, rigOptions{})

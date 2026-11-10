@@ -438,7 +438,7 @@ func TestShadowOnlyForSideEffectFreeGETs(t *testing.T) {
 	}
 }
 
-// tab create with a prompt from a chat's terminal hands the task to a chat nested under that chat (HRN-828); from a terminal
+// tab create with a prompt from a chat's terminal hands the task to a chat nested under that chat; from a terminal
 // that is no chat's, or by an older CLI, the tab is made as before and the first says why.
 func TestCLITabCreateNestsTheAgentUnderTheAskingChat(t *testing.T) {
 	r := newRig(t)

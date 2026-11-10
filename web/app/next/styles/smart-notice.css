@@ -1059,7 +1059,7 @@
 }
 
 /* ── The drops in the chat's right column (features/smart-notice/drops.tsx) ── */
-.hx-drops {
+.hx-sn-drops {
   --sn-bg: var(--hx-ink-bg);
   --sn-fg: var(--hx-ink-fg);
   --sn-fg2: var(--hx-ink-fg2);
@@ -1068,7 +1068,7 @@
   --sn-fill2: var(--hx-ink-fill2);
   margin: 4px 0 12px;
 }
-.hx-drops__list {
+.hx-sn-drops__list {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1076,12 +1076,12 @@
   padding: 0;
   list-style: none;
 }
-.hx-drop {
+.hx-sn-drop {
   border-radius: 22px;
   background: var(--sn-bg);
   color: var(--sn-fg);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-  animation: hx-drop-in 620ms
+  animation: hx-sn-drop-in 620ms
     linear(
       0,
       0.0302,
@@ -1129,11 +1129,11 @@
   transform-origin: 50% 0;
 }
 /* Arriving from the notice: the flight draws it until it lands. */
-.hx-drop[data-arriving] {
+.hx-sn-drop[data-arriving] {
   visibility: hidden;
   animation: none;
 }
-@keyframes hx-drop-in {
+@keyframes hx-sn-drop-in {
   from {
     opacity: 0;
     scale: 0.6;
@@ -1141,12 +1141,12 @@
 }
 /* A drop on the 8pt grid: a 56px capsule, the 32px chip set in it concentrically (12px on every side), 12px from the chip
    to the text, and the chevron as far from the right edge as the chip is from the left. */
-.hx-drop__line {
+.hx-sn-drop__line {
   display: flex;
   align-items: center;
   min-height: 56px;
 }
-.hx-drop__main {
+.hx-sn-drop__main {
   display: flex;
   flex: 1;
   align-items: center;
@@ -1161,39 +1161,39 @@
   text-align: left;
   cursor: pointer;
 }
-.hx-drop__lines {
+.hx-sn-drop__lines {
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 0;
 }
-.hx-drop .hx-sn__chip {
+.hx-sn-drop .hx-sn__chip {
   width: 32px;
   height: 32px;
 }
 /* The timer ring stays inside the chip here, so it keeps the same 12px from the capsule's edge. */
-.hx-drop .hx-sn__ring {
+.hx-sn-drop .hx-sn__ring {
   inset: 0;
   width: 100%;
   height: 100%;
 }
-.hx-drop__title,
-.hx-drop__text {
+.hx-sn-drop__title,
+.hx-sn-drop__text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hx-drop__title {
+.hx-sn-drop__title {
   font-size: var(--hx-text-sm);
   font-weight: 600;
   line-height: 18px;
 }
-.hx-drop__text {
+.hx-sn-drop__text {
   color: var(--sn-fg2);
   font-size: var(--hx-text-xs);
   line-height: 16px;
 }
-.hx-drop__more {
+.hx-sn-drop__more {
   display: grid;
   flex: none;
   place-items: center;
@@ -1206,31 +1206,31 @@
   color: var(--sn-fg2);
   cursor: pointer;
 }
-.hx-drop__more .hx-icon {
+.hx-sn-drop__more .hx-icon {
   transition: rotate 420ms var(--hx-ease-out);
 }
-.hx-drop[data-open] .hx-drop__more .hx-icon {
+.hx-sn-drop[data-open] .hx-sn-drop__more .hx-icon {
   rotate: 180deg;
 }
-.hx-drop__more:hover,
-.hx-drop__main:hover .hx-drop__title {
+.hx-sn-drop__more:hover,
+.hx-sn-drop__main:hover .hx-sn-drop__title {
   color: var(--sn-fg);
 }
 /* Opened in place: it grows to what is asked, springing; folding settles. */
-.hx-drop__fold {
+.hx-sn-drop__fold {
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 360ms var(--hx-ease-out);
 }
-.hx-drop[data-open] .hx-drop__fold {
+.hx-sn-drop[data-open] .hx-sn-drop__fold {
   grid-template-rows: 1fr;
   transition: grid-template-rows 520ms cubic-bezier(0.34, 1.2, 0.64, 1);
 }
-.hx-drop__inner {
+.hx-sn-drop__inner {
   min-height: 0;
   overflow: hidden;
 }
-.hx-drop__what {
+.hx-sn-drop__what {
   margin: 0;
   padding: 0 16px 12px 56px;
   color: var(--sn-fg2);
@@ -1240,11 +1240,11 @@
   opacity: 0;
   transition: opacity 200ms var(--hx-ease-out);
 }
-.hx-drop[data-open] .hx-drop__what {
+.hx-sn-drop[data-open] .hx-sn-drop__what {
   opacity: 1;
   transition-delay: 80ms;
 }
-.hx-drop__answer {
+.hx-sn-drop__answer {
   margin: 0 12px 12px 56px;
   padding: 7px 14px;
   border: 0;
@@ -1257,16 +1257,33 @@
   cursor: pointer;
 }
 .hx-sn :focus-visible,
-.hx-drop :focus-visible {
+.hx-sn-drop :focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.85);
   outline-offset: 2px;
 }
+/* The drop's main button is the whole line: from the keyboard the capsule itself takes a soft ring around its edge. */
+.hx-sn-drop__main:focus-visible {
+  outline: none;
+}
+/* The ring is drawn by the button over the whole capsule, not by :has() on the capsule: a :has() on focus costs every
+   keystroke on the page (has-cost.test.ts). */
+.hx-sn-drop {
+  position: relative;
+}
+.hx-sn-drop__main:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  box-shadow: 0 0 0 3px var(--hx-focus);
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
-  .hx-drop {
+  .hx-sn-drop {
     animation: none;
   }
-  .hx-drop__fold,
-  .hx-drop[data-open] .hx-drop__fold {
+  .hx-sn-drop__fold,
+  .hx-sn-drop[data-open] .hx-sn-drop__fold {
     transition: none;
   }
 }
@@ -1284,7 +1301,7 @@
   background: var(--hx-ink-bg);
   box-shadow: 0 0 0 2px var(--hx-bg-raised, #fff);
   pointer-events: none;
-  animation: hx-drop-in 520ms var(--hx-ease-out) backwards;
+  animation: hx-sn-drop-in 520ms var(--hx-ease-out) backwards;
 }
 
 /* A finished chat's recap in its card, and the field under it. */

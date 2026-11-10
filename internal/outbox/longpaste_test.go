@@ -8,7 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// HRN-841. Gathering stops at GatherMaxText: a message that would grow past it with another one leaves that one in the
+// Gathering stops at GatherMaxText: a message that would grow past it with another one leaves that one in the
 // line, to be typed after it, whole.
 func TestGatherStopsAtGatherMaxText(t *testing.T) {
 	r := newRig(t, tui(t, "claude-busy-spinner.ansi.txt"), wire.StateWorking)
@@ -28,7 +28,7 @@ func TestGatherStopsAtGatherMaxText(t *testing.T) {
 	}
 }
 
-// HRN-841. 07.11: a long steered paste sat folded in Claude's box («[Pasted text #1 +843 lines]»), every Enter pressed
+// 07.11: a long steered paste sat folded in Claude's box («[Pasted text #1 +843 lines]»), every Enter pressed
 // again went nowhere, and the page said «in the agent's queue» for 30 minutes. Past its last Enter it is stalled at
 // once: back in the line, the box cleared, the person decides.
 func TestASteeredPasteClaudeNeverTakesIsStalledAfterItsEnters(t *testing.T) {
@@ -60,7 +60,7 @@ func TestASteeredPasteClaudeNeverTakesIsStalledAfterItsEnters(t *testing.T) {
 	}
 }
 
-// HRN-841. 07.11: a steered message of a picture alone was read by Claude (its queued_command «[Image #29]»), yet the
+// 07.11: a steered message of a picture alone was read by Claude (its queued_command «[Image #29]»), yet the
 // page said «in the agent's queue» for 30 minutes: no words, so no entry was taken for it. An entry of picture
 // references alone is its.
 func TestASteeredPictureAloneIsTakenByItsPictureEntry(t *testing.T) {

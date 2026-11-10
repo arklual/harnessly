@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// The agent's actions on a page of the live browser (HRN-683): what the pane hands over after the person let the agent
+// The agent's actions on a page of the live browser: what the pane hands over after the person let the agent
 // onto the site, the same ops as the proxy's bridge takes (web/app/next/features/pane/agent-acts.ts). The page is read
 // and its fields set by act.js in an isolated world; the pointer and the keys are the browser's own input events, so
 // the page sees a person's click, not a script's.

@@ -1,5 +1,5 @@
-// «Приложения» in the new look (HRN-769) and the runtime without tasks, MRs and help under the «hubFirst» flag
-// (HRN-766). The apps are installed as a person does with the CLI; the shots go to E2E_SHOTS.
+// «Приложения» in the new look and the runtime without tasks, MRs and help under the «hubFirst» flag
+// The apps are installed as a person does with the CLI; the shots go to E2E_SHOTS.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';

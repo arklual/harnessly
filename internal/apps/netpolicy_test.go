@@ -116,7 +116,7 @@ func TestNetworkFromEnv(t *testing.T) {
 	}
 }
 
-// A refused address says which name was refused and who can open it (HRN-920).
+// A refused address says which name was refused and who can open it.
 func TestDialRefusalSaysWhichHostIsOutsideThePolicy(t *testing.T) {
 	err := dialControl("crm.example.corp", false)("tcp", "10.0.0.5:443", nil)
 	var be *BridgeError

@@ -1,4 +1,4 @@
-// The workspace beyond one file, git and the chat's events (HRN-850): the SDK in a frame, the real bridge, the shim.
+// The workspace beyond one file, git and the chat's events: the SDK in a frame, the real bridge, the shim.
 import { describe, expect, it, vi } from 'vitest';
 import { AppBridge, type IBridgeHandlers, type IViewContext } from '@/next/features/app-views/bridge';
 import { eventOfEntry } from '@/next/features/app-views/chat-events';

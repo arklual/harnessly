@@ -1,5 +1,5 @@
 // The «Организация» screen of the new hub (admin): the organization's own settings. For now one: the rule for apps on
-// its machines (HRN-915). The switch changes after the hub answered, and the machines get the rule with their list.
+// its machines. The switch changes after the hub answered, and the machines get the rule with their list.
 // Its own chunk: it loads when the person opens the section.
 import { useEffect, useState } from 'react';
 

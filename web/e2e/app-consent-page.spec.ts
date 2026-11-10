@@ -1,5 +1,5 @@
 // An app installed from a folder waits for the person's consent: its page /apps/<id> shows the consent card with
-// «Allow», not a blank screen (HRN-976: React #301 there, a render that set state over and over).
+// «Allow», not a blank screen (React #301 there, a render that set state over and over).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

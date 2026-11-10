@@ -173,7 +173,7 @@ func TestReplyInStopMode(t *testing.T) {
 	if tool["continue"] != false || tool["stopReason"] != text {
 		t.Fatalf("%v", tool)
 	}
-	// Codex takes only a deny with a reason at a tool call (HRN-807).
+	// Codex takes only a deny with a reason at a tool call.
 	codex := reply(t, g.Reply("codex", "PreToolUse", "s1", ""))
 	out, _ := codex["hookSpecificOutput"].(map[string]any)
 	if codex["continue"] != nil || out["hookEventName"] != "PreToolUse" || out["permissionDecision"] != "deny" || out["permissionDecisionReason"] != text {

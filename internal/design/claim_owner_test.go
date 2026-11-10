@@ -40,7 +40,7 @@ func TestClaimOwnerlessProject(t *testing.T) {
 		t.Fatalf("free: %d", c)
 	}
 	o, ok := l.ReadOwner("free")
-	// HRN-675: the file names the person (a v1 file named only the Unix user, so another runtime of the library could own it).
+	// the file names the person (a v1 file named only the Unix user, so another runtime of the library could own it).
 	if !ok || o.V != 2 || o.User != "se" || o.Private || !o.Claimed || o.Person != "p.smirnov@example.com" {
 		t.Fatalf("owner file: %+v %v", o, ok)
 	}
@@ -52,7 +52,7 @@ func TestClaimOwnerlessProject(t *testing.T) {
 	}
 }
 
-// HRN-675: «take it» from a page session makes that session's person the owner, not the person the machine belongs to;
+// «take it» from a page session makes that session's person the owner, not the person the machine belongs to;
 // the claim is told to the gateway again (design.claim, the team keeps editing) while the snapshot has no row.
 func TestClaimOwnerlessNamesThePersonOfTheSession(t *testing.T) {
 	root := t.TempDir()

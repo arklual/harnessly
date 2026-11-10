@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// HRN-920: the host's own lines and the steps of a load live in the same ring as the page's; the ring keeps the last
+// the host's own lines and the steps of a load live in the same ring as the page's; the ring keeps the last
 // ViewLogMax whatever wrote them.
 func TestAppLogKeepsHostLinesAndTrims(t *testing.T) {
 	reg, _ := installedPaneApp(t, nil)
@@ -76,7 +76,7 @@ func TestJudgeLoad(t *testing.T) {
 	}
 }
 
-// HRN-920: a check link opens any local view, is never listed, and is the only link whose page writes to the log.
+// a check link opens any local view, is never listed, and is the only link whose page writes to the log.
 func TestCheckLink(t *testing.T) {
 	g, reg, _ := guestRig(t)
 	token, link, err := g.CreateCheck("acme.demo", "")

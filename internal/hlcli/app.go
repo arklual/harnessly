@@ -185,7 +185,7 @@ func (c *cli) appValidate(args []string) error {
 }
 
 // validateVerdict is the last line of a check that failed: the errors and, with --strict, the warnings it counted as
-// errors, each said as what it is (HRN-913).
+// errors, each said as what it is.
 func validateVerdict(ps apps.Problems, strict, noPackage bool) string {
 	errs := len(ps.Errors())
 	warns := len(ps) - errs
@@ -267,9 +267,9 @@ func (c *cli) appInstall(args []string, dev bool) error {
 		Message  string        `json:"message"`
 		Problems apps.Problems `json:"problems"`
 		App      cliApp        `json:"app"`
-		// WaitsConsent: what the app reaches waits for the person's click on the install screen (HRN-849).
+		// WaitsConsent: what the app reaches waits for the person's click on the install screen.
 		WaitsConsent bool `json:"waitsConsent"`
-		// ConsentPolicy: the organization's rule «Не спрашивать разрешений» gave the app its rights (HRN-915).
+		// ConsentPolicy: the organization's rule «Не спрашивать разрешений» gave the app its rights.
 		ConsentPolicy bool `json:"consentPolicy"`
 		// Warning: said in words, e.g. a dev install where signatures are required.
 		Warning string `json:"warning"`
@@ -408,7 +408,7 @@ func (c *cli) appEnable(args []string, on bool) error {
 }
 
 // appExplain says why an app is on or off, layer by layer: the machine, the team, its setup, how it turns on, the chat of
-// this tab (when run in one) and the wall (HRN-699). The line marked ✗ is the one that keeps it off.
+// this tab (when run in one) and the wall. The line marked ✗ is the one that keeps it off.
 func (c *cli) appExplain(args []string) error {
 	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
 		return usageErr("takes the app's id")
@@ -450,7 +450,7 @@ func (c *cli) appExplain(args []string) error {
 
 // appLogs prints what the app's journal holds: the console errors, exceptions and failed bridge calls its views
 // reported, and the host's own lines (a file refused, a backend call that failed, the steps of a load), oldest first
-// (HRN-913, HRN-920). --since takes a span (10m), a time (RFC 3339) or milliseconds; --follow keeps printing new lines
+// --since takes a span (10m), a time (RFC 3339) or milliseconds; --follow keeps printing new lines
 // (--for stops it after a span).
 func (c *cli) appLogs(args []string) error {
 	id, limit, since, follow, span := "", "", "", false, time.Duration(0)
@@ -608,7 +608,7 @@ func (c *cli) logSince(v string) (int64, error) {
 	return 0, fmt.Errorf("not a time")
 }
 
-// appCheck opens an app's view in a browser of the machine and says how it loaded (HRN-920): the handshake and every
+// appCheck opens an app's view in a browser of the machine and says how it loaded: the handshake and every
 // line the load wrote. It fails (exit 1) when the view did not load cleanly.
 func (c *cli) appCheck(args []string) error {
 	id, view, open := "", "", false
@@ -926,7 +926,7 @@ func (c *cli) appContext(policyPath string) error {
 	return nil
 }
 
-// appContextLive is the UserPromptSubmit hook of every Claude Code chat (HRN-975): when apps were turned on or off in
+// appContextLive is the UserPromptSubmit hook of every Claude Code chat: when apps were turned on or off in
 // the chat since its agent started (or was last told), the runtime answers what the agent should know of them (their
 // tools, instructions and skills, or why one waits for the agent's next start), and it goes out as additionalContext.
 // Mostly the answer is empty and the hook prints nothing. It never blocks: a runtime that does not answer adds nothing.

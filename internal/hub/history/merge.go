@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// HRN-883: a machine's own projects and favorites merged into its person's sidebar by the machine itself, as the page
+// a machine's own projects and favorites merged into its person's sidebar by the machine itself, as the page
 // merges them (web/app/next/features/sidebar/profile-layout.ts mergeMachine): a project joins the profile's of the same
 // name or becomes one of its own, the favorites' groups join by name with their chats added where missing, the loose
 // ones after the loose; a machine's favorites are merged once, its projects whenever one is new.

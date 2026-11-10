@@ -523,7 +523,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* HRN-945: the fast mode on the pill, a mark before the name like ultracode's, without the glow. */
+/* the fast mode on the pill, a mark before the name like ultracode's, without the glow. */
 .hx-model .hx-model__fast {
   color: var(--hx-accent);
 }
@@ -604,7 +604,7 @@
 .hx-perm__hint[data-pending='true'] {
   color: var(--hx-accent);
 }
-/* HRN-945: the fast mode and ultracode, one row of chips under the permission mode. A chip is a switch: neutral off,
+/* the fast mode and ultracode, one row of chips under the permission mode. A chip is a switch: neutral off,
    the accent's backing on; an ask the agent has not confirmed yet keeps an accent outline. What it does is its hint. */
 .hx-picker__chips {
   display: flex;

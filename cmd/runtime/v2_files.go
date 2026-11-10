@@ -66,7 +66,7 @@ func (f *v2Files) Dir(_ context.Context, conv, dir string) (wire.DirListing, err
 	if err != nil {
 		return wire.DirListing{}, err
 	}
-	// «Машина» in «Файлы» (HRN-679, the old «Диск»): "/" is the workspace's places, an absolute folder in them is listed
+	// «Машина» in «Файлы» (the old «Диск»): "/" is the workspace's places, an absolute folder in them is listed
 	// with absolute paths. What looks like a secret is not shown; nothing outside the places is.
 	if strings.HasPrefix(dir, "/") {
 		return f.machineDir(dir)
@@ -103,7 +103,7 @@ func (f *v2Files) Dir(_ context.Context, conv, dir string) (wire.DirListing, err
 	return out, nil
 }
 
-// markGit puts git's marks on the entries of a folder (HRN-679): new, or changed and not committed.
+// markGit puts git's marks on the entries of a folder: new, or changed and not committed.
 func markGit(entries []wire.FileEntry, dir string) {
 	marks := files.GitMarks(dir)
 	for i := range entries {
@@ -178,7 +178,7 @@ func (f *v2Files) place(ctx context.Context, conv, file string) (root, rel strin
 	if err != nil {
 		return root, file, err
 	}
-	// Any file of the workspace's places opens too (HRN-679), as the viewer opens it: a file the person was sent to
+	// Any file of the workspace's places opens too, as the viewer opens it: a file the person was sent to
 	// outside the chat's folder reads here instead of in the old viewer. Secrets stay closed.
 	if !ok && f.access != nil {
 		if real, rerr := files.Realpath(file); rerr == nil && f.access.Allowed(real) && !f.access.Secret(real) {
@@ -329,7 +329,7 @@ func (f *v2Files) touchedOrDelivered(ctx context.Context, conv, abs string) bool
 }
 
 // ServeGitSide answers GET .../file-git?path=…[&ref=HEAD]: the file as the revision has it, for the editor's diff
-// (HRN-679). The file is placed as File places it (the folder's, or an absolute one it may open); the other side is the
+// The file is placed as File places it (the folder's, or an absolute one it may open); the other side is the
 // editor's own text, unsaved edits too.
 func (f *v2Files) ServeGitSide(w http.ResponseWriter, r *http.Request, conv string) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -364,7 +364,7 @@ func (f *v2Files) ServeGitSide(w http.ResponseWriter, r *http.Request, conv stri
 // searchTime is how long «Найти в файлах» may look before it answers with what it found.
 const searchTime = 5 * time.Second
 
-// ServeSearch answers GET .../find?q=<text>[&path=<folder>] (HRN-679): the lines of the text files under the folder
+// ServeSearch answers GET .../find?q=<text>[&path=<folder>]: the lines of the text files under the folder
 // that hold the text. The folder is the chat's folder or one in it, or an absolute folder of the workspace's places (as
 // «Машина» lists it); the paths come back as the files tab opens them: relative to the chat's folder, or absolute.
 func (f *v2Files) ServeSearch(w http.ResponseWriter, r *http.Request, conv string) {
@@ -435,7 +435,7 @@ type entryOp struct {
 	Name string `json:"name"`
 }
 
-// ServeEntryOp answers POST .../file-op {op, path, name} (HRN-679): "newFile" makes an empty file `name` in the folder
+// ServeEntryOp answers POST .../file-op {op, path, name}: "newFile" makes an empty file `name` in the folder
 // `path`, "rename" names the entry `path` `name` in its folder, "trash" moves the entry `path` to the person's trash.
 // Paths are as the files tab has them (relative to the chat's folder, or absolute in the workspace's places), and so
 // is the answer's path. The chat's folder, a place itself and what looks like credentials are not changed.

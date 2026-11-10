@@ -9,7 +9,7 @@ const config = {
   readerUrl: 'https://ai.example.org/agents/docs/{slug}',
 };
 
-// HRN-943: a link is a document or a board by its exact path, never by its host alone.
+// a link is a document or a board by its exact path, never by its host alone.
 describe('cardKindOf', () => {
   it.each([
     ['https://a.example.org/a/plan', 'doc'],

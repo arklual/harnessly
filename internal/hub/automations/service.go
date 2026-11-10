@@ -1,4 +1,4 @@
-// Package automations is the hub's side of automations (docs/hub/automations.md, HRN-974): a rule turns an event from
+// Package automations is the hub's side of automations (docs/hub/automations.md): a rule turns an event from
 // outside into a conversation on its owner's machine, the conversation reports what it did, and the owner approves or
 // rejects it. The hub keeps the rules and runs (migration 0036), takes events at <platform api>/automations/hook,
 // starts the conversation over the machine's link (conversations.start) and takes its automations.result.

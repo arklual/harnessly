@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// HRN-880: a library that syncs with the hub's store reads its history, returns a board to a version and pins a guest
+// a library that syncs with the hub's store reads its history, returns a board to a version and pins a guest
 // link from the store's revisions, not from git in HistoryDir.
 
 type fakeRevisions struct {

@@ -1542,7 +1542,7 @@ func TestAppsCommand(t *testing.T) {
 }
 
 // A tab started by the CLI (harnessly tab create) keeps the apps of its launch when it becomes a conversation: the chat's
-// switches and its next launch see what its agent runs with (HRN-790).
+// switches and its next launch see what its agent runs with.
 func TestImportKeepsTheLaunchApps(t *testing.T) {
 	tab := jsvalue.NewObject("id", "tab-ap1", "sessionName", "ws-1-ap1", "panelType", "claude-code",
 		"meta", jsvalue.NewObject("launch", jsvalue.NewObject("apps", []any{"acme.meter"})))
@@ -1567,7 +1567,7 @@ func TestImportKeepsTheLaunchApps(t *testing.T) {
 	if rec, _ := r.rt.Record("tab-ap2"); len(rec.Apps) != 0 {
 		t.Fatalf("gone app: %v", rec.Apps)
 	}
-	// A Codex tab keeps them too: Codex chats run apps (HRN-703).
+	// A Codex tab keeps them too: Codex chats run apps.
 	r.deps = func(d *Deps) { d.AppsOK = func([]string) string { return "" } }
 	r.rt = r.runtime()
 	cx, ok := TabFromLayout(jsvalue.NewObject("id", "tab-ap3", "sessionName", "ws-1-ap3", "panelType", "codex-cli",

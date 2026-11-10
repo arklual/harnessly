@@ -349,7 +349,7 @@ export const NotePopover = ({
   // «Приложить» while the voice is still being written down: it finishes, and the card goes once the words are in.
   const [okAfterVoice, setOkAfterVoice] = useState(false);
   const ok = () => {
-    // The card is on its way out: a second press would attach the note twice (HRN-673).
+    // The card is on its way out: a second press would attach the note twice.
     if (closing || wants || sending) return;
     if (mic?.recording) {
       setOkAfterVoice(true);

@@ -121,7 +121,7 @@ func notFound(err error) bool {
 
 // busy is the bucket saying another write of the same key is under way (409 OperationAborted / "A conflicting
 // conditional operation is currently in progress"): two machines putting the same blob at once. A blob is its sha256,
-// so the other write puts the same bytes; the answer is to wait and look again, not a 500 (HRN-878, Selectel S3).
+// so the other write puts the same bytes; the answer is to wait and look again, not a 500 (Selectel S3).
 func busy(err error) bool {
 	resp := minio.ToErrorResponse(err)
 	return resp.StatusCode == http.StatusConflict || resp.Code == "OperationAborted" || resp.Code == "ConditionalRequestConflict"

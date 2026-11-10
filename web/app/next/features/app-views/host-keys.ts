@@ -1,4 +1,4 @@
-// The host's keys for the views of apps (HRN-808, keys.on/press/hints): a view runs the shortcut commands of a screen
+// The host's keys for the views of apps (keys.on/press/hints): a view runs the shortcut commands of a screen
 // with the keys the person set for them, a key pressed inside it runs as the host's would, and it may ask how the host
 // writes a command's key. The same work for a frame and for a builtin app (Sinopia) in the page's own process.
 import { APP_KEY_SCOPES, type IBridgeHandlers } from '@/next/features/app-views/bridge';

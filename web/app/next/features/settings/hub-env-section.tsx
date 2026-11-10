@@ -1,4 +1,4 @@
-// «From the organization» (HRN-767): the skills and MCP servers the hub handed this machine, each with the layer that
+// «From the organization»: the skills and MCP servers the hub handed this machine, each with the layer that
 // gave it, whether it is pinned, how the machine agent applied it, and the error when it did not. A pinned item has no
 // switch; the switch of the others is the person's own and works only where the runtime takes it.
 import type { HubEnvStatus, IHubEnvItem } from '@/next/features/hub-env/api';

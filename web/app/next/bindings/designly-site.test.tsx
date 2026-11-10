@@ -240,7 +240,7 @@ describe('DesignlySite page switch', () => {
   });
 });
 
-// HRN-674: the switch of the bar turns the design between looking and editing, both ways, with or without its chat.
+// the switch of the bar turns the design between looking and editing, both ways, with or without its chat.
 describe('DesignlySite mode', () => {
   const Routed = ({ chat = null }: { chat?: string | null }) => {
     const [edit, setEdit] = useState(false);
@@ -324,7 +324,7 @@ describe('DesignlySite project not in the library', () => {
   });
 
   // After about fifteen seconds the project is still on its way to the store: a card says so, with the way back, and
-  // the page keeps looking on its own and opens the project when it arrives (HRN-880).
+  // the page keeps looking on its own and opens the project when it arrives.
   it('says the project is on its way after fifteen seconds and opens it when it arrives', async () => {
     const away = () => document.querySelector('.hx-acc-card[role="status"]');
     kept = null;

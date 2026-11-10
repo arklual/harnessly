@@ -1,4 +1,4 @@
-// What an app reaches, in the person's words (HRN-849): grouped from the most dangerous down, a high or critical line
+// What an app reaches, in the person's words: grouped from the most dangerous down, a high or critical line
 // says what it can do to the person, the manifest's own name of it shows small on hover. On an update only the new
 // lines are given, each marked «новое».
 import { useState } from 'react';
@@ -76,7 +76,7 @@ const AccessList = ({
 }: {
   access: readonly IAccess[];
   fresh?: boolean;
-  /** HRN-965: every line the app is given can be taken back alone. */
+  /** every line the app is given can be taken back alone. */
   revoke?: IRevoke;
 }) => {
   if (access.length === 0) return <p className="hx-access__none">{t('next.consent.nothing')}</p>;

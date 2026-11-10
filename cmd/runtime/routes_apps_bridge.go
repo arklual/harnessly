@@ -101,8 +101,12 @@ func bridgeRefused(err error) (int, any) {
 		return status, body
 	case errors.Is(err, apps.ErrNotInstalled):
 		return http.StatusNotFound, map[string]string{"error": "not-found"}
-	case errors.Is(err, apps.ErrUnknownMethod), errors.Is(err, apps.ErrStorageArgs):
-		return http.StatusBadRequest, map[string]string{"error": apps.CodeInvalidParams}
+	case errors.Is(err, apps.ErrUnknownMethod):
+		return http.StatusBadRequest, map[string]string{"error": apps.CodeInvalidParams, "message": "no such method"}
+	case errors.Is(err, apps.ErrStorageArgs):
+		// The view's author reads this in the app's log: a bare code said nothing of what to change.
+		return http.StatusBadRequest, map[string]string{"error": apps.CodeInvalidParams,
+			"message": "bad storage arguments: scope is install, user, chat, space or doc; key is 1–256 characters"}
 	case errors.As(err, &conflict):
 		return http.StatusConflict, map[string]any{"error": apps.CodeConflict, "message": "the key changed since it was read", "version": conflict.Current}
 	case errors.Is(err, apps.ErrQuota):
@@ -263,7 +267,9 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		switch scope {
 		case apps.ScopeChat:
 			if sess.Conversation == "" {
-				return refused(apps.ErrStorageArgs)
+				// A view with no chat (the app's own tab, a slot) has no chat area: say so, and where to keep it instead.
+				return refused(&apps.BridgeError{Code: apps.CodeInvalidParams,
+					Message: "this view is in no chat, so it has no chat storage: use hl.storage.user, or check hl.context.chat first"})
 			}
 			owner = sess.Conversation
 		case apps.ScopeDoc:
@@ -730,7 +736,7 @@ func revealApp(store *secrets.Store, app string, names []string) map[string]stri
 func callAppTool(ctx context.Context, d deps, reg *apps.Registry, appID, tool string, args map[string]any) (json.RawMessage, error) {
 	out, err := callAppToolRaw(ctx, d, reg, appID, tool, args)
 	if err != nil {
-		// The author reads a backend's refusal in `harnessly app logs` (HRN-920): the tool, the code and the short reason,
+		// The author reads a backend's refusal in `harnessly app logs`: the tool, the code and the short reason,
 		// never the arguments or the answer's body.
 		reg.LogEventOnce(appID, "", apps.ViewLogMCP, "tools.call "+clip(tool, 80)+" — "+toolFailure(err))
 	}

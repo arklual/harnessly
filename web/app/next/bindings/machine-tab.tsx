@@ -6,6 +6,7 @@ import MachineView from '@/next/features/pane/machine-view';
 import { loadMachineStats, procKey, stopProcess } from '@/next/features/pane/machine/api';
 import { t } from '@/next/i18n';
 import type { MachineId, MachineProc, MachineStats } from '@/next/protocol/v2';
+import { useMachine } from '@/next/stores/machines';
 import { toast } from '@/next/ui/toast';
 import usePendingList from '@/next/ui/use-pending-list';
 
@@ -20,6 +21,7 @@ interface IMachineTabProps {
 }
 
 const MachineTab = ({ machineId, machineName }: IMachineTabProps) => {
+  const view = useMachine(machineId);
   const [stats, setStats] = useState<MachineStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
@@ -88,6 +90,7 @@ const MachineTab = ({ machineId, machineName }: IMachineTabProps) => {
     <MachineView
       name={machineName}
       stats={stats}
+      health={view?.machine.health ?? null}
       error={error}
       onRetry={() => {
         setError(null);

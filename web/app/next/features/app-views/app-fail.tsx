@@ -1,4 +1,4 @@
-// What stands in the place of a view that did not start (HRN-922): the reason in words, and three ways on: try again,
+// What stands in the place of a view that did not start: the reason in words, and three ways on: try again,
 // read the window's log, hand it to the agent. The frame itself is hidden then, so no blank page is left.
 import { useState } from 'react';
 import ConsentBlock from '@/next/features/app-consent/consent-block';
@@ -27,7 +27,7 @@ export const failureText = (failure: IFailure): string => {
   const { reason, detail } = failure;
   if (reason === FAIL_REASON.waiting) return t(`next.appfail.reason.waiting.${waitingKind(detail)}`);
   if (reason === FAIL_REASON.server && detail !== '') return t('next.appfail.reason.serverWhy', { detail });
-  // A view that never connected, with the cause the machine's journal knows (HRN-976).
+  // A view that never connected, with the cause the machine's journal knows.
   if (reason === FAIL_REASON.silent && detail !== '') return t('next.appfail.reason.silentWhy', { detail });
   if (reason === FAIL_REASON.silent || reason === FAIL_REASON.auth || reason === FAIL_REASON.server)
     return t(`next.appfail.reason.${reason}`);
@@ -68,7 +68,7 @@ const AppFail = ({ machine, app, failure, logKey, conversation, onRetry }: IAppF
   const [journal, setJournal] = useState(false);
   const [handed, setHanded] = useState(false);
   const log = useBridgeLog(logKey);
-  // Waiting for consent: the real waiting access is read where the runtime checks it, and «Разрешить» is here (HRN-965).
+  // Waiting for consent: the real waiting access is read where the runtime checks it, and «Разрешить» is here.
   const askable = failure.reason === FAIL_REASON.waiting && failure.detail === APP_REASON.consent;
   const asked = useConsentApps(machine, askable);
   const ask = askable ? consentAskOf(asked?.find((a) => a.id === app.id) ?? app) : null;

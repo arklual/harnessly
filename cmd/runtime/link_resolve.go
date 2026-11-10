@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/panel"
 )
 
-// linkResolver is panel.Targets.Resolve (HRN-890, GitHub #60): an address on an instance of one of the connections, or
+// linkResolver is panel.Targets.Resolve (GitHub #60): an address on an instance of one of the connections, or
 // on the service of the documents provider, opens where that connection or provider reads it, never in the remote
 // browser by default.
 //

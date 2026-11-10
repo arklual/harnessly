@@ -37,7 +37,7 @@ func (h *Hub) newStore(o Options) error {
 	return nil
 }
 
-// designView hands the store the design access (HRN-880): which projects a machine's copy of the library holds.
+// designView hands the store the design access: which projects a machine's copy of the library holds.
 type designView struct{ d *designaccess.Service }
 
 func (v designView) StoreView(ctx context.Context, m store.Machine) (map[string]storehub.Grant, error) {

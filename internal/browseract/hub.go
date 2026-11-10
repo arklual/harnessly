@@ -17,7 +17,7 @@ const (
 	presentFor = 35 * time.Second // a page stays present this long after its last poll ended
 	// answerTimeout is how long the agent waits for the page to take an action and answer. askTimeout is the whole
 	// wait of one call once the page asks the person: the agent's MCP bridge cuts a call without an answer at 60 s,
-	// so the call ends before that with «the person is being asked», and the next call keeps waiting (HRN-681).
+	// so the call ends before that with «the person is being asked», and the next call keeps waiting.
 	answerTimeout = 30 * time.Second
 	askTimeout    = 55 * time.Second
 	// askStale is how long a page may stay silent while it asks: it repeats «asking» every few seconds, so a question

@@ -236,7 +236,7 @@ const videoPage = `<!doctype html><title>Ролики</title><body>
 </body>`
 
 // The agent reads the page's text and the state of its videos, and waits for a clip to end; a looping one ends when
-// it starts over (HRN-683, the person's «листать Shorts, когда ролик кончился»).
+// it starts over (the person's «листать Shorts, когда ролик кончился»).
 func TestAgentReadsAndWaitsForVideo(t *testing.T) {
 	s := chromeOrSkip(t)
 	clip, err := os.ReadFile("testdata/clip.webm")

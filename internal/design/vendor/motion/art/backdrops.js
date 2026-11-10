@@ -1,4 +1,4 @@
-// Backdrops for a video's scenes (HRN-652): 1600 x 900, drawn to fill the frame (`slice`, so 9:16 shows the middle). Each has layers
+// Backdrops for a video's scenes: 1600 x 900, drawn to fill the frame (`slice`, so 9:16 shows the middle). Each has layers
 // <g data-layer="far|mid|near" data-depth="0.2|0.5|1"> for tk.parallax; heroes stand on the floor line, y = 640 of 900 from the top.
 //   bg-office     a room: wall, window, shelf, plant, frames, floor
 //   bg-city       a street: sky, far and near buildings, trees, lamps, road

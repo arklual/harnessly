@@ -8,7 +8,7 @@ import (
 	"slices"
 )
 
-// Safe mode (HRN-700): one switch turns off every app but the ones the organization's environment pins, for the chats
+// Safe mode: one switch turns off every app but the ones the organization's environment pins, for the chats
 // that start from then on. A running chat keeps what it started with until it restarts: stopping the person's work is
 // not the switch's to do. The switch is a file in the registry's folder, so every process of the machine reads the same.
 

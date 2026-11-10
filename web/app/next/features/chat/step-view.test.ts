@@ -1,4 +1,4 @@
-// HRN-905: a bash-mode line the person typed («! git push …») reads as a command run, not as «command /! git push».
+// a bash-mode line the person typed («! git push …») reads as a command run, not as «command /! git push».
 import { describe, expect, it } from 'vitest';
 import { stepView, toolView } from '@/next/features/chat/steps';
 import type { ToolEntry } from '@/next/features/chat/types';

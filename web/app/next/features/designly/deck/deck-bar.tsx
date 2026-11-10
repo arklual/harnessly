@@ -35,7 +35,7 @@ export interface IDeckBarProps {
   playBlocked: string | null;
   /** Absent: the person may not share this deck. */
   onShare?: () => void;
-  /** The kit's chip (HRN-897), before the share button. */
+  /** The kit's chip, before the share button. */
   kit?: ReactNode;
   shareOn: boolean;
   onMore: () => void;

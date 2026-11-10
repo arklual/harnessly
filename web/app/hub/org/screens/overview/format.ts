@@ -18,7 +18,7 @@ export const usd = (n: number): string => `$${dec(n, n < 10 ? 1 : 0)}`;
 
 /**
  * A dollar amount in the hub's currency, compact: $4,2 → «378 ₽», $810 → «72,9 тыс ₽». Every screen writes money with
- * this, so a page never mixes ₽ and $ (HRN-670); dollars only while the hub has not said its rate.
+ * this, so a page never mixes ₽ and $; dollars only while the hub has not said its rate.
  */
 export const fromUsd = (n: number): string => {
   const s = shownOfUsd(n);

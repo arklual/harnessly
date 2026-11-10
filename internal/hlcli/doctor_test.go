@@ -60,7 +60,7 @@ func TestDoctorUsage(t *testing.T) {
 	}
 }
 
-// HRN-914: doctor preview says which slot names do not resolve, with what to do, and exits 1.
+// doctor preview says which slot names do not resolve, with what to do, and exits 1.
 func TestDoctorPreviewNXDOMAIN(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/cli/preview/check" || r.Header.Get("x-cli-token") != "tok" {

@@ -31,7 +31,7 @@ func (r *Runner) Run(ctx context.Context) {
 	t := time.NewTicker(poll)
 	defer t.Stop()
 	// The heartbeat goes on while a run works: a run of minutes (an apply after a reboot) left it stale, the agent
-	// stopped offering the setup and called the hub again, twice per run, and every call cut the page's streams (HRN-901).
+	// stopped offering the setup and called the hub again, twice per run, and every call cut the page's streams.
 	go r.beatLoop(ctx, poll)
 	for {
 		r.Tick(ctx)

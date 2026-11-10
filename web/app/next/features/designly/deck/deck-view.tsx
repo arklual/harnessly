@@ -148,11 +148,11 @@ export interface IDeckViewProps {
   /** Set in the right pane beside a chat: the compact column (`data-embed`), its chat is the host's. */
   pane?: { onBack: () => void };
   access?: ISiteAccess;
-  /** The kit the deck is made from (HRN-897): its chip on the bar. */
+  /** The kit the deck is made from: its chip on the bar. */
   kit?: ReactNode;
   /** The kit's nodes on the deck's slides: «Из кита», «Открыть в ките», «Показать макет» over the slide on screen. */
   kitLink?: IKitLink | null;
-  /** «Править в ките» on a slide's kit node (HRN-903); absent when the kit is not edited from here. */
+  /** «Править в ките» on a slide's kit node; absent when the kit is not edited from here. */
   onEditInKit?: (node: string) => void;
   /** The deck is looked at, as a guest of its link sees it (the `link` screen), until the editing is asked for. */
   viewing?: boolean;
@@ -799,6 +799,21 @@ const DeckView = (props: IDeckViewProps) => {
     if (mode !== null) post({ type: 'tk:deck', on: true, mode });
     if (playing) post({ type: 'tk:deck-step', n: playStep });
   };
+  // The boards of the slides next to the one on screen are loaded ahead, once their slides are drawn; a
+  // recording takes the processor for itself. A board loaded ahead is told the mode, so that it says when it is drawn.
+  const aheadSrcs =
+    hold === null && screen !== DECK_SCREEN.rec
+      ? [index - 1, index + 1].flatMap((i) => {
+          const board = boards[i];
+          // A page the agent has not drawn yet (as the stage's own placeholder reads it) is not loaded ahead.
+          if (!board || deck?.slides.find((s) => s.path === board.path)?.blank === true) return [];
+          const address = props.frameSrc(board.path);
+          return address === null ? [] : [address];
+        })
+      : [];
+  const tellAhead = (frame: HTMLIFrameElement, address: string) => {
+    if (mode !== null) postDeck(frame, address, { type: 'tk:deck', on: true, mode });
+  };
   // The board is the stage's width shrunk to the stage: its buttons are told the scale again whenever the stage is resized.
   useEffect(() => {
     const frame = frameRef.current;
@@ -891,7 +906,7 @@ const DeckView = (props: IDeckViewProps) => {
     return null;
   })();
   const mdock = phone && edit && panel === DECK_PANEL.off && sheet === null && !pick.draft;
-  // «Поделиться» is the one dialog of every kind (HRN-675); the deck's older popover only where the gateway has none.
+  // «Поделиться» is the one dialog of every kind; the deck's older popover only where the gateway has none.
   const onShare = access ? () => (access.manage ? togglePop(POP.share) : access.onOpen()) : undefined;
 
   return (
@@ -989,6 +1004,9 @@ const DeckView = (props: IDeckViewProps) => {
         n={n}
         hold={hold}
         frameRef={frameRef}
+        ahead={aheadSrcs}
+        onAhead={tellAhead}
+        onReady={(ready) => onBoard({ k: 'ready', ...ready })}
         onLoad={tellMode}
         painted={painted}
         error={props.slotError}

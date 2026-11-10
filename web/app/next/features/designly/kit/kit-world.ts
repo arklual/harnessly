@@ -1,4 +1,4 @@
-// The kit's canvas laid out (HRN-897): sections one under another, each a frame with its groups, every group a grid of
+// The kit's canvas laid out: sections one under another, each a frame with its groups, every group a grid of
 // cells laid out by itself (nothing is moved by hand). The main view shows the kit with each template as a stack; a
 // template's own view is its grid of layouts by its sections. Pure: the screen draws what this answers, and finds a
 // node's place, the cells a viewport sees, and the tree's rows here.

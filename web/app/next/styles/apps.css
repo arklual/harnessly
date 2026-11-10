@@ -340,7 +340,7 @@
 
 /* ── The menus the filters open ── */
 .hx-hubmenu {
-  /* The one look of every menu (HRN-962): black in both themes, as the smart notice's. The interface's tokens are
+  /* The one look of every menu: black in both themes, as the smart notice's. The interface's tokens are
      turned to the menu's inside, so what it holds (a search, a picker, a hint) reads on black too. */
   --hx-bg-raised: #000;
   --hx-bg-hover: rgb(255 255 255 / 0.11);

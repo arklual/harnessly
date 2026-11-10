@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Sinopia's backend for the agent (HRN-808, stage 5): the tools sinopia_* are written in its manifest
+// Sinopia's backend for the agent (stage 5): the tools sinopia_* are written in its manifest
 // (builtin/sinopia/harnessly/app.json, backend.tools, each with the Document API method it calls) and the host's tools
 // server offers them as it does any builtin app's. This is the code that answers them: the same calls a view makes
 // (sinopia_api.go), for the document the editor shows beside the agent's chat, or the one named in `document`. The

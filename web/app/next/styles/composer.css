@@ -256,7 +256,7 @@
   transform: rotate(45deg);
 }
 .hx-plus {
-  /* The one look of every menu (HRN-962): black in both themes, as the smart notice's. The interface's tokens are
+  /* The one look of every menu: black in both themes, as the smart notice's. The interface's tokens are
      turned to the menu's inside, so what it holds (a search, a picker, a hint) reads on black too. */
   --hx-bg-raised: #000;
   --hx-bg-hover: rgb(255 255 255 / 0.11);
@@ -1002,6 +1002,15 @@
   white-space: nowrap;
   font-size: var(--hx-text-sm);
   color: var(--hx-fg-2);
+}
+/* Who wrote a row that is not the person's: another agent's machine and chat, quieter than the words after it. */
+.hx-queue__from {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+  color: var(--hx-fg-3);
+  vertical-align: bottom;
 }
 .hx-queue__note {
   flex: 0 1 auto;

@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/storerev"
 )
 
-// The history of a library that syncs with a store (HRN-880) is the store's revisions, kept in the center: every
+// The history of a library that syncs with a store is the store's revisions, kept in the center: every
 // change of every file, whichever machine made it, with no git repository beside the library. A board's versions, the
 // return to one of them and the version a guest link is pinned to are read from there; the machine whose library it
 // is may be off. A library without a store keeps its git history as before, and a version pinned in git still opens.
@@ -41,7 +41,7 @@ type Revisions interface {
 	Read(ctx context.Context, sha string) ([]byte, error)
 }
 
-// RevisionLeases is a store that keeps short claims too (HRN-881): a task one machine of the space does for all, as
+// RevisionLeases is a store that keeps short claims too: a task one machine of the space does for all, as
 // the PDF of a deck, is done by the one that holds its lease. The lease lapses by itself when its holder stops
 // refreshing it.
 type RevisionLeases interface {

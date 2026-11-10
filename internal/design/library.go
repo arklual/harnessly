@@ -44,7 +44,7 @@ type Texts struct {
 // Config is what the deployment names.
 type Config struct {
 	DataDir string
-	// Passive is a library a hub reads or edits for a moment (HRN-881): no keepers, no history, no PDF builds.
+	// Passive is a library a hub reads or edits for a moment: no keepers, no history, no PDF builds.
 	Passive bool
 	// ShareProbe stands in for ProbeShareFS (a test of a runtime that fails it); it runs on every call, uncached.
 	ShareProbe func(dir string) ShareFSReport
@@ -219,6 +219,7 @@ func (l *Library) ProjectDirOf(ref string) string {
 var contentTypes = map[string]string{
 	".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8",
 	".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".jsx": "text/javascript; charset=utf-8",
+	".ts": "text/javascript; charset=utf-8", ".tsx": "text/javascript; charset=utf-8",
 	".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
 	".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
 	".webp": "image/webp", ".avif": "image/avif", ".ico": "image/x-icon",

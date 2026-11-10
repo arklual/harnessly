@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/switches"
 )
 
-// The rollout switches' administration (docs/hub/rollout-switches.md, HRN-979). A switch belongs to the installation,
+// The rollout switches' administration (docs/hub/rollout-switches.md). A switch belongs to the installation,
 // not to an organization, so only an administrator of the installation reads and changes them.
 
 type switchWire struct {

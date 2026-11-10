@@ -208,7 +208,7 @@ func (g *GatewayDB) Read(ctx context.Context) (GatewayData, error) {
 	return data, nil
 }
 
-// gatewaySwitch is the gateway's rollout switch that hands a pair's designs' access to the hub (HRN-756).
+// gatewaySwitch is the gateway's rollout switch that hands a pair's designs' access to the hub.
 const gatewaySwitch = "hub-access"
 
 // Link hands the report's linked pairs to the hub: a row of hub_design_machines each, and the pair's switch on unless it

@@ -2,7 +2,7 @@
 // The view holds what the parts share — the format on screen, the playhead, the selected range, the source (live or MP4)
 // and what a comment is about — and hands it to the player (video-player.tsx), the timeline (video-timeline.tsx) and the
 // comments (video-comments.tsx). The deck's own parts serve a video too: «Стиль» is DeckStyle on /design/deck/settings,
-// «Поделиться» is the one dialog of every kind (HRN-675); DeckShare in its video variant only where the gateway has none. A phone gets the player and a list of scenes instead of the timeline.
+// «Поделиться» is the one dialog of every kind; DeckShare in its video variant only where the gateway has none. A phone gets the player and a list of scenes instead of the timeline.
 import { tourSignal } from '@/next/stores/tour';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ISiteAccess, ISiteMode, ISiteStage } from '@/next/features/designly/site-view';

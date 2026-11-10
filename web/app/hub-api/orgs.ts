@@ -16,7 +16,7 @@ export type Org = {
   timezone: string;
   currency: 'RUB' | 'USD';
   createdAt: string;
-  /** The rule for apps on the organization's machines (HRN-915); absent on an older hub, which means `ask`. */
+  /** The rule for apps on the organization's machines; absent on an older hub, which means `ask`. */
   appsConsent?: AppsConsent;
 };
 

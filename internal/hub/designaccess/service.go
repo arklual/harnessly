@@ -51,11 +51,11 @@ type Deps struct {
 	LinkKey []byte
 	// Notice mails a person about access to a project (a request, a decision); nil sends nothing.
 	Notice Notice
-	// Shared: the hub's store keeps every space's design library (HRN-880), so a project is the space's, not one
+	// Shared: the hub's store keeps every space's design library, so a project is the space's, not one
 	// machine's: its access rows are found under whichever machine of the space recorded it first, and a change of
 	// them reaches the snapshot of every machine of the space.
 	Shared bool
-	// View reads a project from the hub's store for a guest link (HRN-881, internal/hub/designview); nil asks the
+	// View reads a project from the hub's store for a guest link (internal/hub/designview); nil asks the
 	// machine as before.
 	View Viewer
 }

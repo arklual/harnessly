@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// HRN-880. The access to the designs moves from a cluster's gateway to the hub, for everyone at once and not by
+// The access to the designs moves from a cluster's gateway to the hub, for everyone at once and not by
 // hand: ImportGateway copies what the gateway's database says (the projects, their people and teams, the requests, the
 // invites and the guest links with their views and comments) into the hub's rows of a space, and links each person ×
 // machine of the gateway to the person's machine of the hub, so the gateway hands their designs' access over.
@@ -234,7 +234,7 @@ func (s *Service) ImportGateway(ctx context.Context, data GatewayData, opt Impor
 	}
 	rep.Notes = append(rep.Notes, notes...)
 
-	// The owners whose machine was handed to the hub before (HRN-756): the hub is where their access has been changed
+	// The owners whose machine was handed to the hub before: the hub is where their access has been changed
 	// since, so a project of theirs it knows is kept as it is, nothing of the gateway's added.
 	moved := map[string]bool{}
 	for key := range data.Linked {

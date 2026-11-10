@@ -221,6 +221,17 @@ func TestAppViewsAndBridgeRoutes(t *testing.T) {
 		return out.Session
 	}
 	one, two := issue("tab-1"), issue("tab-2")
+	// A view with no chat (the app's own tab) has no chat area, and the refusal says what to use instead.
+	if code, body := open(`{"app":"acme.demo","view":"main","target":"pane"}`); code == http.StatusOK {
+		var lone struct{ Session string }
+		_ = json.Unmarshal([]byte(body), &lone)
+		got, said := call("POST", platformAPI+"/apps/storage", `{"session":"`+lone.Session+`","op":"get","scope":"chat","key":"k"}`, page)
+		if got != http.StatusBadRequest || !strings.Contains(said, "invalid_params") || !strings.Contains(said, "hl.storage.user") {
+			t.Errorf("chat storage with no chat: %d %s", got, said)
+		}
+	} else {
+		t.Errorf("a session with no chat: %d %s", code, body)
+	}
 
 	store := func(session, rest string) (int, string) {
 		return call("POST", platformAPI+"/apps/storage", `{"session":"`+session+`",`+rest+`}`, page)

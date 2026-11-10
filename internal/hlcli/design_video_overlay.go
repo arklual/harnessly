@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/design"
 )
 
-// `design video overlay ls|add|set|rm` (HRN-653): a scene's layer of titles, callouts, highlights, key caps, counters and
+// `design video overlay ls|add|set|rm`: a scene's layer of titles, callouts, highlights, key caps, counters and
 // badges, drawn over the board as a function of time. Positions are fractions of the frame (0..1 from the top left),
 // times are typed as 1.5s, 1500ms or 0:06 and counted from the scene's start. An overlay a person edited is not changed
 // unless --force is given.

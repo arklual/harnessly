@@ -215,10 +215,10 @@ type Config struct {
 	// OrgsShadow (the new endpoints answer instance administrators only: checking and seeding), OrgsOn (everyone).
 	Orgs string
 	// MachineTrust (HUB_MACHINE_TRUST=on) lets an owner of a space trust a machine to run on the hub's own origin when
-	// the hub has no HUB_RUNTIME_DOMAIN (HRN-762); off: only machines an instance administrator connected open there.
+	// the hub has no HUB_RUNTIME_DOMAIN; off: only machines an instance administrator connected open there.
 	MachineTrust bool
 	// OIDCEmailTrusted (HUB_OIDC_EMAIL_TRUSTED=on) takes the email of an OpenID Connect provider as verified even when
-	// the provider does not say email_verified: for a provider the operator runs or trusts (HRN-762). It is how the
+	// the provider does not say email_verified: for a provider the operator runs or trusts. It is how the
 	// first person to sign in through it becomes the administrator of a fresh installation that names none.
 	OIDCEmailTrusted bool
 	// Docs (HUB_DOCS=on) switches on the documents and boards side: the hub answers <platform api>/docs and the agents'
@@ -343,6 +343,10 @@ type StoreConfig struct {
 	// LegacySpace (HUB_STORE_LEGACY_SPACE, a space's slug) is the space whose collections are the rooms of a store
 	// that served one place (`design`, not `design-<space>`): how a design-sync center's library becomes a space's.
 	LegacySpace string
+	// ProfileRooms (HUB_STORE_PROFILE_ROOMS=<user id>=profile-sergey,…) are the rooms a design-sync center kept people's
+	// Claude profiles in, bound to the person's user id (never an email: an account may claim one it does not own):
+	// their machines sync those rooms instead of profile-<user id>.
+	ProfileRooms map[string]string
 }
 
 // StorageS3 says the hub keeps its files in an S3-compatible bucket (HUB_STORAGE=s3), not in its data folder.
@@ -1094,6 +1098,19 @@ func ParsePairs(raw string) (map[string]string, error) {
 	return out, nil
 }
 
+// validRoomName is a store room's name (filestore.ValidRoom): lowercase letters, digits, dashes, at most 64.
+func validRoomName(room string) bool {
+	if room == "" || len(room) > 64 {
+		return false
+	}
+	for _, c := range room {
+		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
+			return false
+		}
+	}
+	return true
+}
+
 // loadStore reads HUB_STORE_*: the store reuses the hub's database and bucket unless told otherwise.
 func (c *Config) loadStore(get func(string) string, def func(string, string) string, bad func(string, ...any)) {
 	switch strings.ToLower(def("HUB_STORE", "on")) {
@@ -1105,6 +1122,22 @@ func (c *Config) loadStore(get func(string) string, def func(string, string) str
 	}
 	c.Store.Dir = def("HUB_STORE_DIR", filepath.Join(c.DataDir, "store"))
 	c.Store.LegacySpace = strings.TrimSpace(get("HUB_STORE_LEGACY_SPACE"))
+	if raw := strings.TrimSpace(get("HUB_STORE_PROFILE_ROOMS")); raw != "" {
+		c.Store.ProfileRooms = map[string]string{}
+		for _, pair := range strings.Split(raw, ",") {
+			pair = strings.TrimSpace(pair)
+			at := strings.LastIndex(pair, "=")
+			who, room := "", ""
+			if at > 0 {
+				who, room = strings.TrimSpace(pair[:at]), strings.TrimSpace(pair[at+1:])
+			}
+			if who == "" || strings.Contains(who, "@") || !strings.HasPrefix(room, "profile-") || !validRoomName(room) {
+				bad("HUB_STORE_PROFILE_ROOMS must be <user id>=profile-<name>,…")
+				break
+			}
+			c.Store.ProfileRooms[who] = room
+		}
+	}
 	switch raw := get("HUB_STORE_DATABASE_URL"); {
 	case raw != "":
 		c.Store.DatabaseURL = raw

@@ -15,7 +15,7 @@ const kitDocs = "../../docs/agents/design-kits.md"
 // the check does not have: the registry, the code and the docs cannot drift apart.
 func TestRulesAreUsedAndDocumented(t *testing.T) {
 	var src strings.Builder
-	for _, f := range []string{"check.go", "../hlcli/designkit.go"} {
+	for _, f := range []string{"check.go", "fields.go", "../hlcli/designkit.go"} {
 		raw, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatal(err)

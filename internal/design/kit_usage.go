@@ -1,6 +1,6 @@
 package design
 
-// Where a kit is used and which kit a project is built on (HRN-897, «Связь проектов с китом»). A project is on a kit's
+// Where a kit is used and which kit a project is built on («Связь проектов с китом»). A project is on a kit's
 // theme when it keeps the theme's folder (ds/<theme>/, what a layout put there) or loads the kit by address
 // (/kit/<id>/<version>/). Its boards name the kit's nodes: a layout board says data-layout="<id>", a component is an
 // <x-import component-from-global-scope="<Namespace>.<Component>"> with the props that pick a layout or an asset.
@@ -202,7 +202,7 @@ func (l *Library) usageThemes(only string) []usageTheme {
 
 // themeOfProject is the installed theme a project is built on and its version, or nil.
 func (l *Library) themeOfProject(id string, themes []usageTheme, boards [][]byte) (*usageTheme, string) {
-	// A project pinned to a kit's version (HRN-903) is on the pinned theme and version; its ds/<theme>/ comes from the
+	// A project pinned to a kit's version is on the pinned theme and version; its ds/<theme>/ comes from the
 	// kit and may not be in its folder at all.
 	if pin, ok := l.KitPinOf(id); ok {
 		for i := range themes {

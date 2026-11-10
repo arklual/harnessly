@@ -36,7 +36,7 @@ describe('a path in inline code', () => {
   });
 });
 
-// HRN-905: the copy button of a code block keeps its word on one line, and a narrow block keeps its name for the icon.
+// the copy button of a code block keeps its word on one line, and a narrow block keeps its name for the icon.
 describe('a code block', () => {
   it('names its copy button and keeps its word apart from the icon', () => {
     const { container } = render(<Markdown md={'```\n! cd ~/projects\n```'} />);

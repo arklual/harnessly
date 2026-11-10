@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// HRN-879: a machine whose agent offers the chats is told where the hub's copy stands and subscribed to them; what it
+// a machine whose agent offers the chats is told where the hub's copy stands and subscribed to them; what it
 // sends is stored under the person who added it, and the workspace reads the list and a chat from the hub — with the
 // machine off as well — instead of from the home machine.
 func TestWorkspaceReadsTheChatsFromTheHubsCopy(t *testing.T) {
@@ -92,7 +92,7 @@ func TestWorkspaceReadsTheChatsFromTheHubsCopy(t *testing.T) {
 	if _, chat := read(); len(chat.Turns) != 1 || chat.Machine != "offline" {
 		t.Errorf("with the machine off %+v", chat)
 	}
-	// The search and the sidebar answer from the hub too (HRN-879).
+	// The search and the sidebar answer from the hub too.
 	var found struct {
 		Hits []struct{ ConvID, EntryID, Role string }
 	}

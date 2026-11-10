@@ -38,7 +38,7 @@ func setRights(t *testing.T, dir string, rights ...string) {
 	}
 }
 
-// HRN-913: an app that waits for consent says what it waits for, everywhere the CLI looks; nothing but the page grants.
+// an app that waits for consent says what it waits for, everywhere the CLI looks; nothing but the page grants.
 func TestWaitingAppSaysWhatItWaitsFor(t *testing.T) {
 	call, _ := appRig(t)
 	cli := map[string]string{"x-cli-token": "tok"}
@@ -63,7 +63,7 @@ func TestWaitingAppSaysWhatItWaitsFor(t *testing.T) {
 	}
 }
 
-// HRN-913: a dev install whose folder gained a right lists it on the card the page draws, so the click there is taken.
+// a dev install whose folder gained a right lists it on the card the page draws, so the click there is taken.
 func TestInstalledAppsShowsTheDevFolderAccess(t *testing.T) {
 	call, _ := appRig(t)
 	cli := map[string]string{"x-cli-token": "tok"}

@@ -1,4 +1,4 @@
-// The page of an app lives on a machine (HRN-913): `/m/<machine>/apps/<id>` on the hub. A link of the machine's own
+// The page of an app lives on a machine: `/m/<machine>/apps/<id>` on the hub. A link of the machine's own
 // page without that prefix (`/apps/<id>`, as the apps guide writes it) comes to the hub; it leads to the person's
 // machine — the one online in their last space, else the first of it.
 import type { Machine, SpaceApp } from './types';
@@ -16,7 +16,7 @@ export type TAppTarget = { machine: string } | { hub: string } | null;
 
 /**
  * The app's page on a machine that is online; with none online, its page at the hub when the space installed it
- * (HRN-898: the hub serves its view from the store); else the page on a machine that is off, which says so; none in a
+ * (the hub serves its view from the store); else the page on a machine that is off, which says so; none in a
  * space without machines and without the app.
  */
 export const appTarget = (

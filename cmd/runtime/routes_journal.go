@@ -20,7 +20,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/telemetry"
 )
 
-// The machine's journal (HRN-976, internal/journal): every link of the way writes to it, the agent reads it.
+// The machine's journal (internal/journal): every link of the way writes to it, the agent reads it.
 //
 //	POST <platform>/journal   the page: {entries: [...]} — what the page, its app views and Sinopia saw
 //	GET  /api/cli/logs?since=&until=&chat=&trace=&app=&source=&level=&text=&limit=   harnessly logs: errors with their
@@ -233,7 +233,7 @@ func journalToolCall(server string) func(ctx context.Context, tool string, took 
 }
 
 // journalBridgeCall tells the journal's line of a call of an app's view (session, storage, tool, files, …) the app, the
-// view, the chat and the method, and for a refusal its code and words, from the view's session (HRN-976).
+// view, the chat and the method, and for a refusal its code and words, from the view's session.
 func journalBridgeCall(ctx context.Context, views *apps.ViewServer, b bridgeBody, status int, out any) {
 	if journal.ScopeOf(ctx) == nil {
 		return
@@ -282,7 +282,7 @@ func bridgeRefusalWords(out any) string {
 }
 
 // journalPreviewRequest writes down a request of a preview slot that failed: blocked, refused or with no answer. A
-// file of an app's view names its app, chat and trace (HRN-976).
+// file of an app's view names its app, chat and trace.
 func journalPreviewRequest(slot string, e devtools.NetworkEntry) {
 	je := journal.Entry{At: e.At, Level: journal.Warn, Source: journal.SourcePreview, Event: "preview.request",
 		Method: e.Method, URL: e.URL, View: "slot " + slot}

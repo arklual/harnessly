@@ -115,7 +115,7 @@ export async function startRuntime(
     RUNTIME_LOCALE: 'en',
     RUNTIME_AGENT_NICE: '10',
     RUNTIME_GATE_COUNT_SECONDS: '3600',
-    // The merge request smoke runs the release binaries (HRN-912), whose version is a real one: no asking GitHub.
+    // The merge request smoke runs the release binaries, whose version is a real one: no asking GitHub.
     RUNTIME_UPDATE_CHECK: '0',
     ...opts.env,
   };

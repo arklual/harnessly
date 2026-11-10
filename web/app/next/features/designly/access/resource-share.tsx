@@ -1,4 +1,4 @@
-// «Поделиться» (HRN-675): one dialog for every kind, the same for everyone who may share. The field «Добавить людей
+// «Поделиться»: one dialog for every kind, the same for everyone who may share. The field «Добавить людей
 // или команды»; «У кого есть доступ» — the owner, the home team first, the people and teams; «Ссылки без входа»; at the
 // foot «Копировать ссылку» and «Готово». «…» in the head: «Редакторы могут делиться» (the owner), «История доступа»,
 // «Передать владение» (the owner, the lead and the admin of a team resource). One who may only look gets the address,
@@ -386,7 +386,7 @@ interface IMainProps extends IResourceSection {
 }
 
 /** The main view: who has access, the links, publishing. Drawn again only when what it shows changes, not when a view
- *  slides over it — the rows' menus made each switch a long task (HRN-675). */
+ *  slides over it — the rows' menus made each switch a long task. */
 const Main = memo(
   ({
     target,

@@ -1,4 +1,4 @@
-// A site of the pane's browser that redirects to another one (HRN-678): the slot never follows a redirect to another
+// A site of the pane's browser that redirects to another one: the slot never follows a redirect to another
 // origin, it shows an offer page. A hop between our sites — the site, its sign-in (Keycloak, Teleport) and back — the
 // tab follows by itself in place of the page, so a sign-in goes through in the pane; any other site waits for the
 // person on the offer page. A loop of redirects stops after a few hops.

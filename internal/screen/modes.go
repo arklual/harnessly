@@ -2,7 +2,7 @@ package screen
 
 import "strings"
 
-// Claude Code's modes as its screen says them (HRN-945): the permission mode on the footer under the prompt box
+// Claude Code's modes as its screen says them: the permission mode on the footer under the prompt box
 // («⏸ plan mode on (shift+tab to cycle)»), and the answers of /fast.
 
 // Claude Code's permission modes as its footer names them; ClaudeModeDefault is a footer that names none.

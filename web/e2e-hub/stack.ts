@@ -14,7 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort } from '../e2e/runtime';
 
-// The stack of the hub journey (HRN-761): a real hub (Postgres when E2E_DATABASE_URL is set, else SQLite), a fake OpenID
+// The stack of the hub journey: a real hub (Postgres when E2E_DATABASE_URL is set, else SQLite), a fake OpenID
 // Connect provider, and one machine: the real agent and runtime with a stand-in for the agent CLI. One cell of the
 // matrix is one set of the hub's settings (CELLS below); the journey itself is the same in every cell.
 
@@ -112,7 +112,7 @@ export interface Stack {
     /** The runtime's settings beyond the common ones. */
     runtimeEnv?: Record<string, string>;
   }) => Promise<{ machineId: string; basePath: string; dataDir: string }>;
-  /** Switches the machine off: its agent and runtime go, the hub and its copy stay (HRN-879). */
+  /** Switches the machine off: its agent and runtime go, the hub and its copy stay. */
   stopMachine: () => Promise<void>;
   /** Freezes the machine's runtime (SIGSTOP) or lets it go on: a machine whose agent is on but answers nothing. */
   hangRuntime: (hung: boolean) => void;

@@ -53,7 +53,7 @@ func (o Owner) Mine(id Identity) bool {
 func (l *Library) SetOwner(id string) error { return l.SetOwnerAs(id, "") }
 
 // SetOwnerAs is SetOwner for the person who made the project: the address of the page session or the chat that asked
-// (HRN-675: the owner is the person who worked, not the one the machine belongs to). An empty person is the runtime's.
+// (the owner is the person who worked, not the one the machine belongs to). An empty person is the runtime's.
 func (l *Library) SetOwnerAs(id, person string) error {
 	file := l.ownerPath(id)
 	if file == "" {

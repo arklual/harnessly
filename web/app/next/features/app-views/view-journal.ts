@@ -1,4 +1,4 @@
-// An app view's part of the machine's journal (HRN-976): which source its lines are, and what the machine knows of why
+// An app view's part of the machine's journal: which source its lines are, and what the machine knows of why
 // a view did not connect, for the card and the debug section to say.
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { TRACE_HEADER, type TJournalSource } from '@/next/core/journal';

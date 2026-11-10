@@ -5,7 +5,7 @@ import { hostKeys } from '@/next/features/app-views/host-keys';
 import { listenKeys } from '@/next/features/keys/use-keys';
 
 // A key a frame of an app passes on (keys.press) runs only the actions of the screens an app may run: never the
-// host's global ones, and only while the frame has the focus (HRN-808).
+// host's global ones, and only while the frame has the focus.
 describe('hostKeys', () => {
   const offs: (() => void)[] = [];
   afterEach(() => {

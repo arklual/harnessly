@@ -372,7 +372,7 @@ func (s Store) ReplaceSpaceSSHKey(ctx context.Context, k SpaceSSHKey) error {
 	return err
 }
 
-// SetInviteTeam says the person who accepts the invitation joins the team too (HRN-762).
+// SetInviteTeam says the person who accepts the invitation joins the team too.
 func (s Store) SetInviteTeam(ctx context.Context, inviteID, teamID string) error {
 	_, err := s.q.Exec(ctx, `INSERT INTO invite_team (invite_id, team_id) VALUES (?, ?)
 		ON CONFLICT (invite_id) DO UPDATE SET team_id = excluded.team_id`, inviteID, teamID)

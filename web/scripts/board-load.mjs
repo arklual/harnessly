@@ -1,4 +1,6 @@
 // How fast a design board loads: node web/scripts/board-load.mjs <url> [--runs 3] [--cookie name=value] [--verbose]
+// A deck's slides: node web/scripts/board-load.mjs --deck <slide-1 url> <slide-2 url> [--edit <slide-2 file>] [--runs 3]
+//   (see «Deck» below)
 //
 // <url> is a board of the design library server (http://127.0.0.1:<port>/a/<project>/p/<board>). Each run opens a
 // fresh headless Chromium context and loads the board twice in it: cold (empty cache) and warm (the cache the cold
@@ -17,7 +19,10 @@ const SEEN_ELEMENTS = 300;
 const TIMEOUT_MS = 60_000;
 
 const args = process.argv.slice(2);
-const url = args.find((a) => /^https?:/.test(a));
+const urls = args.filter((a) => /^https?:/.test(a));
+const url = urls[0];
+const deck = args.includes('--deck');
+const editFile = args.includes('--edit') ? args[args.indexOf('--edit') + 1] : '';
 const flag = (name, fallback) => {
   const i = args.indexOf(name);
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
@@ -25,8 +30,11 @@ const flag = (name, fallback) => {
 const runs = Number(flag('--runs', '3'));
 const cookie = flag('--cookie', '');
 const verbose = args.includes('--verbose');
-if (!url || !Number.isInteger(runs) || runs < 1) {
+if (!url || (deck && urls.length < 2) || !Number.isInteger(runs) || runs < 1) {
   console.error('usage: node web/scripts/board-load.mjs <url> [--runs 3] [--cookie name=value]');
+  console.error(
+    '       node web/scripts/board-load.mjs --deck <slide-1 url> <slide-2 url> [--edit <file>] [--runs 3]',
+  );
   process.exit(2);
 }
 
@@ -44,7 +52,24 @@ const elementsIn = async (page) => {
 };
 
 /** One load in a page of the context: milliseconds until seen, and what crossed the network. */
-async function load(context) {
+/** A slide is seen when its board is drawn as the deck's stage reads it: something in #dc-root, fonts and pictures in. */
+const slideDrawn = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((done) => {
+        const check = () => {
+          const root = document.getElementById('dc-root') || document.body;
+          if (!root) return void setTimeout(check, 10);
+          const pictures = [...root.querySelectorAll('img')].every((i) => i.complete);
+          if (root.children.length > 0 && pictures && document.fonts.status === 'loaded')
+            requestAnimationFrame(() => requestAnimationFrame(() => done(true)));
+          else setTimeout(check, 10);
+        };
+        check();
+      }),
+  );
+
+async function load(context, at = url) {
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   await cdp.send('Network.enable');
@@ -66,9 +91,15 @@ async function load(context) {
     if (r) r.bytes = e.encodedDataLength;
   });
   const started = Date.now();
-  await page.goto(url, { waitUntil: 'commit', timeout: TIMEOUT_MS });
+  await page.goto(at, { waitUntil: 'commit', timeout: TIMEOUT_MS });
   let ms = -1;
-  while (Date.now() - started < TIMEOUT_MS) {
+  if (deck) {
+    ms = await Promise.race([
+      slideDrawn(page).then(() => Date.now() - started),
+      new Promise((r) => setTimeout(() => r(-1), TIMEOUT_MS)),
+    ]);
+  }
+  while (!deck && Date.now() - started < TIMEOUT_MS) {
     if ((await elementsIn(page)) > SEEN_ELEMENTS) {
       ms = Date.now() - started;
       break;
@@ -83,6 +114,54 @@ async function load(context) {
 }
 
 const sum = (list) => list.reduce((n, r) => n + r.bytes, 0);
+
+// Deck: the slides of a presentation, each its own document. A turn of the editor is a new frame whose board loads in
+// full, which is what a fresh page of the same address does in the same browser context (the cache and the cookies
+// are the frame's). Per run, in one fresh context:
+//   open      slide 1, nothing cached
+//   turn      slide 2 right after slide 1: its own board cold, the kit's files (the engine, the theme) cached
+//   turn-warm slide 2 again, after a visit to slide 1: everything cached, the HTML is revalidated
+//   turn-edit slide 2 after its file changed (--edit <file>: a comment line is appended): the board is read anew
+// It prints `open <ms> turn <ms> turn-warm <ms> turn-edit <ms>` (turn-edit -1 without --edit); then, with the medians
+// of all runs, one `median ...` line.
+if (deck) {
+  const [first, second] = urls;
+  const rows = [];
+  for (let run = 0; run < runs; run++) {
+    const browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.CHROME_BIN || undefined,
+    });
+    const context = await browser.newContext();
+    if (cookie) {
+      const [name, ...value] = cookie.split('=');
+      await context.addCookies([{ name, value: value.join('='), url: first }]);
+    }
+    const open = (await load(context, first)).ms;
+    const turn = (await load(context, second)).ms;
+    await load(context, first);
+    const warm = (await load(context, second)).ms;
+    let edited = -1;
+    if (editFile) {
+      const { appendFileSync } = await import('node:fs');
+      appendFileSync(editFile, `\n<!-- board-load ${Date.now()} -->\n`);
+      await new Promise((r) => setTimeout(r, 500));
+      edited = (await load(context, second)).ms;
+    }
+    await browser.close();
+    rows.push({ open, turn, warm, edited });
+    console.log(`open ${open} turn ${turn} turn-warm ${warm} turn-edit ${edited}`);
+  }
+  const median = (key) => {
+    const v = rows.map((r) => r[key]).sort((a, b) => a - b);
+    return v[Math.floor(v.length / 2)];
+  };
+  console.log(
+    `median open ${median('open')} turn ${median('turn')} turn-warm ${median('warm')} turn-edit ${median('edited')}`,
+  );
+  process.exit(0);
+}
+
 let last;
 for (let run = 0; run < runs; run++) {
   const browser = await chromium.launch({

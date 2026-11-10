@@ -161,7 +161,7 @@ export const useCatalog = (
     `${machine}/${provider}/${cwd ?? ''}`,
   );
 
-/** What the hub handed this machine (HRN-767): the runtime says whether the section is on at all. */
+/** What the hub handed this machine: the runtime says whether the section is on at all. */
 export const useHubEnv = (machine: MachineId) =>
   useLoaded<IHubEnv>(
     true,

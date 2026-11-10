@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Git's marks (HRN-679): a changed file, a new one, a folder by what is under it; nothing outside a repository.
+// Git's marks: a changed file, a new one, a folder by what is under it; nothing outside a repository.
 func TestGitMarksOfAFolder(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("no git")

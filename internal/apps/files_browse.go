@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 )
 
-// What an app sees of the workspace besides one file (HRN-850): a folder's entries and a search, both inside the masks
+// What an app sees of the workspace besides one file: a folder's entries and a search, both inside the masks
 // of files.read and by the rules of Resolve. A folder is shown when some mask can reach into it, a file when a mask
 // names it; a secret, the repository's own folder and the host's folders are never shown, whatever the masks say.
 

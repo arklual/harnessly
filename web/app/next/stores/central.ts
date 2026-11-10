@@ -108,7 +108,7 @@ export async function refreshCentral(): Promise<void> {
 
 /** Whether a machine's chats are drawn from the copy: it is off by the cluster's word, or its own list has not come
  *  on this page yet (a machine that is starting, hung or only just switched off, which the cluster names offline
- *  45 s later). A live link's list is the machine's own word and replaces the copy as it comes (HRN-902). */
+ *  45 s later). A live link's list is the machine's own word and replaces the copy as it comes. */
 const drawsFromCopy = (m: MachineId, off: ReadonlySet<MachineId>): boolean => {
   if (connectionStore.get(m)?.k === 'live' && convsLoadedStore.has(m)) return false;
   return off.has(m) || !convsLoadedStore.has(m);
@@ -128,7 +128,7 @@ export function loadCentralChat(
       TIMEOUT_MS,
     );
   if (before || limit !== 33) return read();
-  // The chat's newest page is asked by its feed and by its machine channel at once (HRN-879): one request serves both.
+  // The chat's newest page is asked by its feed and by its machine channel at once: one request serves both.
   const have = newestInFlight.get(conv);
   if (have) return have;
   const p = read().finally(() => newestInFlight.delete(conv));

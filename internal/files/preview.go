@@ -15,7 +15,7 @@ import (
 
 const (
 	MaxPreviewBytes = 15 * 1024 * 1024
-	// MaxVideoBytes bounds what the viewer plays in place; a download has no bound (HRN-679).
+	// MaxVideoBytes bounds what the viewer plays in place; a download has no bound.
 	MaxVideoBytes = 500 * 1024 * 1024
 )
 

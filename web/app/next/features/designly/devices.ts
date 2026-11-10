@@ -197,7 +197,7 @@ export interface IViewport {
 
 // The field (island, notes) floats over the page: a device keeps the whole area, its bottom as narrow as the sides.
 const PAD = 48;
-/** «По окну» is the design set into the window edge to edge, with no canvas round it (HRN-673); the area's padding in
+/** «По окну» is the design set into the window edge to edge, with no canvas round it; the area's padding in
  *  site.css is the same. */
 export const FILL_INSET = 0;
 

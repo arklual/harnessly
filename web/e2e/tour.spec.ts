@@ -1,4 +1,4 @@
-// The hands-on tour (HRN-792) on the demo projects (HRN-813): a lesson started by its link counts the person's real
+// The hands-on tour on the demo projects: a lesson started by its link counts the person's real
 // actions, step by step, and puts the agent's request into the design's field. Runs with TOUR_E2E set.
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';

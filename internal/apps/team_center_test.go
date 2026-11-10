@@ -18,7 +18,7 @@ func mustCurrent(t *testing.T, c *filesync.Client) *filestore.Entry {
 	return e
 }
 
-// HRN-898: an app an owner installs for the space reaches a member's machine through the hub's store alone (no
+// an app an owner installs for the space reaches a member's machine through the hub's store alone (no
 // platform snapshot), with the member's own role, and a team older than the store's is not written over it.
 func TestTeamAppsTravelThroughTheStore(t *testing.T) {
 	center := centerFor(t)

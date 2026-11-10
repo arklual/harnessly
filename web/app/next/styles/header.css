@@ -177,7 +177,7 @@
     animation: hx-plus-in 200ms var(--hx-ease-out) backwards;
   }
 }
-/* The machine's card in the header (HRN-891): the sidebar's card (sidebar.css), opening down and to the right of the
+/* The machine's card in the header: the sidebar's card (sidebar.css), opening down and to the right of the
    title, the chip a button to press for the other machines. */
 .hx-headmach-card {
   flex: none;

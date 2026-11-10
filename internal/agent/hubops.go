@@ -65,7 +65,7 @@ func (h *hub) loginProvider(req map[string]json.RawMessage) (string, error) {
 	return provider(req)
 }
 
-// opHistory is history.start and history.ack (HRN-879): the hub's copy of the chats, the same replica as a cluster's.
+// opHistory is history.start and history.ack: the hub's copy of the chats, the same replica as a cluster's.
 func (h *hub) opHistory(op string, req map[string]json.RawMessage) (any, func(), error) {
 	if !h.historyServed() {
 		return nil, nil, hubproto.Errf(hubproto.CodeUnsupported, "%s: this link reads no chats", op)

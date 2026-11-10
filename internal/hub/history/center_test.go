@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// HRN-879: a rewind sends the chat's new feed whole; the turns it left behind leave the feed and open on their page.
+// a rewind sends the chat's new feed whole; the turns it left behind leave the feed and open on their page.
 func TestARewindLeavesItsTurnsOutOfTheFeedAndOnItsOwnPage(t *testing.T) {
 	ctx, db := context.Background(), openDB(t)
 	_ = ApplyBackfill(ctx, db, mine, hubproto.HistoryBackfill{Ch: "convs", Events: []json.RawMessage{upsert("tab-a", 1, 1)}}, now)

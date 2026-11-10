@@ -45,7 +45,7 @@
   width: 300px;
   max-width: calc(100vw - 24px);
   box-sizing: border-box;
-  /* The black material (HRN-884): the card's own tokens, so what is in it (its buttons too) turns white on black. */
+  /* The black material: the card's own tokens, so what is in it (its buttons too) turns white on black. */
   --hx-fg-1: var(--hx-ink-fg);
   --hx-fg-2: var(--hx-ink-fg2);
   --hx-fg-3: var(--hx-ink-fg3);

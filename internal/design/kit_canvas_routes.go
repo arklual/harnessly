@@ -1,6 +1,6 @@
 package design
 
-// The kit screen of Sinopia (HRN-897): an installed kit whose themes describe a canvas (designkit.ReadCanvas) is shown
+// The kit screen of Sinopia: an installed kit whose themes describe a canvas (designkit.ReadCanvas) is shown
 // as one canvas with a tree and a search instead of a project of boards. These routes give the screen the kits, a
 // theme's canvas with its prepared atlases, the kit's files through the runtime, a template as a project of boards,
 // and where the kit is used.

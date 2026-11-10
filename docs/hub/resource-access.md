@@ -28,6 +28,9 @@ With the flag on, the document routes ask this model for the person's rank, and 
 - `-guest/{token}` (GET), `-guest/{token}/content`, `-guest/{token}/comments` (POST): a guest, no sign-in. Commenting needs the
   `comment` right; a hidden `website` field catches bots; ten comments per ten minutes per link. A guest's text is kept in the
   thread (`author_kind = guest`) and is never handed to the agent of the conversation.
+- `GET /d/{token}` on the hub's root: the address a share hands out (`PUBLIC_URL/d/<token>`). It answers the document itself as a
+  page of its own: the link's version when it was pinned, the sandbox CSP of the viewer, `no-store`, `noindex`, and the open is
+  counted. An unknown token is a 404 page, a revoked or expired one a 410 page. Commenting goes through the guest API above.
 - Mentions: `@[Name](person:email)` in a comment, five people at most, only people the hub knows. Each is mailed once
   (`doc_comment_mentions.notified_at`); the mail names the document and the author, not the text.
 

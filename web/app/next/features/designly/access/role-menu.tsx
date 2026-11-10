@@ -27,7 +27,7 @@ interface IRoleMenuProps<R extends TGrantRole> {
   onRemove?: () => void;
   /** The words of the remove item («Убрать доступ команды»); «Убрать доступ» by default. */
   removeLabel?: string;
-  /** «Может делиться» under the roles while the role is edit (HRN-675); a menu without it has no such item. */
+  /** «Может делиться» under the roles while the role is edit; a menu without it has no such item. */
   share?: { on: boolean; onToggle: () => void };
   disabled?: boolean;
 }

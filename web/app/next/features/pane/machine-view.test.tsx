@@ -48,6 +48,7 @@ const stats = (procs: MachineProc[]): MachineStats => ({
 
 const props = {
   name: 'dev-1',
+  health: null,
   error: null,
   onRetry: () => undefined,
   pending: new Map(),

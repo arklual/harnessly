@@ -17,7 +17,7 @@ export interface IEfficiencyResource<T> {
 }
 
 const BASE = '/api/platform/efficiency';
-/** What the hub answers itself (HRN-987): the summary and the weekly pulse, per organization, behind the `efficiency` flag. */
+/** What the hub answers itself: the summary and the weekly pulse, per organization, behind the `efficiency` flag. */
 const HUB_PATHS = ['/summary', '/pulse'];
 const isHubPath = (path: string): boolean => HUB_PATHS.some((p) => path === p || path.startsWith(`${p}?`));
 const hubOrigin = (): string => appConfig().hubUrl ?? '';

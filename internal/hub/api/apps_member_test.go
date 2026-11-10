@@ -17,7 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/storehub"
 )
 
-// HRN-898: an app installed for a space opens at the hub for its members with no machine at all: a browser without a
+// an app installed for a space opens at the hub for its members with no machine at all: a browser without a
 // session goes to the sign-in, a person of another space is refused, a member gets the page, the list of the space's
 // apps, and an area of their own in the store.
 func TestASpaceAppOpensAtTheHubForItsMembers(t *testing.T) {

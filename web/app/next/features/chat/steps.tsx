@@ -119,7 +119,7 @@ const HookOffHere = ({ app }: { app: string }) => {
 };
 
 /**
- * HRN-879: the rest of a cut output. It is read from the cluster's copy (the machine only when the copy has not got it
+ * the rest of a cut output. It is read from the cluster's copy (the machine only when the copy has not got it
  * whole and the machine is there), so it opens with the machine off; the step in the store gets it.
  */
 const WholeOutput = ({ entry }: { entry: ToolEntry }) => {

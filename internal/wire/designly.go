@@ -243,7 +243,7 @@ func (o DesignOwner) Validate() error { return need("name", o.Name) }
 // a new chat of the design's column: POST /api/v2/designly/chat). TouchedBy are the other conversations that worked on
 // it: their agent wrote its files or named it to a writing command of the design CLI (read from their transcripts, so it
 // holds for the chats from before), the latest activity first; absent from an older runtime. A chat's folder, a design
-// named in its message or opened from it make it neither (HRN-675). Owner is there for a project made after owners were
+// named in its message or opened from it make it neither. Owner is there for a project made after owners were
 // recorded; an older one has none, and none is guessed.
 type DesignArtifact struct {
 	ID          string        `json:"id"`
@@ -332,7 +332,7 @@ type DesignlyPin struct {
 
 func (p DesignlyPin) Validate() error { return need("id", p.ID) }
 
-// DesignlyDemo is the answer of POST /api/v2/designly/demo: the demo projects copied back into the library (HRN-813).
+// DesignlyDemo is the answer of POST /api/v2/designly/demo: the demo projects copied back into the library.
 type DesignlyDemo struct {
 	Restored []string `json:"restored"`
 }
@@ -340,7 +340,7 @@ type DesignlyDemo struct {
 func (d DesignlyDemo) Validate() error { return nil }
 
 // DesignlyChat is the body and the answer of POST /api/v2/designly/chat: the person started conversation Conv from the
-// column of design ID, so it is one of the design's chats (HRN-675).
+// column of design ID, so it is one of the design's chats.
 type DesignlyChat struct {
 	ID   string `json:"id"`
 	Conv string `json:"conv"`

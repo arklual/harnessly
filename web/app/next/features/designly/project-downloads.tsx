@@ -1,4 +1,4 @@
-// «Скачать» of a Sinopia project (HRN-679): one menu wherever a design, a deck or a video shows — the bar's own button,
+// «Скачать» of a Sinopia project: one menu wherever a design, a deck or a video shows — the bar's own button,
 // «Ещё», a page's row in the list of pages and its tab — in the right pane, the full view and the editing one; on a
 // phone it is a bottom sheet (MenuPanel). Each download is a job of the machine (deck/exports.ts) that ends in the
 // browser's download. The whole project as a ZIP is for those who may change it.

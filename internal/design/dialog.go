@@ -328,7 +328,7 @@ func (l *Library) PrepareDialog(id string) (art *Artifact, file, text string, er
 // ErrGone: the project of the library is not there.
 var ErrGone = errors.New("design: the project is gone")
 
-// kitDraftLine is the agent's line in the kit's draft (HRN-903): the folder is the kit, its edits show at once, a version
+// kitDraftLine is the agent's line in the kit's draft: the folder is the kit, its edits show at once, a version
 // is the person's «Опубликовать версию»; a kit for viewing only is not changed at all.
 func (l *Library) kitDraftLine(kit, root string) string {
 	if !locale.Russian() {

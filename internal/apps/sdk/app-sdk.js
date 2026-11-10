@@ -2,8 +2,10 @@
 // runtime at /__hl/app-sdk.js to every view. The wire is MCP Apps (JSON-RPC 2.0 over postMessage: ui/initialize,
 // tools/call, ui/message, notifications) plus the host's own methods under harnessly/.
 //
-//   import { connect } from '/__hl/app-sdk.js'
+//   <script src="/__hl/app-sdk.js"></script>        the view server's app-sdk.js is a classic script: harnessly.connect()
+//   import { connect } from '/__hl/app-sdk.mjs'     the module; an import from app-sdk.js there finds nothing
 //   const hl = await connect()
+// (`harnessly app sdk DIR` writes this file as it is, a module, for a view on the app's own server.)
 //
 // The view server puts /__hl/bridge-shim.js first in every page it serves. The shim makes the handshake with the nonce of
 // the page and takes the host's MessageChannel port; it replaces window.parent with a stand-in that speaks on the port,
@@ -537,7 +539,7 @@ export async function connect(options = {}) {
     confirm: (text) => request('harnessly/ui.confirm', { text }, { timeout: 0 }).then((r) => r.ok),
   };
   // The host's shortcut commands of a screen (deck, video, site, pictures, files), on the keys the person set for them:
-  // the view runs them while it is up (HRN-808). A press inside the view's own frame is the view's; hl.keys.press passes
+  // the view runs them while it is up. A press inside the view's own frame is the view's; hl.keys.press passes
   // one on to the host, which runs it only while the frame has the focus.
   const keyScopes = new Map();
   hl.keys = {

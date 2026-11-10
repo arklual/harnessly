@@ -90,7 +90,7 @@ type UsageBalanceFact = {
 
 A session is sent again whenever it changes (new calls, its end, its metrics); the hub keeps the newest by seq. A window
 is a measurement; the hub keeps the freshest by `measuredAt`, and a measurement with `usedPct: null` after a reset does
-not erase the window (HRN-112): the UI says «ждём замер».
+not erase the window: the UI says «ждём замер».
 
 ## Rules
 

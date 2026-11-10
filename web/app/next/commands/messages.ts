@@ -127,7 +127,7 @@ export function newView(
 }
 
 /**
- * HRN-879: the messages of this chat that wait in the cluster and this page has not got (written on another device, or
+ * the messages of this chat that wait in the cluster and this page has not got (written on another device, or
  * before the tab was closed) join the page's own, on their way; the outbox sends them too when the machine is back.
  */
 export async function adoptParkedMessages(machine: MachineId, conv: ConvId): Promise<void> {
@@ -148,10 +148,10 @@ async function submit(clientId: ClientId): Promise<void> {
   if (!m || m.rev > 0 || !m.conversationId || inFlight.has(clientId)) return;
   inFlight.add(clientId);
   try {
-    // HRN-879: to a machine that is off, the cluster keeps the message too (it outlives the tab, shows on another
+    // to a machine that is off, the cluster keeps the message too (it outlives the tab, shows on another
     // device, goes by itself when the machine is back); this page goes on sending it as well, under the same opId.
     void parkInCluster(clientId);
-    // HRN-879: what was attached while the machine was off is in the hub; the machine takes it before the message goes.
+    // what was attached while the machine was off is in the hub; the machine takes it before the message goes.
     // A message without them goes in the same frame, as before.
     const attachments = anyKept(m.attachments)
       ? await takeKept(m.machineId, m.attachments)
@@ -277,7 +277,7 @@ export function resendRefused(clientId: ClientId): ClientId | null {
 export function cancelMessage(clientId: ClientId): OpHandle | null {
   const m = messagesStore.get(clientId);
   if (!m || !m.conversationId) return null;
-  // The cluster's copy of a message the machine has not shown goes with it (HRN-879).
+  // The cluster's copy of a message the machine has not shown goes with it.
   if (m.rev === 0) void unparkInCluster(m);
   // Nothing of it is on the runtime — it refused it, or no try has been answered and none is on its way — so the
   // page's copy is all there is, and it goes at once, machine or no machine.

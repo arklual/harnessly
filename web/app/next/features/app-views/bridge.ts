@@ -212,15 +212,15 @@ export interface IBridgeHandlers {
   notify?: (text: string) => Promise<void>;
   /** A file of the chat's workspace; the runtime judges the path against the app's masks and answers for it. */
   files?: (op: 'read' | 'write', path: string, text?: string) => Promise<string | undefined>;
-  /** The workspace beyond one file (HRN-850): a folder, a search, the start and end of a watch. */
+  /** The workspace beyond one file: a folder, a search, the start and end of a watch. */
   filesMore?: (op: TFilesOp, params: Record<string, unknown>) => Promise<unknown>;
   /** The person picks a file in the host's dialog; null when they close it. */
   pick?: (accept: readonly string[]) => Promise<{ path: string; text: string } | null>;
   /** The repository of the chat's folder, read only. */
   git?: (op: TGitOp, params: Record<string, unknown>) => Promise<unknown>;
-  /** Commands and processes of the app in the chat's folder, inside the agent's sandbox (HRN-851). */
+  /** Commands and processes of the app in the chat's folder, inside the agent's sandbox. */
   run?: (op: TRunOp, params: Record<string, unknown>) => Promise<unknown>;
-  /** An app's own terminal (terminal.pty, HRN-852): the page holds its socket to the runtime. */
+  /** An app's own terminal (terminal.pty): the page holds its socket to the runtime. */
   terminal?: (params: IAppTerminalOpen, on: IAppTerminalEvents) => Promise<IAppTerminal>;
   /** The view hears the agent's tool calls before they run (hooks.agent): reported with the page's tools. */
   hooks?: (on: boolean) => void;
@@ -231,7 +231,7 @@ export interface IBridgeHandlers {
     args: Record<string, unknown>;
     confirmed?: boolean;
   }) => Promise<unknown>;
-  /** One answer of a model within the app's budget (ai, HRN-853). */
+  /** One answer of a model within the app's budget (ai). */
   ai?: (params: {
     prompt: string;
     system: string;
@@ -239,14 +239,14 @@ export interface IBridgeHandlers {
     model: string;
     confirmed?: boolean;
   }) => Promise<unknown>;
-  /** A value into the safe, never read back: the app's own secret or, shared, the person's (secrets.write, HRN-861). */
+  /** A value into the safe, never read back: the app's own secret or, shared, the person's (secrets.write). */
   secretsPut?: (params: {
     name: string;
     value: string;
     shared: boolean;
     confirmed?: boolean;
   }) => Promise<unknown>;
-  /** A task in a new chat under this one, within the app's budget (agents.run, HRN-853). */
+  /** A task in a new chat under this one, within the app's budget (agents.run). */
   agentsRun?: (params: { prompt: string; title: string; confirmed?: boolean }) => Promise<unknown>;
   /** What the chat's terminals show (terminal.read). */
   terminalRead?: (params: { terminal: string; lines: number }) => Promise<unknown>;
@@ -399,7 +399,7 @@ export interface IBridgeOptions {
   /** Every call, for the app inspector. */
   onCall?: (entry: IBridgeLogEntry) => void;
   /**
-   * A builtin app (HRN-808): the host mounted it in its own page, so there is no frame and no handshake; it calls the
+   * A builtin app: the host mounted it in its own page, so there is no frame and no handshake; it calls the
    * bridge with `call`, and every call goes through the same rights, checks and limits as a frame's.
    */
   inProcess?: boolean;

@@ -11,7 +11,7 @@ import (
 
 // ClaimOwnerless makes the person who asked the owner of a project nobody owns: it exists, has no owner file and the
 // snapshot has no row for it. The file names the person (v2, "claimed"): a v1 file named only the Unix user, so on a
-// shared library the runtime that clicked first owned a project another person made (HRN-675, «harnessly»). The
+// shared library the runtime that clicked first owned a project another person made («harnessly»). The
 // gateway then registers the owner on design.claim and the team keeps editing. An empty person is the runtime's.
 func (l *Library) ClaimOwnerless(id string) error { return l.ClaimOwnerlessAs(id, "") }
 

@@ -86,6 +86,7 @@
 | `HUB_STORE_S3_BUCKET` | `HUB_S3_BUCKET` | другой бакет того же S3 для блобов |
 | `HUB_STORE_S3_PREFIX` | `<HUB_S3_PREFIX>store/` | где в бакете лежат блобы. Блоб — `<префикс>rooms/<комната>/blobs/<sha[:2]>/<sha>` |
 | `HUB_STORE_LEGACY_SPACE` | не задана | slug пространства, чья библиотека — сама комната `design`, которую вёл центр design-sync |
+| `HUB_STORE_PROFILE_ROOMS` | не задана | `<id пользователя>=profile-sergey,<id пользователя>=profile-rsk`: комнаты, в которых центр design-sync держал профили Claude, привязанные к id пользователя (не к почте: её учётка может лишь заявлять); машины человека синкают их вместо `profile-<id пользователя>`. Подробнее — «The Claude profile» в `docs/hub/store.md` |
 
 `hub check-config` показывает, где лежит хранилище.
 

@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/storehub"
 )
 
-// HRN-898: the apps installed for a space open at the hub for its members with every machine off
+// the apps installed for a space open at the hub for its members with every machine off
 // (/apps/space/<space id>/<app id>/, internal/hub/appsview). The session and the role are checked here; a page asked
 // without a session leads to the sign-in and back.
 

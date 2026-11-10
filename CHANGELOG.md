@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- The machine's own projects and favorites go into its person's sidebar on the hub by the move (HRN-883, kind
+- The machine's own projects and favorites go into its person's sidebar on the hub by the move (kind
   `sidebar`, `POST /store/migration/v1/sidebar`): merged as the page merges a machine, without the page open; the
   journal counts it verified once the sidebar lists the machine. A hub with its history off keeps it skipped
   (`MIG-NOT-KEPT`) and is asked again each pass.
@@ -19,7 +19,7 @@ All notable changes to this project are documented here. The format follows
   where it stopped, nothing on the disk is deleted. A failed upload is tried again by itself; a file that cannot be
   read waits for `harnessly migrate retry|skip`. `harnessly migrate status|retry|skip|verify [--json]` read and steer
   it; `RUNTIME_DATA_MOVE=off` turns it off.
-- The hub keeps the journal of the move of the machines' own data into its store (HRN-883, `docs/migrations`): one row
+- The hub keeps the journal of the move of the machines' own data into its store (`docs/migrations`): one row
   per machine × kind × object with its state, error code and attempts (migration 0034). A machine reports with its
   store session (`POST /store/migration/v1/report`); a person who may open the machine reads how far it is and asks to
   retry or skip the failed objects (`/api/machines/<id>/migration`, `…/retry`, `…/skip`). A verified upload becomes its
@@ -33,87 +33,93 @@ All notable changes to this project are documented here. The format follows
 - A space owner's sidebar no longer merges the chats of every machine of the space: the list, the search and the page's
   first machine are the person's own machines; an administered machine is named under `others` and shows its own list
   only when picked. `POST /api/machines/{id}/owner` hands a machine registered by an admin to the member it is for,
-  with its copied chats (#57, HRN-890).
+  with its copied chats (#57).
 - A link of a connection or of the documents provider opens natively before the remote browser is considered: an issue
   in the task tab through its own connection (two trackers with one key on different hosts no longer mix; the key keeps
   its case and hyphens), a wiki page in a safe reader, a document or board by the provider's embed address. A
   documents adapter may declare the new `resolve` capability to tell documents from boards; one without it behaves as
   before. A refused sign-in shows a "Connect" action and an unembeddable provider "Open original link", never a
-  silently started Chrome. Click, context menu and `harnessly open` agree (GitHub #60, HRN-890).
+  silently started Chrome. Click, context menu and `harnessly open` agree (GitHub #60).
 - The home screen's machine setup card takes clicks again: it sat in the greeting, which lets the pointer through to
   the composer, and inherited that, so its stages, «Подробнее», «Повторить» and the safe step did nothing. The card and
   the into-project chip take the pointer while shown; a card fading out lets it through again. A browser test presses
-  each with the mouse (GitHub #59, HRN-890).
+  each with the mouse (GitHub #59).
 - Personal settings (`/api/v2/me`, `/api/v2/me/settings`) are kept by the hub per signed-in user, with their own
   revision and the account's e-mail and name; they were forwarded to one runtime's single settings file, so users who
   shared a runtime overwrote each other's settings, including the main machine. The hub answers them on every route
   (the fleet, the workspace, a machine's own address), also with the machines off, and refuses a main machine the user
   may not open. A runtime's old settings file is not copied into any account; a runtime on its own is unchanged
-  (GitHub #61, HRN-890).
+  (GitHub #61).
 - The agent asks the runtime for its chat list again (after 30 s, doubling up to 5 min) while none came: a runtime
   too busy to make the list in its budget answered nothing, and the backfill to the cluster waited for the next link
-  — chats stayed not caught up for an hour and more on a loaded machine (HRN-879).
+  — chats stayed not caught up for an hour and more on a loaded machine.
 - A chat whose backfill a busy runtime cut (a page not given) goes on from where it stopped a minute later, the wait
-  doubling up to 15 min, while the link stays; it waited for the next link (HRN-879).
+  doubling up to 15 min, while the link stays; it waited for the next link.
 - The chats the cluster holds whole without the steps of every turn (`v2.start.steps`, the cluster's migration 0054) are
   walked again from their steps cursor with all the steps, after the other walks; their pages carry `steps.from` and
-  move only that cursor (HRN-879).
+  move only that cursor.
 - The hub's store waits out a bucket busy with the same blob (409 OperationAborted, «a conflicting conditional
   operation is currently in progress»: two machines putting the same file at once) and finds the blob there or puts it
-  again; it answered 500, and the machine's sync of that file failed (HRN-878).
+  again; it answered 500, and the machine's sync of that file failed.
 - A chat opened on a machine that is on, whose chats the cluster keeps, is drawn from the cluster's copy, and the
   machine's channel is asked after it from the copy's newest entry (a snapshot "after"), not for its whole tail; past
-  3 s without the copy it is asked as before. The copy's newest page is asked once for the feed and the channel (HRN-879).
+  3 s without the copy it is asked as before. The copy's newest page is asked once for the feed and the channel.
   The snapshot after an entry carries every turn from that entry's own on, as it is now, so the turn's state (running or
   idle) reaches the page whatever the cursor; only a runtime that says so (feature `snapshot-after`) is asked that way.
 - A chat backfilled to the cluster brings the steps of every turn, not only of its newest three: a walk reads pages
   of 20 turns with their steps (`…/turns?steps=all`). A folded turn the copy holds fewer steps of than the turn counts
-  (chats backfilled before) is asked from the machine when it is there; it opened with its answer only (HRN-879).
+  (chats backfilled before) is asked from the machine when it is there; it opened with its answer only.
 - The agent gives a page of a long chat 90 s to come whole from the runtime (it was 15 s: the first page of a chat with a
   transcript of tens of megabytes could be cut there, and its backfill stopped on it); a cut answer is logged as
-  cut, not as «runtime answered 200» (HRN-879).
+  cut, not as «runtime answered 200».
 - A chat's backfill to the cluster goes on from its cursor after the runtime restarts: a page asked before a turn
   older than the tail the runtime holds now reads the transcript back to that turn; it answered 404, and the chat's
-  backfill stopped there for good (HRN-879).
+  backfill stopped there for good.
 - The runtime's read back to an old backfill cursor builds the chat's feed again only when what it read has doubled,
   not after each 4 MB of the transcript: a walk deep into a transcript of 100 MB was quadratic and held the chat's
-  actor for minutes (HRN-879).
+  actor for minutes.
 
 ### Added
 
+- A person's Claude profile syncs through the hub's store (`RUNTIME_PROFILE_SYNC=hub`, `docs/hub/store.md`):
+  one room per person (`profile-<user id>`, or design-sync's room bound to the user id by `HUB_STORE_PROFILE_ROOMS`), sealed on the machine
+  with the room key the hub's safe keeps; design-sync's key is taken over from its identity once. Secrets never go in:
+  `.gitconfig`, glab's config, the `RUNTIME_SECRET_CONFIG_DIRS` folders and the settings' token-like environment
+  variables stay on the machine; `RUNTIME_PROFILE_LOCAL_KEYS` keeps more settings keys local, `RUNTIME_PROFILE_STATE_DIR`
+  names the sync's state folder. The runtime installs the plugins the settings enable, as design-sync's profile agents did.
 - Your Claude Code memory can follow you to all your machines (opt-in: `HUB_MEMORY_SYNC=on` on the hub,
   `RUNTIME_MEMORY_SYNC_URL` on the runtime). Only the notes of a project's `memory/` folder sync, under the project's
   git remote, and only between machines of the same person. A Claude conversation syncs its project before it starts.
   A note changed on two machines keeps both versions. `harnessly memory [sync]` shows the last sync and retries it
-  (docs/hub/memory-sync.md, HRN-890).
+  (docs/hub/memory-sync.md).
 - Other CLIs of a machine sign in from the hub's page like the agents do in the console (GitHub #58): the machine
   describes them in `cli-logins.json` of the agent's data folder (or `AGENT_CLI_LOGINS_FILE`) with an id, a label, a
   fixed login command, a status command and a timeout; an extension pack writes the file, the core and the hub need no
   change. The agent reports them as `clis` next to the agents, «Агенты» lists them under «Входы в CLI», and the sign-in
   runs only in the console with `BROWSER=echo`, so the CLI prints its address and its loopback callback comes back
   through the protected console (single use, its owner only). The hub starts a CLI only by an id the machine reported,
-  for a space owner (HRN-890).
+  for a space owner.
 
 - The search over the chats, the sidebar's projects and favorites, and the turns a rewind left behind open from the
   cluster's and the hub's copy, with the machine off too: the hub serves `…/history/search`, `…/history/sidebar` (one
   document per person, written on its revision) and `…/history/conversations/<id>/rewinds/<n>/turns`, as the gateway
   does. A rewind's live `feed_reset` marks the turns it left behind, so the copy's feed no longer shows them; an undone
-  rewind brings them back (HRN-879).
+  rewind brings them back.
 - The hub keeps the messages written to a machine that is off, like the cluster's gateway (`…/offline-prompts`): they
   outlive the tab, show on the person's other devices, and the hub hands each one to the machine as the page's own send
-  command once it is back, in order and once per opId (HRN-879).
+  command once it is back, in order and once per opId.
 - A message written to a machine that is off waits in the cluster's gateway too, as the very send command the page
   sends the machine: it outlives the tab, shows on the person's other devices and goes by itself when the machine is
   back; the machine takes one opId once, so the agent gets it once whoever comes first. A hub without the gateway's
-  queue keeps the page's own outbox, as before (HRN-879).
+  queue keeps the page's own outbox, as before.
 - A tool's whole output is in the cluster's and the hub's copy: the agent reads it from the runtime apart from the
   stream (up to 1 MiB) for every tool it sees cut, pages keep carrying its first 4 KB, and «show all» reads it from
-  `…/history/conversations/<id>/entries/<entry>/output` — with the machine off too (HRN-879).
+  `…/history/conversations/<id>/entries/<entry>/output` — with the machine off too.
 - Heavy checks share the machine: launchers named `go`, `vitest`, `playwright`, `tsc`, `eslint`, `npx`, `npm` and `pnpm` on the agents'
   `PATH` run builds, tests, type checks and linters through `harnessly heavy`, which gives them one of the machine's
   few slots (by its cores), runs them gently and, when the machine stays busy, tells the agent to go on without the check
   (exit 75). `harnessly heavy stats` counts the calls that waited and were refused; the workspace prompt asks agents
-  to check once, at the end, only what they changed (`RUNTIME_HEAVY_LAUNCHERS`, HRN-939).
+  to check once, at the end, only what they changed (`RUNTIME_HEAVY_LAUNCHERS`).
 - The fleet's workspace on a standalone hub (`runtime.fleet`): the hub carries the runtime's page and serves it at
   `/agents/` with the home machine's settings; `/agents/api/v2/…` is the fleet, every other API call goes to
   `?machine=<id>` or the home machine, so Sinopia and the platform API work across machines too. The hub page's
@@ -122,7 +128,7 @@ All notable changes to this project are documented here. The format follows
   ties the hub, runtime, agent, command line and web page to one version and lists the extension protocol ranges. `plan`
   shows what changes and which registered extensions the new core cannot speak to; `apply` replaces the programs
   together, restarts, checks and puts the old ones back on failure; the data is not touched. `tools/relmanifest` makes
-  and signs the manifest. The automatic update by `/dl/manifest.json` is unchanged (HRN-745).
+  and signs the manifest. The automatic update by `/dl/manifest.json` is unchanged.
 - Model profiles without a rebuild (`RUNTIME_PROFILES_FILE`, `RUNTIME_PROFILES_ADAPTER_URL`, `RUNTIME_PROFILES_SECRET_CMD`, off by
   default): a file or an adapter adds profiles to the built-in presets or replaces one by id; address, API format, key as
   a reference to a safe secret, limits and prices. See `docs/model-profiles.md`.
@@ -135,49 +141,49 @@ All notable changes to this project are documented here. The format follows
 - UI slots for apps (`HARNESSLY_UI_SLOTS=on`, off by default): view targets `settings`, `onboarding`, `object-action` and
   `hub-settings`, an app `branding` block, `hl.slot.done()`, a Settings → Extensions page and machine buttons drawn from
   packages in the existing sandboxed frame; a failing view is held by a boundary. The hub's own page is declared but not
-  drawn yet. Example: `examples/ext-ui-slots` (HRN-753).
+  drawn yet. Example: `examples/ext-ui-slots`.
 - Connection adapters (`RUNTIME_CONNECTION_ADAPTERS_FILE`, off by default): a product that is not built in, such as a
   corporate GitLab or an in-house tracker, connects through an HTTP adapter of the extension frame
   (`harnessly.connection/v1`: detect, link, me, projects, issue search and card, pages) without a rebuild. The
   credentials come from the runtime's safe and are not in the declaring file; built-in products are unchanged. Example
-  in `examples/connection-adapter-ts`, docs in `docs/connection-adapters.md` (HRN-750).
+  in `examples/connection-adapter-ts`, docs in `docs/connection-adapters.md`.
 - Memory store contract (`internal/memstore`: list, get, put with a version check, text search) and memory adapters
   (`RUNTIME_MEMORY_ADAPTERS_FILE`, off by default): a team's notes in a wiki or a database connect through an HTTP
   adapter of the extension frame (`harnessly.memory/v1`) and are read over the files, which stay the default and are
   used when the adapter is silent or does not have a note. Example in `examples/memory-adapter-ts`, docs in
-  `docs/memory-adapters.md` (HRN-751).
+  `docs/memory-adapters.md`.
 - Documents and boards provider (`RUNTIME_DOC_ADAPTERS_FILE`, off by default): a contract for reading, publishing,
   access, comments, embed and boards; the built-in artifacts and boards stay the default, an external service plugs in
-  as an adapter of the extension frame (`harnessly.docs/v1`), with a TypeScript example and docs/doc-adapters.md (HRN-749).
+  as an adapter of the extension frame (`harnessly.docs/v1`), with a TypeScript example and docs/doc-adapters.md.
 - An example extension pack (`examples/ext-pack-example`: machine adapter, memory store, tracker, secrets settings and an
   interface extension, installed by one script), a guide to building your own (`docs/extensions/build-your-pack.md`) and
   the acceptance scenario of a release, run in CI on release tags: clean install, sign-in, organization, machine, agent,
-  update to the next version and rollback (HRN-757).
+  update to the next version and rollback.
 - Extension frame of the hub (`HUB_EXTENSIONS`, `HUB_EXTENSIONS_FILE`, off by default): adapters registered by config
   with a token file and an expected protocol, describe handshake, timeouts, retries with an idempotency key, a circuit
   breaker, their state in `hub doctor` and `/api/capabilities`, a Go SDK (`extsdk`) and a TypeScript example. The machine
-  provider protocol now runs on this frame with the same behaviour (HRN-746).
+  provider protocol now runs on this frame with the same behaviour.
 - Machine adapter protocol v1 (`GET /v1/describe`, create, attach, state, power, resize), chosen by describe with
   `HUB_PROVIDER_PROTOCOL=auto`; the default `v0` is the behaviour as before. An example adapter in
-  `examples/machine-adapter` and a scenario that updates the hub under a running adapter (HRN-735).
+  `examples/machine-adapter` and a scenario that updates the hub under a running adapter.
 - Hub: `HUB_AUTH_EMAIL=off` signs people in only through OpenID Connect, GitHub, Yandex or the gateway: no SMTP, no mailed
   codes, invitations as links; the sign-in screen hides the email form. `HUB_STORAGE=s3` with `HUB_S3_*` keeps the hub's
-  files in one bucket, and `hub storage migrate` moves an existing hub's files there. Both are off by default (HRN-739).
+  files in one bucket, and `hub storage migrate` moves an existing hub's files there. Both are off by default.
 - The lively hub behind the `ui.hx.live` feature: one motion system on every screen (cascade, count-up numbers,
   one skeleton, hover and press), analytics periods of 24 hours, 7 and 30 days or any dates kept in the address,
   sortable and searchable tables, and the «Инструменты» screen over `GET /api/orgs/{org}/tools` — which MCP servers
-  and skills the agents call, how often, with errors and who calls (HRN-770, HRN-771).
+  and skills the agents call, how often, with errors and who calls.
 - Installer for a company network: `--check` looks at the machine before installing and changes nothing, `--ca-file`,
   `--proxy`, `--no-proxy`, `--mirror`, `--npm-registry` and `--pip-index` reach every component (`SSL_CERT_FILE`,
   `NODE_EXTRA_CA_CERTS`, `NO_PROXY`, and the container profile's mounts), the hub installer tells a Docker daemon that
   already runs from one it can start of its own (`--docker external|own|auto`), `--offline DIR` installs from a bundle
   that `scripts/make-offline-bundle.sh` builds, every step goes to a journal, and running again changes nothing that is
-  already right. `harnessly install` runs it with the check first (HRN-742).
+  already right. `harnessly install` runs it with the check first.
 - Several hub replicas (`HUB_REPLICAS=on`, off by default): the machines' links get an owner with a lease and a fencing
   token in a table in Postgres, a request for a machine on another replica reaches its owner over an internal hop (calls
   and tunnels), a replica that lost its lease writes nothing, and a killed replica's machines reconnect to a live one. The
   Helm chart runs 2 replicas with a rolling update on a shared Postgres and stays one replica on SQLite
-  ([docs/hub/replicas.md](docs/hub/replicas.md), HRN-740).
+  ([docs/hub/replicas.md](docs/hub/replicas.md)).
 - Documents and boards next to the hub (HUB_DOCS, off by default): `doc.publish` and `doc.acl` from agents, `/api/platform/docs`
   with threads, comments and rights kept in the hub, and "not set up" with the reason on the screens instead of a 404.
   `compose.docs.yaml` and the chart's `docs.*` run the artifacts and boards services beside the hub; see docs/hub/docs.md.
@@ -185,20 +191,20 @@ All notable changes to this project are documented here. The format follows
   GitHub, Stripe, …) and any MCP URL, streamable HTTP or legacy SSE. The runtime finds how a server signs in: the
   service's own sign-in in a popup (OAuth with dynamic registration and PKCE), a pasted token, or nothing. Every Claude
   Code and Codex chat started afterwards gets the enabled servers' tools as `mcp-<name>` through the runtime's proxy,
-  which adds the credentials and refreshes them; agents never hold the service's token (HRN-648).
+  which adds the credentials and refreshes them; agents never hold the service's token.
 - Connections: Settings → Connections takes any link of the person's tracker, wiki or code host (Jira and Confluence in
   the cloud or on Server / Data Center, YouTrack, Linear, GitLab, GitHub, Gitea, Redmine, Yandex Tracker, Notion and
   self-hosted wikis, on any domain and path), finds the product and its version, checks the credentials and keeps them
   in the safe. The tracker app, task cards and link previews read the primary connection in the same shapes as the
   deployment's tracker, which is listed as a connection itself; agents read issues and pages with `harnessly
-  connections`, `issues`, `issue`, `pages` and `page`, never with a token of their own (HRN-638).
+  connections`, `issues`, `issue`, `pages` and `page`, never with a token of their own.
 - Sinopia video: scenes run on one time contract. `tkVideo.motion` puts GSAP (with its plugins and `tk.js` presets, served by the library at `/__lib/motion/`) on the scene's time, `tkVideo.register` adds any other engine. The check now finds overlapping tweens, engine and script errors, outside addresses and motion past the scene, walks the scene in time, and compares frames with a tolerance. `design video frame --sheet` gives a contact sheet. Final renders take PNG frames at CRF 16, preset slow, tagged BT.709.
 - Sinopia video: the rules are read on demand with `design video guide [topic]`, and a chat working in a video project gets `sinopia_view_*`, `sinopia_frame`, `sinopia_check` and `sinopia_video_render`; other chats carry none of this. If the person just moved the player, the agent's command becomes a button.
 - Dictation: Settings → Voice input has «My words» (a personal dictionary kept with the account: a word, optionally how it
   is heard; the runtime puts it over every partial and final text of any model, and finds a word by sound when no
   variant is given) and a choice of the recognition model: the machine's own, OpenAI gpt-4o-transcribe (Realtime API) or
   Yandex SpeechKit v3 (streaming). Their keys are saved in Models and keys; a model without a key cannot be picked, and the
-  audio leaves the machine only for the picked cloud model (HRN-562).
+  audio leaves the machine only for the picked cloud model.
 
 - Dictation: the recognition model «ChatGPT plan (unofficial)» recognizes on the plan the machine's Codex CLI is signed in
   with, whole after the stop, through an undocumented endpoint (docs/voice.md says what that costs).
@@ -347,7 +353,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The agent's Chrome is held to rules (HRN-774): it goes out only through an egress proxy shared with the pane's live
+- The agent's Chrome is held to rules: it goes out only through an egress proxy shared with the pane's live
   browser, which refuses private networks, link-local and the machine's own addresses (by the address a name resolves
   to) and on `localhost` opens only the machine's dev servers, never the runtime's port; `file:`, `chrome:`,
   `javascript:` and `data:` pages are refused. It closes after 3 minutes idle by default and keeps session cookies
@@ -376,12 +382,12 @@ All notable changes to this project are documented here. The format follows
 - A fresh device opening `/agents/` while the home machine's runtime hangs (its agent keeping the link) no longer stays
   blank for up to 30 s: the hub waits on that machine's page settings at most 2 s and not again for 30 s, the person's
   other machine that is on answers for them meanwhile, and the page draws the machines without waiting for its
-  `me` past 3 s (HRN-879).
+  `me` past 3 s.
 - A chat opens whole while its machine is starting, hung or switched off: the feed, older turns and a turn's steps are
   read from the hub's (the cluster's) copy first, not only once the machine is called offline; the machine answers
   only for what the copy does not have yet. A chat the copy does not hold back to its first turn says so (`complete`),
-  so its oldest page asks the machine for the rest instead of ending the feed early (HRN-879).
-- A restart no longer loses the runtime's `RUNTIME_*` settings (HRN-914). `install.sh` keeps the `RUNTIME_*` variables
+  so its oldest page asks the machine for the rest instead of ending the feed early.
+- A restart no longer loses the runtime's `RUNTIME_*` settings. `install.sh` keeps the `RUNTIME_*` variables
   it was given in `~/.config/harnessly/env` (before, only the first start, which inherited them from the installer's
   shell, had them) and passes them to the launchd job; the hub machine's installer keeps the lines added to
   `runtime.env` and `agent.env` instead of rewriting the files. `RUNTIME_PREVIEW_DOMAIN` (and `RUNTIME_PREVIEW_ID`)
@@ -389,7 +395,7 @@ All notable changes to this project are documented here. The format follows
   `harnessly doctor preview` and the machine check `preview_dns` say when those names do not resolve (NXDOMAIN).
 - A new Sinopia project takes a brief of up to 20,000 characters, not 4,000: a dictated brief ran past the old bound
   and the person saw a bare «brief: too long». A longer one is refused in their words, with a hint to attach the text as
-  a file (HRN-866).
+  a file.
 
 - A message with several pictures no longer goes to the agent cut in two: no Enter is pressed while Claude still reads a
   paste («Pasting…»), nor while its box stops short of the message's end; the paths of a paste Claude reads late are

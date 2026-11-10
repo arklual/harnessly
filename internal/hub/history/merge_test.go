@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// HRN-883: the machine's projects and favorites join the person's sidebar the way the page joins them.
+// the machine's projects and favorites join the person's sidebar the way the page joins them.
 func TestAMachineJoinsTheSidebarAsThePageJoinsIt(t *testing.T) {
 	doc := ProfileDoc{
 		Projects: []ProfileProject{{ID: "pp-1", Name: "Работа", CreatedAt: 1,

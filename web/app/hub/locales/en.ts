@@ -570,7 +570,7 @@ export const en: Record<Key, Entry> = {
     'The agent on it stops and will not connect again. Files and agents on the machine itself stay.',
   'settings.machine.removeDo': 'Remove',
 
-  // ---- the closed network (HRN-966)
+  // ---- the closed network
   'network.title': 'Closed network',
   'network.entry':
     'Internal domains, root certificates, proxy and app signing for every machine of this hub.',

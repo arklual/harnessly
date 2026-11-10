@@ -107,6 +107,42 @@ id. A theme is another look (a second brand); light and dark of one look are **m
 (`["Logos", "Icons"]`) and `assetGroups` keeps uploads by blob id. In a kit both are the canvas shapes below; an index
 copied from claude.ai must be rewritten.
 
+### Optional fields: code, presets, status, kind
+
+All of these are optional; a kit without them passes `kit check` as before. Each has its own rule below.
+
+| Where | Field | Meaning |
+| --- | --- | --- |
+| component | `code` | `{import, export}`: the module a consuming project imports from and the export name. Gives the component readiness level 0. |
+| component | `preset` | `{of, props}`: this component is another component with fixed props (`of` is its id, `props` are values it declares). A preset needs only a description; it takes its target's card, sample and readiness. |
+| component | `status` | `stable`, `new` or `deprecated`. |
+| component | `replacedBy` | the component that replaces a `deprecated` one. |
+| `kit` | `kind` | `app`, `site`, `slides` or `video`. |
+| `kit` | `extends` | `<id>@<range>`: the kit this one builds on, e.g. `base-kit@^1.2.0` (`^`, `~`, `>=`, `<`, exact). |
+| `kit` | `omitted` | what the kit leaves out on purpose: `tokens`, `examples`, `docs`, `patterns`, `templates`. An omitted part counts as done in the readiness. |
+| token | `var` | the CSS custom property the token is published as, `--like-this`. |
+
+```json
+{ "id": "PrimaryButton", "description": "The main call to action of a form",
+  "code": { "import": "@acme/ui", "export": "Button" },
+  "preset": { "of": "Button", "props": { "variant": "primary" } }, "status": "stable" }
+```
+
+### Readiness
+
+`kit check` ends with a summary of how far each component is built out. It is not a finding and does not change the
+exit code; `--levels` lists every component and what it lacks for the next level.
+
+| Level | The component has |
+| --- | --- |
+| -1 | no `code` yet |
+| 0 | `code` |
+| 1 | and the theme has `tokens.json` |
+| 2 | and a sample (or variants) plus an example in its card; a part needs no sample of its own |
+| 3 | and a card with «When not to use» |
+
+The kit's level is the lowest of its components.
+
 ### `groups`: components
 
 ```json
@@ -384,6 +420,16 @@ requests and pictures with nothing visible. Errors exit 1: do not pack. Each pro
 | `identity.id` | error | the kit id is lower case letters, digits and - |
 | `identity.version` | error | the version is major.minor.patch |
 | `identity.source` | warning | source is library or draft |
+| `identity.kind` | error | the kit record's kind, when set, is app, site, slides or video |
+| `identity.extends` | error | extends, when set, is <id>@<range> with a valid id and version range |
+| `identity.omitted` | error | omitted, when set, lists only tokens, examples, docs, patterns, templates |
+| `code.shape` | error | a component's code, when set, is {import, export} with plain strings |
+| `preset.shape` | error | a component's preset, when set, is {of, props} |
+| `preset.target` | error | a preset's of is another component of the theme, not a preset itself |
+| `preset.props` | error | a preset's props are simple values the target component declares |
+| `status.value` | error | a component's status, when set, is stable, new or deprecated |
+| `status.replaced-by` | error | replacedBy, when set, names another component and goes with status deprecated |
+| `token.var` | error | a token's var, when set, is a CSS custom property name --like-this |
 | `readme.missing` | error | the theme has README.md |
 | `readme.consuming` | warning | README.md has a Consuming section |
 | `groups.names` | error | groups are component groups, not a claude.ai list of names |
@@ -477,7 +523,7 @@ it in `keywords`.
 ## Not done yet
 
 - Projects do not yet record their kits (`meta.kits` is kept but not read): a board names the kit's files itself
-  (HRN-407).
+ .
 - No command draws a project's board on a kit outside Sinopia, and none turns a package's CSS into `tokens.json`: a
-  library kit's build does it (HRN-967).
+  library kit's build does it.
 - No `harnessly design code` (board → TSX) yet.

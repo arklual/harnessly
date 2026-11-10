@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// The trash of the library (HRN-860): what DeleteProject moved to .trash/ is listed, put back or erased here. Only the
+// The trash of the library: what DeleteProject moved to .trash/ is listed, put back or erased here. Only the
 // project's owner sees and does any of it, by the owner file that went to the trash with the project (the access rows
 // went at the delete, so the file is all that is left to say whose it was).
 

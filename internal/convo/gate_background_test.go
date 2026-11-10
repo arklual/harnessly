@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// HRN-855: a background subagent asks while the main agent writes on. Its question is the screen's, not the main
+// a background subagent asks while the main agent writes on. Its question is the screen's, not the main
 // agent's pending call: no transcript movement of the main agent and no Stop of its own turn closes it.
 
 // backgroundAsks: the main agent runs its own call (toolu_main) and the screen shows another agent's dangerous rm.

@@ -62,7 +62,7 @@ type Launcher interface {
 	Resume(conv wire.Conversation) error
 }
 
-// ModeKeeper is a Launcher that keeps the fast and permission modes a chat last ran in on its tab (HRN-945), so the
+// ModeKeeper is a Launcher that keeps the fast and permission modes a chat last ran in on its tab, so the
 // next start of its agent, the runtime's own resume at startup too, starts in them again.
 type ModeKeeper interface {
 	KeepModes(session string, fast bool, permission wire.PermissionMode)
@@ -278,7 +278,7 @@ type Deps struct {
 	// It answers the id of the first that is not, or "". nil: no app can be turned on (refused{unsupported}).
 	AppsOK func(ids []string) string
 
-	// AppsLive says whether the running agent of a conversation takes its apps changed to ids as it runs (HRN-975): the
+	// AppsLive says whether the running agent of a conversation takes its apps changed to ids as it runs: the
 	// tools of the apps it did not start with come to it live, their words on its next turn. false (or nil) stops an
 	// agent at rest, and the next message brings it back with the apps.
 	AppsLive func(rec wire.Conversation, ids []string) bool

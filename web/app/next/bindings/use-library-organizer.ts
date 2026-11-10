@@ -1,4 +1,4 @@
-// The person's shelf over the machine: folders and where projects lie, the trash and its undo (HRN-860). A change waits
+// The person's shelf over the machine: folders and where projects lie, the trash and its undo. A change waits
 // for the machine before the screen shows it; a refusal is told and thrown so the dialog stays.
 import { useCallback, useEffect, useState } from 'react';
 import {

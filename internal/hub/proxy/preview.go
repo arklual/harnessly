@@ -180,7 +180,7 @@ func ServeReload(w http.ResponseWriter, r *http.Request) {
 
 // A view of an app runs in a frame of the page, which cannot read what a refused request of it got: the hub's refusal
 // of a slot by path is a line of its log with the view's trace, and for the frame a page that tells the page above
-// (hlViewError, as the machine's own refusal of a view does), so the card names the cause (HRN-976).
+// (hlViewError, as the machine's own refusal of a view does), so the card names the cause.
 
 var (
 	errPreviewOffline = httpx.New(http.StatusBadGateway, "machine_offline", "машина не на связи с хабом")

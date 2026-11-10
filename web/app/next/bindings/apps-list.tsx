@@ -63,6 +63,7 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
             installed={(list?.apps ?? []).map((a) => a.id)}
             limit={starter ? 3 : undefined}
             onOpen={open}
+            ask={list?.permissionsOff !== true}
           />
         </>
       }

@@ -1,4 +1,4 @@
-// The art library of a video's board (HRN-652): heroes, things and backdrops drawn in code, flat and rounded, in the colours of
+// The art library of a video's board: heroes, things and backdrops drawn in code, flat and rounded, in the colours of
 // the deck's theme. Load it after tk.js, then the packs you use (heroes.js, props.js, backdrops.js).
 //   <svg data-tk-art="hero-round"></svg>     a place for a drawing: the runtime fills it before your motion builds
 //   tk.art('prop-chart', container)          or draw one from the code; returns the <svg>

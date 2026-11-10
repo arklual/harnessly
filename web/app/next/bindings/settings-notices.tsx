@@ -3,7 +3,7 @@
 // ▶ plays a sound.
 import { useState } from 'react';
 import { useKeyHint } from '@/next/features/keys/keys-help';
-import NoticesSection from '@/next/features/settings/notices-section';
+import NoticesSection, { type TNoticeShow } from '@/next/features/settings/notices-section';
 import {
   SYSTEM_PERMISSION,
   askSystemPermission,
@@ -26,6 +26,13 @@ const showSample = () => {
   });
 };
 
+/** A switch of «Что показывать» as the settings it changes. */
+const showPatch = (show: TNoticeShow, on: boolean): Parameters<typeof setNotify>[0] => {
+  if (show === 'broken') return { kinds: { failed: on, limit: on } };
+  if (show === 'machine') return { machine: on };
+  return { kinds: { [show]: on } };
+};
+
 export const NoticesPage = () => {
   const settings = useNotify();
   const [permission, setPermission] = useState(systemPermission);
@@ -35,9 +42,7 @@ export const NoticesPage = () => {
       settings={settings}
       permission={permission}
       noticeKey={noticeKey}
-      onShow={(show, on) =>
-        setNotify({ kinds: show === 'broken' ? { failed: on, limit: on } : { [show]: on } })
-      }
+      onShow={(show, on) => setNotify(showPatch(show, on))}
       onSummary={(summary) => setNotify({ summary })}
       onSound={(sound) => setNotify({ sound })}
       onSoundOf={(sound, on) => setNotify({ sounds: { [sound]: on } })}

@@ -37,7 +37,7 @@ interface IDialogProps extends IFileShareProps {
 const Dialog = ({ machine, conv, path, open, onClose, doc, onDoc }: IDialogProps) => {
   const gate = useProjectAccess(docRef(doc.slug));
   const { reload } = gate;
-  // HRN-675: the one dialog of every kind where the gateway answers the common access API; the older one otherwise.
+  // the one dialog of every kind where the gateway answers the common access API; the older one otherwise.
   const shared = useResourceView('doc', doc.slug, gate.state.k === ACCESS.ready);
   const { reload: reloadShared } = shared;
   // The dialog shows what the gateway holds now, not what it held when it was last open.

@@ -22,19 +22,19 @@ const Drop = ({ drop, now, onBack }: { drop: IDrop; now: number; onBack: TBack }
   const { item, what } = drop;
   const back = () => onBack(item.key, el.current?.getBoundingClientRect() ?? null, snap(el.current));
   return (
-    <li ref={el} className="hx-drop" data-drop-key={item.key} data-open={open || undefined}>
-      <div className="hx-drop__line">
-        <button type="button" className="hx-drop__main" onClick={back}>
+    <li ref={el} className="hx-sn-drop" data-drop-key={item.key} data-open={open || undefined}>
+      <div className="hx-sn-drop__line">
+        <button type="button" className="hx-sn-drop__main" onClick={back}>
           <Chip item={item} now={now} sent={false} />
-          <span className="hx-drop__lines">
-            <b className="hx-drop__title">{item.title}</b>
-            <span className="hx-drop__text">{item.text}</span>
+          <span className="hx-sn-drop__lines">
+            <b className="hx-sn-drop__title">{item.title}</b>
+            <span className="hx-sn-drop__text">{item.text}</span>
           </span>
         </button>
         {what !== null && (
           <button
             type="button"
-            className="hx-drop__more"
+            className="hx-sn-drop__more"
             aria-expanded={open}
             aria-label={t(open ? 'next.smart.drops.less' : 'next.smart.drops.more')}
             onClick={() => setOpen((was) => !was)}
@@ -44,14 +44,14 @@ const Drop = ({ drop, now, onBack }: { drop: IDrop; now: number; onBack: TBack }
         )}
       </div>
       <div
-        className="hx-drop__fold"
+        className="hx-sn-drop__fold"
         data-state={more.mounted && more.state === PRESENCE.closing ? 'closing' : undefined}
       >
-        <div className="hx-drop__inner">
+        <div className="hx-sn-drop__inner">
           {more.mounted && what !== null && (
             <>
-              <p className="hx-drop__what">{what}</p>
-              <button type="button" className="hx-drop__answer" onClick={back}>
+              <p className="hx-sn-drop__what">{what}</p>
+              <button type="button" className="hx-sn-drop__answer" onClick={back}>
                 {t('next.smart.answer')}
               </button>
             </>
@@ -65,8 +65,8 @@ const Drop = ({ drop, now, onBack }: { drop: IDrop; now: number; onBack: TBack }
 const Drops = ({ drops, now, onBack }: { drops: readonly IDrop[]; now: number; onBack: TBack }) => {
   if (drops.length === 0) return null;
   return (
-    <section className="hx-drops" aria-label={t('next.smart.drops.title')}>
-      <ul className="hx-drops__list">
+    <section className="hx-sn-drops" aria-label={t('next.smart.drops.title')}>
+      <ul className="hx-sn-drops__list">
         {drops.map((drop) => (
           <Drop key={drop.item.key} drop={drop} now={now} onBack={onBack} />
         ))}

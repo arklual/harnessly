@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 )
 
-// HRN-852: an app reaches the agent's browser of its chat only with browser.read (to look) or browser.drive (to act),
+// an app reaches the agent's browser of its chat only with browser.read (to look) or browser.drive (to act),
 // only through the tools of its right, never a password's, a file's or a script's.
 func TestAppBrowserRoute(t *testing.T) {
 	call, conv := appRig(t)

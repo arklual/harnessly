@@ -49,6 +49,18 @@ func (f *healthHost) step(h *HealthMonitor, d time.Duration, busyShare float64) 
 	return h.Sample()
 }
 
+// settleFor is long enough for the swap-in window to forget and a level to leave.
+var settleFor = HealthLimits.swapWindow + HealthLimits.fallAfter
+
+// settle holds the figures as they are past the longest hold, and samples.
+func (f *healthHost) settle(h *HealthMonitor, busyShare float64) wire.MachineHealth {
+	var got wire.MachineHealth
+	for elapsed := time.Duration(0); elapsed <= settleFor; elapsed += HealthEvery {
+		got = f.step(h, HealthEvery, busyShare)
+	}
+	return got
+}
+
 func (f *healthHost) monitor() *HealthMonitor {
 	f.write()
 	return NewHealthMonitor(HealthDeps{ProcRoot: f.root, Path: "/", Now: func() time.Time { return f.now },
@@ -84,7 +96,7 @@ func TestHealthDisk(t *testing.T) {
 	}
 	for i, c := range cases {
 		f.free = c.free
-		got := f.step(h, HealthEvery, 0.1)
+		got := f.settle(h, 0.1)
 		if levelOf(got, wire.HealthDisk) != c.want || got.Level != c.want {
 			t.Fatalf("case %d (%.1f GiB free): %+v, want %s", i, c.free/gib, got, c.want)
 		}
@@ -94,7 +106,7 @@ func TestHealthDisk(t *testing.T) {
 	}
 	// A small disk: the absolute line rules.
 	f.total, f.free = 20*gib, 2.5*gib
-	if got := f.step(h, HealthEvery, 0.1); levelOf(got, wire.HealthDisk) != wire.HealthCritical {
+	if got := f.settle(h, 0.1); levelOf(got, wire.HealthDisk) != wire.HealthCritical {
 		t.Fatalf("2.5 of 20 GiB: %+v", got)
 	}
 }
@@ -113,31 +125,74 @@ func TestHealthMemoryAndSwap(t *testing.T) {
 		{90, 0, wire.HealthWarn},
 		{83, 0, wire.HealthWarn},
 		{80, 0, wire.HealthOK},
-		{60, 5 * 600, wire.HealthCritical}, // 600 pages/s swapped in over 5 s
+		{60, 5 * 600, wire.HealthCritical}, // 600 pages/s swapped in, all the while
 		{60, 0, wire.HealthOK},
 	}
 	for i, s := range steps {
 		f.usedPct = s.used
-		f.swapIn += s.swapPages
-		if got := levelOf(f.step(h, HealthEvery, 0.1), wire.HealthMem); got != s.want {
-			t.Fatalf("step %d: %s, want %s", i, got, s.want)
+		var got wire.MachineHealth
+		for elapsed := time.Duration(0); elapsed <= settleFor; elapsed += HealthEvery {
+			f.swapIn += s.swapPages
+			got = f.step(h, HealthEvery, 0.1)
 		}
+		if levelOf(got, wire.HealthMem) != s.want {
+			t.Fatalf("step %d: %s, want %s", i, levelOf(got, wire.HealthMem), s.want)
+		}
+	}
+}
+
+// A burst is not said: swap-in over one sample is judged over the window, a level over the line comes once it held, and
+// leaves once it is gone for a minute, so a machine whose load jumps for a few seconds never blinks red.
+func TestHealthHoldsBeforeSaying(t *testing.T) {
+	f := newHealthHost(t)
+	h := f.monitor()
+	f.settle(h, 0.1)
+	f.swapIn += 5 * 2000 // 2000 pages/s for one sample: 333 pages/s over the window
+	for i := 0; i < 8; i++ {
+		if got := f.step(h, HealthEvery, 0.1); got.Level == wire.HealthCritical {
+			t.Fatalf("a 5 s swap burst, sample %d: %+v", i, got)
+		}
+	}
+	f.settle(h, 0.1)
+	f.usedPct = 97
+	for i := 0; i < 3; i++ { // 15 s over the line: not yet
+		if got := f.step(h, HealthEvery, 0.1); got.Level != wire.HealthOK {
+			t.Fatalf("after %d s over: %+v", (i+1)*5, got)
+		}
+	}
+	f.usedPct = 40
+	f.step(h, HealthEvery, 0.1)
+	f.usedPct = 97
+	for i := 0; i < 3; i++ { // the burst before does not count: the hold starts again
+		if got := f.step(h, HealthEvery, 0.1); got.Level != wire.HealthOK {
+			t.Fatalf("again after %d s: %+v", (i+1)*5, got)
+		}
+	}
+	f.step(h, HealthEvery, 0.1)
+	if got := f.step(h, HealthEvery, 0.1); got.Level != wire.HealthCritical {
+		t.Fatalf("after 25 s over: %+v", got)
+	}
+	f.usedPct = 40
+	for i := 0; i < 12; i++ { // fine from the first of these samples, 55 s later: still said
+		if got := f.step(h, HealthEvery, 0.1); got.Level != wire.HealthCritical {
+			t.Fatalf("after %d s fine: %+v", i*5, got)
+		}
+	}
+	if got := f.step(h, HealthEvery, 0.1); got.Level != wire.HealthOK {
+		t.Fatalf("after a minute fine: %+v", got)
 	}
 }
 
 func TestHealthCPUNeedsTwoMinutes(t *testing.T) {
 	f := newHealthHost(t)
 	h := f.monitor()
-	for i := 0; i < 23; i++ { // 115 s at full load: not yet
+	for i := 0; i < 28; i++ { // the window fills at 125 s, then the level holds 20 s: not yet at 140 s
 		if got := levelOf(f.step(h, HealthEvery, 1), wire.HealthCPU); got != wire.HealthOK {
 			t.Fatalf("after %d s: %s", (i+1)*5, got)
 		}
 	}
-	for i := 0; i < 2; i++ {
-		f.step(h, HealthEvery, 1)
-	}
 	if got := f.step(h, HealthEvery, 1); levelOf(got, wire.HealthCPU) != wire.HealthWarn || got.Level != wire.HealthWarn {
-		t.Fatalf("after 2 min busy: %+v", got)
+		t.Fatalf("after 145 s busy: %+v", got)
 	}
 	// One quiet sample does not end it; a quiet window does.
 	if got := levelOf(f.step(h, HealthEvery, 0), wire.HealthCPU); got != wire.HealthWarn {
@@ -158,13 +213,13 @@ func TestHealthIssuesWorstFirst(t *testing.T) {
 	f := newHealthHost(t)
 	h := f.monitor()
 	f.usedPct, f.free = 88, 2*gib
-	got := f.step(h, HealthEvery, 0.1)
+	came := f.now.Add(HealthLimits.riseAfter).UnixMilli() + HealthEvery.Milliseconds()
+	got := f.settle(h, 0.1)
 	want := []wire.HealthIssue{{Metric: wire.HealthDisk, Level: wire.HealthCritical}, {Metric: wire.HealthMem, Level: wire.HealthWarn}}
-	if got.Level != wire.HealthCritical || fmt.Sprint(got.Issues) != fmt.Sprint(want) || got.Since != f.now.UnixMilli() {
-		t.Fatalf("%+v", got)
+	if got.Level != wire.HealthCritical || fmt.Sprint(got.Issues) != fmt.Sprint(want) || got.Since != came {
+		t.Fatalf("%+v, since want %d", got, came)
 	}
 	// The level holds: since stays where it came to it.
-	came := got.Since
 	if again := f.step(h, HealthEvery, 0.1); again.Since != came {
 		t.Fatalf("since moved: %+v", again)
 	}
@@ -172,7 +227,7 @@ func TestHealthIssuesWorstFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.usedPct, f.free = 40, 50*gib
-	if got := f.step(h, HealthEvery, 0.1); got.Level != wire.HealthOK || got.Issues == nil || len(got.Issues) != 0 {
+	if got := f.settle(h, 0.1); got.Level != wire.HealthOK || got.Issues == nil || len(got.Issues) != 0 {
 		t.Fatalf("%+v", got)
 	}
 }

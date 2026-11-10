@@ -68,8 +68,10 @@ harnessly app enable acme.board
   отвечает 401. `validate` предупреждает, если находит такой в `ui/`.
 - Модули, `fetch` собственных файлов вида и шрифты работают с хоста 0.16.198: файлы раздаются с сессией в пути и отвечают CORS
   непрозрачному origin фрейма. Раньше грузились только классические скрипты.
-- Типы `window.harnessly` лежат в `src/app-sdk.d.ts` (копия `/__hl/app-sdk.d.ts`). Пакет npm `@harnessly/app-sdk` содержит те же типы
-  и ES-модуль для сборщика, который его импортирует: `import { connect } from '@harnessly/app-sdk'`.
+- Типы `window.harnessly` лежат в `src/app-sdk.d.ts` (копия `/__hl/app-sdk.d.ts`). Пакет `@harnessly/app-sdk` содержит те же типы
+  и ES-модуль для сборщика, который его импортирует: `import { connect } from '@harnessly/app-sdk'`. В npm его нет: он лежит
+  в [репозитории](https://github.com/ly-solutions/harnessly) (`internal/apps/sdk`); `scripts/app-sdk-package.sh` собирает его
+  в `dist/app-sdk-npm`, а `npm install <путь>/dist/app-sdk-npm` подключает к приложению.
 - Без `network` в манифесте из вида ничего не уходит (`fetch` на внешний адрес отклонён, см. [Бэкенд](03-backend.md)). Раздаётся
   только то, что в `ui/`: исходники держите в `src/`, снаружи.
 

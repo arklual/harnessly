@@ -1,4 +1,4 @@
-// The design's chats on every machine of the person (HRN-675). A design is the same project on each machine (the
+// The design's chats on every machine of the person. A design is the same project on each machine (the
 // library is shared), and each machine knows its own chats of it: the ones started from it and the ones that edited its
 // files. The open machine's answer comes with its library; the others are asked when the design opens and again each
 // time the switch opens, the way the sidebar lists the chats of every machine.

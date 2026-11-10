@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// The registry of contributions (HRN-691): everything an installed app puts into the host is one record {owner, kind,
+// The registry of contributions: everything an installed app puts into the host is one record {owner, kind,
 // id, target, spec}. A kind of contribution is described once, in contributionTable: its name, what it is, the targets
 // it shows in and how it is read from a manifest. The list of the machine is made from the installed apps, so removing an
 // app takes all its records away in one operation (Contributions.Without), and nobody keeps a copy that outlives it.

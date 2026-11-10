@@ -1,4 +1,4 @@
-// The consent of an app where the person already is (HRN-915): a card in the chat whose agent installed it (over the
+// The consent of an app where the person already is: a card in the chat whose agent installed it (over the
 // field and in its right pane) and a bar over the app's own window. Everything or nothing: one «Разрешить» agrees to
 // the whole list the card stands for, «Подробнее» opens the install screen with every line. The buttons are the host's,
 // never the app's frame, and a click is the person's: an agent has no route to agree (internal/apps consent.go).
@@ -278,7 +278,7 @@ export const ConsentStage = ({ machine, app, children }: IConsentStageProps) => 
   const waiting = useConsentApps(machine, listed !== null, true);
   const now = waiting === null ? app : (waiting.find((a) => a.id === app.id) ?? null);
   // One ask per answer, not per render: usePresence takes a new object for a new ask and sets its state again, so a
-  // fresh object each render looped (React #301, a blank /apps/<id> while the app waits, HRN-976).
+  // fresh object each render looped (React #301, a blank /apps/<id> while the app waits).
   const ask = useMemo(() => (now === null ? null : consentAskOf(now)), [now]);
   // Agreed somewhere else: the installed list is read again once, so the window starts here without a reload.
   const told = useRef<string | null>(null);

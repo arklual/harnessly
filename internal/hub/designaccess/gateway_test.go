@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// HRN-880: the designs' access moves from the gateway to the hub once, for everyone, as a release step: a dry run says
+// the designs' access moves from the gateway to the hub once, for everyone, as a release step: a dry run says
 // what would move and writes nothing; the move copies what the hub lacks, keeps what it has, never runs twice for a
 // project, and finds the hub machine of every gateway pair or says why not.
 

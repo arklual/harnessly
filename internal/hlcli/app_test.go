@@ -193,7 +193,7 @@ func TestAppGuardCodexJournalsRefusal(t *testing.T) {
 	}
 }
 
-// HRN-852: after the rules, the guard asks the runtime for the word of the apps' hooks: a stop goes out marked as the
+// after the rules, the guard asks the runtime for the word of the apps' hooks: a stop goes out marked as the
 // app's, a context goes to the agent, and a runtime that cannot be asked stops the call only for a strict app.
 func TestAppGuardAsksHooks(t *testing.T) {
 	write := func(snap apps.Snapshot) string {

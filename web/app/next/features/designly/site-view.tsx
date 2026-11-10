@@ -117,7 +117,7 @@ import '@/next/styles/site.css';
 import '@/next/styles/site-tools.css';
 import '@/next/styles/site-pane.css';
 
-/** A board that loaded but did not say it is drawn (a failed script) leaves the loader after this long, ms (HRN-900). */
+/** A board that loaded but did not say it is drawn (a failed script) leaves the loader after this long, ms. */
 const DRAW_WAIT_MS = 8000;
 const POP_MS = 200;
 /** The pill under the page in the pane: a device keeps this much free under it (the pill, its gap and its margin). */
@@ -164,7 +164,7 @@ export interface ISiteAccess {
   label: string;
   onOpen: () => void;
   /** A deck or a video opens its older share popover instead of the dialog: only where the gateway has no one dialog
-   *  (HRN-675, stage «д»). */
+   *  (stage «д»). */
   manage?: boolean;
 }
 
@@ -191,7 +191,7 @@ export interface ISiteMode {
   /** The way to the other mode (the switch's other part); null: there is none, the mode is a label. ask: editing is
       not allowed, its part asks for access. */
   action: { onClick: () => void; ask: boolean } | null;
-  /** «Версии» of the project beside the switch (HRN-903); absent where the project has no history to show. */
+  /** «Версии» of the project beside the switch; absent where the project has no history to show. */
   versions?: { open: boolean; onToggle: () => void };
 }
 
@@ -249,7 +249,7 @@ export interface ISiteViewProps {
   full?: boolean;
   /** Set where the gateway keeps the project's access and the person has something to do there. */
   access?: ISiteAccess;
-  /** The kit the project is made from (HRN-897): its chip on the bar, before the share button. */
+  /** The kit the project is made from: its chip on the bar, before the share button. */
   kit?: ReactNode;
   /** «Скачать» (project-downloads.tsx) on the bar, in «Ещё», on a page's row and tab: the project of the pages. */
   downloads?: Omit<IProjectDownloadsOf, 'board'>;
@@ -432,7 +432,7 @@ const SiteView = ({
   const [browserId, setBrowserId] = useState<string | null>(memory.initial.browser);
   const [bars, setBars] = useState<TBars>(BARS.full);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  // A board of the library says when it is drawn (tk:drawn, after lib-ready): its frame is loading until then (HRN-900).
+  // A board of the library says when it is drawn (tk:drawn, after lib-ready): its frame is loading until then.
   const [libReadyFor, setLibReadyFor] = useState<string | null>(null);
   const [drawnFor, setDrawnFor] = useState<string | null>(null);
   const [drawGaveUp, setDrawGaveUp] = useState<string | null>(null);
@@ -789,7 +789,7 @@ const SiteView = ({
     anchorStore.set(null);
     // Asked again when the page of this frame has loaded already (the effect runs for other reasons too); a page still
     // on its way says «hello» itself, and onLoad asks. A board's script said its word at its load: the editing mode
-    // that comes after it is told it straight away (HRN-820).
+    // that comes after it is told it straight away.
     if (libFor.current === key) toLib();
     ping();
     const onMessage = (event: MessageEvent) => {
@@ -926,7 +926,7 @@ const SiteView = ({
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
     // slotOf reads the frame of this src; a new function each render must not listen again. The editing mode that comes
-    // over a page already loaded asks again: the page said its hello before there was a stage to hear it (HRN-820).
+    // over a page already loaded asks again: the page said its hello before there was a stage to hear it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src, reloadKey, staged]);
   useEffect(() => {

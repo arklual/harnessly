@@ -346,7 +346,7 @@ func TestSetupOffChangesHelloWithoutARestart(t *testing.T) {
 }
 
 // The runtime's heartbeat going stale and fresh again (a start, a long run) does not cut the link: the offer has to hold
-// for relinkSettle, and then one call tells the hub (HRN-901).
+// for relinkSettle, and then one call tells the hub.
 func TestRunnerBeatFlapDoesNotCallTheHubAgain(t *testing.T) {
 	was := relinkSettle
 	relinkSettle = 6 * time.Second

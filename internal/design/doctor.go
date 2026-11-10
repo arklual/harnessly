@@ -21,7 +21,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// The render doctor (HRN-744). "Chrome and ffmpeg are on PATH" says nothing about whether a picture or a video comes
+// The render doctor. "Chrome and ffmpeg are on PATH" says nothing about whether a picture or a video comes
 // out: a Chrome without a sandbox, a missing font set or an ffmpeg without x264 all pass that test and fail on the first
 // export. The doctor draws a real frame with the built-in engine's own browser pipeline, encodes a two-second MP4 with
 // its own ffmpeg command line and reads the result back with ffprobe, step by step, each step with a code of its own.

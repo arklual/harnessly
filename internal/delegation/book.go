@@ -29,7 +29,7 @@ type Page struct {
 	Woken string `json:"woken,omitempty"`
 	Wakes int    `json:"wakes,omitempty"`
 	// Contract: the chat was started with the rules of a delegated chat (see Rules): its final answer ends with a
-	// marker, and a turn that ends without one is a pause the platform answers with a reminder (HRN-828). Chats that
+	// marker, and a turn that ends without one is a pause the platform answers with a reminder. Chats that
 	// were delegated before the rules existed are not held to them.
 	Contract bool `json:"contract,omitempty"`
 	// Nudges are the reminders sent since AskedAt, Nudged the turn (or the end) the last one was for, Judged the turn

@@ -2174,7 +2174,7 @@ const (
 	// FeatureAgentBrowser exposes the conversation browser socket; it does not imply agent tools are installed.
 	FeatureAgentBrowser Feature = "agent-browser"
 	// FeatureSnapshotAfter: a conversation's snapshot after an entry (SubFrame.AfterEntryID) carries every turn from that
-	// entry's own on as it is now, so a page drawn from elsewhere learns the turn's state (HRN-879).
+	// entry's own on as it is now, so a page drawn from elsewhere learns the turn's state.
 	FeatureSnapshotAfter Feature = "snapshot-after"
 )
 

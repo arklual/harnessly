@@ -27,7 +27,7 @@ type Org struct {
 	Currency  string
 	CreatedBy string
 	CreatedAt time.Time
-	// AppsConsent is the organization's rule for apps (HRN-915): AppsConsentAsk, the default, or AppsConsentAuto.
+	// AppsConsent is the organization's rule for apps: AppsConsentAsk, the default, or AppsConsentAuto.
 	AppsConsent string
 }
 

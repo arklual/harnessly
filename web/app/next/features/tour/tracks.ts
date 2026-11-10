@@ -1,4 +1,4 @@
-// The lessons of the hands-on tour: Sinopia on the demo projects of Relay (HRN-813), each step a real action.
+// The lessons of the hands-on tour: Sinopia on the demo projects of Relay, each step a real action.
 // Targets are the product's own elements; a step inside the board itself (a click on the page, a text edited there)
 // is not seen by the shell, so it ends with the person's «Done».
 import type { ITourEnv, ITourStage, ITourStep, ITourTrack } from '@/next/features/tour/model';
@@ -228,7 +228,7 @@ const NAV = (i: number) => `.hx-nav__group[data-i="${i}"] .hx-nav__item`;
 const NEW_CHAT = NAV(0);
 const SEARCH = NAV(1);
 const BELL = '.hx-user__bell';
-// «Ещё» is the last of the sidebar's places (HRN-843): the lessons live in its menu.
+// «Ещё» is the last of the sidebar's places: the lessons live in its menu.
 const MORE = NAV(4);
 const FIELD = '.hx-composer__layer';
 const ROUND = (icon: string) => `.hx-composer__bar .hx-round:has(.hx-icon[data-i="${icon}"])`;

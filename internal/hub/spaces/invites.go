@@ -57,7 +57,7 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 	var req struct {
 		Emails []string
 		Role   string
-		// TeamID is a team of the space the people join with their invitation (HRN-762).
+		// TeamID is a team of the space the people join with their invitation.
 		TeamID string
 	}
 	if err := httpx.Decode(r, &req); err != nil {
@@ -133,7 +133,7 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 	out, joined := []InviteView{}, []string{}
 	for _, email := range emails {
 		if uid, ok := memberID[email]; ok {
-			// Already in the tenant: no letter, but the team the owner named takes them at once (HRN-970: before, the
+			// Already in the tenant: no letter, but the team the owner named takes them at once (before, the
 			// address was dropped silently and the person never reached the team or its machines).
 			if req.TeamID != "" {
 				if err := st.AddTeamMember(ctx, req.TeamID, uid, false, now); err != nil {
@@ -428,7 +428,7 @@ func (s *Service) acceptInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 		return map[string]any{"space": auth.SpaceRef{ID: sp.ID, Slug: sp.Slug, Name: sp.Name, Role: role}}
 	}
 
-	// Someone who is in the space already is not an error: the link takes them there, and into its team (HRN-970).
+	// Someone who is in the space already is not an error: the link takes them there, and into its team.
 	if role, err := st.Role(ctx, sp.ID, p.User.ID); err != nil {
 		return err
 	} else if role != "" {

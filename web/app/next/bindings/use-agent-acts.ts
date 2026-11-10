@@ -1,6 +1,6 @@
-// The agent's hands in the open browser tab (HRN-678): while the page is in view, the tab waits for the next action the
+// The agent's hands in the open browser tab: while the page is in view, the tab waits for the next action the
 // chat's agent asks for, moves the agent's cursor to the element, has the page's frame do the action and tells the
-// machine how it ended. One action at a time. The agent is not asked for on a site (HRN-681): the person sees its
+// machine how it ended. One action at a time. The agent is not asked for on a site: the person sees its
 // cursor, and the sites they blocked in Settings → General refuse at once.
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {

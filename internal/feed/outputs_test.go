@@ -146,7 +146,7 @@ func TestAHandedOverFileIsACard(t *testing.T) {
 	}
 }
 
-// HRN-630: the feed vouches for a handed-over file by the sha256 of its latest hand-over, and for nothing it only wrote.
+// the feed vouches for a handed-over file by the sha256 of its latest hand-over, and for nothing it only wrote.
 func TestDeliveredIsTheLatestHandOver(t *testing.T) {
 	first := delivery.Info{Path: "/tmp/r.md", Name: "r.md", Mime: "text/markdown", Size: 1, SHA256: "aa"}
 	second := first
@@ -167,7 +167,7 @@ func TestDeliveredIsTheLatestHandOver(t *testing.T) {
 	}
 }
 
-// HRN-943: what `open` showed is a card by the exact kind of its address. A document the platform's reader shows is a
+// what `open` showed is a card by the exact kind of its address. A document the platform's reader shows is a
 // page, not a stand; a stand is one name under the stands' domain, a dev server a port of this machine; any other site
 // makes no card. The deployment's name of the command is read as `harnessly open` is.
 func TestOpenedAddressIsItsOwnKind(t *testing.T) {

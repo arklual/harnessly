@@ -1,7 +1,7 @@
 // The public catalog on /apps: what anyone offers, as cards, found with the header's search; nothing is drawn while it
 // is empty.
 // An install is two steps on purpose: the first opens the install screen with everything the app reaches and the
-// warning that apps are not checked (HRN-849), the second installs.
+// warning that apps are not checked, the second installs.
 import { useState } from 'react';
 import { Button } from '@/next/ui/button';
 import AppTile from '@/next/features/app-catalog/app-tile';
@@ -23,6 +23,7 @@ const PublicCatalog = ({
   installed,
   limit,
   onOpen,
+  ask = true,
 }: {
   catalog: IPublicState;
   installed: readonly string[];
@@ -30,6 +31,8 @@ const PublicCatalog = ({
   limit?: number;
   /** A card opens the page of the app. */
   onOpen?: (id: string) => void;
+  /** The install screen with the app's rights comes first; false when the machine's permissions are off. */
+  ask?: boolean;
 }) => {
   const { entries, error, busy, failure, install } = catalog;
   // The row that shows its rights, waiting for the person's word.
@@ -65,7 +68,11 @@ const PublicCatalog = ({
                 onOpen={onOpen && (() => onOpen(entry.id))}
                 action={
                   refusalOf(entry.check) === null && (
-                    <Button size="sm" disabled={busy !== null} onClick={() => setAsking(entry.id)}>
+                    <Button
+                      size="sm"
+                      disabled={busy !== null}
+                      onClick={() => (ask ? setAsking(entry.id) : void install(entry))}
+                    >
                       {t('next.apppublic.install')}
                     </Button>
                   )

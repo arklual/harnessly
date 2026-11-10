@@ -1501,7 +1501,7 @@ test('8. the new project dialog lists folders of the machine', async () => {
 });
 
 test('8b. «More» in the sidebar opens the statistics and the efficiency as pages', async () => {
-  // «More» is a menu beside the item (HRN-843).
+  // «More» is a menu beside the item.
   await page.locator('.hx-nav__item').filter({ hasText: 'More' }).click();
   await page.getByRole('menuitem', { name: 'Statistics' }).click();
   await expect(page.locator('.hx-lscreen[data-screen="stats"]')).toBeVisible();
@@ -1692,7 +1692,7 @@ test('10. a new design opens with its chat; an edit picked on its page goes to t
     await page.mouse.move(end.x, end.y, { steps: 12 });
     await page.mouse.up();
   };
-  // A design opens with its chat docked on the left (HRN-845); the island is the person's pick, and it stays picked.
+  // A design opens with its chat docked on the left; the island is the person's pick, and it stays picked.
   await expect(section).toHaveAttribute('data-mode', 'chat');
   await page.locator('.hx-placement__btn').click();
   await page.getByRole('menuitemradio', { name: /Island/ }).click();
@@ -2057,7 +2057,7 @@ test('10b. the page is shown with its live settings and its DevTools: the elemen
 
 test('11. «Apps» is the first of «More»: the tracker’s epics and stale tasks from the machine, GitLab (the stand-in of 7f) holds nothing for the person, and picked rows go to a new chat as mentions', async () => {
   const kids = page.getByRole('menuitem');
-  // «More» is a menu beside the item (HRN-843): opened for each visit.
+  // «More» is a menu beside the item: opened for each visit.
   const openApps = async () => {
     await page.locator('.hx-nav__item').filter({ hasText: 'More' }).click();
     await kids.first().click();
@@ -2293,7 +2293,7 @@ test('12. Settings opens from the profile menu, the Apps screen and the machine 
   await set.locator('.hx-app-card').first().getByRole('button', { name: 'Open' }).click();
   await expect(page).toHaveURL(/\/tasks$/);
 
-  // 6. The machines are set up in the settings (the footer's machine chip left the sidebar, HRN-843).
+  // 6. The machines are set up in the settings (the footer's machine chip left the sidebar).
   await page.goto(at('/settings/machines'));
   await expect(nav.filter({ hasText: 'Machines' })).toHaveAttribute('aria-current', 'true');
 });

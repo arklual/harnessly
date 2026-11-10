@@ -57,6 +57,8 @@ func designDeckBodyRoutes(d deps) []gate.BodyRoute {
 		{Slice: "design", Match: at("/pptx-style"), Serve: a.DeckPptxStyle},
 		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/kit/import") }, Serve: a.KitImport},
 		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/kit/export") }, Serve: a.KitExport},
+		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/pack/import") }, Serve: a.PackImport},
+		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/pack/export") }, Serve: a.PackExport},
 		{Slice: "design", Match: at("/rec/chunk"), Serve: a.DeckRecChunk},
 		{Slice: "design", Match: at("/rec/media"), Serve: a.DeckRecMedia},
 		{Slice: "design", Match: at("/export/file"), Serve: a.DeckExportFile},

@@ -3,6 +3,7 @@ package hlcli
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,7 +28,7 @@ harnessly design kit export <id> [--version V] [--out FILE] [--with-sources] [--
 harnessly design kit import <file-or-url> [--as-id ID] [--as-version V] [--dry-run] [--dir DIR] [--header 'Name: value']
 harnessly design kit search <id> <words…> [--theme T] [--version V] [--dir DIR]
 harnessly design kit show <id> <node> [--theme T] [--version V] [--dir DIR]
-harnessly design kit check <folder> [--render] [--json]
+harnessly design kit check <folder> [--render] [--levels] [--json]
 harnessly design kit render <folder> [--shots] [--only ID,ID] [--json]
 
 A UI kit is installed once by version and boards load it from /kit/<id>/<version>/... instead of carrying a copy.
@@ -59,7 +60,8 @@ A UI kit is installed once by version and boards load it from /kit/<id>/<version
             replace the components with yours and check after each change.
   check     check a kit folder before packing it (or a project's ds/<folder>/): its identity, the canvas fields,
             tokens.json's shape, a card and a purpose for every component, the bundle's place and styles. Errors
-            make it exit 1. --render also draws every component and layout (see render). The contract:
+            make it exit 1. --render also draws every component and layout (see render). The summary says how far the
+            kit is built out (levels 0-3, no findings); --levels lists every component with what it lacks. The contract:
             harnessly docs read agents/design-kits.
   render    draw every component (its sample and first variant) and every layout of a kit folder in this machine's
             headless Chrome through the pages the kit screen uses, and report script errors, files that do not load
@@ -120,7 +122,7 @@ type kitOptions struct {
 	withSources, acceptRestricted bool
 	dryRun                        bool
 	json                          bool
-	render, shots                 bool
+	render, shots, levels         bool
 	only                          string
 	id, namespace, title, source  string
 }
@@ -159,6 +161,8 @@ func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
 			o.json = true
 		case "render":
 			o.render = true
+		case "levels":
+			o.levels = true
 		case "shots":
 			o.shots = true
 		case "only":
@@ -507,7 +511,7 @@ func (c *cli) kitCheck(opt kitOptions, pos []string) error {
 	} else if opt.render {
 		c.out("the render is skipped until the errors above are fixed\n")
 	}
-	if opt.json {
+	if opt.json || c.json {
 		raw, _ := json.MarshalIndent(rep, "", "  ")
 		c.out("%s\n", raw)
 	} else {
@@ -519,6 +523,7 @@ func (c *cli) kitCheck(opt kitOptions, pos []string) error {
 			c.out("%-7s [%s] %s: %s\n", p.Level, p.Rule, p.File, p.Message)
 		}
 		c.out("%d themes, %d components: %d errors, %d warnings\n", len(rep.Themes), rep.Components, rep.Errors(), len(rep.Problems)-rep.Errors())
+		c.readiness(rep, opt.levels)
 	}
 	if rep.Errors() > 0 {
 		return fail("the kit has %d errors", rep.Errors())
@@ -607,4 +612,41 @@ func (c *cli) kitInit(opt kitOptions, pos []string) error {
 	}
 	c.out("\nA %s kit %s in %s. Next: harnessly docs read agents/design-kits; replace the components; harnessly design kit check %s --render\n", source, opt.id, pos[0], pos[0])
 	return nil
+}
+
+// readiness prints how far the kit is built out: a count per level, the kit's own level and what it lacks, and with
+// --levels every component. It is a summary, never a finding: the exit code does not depend on it.
+func (c *cli) readiness(rep *designkit.CheckReport, all bool) {
+	if len(rep.Readiness) == 0 {
+		return
+	}
+	counts := make([]int, designkit.TopLevel+2) // index 0 is level -1
+	for _, r := range rep.Readiness {
+		counts[r.Level+1]++
+	}
+	parts := []string{}
+	for lv := -1; lv <= designkit.TopLevel; lv++ {
+		if n := counts[lv+1]; n > 0 {
+			parts = append(parts, fmt.Sprintf("level %d: %d", lv, n))
+		}
+	}
+	c.out("readiness: %s; the kit is at level %d", strings.Join(parts, ", "), rep.Level)
+	if rep.Next != "" {
+		c.out(" (next: %s)", rep.Next)
+	}
+	c.out("\n")
+	if !all {
+		return
+	}
+	for _, r := range rep.Readiness {
+		name := r.Name
+		if r.Of != "" {
+			name += " (preset of " + r.Of + ")"
+		}
+		c.out("  %2d  %s", r.Level, name)
+		if r.Next != "" {
+			c.out("  — %s", r.Next)
+		}
+		c.out("\n")
+	}
 }

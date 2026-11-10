@@ -1,5 +1,5 @@
 // A file a chat names, opened from a place that has no pane of its own (a design's chat column): it waits in the
-// chat's pane, in «Файлы», and the person is taken to the chat, where the pane places it (HRN-675).
+// chat's pane, in «Файлы», and the person is taken to the chat, where the pane places it.
 
 import { chatPanes } from '@/next/stores/pane-state';
 

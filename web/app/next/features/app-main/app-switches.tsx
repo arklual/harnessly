@@ -47,7 +47,7 @@ export const EnvSwitch = ({
   );
 };
 
-/** The switch of an app the person installed (HRN-849): one click turns it off everywhere at once. */
+/** The switch of an app the person installed: one click turns it off everywhere at once. */
 export const OwnSwitch = ({
   app,
   onSwitch,

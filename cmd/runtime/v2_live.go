@@ -334,7 +334,7 @@ func (c *core) v2Models(p wire.Provider) []wire.AgentModel {
 		}
 		// Claude's catalog lists ultracode among the levels --effort takes; on the wire it is a mode of its own.
 		am.Ultracode = p == wire.ProviderClaude && slices.Contains(m.Efforts, string(wire.EffortUltracode))
-		// Claude Code's /fast runs on Opus only, and only on an API key: a claude.ai subscription has none (HRN-945).
+		// Claude Code's /fast runs on Opus only, and only on an API key: a claude.ai subscription has none.
 		// Codex says which of its models have the fast tier.
 		am.Fast = m.Fast || p == wire.ProviderClaude && strings.Contains(m.ID, "opus") && c.agents.claudeOnKey()
 		if def := v2DefaultEffort(p, m, opts); def != nil && slices.Contains(am.Efforts, *def) {
@@ -455,7 +455,7 @@ func (v *v2Live) layoutTabs() []convo.ImportTab {
 		}
 	}
 	// The titles are read off the transcripts' tails, a few at a time: a hundred cold transcripts one by one took
-	// minutes after a reboot (HRN-901).
+	// minutes after a reboot.
 	var titled sync.WaitGroup
 	slots := make(chan struct{}, headlineWorkers)
 	for i := range out {
@@ -730,7 +730,7 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 			chosen.Ultracode = true
 		}
 	}
-	// The fast and permission modes the chat starts in (HRN-945); fast is Anthropic's and Codex's own, and on a profile
+	// The fast and permission modes the chat starts in; fast is Anthropic's and Codex's own, and on a profile
 	// the vendor's fast tier, which the profile's proxy asks for (the gpt profile's relay reads it off the tab).
 	// A Claude chat that names no permission mode starts in the machine's, said on the line all the same: left to the
 	// CLI, a `defaultMode` of the person's settings decided it (a GPT chat through Claude Code started in plan mode).
@@ -819,7 +819,7 @@ func (l *v2Launcher) defaultPermission() wire.PermissionMode {
 	return wire.PermissionAsk
 }
 
-// KeepModes writes the fast and permission modes the chat now runs in into its tab's launch (HRN-945).
+// KeepModes writes the fast and permission modes the chat now runs in into its tab's launch.
 func (l *v2Launcher) KeepModes(session string, fast bool, permission wire.PermissionMode) {
 	if err := l.v.c.store.SetTabLaunchModes(session, fast, string(permission)); err != nil {
 		agent.Log("warn", "v2: the chat's modes were not kept", agent.F{K: "session", V: session}, agent.F{K: "err", V: err.Error()})
@@ -845,7 +845,7 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	if err := c.store.SetTabLaunchApps(conv.Session, conv.Apps); err != nil {
 		return err
 	}
-	// So do its fast and permission modes as the chat last had them (HRN-945): the agent starts in them again. A chat
+	// So do its fast and permission modes as the chat last had them: the agent starts in them again. A chat
 	// that never chose one keeps what its tab started with.
 	if m := conv.Model; m != nil && m.Permission != "" {
 		if err := c.store.SetTabLaunchModes(conv.Session, m.Fast, string(m.Permission)); err != nil {

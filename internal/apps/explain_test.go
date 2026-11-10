@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Explain names the layer that keeps an app off (HRN-699).
+// Explain names the layer that keeps an app off.
 func TestExplainNamesTheLayerThatKeepsAnAppOff(t *testing.T) {
 	m := func(mut func(*Manifest)) *Manifest {
 		x := &Manifest{ID: "acme.pulse", Trust: TrustSandboxed, Targets: []string{TargetChat}}

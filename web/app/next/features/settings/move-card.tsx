@@ -1,4 +1,4 @@
-// The move of a machine's data into the hub under its row in «Машины» (HRN-883): «переносим данные с машины X: 412 из
+// The move of a machine's data into the hub under its row in «Машины»: «переносим данные с машины X: 412 из
 // 420» while it goes; when it stopped, the objects with their codes and two buttons: «Повторить» and «Продолжить с
 // агентом» (a chat on that machine with the brief, docs/migrations/<id>.md).
 import { SetButton } from '@/next/features/settings/rows';

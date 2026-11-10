@@ -1,4 +1,4 @@
-// «У кого есть доступ» of the one dialog (HRN-675): the owner; the home team first, with its role and «Убрать доступ
+// «У кого есть доступ» of the one dialog: the owner; the home team first, with its role and «Убрать доступ
 // команды» (a removed one reads «Команда X — нет доступа · Вернуть»); then the people and teams with a role of their
 // own, each with its menu: the role, «Может делиться» at edit (for a manager), the term, «Убрать доступ». Above them the
 // requests, when someone asks. Every change waits for the gateway.

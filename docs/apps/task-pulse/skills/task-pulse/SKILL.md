@@ -1,6 +1,6 @@
 ---
 name: task-pulse
-description: Show a live card of a tracker task in the chat — its status, assignee, the «Готово когда» checklist, the merge requests that name it and their pipelines — and change it in place on the next look. Use when the person names a task key (HRN-784) and asks how it is going, whether it is done or its CI passed, or writes /pulse KEY.
+description: Show a live card of a tracker task in the chat — its status, assignee, the «Готово когда» checklist, the merge requests that name it and their pipelines — and change it in place on the next look. Use when the person names a task key and asks how it is going, whether it is done or its CI passed, or writes /pulse KEY.
 ---
 
 # Карточка задачи

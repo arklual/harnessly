@@ -184,7 +184,7 @@ export const splitAtMessages = (steps: Entry[]): { parts: Entry[][]; messages: U
 
 /**
  * Whether a turn is unfolded before the person folds or unfolds it: every turn in the full density; a turn the person
- * stopped in any (HRN-905), so what the agent thought and wrote up to the stop stays in view under «Остановлено».
+ * stopped in any, so what the agent thought and wrote up to the stop stays in view under «Остановлено».
  */
 export const openByDefault = (item: FeedItem, density: FeedDensity): boolean =>
   density === 'full' || (item.kind === 'turn' && item.turn.status === 'interrupted');

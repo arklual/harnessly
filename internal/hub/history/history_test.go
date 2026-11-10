@@ -154,7 +154,7 @@ func TestAChatPageIsTheMachinesOwnShape(t *testing.T) {
 		t.Errorf("entries %d", len(page.Entries))
 	}
 	older, _ := Read(ctx, db, "u-sergey", "tab-a", []string{"m-1"}, *page.BeforeTurnID, 33)
-	// HRN-879: a page without the walk's mark does not make the chat whole: its oldest page still offers more, and
+	// a page without the walk's mark does not make the chat whole: its oldest page still offers more, and
 	// past it the page is empty and says the copy is not complete, for the page to ask the machine.
 	if got := ids(t, older.Turns); len(got) != 7 || got[6] != "c:t06#0" || older.Complete ||
 		older.BeforeTurnID == nil || *older.BeforeTurnID != "c:t00#0" {

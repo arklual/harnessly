@@ -63,5 +63,5 @@ On a machine linked to the hub as an observer the cluster keeps its documents un
 
 ## The installer
 
-`harnessly install` (HRN-742, branch `agent/742-installer`) sets up a machine, not a hub, so it needs nothing from this
+`harnessly install` (branch `agent/742-installer`) sets up a machine, not a hub, so it needs nothing from this
 page. When it grows a hub mode, the hub's compose files are `compose.hub.yaml` plus `compose.docs.yaml`.

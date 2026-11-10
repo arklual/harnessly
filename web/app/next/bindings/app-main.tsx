@@ -134,7 +134,7 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
   if (list === null || (conv !== null && record === undefined && !answered))
     return <div className="hx-appview__wait" aria-busy="true" />;
   if (!app) return <p className="hx-appview__error">{t('next.appmain.gone')}</p>;
-  // An app with a window that waits for consent shows the bar over it (ConsentStage, HRN-915); one with no window says
+  // An app with a window that waits for consent shows the bar over it (ConsentStage); one with no window says
   // what it waits for here.
   if (!view && app.consent) return <ConsentBlock className="hx-consentblock--page" app={app} />;
   if (!view) return <p className="hx-appview__error">{t('next.appmain.noScreen')}</p>;

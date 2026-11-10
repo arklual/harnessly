@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
-// The agent's browser of the chat through an app (HRN-852): browser.read looks, browser.drive acts. Both go through
+// The agent's browser of the chat through an app: browser.read looks, browser.drive acts. Both go through
 // the agent's own browser tools for the chat (internal/agentbrowser/tools), so a tab the person holds stays theirs and
 // a page's text comes marked untrusted. What reaches a password, a local file or a script is not given to an app.
 

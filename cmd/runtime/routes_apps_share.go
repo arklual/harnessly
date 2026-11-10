@@ -142,7 +142,7 @@ func appShareRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version str
 			Dir     string `json:"dir"`
 			Channel string `json:"channel"`
 			Team    bool   `json:"team"`
-			// Archive is a .hlapp to publish instead of a folder, Sig its signature (HRN-966).
+			// Archive is a .hlapp to publish instead of a folder, Sig its signature.
 			Archive string `json:"archive"`
 			Sig     string `json:"sig"`
 		}

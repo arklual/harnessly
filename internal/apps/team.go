@@ -63,7 +63,7 @@ type CatalogEntry struct {
 	// Sum is the SHA-256 of the archive of Version; PreviousSum that of Previous.
 	Sum         string `json:"sum"`
 	PreviousSum string `json:"previousSum,omitempty"`
-	// What a machine checks before it downloads the app (HRN-700): the harnessly it wants, the slash command and the
+	// What a machine checks before it downloads the app: the harnessly it wants, the slash command and the
 	// document types it takes, the secrets it needs. An entry made before these were kept has none, and is checked at
 	// the install as before.
 	Harnessly string   `json:"harnessly,omitempty"`
@@ -594,7 +594,7 @@ type SnapshotEntry struct {
 	CatalogEntry
 	Archive         []byte `json:"archive,omitempty"`
 	PreviousArchive []byte `json:"previousArchive,omitempty"`
-	// Signature and PreviousSignature are the publisher's signatures of those archives, when they have them (HRN-966).
+	// Signature and PreviousSignature are the publisher's signatures of those archives, when they have them.
 	Signature         *Signature `json:"signature,omitempty"`
 	PreviousSignature *Signature `json:"previousSignature,omitempty"`
 }

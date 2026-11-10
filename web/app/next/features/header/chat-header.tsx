@@ -22,7 +22,7 @@ import {
 } from '@/next/features/sidebar/types';
 import '@/next/styles/delegation.css';
 
-/** The machine the window works on, in the header of a chat and of the start page (HRN-891): its card with the load and
+/** The machine the window works on, in the header of a chat and of the start page: its card with the load and
  *  what is wrong on hover, the other machines to move to on a click. */
 export interface IHeaderMachine {
   /** null while the machines load, or when none is chosen: the card says so and still offers the others. */

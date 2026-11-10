@@ -1,5 +1,5 @@
 // Package capabilities is the one answer to «what does this server do»: GET /api/capabilities, served by the hub and by
-// the runtime in the same shape (HRN-737). It reads the mechanisms that already exist (the hub's feature flags, the
+// the runtime in the same shape. It reads the mechanisms that already exist (the hub's feature flags, the
 // runtime's RUNTIME_WEB_FEATURES and service settings) and breaks none of them: it only says, per capability, whether it
 // is on, off, or on once something is configured, and which setting that is.
 package capabilities

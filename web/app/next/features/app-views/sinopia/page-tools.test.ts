@@ -18,7 +18,7 @@ const screen = {
   viewing: false,
 };
 
-// What the agent reads of the editor (HRN-808): the document, the board on screen, the selection, held small.
+// What the agent reads of the editor: the document, the board on screen, the selection, held small.
 describe('screenContext', () => {
   it('says what is open and selected', () => {
     const c = screenContext(screen);

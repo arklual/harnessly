@@ -164,6 +164,7 @@
   "next.queue.failReturned": "back in the terminal's input line",
   "next.queue.failStuck": "Not sent · it stuck in the agent's input",
   "next.queue.failed": "Not sent",
+  "next.queue.fromAgent": "from another agent",
   "next.queue.label": "Message queue",
   "next.queue.limit": "waits for the limit",
   "next.message.pasted": "Pasted text",

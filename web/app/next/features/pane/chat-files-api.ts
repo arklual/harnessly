@@ -26,7 +26,7 @@ export const saveFile = (m: MachineId, conv: ConvId, path: string, body: FileSav
     body,
   });
 
-/** A file as a git revision has it, for the editor's diff (HRN-679). */
+/** A file as a git revision has it, for the editor's diff. */
 export interface IGitSide {
   ref: string;
   inRepo: boolean;
@@ -98,7 +98,7 @@ export const findText = async (
   return { hits, truncated: o.truncated === true };
 };
 
-/** What «Файлы» changes in a folder (HRN-679). */
+/** What «Файлы» changes in a folder. */
 export type TEntryOp = 'newFile' | 'rename' | 'trash';
 
 /** A new empty file `name` in the folder `path`, a new name for the entry `path`, or the entry moved to the trash.

@@ -1,5 +1,5 @@
-// The hands-on tour (HRN-792): a lesson is a list of steps the person does themselves in the real product, on the
-// demo projects every library starts with (HRN-813). A step points at a real element and is counted when the product
+// The hands-on tour: a lesson is a list of steps the person does themselves in the real product, on the
+// demo projects every library starts with. A step points at a real element and is counted when the product
 // shows it was done, not when a «Next» is pressed; a step the product cannot see ends with the person's «Done».
 
 /** What a step can read to tell whether it was done: the page and what the features said happened. */

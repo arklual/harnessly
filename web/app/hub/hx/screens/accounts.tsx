@@ -1,4 +1,4 @@
-// «Аккаунты» (HRN-661): the subscriptions and API keys the organization's agents work on — who pays, who used each
+// «Аккаунты»: the subscriptions and API keys the organization's agents work on — who pays, who used each
 // this month and what it cost at list prices. An account the hub only found on a machine waits on top until an
 // administrator says what it is; the card and its form live in the address (`?a=<id>`, `&dlg=register`).
 import { type CSSProperties, type FormEvent, useState } from 'react';

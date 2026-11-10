@@ -69,6 +69,12 @@ describe('the switches', () => {
     expect(parseNotify(JSON.stringify({ v: 3, place: 'top-right' })).place).toBe('top-right');
   });
 
+  it('keep the machine switch, on by default', () => {
+    expect(parseNotify(JSON.stringify({ v: 3, machine: false })).machine).toBe(false);
+    expect(parseNotify(JSON.stringify({ v: 3, machine: 'no' })).machine).toBe(true);
+    expect(parseNotify(null).machine).toBe(true);
+  });
+
   it('bring back the smart notice turned off before its switch was taken away', () => {
     expect(parseNotify(JSON.stringify({ v: 2, cards: false })).cards).toBe(true);
     expect(parseNotify(JSON.stringify({ cards: false })).cards).toBe(true);

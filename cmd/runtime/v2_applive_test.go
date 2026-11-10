@@ -36,7 +36,7 @@ func installLiveApp(t *testing.T, reg *apps.Registry, id, name, tools string) {
 	}
 }
 
-// HRN-975: an app turned on in a running Claude Code chat goes live when it needs nothing of a launch; the agent is told
+// an app turned on in a running Claude Code chat goes live when it needs nothing of a launch; the agent is told
 // once on its next turn, and of an app turned off; an app with rules, or any app where the wall is required and the
 // agent started without it, waits for the next start with the reason.
 func TestLiveApps(t *testing.T) {

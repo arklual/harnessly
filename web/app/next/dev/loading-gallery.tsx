@@ -370,6 +370,7 @@ const MachineScene = () => (
   <MachineView
     name="runner-2"
     stats={null}
+    health={null}
     error="Нет ответа от машины"
     onRetry={noop}
     pending={NO_PENDING}

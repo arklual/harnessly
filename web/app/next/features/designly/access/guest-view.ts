@@ -34,7 +34,7 @@ export const guestViewOf = (design: string): IGuestView | undefined => {
     height,
     chrome: memory.chrome,
     browser: memory.browser,
-    // The standard view («Вписать») goes as the fit «auto» that every guest page reads as it (HRN-674).
+    // The standard view («Вписать») goes as the fit «auto» that every guest page reads as it.
     fit: free ? null : FIT.auto,
     zoom: free ? memory.zoom.s : null,
     panX: free ? memory.zoom.x : null,

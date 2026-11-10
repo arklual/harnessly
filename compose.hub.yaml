@@ -59,7 +59,7 @@ services:
       # The first account to sign in becomes the administrator. A provider that does not verify emails cannot prove the
       # address, so name the installation's own OpenID Connect provider as one that does (HUB_OIDC_EMAIL_TRUSTED=on).
       HUB_OIDC_EMAIL_TRUSTED: ${HUB_OIDC_EMAIL_TRUSTED:-}
-      # Organizations and the new interface are on for a new installation (HRN-762): sign in, make an organization with
+      # Organizations and the new interface are on for a new installation: sign in, make an organization with
       # its first tenant, invite people, connect a machine. An existing installation keeps its own values.
       HUB_ORGS: ${HUB_ORGS:-on}
       HUB_FEATURES_DEFAULT: ${HUB_FEATURES_DEFAULT:-ui.hx}

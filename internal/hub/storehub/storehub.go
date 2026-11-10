@@ -50,7 +50,7 @@ type Admit func(r *http.Request) (store.Machine, error)
 // Grant is what a machine may do with one recorded design project: see it (its files come to the machine), edit it.
 type Grant struct{ See, Edit, Own bool }
 
-// Design is the hub's design access as the store needs it (HRN-880): a machine's copy of its space's library holds only
+// Design is the hub's design access as the store needs it: a machine's copy of its space's library holds only
 // the projects its person has a role in, and takes writes only to those they may edit; a project's owner file reaching
 // the store records the project if the hub has no row for it yet.
 type Design interface {
@@ -72,6 +72,8 @@ type Store struct {
 	log    *slog.Logger
 	now    func() time.Time
 	legacy string // the space id whose rooms are bare kinds; "" for none
+	// profileRooms are design-sync's profile rooms by a person's user id (config.Store.ProfileRooms).
+	profileRooms map[string]string
 
 	design Design
 
@@ -117,7 +119,7 @@ func Open(ctx context.Context, o Options) (*Store, error) {
 		return nil, errors.New("store: no session key")
 	}
 	s := &Store{key: o.Key, db: o.DB, admit: o.Admit, log: o.Log, now: o.Now, machines: map[string]cachedMachine{},
-		design: o.Design, views: map[string]cachedView{}}
+		design: o.Design, views: map[string]cachedView{}, profileRooms: cfg.Store.ProfileRooms}
 	if s.log == nil {
 		s.log = slog.Default()
 	}
@@ -211,13 +213,13 @@ func (s *Store) PutBlob(ctx context.Context, spaceID, kind, sha string, r io.Rea
 	return s.blobs.Put(ctx, s.Room(spaceID, kind), sha, r)
 }
 
-// DesignRoom is a space's design collection as the hub reads it itself (HRN-881): the views of the projects that no
+// DesignRoom is a space's design collection as the hub reads it itself: the views of the projects that no
 // machine serves.
 func (s *Store) DesignRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindDesign))
 }
 
-// AppsRoom is a space's apps collection as the hub reads it itself (HRN-898): the guest links it serves.
+// AppsRoom is a space's apps collection as the hub reads it itself: the guest links it serves.
 func (s *Store) AppsRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindApps))
 }
@@ -334,6 +336,13 @@ func (s *Store) authorize(r *http.Request, coll string) (filestore.Access, error
 		return filestore.Access{}, err
 	}
 	acc := filestore.Access{Member: memberName(m), Room: s.Room(m.SpaceID, coll)}
+	if coll == filestore.KindProfile {
+		room, err := s.ProfileRoom(r.Context(), m.CreatedBy)
+		if err != nil {
+			return filestore.Access{}, err
+		}
+		acc.Room = room
+	}
 	if coll == filestore.KindDesign && s.design != nil {
 		if err := s.filter(r.Context(), m, &acc); err != nil {
 			return filestore.Access{}, err
@@ -345,6 +354,24 @@ func (s *Store) authorize(r *http.Request, coll string) (filestore.Access, error
 		}
 	}
 	return acc, nil
+}
+
+// ProfileRoom is the room of a person's Claude profile: one per person, whatever space the machine is in,
+// so only that person's machines open it. A design-sync center's room the configuration binds to the person's user id
+// (HUB_STORE_PROFILE_ROOMS) is kept — by id only: an email an account merely claims would hand it someone else's
+// room; anyone else's is profile-<user id>. A machine nobody made has none.
+func (s *Store) ProfileRoom(ctx context.Context, userID string) (string, error) {
+	if userID == "" {
+		return "", filestore.ErrForbidden
+	}
+	if room, ok := s.profileRooms[userID]; ok {
+		return room, nil
+	}
+	room := filestore.KindProfile + "-" + userID
+	if !filestore.ValidRoom(room) {
+		return "", filestore.ErrForbidden
+	}
+	return room, nil
 }
 
 // sessionMachine is the machine of a live store session that is still in the space the session names.
@@ -393,7 +420,7 @@ func PersonName(userID string) string {
 	return "p-" + hex.EncodeToString(sum[:16])
 }
 
-// appsRules are what a machine may read and write of its space's apps collection (HRN-898):
+// appsRules are what a machine may read and write of its space's apps collection:
 //
 //   - storage/<app>/user/<person>.json, a person's user area: only their machines;
 //   - storage/<app>/chat/<person>.<chat>.json, a chat's area: only the machines of the person whose chat it is;
@@ -423,7 +450,7 @@ func (a appsRules) may(p string, write bool) bool {
 		ok := p == "team/state.json" || len(parts) == 4 && parts[1] == "archives" && appstore.ValidApp(parts[2]) && strings.HasSuffix(parts[3], ".tgz")
 		return ok && (!write || a.owner)
 	case parts[0] == "guests":
-		// A person's guest links (HRN-898): only their machines put them there; the hub reads them itself.
+		// A person's guest links: only their machines put them there; the hub reads them itself.
 		return len(parts) == 3 && a.person != "" && parts[1] == a.person && hex64(strings.TrimSuffix(parts[2], ".json")) && strings.HasSuffix(parts[2], ".json")
 	case parts[0] == "bundles":
 		// An app's package by the sum of its archive, which the hub checks before it serves a byte of it.
@@ -507,7 +534,7 @@ func (s *Store) appsFilter(ctx context.Context, m store.Machine, acc *filestore.
 	return nil
 }
 
-// filter limits a machine to the design projects its person has a role in (HRN-880): the files of another person's
+// filter limits a machine to the design projects its person has a role in: the files of another person's
 // project never reach a machine that has nothing to do with it, and a write to a project the person may not edit is
 // refused. Paths outside a project folder (the shelves under .folders) and projects the hub has no row for are open.
 func (s *Store) filter(ctx context.Context, m store.Machine, acc *filestore.Access) error {
