@@ -192,8 +192,8 @@ const Landing = () => {
 };
 
 /**
- * `/apps/<id>`: the app's page lives on a machine; the person's machine in their last space opens it. With
- * none of them online, an app installed for the space opens at the hub, from the store.
+ * `/apps/<id>`: the app's page lives on a machine; the person's machine in their last space opens it (HRN-913). With
+ * none of them online, an app installed for the space opens at the hub, from the store (HRN-898).
  */
 const AppRedirect = ({ app, search }: { app: string; search: string }) => {
   const api = useApi();

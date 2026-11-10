@@ -13,7 +13,7 @@ import (
 )
 
 // agreeAll is the person's click on every install screen that waits: the tests that install through the CLI and then
-// use the app's rights need it, as a person would.
+// use the app's rights need it, as a person would (HRN-849).
 func agreeAll(t *testing.T, reg *apps.Registry) {
 	t.Helper()
 	list, err := reg.ListAll()

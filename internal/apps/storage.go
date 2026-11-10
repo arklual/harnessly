@@ -14,7 +14,7 @@ import (
 
 // The storage of an app's views (hl.storage.<scope>): key-value areas, one file each (internal/appstore). Install,
 // user and space are one area each; chat and doc are one area per chat or document, named by the owner the page gives.
-// On a machine of its own they are all under <data>/apps/storage/<app id>/<scope>/. Under a hub only the
+// On a machine of its own they are all under <data>/apps/storage/<app id>/<scope>/. Under a hub (HRN-898) only the
 // install's area is there: user, space, chat and doc are in the space's apps collection of the hub's store, the same on
 // every machine of the space and there with the machines off, the user's area named by the person
 // (storage/<app>/user/<person>.json, which only the person's machines see). Removing an install leaves the data, so a

@@ -74,11 +74,11 @@ export const fetchEngine = (m: MachineId, signal?: AbortSignal) =>
 export const pinDesign = (m: MachineId, id: string, pinned: boolean) =>
   page(m, '/designly/pin', parsePage.designlyPin, { method: 'POST', body: { id, pinned } });
 
-/** Copies back the demo projects (Relay) the library no longer has; edited ones stay as they are. */
+/** Copies back the demo projects (Relay) the library no longer has; edited ones stay as they are (HRN-813). */
 export const restoreDemoDesigns = (m: MachineId) =>
   page(m, '/designly/demo', parsePage.designlyDemo, { method: 'POST', body: {} });
 
-/** The chat conv was started from the design's own column: the machine lists it among the design's chats. */
+/** The chat conv was started from the design's own column: the machine lists it among the design's chats (HRN-675). */
 export const recordDesignChat = (m: MachineId, id: string, conv: string) =>
   page(m, '/designly/chat', parsePage.designlyChat, { method: 'POST', body: { id, conv } });
 
@@ -113,7 +113,7 @@ export interface IDesignSystemRef {
   label: string;
 }
 
-/** The person's own shelf: folders, where each project lies, the design system each was built on. */
+/** The person's own shelf: folders, where each project lies, the design system each was built on (HRN-860). */
 export interface ILibraryLayout {
   folders: IFolder[];
   placed: Record<string, string>;

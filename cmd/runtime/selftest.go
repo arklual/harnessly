@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
-// The self-test: what an agent's tab needs from this machine, tried on the machine itself, in a throwaway pane
+// The self-test (HRN-794): what an agent's tab needs from this machine, tried on the machine itself, in a throwaway pane
 // started exactly as a tab's pane is. Tests on stand-ins cannot see the machine: HRN-777 (tmux answered `nice` for a
 // bare shell, and a restored agent was never resumed) lived only in one machine's process namespaces.
 //
@@ -27,7 +27,7 @@ import (
 
 const (
 	// selftestShellWait is how long a new pane's login shell may take to read what is typed: its rc files run first,
-	// and on a machine busy starting a hundred tabs that took longer than a step's wait.
+	// and on a machine busy starting a hundred tabs (HRN-901) that took longer than a step's wait.
 	selftestShellWait = 45 * time.Second
 	selftestStepWait  = 8 * time.Second
 	selftestPoll      = 200 * time.Millisecond
@@ -117,7 +117,7 @@ func (s selftest) run(ctx context.Context) []machineCheck {
 	}
 	// The shell is in the foreground from its first instant, before its rc files have run; what is typed then waits
 	// for them. A line it answers says it reads input now, so the program's step below times the program alone: on
-	// 1.187.10 a slow rc under load used up that step's wait and the release was taken back. The mark is
+	// 1.187.10 a slow rc under load used up that step's wait and the release was taken back (HRN-901). The mark is
 	// split by quotes so that the echo of the typed line is not taken for the answer.
 	if shell.OK {
 		if err := s.panes.SendKeys(name, "echo "+selftestReadyTyped); err != nil {

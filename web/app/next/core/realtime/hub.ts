@@ -123,7 +123,7 @@ class Hub {
         unhold();
       };
     }
-    // the copy draws the feed; the machine is asked for what came after the copy's newest entry.
+    // HRN-879: the copy draws the feed; the machine is asked for what came after the copy's newest entry.
     let release: (() => void) | null = null;
     let gone = false;
     void noteCentralCursor(m, conv).finally(() => {

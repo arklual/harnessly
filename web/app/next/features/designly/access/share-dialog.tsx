@@ -75,7 +75,7 @@ const VIEW_TITLE: Record<TSubView, string> = {
 
 export interface IFrameProps {
   open: boolean;
-  /** the one dialog of every kind — at most 600px tall on a wide window; on the phone the head stays and
+  /** HRN-675: the one dialog of every kind — at most 600px tall on a wide window; on the phone the head stays and
    *  only the body scrolls. */
   fixedHead?: boolean;
   /** The first focus on a wide window (the add field); the phone's sheet keeps it on itself, no keyboard pops up. */
@@ -131,7 +131,7 @@ export const Frame = ({
   );
 };
 
-/** A view kept in the dialog while it is hidden: it was opened once since the dialog opened. */
+/** A view kept in the dialog while it is hidden: it was opened once since the dialog opened (HRN-675). */
 export const IDLE = 'idle';
 
 /** The main view fades out in this long before it is skipped (styles/design-access.css, .hx-acc-view--main). */
@@ -139,7 +139,7 @@ const MAIN_OUT_MS = 280;
 
 /** True once a view has covered the main one for its whole fade, false at once when the view goes. The covered main
  *  view is skipped by the browser (content-visibility) instead of being made inert: inert restyled every row of it on
- *  each switch, the skip keeps what was computed. */
+ *  each switch, the skip keeps what was computed (HRN-675). */
 export const useCovered = (on: boolean): boolean => {
   const [covered, setCovered] = useState(false);
   if (!on && covered) setCovered(false);
@@ -152,7 +152,7 @@ export const useCovered = (on: boolean): boolean => {
 };
 
 /** Holds what a view last drew while it is out of sight or on its way out: the dialog drawing again for the view that
- *  shows does not draw the hidden ones. */
+ *  shows does not draw the hidden ones (HRN-675). */
 export const Still = memo(
   ({ children }: { still: boolean; children: ReactNode }) => children,
   (before, after) => before.still && after.still,
@@ -168,7 +168,7 @@ interface IMainProps {
   extra?: ReactNode;
 }
 
-/** The main view, drawn again only when what it shows changes, not when a view slides over it. */
+/** The main view, drawn again only when what it shows changes, not when a view slides over it (HRN-675). */
 const Main = memo(({ project, access, action, onNext, me, field, extra }: IMainProps) => {
   const section = { project, access, action, onNext };
   return (

@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 )
 
-// an app spends the person's model only with its right and within its budget of the day; a call that would
+// HRN-853: an app spends the person's model only with its right and within its budget of the day; a call that would
 // go past it is refused before the model is asked, and so is a chat past the day's number.
 func TestAppAIAndRunRoutes(t *testing.T) {
 	call, conv := appRig(t)

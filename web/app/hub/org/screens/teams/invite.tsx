@@ -1,4 +1,4 @@
-// «Пригласить»: invite to a tenant by email or by link, see who has not answered yet and take an invitation
+// «Пригласить» (HRN-625): invite to a tenant by email or by link, see who has not answered yet and take an invitation
 // back. The tenant is a space on the hub; its invitations are the space's own, so an invited person joins as a member.
 import { useCallback, useEffect, useState } from 'react';
 import { Link2, Mail, Trash2 } from 'lucide-react';

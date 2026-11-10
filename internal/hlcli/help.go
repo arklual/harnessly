@@ -115,6 +115,9 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
                                     the person agrees that the app uses their connection (Settings → Connections), or takes it back
   harnessly app explain ID          why the app is on or off here, layer by layer: machine, team, consent, setup,
                                     activation, this chat, the wall, its views' errors; ✗ marks what keeps it off
+  harnessly logs [--since 30m] [--level error|warn|info] [--chat ID] [--trace ID] [--app ID] [--source S]
+                                    the machine's journal: errors of the page, the runtime, the apps' views, Sinopia
+                                    and the MCP tools, each with the chain of steps that led to it (logs --help)
   harnessly app logs ID [--follow] [--since 10m] [--limit N] [--json]
                                     the app's log: what its views reported (console errors, exceptions, failed bridge
                                     calls) and what the host refused (files, backend calls, a load that did not finish)
@@ -257,6 +260,7 @@ Deletes a chat this one delegated, as the sidebar's «Удалить» does (the
 counts towards the person's limit of delegated chats until it goes. Only a chat of this one, and not while it works.
 `,
 	"docs":         docsUsage,
+	"logs":         logsHelp,
 	"browser":      browserHelp,
 	"upgrade":      upgradeHelp,
 	"fleet":        fleetHelp,

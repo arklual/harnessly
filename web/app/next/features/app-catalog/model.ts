@@ -47,7 +47,7 @@ export const rowsOf = (info: ITeamInfo): ICatalogRow[] =>
     return { entry, action, muted };
   });
 
-/** Why this machine cannot install the entry, in words, before anything is downloaded; null when it can. */
+/** Why this machine cannot install the entry, in words, before anything is downloaded (HRN-700); null when it can. */
 export const refusalOf = (check: IPrecheck | undefined): string | null => {
   const first = check?.refusals[0];
   if (first === undefined) return null;

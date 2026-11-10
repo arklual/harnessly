@@ -71,7 +71,7 @@ type appView struct {
 	// have no value yet: the app is «ждёт секрет».
 	Setup   bool     `json:"setup"`
 	Waiting []string `json:"waiting"`
-	// AppState is ready, waiting, failed or disabled, with the reason the page says in words.
+	// AppState is ready, waiting, failed or disabled, with the reason the page says in words (HRN-693).
 	apps.AppState
 	// WaitingConnections are the connections (catalog ids) the app's servers name that the person has not made or not
 	// signed in to: the app is «ждёт вход», its «О приложении» offers «Подключить». Its chat does not fail; those servers
@@ -88,13 +88,13 @@ type appView struct {
 	Dir         string `json:"dir,omitempty"`
 	InstalledAt int64  `json:"installedAt"`
 	UpdatedAt   int64  `json:"updatedAt"`
-	// Access is everything the app reaches, from the most dangerous, in the person's words.
+	// Access is everything the app reaches, from the most dangerous, in the person's words (HRN-849).
 	Access []apps.Access `json:"access"`
-	// Granted are the keys of Access the app is given now: each of them can be taken back alone.
+	// Granted are the keys of Access the app is given now: each of them can be taken back alone (HRN-965).
 	Granted []string `json:"granted"`
 	// Consent: the install waits for the person to agree to all of Access (a first install nobody clicked through).
 	Consent bool `json:"consent,omitempty"`
-	// AskedIn is the chat whose agent installed what waits for consent: its card shows there.
+	// AskedIn is the chat whose agent installed what waits for consent: its card shows there (HRN-915).
 	AskedIn string `json:"askedIn,omitempty"`
 	// Pending is a newer version that reaches more and waits for the person's word; its Access is only what it adds.
 	Pending *pendingView `json:"pending,omitempty"`
@@ -119,7 +119,7 @@ type appViewEntry struct {
 	Height  string   `json:"height,omitempty"`
 	Path    string   `json:"path,omitempty"`
 	URL     string   `json:"url,omitempty"`
-	// The slots: the name, icon, place and objects of a view that fills one.
+	// The slots (HRN-753): the name, icon, place and objects of a view that fills one.
 	Label   string   `json:"label,omitempty"`
 	Icon    string   `json:"icon,omitempty"`
 	Order   int      `json:"order,omitempty"`
@@ -197,7 +197,7 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 		}
 	}
 	v.InstructionsBytes = apps.InstructionsBytes(a)
-	// What the install reaches now: a dev install's folder as it is, where its consent is read from too.
+	// What the install reaches now: a dev install's folder as it is, where its consent is read from too (HRN-913).
 	v.Access = a.AccessNow()
 	v.Granted = a.GrantedKeys()
 	v.Consent, v.Off, v.Source = a.NeedsConsent(), a.Off, a.Source
@@ -348,7 +348,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		secretJSON(w, http.StatusOK, map[string]any{"apps": views, "viewPort": port, "agentWalled": agentWalled(reg.Root), "slots": slots, "safeMode": reg.SafeMode()})
 	}
 
-	// safeMode turns every app but the environment's pinned ones off for the chats that start from now. The
+	// safeMode turns every app but the environment's pinned ones off for the chats that start from now (HRN-700). The
 	// person's page only: an agent cannot turn it off to get its apps back.
 	safeMode := func(w http.ResponseWriter, r *http.Request) {
 		if sameorigin.Refuse(w, r) {
@@ -443,11 +443,11 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		var b struct {
 			Dir string `json:"dir"`
 			// Archive is a .hlapp to install instead of a folder (absolute path); Sig the path of its signature, none:
-			// <archive>.sig when that file is there.
+			// <archive>.sig when that file is there (HRN-966).
 			Archive string `json:"archive"`
 			Sig     string `json:"sig"`
 			Dev     bool   `json:"dev"`
-			// Session is the CLI's tab: the chat whose agent installs, where the consent card shows.
+			// Session is the CLI's tab: the chat whose agent installs, where the consent card shows (HRN-915).
 			Session string `json:"session"`
 		}
 		if !readSecretBody(r, &b) || !strings.HasPrefix(b.Dir, "/") && !strings.HasPrefix(b.Archive, "/") {
@@ -733,7 +733,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			return
 		}
 		// An app that waits for the person's consent cannot be turned on in a chat: the answer says what it waits for and
-		// where the person gives the word.
+		// where the person gives the word (HRN-913).
 		if a, err := reg.Find(b.ID); b.On && err == nil && a.NeedsConsent() {
 			secretJSON(w, http.StatusConflict, map[string]any{"error": "consent", "access": apps.AccessCodes(a.WaitingAccess()), "where": apps.ConsentWhere(b.ID)})
 			return
@@ -786,7 +786,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		secretJSON(w, http.StatusOK, answer)
 	}
 
-	// explain: why an app is on or off, layer by layer — the machine, the team, its setup, how it turns on, the
+	// explain: why an app is on or off, layer by layer (HRN-699) — the machine, the team, its setup, how it turns on, the
 	// chat of the calling tab and the wall. A read: the agent of a chat with apps may ask it too.
 	explain := func(w http.ResponseWriter, r *http.Request) {
 		if !cliOK(w, r, http.MethodGet) {
@@ -798,7 +798,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			return
 		}
 		in := apps.ExplainInput{ID: id, HostVersion: version}
-		// Every install, a dev one that waits for consent and one turned off too: explain says why it is off.
+		// Every install, a dev one that waits for consent and one turned off too: explain says why it is off (HRN-913).
 		if a, err := reg.Find(id); err == nil {
 			in.App = &a
 			in.ViewLog, _ = reg.ViewLog(id, apps.ViewLogMax)

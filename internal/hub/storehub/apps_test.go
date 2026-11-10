@@ -6,7 +6,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/filestore"
 )
 
-// in the apps collection a machine sees its own person's user and chat areas and nobody else's, a document's
+// HRN-898: in the apps collection a machine sees its own person's user and chat areas and nobody else's, a document's
 // area goes as the design project, the team's apps are written only by an owner's machine, and nothing else is written.
 func TestAppsCollectionRules(t *testing.T) {
 	me, other := PersonName("user-1"), PersonName("user-2")

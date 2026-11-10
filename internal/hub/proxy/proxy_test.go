@@ -376,7 +376,7 @@ func TestPathModeOpensOnlyMachinesAnAdministratorConnected(t *testing.T) {
 	}
 }
 
-// with HUB_MACHINE_TRUST=on an owner of the machine's space may trust it, and then it opens on the hub's origin;
+// HRN-762: with HUB_MACHINE_TRUST=on an owner of the machine's space may trust it, and then it opens on the hub's origin;
 // the hub says beforehand (View.Runtime) that the machine waits for that.
 func TestPathModeOwnerCanTrustAMachine(t *testing.T) {
 	f := setup(t, hubtest.Env("HUB_MACHINE_TRUST", "on"))

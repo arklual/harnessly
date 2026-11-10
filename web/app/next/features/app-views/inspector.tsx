@@ -174,7 +174,7 @@ export const deprecatedOf = (calls: readonly IBridgeLogEntry[]): string[] => [
 
 type TJournal = { k: 'loading' } | { k: 'ready'; list: IJournalEntry[] } | { k: 'failed'; text: string };
 
-/** The app's journal: what it did of a high or critical class and every change of what it may do. */
+/** The app's journal (HRN-849): what it did of a high or critical class and every change of what it may do. */
 export const Journal = ({ machine, app }: { machine: MachineId; app: string }) => {
   const [state, setState] = useState<TJournal>({ k: 'loading' });
   useEffect(() => {

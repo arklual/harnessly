@@ -1,4 +1,4 @@
-// The feed's own menu (a right click or a two-finger tap in the chat): the answer under the pointer copied or
+// The feed's own menu (a right click or a two-finger tap in the chat, HRN-962): the answer under the pointer copied or
 // branched from, the chat's link, the right pane. Selected text, links, pictures and code fields keep the browser's
 // menu (ui/context-menu.tsx); a held finger selects text here, so it opens nothing.
 import { useKeyHint } from '@/next/features/keys/keys-help';

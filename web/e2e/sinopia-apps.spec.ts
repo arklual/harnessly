@@ -1,7 +1,7 @@
-// Sinopia as a builtin app, on a live runtime and page:
+// Sinopia as a builtin app (HRN-808), on a live runtime and page:
 //   1–2. the editor's tools of the page (WebMCP form, through its SDK) and its screen reach the chat's agent: the page
 //        reports them to the runtime, and an agent's call (show_board) turns the deck and comes back with the answer;
-//   3.   the Cashback card of a site: a click on an element with data-hl-field opens the app's inspector on
+//   3.   the Cashback card of a site (HRN-524): a click on an element with data-hl-field opens the app's inspector on
 //        that field, and the value written there goes back into the board.
 // The agent's side of page_call (the runtime holding the call until the page takes it) is covered in Go
 // (internal/apps/pagetools_test.go); here the call is handed to the page as the runtime hands it.

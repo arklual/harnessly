@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
-// The Disk tab's file routes: /api/fs/roots, /api/fs/list, /api/fs/favorites, /api/fs/download,
+// The Disk tab's file routes (HRN-981): /api/fs/roots, /api/fs/list, /api/fs/favorites, /api/fs/download,
 // /api/fs/mkdir and the resumable /api/fs/uploads. Off unless RUNTIME_DISK_ROOTS names the folders the tab may open
 // ("Label=/abs/path;Other=/abs/other"); only those folders are reachable, see internal/diskfs.
 

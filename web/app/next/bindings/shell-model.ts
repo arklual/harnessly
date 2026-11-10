@@ -441,7 +441,7 @@ export function useShellModel(): IShellModel {
   const projectIndex = useMemo(() => (shared ? profileProjectOf(shared) : null), [shared]);
   const own = useConversationList(here);
   // The one list draws as soon as any machine's list is there (its own, the browser's copy, the cluster's): a home
-  // machine that is off or starting held the whole sidebar until the cluster called it offline.
+  // machine that is off or starting held the whole sidebar until the cluster called it offline (HRN-902).
   const anyList = useConversationList(null);
   const every = useEveryChat();
   const convs = useMemo(

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// The agent's hooks of an app (hooks.agent): a view of the app hears each tool call of the chat's agent before
+// The agent's hooks of an app (hooks.agent, HRN-852): a view of the app hears each tool call of the chat's agent before
 // it runs and may stop it or add context; it cannot change the call. The guard (internal/hlcli appGuard) asks the
 // runtime, the runtime asks the live views of the chat's apps that hear, and their words are put together here: any
 // stop wins, contexts add up. A view that does not answer in HookTimeout lets the call through and the journal says so;

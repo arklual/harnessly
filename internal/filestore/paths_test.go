@@ -54,7 +54,7 @@ func TestSyncedFolderLayouts(t *testing.T) {
 	}
 }
 
-// of a project's hidden media folder only the published files and the PDF mark sync.
+// HRN-881: of a project's hidden media folder only the published files and the PDF mark sync.
 func TestPublishedMediaSyncs(t *testing.T) {
 	for rel, want := range map[string]bool{
 		"deck/.media/published/deck.pdf":     true,

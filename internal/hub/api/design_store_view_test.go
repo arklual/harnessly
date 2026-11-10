@@ -18,7 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// a project in the hub's store is read for a guest from the store, not from the author's machine. The author
+// HRN-881: a project in the hub's store is read for a guest from the store, not from the author's machine. The author
 // makes a live link and a pinned one while the machine is on; the machine goes off; both open, the live one follows
 // the store's new revision, the pinned one stays where it was, the version and the events come from the hub, and the
 // machine is asked nothing.
@@ -161,7 +161,7 @@ func TestDesignGuestLinksReadTheStoreWithTheMachineOff(t *testing.T) {
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
-// the team reads and edits a project of the store through the hub with the author's machine off: the role is
+// HRN-881: the team reads and edits a project of the store through the hub with the author's machine off: the role is
 // the hub's, a write on a stale revision is refused with the file's revision now, a viewer and a non-owner touching
 // the owner file are refused, and the edit is the project's next revision, under the person who made it.
 func TestDesignTeamEditsTheStoreThroughTheHubWithTheMachineOff(t *testing.T) {
@@ -283,7 +283,7 @@ func TestDesignTeamEditsTheStoreThroughTheHubWithTheMachineOff(t *testing.T) {
 	}
 }
 
-// the deck editor saves through the hub with the machine off: the settings are a store revision under the
+// HRN-881: the deck editor saves through the hub with the machine off: the settings are a store revision under the
 // person, the hub's read of the deck shows them, a change another machine made meanwhile is kept, and a viewer of the
 // project may not save.
 func TestDesignDeckEditsSaveThroughTheHubWithTheMachineOff(t *testing.T) {

@@ -1,4 +1,4 @@
-// The agent's actions on the page of the pane's browser: what the machine hands the page (GET
+// The agent's actions on the page of the pane's browser (HRN-678): what the machine hands the page (GET
 // /api/v2/pane-act), whether the person lets the agent act on the page's site, and what goes back (POST
 // /api/v2/pane-act). The page's frame does the work (`tk:act` of the slot's bridge); the pane shows the agent's cursor.
 import type { IBrowserAgentChoice } from '@/next/stores/browser-agent';

@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// The organization's rule for apps «Не спрашивать разрешений». The hub sends it with the environment list
+// The organization's rule for apps «Не спрашивать разрешений» (HRN-915). The hub sends it with the environment list
 // (env.set, hubproto.EnvSet.AppsConsent); the agent keeps it in environment.json of its link folder, beside the list, and
 // this runtime reads it from there. The rule is on when one link of the machine says auto: then an install, an update or
 // a dev edit that would wait for the person gets its rights at once (apps.ConsentPolicy), and what waited when the rule

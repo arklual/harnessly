@@ -32,7 +32,7 @@ type fakePanes struct {
 	stuckShell string // the foreground never leaves this
 	keysLost   bool
 	// rcLooks is how many looks at the pane its shell's rc files take: the shell is in the foreground at once, and what
-	// is typed before they end waits for them. queued holds those lines.
+	// is typed before they end waits for them (HRN-901). queued holds those lines.
 	rcLooks int
 	queued  []string
 }
@@ -187,7 +187,7 @@ func TestSelftestFailures(t *testing.T) {
 	}
 }
 
-// on 1.187.10 the shell's rc files ran ~10 s under the load of a start; the line typed waited for them, and
+// HRN-901: on 1.187.10 the shell's rc files ran ~10 s under the load of a start; the line typed waited for them, and
 // the program's step (8 s) failed. The shell's step waits until the shell answers, and the program's step is the
 // program's alone.
 func TestSelftestWaitsForASlowShell(t *testing.T) {

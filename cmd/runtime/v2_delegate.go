@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/journal"
 	"net"
 	"net/http"
 	"net/netip"
@@ -67,7 +68,7 @@ func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Se
 }
 
 // cliDelegate is `harnessly tab create -t claude-code|codex-cli --prompt …` run in the terminal of a chat: the work goes
-// to a chat nested under that chat, as delegate_task makes it, not to a loose tab of the workspace. The chat
+// to a chat nested under that chat, as delegate_task makes it, not to a loose tab of the workspace (HRN-828). The chat
 // is the one that runs in the terminal the command names (the CLI sends its tmux session, as peers send does); a command
 // from a terminal that is no chat's gets layoutapi.ErrNoParent and the tab is made the old way.
 func (c *core) cliDelegate(ctx context.Context, req layoutapi.DelegateRequest) (layoutapi.DelegateResult, error) {
@@ -141,7 +142,7 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		if _, walled := v.d.CLI.AgentOf(r); walled {
 			return toolsets{hand, pics, place, browse}
 		}
-		// Only a chat that works in a video project carries the video's tools.
+		// Only a chat that works in a video project carries the video's tools (HRN-580).
 		video := design.VideoTools{L: designAPI(v.d).L}
 		if rec, ok := v.rt.Record(id); ok {
 			video.Project = video.L.VideoProjectOf(rec.Cwd)
@@ -262,6 +263,13 @@ type cachedCaller struct {
 const callerKept = 30 * time.Second
 
 func (c *callerCache) of(r *http.Request) (string, string) {
+	conv, why := c.lookup(r)
+	// The journal's line of this request learns the chat (HRN-976).
+	journal.SetChat(r.Context(), conv)
+	return conv, why
+}
+
+func (c *callerCache) lookup(r *http.Request) (string, string) {
 	if c.panes == nil {
 		return "", "this machine runs no terminals, so no chat's agent can be told by its connection"
 	}

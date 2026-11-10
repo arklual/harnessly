@@ -60,7 +60,7 @@ type hub struct {
 	// tunnels reach the guest read of a shared design only; guestPort is where they go.
 	guests    *guestFilter
 	guestPort int
-	// observe: the hub only sees the machine. The agent runs its closed cluster's link as before, and the hub
+	// observe: the hub only sees the machine (HRN-596). The agent runs its closed cluster's link as before, and the hub
 	// link answers what can be read (hello, preflight, agents, spend) under a policy that allows nothing: no tunnel to the
 	// runtime, no keys, env, logins or installs, no limits, and nothing of the cluster's tunnels is touched. The one
 	// thing it takes is the hub's environment list (env.set), applied only into the link's own folder.
@@ -482,7 +482,7 @@ func (h *hub) hello() hubproto.Hello {
 	if h.usage != nil {
 		features = append(features, hubproto.FeatureUsage)
 	}
-	// The organization's rule for apps rides on env.set; the runtime reads it from the list's file.
+	// The organization's rule for apps rides on env.set; the runtime reads it from the list's file (HRN-915).
 	features = append(features, hubproto.FeatureEnvironment, hubproto.FeatureEnvAppsConsent)
 	// The runtime ships in the same release and does the setup; an own link takes it only under the policy's `setup`.
 	offered := h.setupOffered()

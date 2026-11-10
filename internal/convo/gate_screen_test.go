@@ -46,7 +46,7 @@ func TestPermissionWithAWarningAndAnAutoDenyTimer(t *testing.T) {
 }
 
 // The pending call of the main agent is not the one the menu on the screen draws (a subagent asks): the card is the
-// screen's own, with the command it draws, and no key goes in by itself.
+// screen's own, with the command it draws, and no key goes in by itself (HRN-855).
 func TestPermissionOfAnotherCallIsTheScreensOwnCard(t *testing.T) {
 	r := newRig(t)
 	r.bashPrompt(tui(t, "claude-2.1.311-bash-dangerous-rm-auto-deny.ansi.txt"), "git push --force origin main")
@@ -113,7 +113,7 @@ func TestBackgroundAgentAsksAfterTheTurn(t *testing.T) {
 	}
 }
 
-// Claude 2.1.316 writes the ExitPlanMode call only once its menu is answered. The screen opens the plan's card,
+// HRN-647: Claude 2.1.316 writes the ExitPlanMode call only once its menu is answered. The screen opens the plan's card,
 // its answer reaches the menu, and the call written after that opens no second card.
 func TestPlanCardFromTheScreen(t *testing.T) {
 	r := newRig(t)

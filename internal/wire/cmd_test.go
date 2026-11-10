@@ -17,7 +17,7 @@ func TestOpLogKeepsAnswersOnDisk(t *testing.T) {
 	if res := log.Run(context.Background(), cmd, time.Second, run); res.R != ResultAccepted || res.Seq != 7 {
 		t.Fatalf("first %+v", res)
 	}
-	// The save is a timer plus fsync: on a loaded CI runner the fsync alone took over 2 s (05.11).
+	// The save is a timer plus fsync: on a loaded CI runner the fsync alone took over 2 s (HRN-568, 05.11).
 	deadline := time.Now().Add(10 * time.Second)
 	var next *OpLog
 	for {

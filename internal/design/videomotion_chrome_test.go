@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// The motion contract in Chrome on the real engine: GSAP and a registered engine follow the scene's time in any
+// The motion contract (HRN-576) in Chrome on the real engine: GSAP and a registered engine follow the scene's time in any
 // order, and the check's readers see what the board did.
 
 const videoKitTags = `<script src="/__lib/motion/gsap.min.js"></script><script src="/__lib/motion/DrawSVGPlugin.min.js"></script><script src="/__lib/motion/SplitText.min.js"></script><script src="/__lib/motion/tk.js"></script>`

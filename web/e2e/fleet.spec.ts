@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { type Runtime, startRuntime } from './runtime';
 
-// One runtime, the machines of two organizations: the hub's list of the person's machines is stood in
+// One runtime, the machines of two organizations (HRN-764, HRN-765): the hub's list of the person's machines is stood in
 // for by a route over /api/v2/machines (the real runtime answers every `machine=` of the page, as a standalone one
 // does). The person sees both machines with their organization, picks the second one for the new chat, and the chat
 // is listed with the machine and the organization it is on.

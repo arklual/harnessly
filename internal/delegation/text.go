@@ -143,7 +143,7 @@ func entryLine(e wire.Entry) string {
 }
 
 // Markers end the final message of a delegated chat: [[done]] when the task is complete, [[question]] when the agent
-// waits for its parent's answer. A turn that ends without one is a pause, not an answer.
+// waits for its parent's answer. A turn that ends without one is a pause, not an answer (HRN-828).
 const (
 	MarkDone     = "[[done]]"
 	MarkQuestion = "[[question]]"

@@ -51,7 +51,7 @@ type HookSettingsConfig struct {
 	BudgetHook string
 	// HookTimeout is each hook's timeout in seconds (3 when 0); the script returns at once, so it hardly matters.
 	HookTimeout int
-	// AppsLiveHook is the command line of the live hook of the apps (`harnessly hook app-context --live`): on
+	// AppsLiveHook is the command line of the live hook of the apps (`harnessly hook app-context --live`, HRN-975): on
 	// UserPromptSubmit it tells the agent of the apps turned on or off in its chat since it started. "" adds none.
 	AppsLiveHook string
 }

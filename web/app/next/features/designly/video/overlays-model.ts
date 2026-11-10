@@ -1,4 +1,4 @@
-// The overlay layer as the player edits it: where an overlay stands in a format, which are on screen at a
+// The overlay layer as the player edits it (HRN-653): where an overlay stands in a format, which are on screen at a
 // time, how a drag moves or resizes one (with a snap to the frame's middle and safe zone), how a strip on the timeline
 // moves, and the words the runtime draws from. Pure; the runtime's rules (internal/design/video_overlays.go) are the
 // truth and this only mirrors the ones the editor needs. No React here.

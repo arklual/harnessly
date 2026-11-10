@@ -27,7 +27,7 @@ const BOARD_PATH = new RegExp(String.raw`^/b/(${SLUG})/?$`);
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * Which of our pages a link is, or null for any other link, by the exact patterns the runtime's
+ * Which of our pages a link is, or null for any other link (HRN-943), by the exact patterns the runtime's
  * `open` reads (internal/panel Classify): a document is `/a/<slug>` of the documents' server or `<reader path><slug>` of
  * the platform's reader, a board `/b/<slug>` of the boards' server. The host alone tells nothing: the portal serves
  * documents and boards on one host, and the platform's other pages are no document.

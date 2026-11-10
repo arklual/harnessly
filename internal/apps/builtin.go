@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
-// Builtin apps: apps that come with the host, in its own bundle, and run in the host's page instead of a
+// Builtin apps (HRN-808): apps that come with the host, in its own bundle, and run in the host's page instead of a
 // frame. They are written as any app is, with a manifest, and get no right the list of the surface does not give any
 // app: what is theirs alone is where they run. Sinopia is the first: builtin/sinopia/harnessly/app.json.
 //

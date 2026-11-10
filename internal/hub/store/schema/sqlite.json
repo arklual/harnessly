@@ -6038,6 +6038,76 @@
         "person_id",
         "agent_key"
       ]
+    },
+    "voice_takes": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "ms",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "mime",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "text",
+          "type": "TEXT"
+        },
+        {
+          "name": "audio",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "changed_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "voice_takes_person",
+          "columns": [
+            "user_id",
+            "at"
+          ]
+        }
+      ]
     }
   }
 }

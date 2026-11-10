@@ -5404,6 +5404,76 @@
           ]
         }
       ]
+    },
+    "voice_takes": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "ms",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "mime",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "text",
+          "type": "text"
+        },
+        {
+          "name": "audio",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "changed_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "voice_takes_person",
+          "columns": [
+            "user_id",
+            "at"
+          ]
+        }
+      ]
     }
   }
 }

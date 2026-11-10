@@ -86,7 +86,7 @@ const GuestVideo = ({ config }: IGuestVideoProps) => {
     () => scenesOf(chapters, config.boards, total ?? 0),
     [chapters, config.boards, total],
   );
-  // The link may keep comments off the timeline: the list beside the player still has them.
+  // The link may keep comments off the timeline (HRN-675): the list beside the player still has them.
   const onTimeline = timelineCommentsOn(config.view);
   const marks = useMemo(() => marksOf(list, scenes), [list, scenes]);
   const autoplay = autoplayOn(config.view);

@@ -263,6 +263,7 @@ These apply when `RUNTIME_GATE_UPSTREAM` is empty and the runtime does the start
 | `RUNTIME_CODEX_LAUNCHER_FILE` | the Codex launcher script as the platform ships it (default the release's `runtime-static/codex-launcher.js`; none: a neutral one) |
 | `RUNTIME_TELEMETRY_URL`, `RUNTIME_TELEMETRY_KEY` | a PostHog-compatible batch endpoint and project key a released runtime reports corrected tab states to (unset: logged only) |
 | `RUNTIME_TELEMETRY_PROPERTIES`, `RUNTIME_TELEMETRY_ANONYMOUS_ID`, `RUNTIME_TELEMETRY_MISMATCH_EVENT` | the properties every event starts with (a JSON object), who the events are about without an owner e-mail (default `runtime`), the event's name (default `platform_status_mismatch`) |
+| `RUNTIME_JOURNAL`, `RUNTIME_JOURNAL_DAYS`, `RUNTIME_JOURNAL_EXPORT` | the machine's journal of the page, the runtime, app views and tool calls (`harnessly logs`): `off` keeps none; how many days it is kept (1–7, default 3); `telemetry` also sends its warnings and errors to the telemetry endpoint above (unset: it stays on the machine, the default) |
 | `RUNTIME_PLUGIN_RELOAD_MARK` | the plugin reconciler's mark file (`{"plugins": ms, "skills": ms}`); unset: no reloads |
 
 ### Web page

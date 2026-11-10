@@ -132,7 +132,7 @@ func TestSnapshotKeepsTheAppsOn(t *testing.T) {
 	}
 }
 
-// A skill's own script runs from its package, and the package may be read; nothing writes into it.
+// A skill's own script runs from its package, and the package may be read; nothing writes into it (HRN-790).
 func TestSnapshotLetsThePackageBeReadAndRun(t *testing.T) {
 	pkg := "/data/apps/packages/a.b/1.0.0"
 	s := Snapshot{Apps: []SnapshotApp{{ID: "a.b", Name: "AB"}}, Protected: []string{"/data/apps", pkg}}

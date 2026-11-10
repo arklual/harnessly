@@ -26,7 +26,7 @@ const (
 // FileKinds is every FileKind, in the schema's order.
 var FileKinds = []FileKind{FileFile, FileDirectory}
 
-// FileGit is what git says of an entry: a file or folder git does not have yet, or one with changes not
+// FileGit is what git says of an entry (HRN-679): a file or folder git does not have yet, or one with changes not
 // committed. A folder is new when all that changed in it is new. An entry git has nothing to say of has none.
 type FileGit string
 
@@ -63,7 +63,7 @@ type DirListing struct {
 	Path      string      `json:"path"`
 	Entries   []FileEntry `json:"entries"`
 	Truncated bool        `json:"truncated"`
-	// Root is the place of the workspace an absolute folder lies in: the crumbs go up to it, not further.
+	// Root is the place of the workspace an absolute folder lies in (HRN-679): the crumbs go up to it, not further.
 	Root string `json:"root,omitempty"`
 }
 

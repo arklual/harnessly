@@ -92,7 +92,7 @@ func TestAppValidateStrictCountsContextWeight(t *testing.T) {
 	}
 }
 
-// The live hook asks the runtime for the chat's session and hands its words to the agent; an empty answer, a
+// The live hook (HRN-975) asks the runtime for the chat's session and hands its words to the agent; an empty answer, a
 // failed one or another event prints nothing.
 func TestAppContextLiveHook(t *testing.T) {
 	text := atomic.Value{}

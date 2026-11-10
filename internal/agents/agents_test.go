@@ -256,7 +256,7 @@ func TestLaunchShape(t *testing.T) {
 	if err := agents.CheckLaunch(&agents.Launch{Model: &model, Effort: &effort, Profile: "kimi-code", Ultracode: true}); err != agents.ErrLaunchProfile {
 		t.Fatalf("a profile still takes no ultracode: %v", err)
 	}
-	// fast mode on a profile is the vendor's tier, asked for by its proxy.
+	// HRN-945: fast mode on a profile is the vendor's tier, asked for by its proxy.
 	if err := agents.CheckLaunch(&agents.Launch{Model: &model, Effort: &effort, Profile: "gpt", Fast: true}); err != nil {
 		t.Fatalf("a profile in fast mode: %v", err)
 	}

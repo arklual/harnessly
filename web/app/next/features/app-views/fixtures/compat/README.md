@@ -1,7 +1,7 @@
 # The corpus of old apps
 
 Apps as they were written for earlier versions of harnessly, kept unchanged: an update of the host must not break
-them («Совместимость»). `compat-corpus.test.ts` runs each view against the real bridge and SDK — handshake,
+them (HRN-849, «Совместимость»). `compat-corpus.test.ts` runs each view against the real bridge and SDK — handshake,
 the calls it makes on start, its page tools — and `internal/apps/compat_test.go` installs each package and checks that
 an install made before consent was asked keeps its rights.
 

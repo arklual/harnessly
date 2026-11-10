@@ -69,7 +69,7 @@ type GuestLink struct {
 	View string `json:"view"`
 	// Write lets the guest's view write to the link's storage; a link reads only by default.
 	Write bool `json:"write,omitempty"`
-	// Check marks a link `harnessly app check` made for the machine's own headless browser: any local view, a
+	// Check marks a link `harnessly app check` made for the machine's own headless browser (HRN-920): any local view, a
 	// couple of minutes, never listed, and the only kind whose page reports to the app's log.
 	Check     bool  `json:"check,omitempty"`
 	CreatedAt int64 `json:"createdAt"`
@@ -85,7 +85,7 @@ type Guests struct {
 	reg     *Registry
 	storage *Storage
 	// lookup, when set, finds a link and its app by the token's hash instead of this machine's list: the hub's own
-	// serving of a link from the store (NewGuestsFrom).
+	// serving of a link from the store (HRN-898, NewGuestsFrom).
 	lookup func(hash string) (GuestLink, Installed, error)
 	// Now is the clock; nil is the real one.
 	Now func() time.Time

@@ -236,7 +236,7 @@ func (a *args) err() error {
 }
 
 // modelArg is the model a call asks for: agent_model, else the older `model`. Claude Code rewrites a tool argument named
-// exactly `model` to its subagent model when CLAUDE_CODE_SUBAGENT_MODEL is set, so the name is only a fallback.
+// exactly `model` to its subagent model when CLAUDE_CODE_SUBAGENT_MODEL is set (HRN-828), so the name is only a fallback.
 func modelArg(a *args) string {
 	if m := strings.TrimSpace(a.str("agent_model")); m != "" {
 		return m

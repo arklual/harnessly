@@ -380,7 +380,7 @@ func TestDevFolderReadFailsClosed(t *testing.T) {
 	}
 }
 
-// The chat whose agent installed an app is where its consent card shows: an install from a chat names it, an
+// The chat whose agent installed an app is where its consent card shows (HRN-915): an install from a chat names it, an
 // update from outside a chat keeps it, an update that grows from another chat moves it there.
 func TestConsentRemembersTheChatThatAsked(t *testing.T) {
 	r := &Registry{Root: t.TempDir()}

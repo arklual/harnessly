@@ -17,7 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 )
 
-// a view opens a terminal only with terminal.pty, in a chat the app is on in; the shell answers over the
+// HRN-852: a view opens a terminal only with terminal.pty, in a chat the app is on in; the shell answers over the
 // socket, ends with its code, and the opening and the end are journaled (what is typed is not).
 func TestAppTerminalRoute(t *testing.T) {
 	call, conv := appRig(t)

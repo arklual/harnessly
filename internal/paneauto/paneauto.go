@@ -5,7 +5,7 @@
 // publication of a document asks a tab that shows it to reload. Conservative on purpose: only the pane's own apps, only
 // what a successful call names.
 //
-// What opens the pane by itself (docs/pane-opening.md); the intents this package keeps are Auto, and the page
+// What opens the pane by itself (HRN-943, docs/pane-opening.md); the intents this package keeps are Auto, and the page
 // places an Auto intent behind, with a dot, without bringing the pane out:
 //
 //	trigger                                        intent             the page
@@ -232,7 +232,7 @@ func OpenOnce(intents *paneintents.Store, tabID, tab, target string) bool {
 }
 
 // RepeatWindow: the agent's `open` of the very thing it asked for within this is not asked again. Each address opens
-// once: an agent that names the same document in every reply, or runs `open` for it twice, does not throw the
+// once (HRN-943): an agent that names the same document in every reply, or runs `open` for it twice, does not throw the
 // pane at the person again. After it, an `open` acts again: the person may have asked to see it once more.
 const RepeatWindow = 10 * time.Minute
 

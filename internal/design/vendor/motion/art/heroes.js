@@ -1,4 +1,4 @@
-// Heroes for tk.rig: three bodies, one set of part names, so one script of actions plays on any of them.
+// Heroes for tk.rig (HRN-652): three bodies, one set of part names, so one script of actions plays on any of them.
 //   hero-person   a figure with arms in two parts and legs
 //   hero-round    a round mascot with a leaf on top and small arms
 //   hero-robot    a boxy robot with a screen face and an antenna

@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent } from 'react';
 import { eventsUrlOf } from '@/next/features/designly/guest/guest-config';
 
 /**
- * The hub says when the project of a live link reaches a new revision of the store (`event: rev`, the
+ * HRN-881. The hub says when the project of a live link reaches a new revision of the store (`event: rev`, the
  * revision's number); the board on screen is then loaded again. The first event is the revision the page opened at.
  * A pinned link, or a hub that reads the project from the owner's machine, answers 204 and the page stops asking.
  */

@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// demoProjects are the projects every library starts with: a site, a deck, a video and a design system of
+// demoProjects are the projects every library starts with (HRN-813): a site, a deck, a video and a design system of
 // one made-up product, Relay, for the lessons and for trying Sinopia on something real. They are the person's own
 // copies: edited and deleted like any project.
 //

@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// a launch that names a permission mode starts in it whatever the person's settings or the machine say, and
+// HRN-945: a launch that names a permission mode starts in it whatever the person's settings or the machine say, and
 // never with bypass allowed (Claude's plan mode stops asking then); fast mode goes in a copy of the settings, said
 // either way.
 func TestALaunchStartsInItsPermissionAndFastModes(t *testing.T) {

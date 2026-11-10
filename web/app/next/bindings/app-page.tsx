@@ -53,7 +53,7 @@ const Rights = ({
 }: {
   access?: readonly IAccess[];
   permissions: readonly string[];
-  /** every access the app is given can be taken back alone. */
+  /** HRN-965: every access the app is given can be taken back alone. */
   revoke?: IRevoke;
 }) => {
   if (access) return <AccessList access={access} revoke={revoke} />;

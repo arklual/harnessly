@@ -212,7 +212,7 @@ func TestHubEnvSetOverTheLink(t *testing.T) {
 	}
 }
 
-// The organization's rule for apps rides on env.set: the agent keeps it beside the list for the runtime, says
+// The organization's rule for apps (HRN-915) rides on env.set: the agent keeps it beside the list for the runtime, says
 // the hash of both to the hub, and a change of the rule alone applies nothing again.
 func TestEnvKeeperKeepsTheAppsRule(t *testing.T) {
 	dir := t.TempDir()

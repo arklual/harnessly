@@ -113,13 +113,13 @@ export interface IInstalledApp {
   detail?: string;
   /** The branding slot: the name, accent and support address the app brings. */
   branding?: IBranding;
-  /** Everything the app reaches, from the most dangerous, in words; absent from an older machine. */
+  /** Everything the app reaches, from the most dangerous, in words (HRN-849); absent from an older machine. */
   access?: IAccess[];
-  /** The keys of `access` the app is given now; each can be taken back alone. */
+  /** The keys of `access` the app is given now; each can be taken back alone (HRN-965). */
   granted?: string[];
   /** The install waits for the person to agree to all of `access`. */
   consent?: boolean;
-  /** The chat whose agent installed what waits for consent: its card shows there. */
+  /** The chat whose agent installed what waits for consent: its card shows there (HRN-915). */
   askedIn?: string;
   /** A newer version that reaches more waits for the person's word; its `access` is only what it adds. */
   pending?: { version: string; access: IAccess[] };
@@ -174,7 +174,7 @@ export const consentApp = (
   access: readonly string[],
 ): Promise<unknown> => runtimeJson(m, platformPath('/apps/consent'), postJson({ id, version, access }));
 
-/** Takes one access back: the app then waits for the person's word like a first install. */
+/** Takes one access back (HRN-965): the app then waits for the person's word like a first install. */
 export const revokeAccess = (m: MachineId, id: string, key: string): Promise<unknown> =>
   runtimeJson(m, platformPath('/apps/revoke'), postJson({ id, key }));
 
@@ -182,7 +182,7 @@ export const revokeAccess = (m: MachineId, id: string, key: string): Promise<unk
 export const declineApp = (m: MachineId, id: string): Promise<{ removed: boolean }> =>
   runtimeJson<{ removed: boolean }>(m, platformPath('/apps/decline'), postJson({ id }));
 
-/** One line a view reported: its console, an exception, a failed bridge call. */
+/** One line a view reported (HRN-913): its console, an exception, a failed bridge call. */
 export interface IViewLogLine {
   at: number;
   level: 'error' | 'warn' | 'bridge';
@@ -465,7 +465,7 @@ export const callFiles = async (
   }
 };
 
-/** The workspace beyond one file: the runtime judges each against the app's masks. */
+/** The workspace beyond one file (HRN-850): the runtime judges each against the app's masks. */
 export const callFilesMore = async (
   m: MachineId,
   session: string,
@@ -493,12 +493,12 @@ export const callGit = async (
   }
 };
 
-/** A command or a process of the app in the chat's folder; the runtime runs it inside the agent's wall. */
+/** A command or a process of the app in the chat's folder (HRN-851); the runtime runs it inside the agent's wall. */
 /** The person turns an app's hook off (or on) on the machine: from the feed's line of its stop. */
 export const setHookOff = (m: MachineId, id: string, off: boolean): Promise<unknown> =>
   runtimeJson(m, platformPath('/apps/hooks-off'), postJson({ id, off }));
 
-/** The agent's browser of the chat through an app (browser.read, browser.drive). */
+/** The agent's browser of the chat through an app (browser.read, browser.drive, HRN-852). */
 export const callBrowser = async (
   m: MachineId,
   session: string,
@@ -511,7 +511,7 @@ export const callBrowser = async (
   }
 };
 
-/** One answer of a model within the app's budget of the day (ai). */
+/** One answer of a model within the app's budget of the day (ai, HRN-853). */
 export const callAI = async (
   m: MachineId,
   session: string,
@@ -524,7 +524,7 @@ export const callAI = async (
   }
 };
 
-/** A value into the safe, never read back (secrets.write): {created}. */
+/** A value into the safe, never read back (secrets.write, HRN-861): {created}. */
 export const callSecretsPut = async (
   m: MachineId,
   session: string,
@@ -537,7 +537,7 @@ export const callSecretsPut = async (
   }
 };
 
-/** A task in a new chat under the app's chat, within the app's budget of the day (agents.run). */
+/** A task in a new chat under the app's chat, within the app's budget of the day (agents.run, HRN-853). */
 export const callAgentsRun = async (
   m: MachineId,
   session: string,
@@ -550,7 +550,7 @@ export const callAgentsRun = async (
   }
 };
 
-/** What the chat's terminals show (terminal.read). */
+/** What the chat's terminals show (terminal.read, HRN-852). */
 export const callTerminalRead = async (
   m: MachineId,
   session: string,
@@ -649,7 +649,7 @@ export const answerAppAsk = async (m: MachineId, id: string, answer: string | nu
 
 const lists = new Map<MachineId, Promise<IInstalledApps>>();
 
-/** How many times each machine's list was read again: a consent given in one place shows in every other. */
+/** How many times each machine's list was read again: a consent given in one place shows in every other (HRN-915). */
 const rereads = new Map<MachineId, number>();
 const rereadListeners = new Set<() => void>();
 const onReread = (f: () => void) => {
@@ -666,7 +666,7 @@ export const refreshInstalledApps = (m: MachineId): void => {
   for (const f of rereadListeners) f();
 };
 
-/** The apps that wait for the person's word, light: no view server is started for it. */
+/** The apps that wait for the person's word, light: no view server is started for it (HRN-915). */
 export const loadConsentApps = async (m: MachineId): Promise<IInstalledApp[]> =>
   (await runtimeJson<{ apps: IInstalledApp[] }>(m, platformPath('/apps/consent/asks'))).apps;
 

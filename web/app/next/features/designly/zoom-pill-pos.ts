@@ -1,5 +1,5 @@
-// Where a pill over the canvas stands: the zoom pill by default in the bottom right corner of the canvas, the
-// phone's pill beside the phone; the person may drag one anywhere over the canvas or hide it. Its place is kept
+// Where a pill over the canvas stands (HRN-673): the zoom pill by default in the bottom right corner of the canvas, the
+// phone's pill beside the phone (HRN-674); the person may drag one anywhere over the canvas or hide it. Its place is kept
 // per browser, under the pill's own key, as its distance from the right and the bottom edges, so a window grown or
 // narrowed keeps it by the same corner, and it is always put back inside the canvas.
 
@@ -76,7 +76,7 @@ export type TPillAxis = (typeof PILL_AXIS)[keyof typeof PILL_AXIS];
 export const BESIDE_GAP = 12;
 
 /**
- * The phone's pill by the phone: on its right, level with its top, standing up, where the canvas has room for
+ * The phone's pill by the phone (HRN-674): on its right, level with its top, standing up, where the canvas has room for
  * it there (it usually has: the canvas is wider than a phone); else over the phone along its top, by its right edge.
  * `box` is the phone's case in the canvas's own coordinates, `col` the pill's size standing up.
  */

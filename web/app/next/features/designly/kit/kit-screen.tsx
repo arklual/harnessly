@@ -1,4 +1,4 @@
-// A kit as one screen, the way a design tool shows a library: the tree on the left, one canvas in the middle
+// A kit as one screen (HRN-897), the way a design tool shows a library: the tree on the left, one canvas in the middle
 // with the kit's sections laid out by themselves, the panel of what is selected on the right, the search on ⌘K. A
 // template is a stack on the canvas; «Раскрыть» goes inside it to its grid of layouts by sections, a layout opens
 // alone and large with ← →. The screen knows nothing of the machine: the binding gives it the canvas and the ways out.
@@ -51,13 +51,13 @@ export interface IKitScreenProps {
   onInsert: (deck: string, layout: IKitLayout) => Promise<void>;
   onOpenAsProject: (template: string) => Promise<void>;
   onOpenBoard: (project: string, board: string) => void;
-  /** The head's tools of the editing mode: «Редактировать», «Опубликовать версию», «Только просмотр». */
+  /** The head's tools of the editing mode (HRN-903): «Редактировать», «Опубликовать версию», «Только просмотр». */
   tools?: ReactNode;
-  /** The draft's chat, docked on the left while the kit is edited. */
+  /** The draft's chat, docked on the left while the kit is edited (HRN-903). */
   chat?: ReactNode;
 }
 
-/** The kit's draft stands where a version goes: its live pages carry the canvas's moment, so an edit shows. */
+/** The kit's draft stands where a version goes (HRN-903): its live pages carry the canvas's moment, so an edit shows. */
 const DRAFT_VERSION = 'draft';
 
 /** The default names of the canvas's sections and foundation groups. */

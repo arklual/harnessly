@@ -1,6 +1,6 @@
 package design
 
-// A kit's settings: its maker may make it for viewing only, for everyone. While it is, nobody edits it, the
+// A kit's settings (HRN-903): its maker may make it for viewing only, for everyone. While it is, nobody edits it, the
 // maker included: the draft is not started, published or discarded (403), the projects do not move onto it, and the
 // draft's project is for viewing only, so no write of the library reaches it. The maker turns it off again.
 

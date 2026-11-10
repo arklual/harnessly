@@ -8,7 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/designkit"
 )
 
-// The canvas of a kit for an agent: `design kit search` looks through the index the kit screen's search
+// The canvas of a kit for an agent (HRN-897): `design kit search` looks through the index the kit screen's search
 // uses, `design kit show` gives one node with what an agent needs to use it. An agent picks a layout from the catalogue
 // (purpose, slots) instead of opening a hundred boards.
 

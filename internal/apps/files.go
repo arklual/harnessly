@@ -35,7 +35,7 @@ func refuseFile(format string, a ...any) error {
 var secretNames = []string{".env", ".env.*", ".npmrc", ".netrc", ".pypirc", ".git-credentials", ".htpasswd",
 	"id_rsa", "id_rsa.*", "id_dsa", "id_ecdsa", "id_ed25519", "id_ed25519.*", "*.pem", "*.key", "*.p12", "*.pfx", "*.keystore",
 	"cli-token", ".envrc",
-	// The agents' own credentials and account: a chat in the home folder has them in its workspace.
+	// The agents' own credentials and account (HRN-850): a chat in the home folder has them in its workspace.
 	".credentials.json", ".claude.json",
 	// What the person typed into shells and interpreters.
 	".*_history", ".histfile", ".lesshst", ".viminfo"}

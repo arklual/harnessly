@@ -24,7 +24,7 @@ export type TRefusal = (typeof REFUSAL)[keyof typeof REFUSAL];
 export interface IPrecheck {
   refusals: { code: TRefusal; detail?: string }[];
   secrets: string[];
-  /** What the entry says the app reaches, in words, for the install screen; absent from an older machine. */
+  /** What the entry says the app reaches, in words, for the install screen (HRN-849); absent from an older machine. */
   access?: IAccess[];
 }
 

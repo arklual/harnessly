@@ -215,10 +215,10 @@ type Config struct {
 	// OrgsShadow (the new endpoints answer instance administrators only: checking and seeding), OrgsOn (everyone).
 	Orgs string
 	// MachineTrust (HUB_MACHINE_TRUST=on) lets an owner of a space trust a machine to run on the hub's own origin when
-	// the hub has no HUB_RUNTIME_DOMAIN; off: only machines an instance administrator connected open there.
+	// the hub has no HUB_RUNTIME_DOMAIN (HRN-762); off: only machines an instance administrator connected open there.
 	MachineTrust bool
 	// OIDCEmailTrusted (HUB_OIDC_EMAIL_TRUSTED=on) takes the email of an OpenID Connect provider as verified even when
-	// the provider does not say email_verified: for a provider the operator runs or trusts. It is how the
+	// the provider does not say email_verified: for a provider the operator runs or trusts (HRN-762). It is how the
 	// first person to sign in through it becomes the administrator of a fresh installation that names none.
 	OIDCEmailTrusted bool
 	// Docs (HUB_DOCS=on) switches on the documents and boards side: the hub answers <platform api>/docs and the agents'
@@ -250,6 +250,9 @@ type Config struct {
 	// (HUB_VAULT_SHARED_MEMBERS, HUB_VAULT_SHARED_EDITORS, comma-separated emails) say who sees and who changes the
 	// shared entries.
 	VaultKeys, VaultSharedMembers, VaultSharedEditors string
+	// VoiceTakes (HUB_VOICE_TAKES=on) keeps the people's dictation recordings in the hub (docs/hub/voice-takes.md);
+	// off, the default: <platform api>/voice/takes answers 404 and the takes stay in the browser.
+	VoiceTakes bool
 	// Peers (HUB_PEERS=on) lets the machines' agents exchange messages between their chats through the hub
 	// (docs/hub/peers.md); off: POST /agent/peers/* answer 404.
 	Peers bool
@@ -669,6 +672,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_HISTORY must be on or off")
+	}
+	switch strings.ToLower(def("HUB_VOICE_TAKES", "off")) {
+	case "on", "true", "1", "yes":
+		c.VoiceTakes = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_VOICE_TAKES must be on or off")
 	}
 	switch strings.ToLower(def("HUB_USAGE_INGEST", "off")) {
 	case "on", "true", "1", "yes":

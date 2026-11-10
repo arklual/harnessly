@@ -32,7 +32,7 @@ func TestStateOf(t *testing.T) {
 	}
 }
 
-// An update that fails its check leaves the installed version as it was and working.
+// An update that fails its check leaves the installed version as it was and working (HRN-693).
 func TestFailedUpdateKeepsThePreviousVersion(t *testing.T) {
 	reg := Open(t.TempDir())
 	pkg := filepath.Join(t.TempDir(), "demo")

@@ -1,5 +1,5 @@
 #!/bin/sh
-# The acceptance scenario of a public release (internal/hub/acceptance): a clean install of the hub and of the
+# The acceptance scenario of a public release (HRN-757, internal/hub/acceptance): a clean install of the hub and of the
 # example extension pack, sign-in, organization, machine, agent, update to the next version, and rollback.
 # N+1 is the tree under test (the release tag); N is the previous release tag, or $HUB_N_REF.
 set -eu

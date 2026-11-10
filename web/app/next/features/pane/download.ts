@@ -1,4 +1,4 @@
-// One way to save files of a chat: the runtime's .../download sends a file as it is on disk (in ranges, so the
+// One way to save files of a chat (HRN-679): the runtime's .../download sends a file as it is on disk (in ranges, so the
 // browser resumes it), a folder or several paths as one zip made while it is sent. Paths are the chat folder's
 // (relative) or absolute ones the chat touched; the runtime keeps secrets and what lies outside out.
 import { machineApi } from '@/next/core/net/machine';

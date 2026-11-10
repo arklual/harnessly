@@ -1,4 +1,4 @@
-// What a board took from the kit: «Из кита: Обложка», «Открыть в ките» (the kit screen with the camera on
+// What a board took from the kit (HRN-897): «Из кита: Обложка», «Открыть в ките» (the kit screen with the camera on
 // that node) and, for a layout with a picture, «Показать макет» — the source laid over the board to compare.
 import { useState } from 'react';
 import type { IKitLink } from '@/next/features/designly/kit/kit-api';
@@ -11,7 +11,7 @@ interface IKitOriginProps {
   /** The node's picture by its path in the version. */
   shotUrl: (path: string) => string;
   onOpen: (node: string) => void;
-  /** «Править в ките»: the kit's draft opens on that node with its chat; absent when the kit is not edited. */
+  /** «Править в ките» (HRN-903): the kit's draft opens on that node with its chat; absent when the kit is not edited. */
   onEdit?: (node: string) => void;
 }
 

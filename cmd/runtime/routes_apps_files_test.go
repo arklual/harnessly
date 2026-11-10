@@ -105,7 +105,7 @@ func TestAppFilesRoute(t *testing.T) {
 		t.Errorf("an unknown op: %d", code)
 	}
 
-	// a folder and a search, inside the masks; a watch and git need their own rights.
+	// HRN-850: a folder and a search, inside the masks; a watch and git need their own rights.
 	if code, body := files(`"op":"list","path":""`); code != http.StatusOK || !strings.Contains(body, `"path":"docs"`) ||
 		strings.Contains(body, "other") || strings.Contains(body, ".env") {
 		t.Errorf("list: %d %s", code, body)

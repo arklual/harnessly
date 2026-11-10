@@ -397,7 +397,7 @@ const FilesTab = ({
     setEpoch((n) => n + 1),
   );
 
-  // The state the file is shown against: git's revision or another file, read when the tab asks for it.
+  // The state the file is shown against (HRN-679): git's revision or another file, read when the tab asks for it.
   const [compare, setCompare] = useState<{ key: string; value: ICompare } | null>(null);
   const against = tab.file ? (tab.against ?? null) : null;
   useEffect(() => {
@@ -1351,7 +1351,7 @@ export const useRightPane = (
   // what the person reads, the tabs wait under its button.
   const phone = usePhone();
   /** `asked`: the person asked for it themselves (a view's button), so it comes in front whatever tab they are in.
-   *  `quiet`: what the runtime asked by itself: its tab goes behind with a dot, the pane does not come out. */
+   *  `quiet`: what the runtime asked by itself (HRN-943): its tab goes behind with a dot, the pane does not come out. */
   const applyRequests = (
     requests: readonly IPaneRequest[],
     asked = false,

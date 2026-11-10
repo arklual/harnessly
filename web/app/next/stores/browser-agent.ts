@@ -1,5 +1,5 @@
 // «Агент в браузере» (Settings → General): the sites the person blocked for the agent in the pane's browser. Anywhere
-// else the agent acts without asking: the person sees its cursor on the page. Kept in this browser, as the
+// else the agent acts without asking (HRN-681): the person sees its cursor on the page. Kept in this browser, as the
 // list of the pane's sites is.
 import { useSyncExternalStore } from 'react';
 

@@ -18,7 +18,7 @@ Every space has its own collections; a machine reaches only the ones of the spac
 | `uploads` | files people put into a chat, pictures and attachments |
 | `files` | any other file an agent or a person keeps |
 | `handoff` | what one machine passes to another |
-| `apps` | the files of a space's apps: their storage areas under `storage/` (docs/apps.md); a machine sees only its own person's user and chat areas; the team's apps (`team/`), the guest links (`guests/<person>/`) and their packages (`bundles/`) |
+| `apps` | the files of a space's apps: their storage areas under `storage/` (HRN-898, docs/apps.md); a machine sees only its own person's user and chat areas; the team's apps (`team/`), the guest links (`guests/<person>/`) and their packages (`bundles/`) |
 
 `design` takes only the files of a library (no executables, no tool configuration). The others take any relative path.
 A collection is a room of the store named `<collection>-<space id>`.

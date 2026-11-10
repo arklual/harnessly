@@ -39,7 +39,7 @@ export async function loadOlderTurns(
   before: TurnId,
   limit = 20,
 ): Promise<PageOutcome<true>> {
-  // the older turns come from the cluster's copy whenever it keeps the machine's chats, on or off; the
+  // HRN-879: the older turns come from the cluster's copy whenever it keeps the machine's chats, on or off; the
   // machine is asked only for a chat the copy does not have yet, and only when it is there to answer.
   if (keepsHistory(m)) {
     const central = await loadCentralChat(conv, before, limit);
@@ -60,7 +60,7 @@ export async function loadOlderTurns(
 }
 
 export async function loadEntries(m: MachineId, conv: ConvId, turn: TurnId): Promise<PageOutcome<true>> {
-  // a turn's steps from the cluster's copy first; a turn the copy has no steps of yet (the one under way), or
+  // HRN-879: a turn's steps from the cluster's copy first; a turn the copy has no steps of yet (the one under way), or
   // fewer than the turn counts (a chat backfilled by pages without them), is the machine's to tell, when it is there.
   if (keepsHistory(m)) {
     const central = await getPage(
@@ -91,7 +91,7 @@ export async function loadOutput(
 ): Promise<PageOutcome<OutputPage>> {
   const put = (page: OutputPage) =>
     entryStore.patch(key(conv, entry), (e) => (e && e.t === 'tool' ? { ...e, output: page.output } : e));
-  // the cluster's copy keeps a tool's whole output (the agent sends it apart from the stream). The machine is
+  // HRN-879: the cluster's copy keeps a tool's whole output (the agent sends it apart from the stream). The machine is
   // asked only for what the copy does not have whole yet (a tool that has just ended), and only when it is there.
   if (keepsHistory(m)) {
     const central = await getPage(
@@ -125,7 +125,7 @@ export const loadRewindPlan = (
 
 /**
  * The turns the conversation's rewind n (of its rewinds, oldest first) left behind, by their faces; not in the stores.
- * the cluster's copy keeps them (marked by the rewind's live feed_reset); the machine is asked only when the
+ * HRN-879: the cluster's copy keeps them (marked by the rewind's live feed_reset); the machine is asked only when the
  * copy has not got them and the machine is there.
  */
 export async function loadRewound(m: MachineId, conv: ConvId, n: number): Promise<PageOutcome<TurnsPage>> {

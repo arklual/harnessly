@@ -16,7 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// The agent's scenario: a real Claude of a given binary, on the cheapest model, in a throwaway pane, asks one
+// The agent's scenario (HRN-795): a real Claude of a given binary, on the cheapest model, in a throwaway pane, asks one
 // question with AskUserQuestion; the screen is read the way the typist reads it, the second option is chosen with its
 // digit the way the question card answers, and the agent's reply must name that option. It sees what a stand-in cannot:
 // a new Claude whose dialog the runtime no longer reads, whose keys no longer answer it, or that does not start.

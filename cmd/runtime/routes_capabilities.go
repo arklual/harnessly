@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
-// GET /api/capabilities: what this runtime does, in the shape the hub answers too. It reads the settings the
+// GET /api/capabilities (HRN-737): what this runtime does, in the shape the hub answers too. It reads the settings the
 // other mechanisms already read (RUNTIME_WEB_FEATURES, the services' environment) and changes none of them. Open like
 // the page itself: it names no person, no token and no address.
 

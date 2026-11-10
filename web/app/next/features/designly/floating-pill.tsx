@@ -1,4 +1,4 @@
-// A pill floating over the canvas of a design: dragged by any part of it to any place over the canvas,
+// A pill floating over the canvas of a design (HRN-673, HRN-674): dragged by any part of it to any place over the canvas,
 // its settings on a right click (a two-finger press on a trackpad), hidden from there and brought back from the bar's
 // «…». The zoom pill (zoom-pill.tsx) and the phone's pill (phone-pill.tsx) are two of them; each keeps its own place
 // (zoom-pill-pos.ts).

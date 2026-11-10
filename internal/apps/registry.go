@@ -53,7 +53,7 @@ type Installed struct {
 	Pending *Installed `json:"pending,omitempty"`
 	// Off: the person turned the app off (the switch of its card); it starts nowhere until it is turned on.
 	Off bool `json:"off,omitempty"`
-	// AskedIn is the chat whose agent installed or updated the app last: its consent card shows there and in
+	// AskedIn is the chat whose agent installed or updated the app last (HRN-915): its consent card shows there and in
 	// that chat's right pane. "" for an install from outside a chat.
 	AskedIn string `json:"askedIn,omitempty"`
 }
@@ -83,7 +83,7 @@ func (r *Registry) OnPublicChange(f func()) {
 }
 
 // OnTeamChange adds what is called after the team's catalog or installs change on this machine (an owner's install
-// or uninstall, a publish to the team, a rollback of the catalog): the cluster's event and the hub's store
+// or uninstall, a publish to the team, a rollback of the catalog): the cluster's event and the hub's store (HRN-898)
 // each have one. It is not called for a snapshot applied from the platform or the store, nor for a person muting an
 // app. The function must not block.
 func (r *Registry) OnTeamChange(f func()) {
@@ -237,7 +237,7 @@ type InstallOptions struct {
 	Consent ConsentFrom
 	// Granted are the keys the install screen listed, with ConsentGiven; nil grants all the package reaches.
 	Granted []string
-	// AskedIn is the chat the install was made from; "" keeps the chat an earlier install was made from.
+	// AskedIn is the chat the install was made from (HRN-915); "" keeps the chat an earlier install was made from.
 	AskedIn string
 	// Signed: the package's signature was checked and is a trusted publisher's (VerifyArchive). Only the paths that hold a
 	// signature set it; where the deployment requires signatures an install without it is refused unless it is Dev.

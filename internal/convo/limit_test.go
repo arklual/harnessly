@@ -372,7 +372,7 @@ func TestLimitStaleResetWaits(t *testing.T) {
 }
 
 // Claude's limit seen as a terminal failure names its reset: the chat waits for it instead of for another model, and
-// what the person wrote goes on then, with no click.
+// what the person wrote goes on then, with no click (HRN-574).
 func TestTerminalLimitWaitsForItsReset(t *testing.T) {
 	r := newRig(t)
 	r.working("big job")

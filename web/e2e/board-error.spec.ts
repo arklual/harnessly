@@ -1,4 +1,4 @@
-// A board that fails shows its error card with «Отправить в чат»: from the viewing mode the project switches to
+// A board that fails shows its error card with «Отправить в чат» (HRN-862): from the viewing mode the project switches to
 // editing, the chat opens and the error goes there, so the person sees their message and the agent's answer. On a site
 // and a deck (a video's scene has no such card: its own error line has no chat to send to). Runs with BOARD_ERROR_E2E set (a runtime of its own, the fake agent answers).
 import { execFileSync } from 'node:child_process';

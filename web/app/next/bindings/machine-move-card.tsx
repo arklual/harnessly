@@ -1,4 +1,4 @@
-// The move of a machine's data into the hub under its row in «Машины»: asked of the machine while it is on.
+// The move of a machine's data into the hub under its row in «Машины» (HRN-883): asked of the machine while it is on.
 import { useState } from 'react';
 import { moveCardOf } from '@/next/bindings/machine-move';
 import MoveCard from '@/next/features/settings/move-card';

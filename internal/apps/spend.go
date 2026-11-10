@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// The budget of an app: what it may spend of the person's model a day through `ai` and how many chats it may
+// The budget of an app (HRN-853): what it may spend of the person's model a day through `ai` and how many chats it may
 // start through `agents.run`. The manifest says it (`budget`), the host caps it, the install screen shows it in the
 // lines of the two rights, and the runtime keeps the day's spending per app on this machine: a call that would go past
 // it is refused before it is made.

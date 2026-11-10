@@ -1,13 +1,21 @@
 // The smart notice under a finger, a mouse and a trackpad. Only the front plate moves: while a gesture leads, it
 // follows one to one (the shift goes into --sn-dx/--sn-dy on the host and moves the shape, nothing re-renders); let
 // go, it settles. Sideways it leaves (with the speed it was thrown at) or springs back, and the next plate of the stack
-// rises into its place. Up and down the direction decides by the first pixels and stays: on a folded stack it pages
-// (the front plate goes back, the next comes forward); on one plate, away from its edge opens it and back towards it
-// folds it (an open card into the line, an announcement into the line too; it never hides). A long press (or the
-// right button) opens the menu of actions. On a trackpad two fingers sideways sweep the front plate aside, a pinch out
-// opens and a pinch in folds, the wheel over the stack pages it. Every gesture has its key too (smart-notice.tsx):
-// ⌘J and Esc, ⌫, ↑ ↓, ⇧F10.
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+// rises into its place. Up and down the direction decides by the first pixels and stays: on a folded stack it pages,
+// the whole stack following the finger one to one and springing on when let go (pager.ts, HRN-985); on one plate,
+// away from its edge opens it and back towards it folds it (an open card into the line, an announcement into the line
+// too; it never hides). A long press (or the right button) opens the menu of actions. On a trackpad two fingers
+// sideways sweep the front plate aside, up and down they page the stack as a finger does; a pinch out opens and a pinch
+// in folds; a mouse wheel's click pages by one. Every gesture has its key too (smart-notice.tsx): ⌘J and Esc, ⌫, ↑ ↓,
+// ⇧F10.
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
+import { StackPager, isWheelNotch } from './pager';
 
 export const GESTURE = {
   hide: 'hide',
@@ -47,8 +55,6 @@ const FLICK = 0.45;
 const LONG_PRESS_MS = 500;
 const WHEEL_IDLE_MS = 120;
 const PINCH_PX = 24;
-const STEP_PX = 40;
-const STEP_GAP_MS = 420;
 /** The longest and the shortest a thrown plate takes to leave, ms. */
 const FLING_MAX_MS = 380;
 const FLING_MIN_MS = 160;
@@ -171,6 +177,8 @@ interface IGestureOptions extends ILatest {
   host: RefObject<HTMLElement | null>;
   /** The plate is drawn: the wheel is listened to from then on. */
   present: boolean;
+  /** The front plate's key: when it changes after a page, the stack's position moves with it (pager.ts). */
+  frontKey: string | null;
 }
 
 interface IDrag {
@@ -184,7 +192,25 @@ interface IDrag {
   vy: number;
   axis: 'x' | 'y' | null;
   long: number | null;
+  /** The stack is paged by this finger (pager.ts); `caught` it was moving when the finger came down. */
+  paging: boolean;
+  caught: boolean;
+  /** Where the finger was when paging began, px. */
+  py: number;
 }
+
+/** The stack's pager, made on the first gesture (never while rendering) and kept. */
+const stackOf = (
+  ref: { current: StackPager | null },
+  host: RefObject<HTMLElement | null>,
+  latest: RefObject<ILatest>,
+): StackPager => {
+  ref.current ??= new StackPager({
+    host: () => host.current,
+    onStep: (dir) => latest.current.onStep(dir),
+  });
+  return ref.current;
+};
 
 /** Where a press does not start a gesture: text to type into or select. */
 const isField = (target: EventTarget | null): boolean =>
@@ -193,7 +219,7 @@ const isField = (target: EventTarget | null): boolean =>
 /** The speed, smoothed: a finger lifted after a pause throws nothing. */
 const SMOOTH = 0.6;
 
-const useGestures = ({ host, present, ...options }: IGestureOptions) => {
+const useGestures = ({ host, present, frontKey, ...options }: IGestureOptions) => {
   const drag = useRef<IDrag | null>(null);
   /** A gesture ran: the click that ends it does nothing. */
   const swallow = useRef(false);
@@ -201,6 +227,16 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
   useEffect(() => {
     latest.current = options;
   });
+  const pagerRef = useRef<StackPager | null>(null);
+  const stack = () => stackOf(pagerRef, host, latest);
+  // React has drawn the plate the stack paged to: its position moves with it in the same frame.
+  useLayoutEffect(() => pagerRef.current?.rebase(), [frontKey]);
+  // Opened, or nothing left to page: the stack is the stylesheet's again.
+  const pageable = options.stacked && !options.open;
+  useLayoutEffect(() => {
+    if (!pageable) pagerRef.current?.reset();
+  }, [pageable]);
+  useEffect(() => () => pagerRef.current?.reset(), []);
 
   const stopLong = () => {
     const d = drag.current;
@@ -232,7 +268,16 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
       vy: 0,
       axis: null,
       long,
+      paging: false,
+      caught: false,
+      py: event.clientY,
     };
+    // A touch stops the stack where it is moving, as a finger stops a flicked list.
+    if (stack().active && latest.current.stacked && !latest.current.open) {
+      stack().grab();
+      drag.current.caught = true;
+      swallow.current = true;
+    }
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
@@ -253,6 +298,19 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
       d.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
       swallow.current = true;
       event.currentTarget.setPointerCapture(event.pointerId);
+      const now = latest.current;
+      if (d.axis === 'y' && now.stacked && !now.open) {
+        // Paging: the stack follows from here on, one to one, without the slop's jump.
+        if (!d.caught) stack().grab();
+        d.paging = true;
+        d.py = d.y;
+      } else if (d.caught) {
+        stack().release(0);
+      }
+    }
+    if (d.paging) {
+      stack().drag(d.y - d.py);
+      return;
     }
     showShift(host.current, latest.current, dx, dy, d.axis);
   };
@@ -262,9 +320,13 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
     if (!d || d.id !== event.pointerId) return;
     stopLong();
     drag.current = null;
-    if (d.axis === null) return;
     // A finger that stood still before it lifted throws nothing.
     const still = event.timeStamp - d.t > 80;
+    if (d.paging || (d.caught && d.axis === null)) {
+      stack().release(d.paging && !still ? d.vy : 0);
+      return;
+    }
+    if (d.axis === null) return;
     const x = d.axis === 'x';
     finishGesture(host.current, latest.current, {
       dx: x ? d.x - d.x0 : 0,
@@ -276,8 +338,10 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
 
   const onPointerCancel = () => {
     stopLong();
+    const d = drag.current;
     drag.current = null;
-    clearShift(host.current);
+    if (d?.paging || d?.caught) stack().release(0);
+    else clearShift(host.current);
   };
 
   /** The click that ends a gesture (or a long press) does not press the button under it. */
@@ -304,9 +368,18 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
     let vx = 0;
     let lastT = 0;
     let pinch = 0;
-    let step = 0;
-    let lastStep = 0;
     let idle: number | null = null;
+    /** A trackpad paging the stack: up and down to the end of the gesture, even if it drifts sideways. */
+    let paging = false;
+    let pv = 0;
+    let pt = 0;
+    const endPaging = () => {
+      idle = null;
+      paging = false;
+      // The trackpad's own momentum has already moved it; what speed is left carries it to a plate.
+      stackOf(pagerRef, host, latest).release(pv);
+      pv = 0;
+    };
     const wheel = (event: WheelEvent) => {
       const now = latest.current;
       if (now.off || el.dataset.fling !== undefined) return;
@@ -323,7 +396,7 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
         }
         return;
       }
-      if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || dx !== 0) {
+      if (!paging && (Math.abs(event.deltaX) > Math.abs(event.deltaY) || dx !== 0)) {
         // Two fingers sideways: the front plate goes with them, one to one, and is thrown or springs back when they
         // stop (the trackpad's own momentum keeps sending deltas a while, so the speed is real).
         event.preventDefault();
@@ -345,13 +418,21 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
       }
       if (now.open || !now.stacked) return;
       event.preventDefault();
-      step += event.deltaY;
-      if (Math.abs(step) < STEP_PX || event.timeStamp - lastStep < STEP_GAP_MS) return;
-      lastStep = event.timeStamp;
-      const dir = step > 0 ? 1 : -1;
-      step = 0;
-      rise(el, dir);
-      now.onStep(dir);
+      // What it scrolls goes as the fingers do (natural scrolling): a delta of +y moves it up the screen.
+      const dy = -event.deltaY;
+      if (isWheelNotch(event)) {
+        // A mouse wheel clicks: one plate per click, by the spring.
+        stackOf(pagerRef, host, latest).click(dy);
+        return;
+      }
+      // A trackpad: the stack follows the deltas one to one; the end of the gesture is a pause in them.
+      const dt = Math.max(1, event.timeStamp - pt);
+      pt = event.timeStamp;
+      pv = paging ? pv * 0.5 + (dy / dt) * 0.5 : 0;
+      paging = true;
+      stackOf(pagerRef, host, latest).nudge(dy);
+      if (idle !== null) window.clearTimeout(idle);
+      idle = window.setTimeout(endPaging, WHEEL_IDLE_MS);
     };
     el.addEventListener('wheel', wheel, { passive: false });
     return () => {
@@ -360,7 +441,10 @@ const useGestures = ({ host, present, ...options }: IGestureOptions) => {
     };
   }, [host, present]);
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onClickCapture, onContextMenu };
+  /** Pages the stack by one plate, animated (a key, a plate pressed). */
+  const page = (dir: 1 | -1) => stack().step(dir);
+
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onClickCapture, onContextMenu, page };
 };
 
 export default useGestures;

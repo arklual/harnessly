@@ -29,7 +29,7 @@ export const uploadSrc = (m: MachineId, item: { id: string; mime?: string }): st
   }
   const id = UPLOAD_ID.exec(item.id)?.[1];
   if (!id) return null;
-  // under a hub the upload is read from the hub's store (it sends the machine's copy on for older ones).
+  // HRN-879: under a hub the upload is read from the hub's store (it sends the machine's copy on for older ones).
   if (appConfig().centralUploads)
     return `${gatewayPath(`/uploads/files/${id}`)}?machine=${encodeURIComponent(m)}`;
   return machineApi(m).http(`/uploads/${id}`);
@@ -42,7 +42,7 @@ const hex = (buf: ArrayBuffer) =>
   [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 /**
- * Puts what the machine took into the hub's store as well: the bytes under their sha256, then which upload of
+ * HRN-879. Puts what the machine took into the hub's store as well: the bytes under their sha256, then which upload of
  * the machine they are. The chat then reads it from the hub, with the machine off too. Best effort: a failure leaves the
  * upload on the machine only, as before, and is not the person's to see.
  */
@@ -78,7 +78,7 @@ export async function mirrorUpload(m: MachineId, file: Blob, ref: AttachmentRef)
 }
 
 /**
- * An attachment put into the hub while its machine was off: `hub:<sha256>`. The message waits in the outbox,
+ * HRN-879. An attachment put into the hub while its machine was off: `hub:<sha256>`. The message waits in the outbox,
  * and when the machine is back it takes its copy from the hub (takeKept) before the message goes.
  */
 const KEPT = /^hub:([0-9a-f]{64})$/;

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Every template is a package that passes validate as it is, with no warnings.
+// Every template is a package that passes validate as it is, with no warnings (HRN-924).
 func TestScaffoldTemplatesPassValidateStrict(t *testing.T) {
 	for _, tpl := range Templates {
 		dir := filepath.Join(t.TempDir(), "demo")

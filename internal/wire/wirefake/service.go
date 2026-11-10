@@ -285,7 +285,7 @@ func (s *Service) ConversationAfter(ctx context.Context, id, afterEntryID string
 		return wire.ConvSnapshot{}, convo.ErrUnknownCursor
 	}
 	snap := clone(c.snap)
-	// Every turn from the cursor's own on, as feed.After gives them.
+	// Every turn from the cursor's own on, as feed.After gives them (HRN-879).
 	from := len(snap.Turns)
 	for _, e := range snap.Entries[at:] {
 		if e.TurnID == nil {

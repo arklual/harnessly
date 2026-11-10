@@ -30,7 +30,7 @@ const FoldersDir = ".folders"
 var layoutFile = regexp.MustCompile(`^\.folders/[0-9a-f]{32}\.json$`)
 
 // MediaDir is a project's hidden folder of machine state (recordings, exports, thumbnails). Two things in it are the
-// design's and sync: the folder guests read the published files from (`<project>/.media/published/<file>`:
+// design's and sync (HRN-881): the folder guests read the published files from (`<project>/.media/published/<file>`:
 // the deck's PDF, a video's MP4, its chapters — files the runtime made, plain data no tool loads, one level deep), and
 // the mark that a deck's PDF is kept for guests (`<project>/.media/pdf-auto`), so any machine of the space may build it.
 const MediaDir = ".media"

@@ -52,7 +52,7 @@ type Tab struct {
 	// leaveTimer closes the page when no pane came back for it.
 	leaveTimer *time.Timer
 
-	// The pictures' pace. A pane that acks what it drew (paced) gets at most inflightMax pictures on the way:
+	// The pictures' pace (HRN-711). A pane that acks what it drew (paced) gets at most inflightMax pictures on the way:
 	// the browser's next one is held (chromeAck) until the pane catches up, so nothing piles up in the buffers between.
 	// While the page stands still, one still shot in the screen's own scale replaces the screencast's 1x picture
 	// (stillShown), and the screencast's pictures of a page that only blinks its caret are not sent over it.

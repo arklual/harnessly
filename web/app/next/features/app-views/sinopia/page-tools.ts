@@ -1,4 +1,4 @@
-// Sinopia's tools of the page and what it publishes: while a document is open beside its chat, the editor
+// Sinopia's tools of the page and what it publishes (HRN-808): while a document is open beside its chat, the editor
 // offers the chat's agent tools in WebMCP's form (registerTool through its SDK: show a board, reload it) and publishes what is on screen — the document, the board, the selection — for page_tools to read. The
 // tools of its manifest (sinopia_*) stay for the work that needs no open editor.
 import { useEffect, useRef } from 'react';

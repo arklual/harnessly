@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// The corpus of old apps (web/app/next/features/app-views/fixtures/compat/README.md): every package installs
+// The corpus of old apps (web/app/next/features/app-views/fixtures/compat/README.md, HRN-849): every package installs
 // on today's host as it is, and an install made before the consent was asked keeps its rights through an update that
 // asks for no more. A red test means an update of the host broke an app that worked: fix the host, never the app.
 func corpusDirs(t *testing.T) []string {

@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
-// The start page's «Настройка машины» card: GET <platform>/environment is how the setup of the hub's list
+// The start page's «Настройка машины» card (HRN-667): GET <platform>/environment is how the setup of the hub's list
 // stands on this machine; POST <platform>/environment/run puts a run of the list in the queue («Повторить»). Both are
 // the page's, under its session; the agent's CLI has its own way in.
 

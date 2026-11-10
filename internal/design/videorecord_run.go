@@ -20,7 +20,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// The recorder. The page runs on a clock of our own: the browser is chrome-headless-shell with
+// The recorder (HRN-627). The page runs on a clock of our own: the browser is chrome-headless-shell with
 // --deterministic-mode and --enable-begin-frame-control, so it draws a frame only when HeadlessExperimental.beginFrame
 // asks, and the time of that frame (frameTimeTicks) is the one we give. A frame is then one step of 1000/fps ms of the
 // page's own time, however long the machine takes to draw it: CSS animations, transitions and requestAnimationFrame all

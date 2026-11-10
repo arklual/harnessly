@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
-// The runtime's memory, seen from inside: on SIGUSR1 it writes its heap, allocations and goroutines as pprof
+// The runtime's memory, seen from inside (HRN-901): on SIGUSR1 it writes its heap, allocations and goroutines as pprof
 // profiles into <data dir>/debug and logs its memory statistics. A machine's root reads them with `go tool pprof`
 // (`kill -USR1 <pid>`), without a port to keep closed and without restarting what people work in.
 

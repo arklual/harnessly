@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// A new file, a rename and the trash: names that are not one entry, or that look like credentials, are
+// A new file, a rename and the trash (HRN-679): names that are not one entry, or that look like credentials, are
 // refused; a taken name is refused; the trash keeps the file and the note to put it back.
 func TestEntryOps(t *testing.T) {
 	dir := t.TempDir()

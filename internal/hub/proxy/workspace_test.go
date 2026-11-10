@@ -225,7 +225,7 @@ func hangingRuntime(name string, hang *atomic.Bool) http.Handler {
 	})
 }
 
-// a home machine whose runtime hangs while its agent keeps the link held every load of /agents/ for the whole
+// HRN-879: a home machine whose runtime hangs while its agent keeps the link held every load of /agents/ for the whole
 // wait on its settings, and kept answering for the person (me) with nothing. The page waits a moment once, the
 // machine is not asked again for a while, and the person's other machine that is on answers for them meanwhile.
 func TestWorkspaceDoesNotWaitOnAHomeMachineThatHangs(t *testing.T) {

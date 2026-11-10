@@ -49,7 +49,7 @@ func appGuardCommand() string {
 	return ""
 }
 
-// appsLiveHookCommand is the live hook of the apps every Claude Code chat runs on UserPromptSubmit: the same
+// appsLiveHookCommand is the live hook of the apps every Claude Code chat runs on UserPromptSubmit (HRN-975): the same
 // CLI as the guard's. "" when the deployment names no CLI and none lies beside the runtime: a hook off a PATH that may
 // not have it would fail at every turn.
 func appsLiveHookCommand() string {

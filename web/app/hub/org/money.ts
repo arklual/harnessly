@@ -13,7 +13,7 @@ export const setShownCurrency = (code: Currency['code'], rate?: number): void =>
   if (rate && rate > 0) perUsd = rate;
 };
 
-/** Remembers the currency any answer of the hub carries, so every screen writes money the same way. */
+/** Remembers the currency any answer of the hub carries, so every screen writes money the same way (HRN-670). */
 export const noteCurrency = (body: unknown): void => {
   const c = (body as { currency?: Partial<Currency> } | null)?.currency;
   if (c && (c.code === 'RUB' || c.code === 'USD')) setShownCurrency(c.code, c.perUsd);
@@ -28,7 +28,7 @@ export const shownSymbol = (): string => SYMBOL[current];
 export const inRubles = (): boolean => current === 'RUB';
 
 /**
- * What a part of the spend comes to, for a screen: the work at API prices, token by token. What the
+ * What a part of the spend comes to, for a screen: the work at API prices, token by token (HRN-663). What the
  * subscriptions cost a month is a fact of «Аккаунты», not of the work; it shows there. Paid stands in only for a part
  * that has no list price at all.
  */

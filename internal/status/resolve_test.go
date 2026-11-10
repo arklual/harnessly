@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
-// a new Claude writes its transcript only after the hook of the first prompt. The tab looks for it again
+// HRN-674: a new Claude writes its transcript only after the hook of the first prompt. The tab looks for it again
 // soon after, instead of waiting for the next poll of the tabs (30-60 s) while the answer is already there.
 func TestTranscriptOfANewSessionIsLookedForAgain(t *testing.T) {
 	e := newEnv(t, claudeTab(Idle), &tmux.PaneInfo{Command: "claude", Path: "/srv/app", PID: 10})

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// The living art in Chrome on the real engine: the sample scene (a hero walks in, waves, points at a chart that draws
+// The living art (HRN-652) in Chrome on the real engine: the sample scene (a hero walks in, waves, points at a chart that draws
 // itself, cheers under confetti) is a function of time. A frame reached by seeking, in any order, is the frame reached by playing
 // the scene through, and the check finds nothing wrong with it.
 

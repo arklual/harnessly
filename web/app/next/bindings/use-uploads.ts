@@ -112,7 +112,7 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       }
       const mark = { at: performance.now(), sent: 0, speed: 0 };
       const session = rowSession(id);
-      // a machine that is off gets the file later: it goes into the hub now, and the machine takes it from
+      // HRN-879: a machine that is off gets the file later: it goes into the hub now, and the machine takes it from
       // there when the message leaves the outbox.
       const offline = appConfig().centralUploads && connectionStore.get(machine)?.k !== 'live';
       const road = offline

@@ -11,7 +11,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// hl.files.watch: a view hears which files of its masks changed, not what is in them; it reads them again
+// hl.files.watch (HRN-850): a view hears which files of its masks changed, not what is in them; it reads them again
 // with hl.files.read when it wants to. One watch per view session; it ends with hl.files.unwatch, with the session, or
 // when the machine has too many.
 

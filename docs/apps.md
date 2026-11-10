@@ -61,7 +61,7 @@ A target with nothing of the app in it is an error, and so is a contribution to 
 `harnessly app enable <id>` (or the chat's app list) turns an app on in a Claude Code chat; Codex chats get apps
 later.
 
-An app turned on while the chat's agent runs reaches it live when it needs nothing a launch alone gives:
+An app turned on while the chat's agent runs reaches it live when it needs nothing a launch alone gives (HRN-975):
 every Claude Code chat has the `harnessly-app` server from its start, quiet (no tools, no words) while no app is on;
 when one turns on, the server tells the client over its GET stream (`notifications/tools/list_changed`) and the agent's
 next turn has the app's tools, and its instructions and skill files from the live hook (`harnessly hook app-context
@@ -515,7 +515,7 @@ installs) to `<apps>/team.json`, the way `design.access` does for the design lib
 from a machine (the one an owner installed on) for the platform to send to the others. A machine without the platform
 is told by hand: `harnessly app team set <space> owner|member`.
 
-Under a hub the team also travels through the space's `apps` collection of the hub's store, with or without
+Under a hub the team also travels through the space's `apps` collection of the hub's store (HRN-898), with or without
 the platform: a machine whose team changed writes it to `team/state.json` (the catalog and the installs, no role) and
 the packages' archives to `team/archives/<id>/<version>.tgz`; every machine of the space applies the team it reads there
 as it applies the platform's snapshot (the newer `at` wins, every archive checked against its sum), with its own
@@ -595,7 +595,7 @@ when the app is uninstalled. Only the token's hash is kept. The page itself carr
 The runtime answers these routes without a session (the token is the authority); how far a guest can reach the machine is
 the deployment's: through the hub's proxy a guest would need the hub session, so a public link is for a machine the
 guest can reach directly, or for the platform's gateway to relay. Under a hub the link also opens at
-`<hub>/apps/guest/<token>/` with the machine off (`internal/hub/appsview`): the machine puts each live link
+`<hub>/apps/guest/<token>/` with the machine off (HRN-898, `internal/hub/appsview`): the machine puts each live link
 into the space's `apps` collection (`guests/<person>/<hash>.json`, the token's hash, never the token) with the app's
 package (`bundles/<app>/<sum>.tgz`), every 15 seconds that the links changed, and takes out the ones that ended; the hub
 finds the link by the token's hash, checks the archive against its sum (never the trusted tier), and answers with the
@@ -758,7 +758,7 @@ What stays open, and cannot be closed by this wall:
 A dev install whose source folder is missing when the chat starts has no bind (bwrap cannot bind what is not there); the hook
 still refuses its being made.
 
-## Slots of the interface
+## Slots of the interface (HRN-753)
 
 A package can fill places of the interface itself, with no React and no fork. The places are targets of a view, in the
 same `views` list as the pane and chat views, and the view runs in the same sandboxed frame with the same bridge: its

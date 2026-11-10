@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
-// The agent's hooks of the apps (internal/apps hooks.go).
+// The agent's hooks of the apps (HRN-852, internal/apps hooks.go).
 //
 //	POST /api/cli/apps/hook          the guard of an agent's launch: {session, tool, input} → {deny, app, name, reason, context}
 //	POST <platform>/apps/hooks-off   the person's page: {id, off}, the feed's «Выключить хук»

@@ -35,7 +35,7 @@ export function useCentralHistory(links: string): void {
 const emptyQueue = (conv: ConvId): Queue => ({ conversationId: conv, items: [], paused: null, rev: 0 });
 
 /**
- * The feed of a chat from the cluster's copy (spec v10: reading goes through the hub). It is asked as soon as
+ * The feed of a chat from the cluster's copy (HRN-879, spec v10: reading goes through the hub). It is asked as soon as
  * the chat opens whenever the copy keeps the machine's chats, not only once the cluster calls the machine off: a
  * machine that is starting, hung or only just gone (the cluster names it offline 45 s later) used to hold the chat on a
  * skeleton and then «no answer». The machine's own snapshot, when it comes, has the last word; with the machine off the

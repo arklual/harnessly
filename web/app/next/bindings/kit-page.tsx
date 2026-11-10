@@ -1,4 +1,4 @@
-// The kit screen over the machine: reads the theme's canvas, opens the library's preview slot for the live
+// The kit screen over the machine (HRN-897): reads the theme's canvas, opens the library's preview slot for the live
 // pages (entered once by a hidden frame, then plain addresses), reads where the kit is used and the decks a layout can
 // go into, and turns the screen's actions into the machine's: a template as a project, a slide added to a deck, a text
 // put into a chat's field (never sent by itself).
@@ -54,7 +54,7 @@ const DRAFT_IDLE_MS = 15000;
 const KitPage = ({ machine, route, onOpenDrawer }: IKitPageProps) => {
   const [load, setLoad] = useState<TLoad>({ k: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  // The editing mode: the screen shows the kit's draft with its chat; its edits are read again as they come.
+  // The editing mode (HRN-903): the screen shows the kit's draft with its chat; its edits are read again as they come.
   const editing = route.version === KIT_DRAFT_VERSION;
   const edit = useKitEdit(machine, route.id, editing);
   const [fresh, setFresh] = useState(0);

@@ -841,7 +841,7 @@ func TestMaskEmail(t *testing.T) {
 	}
 }
 
-// An invitation may name a team of the space: the person who accepts it joins the space and that team.
+// An invitation may name a team of the space: the person who accepts it joins the space and that team (HRN-762).
 func TestInviteCarriesATeam(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
@@ -911,7 +911,7 @@ func TestInviteCarriesATeam(t *testing.T) {
 		t.Error("a link without a team put the guest in one")
 	}
 
-	// Someone already in the tenant: an email naming a team puts them in it at once, no letter; a team link
+	// Someone already in the tenant (HRN-970): an email naming a team puts them in it at once, no letter; a team link
 	// they open does the same. Before, both were dropped silently and the person never reached the team's machines.
 	second2 := store.Team{SpaceID: sp.ID, Slug: "ops", Name: "Опс"}
 	if err := e.db.S().CreateTeam(ctx, &second2); err != nil {

@@ -301,7 +301,7 @@ func (b *builder) add(o *jsvalue.Object, offset int64) step {
 		line := CommandLine(str(o, "name"), str(o, "args"))
 		cmdID := id
 		if str(o, "name") == ShellCommand && b.open == nil {
-			// A bash-mode line typed between turns is the person's message: it opens a turn of its own (the
+			// HRN-905. A bash-mode line typed between turns is the person's message: it opens a turn of its own (the
 			// agent answers it), its line as the opener and the command with its output as the turn's step. Outside
 			// any turn the page draws nothing of it, and the message on its way went with its signal.
 			if next, ok := siblingID(id); ok {

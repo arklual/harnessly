@@ -1,4 +1,4 @@
-// The move of a machine's data into the hub as «Машины» and the chat's bar show it, and «Продолжить с
+// The move of a machine's data into the hub as «Машины» and the chat's bar show it (HRN-883), and «Продолжить с
 // агентом»: a new chat on that machine with the brief in its field, for the person to send.
 import {
   moveBrief,

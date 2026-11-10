@@ -35,7 +35,7 @@ const (
 	// never two at once (observe), and only the few conversations that are starting look this often.
 	LookStarting = 250 * time.Millisecond
 	// BootSettle is how long a freshly started agent's screen must stand unchanged, its input box drawn, before it
-	// counts as ready for the first message. Kept at 1.5 s on purpose: Claude 2.1.317 on a loaded machine was
+	// counts as ready for the first message. Kept at 1.5 s on purpose (HRN-659): Claude 2.1.317 on a loaded machine was
 	// seen not showing keys typed up to two seconds after its box was drawn, and a lost first Enter costs more (a retry
 	// backing off from 1.5 s) than the settle does. What made the launch slow was the look a second apart, not this.
 	BootSettle = 1500 * time.Millisecond
@@ -1677,7 +1677,7 @@ func (c *conv) tick(now time.Time) {
 	c.flush(now, false)
 }
 
-// releaseQuietFeed lets the feed go of what it read once nobody has read it for FeedKept: the looks of an
+// releaseQuietFeed lets the feed go of what it read once nobody has read it for FeedKept (HRN-901): the looks of an
 // idle chat ask only what the released feed keeps, and the next page or message reads the transcript again.
 func (c *conv) releaseQuietFeed(now time.Time) {
 	if c.fd == nil || c.fd.Released() {
@@ -1694,7 +1694,7 @@ func (c *conv) releaseQuietFeed(now time.Time) {
 
 // clockEvery is how often the clock turns for nothing in particular: every second for a chat that may move, as seldom as
 // it is looked at for one stopped or gone — 276 gone and 101 stopped chats of one account turning every second were a
-// CPU of the runtime. A deadline, a timer or a message still wakes it on time.
+// CPU of the runtime (HRN-901). A deadline, a timer or a message still wakes it on time.
 func (c *conv) clockEvery() time.Duration {
 	switch c.rec.State.K {
 	case wire.StateStopped, wire.StateGone, wire.StateLaunchFailed:
@@ -1713,7 +1713,7 @@ func (c *conv) wake(now time.Time) time.Time {
 	}
 	if c.deletedAt == 0 {
 		// A deleted chat's queue is not pumped (pump returns at once): a time of its box past would turn the actor
-		// without a pause.
+		// without a pause (HRN-969).
 		consider(c.box.Wake())
 	}
 	consider(c.throttle.Wake())
@@ -1721,7 +1721,7 @@ func (c *conv) wake(now time.Time) time.Time {
 	consider(c.restartWake())
 	if c.rec.PendingModel != nil && c.pendingAt.After(now) {
 		// Once past, the change waits for the agent to be at its prompt (canSwitchNow), not for the clock: every tick
-		// asks again, and a past time here would make those ticks back to back.
+		// asks again, and a past time here would make those ticks back to back (HRN-969).
 		consider(c.pendingAt)
 	}
 	if w := c.rec.State.Wait; w != nil {
@@ -1736,7 +1736,7 @@ func (c *conv) wake(now time.Time) time.Time {
 		consider(c.flushedAt.Add(StateCoalesce))
 	}
 	if !c.titling && c.deletedAt == 0 {
-		// watchTitle names no deleted chat, and its due time stays: past, it would be due at every turn.
+		// watchTitle names no deleted chat, and its due time stays: past, it would be due at every turn (HRN-969).
 		consider(c.titleDueAt)
 	}
 	if next.Before(now) {

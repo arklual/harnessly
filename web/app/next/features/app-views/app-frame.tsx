@@ -37,6 +37,14 @@ import {
 import AppFail from '@/next/features/app-views/app-fail';
 import { logCall, logKey } from '@/next/features/app-views/bridge-log';
 import { bridgeLine, consoleLine, queueViewLog } from '@/next/features/app-views/view-log-report';
+import { cleanUrl, followTrace, journal, newTrace } from '@/next/core/journal';
+import {
+  frameReason,
+  journalReason,
+  journalSource,
+  withTraceParam,
+  type IFrameSeen,
+} from '@/next/features/app-views/view-journal';
 import {
   FAIL_REASON,
   HANDSHAKE_WAIT_MS,
@@ -219,6 +227,16 @@ const AppFrame = ({
   const waits = app.state === APP_STATE.waiting;
   const key = `${machine}|${app.id}|${view.id}|${viewPort}|${reload}|${reloadToken}|${waits ? 'w' : ''}`;
   const state: TFrameState = health.key === key ? health.state : LOADING;
+  // The frame's key, by a name the bridge's effect does not shadow.
+  const frameKey = key;
+  // One trace for everything of this mount, from the page's ask for a session through the slot and the view server
+  // to the view's calls, so `harnessly logs` reads one chain (HRN-976).
+  const mountRef = useRef<{ key: string; trace: string; at: number } | null>(null);
+  // Read in effects only: the first effect of a mount makes it.
+  const mountOf = useCallback((k: string) => {
+    if (mountRef.current?.key !== k) mountRef.current = { key: k, trace: newTrace('v-'), at: Date.now() };
+    return mountRef.current;
+  }, []);
   const send = useCallback(
     (event: TFrameEvent) =>
       setHealth((h) => {
@@ -245,6 +263,22 @@ const AppFrame = ({
     const failText = (text: string) => fail({ reason: FAIL_REASON.refused, detail: text });
     const failError = (e: Error) => fail(classifySessionError(e.message));
     const slow = t('next.appfail.sessionTimeout', { s: SESSION_WAIT_MS / 1000 });
+    // The session's request carries the mount's trace; the runtime keeps it with the session.
+    const mount = mountOf(key);
+    followTrace(mount.trace);
+    journal(
+      {
+        level: 'info',
+        src: journalSource(app.id),
+        ev: 'view.open',
+        app: app.id,
+        view: view.id,
+        trace: mount.trace,
+        ...(chat === null ? {} : { chat }),
+        ...(waits ? { text: `waiting: ${app.reason ?? ''}` } : {}),
+      },
+      machine,
+    );
     if (waits) {
       fail({ reason: FAIL_REASON.waiting, detail: app.reason ?? '' });
       return () => {
@@ -307,7 +341,14 @@ const AppFrame = ({
             SESSION_WAIT_MS,
             slow,
           );
-          if (live) setOpened({ key, src: o.enterUrl, session: made.session, nonce: made.nonce });
+          // The address carries the mount's trace: a gateway in front of the machine logs a refusal with it.
+          if (live)
+            setOpened({
+              key,
+              src: withTraceParam(o.enterUrl, mount.trace),
+              session: made.session,
+              nonce: made.nonce,
+            });
         })
         .catch(failError);
     } else failText(t('next.appview.noEntry'));
@@ -316,6 +357,7 @@ const AppFrame = ({
     };
   }, [
     key,
+    mountOf,
     send,
     waits,
     app.reason,
@@ -375,6 +417,49 @@ const AppFrame = ({
     }, RENEW_MS);
     return () => window.clearInterval(timer);
   }, [machine, session]);
+
+  // What the page sees of the frame itself (HRN-976): when its first document loaded, and a refusal of the page's own
+  // policy. When the machine never saw the view's request, these are what the card can tell.
+  const frameSeen = useRef<IFrameSeen | null>(null);
+  useEffect(() => {
+    if (!frame || src === null) return;
+    const seenNow: IFrameSeen = { src, at: Date.now(), loadedAt: null, csp: null };
+    frameSeen.current = seenNow;
+    const mount = mountOf(key);
+    const tags = { app: app.id, view: view.id, trace: mount.trace, ...(chat === null ? {} : { chat }) };
+    const onLoad = () => {
+      if (seenNow.loadedAt !== null) return;
+      seenNow.loadedAt = Date.now();
+      journal(
+        {
+          level: 'info',
+          src: journalSource(app.id),
+          ev: 'frame.load',
+          url: cleanUrl(seenNow.src),
+          dur: seenNow.loadedAt - seenNow.at,
+          ...tags,
+        },
+        machine,
+      );
+    };
+    let origin = '';
+    try {
+      origin = new URL(src, window.location.href).origin;
+    } catch {
+      origin = '';
+    }
+    const onCsp = (e: SecurityPolicyViolationEvent) => {
+      if (origin === '' || !e.blockedURI.startsWith(origin)) return;
+      if (!/^(frame-src|child-src|default-src)/.test(e.effectiveDirective)) return;
+      seenNow.csp = e.effectiveDirective;
+    };
+    frame.addEventListener('load', onLoad);
+    document.addEventListener('securitypolicyviolation', onCsp);
+    return () => {
+      frame.removeEventListener('load', onLoad);
+      document.removeEventListener('securitypolicyviolation', onCsp);
+    };
+  }, [frame, src, machine, app.id, view.id, chat, key, mountOf]);
 
   // The first document the frame loads is the view; any later load is a navigation, which ends the bridge. It is kept
   // apart from the bridge's effect so that a bridge made afresh later does not take the navigated page for the first.
@@ -544,13 +629,18 @@ const AppFrame = ({
     // A remote view speaks from its own origin, and is answered only there.
     const remoteOrigin = remote && src !== null ? new URL(src).origin : null;
     const key = logKey(app.id, chat);
-    // What the view reports goes to the debug section here and to the machine, where the CLI reads it.
+    // What the view reports goes to the debug section here and to the machine, where the CLI reads it (HRN-913).
     const report = (line: ReturnType<typeof bridgeLine>) =>
       line && queueViewLog(machine, app.id, view.id, line);
+    const jsrc = journalSource(app.id);
+    const mount = mountOf(frameKey);
+    const tags = { app: app.id, view: view.id, trace: mount.trace, ...(chat === null ? {} : { chat }) };
     host.debugLog = (level, text) => {
       const at = Date.now();
       logCall(key, { method: `console.${level}`, permission: '', ok: false, message: text, at });
       report(consoleLine(level, text, at));
+      if (level === 'error' || level === 'warn')
+        journal({ at, level, src: jsrc, ev: 'view.console', text, ...tags }, machine);
     };
     const b = new AppBridge({
       frame: () => frame.contentWindow,
@@ -560,11 +650,30 @@ const AppFrame = ({
       context: latest.current.context,
       handlers: host,
       hostVersion: HOST_VERSION,
-      onReady: () => send({ k: 'handshake' }),
+      onReady: () => {
+        journal(
+          { level: 'info', src: jsrc, ev: 'ui.initialize', dur: Date.now() - mount.at, ...tags },
+          machine,
+        );
+        send({ k: 'handshake' });
+      },
       ...(nonce === null ? {} : { nonce }),
       onCall: (entry) => {
         logCall(key, entry);
         report(bridgeLine(entry));
+        if (!entry.ok && !entry.method.startsWith('console.'))
+          journal(
+            {
+              at: entry.at,
+              level: entry.code === 'host_unavailable' ? 'error' : 'warn',
+              src: jsrc,
+              ev: 'bridge',
+              tool: entry.method,
+              text: [entry.code, entry.message].filter(Boolean).join(': '),
+              ...tags,
+            },
+            machine,
+          );
         latest.current.onBridgeCall?.(entry);
       },
     });
@@ -573,23 +682,61 @@ const AppFrame = ({
     const offChat = chat === null ? null : watchChatEvents(chat, (kind, params) => b.event(kind, params));
     const onMessage = (event: MessageEvent) => void b.onMessage(event);
     window.addEventListener('message', onMessage);
-    // A view that never connects shows nothing of why: the debug section says so.
+    // A view that never connects shows nothing of why: the debug section says so, with the cause the machine's journal
+    // knows (a file the slot refused, a request the preview blocked), and the card shows that cause too (HRN-976).
     const watchdog = window.setTimeout(() => {
-      if (!b.ready && bridge.current === b)
+      if (b.ready || bridge.current !== b) return;
+      const known = seen.current?.key === mount.key ? seen.current.failure.detail : '';
+      const asked =
+        known === '' ? journalReason(machine, app.id, chat, mount.at, mount.trace) : Promise.resolve(known);
+      // The machine saw nothing of the view: the page says what it saw of the frame (a gateway, its own policy).
+      const told = asked.then(async (why) => {
+        if (why !== '' || b.ready || bridge.current !== b) return why;
+        const shownFrame = frameSeen.current;
+        const r = await frameReason(shownFrame, mount.trace);
+        if (r.text !== '')
+          journal(
+            {
+              level: 'error',
+              src: jsrc,
+              ev: 'frame.gateway',
+              url: cleanUrl(shownFrame?.src ?? ''),
+              text: r.text,
+              ...(r.status === undefined ? {} : { status: r.status }),
+              ...tags,
+            },
+            machine,
+          );
+        return r.text;
+      });
+      void told.then((why) => {
+        if (b.ready || bridge.current !== b) return;
+        const base = `ui/initialize — host_unavailable: no handshake in ${HANDSHAKE_WAIT_MS / 1000} s`;
+        const message =
+          t('next.inspector.noHandshake', { s: HANDSHAKE_WAIT_MS / 1000 }) + (why === '' ? '' : ` — ${why}`);
         logCall(key, {
           method: 'ui/initialize',
           permission: '',
           ok: false,
           code: 'host_unavailable',
-          message: t('next.inspector.noHandshake', { s: HANDSHAKE_WAIT_MS / 1000 }),
+          message,
           at: Date.now(),
         });
-      if (!b.ready && bridge.current === b)
-        report({
-          level: 'bridge',
-          text: `ui/initialize — host_unavailable: no handshake in ${HANDSHAKE_WAIT_MS / 1000} s`,
-          at: Date.now(),
-        });
+        report({ level: 'bridge', text: why === '' ? base : `${base} — ${why}`, at: Date.now() });
+        journal(
+          {
+            level: 'error',
+            src: jsrc,
+            ev: 'ui.initialize',
+            text: why === '' ? base : `${base} — ${why}`,
+            dur: Date.now() - mount.at,
+            ...tags,
+          },
+          machine,
+        );
+        if (why !== '' && known === '')
+          send({ k: 'session-failed', failure: { reason: FAIL_REASON.silent, detail: why } });
+      });
     }, HANDSHAKE_WAIT_MS);
     return () => {
       window.clearTimeout(watchdog);
@@ -621,6 +768,8 @@ const AppFrame = ({
     src,
     view.id,
     send,
+    mountOf,
+    frameKey,
   ]);
 
   // The view has HANDSHAKE_WAIT_MS from the moment its address is given to the frame; no handshake, no view. The wait
@@ -642,6 +791,7 @@ const AppFrame = ({
       const said = viewErrorOf(event.data);
       if (said === null) return;
       const failure = failureOfViewError(said, app.id);
+      const mount = mountOf(key);
       seen.current = {
         key,
         failure: keepTelling(seen.current?.key === key ? seen.current.failure : null, failure),
@@ -655,14 +805,31 @@ const AppFrame = ({
         message,
         at,
       });
-      // The same line goes to the machine, where `harnessly app logs` reads it: one journal, not two.
+      // The same line goes to the machine, where `harnessly app logs` reads it (HRN-913), and to the machine's
+      // journal with the file's address and the mount's trace, where `harnessly logs` reads it (HRN-976).
       queueViewLog(machine, app.id, view.id, { level: 'error', text: message, at });
+      journal(
+        {
+          at,
+          level: 'error',
+          src: journalSource(app.id),
+          ev: said.kind === 'resource' ? 'resource' : `view.${said.kind}`,
+          text: said.text,
+          ...(said.src === '' ? {} : { url: cleanUrl(said.src) }),
+          ...(said.status === null ? {} : { status: said.status }),
+          app: app.id,
+          view: view.id,
+          trace: mount.trace,
+          ...(chat === null ? {} : { chat }),
+        },
+        machine,
+      );
       // A refusal of the view server is the answer, not a guess: the card needs no more waiting.
       if (said.kind === 'refused') send({ k: 'session-failed', failure });
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [frame, ready, machine, app.id, view.id, chat, key, send]);
+  }, [frame, ready, machine, app.id, view.id, chat, key, send, mountOf]);
 
   // `storage`: a key of the app's storage was written (by the agent, another view of the app, the view itself), told at
   // once from the runtime's stream. It names the scope and the key, never the value; the view reads the key again.

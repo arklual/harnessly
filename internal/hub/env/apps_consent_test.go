@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// The organization's rule for apps rides on env.set to a machine that keeps it, and its hash changes with
+// The organization's rule for apps (HRN-915) rides on env.set to a machine that keeps it, and its hash changes with
 // the rule; an older machine gets the list as before, without the field and under the items' hash.
 func TestAppsConsentRuleGoesWithTheList(t *testing.T) {
 	a := newAcme(t)

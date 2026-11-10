@@ -1,4 +1,4 @@
-// The phone's pill: beside a phone or a tablet on the canvas, the way it is drawn — turned or upright, its case,
+// The phone's pill (HRN-674): beside a phone or a tablet on the canvas, the way it is drawn — turned or upright, its case,
 // its status bar, the browser's bars, a fingertip instead of the pointer (no hover). It stands on the phone's right, level
 // with its top, and follows it as the canvas moves; with no room there it lies over the phone. Dragged, it stays where it
 // was put; its menu (a right click) has the same with names, back to its place, hide (floating-pill.tsx).

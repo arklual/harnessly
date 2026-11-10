@@ -52,13 +52,13 @@ type Changes struct {
 	Rev     int64   `json:"rev"`
 	Entries []Entry `json:"entries"`
 	More    bool    `json:"more,omitempty"`
-	// Scope names what of the room the caller sees (a design library shows a machine only the projects its
+	// Scope names what of the room the caller sees (HRN-880: a design library shows a machine only the projects its
 	// people have a role in). It changes when that does; "" for a caller who sees the whole room.
 	Scope string `json:"scope,omitempty"`
 }
 
 // Snapshot is a folder of the room as it was at a revision: the newest revision of every path under the prefix that
-// is not newer than At, deleted paths left out (a design's history and its pinned versions).
+// is not newer than At, deleted paths left out (HRN-880: a design's history and its pinned versions).
 type Snapshot struct {
 	At      int64   `json:"at"`
 	Entries []Entry `json:"entries"`

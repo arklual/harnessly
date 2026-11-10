@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Sinopia is an app of the host's own: its manifest declares its points and the older targets as its aliases.
+// Sinopia is an app of the host's own: its manifest declares its points and the older targets as its aliases (HRN-808).
 func TestSinopiaIsBuiltinWithItsPoints(t *testing.T) {
 	m := builtinOf(SinopiaApp)
 	if m == nil || m.Delivery != DeliveryBuiltin || !slices.Contains(m.Targets, TargetApp) {
@@ -42,7 +42,7 @@ func TestSinopiaIsBuiltinWithItsPoints(t *testing.T) {
 }
 
 // The apps written for Sinopia before it had points work as they are: their manifests are not touched, and what they
-// put into Sinopia goes into its points (stage 4).
+// put into Sinopia goes into its points (HRN-808, stage 4).
 func TestSinopiaAppsWorkUnchangedThroughItsPoints(t *testing.T) {
 	read := func(name string) *Manifest {
 		raw, err := os.ReadFile(filepath.Join("..", "..", "docs", "apps", name, ManifestPath))

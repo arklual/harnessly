@@ -14,15 +14,15 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 )
 
-// The workspace's chat history from the hub's copy (docs/hub/history.md): what a cluster's gateway answers
+// The workspace's chat history from the hub's copy (docs/hub/history.md, HRN-879): what a cluster's gateway answers
 // under <platform api>/history, read here instead of on the person's home machine, so the list and a chat open with
 // every machine off.
 //
 //	GET <platform api>/history/conversations                            the list, which machines are on, the chats
 //	GET <platform api>/history/conversations/<id>?before=&limit=        a page of a chat, oldest turn first
 //	GET <platform api>/history/conversations/<id>/turns/<turn>/entries  the steps of one folded turn
-//	GET <platform api>/history/conversations/<id>/entries/<entry>/output the whole output of a tool
-//	GET <platform api>/history/conversations/<id>/rewinds/<n>/turns      the turns rewind n left behind
+//	GET <platform api>/history/conversations/<id>/entries/<entry>/output the whole output of a tool (HRN-879)
+//	GET <platform api>/history/conversations/<id>/rewinds/<n>/turns      the turns rewind n left behind (HRN-879)
 //	GET <platform api>/history/search?q=&limit=                          the person's messages that hold the words
 //	GET <platform api>/history/sidebar                                   the person's projects and favorites, with its rev
 //	PUT <platform api>/history/sidebar {baseRev, doc}                    writes it on baseRev; 409 with the current one

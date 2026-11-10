@@ -1,4 +1,4 @@
-// Package appsview is the hub's own serving of a harnessly app's guest link: the page, the view's files and
+// Package appsview is the hub's own serving of a harnessly app's guest link (HRN-898): the page, the view's files and
 // the link's area of the storage, all from the space's apps collection of the hub's store, so a link opens with the
 // machine that made it off. The machine puts its live links there (guests/<person>/<hash>.json, never the token) and
 // the app's package (bundles/<app>/<sum>.tgz); the hub finds a link by the token's hash, checks the archive against its

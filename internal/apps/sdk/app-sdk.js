@@ -537,7 +537,7 @@ export async function connect(options = {}) {
     confirm: (text) => request('harnessly/ui.confirm', { text }, { timeout: 0 }).then((r) => r.ok),
   };
   // The host's shortcut commands of a screen (deck, video, site, pictures, files), on the keys the person set for them:
-  // the view runs them while it is up. A press inside the view's own frame is the view's; hl.keys.press passes
+  // the view runs them while it is up (HRN-808). A press inside the view's own frame is the view's; hl.keys.press passes
   // one on to the host, which runs it only while the frame has the focus.
   const keyScopes = new Map();
   hl.keys = {

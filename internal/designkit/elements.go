@@ -40,7 +40,7 @@ func FunctionValue(v any) (field string, ok bool) {
 var previewPropRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]{0,40}$`)
 
 // PreviewProp tells whether the live preview passes a prop of this name: a plain name (letters and digits — the board
-// engine reads a dashed attribute under other spellings), never a handler, a style, a link or a loader,
+// engine reads a dashed attribute under other spellings, HRN-897), never a handler, a style, a link or a loader,
 // whatever the kit declares. The check warns about sample props it leaves out, so a picture never silently lacks one.
 func PreviewProp(name string) bool {
 	if !previewPropRe.MatchString(name) {

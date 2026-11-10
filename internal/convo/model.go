@@ -94,7 +94,7 @@ func (c *conv) modelDiff(m wire.ModelCmd) modelDiff {
 		fastOn: m.FastAfter(c.rec.Model), permissionTo: m.PermissionAfter(c.rec.Model)}
 	d.effort = m.Effort != nil && (d.model || curEffort == nil || *curEffort != *m.Effort)
 	d.ultracode = d.ultracodeOn != curUltra
-	// Fast mode and the permission mode are typed when the ask turns them; a permission mode of "" is the
+	// Fast mode and the permission mode (HRN-945) are typed when the ask turns them; a permission mode of "" is the
 	// machine's default and is never typed.
 	curFast, curPermission := false, wire.PermissionMode("")
 	if cur := c.rec.Model; cur != nil {
@@ -251,7 +251,7 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 			}
 			took.ultracode = true
 		}
-		// A profile's fast mode is its proxy's (the gpt relay reads it off the tab on each request): nothing is
+		// A profile's fast mode is its proxy's (the gpt relay reads it off the tab on each request, HRN-945): nothing is
 		// typed, the tab keeps it once the change is on record.
 		if diff.fast && !onProfile {
 			if err := typist.SetFast(pane, clock, diff.fastOn); err != nil {
@@ -322,7 +322,7 @@ func (c *conv) canRestart() bool {
 		(c.rec.AgentSessionID != "" || c.rec.TranscriptPath != "")
 }
 
-// restartInMode starts the chat's agent again in the permission mode: its terminal is stopped the way an idle
+// restartInMode starts the chat's agent again in the permission mode (HRN-945): its terminal is stopped the way an idle
 // one is, under the pane's lock, the record takes the mode, and the agent is resumed on its session at once, with the
 // mode on its launch line (the tab's launch keeps it, Launcher.Resume). The queue waits meanwhile, as for a switch.
 func (c *conv) restartInMode(to wire.PermissionMode, done func(err error, now time.Time)) {

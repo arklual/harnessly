@@ -23,7 +23,7 @@ import (
 // on; RUNTIME_HUB_ENV_SWITCH=on lets the page offer the personal switch (see PUT).
 //
 // The personal switch is the hub's (PUT /api/me/env/{itemId}, internal/hub/env/api_me.go) and needs the person's hub
-// session, which the runtime does not hold. Until the hub takes a machine-authenticated switch, PUT answers
+// session, which the runtime does not hold. Until the hub takes a machine-authenticated switch (HRN-667), PUT answers
 // 501 «no-hub-session» and changes nothing.
 
 // hubEnvItem is one row of the section.

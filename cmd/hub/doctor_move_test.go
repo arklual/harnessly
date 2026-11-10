@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// `hub doctor` lists every machine's move and, for a code that failed, its cause and fix from the page of the
+// HRN-883: `hub doctor` lists every machine's move and, for a code that failed, its cause and fix from the page of the
 // move this version carries.
 func TestDoctorSaysTheMoveAndTheFixOfItsCodes(t *testing.T) {
 	c := describeMoves([]hubproto.MigrationStatus{

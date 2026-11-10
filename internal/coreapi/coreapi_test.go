@@ -350,7 +350,7 @@ func TestClaudeHook(t *testing.T) {
 	if e := ev[0].args[2].(agents.Event); e.AgentSession != "" {
 		t.Fatalf("a hook naming no agent session: %+v", e)
 	}
-	// the agent's own session id goes with the event, for the keeper to tell a foreign agent's hook.
+	// HRN-659: the agent's own session id goes with the event, for the keeper to tell a foreign agent's hook.
 	expect(t, r.post("/api/status/hook", `{"event":"stop","session":"s1","agentSessionId":"9764fa81-4c34-4673-af5e-6f243c9d8be1"}`), 204, "")
 	if ev = r.keeper.named("event"); len(ev) != 3 || ev[2].args[2].(agents.Event).AgentSession != "9764fa81-4c34-4673-af5e-6f243c9d8be1" {
 		t.Fatalf("%+v", ev)

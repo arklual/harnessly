@@ -1,4 +1,4 @@
-// The welcome of a first launch: once per browser, on the greeting, when the person has no chat yet and
+// The welcome of a first launch (HRN-792): once per browser, on the greeting, when the person has no chat yet and
 // «Что нового» is not on screen, a card at the top offers the one-minute introduction (a tour over the real greeting) or the lessons.
 // It blocks nothing: the page stays clickable, and any answer puts it away for good.
 import { useEffect, useState } from 'react';

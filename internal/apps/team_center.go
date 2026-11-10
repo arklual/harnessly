@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/filestore"
 )
 
-// Under a hub the team's apps travel through the space's apps collection of the hub's store, not only
+// HRN-898. Under a hub the team's apps travel through the space's apps collection of the hub's store, not only
 // through the platform's snapshot: an app installed for the space reaches every machine of it, and a machine that
 // joins (or was off) finds it there, whichever machine installed it is on or off. A machine whose team changed (an
 // owner's install or uninstall, a publish, a rollback) writes the team (TeamStateFile) and the packages' archives

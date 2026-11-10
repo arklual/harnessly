@@ -15,7 +15,7 @@ func notDue(t *testing.T, r *rig) {
 	}
 }
 
-// a stalled head whose last try's time is long past waits for the person; Wake does not name that time.
+// HRN-969: a stalled head whose last try's time is long past waits for the person; Wake does not name that time.
 func TestStalledHeadDoesNotWakeTheClock(t *testing.T) {
 	r := newRig(t, withInput(t, "a draft the person is writing"), wire.StateIdle)
 	r.send("m1", "hello there", wire.ModeQueue)
@@ -37,7 +37,7 @@ func TestStalledHeadDoesNotWakeTheClock(t *testing.T) {
 	notDue(t, r)
 }
 
-// a retry's time that came while the agent works is not named by Wake over and over: the agent's state holds
+// HRN-969: a retry's time that came while the agent works is not named by Wake over and over: the agent's state holds
 // the head, and the try goes when it lets it.
 func TestDueRetryWhileAgentBusyDoesNotWakeTheClock(t *testing.T) {
 	r := newRig(t, withInput(t, "a draft the person is writing"), wire.StateIdle)

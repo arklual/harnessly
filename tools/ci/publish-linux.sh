@@ -1,5 +1,5 @@
 #!/bin/sh
-# Publishes the linux-amd64 binaries of a release tag vX.Y.Z (agent, harnessly, runtime and their SHA256SUMS) to
+# HRN-912. Publishes the linux-amd64 binaries of a release tag vX.Y.Z (agent, harnessly, runtime and their SHA256SUMS) to
 # the generic package agent/X.Y.Z, which the machines take (their pin checks exactly these four files, each uploaded by a
 # pipeline of this tag). Not rebuilt: the main pipeline of this very commit built them already (release-build, on the
 # release runner with the protected caches, as this job would), and runtime-tag named that job in the tag's message

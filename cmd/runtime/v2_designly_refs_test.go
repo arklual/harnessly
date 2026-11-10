@@ -12,7 +12,7 @@ import (
 )
 
 // A design attached to a chat's message is named with its folder and the rules of a design dialog. Naming it is no work
-// on it: the chat does not become one of the design's chats.
+// on it: the chat does not become one of the design's chats (HRN-675).
 func TestAnAttachedDesignIsNamedNotLinked(t *testing.T) {
 	t.Setenv("RUNTIME_LOCALE", "")
 	root, data := t.TempDir(), t.TempDir()

@@ -13,7 +13,7 @@ export type TTab =
   | { id: string; kind: 'machine' }
   | { id: string; kind: 'designly'; design: string | null }
   | { id: string; kind: 'subagent'; focus: string | null }
-  /** `against`: the file is shown against another state of it — 'git:<ref>' or the path of another file.
+  /** `against`: the file is shown against another state of it — 'git:<ref>' or the path of another file (HRN-679).
    *  `at`: the place in the file to show (a line «Найти в файлах» found). */
   | {
       id: string;
@@ -119,7 +119,7 @@ export const MACHINE = '/';
 
 const placeFiles = (state: IPaneTabs, target: string | null, ctx: IPlaceContext): IPlaced => {
   const rel = target === null ? '' : inFolder(ctx.cwd, target);
-  // A file or a folder outside the chat's folder opens here too, by its absolute path: a file the agent
+  // A file or a folder outside the chat's folder opens here too, by its absolute path (HRN-679): a file the agent
   // handed over or made in a worktree beside it, a folder of the machine («Машина», what «Диск» was). The machine says
   // what of it may be read.
   if (rel === null) {

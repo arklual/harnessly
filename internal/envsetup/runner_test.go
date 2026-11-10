@@ -1028,7 +1028,7 @@ func TestHeartbeatIsWritten(t *testing.T) {
 	}
 }
 
-// The heartbeat is written while Tick is busy (a run of minutes): Run keeps it on its own.
+// The heartbeat is written while Tick is busy (a run of minutes): Run keeps it on its own (HRN-901).
 func TestHeartbeatGoesOnWhileARunWorks(t *testing.T) {
 	var mu sync.Mutex
 	clock := time.Now()

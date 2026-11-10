@@ -198,7 +198,7 @@ func (m *Manager) scanAll() {
 		ports  []int
 	}
 	// Each tab's look (its processes, its transcript's tail) is independent of the others': a pool reads them, since
-	// one by one a hundred tabs on a cold disk took minutes. The order of the tabs stays the layouts'.
+	// one by one a hundred tabs on a cold disk took minutes (HRN-901). The order of the tabs stays the layouts'.
 	ready := make([]prepared, len(tabs))
 	eachLimited(len(tabs), scanWorkers, func(i int) {
 		st := tabs[i]

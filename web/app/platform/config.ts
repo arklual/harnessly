@@ -63,7 +63,7 @@ export interface IAppConfig {
   hubUrl: string | null;
   /** Where the «Хаб» link leads (RUNTIME_HUB_LINK, else hubUrl), no trailing slash. It says nothing of who signs in. */
   hubLink: string | null;
-  /** the hub keeps the chats' uploads (its store): what a person attaches goes there too, and the chat's
+  /** HRN-879: the hub keeps the chats' uploads (its store): what a person attaches goes there too, and the chat's
    *  pictures and files are read from there, the machine on or off. Set by the hub's workspace; false elsewhere. */
   centralUploads: boolean;
 }

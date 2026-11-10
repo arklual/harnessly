@@ -1,6 +1,6 @@
 package hlcli
 
-// `harnessly app <sub> --help` and a bare `harnessly app` print help, never an error. The texts follow the
+// `harnessly app <sub> --help` and a bare `harnessly app` print help, never an error (HRN-924). The texts follow the
 // APPS section of helpText; commandHelp["app <sub>"] is what the command line looks up.
 
 // appSubHelp is the usage of each subcommand of `harnessly app`: the line, then what it does.

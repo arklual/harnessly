@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/storelink"
 )
 
-// a machine reports the move of its data with its store session; the person who may open it sees how far it
+// HRN-883: a machine reports the move of its data with its store session; the person who may open it sees how far it
 // is and asks to retry; nobody else sees it.
 func TestTheJournalOfAMachinesMove(t *testing.T) {
 	s := hubtest.New(t)
@@ -129,7 +129,7 @@ func must(t *testing.T, r hubtest.Resp) hubtest.Resp {
 	return r
 }
 
-// a machine merges its projects and favorites into its person's sidebar with its store session; the journal
+// HRN-883: a machine merges its projects and favorites into its person's sidebar with its store session; the journal
 // counts the object verified only once the sidebar lists the machine; a hub without history answers 404.
 func TestAMachineMergesItsSidebarIntoItsPersons(t *testing.T) {
 	s := hubtest.New(t)

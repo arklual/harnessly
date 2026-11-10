@@ -1,4 +1,4 @@
-/* The install screen of an app (features/app-consent): the name the largest, the warning under it, then what
+/* The install screen of an app (features/app-consent, HRN-849): the name the largest, the warning under it, then what
    the app reaches from the most dangerous down. The sheet's own rise and leave animate it; nothing here moves. */
 @media (min-width: 761px) {
   .hx-sheet.hx-consent {
@@ -187,7 +187,7 @@
   color: var(--hx-danger);
 }
 
-/* The consent where the person is: a card over the chat's field, in its right pane and over the app's own
+/* The consent where the person is (HRN-915): a card over the chat's field, in its right pane and over the app's own
    window. The name of the app is the largest; what it gets under it; «Разрешить» the one loud button. */
 .hx-consentasks {
   display: flex;
@@ -315,7 +315,7 @@
     animation-duration: 1ms;
   }
 }
-/* The waiting access of an installed app, with «Разрешить» and «Отклонить» under it: in the card's details
+/* The waiting access of an installed app, with «Разрешить» and «Отклонить» under it (HRN-913): in the card's details
    and, centred, on the app's own page in place of its view. */
 .hx-consentblock {
   display: flex;

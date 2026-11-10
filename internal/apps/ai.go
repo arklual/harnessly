@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 )
 
-// One answer of a model for an app (the right `ai`): Claude Code in print mode with no tools, no settings and
+// One answer of a model for an app (the right `ai`, HRN-853): Claude Code in print mode with no tools, no settings and
 // no session, in an empty folder, on the person's own login. The call is made only when its worst price fits in what
 // is left of the app's budget of the day; it is capped twice (`--max-budget-usd` and the output's tokens), and the day
 // is charged what the model says it cost.

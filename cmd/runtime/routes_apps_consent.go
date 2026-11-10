@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
-// The person's word on an app: the install screen's «Установить» and «Отмена», the switch of its card and
+// The person's word on an app (HRN-849): the install screen's «Установить» and «Отмена», the switch of its card and
 // its journal. The page's session only: no CLI token and no agent reaches these, so what an app may do changes only by
 // a click of the person in the host's page (internal/apps consent.go).
 
@@ -75,7 +75,7 @@ func appConsentRoutes(d deps, reg *apps.Registry) []gate.Route {
 		secretJSON(w, http.StatusOK, map[string]any{"app": viewOfApp(got, false)})
 	}
 
-	// revoke: takes one access back; the app then waits for the person's word again.
+	// revoke: takes one access back (HRN-965); the app then waits for the person's word again.
 	revoke := func(w http.ResponseWriter, r *http.Request) {
 		if !pageOK(w, r, http.MethodPost) {
 			return
@@ -153,7 +153,7 @@ func appConsentRoutes(d deps, reg *apps.Registry) []gate.Route {
 	}
 
 	// asks: the apps that wait for the person's word, light (no view server, no states): what the chat's card, its
-	// right pane and the app's own window read, and read again while the page is seen.
+	// right pane and the app's own window read, and read again while the page is seen (HRN-915).
 	asks := func(w http.ResponseWriter, r *http.Request) {
 		if !pageOK(w, r, http.MethodGet) {
 			return

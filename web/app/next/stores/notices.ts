@@ -31,7 +31,7 @@ export interface INotice {
   text: string;
   at: number;
   /**
-   * A finished turn's summary: 2–4 lines of plain text, one per line («\n» between them), on what the agent
+   * A finished turn's summary (HRN-957): 2–4 lines of plain text, one per line («\n» between them), on what the agent
    * did — the cheap model's, or Claude's own recap written after the turn. Absent until it comes, and when Settings
    * turn summaries off; `text` stays the answer's start either way.
    */
@@ -193,7 +193,7 @@ export interface INotifySettings {
   /** The smart notice in the window; off, a notice only counts in the tab's title and sounds. */
   cards: boolean;
   place: TNoticePlace;
-  /** A finished turn comes with a few lines on what was done, from the cheapest model. */
+  /** A finished turn comes with a few lines on what was done, from the cheapest model (HRN-957). */
   summary: boolean;
 }
 

@@ -1,4 +1,4 @@
-// A fake OpenID Connect provider for the hub's end-to-end journey: no screen, no password. The authorize
+// A fake OpenID Connect provider for the hub's end-to-end journey (HRN-761): no screen, no password. The authorize
 // endpoint approves at once as the person named in ?login_hint=, else in the browser's fake_oidc_email cookie (each
 // person of a test has a browser of their own, so one provider serves several people), else FAKE_OIDC_EMAIL, and sends
 // the browser back with a code; the token endpoint answers with an RS256 id_token the hub checks against /jwks.

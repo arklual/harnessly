@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// moveCheck is the «data move» line of `hub doctor` (docs/migrations) and what it prints under it: every
+// moveCheck is the «data move» line of `hub doctor` (docs/migrations, HRN-883) and what it prints under it: every
 // machine's move in a line, and for the codes that failed, their cause and fix from the page of the move.
 type moveCheck struct {
 	check

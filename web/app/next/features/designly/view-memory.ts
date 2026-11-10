@@ -4,7 +4,7 @@ import { canRotate, deviceOf, DEVICES, keptSize, type ISize } from '@/next/featu
 import { ZOOM, ZOOM_FIT, type IZoom } from '@/next/features/designly/site-zoom';
 
 const KEY_PREFIX = 'hx-next-dl-view:';
-/** 2: the view is locked unless the person unlocked it; a record of 1 kept `locked: false` by default. */
+/** 2: the view is locked unless the person unlocked it (HRN-673); a record of 1 kept `locked: false` by default. */
 const VERSION = 2;
 const VERSIONS: readonly unknown[] = [1, VERSION];
 /** The quiet after the last change before the view is written: a pan or a drag is not written frame by frame. */
@@ -18,7 +18,7 @@ export interface IViewMemory {
   rot: boolean;
   chrome: boolean;
   browser: string | null;
-  /** The view is the standard one of its device; false when the person moved it, then `zoom` is the view. */
+  /** The view is the standard one of its device (HRN-674); false when the person moved it, then `zoom` is the view. */
   std: boolean;
   zoom: IZoom;
   locked: boolean;

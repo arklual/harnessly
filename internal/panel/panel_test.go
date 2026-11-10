@@ -426,7 +426,7 @@ func TestApps(t *testing.T) {
 	}
 }
 
-// an app that waits for consent says so, not «no such app».
+// HRN-913: an app that waits for consent says so, not «no such app».
 func TestAppWhyNot(t *testing.T) {
 	withApps := targets
 	withApps.AppRef = func(string) string { return "" }
@@ -478,7 +478,7 @@ func TestOpenGitHubChangesInTheGitlabTab(t *testing.T) {
 	}
 }
 
-// every kind of address by its exact pattern, as the chat's chips, the agent's `open` and the runtime's own
+// HRN-943: every kind of address by its exact pattern, as the chat's chips, the agent's `open` and the runtime's own
 // opening read it. A document (/a/<slug> of the portal, the platform's reader) is never the browser, so it never opens
 // as a stand; a stand is one name under the stands' domain; a dev server a port of this machine.
 func TestEveryKindOfAddressByItsExactPattern(t *testing.T) {

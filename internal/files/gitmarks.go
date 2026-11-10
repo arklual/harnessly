@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Git's marks in «Файлы»: for each entry of a folder, whether git does not have it yet ("new") or it has
+// Git's marks in «Файлы» (HRN-679): for each entry of a folder, whether git does not have it yet ("new") or it has
 // changes not committed ("changed"). A folder takes the marks of what is under it: new when all that changed there is
 // new, changed otherwise. Outside a repository, or when git does not answer in time, there are no marks.
 

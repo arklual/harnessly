@@ -39,7 +39,7 @@ const (
 	EnvKindDoc   = "doc"
 )
 
-// The organization's rule for apps: AppsConsentAsk, the default, leaves an app's rights to the person's click;
+// The organization's rule for apps (HRN-915): AppsConsentAsk, the default, leaves an app's rights to the person's click;
 // AppsConsentAuto gives an app every right it asks for at once («Не спрашивать разрешений»). Only a machine whose hello has
 // FeatureEnvAppsConsent is sent the rule, and only AppsConsentAuto is sent: an older agent would take a hash it does not
 // know for a broken list, and a list without the field is the rule ask.

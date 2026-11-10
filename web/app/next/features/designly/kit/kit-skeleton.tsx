@@ -1,4 +1,4 @@
-// The kit screen while its canvas loads: the same head, tree, canvas and panel as bars, so a switch of theme
+// The kit screen while its canvas loads (HRN-897): the same head, tree, canvas and panel as bars, so a switch of theme
 // or the first open never leaves the window empty. Bars appear after the shared delay, a fast answer does not flash.
 import { Delayed, Skeleton } from '@/next/ui/skeleton';
 import { t } from '@/next/i18n';

@@ -1,4 +1,4 @@
-// Package storerev is the version id of a store revision: 40 hex digits like a git commit, so every place that
+// Package storerev is the version id of a store revision (HRN-880): 40 hex digits like a git commit, so every place that
 // takes a version (the hub's and the gateway's links, --at) takes it as it is, and no git commit starts with so many
 // zeros. It has no dependencies: the hub reads the ids without the runtime's design code.
 package storerev

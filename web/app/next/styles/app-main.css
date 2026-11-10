@@ -705,7 +705,7 @@
   align-items: flex-end;
 }
 
-/* hl.files.pick: the host's dialog where the person picks a file for an app. */
+/* hl.files.pick: the host's dialog where the person picks a file for an app (HRN-850). */
 .hx-filepick__field {
   width: 100%;
   padding: var(--hx-space-2) var(--hx-space-3);

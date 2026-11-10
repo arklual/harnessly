@@ -1,4 +1,4 @@
-// Sinopia's keys: the editor's screens (deck, video, site) run the host's shortcut commands through its SDK
+// Sinopia's keys (HRN-808): the editor's screens (deck, video, site) run the host's shortcut commands through its SDK
 // (hl.keys.on), on the keys the person set in Settings, and a key pressed inside a board is passed on as the host's
 // (hl.keys.press). The same hook the editor used before, so its screens are not rewritten.
 import { useEffect, useRef, useState } from 'react';

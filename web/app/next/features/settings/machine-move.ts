@@ -1,4 +1,4 @@
-// The move of a machine's own data into the hub (docs/migrations/0001-data-to-hub.md), as the machine's
+// The move of a machine's own data into the hub (docs/migrations/0001-data-to-hub.md, HRN-883), as the machine's
 // runtime tells it (<platform>/machine/migration): how far it is, what failed with which code, and the two things a
 // person can do: try again, or hand it to an agent on that machine with a brief.
 import { getPage, sendBody } from '@/next/core/net/http';

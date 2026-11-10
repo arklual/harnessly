@@ -1,4 +1,4 @@
-// The files going into a folder of «Файлы», under its list: each with its progress, pause and cancel, and the
+// The files going into a folder of «Файлы» (HRN-679), under its list: each with its progress, pause and cancel, and the
 // question when a file of that name is there already. Done ones stay until cleared, so the person sees what arrived.
 import { useState, type CSSProperties } from 'react';
 import Icon from '@/next/ui/icon';

@@ -28,7 +28,7 @@ func fakeProc(t *testing.T, procs map[int][2]string) {
 	t.Cleanup(func() { procRoot = old })
 }
 
-// tmux answered `nice` (its fallback, the pane's start command) for a pane with nothing but bash in it.
+// HRN-777: tmux answered `nice` (its fallback, the pane's start command) for a pane with nothing but bash in it.
 func TestForegroundTrustsProcOverTmuxFallback(t *testing.T) {
 	fakeProc(t, map[int][2]string{
 		// The pane's shell: session leader on a tty, its own group in the foreground.

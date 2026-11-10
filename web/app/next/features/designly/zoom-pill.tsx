@@ -1,4 +1,4 @@
-// The canvas's zoom pill in its corner: −, the scale, +, «Вписать» and the lock, dragged by any part of it to
+// The canvas's zoom pill in its corner (HRN-673): −, the scale, +, «Вписать» and the lock, dragged by any part of it to
 // any place over the canvas, and with its settings on a right click (a two-finger press on a trackpad): the scales,
 // «Вписать», the lock, back to the corner, hide. A hidden pill comes back from the bar's «…».
 import { useRef } from 'react';

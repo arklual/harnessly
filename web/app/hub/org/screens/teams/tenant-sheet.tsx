@@ -1,4 +1,4 @@
-// Настройки тенанта: the name, and the people of the tenant with their tenant role. A tenant is a space on the
+// Настройки тенанта (HRN-625): the name, and the people of the tenant with their tenant role. A tenant is a space on the
 // hub, so the roles here are the space's: owner (runs the tenant) or member. Every change is pessimistic.
 import { useCallback, useEffect, useState } from 'react';
 

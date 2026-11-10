@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 
 import { startRuntime } from './runtime';
 
-// The fleet hub's chat move, seen from the page. The hub is stood in for by routes over
+// The fleet hub's chat move (HRN-773), seen from the page. The hub is stood in for by routes over
 // /api/v2/chat-move/* (one runtime cannot be two machines behind a hub; the real answers are covered by the hub's own
 // Go tests in internal/hub/proxy). The person opens the chat menu, sees the machines with their organization, the one
 // that is away refused in words, and moves the chat.

@@ -743,7 +743,7 @@ func (l *Library) serveStatic(w http.ResponseWriter, r *http.Request, file strin
 		return
 	}
 	if strings.HasPrefix(typ, "video/") {
-		// a clip is read by seeking (a recording of an interface in a scene): the browser asks for ranges
+		// a clip is read by seeking (a recording of an interface in a scene, HRN-627): the browser asks for ranges
 		f, err := os.Open(file)
 		if err != nil {
 			w.WriteHeader(404)

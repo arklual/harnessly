@@ -1,4 +1,4 @@
-// The participant's own view: only their limit, their chats, their machine. Aligns with `GET /api/me/limits`,
+// The participant's own view (HRN-541): only their limit, their chats, their machine. Aligns with `GET /api/me/limits`,
 // `/api/me/sessions`, `/api/me/usage`, `POST /api/me/limit-requests` of the plan (§2.11).
 export interface MyLimit {
   spentRub: number;

@@ -182,7 +182,7 @@ func TestReleaseManifestIsServedOnlyWhenTheFolderHoldsIt(t *testing.T) {
 	}
 }
 
-// The deployment's network policy: served as it is when valid, 404 without a file, refused when broken.
+// The deployment's network policy (HRN-920): served as it is when valid, 404 without a file, refused when broken.
 func TestNetworkPolicyIsServedWhenValid(t *testing.T) {
 	good := `{"internalHosts":["*.example.corp"],"proxy":"http://proxy.example.corp:3128","noProxy":["localhost"]}`
 	srv, _ := newServer(t, map[string]string{"network.json": good})

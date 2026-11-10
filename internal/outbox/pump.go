@@ -835,7 +835,7 @@ func (r *Record) handed() *wire.MessageHanded {
 
 // settleDueTry forgets a retry's time that is due already when something else than the clock holds the head (the
 // agent's state, a message on its way): the try goes when that lets it, as a fresh message's does (NextTry 0), and Wake
-// does not name a time past over and over — the actor would turn without a pause until the agent moved.
+// does not name a time past over and over — the actor would turn without a pause until the agent moved (HRN-969).
 func (r *Record) settleDueTry(now time.Time) {
 	if r.NextTry != 0 && r.NextTry <= ms(now) {
 		r.NextTry = 0
@@ -865,7 +865,7 @@ func (b *Box) Wake() time.Time {
 	}
 	if len(b.items) > 0 {
 		// A stalled head waits for the person, not the clock: its last try's time would be due forever, and the actor
-		// would turn without a pause (30 000 turns a second, a CPU of the runtime, for one chat).
+		// would turn without a pause (HRN-969: 30 000 turns a second, a CPU of the runtime, for one chat).
 		if head := b.recs[b.items[0]]; !head.Stalled {
 			soon(head.NextTry)
 		}

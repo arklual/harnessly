@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// The overlay layer's routes. One route does it all, as the boards' route does: POST {page, action:
+// The overlay layer's routes (HRN-653). One route does it all, as the boards' route does: POST {page, action:
 // add|set|rm|ls, id?, force?, ...the overlay's fields}. The page's route is a person (their edit is stamped human), the
 // CLI's is the agent (its edit is stamped agent, and it may not change what a person wrote unless it says force).
 

@@ -23,7 +23,7 @@ type OrgView struct {
 	Timezone  string `json:"timezone"`
 	Currency  string `json:"currency"`
 	CreatedAt string `json:"createdAt"`
-	// AppsConsent is the rule for apps on the organization's machines: "ask" (the default) or "auto".
+	// AppsConsent is the rule for apps on the organization's machines: "ask" (the default) or "auto" (HRN-915).
 	AppsConsent string `json:"appsConsent"`
 }
 

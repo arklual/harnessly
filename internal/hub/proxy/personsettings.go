@@ -13,7 +13,7 @@ import (
 )
 
 // The person's settings (GET /api/v2/me, PATCH /api/v2/me/settings) are the hub user's, kept by the hub in
-// person_settings (GitHub #61). A runtime keeps one record for the whole machine, so a hub that sent these
+// person_settings (HRN-890, GitHub #61). A runtime keeps one record for the whole machine, so a hub that sent these
 // paths to a runtime let the users of that runtime overwrite each other. Every way in answers them here and never
 // forwards them: the fleet (/api/v2/…, with or without ?machine=), the workspace (/agents/api/v2/…) and a machine's
 // own address (/m/<id>/…).

@@ -1,4 +1,4 @@
-// Things for an explainer, drawn flat and rounded in the deck's colours. Parts a scene can animate are named:
+// Things for an explainer (HRN-652), drawn flat and rounded in the deck's colours. Parts a scene can animate are named:
 //   prop-laptop (screen)   prop-phone (screen)   prop-chart (bar, line, dot, arrow)   prop-cloud (arrow)   prop-server (led)
 //   prop-gear (gear)   prop-rocket (flame)   prop-bulb (glow, ray)   prop-doc (row)   prop-folder (sheet)   prop-bubble (dot)
 //   prop-check (ring, check)

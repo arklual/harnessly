@@ -363,7 +363,7 @@ func (m *Manager) HandleProviderEvent(providerID, session string, ev agents.Even
 
 // ForeignHook tells a hook to drop: one of an agent the tab's agent (or a script in its terminal) started, which
 // inherits the tab's tmux session and its hooks — its SessionStart and Stop would end the turn of the tab's agent
-// The hook names its agent session; it is the tab's when it is the one the keeper knows, or one the agent
+// (HRN-659). The hook names its agent session; it is the tab's when it is the one the keeper knows, or one the agent
 // running in the pane goes by now (after /clear the pid file names the new session before its SessionStart fires).
 // A hook naming no session, a provider that cannot tell, or a pane with no agent seen: not foreign, as before.
 func (m *Manager) ForeignHook(providerID, session string, ev agents.Event) bool {

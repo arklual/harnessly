@@ -121,7 +121,7 @@ export type TBridgeMessage =
   /** The page is on its way: it has taken `resources` files so far. */
   | { k: 'progress'; state: TDocState; resources: number }
   | { k: 'lib-ready' }
-  /** The board's script saw the page drawn: its root filled, its fonts, pictures and videos in. */
+  /** The board's script saw the page drawn: its root filled, its fonts, pictures and videos in (HRN-900). */
   | { k: 'drawn' }
   | { k: 'tweaks'; controls: ITweak[] }
   | { k: 'tweaks-panel'; open: boolean }

@@ -1,5 +1,5 @@
-// What the person sees of the agent in the browser tab: its cursor over the page, going to the element it
-// acts on with the agent's words for it. Nothing else: no bar, no question.
+// What the person sees of the agent in the browser tab (HRN-678): its cursor over the page, going to the element it
+// acts on with the agent's words for it. Nothing else (HRN-681): no bar, no question.
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
 

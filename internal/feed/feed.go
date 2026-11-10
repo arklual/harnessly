@@ -324,7 +324,7 @@ func (f *Feed) Messages(fn func(wire.Entry)) {
 }
 
 // Held is Messages over what the feed holds now, without reading a released feed again or counting a use: a look the
-// actor makes by itself on the clock must not keep an idle chat's transcript in memory. False when released.
+// actor makes by itself on the clock must not keep an idle chat's transcript in memory (HRN-901). False when released.
 func (f *Feed) Held(fn func(wire.Entry)) bool {
 	if f.rel != nil {
 		return false
@@ -603,7 +603,7 @@ func (f *Feed) page(end, limit, full int) ([]wire.Turn, []wire.Entry, *string) {
 
 // After is what follows an entry: the entries after it, and every turn from the entry's own on, as they are now. The
 // turns go along whether or not an entry after the cursor touches them: a page that had the chat from elsewhere (the
-// cluster's copy) saw the entry's turn running, and has to learn that it ended, or that a new turn began
+// cluster's copy, HRN-879) saw the entry's turn running, and has to learn that it ended, or that a new turn began
 // with nothing in it yet. ok is false when the feed does not have the entry.
 func (f *Feed) After(entryID string) (ts []wire.Turn, es []wire.Entry, ok bool) {
 	f.ensure()
@@ -639,13 +639,13 @@ func (f *Feed) After(entryID string) (ts []wire.Turn, es []wire.Entry, ok bool) 
 // Turns is the page of turns before a turn ("" from the end), at most limit, oldest first, with their answer
 // entries. Older turns than the feed holds are read from the transcript first: a turn named that the feed does not
 // hold now (a cursor kept from before the runtime restarted, older than the tail it read) is looked for there too,
-// so a walk through the chat goes on from where it stopped.
+// so a walk through the chat goes on from where it stopped (HRN-879).
 func (f *Feed) Turns(before string, limit int) (wire.TurnsPage, bool) {
 	return f.turns(before, limit, false)
 }
 
 // TurnsWithSteps is the page Turns gives with the steps of every turn in it, not only of the newest: what the
-// cluster's copy is backfilled from, so a folded turn opens from the copy too.
+// cluster's copy is backfilled from, so a folded turn opens from the copy too (HRN-879).
 func (f *Feed) TurnsWithSteps(before string, limit int) (wire.TurnsPage, bool) {
 	return f.turns(before, limit, true)
 }
@@ -678,7 +678,7 @@ func (f *Feed) turns(before string, limit int, steps bool) (wire.TurnsPage, bool
 
 // reach reads what precedes the feed until it holds the turn; whether it does. The older windows are gathered as read
 // and the feed is built again only when what it holds has doubled: a build per window made the walk to a cursor deep
-// in a transcript of 100 MB quadratic, on the chat's actor.
+// in a transcript of 100 MB quadratic, on the chat's actor (HRN-879).
 func (f *Feed) reach(turn string) bool {
 	var read [][]raw // newest window first
 	n, built := 0, len(f.raws)

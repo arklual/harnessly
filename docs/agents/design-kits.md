@@ -477,7 +477,7 @@ it in `keywords`.
 ## Not done yet
 
 - Projects do not yet record their kits (`meta.kits` is kept but not read): a board names the kit's files itself
- .
+  (HRN-407).
 - No command draws a project's board on a kit outside Sinopia, and none turns a package's CSS into `tokens.json`: a
-  library kit's build does it.
+  library kit's build does it (HRN-967).
 - No `harnessly design code` (board → TSX) yet.

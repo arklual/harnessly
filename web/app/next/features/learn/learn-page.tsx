@@ -1,4 +1,4 @@
-// «Обучение» (/learn): the lessons in three sections. Each is done by hand — the tour leads through the real
+// «Обучение» (/learn, HRN-792): the lessons in three sections. Each is done by hand — the tour leads through the real
 // interface, on the person's own chats and the Relay demo projects — or watched as a short film recorded from the same
 // interface. A lesson done to its end is marked passed.
 import { useState } from 'react';

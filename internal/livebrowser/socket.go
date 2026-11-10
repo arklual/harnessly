@@ -16,7 +16,7 @@ import (
 // as JSON text both ways.
 //
 //	page → machine: {t:"open", url, w, h, dpr, ack}  the first message: the tab's page, made when there is none;
-//	                ack: true says the pane answers each picture it drew with {t:"ack"}
+//	                ack: true says the pane answers each picture it drew with {t:"ack"} (HRN-711)
 //	                {t:"nav", url} {t:"back"} {t:"fwd"} {t:"reload"} {t:"size", w, h, dpr} {t:"cast", on}
 //	                {t:"mouse", k:"down"|"up"|"move", x, y, b, bs, m, c} {t:"wheel", x, y, dx, dy, m}
 //	                {t:"key", k:"down"|"up", key, code, text, vk, m} {t:"text", text} {t:"copy"}
@@ -112,7 +112,7 @@ type paneConn struct {
 	id  string
 	tab *Tab
 	out chan []byte
-	// The person's input, in order, run beside the socket's reading.
+	// The person's input, in order, run beside the socket's reading (HRN-711).
 	imu        sync.Mutex
 	input      []inbound
 	inputReady chan struct{}
@@ -190,7 +190,7 @@ func (c *paneConn) run(ctx context.Context) {
 		switch m.T {
 		case "mouse", "wheel", "key", "text":
 			// The person's input goes through its own queue: a browser call takes a while, and the reading of the
-			// socket must not wait for it.
+			// socket must not wait for it (HRN-711).
 			c.queueInput(m)
 		default:
 			c.handle(m)

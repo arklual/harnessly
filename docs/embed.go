@@ -12,6 +12,6 @@ import "embed"
 //go:embed *.md all:hub all:migrations all:build-apps all:apps all:ru all:start all:agents all:inside all:self-host
 var Guide embed.FS
 
-// Migration is the page of a move of the machines' data (docs/migrations/<id>.md), as this version carries it:
+// Migration is the page of a move of the machines' data (docs/migrations/<id>.md, HRN-883), as this version carries it:
 // `hub doctor` and `harnessly migrate` show it with the version that moves.
 func Migration(id string) ([]byte, error) { return Guide.ReadFile("migrations/" + id + ".md") }

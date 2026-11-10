@@ -20,15 +20,15 @@ import (
 // (Write, Edit, MultiEdit, NotebookEdit, apply_patch, a shell command that writes under the design's folder) or that it
 // named to the design CLI (`open design <id>`, `design <cmd> <id>`). A command of the CLI that only reads (`design check`,
 // `logs`, `list`, `history`…) is no work on the design: a chat that took a screenshot of another design to borrow from
-// it is not that design's chat. It is read from the transcripts, so it holds for
+// it is not that design's chat (HRN-673). It is read from the transcripts, so it holds for
 // the chats that worked on a design before it was kept anywhere. Each transcript is read once: the index keeps how far
 // it got and what it found, grows with the file, and is kept on disk across restarts. A short growth is read when it is
 // asked for; a long one (a chat never read, the first run on a machine) is read behind, slowly, by Run.
 
 const (
-	// chatLinksVersion 3: a design counts only for what the chat wrote or created, not for a path in a command.
+	// chatLinksVersion 3: a design counts only for what the chat wrote or created, not for a path in a command (HRN-674).
 	// 4: a path the shell expands (`$S/x.css`, `~/x`) has no place; it was read under the folder the chat stood in, so a
-	// chat that wrote into its scratchpad from a design's folder counted as that design's. The kept index of
+	// chat that wrote into its scratchpad from a design's folder counted as that design's (HRN-675). The kept index of
 	// an older version is read anew.
 	chatLinksVersion = 4
 	// chatLinksSyncBytes is the most a lookup reads itself; the rest is Run's.
@@ -578,7 +578,7 @@ func resolveIn(base, p string) string {
 
 // writtenPaths are the absolute paths one simple command may write (relative ones resolve against base): a redirect's
 // target, the destination of a copy, every path of a command that changes what it names. A path that is only read
-// (`cat`, `ls`, the source of `cp`) or the folder a chat stands in is none: it is no work on the design.
+// (`cat`, `ls`, the source of `cp`) or the folder a chat stands in is none: it is no work on the design (HRN-674).
 func writtenPaths(seg, base string) []string {
 	if !writesShell.MatchString(seg) {
 		return nil

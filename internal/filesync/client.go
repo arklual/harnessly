@@ -131,7 +131,7 @@ func (c *Client) GetBlob(ctx context.Context, sha string, w io.Writer) error {
 }
 
 // ErrRefused is a write the store does not take from this machine: the path is in a project none of the machine's
-// people may edit.
+// people may edit (HRN-880).
 var ErrRefused = errors.New("the store refuses this machine's write")
 
 // Commit asks for a new revision; a stale base answers Conflict with the current revision.

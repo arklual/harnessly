@@ -110,11 +110,11 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   const pins = useBrowserPins(person);
   const at = tab.hist[tab.hi] ?? null;
   const frame = useRef<HTMLIFrameElement>(null);
-  // An outside site goes to the machine's live browser; the proxy keeps the machine's servers and the team's
+  // An outside site goes to the machine's live browser (HRN-680); the proxy keeps the machine's servers and the team's
   // own sites, where the page is rewritten, inspected and edited.
   const liveUrl = at !== null && at.target.kind === 'url' ? `${at.target.origin}${at.path}` : null;
   // A site of the team's own that the proxy could not fetch (a reset, a timeout, a certificate) goes to the live
-  // browser as well, for as long as this tab stays on it.
+  // browser as well, for as long as this tab stays on it (HRN-684).
   const [liveForced, setLiveForced] = useState<string | null>(null);
   const live =
     liveUrl !== null &&
@@ -200,7 +200,7 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   useEffect(() => {
     if (!live) livePageRef.current = null;
   }, [live]);
-  // The agent's action on the live page: the machine runs it on its browser; without a socket, no answer, as
+  // The agent's action on the live page: the machine runs it on its browser (HRN-683); without a socket, no answer, as
   // with a frame that does not answer.
   const liveAct = (message: IFrameAct, timeoutMs: number): Promise<IFrameActed | null> =>
     liveControl.current?.act(message, timeoutMs) ?? Promise.resolve(null);

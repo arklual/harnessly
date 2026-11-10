@@ -35,7 +35,7 @@ const (
 var envItemID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // envHeld is the file: the list and how it went. Hash is the hash of the items (EnvHash), as the runtime's setup reads it;
-// AppsConsent is the organization's rule for apps, which the runtime reads from here too ("" for ask). The hub is
+// AppsConsent is the organization's rule for apps (HRN-915), which the runtime reads from here too ("" for ask). The hub is
 // told the hash of both (hubproto.EnvSetHash).
 type envHeld struct {
 	Rev         int64                 `json:"rev"`

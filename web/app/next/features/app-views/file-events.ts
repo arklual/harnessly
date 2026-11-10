@@ -1,4 +1,4 @@
-// The files that changed for the views that watch (hl.files.watch), as the runtime tells them
+// The files that changed for the views that watch (hl.files.watch, HRN-850), as the runtime tells them
 // (GET /apps/file-events): the session of the view and the names of the files, never what is in them. One stream per
 // machine serves every watching view on the page; each hears only its own session.
 import { platformPath, runtimePath } from '@/next/core/net/machine';

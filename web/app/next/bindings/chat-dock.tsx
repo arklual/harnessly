@@ -226,7 +226,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const goneVendor = record
     ? removedKeyOf(machineView?.machine.agents ?? [], record.provider, record.model?.profile)
     : null;
-  // the machine is off and the chat is the cluster's copy. The field stays usable: a message waits
+  // the machine is off and the chat is the cluster's copy. The field stays usable (HRN-674): a message waits
   // in the outbox (kept through F5) and goes when the machine is back, a dictation is kept in the browser. A restart
   // for an update takes about a minute, so the bar says so only once the machine has been away for a while.
   const central = useCentral();
@@ -248,7 +248,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     [longOff, machineName, goneVendor, handoff, conv],
   );
 
-  // the move of the machine's data into the hub stopped on errors: the bar says so with «Повторить» and
+  // HRN-883: the move of the machine's data into the hub stopped on errors: the bar says so with «Повторить» and
   // «Продолжить с агентом» (a chat on that machine with the brief).
   const move = useMachineMove(machine, !machineOff);
   const moveNotice = useMemo<DockNotice | null>(() => {

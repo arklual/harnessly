@@ -17,7 +17,7 @@ var procRoot = "/proc"
 // tmux's own #{pane_current_command} cannot be trusted alone: when the server cannot read /proc/<pgrp>/cmdline (the
 // group is not visible from its pid namespace, /proc is hidden from it, the leader is gone) it silently answers with the
 // first word of the command the pane was started with — `nice` or `env` for every pane of this runtime — and a pane
-// with nothing but its shell looked busy, so the agent of a restored tab was never resumed.
+// with nothing but its shell looked busy, so the agent of a restored tab was never resumed (HRN-777).
 func foregroundOf(panePID int) string {
 	if panePID <= 0 {
 		return ""

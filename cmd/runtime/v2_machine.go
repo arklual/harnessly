@@ -504,7 +504,7 @@ func (m *liveMachine) run(ctx context.Context) {
 // codexNeverAsksRE is a top-level `approval_policy = "never"` of Codex's config.toml.
 var codexNeverAsksRE = regexp.MustCompile(`(?m)^\s*approval_policy\s*=\s*["']never["']`)
 
-// defaultPermissionOf is the permission mode a chat that names none starts in: bypass when the runtime skips
+// defaultPermissionOf is the permission mode a chat that names none starts in (HRN-945): bypass when the runtime skips
 // permissions; a Claude chat asks (the launch says so); a Codex chat runs on its config.toml, which asks unless its
 // approval_policy is "never" (read before its first table).
 func defaultPermissionOf(p wire.Provider, skip bool, codexConfig string) wire.PermissionMode {

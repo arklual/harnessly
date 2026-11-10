@@ -1229,7 +1229,7 @@ input.hx-tbrowser__url:focus {
   padding: 2px 4px 8px;
   color: var(--hx-fg-3);
 }
-/* The head row of a pane tab (pane-head.tsx): the crumbs on the left, shrinking with an ellipsis (the folders
+/* The head row of a pane tab (pane-head.tsx, HRN-674): the crumbs on the left, shrinking with an ellipsis (the folders
    in the middle first, then the first and the parent, the name last); on the right what is done with it, never wrapped:
    the view's own controls (the switch of the view, the save state), then the place's (download, share, «…»,
    «Сохранить»). */
@@ -2707,7 +2707,7 @@ input.hx-tbrowser__url:focus {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-/* A font as a specimen: the person's text in it at several sizes, then its letters and digits. */
+/* A font as a specimen (HRN-679): the person's text in it at several sizes, then its letters and digits. */
 .hx-font {
   display: flex;
   flex-direction: column;
@@ -2943,7 +2943,7 @@ input.hx-tbrowser__url:focus {
     min-height: 36px;
   }
 }
-/* Git's mark of an entry: the name takes the colour, a dot after it says it without the colour too. */
+/* Git's mark of an entry (HRN-679): the name takes the colour, a dot after it says it without the colour too. */
 .hx-tv__name[data-git='changed'] {
   color: var(--hx-warning);
 }

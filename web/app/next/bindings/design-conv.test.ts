@@ -157,7 +157,7 @@ describe("the design's first message", () => {
     putList([conv('tab-old', 1), conv('tab-new', 2)]);
     expect(result.current.picked).toEqual({ k: DESIGN_CONV.conv, id: 'tab-new' });
     expect(designBindingStore.get(KEY)).toEqual({ id: 'tab-new', fresh: false });
-    // The machine keeps that the chat was started from the design.
+    // The machine keeps that the chat was started from the design (HRN-675).
     expect(record).toHaveBeenCalledWith(M, 'abc', 'tab-new');
   });
 

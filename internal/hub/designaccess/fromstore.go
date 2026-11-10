@@ -17,7 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/storerev"
 )
 
-// A guest link reads its project from the hub's store, not from the author's machine: the hub puts the
+// HRN-881. A guest link reads its project from the hub's store, not from the author's machine: the hub puts the
 // revision into a folder of its own and answers with the runtime's code (internal/hub/designview). The machine is
 // asked only for what the store cannot say: a project the store has nothing of yet (the screen «still loading from the
 // owner's machine»), and a link pinned to a version of git, made before the library moved to the store.

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// git.read: an app sees the changes and the history of the repository of the chat's folder — what
+// git.read (HRN-850): an app sees the changes and the history of the repository of the chat's folder — what
 // `git status`, `git diff` and `git log` say there — without a terminal. Git runs read only: no hook, no fsmonitor,
 // no external diff or textconv program of the repository's config (each would run a program the repository names),
 // no lock taken, no network. A secret file (.env, keys) and the host's own folders are left out of every answer.

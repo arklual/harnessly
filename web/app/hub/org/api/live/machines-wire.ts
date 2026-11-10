@@ -1,4 +1,4 @@
-// What the machines endpoints of the hub carry beyond the old `HubMachine` (machine resources): the hardware,
+// What the machines endpoints of the hub carry beyond the old `HubMachine` (machine resources, HRN-633): the hardware,
 // the load now, the week's spend, the provider's server, the managed capabilities and the operations in flight. Every
 // field is optional here: a hub that does not send one leaves the screen with «—», never with a made-up number.
 import { type Money, type MachineBusyKind, type MachineManaged, type OrgMachine } from '../machines';

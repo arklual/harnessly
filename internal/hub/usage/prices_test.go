@@ -47,7 +47,7 @@ func TestCostMatchesTheRuntime(t *testing.T) {
 	}
 }
 
-// Another vendor's model that ran through Claude Code or Codex is priced by its maker's row.
+// Another vendor's model that ran through Claude Code or Codex is priced by its maker's row (HRN-663).
 func TestVendorModelThroughAnotherCLI(t *testing.T) {
 	b := NewBook(SeedRows())
 	for _, c := range []struct {

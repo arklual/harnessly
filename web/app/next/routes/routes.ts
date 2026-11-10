@@ -70,7 +70,7 @@ export type TRoute =
       access?: TAccessFocus;
       edit?: boolean;
     }
-  /** A kit's screen: `/designly/kit/:id`, `?v=` the version (the newest without it), `?theme=` the theme,
+  /** A kit's screen (HRN-897): `/designly/kit/:id`, `?v=` the version (the newest without it), `?theme=` the theme,
       `?node=` the node the camera starts on, `?chat=` the chat it was opened from («Отправить в чат» goes there). */
   | { kind: typeof ROUTE.kit; id: string; version?: string; theme?: string; node?: string; chat?: string }
   /** A document of a type an installed app adds, opened in the app's editor: `/designly/doc/:id`, `?chat=` the chat
@@ -95,7 +95,7 @@ export type TRoute =
    */
   | { kind: typeof ROUTE.help; section: string | null; page: string | null; anchor?: string }
   /** Settings: `/settings` (the list of sections; on a wide window the first one is open) and `/settings/:section`. */
-  /** «Обучение»: the lessons, each a film and a hands-on tour. */
+  /** «Обучение»: the lessons, each a film and a hands-on tour (HRN-792). */
   | { kind: typeof ROUTE.learn }
   | { kind: typeof ROUTE.settings; section: SettingsSection | null };
 

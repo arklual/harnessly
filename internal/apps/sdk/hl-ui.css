@@ -1,4 +1,4 @@
-/* hl-ui.css: the host's primitives for an app's view. Classes only, all under .hl-, on the platform's tokens
+/* hl-ui.css: the host's primitives for an app's view (HRN-695). Classes only, all under .hl-, on the platform's tokens
    (the SDK puts --t-* on :root and follows the theme), so a view looks like the pane around it in light and dark without
    a style of its own. Load it with <link rel="stylesheet" href="/__hl/hl-ui.css">; a view's own sheet after it wins. */
 :root {

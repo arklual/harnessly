@@ -219,7 +219,7 @@ func (s *Service) homeOf(ctx context.Context, userID string, onHub bool) (FleetM
 	if own := personal(list); len(own) > 0 {
 		list = own
 	}
-	// a machine that is on but did not give its page a moment ago (its runtime hangs while its agent keeps the
+	// HRN-879: a machine that is on but did not give its page a moment ago (its runtime hangs while its agent keeps the
 	// link) answers for the person only when no other machine of theirs is on.
 	first := -1
 	for i, f := range list {
@@ -287,7 +287,7 @@ func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User
 		return
 	}
 	if me, settings := mePath(r.URL.Path); me {
-		// The person's settings are the hub user's, whatever machine is named: they never go to a runtime.
+		// The person's settings are the hub user's, whatever machine is named: they never go to a runtime (HRN-890).
 		if _, err := s.fleet(r.Context(), u.ID, onHub); err != nil {
 			s.fail(w, r, err)
 			return

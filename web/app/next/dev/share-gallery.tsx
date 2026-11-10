@@ -313,7 +313,7 @@ const playGateway = (box: { access: IProjectAccess }) => {
   };
 };
 
-/** The one access API, played in the page. */
+/** The one access API, played in the page (HRN-675). */
 const playOne = (box: { view: IResourceView }) => {
   const real = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {

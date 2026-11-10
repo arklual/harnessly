@@ -323,7 +323,7 @@ func (e ErrWallRequired) Unwrap() error { return e.Cause }
 // HostMCPFile is the name, in the runtime's data folder, of the harnessly-app config a chat without apps starts with.
 const HostMCPFile = "app-mcp.json"
 
-// HostMCP is the --mcp-config of the harnessly-app server for a Claude Code chat that starts with no app on:
+// HostMCP is the --mcp-config of the harnessly-app server for a Claude Code chat that starts with no app on (HRN-975):
 // the server is quiet until an app turns on in the chat, then its tools come live (live.go). It holds the person's token,
 // as the runtime's own config beside it does, so it lives in the data folder, which the wall of a launch with apps
 // leaves unreadable (seal.go). "" when the runtime has no MCP config.

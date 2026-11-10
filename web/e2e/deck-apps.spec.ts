@@ -1,4 +1,4 @@
-// An app of «Валидатор презентаций» in the slide editor: its checks' marks are drawn on the blocks of the
+// An app of «Валидатор презентаций» in the slide editor (HRN-612): its checks' marks are drawn on the blocks of the
 // slide, a block selected on the slide brings the app's bar over the field, and the bar's item sends the task and the
 // block's words to the deck's chat. The agent is the stand-in CLI, so what is checked is that the message gets there.
 import { execFileSync } from 'node:child_process';

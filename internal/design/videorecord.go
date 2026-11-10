@@ -16,7 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// A recording of a product's interface: the agent writes a script of actions, `design video record` plays it in
+// A recording of a product's interface (HRN-627): the agent writes a script of actions, `design video record` plays it in
 // a headless browser frame by frame on a clock of its own (internal/design/videorecord_run.go) and keeps two files in
 // the project's records/ folder: the clip (<name>.mp4, a lossless-grade H.264 at twice the pixels of the final video) and
 // the log (<name>.json: the cursor's path and every action with the element's box). The scene draws the cursor, the window

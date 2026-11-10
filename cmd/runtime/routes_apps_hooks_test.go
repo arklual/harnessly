@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
-// the guard of an agent's launch asks the views that hear its calls; a stop wins, a context comes back, a
+// HRN-852: the guard of an agent's launch asks the views that hear its calls; a stop wins, a context comes back, a
 // strict app with no view stops the call, and the person's switch turns the hook off.
 func TestAppHookRoute(t *testing.T) {
 	// A hook marks the agent's window on the app (appPages.Driving): a page tools of its own keeps it from the tests after.

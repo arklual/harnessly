@@ -18,7 +18,7 @@ import (
 // Service is what the protocol asks of the conversations: convo.Service, which imports this package, has exactly
 // these methods (see its comments). NotFound and UnknownCursor on Server tell its errors apart.
 // StepsPager is a Service that gives a page of turns with the steps of every turn in it (`…/turns?steps=all`): the
-// agent backfills the cluster's copy from it, so a folded turn of a backfilled chat opens from the copy. A
+// agent backfills the cluster's copy from it, so a folded turn of a backfilled chat opens from the copy (HRN-879). A
 // Service without it answers the plain page.
 type StepsPager interface {
 	TurnsWithSteps(ctx context.Context, id, beforeTurnID string, limit int) (TurnsPage, error)
@@ -83,17 +83,17 @@ type Server struct {
 	// Legacy is the Legacy tab a conversation runs in; nil: .../legacy is a 404.
 	Legacy func(ctx context.Context, conv string) (LegacyTab, error)
 	// Download hands over files of a conversation to be saved: GET .../download?path=<p>[&path=<p>…][&name=<zip>] sends one
-	// file whole or in ranges, a folder or several paths as one zip made while it is sent. It writes the
+	// file whole or in ranges, a folder or several paths as one zip made while it is sent (HRN-679). It writes the
 	// answer itself, with no time budget: a download may take as long as it takes. nil: a 404.
 	Download func(w http.ResponseWriter, r *http.Request, conv string)
 	// GitSide answers GET .../file-git?path=<p>[&ref=HEAD]: a file as a git revision has it, for the editor's diff
-	// nil: a 404.
+	// (HRN-679). nil: a 404.
 	GitSide func(w http.ResponseWriter, r *http.Request, conv string)
 	// FindText answers GET .../find?q=<text>[&path=<folder>]: the lines of the folder's text files that hold the text,
-	// for «Найти в файлах». nil: a 404.
+	// for «Найти в файлах» (HRN-679). nil: a 404.
 	FindText func(w http.ResponseWriter, r *http.Request, conv string)
 	// EntryOp answers POST .../file-op {op, path, name}: a new empty file, a new name or the trash for an entry of
-	// «Файлы». nil: a 404.
+	// «Файлы» (HRN-679). nil: a 404.
 	EntryOp func(w http.ResponseWriter, r *http.Request, conv string)
 	// Files reads the folders of the conversations: .../files lists a folder, .../file reads a text file. nil: both are
 	// 404s.

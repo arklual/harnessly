@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// File rules: an Edit rule names every tool that writes a file; a relative mask and a relative path are taken
+// File rules (HRN-799): an Edit rule names every tool that writes a file; a relative mask and a relative path are taken
 // from the chat's folder; a mask with ** reads as file masks do, one without keeps the old, wide reading.
 func TestFileRules(t *testing.T) {
 	home, _ := os.UserHomeDir()

@@ -10,9 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
@@ -227,6 +229,7 @@ func (s *Server) Cmd(w http.ResponseWriter, r *http.Request, op Op) {
 		jsonlog.Log("error", "v2: a command answered out of contract", jsonlog.F{K: "op", V: string(op)}, jsonlog.F{K: "error", V: err.Error()})
 		res = Refused(RefuseInternal)
 	}
+	journalCmd(r.Context(), op, body, res)
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -247,4 +250,32 @@ func (o *OpLog) Clear() {
 	defer o.mu.Unlock()
 	o.m = map[string]*opEntry{}
 	o.scheduleSave()
+}
+
+// journalCmd tells the journal's line of a command its op, the chat it is about and, for a refusal, its code: a refusal
+// answers 200, and is a warning of the journal still (HRN-976).
+func journalCmd(ctx context.Context, op Op, body []byte, res CmdResult) {
+	if journal.ScopeOf(ctx) == nil {
+		return
+	}
+	var about struct {
+		ID   string   `json:"id"`
+		Conv string   `json:"conversationId"`
+		Apps []string `json:"apps"`
+	}
+	_ = json.Unmarshal(body, &about)
+	if about.Conv != "" {
+		journal.SetChat(ctx, about.Conv)
+	} else if len(op) > 13 && op[:13] == "conversation." {
+		journal.SetChat(ctx, about.ID)
+	}
+	note := ""
+	if about.Apps != nil {
+		note = "apps: " + strings.Join(about.Apps, ", ")
+	}
+	if res.R == ResultRefused {
+		journal.SetLevel(ctx, journal.Warn)
+		note = strings.TrimSpace("refused: " + string(res.Code) + " " + note)
+	}
+	journal.SetCall(ctx, "", string(op), note)
 }

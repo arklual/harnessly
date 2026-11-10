@@ -1,4 +1,4 @@
-// What the tour may do to the library screen: the lesson that leads to a demo project sets aside what hides it
+// What the tour may do to the library screen (HRN-862): the lesson that leads to a demo project sets aside what hides it
 // (a search, a filter, the trash, another tab) or copies the demo back. The library registers itself while it is the
 // page; the tour calls it from a card's button.
 

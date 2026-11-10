@@ -27,7 +27,7 @@ func (s memStore) PutBlob(_ context.Context, kind, sha string, _ []byte) error {
 	return nil
 }
 
-// `harnessly migrate` and the page read and steer the move through the runtime; without a hub there is none.
+// HRN-883: `harnessly migrate` and the page read and steer the move through the runtime; without a hub there is none.
 func TestMoveRoutes(t *testing.T) {
 	d := deps{SessionOK: func(r *http.Request) bool { return r.Header.Get("X-Session") == "1" }}
 	routes := moveRoutes(d)

@@ -59,7 +59,7 @@ type deckStoreRevAt struct {
 	checked time.Time
 }
 
-// A library synced with a store that keeps leases builds the PDF of a marked deck on any machine of the space
+// HRN-881. A library synced with a store that keeps leases builds the PDF of a marked deck on any machine of the space
 // whose person may edit it, one machine at a time: the one holding the store's lease "pdf/<deck>". Whether the PDF is
 // behind is told by the store's revisions (the newest of what the PDF is made of, against the one written beside the
 // published PDF, deckPdfRevFile), not by the files' times: a file another machine wrote has the time it arrived.

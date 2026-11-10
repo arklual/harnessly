@@ -267,7 +267,7 @@ func TestFeedResetCarriesAPageAsAnEvent(t *testing.T) {
 	}
 }
 
-// a cluster with backfill cursors gets every chat it does not hold whole walked to its first turn, from where
+// HRN-879: a cluster with backfill cursors gets every chat it does not hold whole walked to its first turn, from where
 // the last walk stopped, each page saying where it was read from; a chat it holds whole is read by its newest page only
 // when it changed, and not at all when it did not.
 func TestReplicaWalksTheChatsTheClusterHoldsInPartFromTheirCursor(t *testing.T) {
@@ -386,7 +386,7 @@ func TestReplicaStopsAWalkWhenTheLinkGoes(t *testing.T) {
 	}
 }
 
-// a runtime that could not make its chat list in its budget answers nothing; the agent asks again, waiting
+// HRN-879: a runtime that could not make its chat list in its budget answers nothing; the agent asks again, waiting
 // longer each time, until the list comes, and stops then: the backfill no longer waits for the next link.
 func TestReplicaAsksForTheChatListAgainUntilItComes(t *testing.T) {
 	g := newReplicaRig(t)
@@ -406,7 +406,7 @@ func TestReplicaAsksForTheChatListAgainUntilItComes(t *testing.T) {
 	}
 }
 
-// a walk the runtime cut (a busy answer) goes on a while later from the page it stopped at, while the link
+// HRN-879: a walk the runtime cut (a busy answer) goes on a while later from the page it stopped at, while the link
 // stays: it waited for the next link before.
 func TestReplicaGoesOnWithAWalkAPageStopped(t *testing.T) {
 	g := newReplicaRig(t)
@@ -447,7 +447,7 @@ func TestReplicaGoesOnWithAWalkAPageStopped(t *testing.T) {
 	}
 }
 
-// a walk reads pages of replicaWalkTurns turns with the steps of each (`steps=all`), so the copy opens a
+// HRN-879: a walk reads pages of replicaWalkTurns turns with the steps of each (`steps=all`), so the copy opens a
 // folded turn of a backfilled chat without the machine; the newest page of a changed chat stays the plain page.
 func TestReplicaWalksAskForTheStepsOfEveryTurn(t *testing.T) {
 	g := newReplicaRig(t)
@@ -483,7 +483,7 @@ func TestReplicaWalksAskForTheStepsOfEveryTurn(t *testing.T) {
 	}
 }
 
-// a chat the cluster holds whole without the steps of every turn (`v2.start.steps`) is walked again from its
+// HRN-879: a chat the cluster holds whole without the steps of every turn (`v2.start.steps`) is walked again from its
 // steps cursor with the steps of every turn, after the other walks, and its pages move the steps cursor, not the
 // history's; a chat still walked for its history is not walked for its steps apart.
 func TestReplicaWalksTheStepsOfAChatHeldWholeByTheirCursor(t *testing.T) {

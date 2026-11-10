@@ -227,7 +227,7 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	var req struct {
 		Name     string
 		SpaceIDs []string
-		// TenantName asks for a first tenant made together with the organization: an organization without one
+		// TenantName asks for a first tenant made together with the organization (HRN-762): an organization without one
 		// is a dead end for a person who has no tenant to move in. A blank name means "Основное". Absent: the
 		// organization is made as it always was.
 		TenantName *string
@@ -356,7 +356,7 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		Name     *string
 		Timezone *string
 		Currency *string
-		// AppsConsent is the rule for apps: "ask" or "auto" («Не спрашивать разрешений»). It is the
+		// AppsConsent is the rule for apps (HRN-915): "ask" or "auto" («Не спрашивать разрешений»). It is the
 		// organization's admin's, by a person's session: Gate lets no machine's or agent's token in.
 		AppsConsent *string
 	}

@@ -10,9 +10,11 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/ly-solutions/harnessly/internal/journal"
 )
 
-// The errors of an app's views: what the SDK catches in a view (console.error and console.warn, uncaught
+// The errors of an app's views (HRN-913): what the SDK catches in a view (console.error and console.warn, uncaught
 // exceptions, rejected promises, refusals of the content policy) and the bridge calls that failed. The page sends them
 // here while a view runs, the runtime keeps the last ones of each app in <registry>/viewlog/<id>.jsonl, and
 // `harnessly app logs <id>` and `harnessly app explain <id>` read them. A hint for the author, bounded in size: never a
@@ -31,7 +33,7 @@ const (
 	ViewLogError  = "error"
 	ViewLogWarn   = "warn"
 	ViewLogBridge = "bridge"
-	// The host's own lines: a file of a view the server refused, a call of the app's MCP backend that failed,
+	// The host's own lines (HRN-920): a file of a view the server refused, a call of the app's MCP backend that failed,
 	// and the steps of a load (a view opened, its handshake answered, no handshake in time).
 	ViewLogServe = "serve"
 	ViewLogMCP   = "mcp"
@@ -60,12 +62,45 @@ func ValidViewLevel(level string) bool {
 // ViewLogFailure says whether a line is a failure: everything but a load step and a warning.
 func ViewLogFailure(l ViewLogLine) bool { return l.Level != ViewLogLoad && l.Level != ViewLogWarn }
 
-// LogEvent adds one line of the host's own to an app's log; a failure to write it is not the caller's concern.
+// LogEvent adds one line of the host's own to an app's log; a failure to write it is not the caller's concern. The
+// line goes to the machine's journal too (HRN-976).
 func (r *Registry) LogEvent(id, view, level, text string) {
+	r.logEvent(id, view, level, text, journal.Entry{})
+}
+
+func (r *Registry) logEvent(id, view, level, text string, je journal.Entry) {
 	if r == nil {
 		return
 	}
 	_, _ = r.AppendViewLog(id, []ViewLogLine{{Level: level, View: view, Text: text}}, time.Now())
+	if je.Event == "" {
+		je.Event = "app." + level
+		je.Text = text
+	}
+	je.Source, je.App, je.View = JournalSource(id), id, view
+	if je.Level == "" {
+		je.Level = journalLevel(level)
+	}
+	journal.Add(je)
+}
+
+// JournalSource is the journal's source of an app's lines: Sinopia's own, or an app's.
+func JournalSource(id string) string {
+	if id == SinopiaApp {
+		return journal.SourceSinopia
+	}
+	return journal.SourceApp
+}
+
+// journalLevel is the journal's level of an app log's level: a load step is info, a warning a warning, the rest errors.
+func journalLevel(level string) string {
+	switch level {
+	case ViewLogLoad:
+		return journal.Info
+	case ViewLogWarn:
+		return journal.Warn
+	}
+	return journal.Error
 }
 
 // ViewLogSince is the lines of an app's log written at or after since (milliseconds), oldest first, at most limit of the
@@ -207,6 +242,11 @@ var (
 // LogEventOnce is LogEvent, but the same line of the same app is written once in ten seconds: a view that asks for a
 // missing file on every load fills its log with one line, not a hundred.
 func (r *Registry) LogEventOnce(id, view, level, text string) {
+	r.LogEventOnceJ(id, view, level, text, journal.Entry{})
+}
+
+// LogEventOnceJ is LogEventOnce with the journal's line given whole (its chat, trace, address and status).
+func (r *Registry) LogEventOnceJ(id, view, level, text string, je journal.Entry) {
 	key := id + "|" + view + "|" + level + "|" + text
 	now := time.Now()
 	onceMu.Lock()
@@ -219,5 +259,5 @@ func (r *Registry) LogEventOnce(id, view, level, text string) {
 	}
 	onceSeen[key] = now
 	onceMu.Unlock()
-	r.LogEvent(id, view, level, text)
+	r.logEvent(id, view, level, text, je)
 }

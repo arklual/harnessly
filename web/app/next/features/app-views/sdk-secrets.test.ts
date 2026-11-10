@@ -1,4 +1,4 @@
-// The safe through the SDK: secrets.put reaches the host with the name and the value; the app's own secret
+// The safe through the SDK (HRN-861): secrets.put reaches the host with the name and the value; the app's own secret
 // is quiet in the agent's turn, the person's shared one is asked about by its name, never by its value.
 import { describe, expect, it, vi } from 'vitest';
 import { AppBridge, type IBridgeHandlers, type IViewContext } from '@/next/features/app-views/bridge';

@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// The files of the view templates of `harnessly app new`. A view is a page on an opaque origin: it loads the
+// The files of the view templates of `harnessly app new` (HRN-924). A view is a page on an opaque origin: it loads the
 // host's hl-ui.css (the platform's tokens and primitives), shows a state for loading and one for an error, and talks
 // protocol 2 (a refused call answers a Refusal, it does not throw).
 

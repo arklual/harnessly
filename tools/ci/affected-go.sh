@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prints the Go packages a merge request has to test (one per line), or `./...` for all of them.
+# HRN-912. Prints the Go packages a merge request has to test (one per line), or `./...` for all of them.
 # Only when the request changes nothing but .go files under cmd/ and internal/: then a test can see the change only
 # through what its test binary imports, so the packages whose test binary (`go list -test`, every dependency, the test
 # imports' own ones too) contains a changed package are the ones to test. Anything else — a test's data, a page, a

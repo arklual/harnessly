@@ -83,7 +83,7 @@ func TabFromLayout(tab *jsvalue.Object, cwd, metaKey string) (ImportTab, bool) {
 			t.AgentSessionID = strings.TrimSuffix(path.Base(t.TranscriptPath), ".jsonl")
 		}
 	}
-	// Claude Code and Codex both take apps.
+	// Claude Code and Codex both take apps (HRN-703).
 	if l := tab.Object(metaKey).Object("launch"); metaKey != "" && l != nil {
 		v, _ := l.Get("apps")
 		list, _ := v.([]any)

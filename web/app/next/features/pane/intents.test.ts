@@ -142,7 +142,7 @@ describe('requestOf', () => {
   });
 });
 
-// only the agent's own `open` brings the pane out; what the runtime asked by itself waits behind.
+// HRN-943: only the agent's own `open` brings the pane out; what the runtime asked by itself waits behind.
 describe('requestsOf', () => {
   it('splits what the agent asked from what the runtime asked by itself', () => {
     const got = requestsOf([

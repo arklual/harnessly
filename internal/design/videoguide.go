@@ -6,7 +6,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// The video's rules are read on demand: an agent that works on anything else does not carry them. They are
+// The video's rules are read on demand (HRN-577): an agent that works on anything else does not carry them. They are
 // embedded with the other texts and read by `design video guide [topic]`.
 
 // VideoGuideTopics are the topics in the order a newcomer needs them.

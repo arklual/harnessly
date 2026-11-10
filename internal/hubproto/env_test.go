@@ -92,7 +92,7 @@ func TestEnvHash(t *testing.T) {
 	}
 }
 
-// The organization's rule for apps takes part in the hash only when it is auto: a list with the rule ask holds
+// The organization's rule for apps takes part in the hash only when it is auto (HRN-915): a list with the rule ask holds
 // the hash an older agent computes, and a change of the rule changes the hash the way a change of the list does.
 func TestEnvSetHashCarriesTheAppsRule(t *testing.T) {
 	items := EnvHash(envItems())

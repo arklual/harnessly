@@ -145,7 +145,7 @@ func TestAgentsNowCodexLogin(t *testing.T) {
 	}
 }
 
-// Claude Code's /fast is offered on Opus only while Claude runs on an API key; a claude.ai subscription has none.
+// HRN-945: Claude Code's /fast is offered on Opus only while Claude runs on an API key; a claude.ai subscription has none.
 func TestClaudeFastModeIsOfferedOnAKeyOnly(t *testing.T) {
 	c := machineModels(t, `{}`, "")
 	for auth, want := range map[string]bool{"api_key": true, "subscription": false, "": false} {

@@ -520,7 +520,7 @@
   z-index: 8980;
   width: min(440px, calc(100vw - 32px));
   box-sizing: border-box;
-  /* The black material: its own tokens, so its buttons turn white on black. */
+  /* The black material (HRN-884): its own tokens, so its buttons turn white on black. */
   --hx-fg-1: var(--hx-ink-fg);
   --hx-fg-2: var(--hx-ink-fg2);
   --hx-fg-3: var(--hx-ink-fg3);

@@ -360,7 +360,7 @@ func TestInstallDirProfile(t *testing.T) {
 	mustNotContain(t, "manifest", man, "hx_secretcode42")
 }
 
-// a run again of the installer (an update, a re-registration) keeps the lines the deployment added to the
+// HRN-914: a run again of the installer (an update, a re-registration) keeps the lines the deployment added to the
 // services' env files, and rewrites only those it writes itself.
 func TestInstallAgainKeepsAddedEnvLines(t *testing.T) {
 	t.Parallel()

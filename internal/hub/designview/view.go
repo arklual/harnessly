@@ -1,4 +1,4 @@
-// Package designview is the hub's own read of a design project: a revision of the project from the store,
+// Package designview is the hub's own read of a design project (HRN-881): a revision of the project from the store,
 // put into a folder of the hub from the store's contents (the blobs by sha256, kept once and linked into every
 // revision that has them), and answered by the same code that answers a guest on the runtime (design.API). Nobody's
 // machine takes part: a guest link, live or pinned, opens while the author's machine is off, and opening it costs

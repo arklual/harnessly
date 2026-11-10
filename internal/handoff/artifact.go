@@ -35,7 +35,7 @@ type ArtifactStore struct {
 	root string
 	now  func() time.Time
 	// Written is told when material was written (a draft, a claim, approved text): under a hub the runtime moves it
-	// into the store's `handoff` collection at once (internal/datamove). It must not block.
+	// into the store's `handoff` collection at once (internal/datamove, HRN-878). It must not block.
 	Written func()
 }
 

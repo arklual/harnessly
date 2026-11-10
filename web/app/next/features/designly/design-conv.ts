@@ -50,7 +50,7 @@ export interface IDesignChatsFound {
 }
 
 /**
- * The design's chats for the column's switch, from every machine of the person: the ones each machine says
+ * The design's chats for the column's switch, from every machine of the person (HRN-675): the ones each machine says
  * were started from the design or edited its files, the latest activity first. Nothing else ties a chat to the design:
  * not its folder, not opening the design from it, not naming it — a chat the design was opened from is shown in the
  * column, but is not listed as the design's. A chat just started from the column (`fresh`) is in before the machine's

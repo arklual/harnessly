@@ -1,6 +1,6 @@
 // Package appstore is the storage of an app's views (hl.storage.<scope>) without the rest of the apps: the areas, their
 // limits, the versions of their keys (ifVersion) and where an area's file lives. The runtime keeps the install's area
-// on its disk and, under a hub, every other area in the hub's store, so the data of an app is the same on
+// on its disk and, under a hub, every other area in the hub's store (HRN-898), so the data of an app is the same on
 // every machine of a space and is there with the machines off; the hub answers a view it serves with the same code.
 // It imports nothing of the runtime or the hub.
 package appstore

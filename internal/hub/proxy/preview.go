@@ -1,15 +1,21 @@
 package proxy
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"html"
 	"net/http"
 	"net/http/httputil"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // A runtime shows the right pane's preview by path when its slots have no origins of their own (a company's one host,
@@ -35,7 +41,7 @@ func previewPath(path, id string) bool {
 func (s *Service) servePreview(w http.ResponseWriter, r *http.Request, id string) {
 	m, err := s.db.S().MachineByID(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) || err == nil && (m.RevokedAt != nil || m.SpaceID == "") {
-		httpx.WriteError(w, r, httpx.ErrNotFound)
+		s.previewRefused(w, r, id, httpx.ErrNotFound, func() { httpx.WriteError(w, r, httpx.ErrNotFound) })
 		return
 	}
 	if err != nil {
@@ -44,7 +50,9 @@ func (s *Service) servePreview(w http.ResponseWriter, r *http.Request, id string
 	}
 	// The same trust as the machine's page: in path mode only a machine an administrator connected runs here.
 	if err := s.trusted(r.Context(), m); err != nil {
-		s.fail(w, r, err)
+		he := httpx.ErrInternal
+		_ = errors.As(err, &he)
+		s.previewRefused(w, r, id, he, func() { s.fail(w, r, err) })
 		return
 	}
 	// A service worker would outlive the page and serve the whole origin's paths: never on the hub's origin.
@@ -53,7 +61,7 @@ func (s *Service) servePreview(w http.ResponseWriter, r *http.Request, id string
 		return
 	}
 	if s.reg.Get(m.ID) == nil {
-		s.offline(w, r)
+		s.previewRefused(w, r, id, errPreviewOffline, func() { s.offline(w, r) })
 		return
 	}
 	prefix := "/m/" + id + "/__pv/"
@@ -91,7 +99,7 @@ func (s *Service) servePreview(w http.ResponseWriter, r *http.Request, id string
 			if r.Context().Err() != nil {
 				return
 			}
-			s.upstreamFailed(w, r, err)
+			s.previewRefused(w, r, id, previewUpstreamError(err), func() { s.upstreamFailed(w, r, err) })
 		},
 	}
 	rp.ServeHTTP(w, r)
@@ -168,4 +176,79 @@ func ServeReload(w http.ResponseWriter, r *http.Request) {
 	path, _ := json.Marshal(r.URL.RequestURI())
 	_, _ = w.Write([]byte(`<!doctype html><meta charset="utf-8"><script>parent.postMessage({type:"hl-preview-reload",path:` +
 		string(path) + `},"*")</script>`))
+}
+
+// A view of an app runs in a frame of the page, which cannot read what a refused request of it got: the hub's refusal
+// of a slot by path is a line of its log with the view's trace, and for the frame a page that tells the page above
+// (hlViewError, as the machine's own refusal of a view does), so the card names the cause (HRN-976).
+
+var (
+	errPreviewOffline = httpx.New(http.StatusBadGateway, "machine_offline", "машина не на связи с хабом")
+	previewTraceRE    = regexp.MustCompile(`^[A-Za-z0-9-]{1,40}$`)
+)
+
+// previewUpstreamError is the hub's word on a slot request the machine did not take.
+func previewUpstreamError(err error) *httpx.Error {
+	var he *httpx.Error
+	var ae *hubproto.Error
+	switch {
+	case errors.Is(err, errOffline), errors.Is(err, link.ErrClosed), errors.As(err, &he) && he.Code == "machine_offline":
+		return errPreviewOffline
+	case errors.As(err, &he) && he.Code == "machine_policy", errors.As(err, &ae) && ae.Code == hubproto.CodePolicyDenied:
+		return httpx.New(http.StatusForbidden, "machine_policy", "владелец машины запретил открывать её из harnessly")
+	}
+	return httpx.New(http.StatusBadGateway, "machine_error", "машина не ответила")
+}
+
+// previewTrace is the trace of the view whose request this is: the header of the page's own requests, or the query
+// parameter a frame's address carries.
+func previewTrace(r *http.Request) string {
+	t := r.Header.Get("X-Hl-Trace")
+	if t == "" {
+		t = r.URL.Query().Get("__hl_trace")
+	}
+	if !previewTraceRE.MatchString(t) {
+		return ""
+	}
+	return t
+}
+
+// previewRefused logs a refused slot request and answers it: a frame gets the page that tells the page above, anything
+// else the hub's usual answer.
+func (s *Service) previewRefused(w http.ResponseWriter, r *http.Request, id string, he *httpx.Error, answer func()) {
+	s.log.Info("preview refused", "machine", id, "status", he.Status, "code", he.Code, "trace", previewTrace(r),
+		"path", httpx.SafePath(r.URL.Path))
+	if r.Header.Get("Sec-Fetch-Dest") == "iframe" {
+		serveFrameRefusal(w, r, he)
+		return
+	}
+	answer()
+}
+
+// frameRefusalScript tells the page above the frame what the hub refused; the CSP runs this one script by its hash.
+const frameRefusalScript = `try{var d=document.documentElement.dataset;parent.postMessage({hlViewError:{kind:"refused",status:Number(d.status),code:d.code,text:d.reason,src:""}},"*")}catch(e){}`
+
+var frameRefusalCSP = func() string {
+	sum := sha256.Sum256([]byte(frameRefusalScript))
+	return "default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) +
+		"'; sandbox allow-scripts; frame-ancestors 'self'"
+}()
+
+func serveFrameRefusal(w http.ResponseWriter, r *http.Request, he *httpx.Error) {
+	reason := "хаб не пропустил окно к машине: " + he.Message
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", frameRefusalCSP)
+	w.WriteHeader(he.Status)
+	if r.Method == http.MethodHead {
+		return
+	}
+	code := "hub-" + he.Code
+	_, _ = w.Write([]byte(`<!doctype html><html lang="ru" data-status="` + strconv.Itoa(he.Status) + `" data-code="` + html.EscapeString(code) +
+		`" data-reason="` + html.EscapeString(reason) + `"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark">` +
+		`<title>Окно не открылось</title><style>body{margin:0;padding:24px;font:14px/1.5 system-ui,sans-serif}</style></head><body><p>` +
+		html.EscapeString(reason) + `</p><script>` + frameRefusalScript + `</script></body></html>`))
 }

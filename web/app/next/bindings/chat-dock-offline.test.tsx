@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// the machine restarts (an update) or is switched off while the person dictates or writes. The microphone is
+// HRN-674: the machine restarts (an update) or is switched off while the person dictates or writes. The microphone is
 // the browser's, so stop and cancel never wait for the machine; a message waits in the outbox and goes by itself.
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

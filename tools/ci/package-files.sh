@@ -1,5 +1,5 @@
 #!/bin/sh
-# Reads the JSON of GET /projects/:id/packages/:id/package_files without jq (the Go image has none); sourced by
+# HRN-949. Reads the JSON of GET /projects/:id/packages/:id/package_files without jq (the Go image has none); sourced by
 # publish-linux.sh, tested by test-package-files.sh against a real answer (testdata/package-files-agent-build.json).
 
 # Prints the ids of the pipelines that wrote the files, once each, space separated. Only pipelines[].id: a pipeline object

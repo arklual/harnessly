@@ -28,6 +28,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/envsetup"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
+	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/limits"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
@@ -134,7 +135,7 @@ type runtimeGate struct {
 	envSetup []*envsetup.Runner
 	// library is the folder of the Sinopia library, store the store it syncs with (nil: none, docs/hub/store.md).
 	library func() string
-	// revisions makes the store's revisions the Sinopia library's history.
+	// revisions makes the store's revisions the Sinopia library's history (HRN-880).
 	revisions func(design.Revisions)
 	store     *storelink.Link
 }
@@ -192,7 +193,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	})
 	tmuxNames = tm
 	hooks := hookConfigFromEnv(configFile)
-	// off the seal's list (internal/apps/seal.go), so no wall shows it.
+	// HRN-621: off the seal's list (internal/apps/seal.go), so no wall shows it.
 	agents.SetLineDir(filepath.Join(cfg.DataDir, "launch-lines"))
 	pusher := newSharedPusher(cfg.DataDir, hooks)
 	ref.c = newCore(coreConfig{DataDir: cfg.DataDir, Home: home, Tmux: tm, Term: terms,
@@ -218,6 +219,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	if cfg.Standalone() {
 		ref.c.cfg.WorkspacePrompts = workspacePrompts()
 		ref.c.cfg.Telemetry = mismatchTelemetry(configFile)
+		exportJournal(journal.Default(), ref.c.cfg.Telemetry)
 	}
 
 	// A page session: the cookie the cluster gateway (or the machine agent) signs with the pair's secret.
@@ -475,7 +477,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	liveBrowser := newLiveBrowser(d)
 	defer liveBrowser.Close()
 	f.Add(liveBrowserRoutes(d, liveBrowser)...)
-	// Before the JSON routes: the GET stream of the apps' MCP server shares the MCP route's path.
+	// Before the JSON routes: the GET stream of the apps' MCP server shares the MCP route's path (HRN-975).
 	f.Add(appToolStreamRoutes(d)...)
 	for _, group := range routeGroups {
 		f.Add(f.AsRoutes(group(d)...)...)
@@ -511,6 +513,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(basepkgRoutes(d)...)
 	f.Add(connectionRoutes(d)...)
 	f.Add(mcpRoutes(d)...)
+	f.Add(journalRoutes(d)...)
 	f.Add(appRoutes(d, ref.c)...)
 	f.Add(v2Routes(d, ref.c)...)
 	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
@@ -605,6 +608,10 @@ func run(ctx context.Context, cfg gate.Config) error {
 		defer alone.stop()
 		alone.files(port, nil)
 	}
+	// The journal first: the routes built next write to it (HRN-976).
+	if jl := openJournal(cfg.DataDir); jl != nil {
+		defer jl.Close()
+	}
 	f, err := build(cfg)
 	if err != nil {
 		_ = ln.Close()
@@ -630,6 +637,8 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	terms := f.terms
 	var confined http.Handler = confineAgentToken(&gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}, f)
+	// Every request of the runtime passes the journal (HRN-976): a failure, a change or a slow read is a line of it.
+	confined = journal.HTTP(confined, journal.HTTPOptions{Quiet: journalQuiet})
 	handler := confined
 	if cfg.Standalone() {
 		handler = standaloneSlots.mount(apiAlias(appBase(), confined))

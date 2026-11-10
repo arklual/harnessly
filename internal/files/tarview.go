@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// The viewer of a tar, plain or gzipped, by the zip viewer's rules: the entries as a list, one file out of it
+// The viewer of a tar, plain or gzipped (HRN-679), by the zip viewer's rules: the entries as a list, one file out of it
 // as an attachment. A tar has no index, so both read the archive from its start; a name is matched against the
 // archive's own, never joined to a folder.
 

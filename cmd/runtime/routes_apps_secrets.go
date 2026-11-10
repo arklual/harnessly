@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/secrets"
 )
 
-// An app's view puts a value into the safe and never reads it back:
+// An app's view puts a value into the safe and never reads it back (HRN-861):
 //
 //	POST <platform>/apps/secrets  {name, value}               secrets.write: the app's own secret (app/<id>/<name>),
 //	                                                          one of those it holds secrets:<name> for → {created}

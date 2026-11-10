@@ -44,7 +44,7 @@ type Texts struct {
 // Config is what the deployment names.
 type Config struct {
 	DataDir string
-	// Passive is a library a hub reads or edits for a moment: no keepers, no history, no PDF builds.
+	// Passive is a library a hub reads or edits for a moment (HRN-881): no keepers, no history, no PDF builds.
 	Passive bool
 	// ShareProbe stands in for ProbeShareFS (a test of a runtime that fails it); it runs on every call, uncached.
 	ShareProbe func(dir string) ShareFSReport

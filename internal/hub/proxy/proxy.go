@@ -72,6 +72,8 @@ type Deps struct {
 	// History: the workspace's chat history is read from the hub's copy (internal/hub/history, history.go); false leaves
 	// it to the home machine.
 	History bool
+	// VoiceTakes: the person's dictation recordings are kept here (voicetakes.go); false answers 404.
+	VoiceTakes bool
 }
 
 // Interceptor answers some requests of a signed-in person to a machine itself; false lets them through to it.
@@ -96,6 +98,8 @@ type Service struct {
 	history bool
 	uploads Uploads
 	vault   *vaultsvc.Service
+	// voiceTakes: HUB_VOICE_TAKES.
+	voiceTakes bool
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
@@ -123,7 +127,7 @@ type grantCall struct {
 // New makes the proxy.
 func New(d Deps) *Service {
 	s := &Service{
-		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History,
+		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History, voiceTakes: d.VoiceTakes,
 		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
 		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}

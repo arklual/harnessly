@@ -1,4 +1,4 @@
-// «…» of a file or a folder: one set of actions wherever a file shows — its row in «Файлы» and the pane's
+// «…» of a file or a folder (HRN-679): one set of actions wherever a file shows — its row in «Файлы» and the pane's
 // header over an open file. A menu beside the control on a wide window, a bottom sheet on the phone (MenuPanel).
 import { Menu } from '@base-ui/react/menu';
 import type { ReactElement } from 'react';

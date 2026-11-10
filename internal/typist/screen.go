@@ -192,7 +192,7 @@ const liveReplyMax = 160
 // liveReply is the reply Claude writes this moment: the last bullet of a plain screen when it is text — "● …", not a
 // tool call, not a group of calls (its "⎿" lines under it) — with the lines it wraps onto, joined by spaces and cut to
 // liveReplyMax characters. A text bullet with anything but the spinner or the input box under it is finished: the feed
-// has it already, and the line under the turn would only repeat an older thought.
+// has it already, and the line under the turn would only repeat an older thought (HRN-841).
 func liveReply(plain string) string {
 	lines := strings.Split(plain, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {

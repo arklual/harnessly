@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// «Найти в файлах»: lines with their place, the case ignored for a query in small letters, and nothing from
+// «Найти в файлах» (HRN-679): lines with their place, the case ignored for a query in small letters, and nothing from
 // service folders, credentials, binaries or links.
 func TestSearchTextFindsLinesAndKeepsOut(t *testing.T) {
 	dir := t.TempDir()

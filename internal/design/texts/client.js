@@ -942,7 +942,7 @@
   // What the board has to offer grows after its first paint (the runtime draws it, the list of boards arrives): look again.
   setInterval(function () { tellHost(false); }, 1000);
   if (parentWin) { try { parentWin.postMessage({ type: 'tk:lib-ready' }, hostOrigin); } catch (e) {} }
-  // The page is drawn: its runtime has put something in its root and the fonts, pictures and videos of it are
+  // The page is drawn (HRN-900): its runtime has put something in its root and the fonts, pictures and videos of it are
   // in. Told once per load (tk:drawn): the host keeps its loader over the page until then, not over a blank page.
   function pageRoot() { return document.getElementById('dc-root') || document.getElementById('root') || document.body; }
   function tellDrawn() {
@@ -2037,7 +2037,7 @@
   }
   // The board is drawn when the engine has put something in #dc-root, its fonts are in, every picture (an <img> and a
   // background) is decoded and a video has its first frame, then two frames later, when it is on the screen: the host
-  // shows the slide only then, not a blank page while it loads.
+  // shows the slide only then, not a blank page while it loads (HRN-900).
   var deckDrawnTurn = 0;
   function deckWaitPicture(url) {
     return new Promise(function (done) {

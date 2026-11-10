@@ -1,4 +1,4 @@
-// The hands-on tour over the real product: a ring around the element a step is about and a card beside it,
+// The hands-on tour over the real product (HRN-792): a ring around the element a step is about and a card beside it,
 // never over it nor over the menu or panel the step opened. The step is counted when the product shows it was done;
 // the ring and the card follow the element as the page moves. Nothing here blocks the page: the person clicks through.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';

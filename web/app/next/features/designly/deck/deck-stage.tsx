@@ -59,7 +59,7 @@ interface IFrame {
   loaded: boolean;
   /** The board said it is drawn (its `ready`, after its fonts and pictures are in). */
   painted: boolean;
-  /** Loaded and drawn, or did not say so in time: the frame fades in over the one under it. */
+  /** Loaded and drawn, or did not say so in time: the frame fades in over the one under it (HRN-900). */
   shown: boolean;
 }
 

@@ -1,6 +1,6 @@
 # Rollout switches
 
-A rollout switch turns a feature on or off for a **person on a machine** without a release (the wave that moves
+A rollout switch turns a feature on or off for a **person on a machine** without a release (HRN-979, the wave that moves
 the gateway's switches into the hub). It is finer than an organization's flag (`internal/hub/features`): the same feature
 can be on for one person on one machine, for a person everywhere, for a machine, or for everyone.
 

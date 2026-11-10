@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the binaries the machines run, agent, harnessly and runtime (with the page, the webui tag) for
+# HRN-912. Builds the binaries the machines run, agent, harnessly and runtime (with the page, the webui tag) for
 # linux/amd64, exactly as a release does: -trimpath, stripped, the version linked in. The main pipeline (release-build)
 # builds them with the version its tag will have (next-runtime-version.sh), so the tag pipeline only checks and publishes
 # them (publish-linux.sh); it builds them itself only when that fails. A merge request builds them too, for its smoke test

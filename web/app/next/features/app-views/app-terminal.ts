@@ -1,4 +1,4 @@
-// An app's own terminal (terminal.pty): the page holds the socket to the runtime (a shell on a pty inside the
+// An app's own terminal (terminal.pty, HRN-852): the page holds the socket to the runtime (a shell on a pty inside the
 // agent's sandbox, cmd/runtime routes_apps_terminal.go) and the bridge carries its bytes to the view and back. Binary
 // frames are what is typed and what the shell prints; a text frame {cols, rows} sets the size; the runtime's last text
 // frame {exit} says how the shell ended.

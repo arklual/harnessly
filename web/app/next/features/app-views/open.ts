@@ -23,7 +23,7 @@ type TAddressListener = (address: string) => void;
 
 const addressListeners = new Set<TAddressListener>();
 
-/** Opens a local address (`localhost:<port><path>`) in the pane's browser: a view's hl.preview.open. */
+/** Opens a local address (`localhost:<port><path>`) in the pane's browser: a view's hl.preview.open (HRN-851). */
 export const openAddressTab = (address: string): boolean => {
   if (addressListeners.size === 0) return false;
   addressListeners.forEach((listen) => listen(address));

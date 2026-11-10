@@ -1018,7 +1018,7 @@ func TestVoicePage(t *testing.T) {
 	if code := g.do("POST", "/api/v2/voice", audio, &got); code != 200 || got.Text != "открой Sinopia" {
 		t.Fatalf("words: %d %q", code, got.Text)
 	}
-	// a recording sent whole is recognized by the engine the person picked, as the live dictation is.
+	// HRN-674: a recording sent whole is recognized by the engine the person picked, as the live dictation is.
 	if engine != "local" {
 		t.Errorf("engine %q, the person picked local", engine)
 	}

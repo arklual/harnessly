@@ -1,4 +1,4 @@
-// The kit a project is made from, read once per project; null while it is read, when it has none, or when
+// The kit a project is made from (HRN-897), read once per project; null while it is read, when it has none, or when
 // the machine cannot say.
 import { useEffect, useState } from 'react';
 import { fetchKitLink, type IKitLink } from '@/next/features/designly/kit/kit-api';

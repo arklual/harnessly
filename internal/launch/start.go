@@ -444,7 +444,7 @@ func launchJSON(l *agents.Launch) *jsvalue.Object {
 	return o
 }
 
-// setLaunchModes writes the fast and permission modes of a launch into the tab's launch: a resume starts the
+// setLaunchModes writes the fast and permission modes of a launch into the tab's launch (HRN-945): a resume starts the
 // agent in them again. Absent ones are not written, so a launch without them is stored as it always was.
 func setLaunchModes(o *jsvalue.Object, l *agents.Launch) {
 	if l.Fast {

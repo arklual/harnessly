@@ -1,4 +1,4 @@
-// «Аккаунты»: the subscriptions and keys the machines of the organization work on, with who used each this
+// «Аккаунты» (HRN-661): the subscriptions and keys the machines of the organization work on, with who used each this
 // month and what it cost at list prices; and registering one the hub only discovered on a machine.
 // GET/PATCH /api/orgs/{org}/accounts of internal/hub/analytics/accounts.go.
 

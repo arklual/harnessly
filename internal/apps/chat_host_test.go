@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The chat's own interface an app puts into: starters, buttons at the field and link cards.
+// The chat's own interface an app puts into (HRN-859): starters, buttons at the field and link cards.
 const withChatHost = `"chat": { "cards": ["card"], "commands": ["/cashback"],
     "starters": [{ "text": "Проверь кешбэк в макете" }],
     "buttons": [{ "id": "open", "title": "Кешбэки", "icon": "percent", "view": "main" }, { "id": "run", "title": "Проверить", "command": "/cashback" }],

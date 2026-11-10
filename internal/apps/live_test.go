@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// A chat with no app on has the server all the same: it offers nothing and says nothing, so it costs the agent
+// A chat with no app on has the server all the same (HRN-975): it offers nothing and says nothing, so it costs the agent
 // nothing; an app turned on brings the tools.
 func TestHostToolsQuietWithoutApps(t *testing.T) {
 	none, _ := hostRig(t, nil)

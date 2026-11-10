@@ -1,4 +1,4 @@
-// The start page's «Настройка машины»: how the team's environment list is set up on the machine a new chat
+// The start page's «Настройка машины» (HRN-667): how the team's environment list is set up on the machine a new chat
 // starts on, read every few seconds while the page is visible, with «Повторить» and «Открыть сейф». A card that was
 // hidden stays hidden until the list changes; a card goes away, fading, once everything is done.
 import { useEffect, useEffectEvent, useMemo, useState } from 'react';

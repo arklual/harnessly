@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// «Машина» in «Файлы»: "/" lists the workspace's places, a folder in them lists with absolute paths and
+// «Машина» in «Файлы» (HRN-679): "/" lists the workspace's places, a folder in them lists with absolute paths and
 // without its secrets; a folder outside them, or a secret folder, is refused.
 func TestV2FilesMachineDir(t *testing.T) {
 	place, _ := filepath.EvalSymlinks(t.TempDir())
@@ -61,7 +61,7 @@ func TestV2FilesMachineDir(t *testing.T) {
 	}
 }
 
-// «Найти в файлах»: the chat's folder answers paths the files tab opens; a folder outside the places, or one
+// «Найти в файлах» (HRN-679): the chat's folder answers paths the files tab opens; a folder outside the places, or one
 // leading out of the chat's folder, is refused.
 func TestV2FilesFindText(t *testing.T) {
 	place, _ := filepath.EvalSymlinks(t.TempDir())

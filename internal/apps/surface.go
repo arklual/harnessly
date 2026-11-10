@@ -2,7 +2,7 @@ package apps
 
 import "sort"
 
-// Surface is the one description of what an app reaches in the host: the places it works in, the rights it
+// Surface is the one description of what an app reaches in the host (HRN-690): the places it works in, the rights it
 // asks for, the methods of the bridge and what each needs, the host tools of the agent. The manifest check, the bridge
 // and the catalog read it here; the page's table (web/app/next/features/app-views/surface.gen.ts), the reference
 // (docs/apps/reference.md) and the JSON Schema of app.json (docs/apps/app.schema.json) are written from it by
@@ -12,7 +12,7 @@ import "sort"
 type SurfaceTarget struct {
 	Name string `json:"name"`
 	Doc  string `json:"doc"`
-	// Slot: a place of the interface filled by a view at a spot the page declares.
+	// Slot: a place of the interface filled by a view at a spot the page declares (HRN-753).
 	Slot bool `json:"slot,omitempty"`
 	// Pattern: the name stands for a family (sinopia.<kind>).
 	Pattern bool `json:"pattern,omitempty"`
@@ -30,7 +30,7 @@ type SurfacePermission struct {
 	Alone Text `json:"alone,omitzero"`
 	// Unsupported: the host accepts the right in no call yet, so the check refuses it.
 	Unsupported bool `json:"unsupported,omitempty"`
-	// Class is how much the right lets an app do: it orders the install screen and says how loud it is, it
+	// Class is how much the right lets an app do (HRN-849): it orders the install screen and says how loud it is, it
 	// forbids nothing.
 	Class string `json:"class"`
 	// ParamClass is the class with a Param when it is not Class (secrets.write alone is the app's own keys, with a name
@@ -48,7 +48,7 @@ type Text struct {
 	En string `json:"en"`
 }
 
-// The classes of risk, from the most dangerous; the install screen lists them in this order.
+// The classes of risk (HRN-849), from the most dangerous; the install screen lists them in this order.
 const (
 	ClassCritical = "critical"
 	ClassHigh     = "high"
@@ -70,15 +70,15 @@ type SurfaceMethod struct {
 	// SDK is how a view calls it through @harnessly/app-sdk.
 	SDK string `json:"sdk,omitempty"`
 	Doc string `json:"doc"`
-	// Deprecated names what to call instead. The method keeps working (the SDK only grows); the app's inspector
+	// Deprecated names what to call instead. The method keeps working (the SDK only grows, HRN-849); the app's inspector
 	// says it is deprecated and what replaces it.
 	Deprecated string `json:"deprecated,omitempty"`
 }
 
-// EventKinds are what events:<kind> names: what happened in the chat, without its content.
+// EventKinds are what events:<kind> names: what happened in the chat, without its content (HRN-850).
 var EventKinds = []string{"turn", "tool", "message"}
 
-// SDKProtocols are the versions of the bridge's protocol the host speaks. A view names its own with
+// SDKProtocols are the versions of the bridge's protocol the host speaks (HRN-849). A view names its own with
 // harnessly/protocol after the handshake (1 when it names none); the host speaks every one listed, and a
 // behavior that is new is the view's only when it asked for the version that brings it. 2: a refused call resolves
 // to {error: 'denied' | 'unsupported' | 'failed', code, message} instead of rejecting.

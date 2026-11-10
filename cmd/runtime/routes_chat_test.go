@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// `harnessly chat test` marks the chat of the calling tab (current) or one by its id, through the page's command.
+// HRN-842: `harnessly chat test` marks the chat of the calling tab (current) or one by its id, through the page's command.
 func TestChatTestRoute(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "cli-token"), []byte("tok"), 0o600); err != nil {
@@ -70,7 +70,7 @@ func TestChatTestRoute(t *testing.T) {
 	}
 }
 
-// `harnessly chat delete` removes only a chat the calling one delegated.
+// HRN-520: `harnessly chat delete` removes only a chat the calling one delegated.
 func TestChatDeleteRoute(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "cli-token"), []byte("tok"), 0o600); err != nil {

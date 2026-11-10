@@ -80,7 +80,7 @@ describe('designChats', () => {
   });
 
   it('lists no chat the machines did not name: not the one the design was opened from, not one of its folder', () => {
-    // «Макет дизайн-системы Harnessly» opened the design to borrow from it; «Безопасность коротких URL» stood
+    // HRN-675: «Макет дизайн-системы Harnessly» opened the design to borrow from it; «Безопасность коротких URL» stood
     // in its folder. Neither started from the design or edited it, so the machine names neither.
     const list = [on(ROMA, 'tab-Ox54W1', 50), on(ROMA, 'tab-7dcegrokh', 60), on(ROMA, 'tab-design', 10)];
     const ids = designChats({ list, found: [{ machine: ROMA, convs: ['tab-design'] }], fresh: null }).map(

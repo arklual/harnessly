@@ -778,7 +778,7 @@ export interface DesignOwner {
   me: boolean;
 }
 /**
- * A project of the library; convs are the v2 conversations started from it, touchedBy the others that worked
+ * A project of the library; convs are the v2 conversations started from it (HRN-675), touchedBy the others that worked
  * on it from any folder (their agent wrote its files or named it to a writing command of the design CLI, read from the
  * transcripts: the chats from before count too), the latest activity first; an older runtime leaves it out. The owner is there for
  * a project made after owners were recorded: an older one has none.
@@ -812,11 +812,11 @@ export interface DesignlyPin {
   id: string;
   pinned: boolean;
 }
-/** POST /api/v2/designly/demo: the demo projects copied back into the library. */
+/** POST /api/v2/designly/demo: the demo projects copied back into the library (HRN-813). */
 export interface DesignlyDemo {
   restored: string[];
 }
-/** POST /api/v2/designly/chat: conv was started from the design's own column. */
+/** POST /api/v2/designly/chat: conv was started from the design's own column (HRN-675). */
 export interface DesignlyChat {
   id: string;
   conv: string;
@@ -1210,7 +1210,7 @@ export interface OpenedRefs {
 export type FileKind = 'file' | 'directory';
 export const FILE_KINDS: readonly FileKind[] = ['file', 'directory'];
 /** One entry of a conversation's folder; path is from the folder's root. */
-/** What git says of an entry: not in git yet, or with changes not committed. */
+/** What git says of an entry: not in git yet, or with changes not committed (HRN-679). */
 export type FileGit = 'new' | 'changed';
 export const FILE_GITS: readonly FileGit[] = ['new', 'changed'];
 export interface FileEntry {
@@ -1224,7 +1224,7 @@ export interface DirListing {
   path: string;
   entries: FileEntry[];
   truncated: boolean;
-  /** The place of the workspace an absolute folder lies in: the crumbs go up to it. */
+  /** The place of the workspace an absolute folder lies in: the crumbs go up to it (HRN-679). */
   root?: string;
 }
 /** GET /api/v2/conversations/{id}/file?path=: a UTF-8 text file of at most 1 MB, with the revision a save names. */
@@ -2087,7 +2087,7 @@ export interface CentralChat extends TurnsPage {
   machine: CentralState;
   machineId: MachineId;
   conversation: Conversation;
-  /** the copy holds the chat back to its first turn; false: older turns may still be only on the machine.
+  /** HRN-879: the copy holds the chat back to its first turn; false: older turns may still be only on the machine.
    *  Absent from an older gateway or hub. */
   complete?: boolean;
 }

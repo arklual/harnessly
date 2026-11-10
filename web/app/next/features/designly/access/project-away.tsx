@@ -1,4 +1,4 @@
-// What a person with a place in a project sees when the project has not reached the center yet: its owner's
+// What a person with a place in a project sees when the project has not reached the center yet (HRN-880): its owner's
 // machine made it and has not sent it to the hub's store, being off since. Projects in the store reach every machine
 // whose person has a role, the owner's machine on or off; so this card is only for one still on its way. The page keeps
 // looking on its own and opens the project when it arrives; the way back is always there — never an empty screen.

@@ -520,7 +520,7 @@ func TestLiveReplyIsTheLastTextBullet(t *testing.T) {
 	if got := liveReply("● Bash(ls)\n  ⎿ a b\n✻ Working…\n"); got != "" {
 		t.Fatalf("a tool call is not a reply: %q", got)
 	}
-	// a finished thought with calls under it, and a group of calls, are no live reply.
+	// HRN-841: a finished thought with calls under it, and a group of calls, are no live reply.
 	done := "● Две проблемы на скриншоте: меню на месте.\n\n  Ran 1 shell command\n\n✻ Photosynthesizing… (1m 2s)\n"
 	if got := liveReply(done); got != "" {
 		t.Fatalf("a finished thought is repeated: %q", got)

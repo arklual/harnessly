@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/filestore"
 )
 
-// a design library in the store shows each machine only the projects its person has a role in. The owner's
+// HRN-880: a design library in the store shows each machine only the projects its person has a role in. The owner's
 // machine goes away; a teammate with a role edits the project from their own machine; the edit reaches the owner when
 // the owner's machine is back; a machine whose person has no role never gets the files and cannot write them.
 

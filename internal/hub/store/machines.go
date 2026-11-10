@@ -368,7 +368,7 @@ func (s Store) SetEnvNames(ctx context.Context, machineID string, names []string
 // IsNotFound says whether err is the "no such row" error.
 func IsNotFound(err error) bool { return errors.Is(err, sql.ErrNoRows) }
 
-// TrustMachine records that by accepted the machine's page running on the hub's own origin.
+// TrustMachine records that by accepted the machine's page running on the hub's own origin (HRN-762).
 func (s Store) TrustMachine(ctx context.Context, machineID, by string, at time.Time) error {
 	_, err := s.q.Exec(ctx, `INSERT INTO machine_trust (machine_id, trusted_by, trusted_at) VALUES (?, ?, ?)
 		ON CONFLICT (machine_id) DO UPDATE SET trusted_by = excluded.trusted_by, trusted_at = excluded.trusted_at`, machineID, by, Ms(at))

@@ -9,7 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 )
 
-// the CLI says what an app waits for and where the person agrees; no command grants consent.
+// HRN-913: the CLI says what an app waits for and where the person agrees; no command grants consent.
 func TestAppEnableSaysConsentWaits(t *testing.T) {
 	f := newFake(t)
 	r := f.run(t, "hs-chat", "app", "enable", "example.waits")
@@ -103,7 +103,7 @@ func lastLine(s string) string {
 	return lines[len(lines)-1]
 }
 
-// --since goes to the runtime as a time, --json prints the lines as the runtime sent them.
+// HRN-920: --since goes to the runtime as a time, --json prints the lines as the runtime sent them.
 func TestAppLogsSinceAndJSON(t *testing.T) {
 	f := newFake(t)
 	r := f.run(t, "", "app", "logs", "example.app", "--since", "10m")
@@ -122,7 +122,7 @@ func TestAppLogsSinceAndJSON(t *testing.T) {
 	}
 }
 
-// --follow prints what is there, then stops after --for; a line is told once.
+// HRN-920: --follow prints what is there, then stops after --for; a line is told once.
 func TestAppLogsFollowStopsAfterFor(t *testing.T) {
 	f := newFake(t)
 	r := f.run(t, "", "app", "logs", "example.app", "--follow", "--for", "1s")
@@ -131,7 +131,7 @@ func TestAppLogsFollowStopsAfterFor(t *testing.T) {
 	}
 }
 
-// app check says how the view loaded and fails (exit 1) when it did not load cleanly.
+// HRN-920: app check says how the view loaded and fails (exit 1) when it did not load cleanly.
 func TestAppCheck(t *testing.T) {
 	f := newFake(t)
 	r := f.run(t, "", "app", "check", "example.app", "--open", "--view", "main")

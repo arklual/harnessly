@@ -379,7 +379,7 @@ func hasSinopiaView(targets []string) bool {
 // are its aliases.
 const SinopiaApp = "harnessly.sinopia"
 
-// The readers of Sinopia's points: each reads one list of a manifest's `sinopia`.
+// The readers of Sinopia's points: each reads one list of a manifest's `sinopia` (HRN-808).
 func init() {
 	pointReaders["sinopia.kind"] = func(m *Manifest) []Contribution {
 		s, err := m.SinopiaOf()

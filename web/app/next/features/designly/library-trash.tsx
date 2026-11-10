@@ -1,4 +1,4 @@
-// The trash: the person's own deleted projects, to put back or to erase for good. The machine keeps the files
+// The trash (HRN-860): the person's own deleted projects, to put back or to erase for good. The machine keeps the files
 // whole in its trash folder until they are erased here.
 import { useEffect, useState } from 'react';
 import type { ITrashItem } from '@/next/features/designly/api';

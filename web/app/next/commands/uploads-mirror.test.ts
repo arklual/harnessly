@@ -1,4 +1,4 @@
-// under a hub what a person attaches goes into the hub's store too, and the chat's uploads are read from the
+// HRN-879: under a hub what a person attaches goes into the hub's store too, and the chat's uploads are read from the
 // hub; elsewhere (a runtime on its own, a cluster) nothing changes.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

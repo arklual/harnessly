@@ -7,6 +7,7 @@ import { pageClock } from '@/next/core/clock';
 import { getPage } from '@/next/core/net/http';
 import { clusterApi, machineApi } from '@/next/core/net/machine';
 import { startDraftSync } from '@/next/core/drafts-cloud';
+import { startJournal } from '@/next/core/journal';
 import { dbNameOf, idbKV, startPersistence, type KV, type Persistence } from '@/next/core/persist';
 import { hub, type HubOptions } from '@/next/core/realtime/hub';
 import { clearPersonData } from '@/next/core/session';
@@ -124,6 +125,7 @@ let generation = 0;
 let persistence: Persistence | null = null;
 let stopOutbox: (() => void) | null = null;
 let stopDraftSync: (() => void) | null = null;
+let stopJournal: (() => void) | null = null;
 
 const flushOnHide = () => void persistence?.flushNow();
 // A phone puts a page in the background and may end it there without a pagehide: what was typed is written as the
@@ -133,7 +135,7 @@ const flushOnHidden = () => {
 };
 
 /**
- * How long the first screen waits for me before it draws the machines. me is the home machine's answer; a
+ * How long the first screen waits for me before it draws the machines (HRN-879). me is the home machine's answer; a
  * home machine whose agent keeps its link while its runtime hangs answered it late or never, and a fresh device, with
  * nothing kept to draw, stayed blank for that long. The list and the chats are the hub's; me comes when it comes.
  */
@@ -228,6 +230,8 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     if (typeof window !== 'undefined') {
       window.addEventListener('pagehide', flushOnHide);
       document.addEventListener('visibilitychange', flushOnHidden);
+      // The machine's journal of what the page does and where it fails (HRN-976).
+      stopJournal = startJournal();
     }
     const openKV = o.kv ?? ((person: string) => idbKV(dbNameOf(person)));
     const hint = o.lastPerson === undefined ? readHint() : o.lastPerson;
@@ -267,7 +271,7 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
     batch(() => putMachines(machines));
     if (o.hub) hub.configure(o.hub);
     // Every machine's socket opens at once; /hello is asked of each on its own, behind them. Waiting for every
-    // machine's answer held the page up to 10 s on one machine that was off.
+    // machine's answer held the page up to 10 s on one machine that was off (HRN-902).
     const preferred = me.k === 'ready' ? me.me.settings.defaultMachine : null;
     const all = machines.map((m) => m.id);
     hub.start(all, pickActive(machines, preferred));
@@ -311,6 +315,8 @@ export async function shutdownNext(): Promise<void> {
   stopOutbox = null;
   stopDraftSync?.();
   stopDraftSync = null;
+  stopJournal?.();
+  stopJournal = null;
   if (typeof window !== 'undefined') {
     window.removeEventListener('pagehide', flushOnHide);
     document.removeEventListener('visibilitychange', flushOnHidden);

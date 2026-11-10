@@ -156,7 +156,7 @@ func (p *Pusher) Connected(machineID string, hello hubproto.Hello) {
 	p.extra[machineID] = Extra{
 		Claude: p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvClaude),
 		Apps:   p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvApps),
-		// The rule for apps does not need the setup: the runtime reads it from the list's file.
+		// The rule for apps does not need the setup: the runtime reads it from the list's file (HRN-915).
 		AppsConsent: slices.Contains(hello.Features, hubproto.FeatureEnvAppsConsent),
 	}
 	if slices.Contains(hello.Features, hubproto.FeatureEnvironment) {

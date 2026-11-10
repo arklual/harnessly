@@ -11,7 +11,7 @@
 // recognized stays over the field it was recorded in (`scope`: the chat, or the start page) as a failed take, recognized
 // again by hand or by itself when the link is back (voice-retry.ts). A field without a scope shows no failed takes.
 //
-// The microphone is the browser's: stop and cancel never wait for the machine. Without a link no socket is
+// The microphone is the browser's (HRN-674): stop and cancel never wait for the machine. Without a link no socket is
 // opened, and a stop while the link is down keeps the recording at once («распознаю, когда машина вернётся»).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { transcribe } from '@/next/features/composer/voice-api';
@@ -490,7 +490,7 @@ export const useVoice = (
   const tried = useRef(new Set<string>());
 
   // One request per take: the person's press while the field is already recognizing it by itself joins that request
-  // (it used to return at once, and the button did nothing). The bar shows it busy, then the text is in the
+  // (HRN-674: it used to return at once, and the button did nothing). The bar shows it busy, then the text is in the
   // field, or the bar says why not.
   const retry = async (take: VoiceTake, quiet: boolean) => {
     const outcome = await recognizeTake(

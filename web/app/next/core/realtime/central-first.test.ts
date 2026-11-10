@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// a chat opened on a machine whose chats the cluster keeps is drawn from the copy, and the machine's channel goes
+// HRN-879: a chat opened on a machine whose chats the cluster keeps is drawn from the copy, and the machine's channel goes
 // on from the copy's newest entry (a snapshot "after"), not from nothing (its whole tail).
 
 const net = vi.hoisted(() => ({ getPage: vi.fn() }));

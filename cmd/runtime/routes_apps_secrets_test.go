@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 )
 
-// a view puts its own secret, one it declared, and the person's secret only by the right of that name; the
+// HRN-861: a view puts its own secret, one it declared, and the person's secret only by the right of that name; the
 // value never comes back and never reaches the journal.
 func TestAppSecretsPutRoute(t *testing.T) {
 	call, conv := appRig(t)

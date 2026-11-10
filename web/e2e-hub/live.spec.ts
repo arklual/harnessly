@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-// The read-only run against hubs that are up: nothing is created, changed or deleted. The addresses and the
+// The read-only run against hubs that are up (HRN-761): nothing is created, changed or deleted. The addresses and the
 // test account come from CI variables only, never from the code:
 //   E2E_LIVE_HUBS       space-separated hub addresses (https://hub.example.com ...)
 //   E2E_LIVE_COOKIE     the value of the test account's session cookie (masked in CI). An account that signs in by a

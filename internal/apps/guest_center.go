@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/filestore"
 )
 
-// A guest link opens with the machine that made it off: under a hub the machine puts each of its live links
+// HRN-898. A guest link opens with the machine that made it off: under a hub the machine puts each of its live links
 // (never the token: the hash, as it keeps it) into the space's apps collection, guests/<person>/<hash>.json, with the
 // version and sum of the app's package, whose archive goes to bundles/<app>/<sum>.tgz. The hub serves the link at
 // <hub>/apps/guest/<token>/ from there (internal/hub/appsview): the page, the view's files out of the archive, and the

@@ -19,6 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -137,6 +138,7 @@ func previewOf(d deps) *previewSet {
 		return s
 	}
 	store := devtools.NewStore()
+	store.OnFailed, store.OnError = journalPreviewRequest, journalPreviewConsole
 	hidden := previewHidden(d)
 	scanner := &ports.Scanner{Home: d.Home, Worktrees: env("RUNTIME_WORKTREES_ROOT", filepath.Join(d.Home, ".worktrees")), Hidden: hidden}
 	where := os.Getenv("RUNTIME_PLATFORM_HOST")
@@ -530,8 +532,16 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 	if err != nil {
 		return previewBytes(r, 400, mcpserver.ParseError(), previewNoStore())
 	}
-	srv := &mcpserver.Server{Name: s.mcpName, Sets: []mcpserver.Toolset{s.mcp}}
+	// The journal learns the calling chat when a toolset finds it by the connection (callerCache.of), and writes down
+	// every tool call with how long it took (HRN-976).
+	ctx, _ := journal.WithScope(r.Context(), r.Header.Get(journal.TraceHeader), "")
+	r = r.WithContext(ctx)
+	// An agent inside the wall reads only its own chat's lines; the person's agents, the whole journal.
+	_, walled := d.CLI.AgentOf(r)
+	srv := &mcpserver.Server{Name: s.mcpName, Sets: []mcpserver.Toolset{s.mcp, journalTools{own: walled}}}
+	server := s.mcpName
 	if r.URL.Query().Get("server") == apps.HostServer {
+		server = apps.HostServer
 		// Its tools follow the apps on in the chat; the GET stream says when they change (v2_applive.go).
 		srv = &mcpserver.Server{Name: apps.HostServer, ListChanged: true}
 		if more := s.appTools.Load(); more != nil {
@@ -544,6 +554,7 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 			srv.Sets = append(srv.Sets, set)
 		}
 	}
+	srv.OnCall = journalToolCall(server)
 	status, body := srv.Handle(r.Context(), payload)
 	if body == nil {
 		return status, nil, previewNoStore()

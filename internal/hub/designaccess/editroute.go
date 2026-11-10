@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// The editor's saves of a deck or a video (<platform api>/design/{deck,video}[/...], EditRoutes)
+// HRN-881. The editor's saves of a deck or a video (<platform api>/design/{deck,video}[/...], EditRoutes)
 // are the hub's when the project is recorded and in the store: the hub checks the person's role in its own tables and
 // saves the edit as a revision, whether or not the machine the page runs over is on. A read of the deck's or the
 // video's state stays the machine's while it is on (it knows the recordings and the exports that run there); with the

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// GitBlob is a file as a git revision has it, for the editor's diff: read from the file's own folder by a
+// GitBlob is a file as a git revision has it (HRN-679), for the editor's diff: read from the file's own folder by a
 // path relative to it ("./name"), so any file of any repository works without knowing where the repository starts.
 // inRepo is false outside a repository; tracked is false for a file the revision does not have.
 func GitBlob(abs, ref string) (side Side, inRepo, tracked bool) {

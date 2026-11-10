@@ -264,6 +264,8 @@ func (c *cli) run(args []string) error {
 		return c.page(rest)
 	case "docs", "doc":
 		return c.docs(rest)
+	case "logs", "log", "journal":
+		return c.logs(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }
@@ -444,7 +446,7 @@ type tabInfo struct {
 	AgentProviderID string `json:"agentProviderId"`
 	AgentSessionID  string `json:"agentSessionId"`
 	Launched        bool   `json:"launched"`
-	// Delegated: the agent runs in a chat nested under ParentChatID (tab create --prompt from a chat); DelegateNote
+	// Delegated: the agent runs in a chat nested under ParentChatID (tab create --prompt from a chat, HRN-828); DelegateNote
 	// is why it did not, when it was started as a plain tab instead.
 	Delegated    bool   `json:"delegated"`
 	ParentChatID string `json:"parentChatId"`
@@ -688,7 +690,7 @@ func (c *cli) tabCreate(args []string) error {
 		}
 	}
 	if _, ok := f.values["prompt"]; ok {
-		// An agent started with a first message is a chat nested under the chat this command runs in; the
+		// An agent started with a first message is a chat nested under the chat this command runs in (HRN-828); the
 		// runtime finds that chat by the terminal's session.
 		if s := c.session(); s != "" {
 			body["session"] = s

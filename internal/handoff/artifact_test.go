@@ -280,7 +280,7 @@ func TestArtifactSnapshotCanonicalizesClaudeAndCodexWithoutSourceIdentity(t *tes
 	}
 }
 
-// every write is told, so that under a hub the runtime moves the note into the store at once; a failed one
+// HRN-878: every write is told, so that under a hub the runtime moves the note into the store at once; a failed one
 // is not.
 func TestArtifactWritesAreTold(t *testing.T) {
 	root := t.TempDir()

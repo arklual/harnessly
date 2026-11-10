@@ -315,7 +315,7 @@ func TestALinkIsNotFollowed(t *testing.T) {
 	}
 }
 
-// the machine's sidebar goes to the hub once, and again only when it changes; a hub that keeps none leaves it
+// HRN-883: the machine's sidebar goes to the hub once, and again only when it changes; a hub that keeps none leaves it
 // skipped and asked again each pass; Verify does not ask the store for it.
 func TestTheSidebarIsDeliveredOnceAndAgainWhenItChanges(t *testing.T) {
 	data := t.TempDir()
@@ -366,7 +366,7 @@ func TestTheSidebarIsDeliveredOnceAndAgainWhenItChanges(t *testing.T) {
 	}
 }
 
-// An upload of today's runtime is <id><ext> (wire.uploadExt) beside <id>.json: it moves, not "gone".
+// An upload of today's runtime is <id><ext> (wire.uploadExt) beside <id>.json: it moves, not "gone" (HRN-982).
 func TestAnUploadWithAnExtensionMoves(t *testing.T) {
 	data, transcripts := oldInstall(t)
 	up := filepath.Join(data, "v2", "uploads")

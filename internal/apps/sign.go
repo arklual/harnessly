@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/egress"
 )
 
-// The signature of an app package. A package is a .hlapp: the archive of Pack. Its signature is a small JSON file
+// The signature of an app package (HRN-966). A package is a .hlapp: the archive of Pack. Its signature is a small JSON file
 // beside it, <name>.hlapp.sig: the publisher's name, the public key and an ed25519 signature of the archive's SHA-256.
 // The key is the publisher's own (made by `harnessly app key`, kept in the machine's safe); a deployment lists the keys
 // it trusts in its network policy (egress.Publisher) and may require a signature of every package it installs.

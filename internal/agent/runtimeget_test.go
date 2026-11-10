@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// what the runtime gave is told as it was — a cut answer is not «answered 200».
+// HRN-879: what the runtime gave is told as it was — a cut answer is not «answered 200».
 func TestRuntimeGetSaysWhatWasWrongWithTheAnswer(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

@@ -32,7 +32,7 @@ export const forPeriod = (p: OverviewPeriod): string => (p === 'week' ? 'за н
 
 export type Unit = 'rub' | 'usd' | 'tok';
 
-/** The units the donut counts in: money in the shown currency and tokens; one currency on the whole hub. */
+/** The units the donut counts in: money in the shown currency and tokens; one currency on the whole hub (HRN-670). */
 export const unitsOf = (): { id: Unit; label: string }[] =>
   inRubles()
     ? [

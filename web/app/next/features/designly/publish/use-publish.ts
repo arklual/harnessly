@@ -34,7 +34,7 @@ export interface IPublishState {
   pages: readonly IScopePage[];
   busy: boolean;
   error: string | null;
-  /** The site as the hub last answered: read back once the design opens, then what publishing answers; null
+  /** The site as the hub last answered: read back once the design opens (HRN-675), then what publishing answers; null
    *  while there is none. */
   done: IPublished | null;
   run: () => Promise<void>;

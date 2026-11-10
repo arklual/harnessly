@@ -30,7 +30,7 @@ func snapJSON(t *testing.T, s wire.ConvSnapshot) string {
 	return string(raw)
 }
 
-// after a start every conversation's feed lets go of what it read, and an idle chat's looks do not read it
+// HRN-901: after a start every conversation's feed lets go of what it read, and an idle chat's looks do not read it
 // again; the page's snapshot is the one it was, and what the agent writes next goes out as before.
 func TestAQuietChatHoldsNoFeedAfterARestart(t *testing.T) {
 	r := newRig(t)

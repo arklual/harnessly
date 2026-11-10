@@ -1,4 +1,4 @@
-// The overlay layer of a video end to end on a standalone runtime of its own: an agent adds overlays with the
+// The overlay layer of a video (HRN-653) end to end on a standalone runtime of its own: an agent adds overlays with the
 // CLI and the editor draws them on the scene's frame; a person moves one with the mouse, retypes it in place, drags its
 // strip on the time line and picks its look in the inspector, and each of it lands in the same meta file the CLI reads; an
 // agent's change to what the person edited is refused until it says --force, and the editor shows what the agent changed.

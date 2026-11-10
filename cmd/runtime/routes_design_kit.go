@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
-// The kit screen's routes (slice "design"): the kits with a canvas, a theme's canvas, a template as a project,
+// The kit screen's routes (slice "design", HRN-897): the kits with a canvas, a theme's canvas, a template as a project,
 // where a kit is used, the kit a project is on, and the kit's files.
 
 func init() {

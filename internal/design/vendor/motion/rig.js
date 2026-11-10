@@ -1,4 +1,4 @@
-// A rigged hero for a video's board: a drawing from art/heroes.js with named parts, and the actions of a character as
+// A rigged hero for a video's board (HRN-652): a drawing from art/heroes.js with named parts, and the actions of a character as
 // calls on the scene's timeline. Load after gsap.min.js, MorphSVGPlugin.min.js, tk.js, art/art.js and art/heroes.js.
 //
 //   <svg class="hero" data-tk-art="hero-person"></svg>

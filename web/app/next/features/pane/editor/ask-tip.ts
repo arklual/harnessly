@@ -1,4 +1,4 @@
-// «Спросить агента» over a selection: a small bar by the selected text — «Спросить агента», «Объясни»,
+// «Спросить агента» over a selection (HRN-679): a small bar by the selected text — «Спросить агента», «Объясни»,
 // «Исправь» — that puts the selection, with its path and lines, into the chat's field. It shows only once the mouse is
 // let go (not while a selection is being dragged) and leaves with the selection.
 import { StateEffect, StateField, type EditorState, type Extension } from '@codemirror/state';

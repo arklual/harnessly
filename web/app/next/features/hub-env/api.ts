@@ -72,7 +72,7 @@ export const loadHubEnv = (machine: MachineId): Promise<PageOutcome<IHubEnv>> =>
 
 /**
  * The personal switch of an item that is not pinned. The hub keeps it (PUT /api/me/env/{itemId}); the runtime answers
- * 501 until the hub takes a machine's request for it, and then the page shows the failure.
+ * 501 until the hub takes a machine's request for it (HRN-667), and then the page shows the failure.
  */
 export const switchHubEnv = (machine: MachineId, itemId: string, off: boolean) =>
   sendBody(

@@ -768,7 +768,7 @@
   border-bottom: 1px solid var(--hx-border);
 }
 
-/* the one «Поделиться» of every kind (features/designly/access/resource-share.tsx). At most 600px tall on a
+/* HRN-675: the one «Поделиться» of every kind (features/designly/access/resource-share.tsx). At most 600px tall on a
    wide window; on the phone the sheet's head stays, only the body scrolls, and the sheet rides over the keyboard. */
 .hx-acc--one {
   max-height: min(600px, calc(100dvh - 48px));

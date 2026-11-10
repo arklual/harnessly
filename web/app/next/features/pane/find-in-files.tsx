@@ -1,4 +1,4 @@
-// «Найти в файлах» (⇧⌘F) of «Файлы»: a piece of text across the folder's files, the lines that hold it grouped
+// «Найти в файлах» (⇧⌘F) of «Файлы» (HRN-679): a piece of text across the folder's files, the lines that hold it grouped
 // by file, the line opened in the editor with the text selected. What was searched stays while the tab is open, so the
 // panel comes back with it after a line is looked at.
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react';

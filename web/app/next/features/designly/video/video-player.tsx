@@ -78,7 +78,7 @@ export interface IVideoPlayerProps {
   command?: IPlayerCommand | null;
   /** Says whether it is playing, for what the agent is told. */
   onPlaying?: (playing: boolean) => void;
-  /** The overlay layer's editing. */
+  /** The overlay layer's editing (HRN-653). */
   overlays: IVideoOverlayEditor;
   /** A board's error card sends its error to the design's chat; absent: it only copies. */
   onBoardError?: (words: string) => void;

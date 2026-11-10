@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
 )
 
-// with HUB_APPS_GUEST_URL the guest links of apps run on an origin of their own and nothing of the hub does.
+// HRN-979: with HUB_APPS_GUEST_URL the guest links of apps run on an origin of their own and nothing of the hub does.
 func TestAppsGuestHostServesOnlyGuestLinks(t *testing.T) {
 	const guest = "guest.example.com"
 	s := hubtest.New(t, hubtest.Env("HUB_APPS_GUEST_URL", "http://"+guest))

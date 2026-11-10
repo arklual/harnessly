@@ -163,7 +163,7 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 		}
 		mailer = mail.Log{Logger: log}
 	}
-	// design projects are read and edited through the hub's store (the API does not import the view).
+	// HRN-881: design projects are read and edited through the hub's store (the API does not import the view).
 	api.DesignView = designview.Hub
 	api.AppsView = appsview.Hub
 	hub, err := api.New(api.Options{Config: cfg, DB: db, Mailer: mailer, Log: log, UI: web.HubDist(), Workspace: web.Dist()})

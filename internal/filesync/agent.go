@@ -796,7 +796,7 @@ func (a *Agent) Pull(ctx context.Context, wait time.Duration) (bool, error) {
 	return ch.More, a.state.setCursor(ch.Rev)
 }
 
-// rescope follows a change of what the store shows this machine (a role given or taken on a project): the
+// rescope follows a change of what the store shows this machine (a role given or taken on a project, HRN-880): the
 // room is read again from the start, so a project that became visible arrives whole, and a file the agent knew that
 // the store no longer shows it is removed when it was not edited here (an edit stays, unsynced). The first scope a
 // store names (was "") only reads the room again.

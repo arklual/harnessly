@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// An app turned on in a chat whose agent already runs. Every Claude Code chat has the host's server
+// An app turned on in a chat whose agent already runs (HRN-975). Every Claude Code chat has the host's server
 // (harnessly-app) from its start, quiet while no app is on: the server's tools are read at every call from the apps on
 // in the chat now (HostTools.Enabled), and the client is told when they change (notifications/tools/list_changed). What
 // the server cannot carry, the agent gets on its next turn from the live hook (`harnessly hook app-context --live`):

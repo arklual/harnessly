@@ -19,7 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// the hub's store shows a machine only the design projects its person has a role in, takes its writes only to
+// HRN-880: the hub's store shows a machine only the design projects its person has a role in, takes its writes only to
 // those its person may edit, and records a project whose owner file arrives before the hub knew it.
 
 type fakeMachines map[string]store.Machine

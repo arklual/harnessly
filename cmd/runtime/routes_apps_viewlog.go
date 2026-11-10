@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
-// The errors of the apps' views (internal/apps viewlog.go):
+// The errors of the apps' views (HRN-913, internal/apps viewlog.go):
 //
 //	POST <platform>/apps/view-log   the page: {id, view, lines: [{at, level, text}]} — what a view it runs reported
 //	GET  /api/cli/apps/logs?id=&limit=&since=   harnessly app logs <id>: the last lines (written at or after since), oldest first

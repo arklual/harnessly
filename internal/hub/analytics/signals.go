@@ -405,7 +405,7 @@ func (s *Service) snoozeSignal(w http.ResponseWriter, r *http.Request, p *auth.P
 	})
 }
 
-// unsnoozeSignal brings a snoozed signal back at once: the «Вернуть» of a snooze made by mistake.
+// unsnoozeSignal brings a snoozed signal back at once: the «Вернуть» of a snooze made by mistake (HRN-670).
 func (s *Service) unsnoozeSignal(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
 	return s.setSnooze(w, r, p, func(*time.Location, time.Time) (*time.Time, error) { return nil, nil })
 }

@@ -133,7 +133,7 @@
   z-index: 1;
 }
 
-/* «Куда ушли деньги»: the cut and the span on one line, the rows as the board's bars. */
+/* «Куда ушли деньги» (HRN-661): the cut and the span on one line, the rows as the board's bars. */
 .hb .sp-tools {
   display: flex;
   flex-wrap: wrap;
@@ -155,7 +155,7 @@
   color: var(--hx-fg-3);
 }
 
-/* «Кто сегодня в работе»: the person's initial, green while a chat of theirs is going on. */
+/* «Кто сегодня в работе» (HRN-663): the person's initial, green while a chat of theirs is going on. */
 .hb .dash-bar__label.ac-who {
   display: flex;
   flex-direction: row;

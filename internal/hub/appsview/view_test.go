@@ -28,7 +28,7 @@ func (r rooms) AppsRoom(ctx context.Context, spaceID string) (*filestore.Store, 
 
 func (r rooms) AppsSpaces(context.Context) ([]string, error) { return []string{r.space}, nil }
 
-// a guest link opens from the hub's store with the machine that made it gone: the page, the view's file and
+// HRN-898: a guest link opens from the hub's store with the machine that made it gone: the page, the view's file and
 // the link's own storage; a revoked link ends there too.
 func TestGuestLinkOpensFromTheStoreWithTheMachineOff(t *testing.T) {
 	srv, err := filestore.OpenFolder(t.TempDir(), func(r *http.Request, coll string) (filestore.Access, error) {

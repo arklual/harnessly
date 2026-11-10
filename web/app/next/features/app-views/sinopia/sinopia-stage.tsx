@@ -49,7 +49,7 @@ export interface ISinopiaStageProps {
   viewing?: boolean;
   /** The document's own view. */
   children: ReactNode;
-  /** A band over the view (the project's kit). */
+  /** A band over the view (the project's kit, HRN-903). */
   band?: ReactNode;
   /** A panel of the document beside the view (its «Версии»), mounted while it shows and leaves. */
   side?: ReactNode;

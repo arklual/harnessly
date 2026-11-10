@@ -1,7 +1,7 @@
 // The public catalog on /apps: what anyone offers, as cards, found with the header's search; nothing is drawn while it
 // is empty.
 // An install is two steps on purpose: the first opens the install screen with everything the app reaches and the
-// warning that apps are not checked, the second installs.
+// warning that apps are not checked (HRN-849), the second installs.
 import { useState } from 'react';
 import { Button } from '@/next/ui/button';
 import AppTile from '@/next/features/app-catalog/app-tile';

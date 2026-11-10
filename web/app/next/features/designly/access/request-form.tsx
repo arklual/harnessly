@@ -1,6 +1,6 @@
 // «Запросить»: the level asked for and a word to the owner. After it the screen says «Запрос отправлен» for as long as
 // the request is open. Used by the card of a person with no access and by the dialogs of one who may only look; who
-// receives the request (the older design API or the common /access one) is the caller's `onSend`.
+// receives the request (the older design API or the common /access one, HRN-675) is the caller's `onSend`.
 import { useEffect, useRef, useState } from 'react';
 import type { TRequestLevel } from '@/next/features/designly/access/api';
 import { useAction } from '@/next/features/designly/access/use-action';

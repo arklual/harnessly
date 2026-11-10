@@ -2,7 +2,7 @@
 // of the pane opens an outside site, driven over the DevTools protocol (CDP). The page's picture goes to the pane as a
 // screencast, the person's mouse, keys, wheel and paste go back as input events, and the agent's tools act on the page
 // through the same protocol. The proxy (internal/preview) keeps the machine's own servers and stands, where the page is
-// rewritten, inspected and edited; this browser takes the sites the proxy cannot carry.
+// rewritten, inspected and edited; this browser takes the sites the proxy cannot carry (HRN-680).
 //
 // The browser is driven over a pipe (--remote-debugging-pipe), not a DevTools port: no process or page on the machine
 // can reach the protocol, and so the profile's cookies, except the runtime through the pipe it holds.

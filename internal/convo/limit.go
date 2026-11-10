@@ -41,7 +41,7 @@ func (c *conv) autoOn() (limit, restart bool) {
 
 // limitEnd turns the end of a turn into a failure on the usage limit when its last line is the agent's notice of it,
 // or when it failed while the limits say the plan ran out (the composer's «5ч 0%»): Claude fires StopFailure before
-// its refusal is on the transcript, and the hook does not say why the turn failed.
+// its refusal is on the transcript, and the hook does not say why the turn failed (HRN-916).
 func (c *conv) limitEnd(id string, st wire.TurnStatus, failure *wire.TurnFailure, now time.Time) (wire.TurnStatus, *wire.TurnFailure, *feed.Limit) {
 	if st == wire.TurnInterrupted {
 		return st, failure, nil
@@ -87,7 +87,7 @@ func (c *conv) exhausted(st wire.TurnStatus, failure *wire.TurnFailure, now time
 }
 
 // lateLimit holds a chat whose failed turn shows its limit only now: the refusal came onto the transcript after the
-// StopFailure ended the turn. The turn's failure is named again, and the chat waits for the reset.
+// StopFailure ended the turn (HRN-916). The turn's failure is named again, and the chat waits for the reset.
 func (c *conv) lateLimit(now time.Time) {
 	if c.rec.Limited != nil || c.rec.State.K == wire.StateWorking {
 		return

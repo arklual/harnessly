@@ -24,7 +24,7 @@
 //   window.tkVideo = {v: 3, ready(): Promise, seek(ms): Promise<{same}>, audit(opts?): Promise<issue[]>, moments(),
 //                     scene({transition, overlays}), problems(): problem[], info(): {engines, motionDur}}
 //
-// The board's motion engines. All of them hang on one time:
+// The board's motion engines (HRN-576). All of them hang on one time:
 //   tkVideo.motion(build)  build(root) runs once the board is drawn and the fonts and images are in. With GSAP on the page
 //                          every tween and timeline it makes is gathered into one paused timeline and sought with t.
 //   tkVideo.register({name, ready?(), seek(ms)})  any other engine (a canvas, three.js, lottie): ready may return a promise
@@ -387,7 +387,7 @@
     return changed;
   }
 
-  // ---- the overlay layer ----
+  // ---- the overlay layer (HRN-653) ----
   //
   // Titles, lower thirds, callouts, highlights, key caps, counters and badges that the host or the render hands over in
   // the scene's config ({overlays: [...]}, internal/design/video_overlays.go). They are drawn over the board as a pure

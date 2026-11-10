@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// the log route takes since; the check route answers for an app that waits for consent or is off without a
+// HRN-920: the log route takes since; the check route answers for an app that waits for consent or is off without a
 // browser, says plainly when there is none, and 404s an app that is not installed.
 func TestAppLogsSinceAndCheckRoutes(t *testing.T) {
 	call, _ := appRig(t)

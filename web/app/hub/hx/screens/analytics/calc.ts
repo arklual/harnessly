@@ -21,7 +21,7 @@ export const DASH = '—';
 
 /**
  * Money of the screen, in the hub's currency: the API counts in dollars, the page shows rubles at the hub's rate, so
- * Аналитика speaks the same ₽ as Обзор and the limits. `min`/`max` are the dollar digits while the rate is
+ * Аналитика speaks the same ₽ as Обзор and the limits (HRN-670). `min`/`max` are the dollar digits while the rate is
  * not known yet; rubles are whole.
  */
 export const cash = (usd: number, min = 0, max = min): string => {

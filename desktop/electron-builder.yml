@@ -1,0 +1,20 @@
+appId: ${env.HARNESSLY_DESKTOP_APP_ID}
+productName: Harnessly
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+publish:
+  provider: generic
+  url: ${env.HARNESSLY_UPDATE_URL}
+mac:
+  category: public.app-category.developer-tools
+  target: [dmg, zip]
+protocols:
+  - name: Harnessly
+    schemes: [harnessly]
+linux:
+  target: [AppImage, deb]
+win:
+  target: nsis

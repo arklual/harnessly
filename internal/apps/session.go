@@ -33,6 +33,9 @@ type Session struct {
 	// Nonce is what the view's own document carries (a meta tag the view server writes into its pages) and the bridge
 	// asks for in ui/initialize: a document the frame navigated to never saw it.
 	Nonce string
+	// Trace is the journal's trace of the page's action that mounted the view (HRN-976): the view server's lines of the
+	// session carry it, so a file the view could not load reads in one chain with the page's lines.
+	Trace string
 
 	created time.Time
 	seen    time.Time
@@ -93,6 +96,29 @@ func (s *ViewSessions) Get(token string) (Session, bool) {
 	}
 	sess.seen = now
 	return *sess, true
+}
+
+// Peek is the live session of a token, not renewed by the look; a token unknown or gone is a zero session.
+func (s *ViewSessions) Peek(token string) (Session, bool) {
+	if s == nil || token == "" {
+		return Session{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess := s.byID[token]
+	if sess == nil || s.expired(sess, s.Now()) {
+		return Session{}, false
+	}
+	return *sess, true
+}
+
+// SetTrace gives a live session the journal's trace of the action that mounted it.
+func (s *ViewSessions) SetTrace(token, trace string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sess := s.byID[token]; sess != nil {
+		sess.Trace = trace
+	}
 }
 
 // Renew keeps a live session for a view that is still mounted but unused, and says how long it now lives at least

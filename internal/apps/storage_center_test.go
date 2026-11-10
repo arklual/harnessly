@@ -54,7 +54,7 @@ func onCenter(t *testing.T, c *filesync.Client, person string) *Storage {
 	return s
 }
 
-// two machines of a space read and write one space's area in the hub's store, ifVersion holds across them,
+// HRN-898: two machines of a space read and write one space's area in the hub's store, ifVersion holds across them,
 // and the install's area stays on each machine.
 func TestStorageAreasAreTheSpacesUnderAHub(t *testing.T) {
 	center := centerFor(t)

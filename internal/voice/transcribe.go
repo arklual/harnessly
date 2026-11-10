@@ -34,7 +34,7 @@ func (s *Server) Available() bool {
 }
 
 // segmentMax is the longest piece of a recording recognized in one pass. The recognition service reads a pass in time
-// that grows faster than the audio (a 2:39 recording given whole did not come back in three minutes, and the
+// that grows faster than the audio (HRN-674: a 2:39 recording given whole did not come back in three minutes, and the
 // service's one inference thread was held for everyone on the machine meanwhile), the live dictation never gives it
 // more than 12 s at once; a whole recording is cut the same way.
 const segmentMax = 15 * time.Second

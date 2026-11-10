@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// the bucket answers 409 OperationAborted while another write of the same key is under way (two machines
+// HRN-878: the bucket answers 409 OperationAborted while another write of the same key is under way (two machines
 // putting the same blob at once, Selectel S3). A put waits and finds the blob there; a look waits and looks again.
 func TestABusyBucketKeyIsWaitedFor(t *testing.T) {
 	was := busyWaits

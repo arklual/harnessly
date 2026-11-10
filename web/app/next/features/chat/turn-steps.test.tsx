@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// a folded turn unfolds to what the agent did and wrote, a stopped one stays in view.
+// HRN-905: a folded turn unfolds to what the agent did and wrote, a stopped one stays in view.
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TurnView, { openByDefault, type ITurnHandlers } from '@/next/features/chat/turn';

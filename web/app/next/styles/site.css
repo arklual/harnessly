@@ -2854,7 +2854,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Another machine's chat: its machine, quiet, before the time. */
+/* Another machine's chat: its machine, quiet, before the time (HRN-675). */
 .hx-chatswitch__machine {
   flex: none;
   max-width: 96px;
@@ -3018,7 +3018,7 @@
   opacity: 0.35;
   pointer-events: none;
 }
-/* Locked (the default): the scale reads as fixed and the lock is lit, so a dead − and + tell why. */
+/* Locked (the default, HRN-674): the scale reads as fixed and the lock is lit, so a dead − and + tell why. */
 .hx-zoomctl .hx-head-btn[aria-pressed='true'] {
   background: var(--hx-accent-soft);
   color: var(--hx-accent);
@@ -3382,7 +3382,7 @@
   }
 }
 
-/* Where the chat stands, in words: the place it is in, and on hover the places with what each one is. */
+/* Where the chat stands, in words (HRN-673): the place it is in, and on hover the places with what each one is. */
 .hx-placement {
   position: relative;
   flex: none;
@@ -3437,7 +3437,7 @@
   color: var(--hx-accent);
 }
 
-/* The zoom pill dragged: it follows the pointer, lifted over the canvas. */
+/* The zoom pill dragged (HRN-673): it follows the pointer, lifted over the canvas. */
 .hx-vpzoom[data-dragging='true'] {
   cursor: grabbing;
   box-shadow:
@@ -3499,7 +3499,7 @@
   color: var(--hx-fg-3);
   font-size: 11px;
 }
-/* The phone's pill: beside a phone or a tablet, level with its top, standing up (phone-pill.tsx); lying along
+/* The phone's pill (HRN-674): beside a phone or a tablet, level with its top, standing up (phone-pill.tsx); lying along
    the phone's top where its right has no room. Dragged like the zoom pill (floating-pill.tsx). */
 .hx-phonepill {
   position: absolute;

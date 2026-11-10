@@ -13,7 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// the apps installed for a space, served to its members from the store with every machine off: the page and
+// HRN-898: the apps installed for a space, served to its members from the store with every machine off: the page and
 // the view's files from the package the team keeps there (team/archives), the user and space areas of the storage in
 // the store. The hub's API checks the session and the role before it hands a request over (ServeMember).
 

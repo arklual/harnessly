@@ -8,7 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// with the hub's store the design library is the space's. A project recorded under its owner's machine counts
+// HRN-880: with the hub's store the design library is the space's. A project recorded under its owner's machine counts
 // on every machine of the space: a teammate's machine finds its rows, the store's view shows the project to the
 // machines whose person has a role in it and hides it from the others, and an owner file reaching the store records a
 // project the hub did not know.

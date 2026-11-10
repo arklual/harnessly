@@ -356,7 +356,7 @@ What is not done yet:
   Next: carry the session's subject into the launch and the tab's metadata, and set `Gate.UserOf`.
 - **The account.** Only subscription logins are known (`claude:<uuid>` from `~/.claude.json`, `codex:<id>` from
   `auth.json`); a chat on an API key or another endpoint matches entries for any account only. Replace
-  `budget.Accounts` with the usage collector's record of the chat.
+  `budget.Accounts` with the usage collector's record of the chat (HRN-588).
 - **The model of an Auto launch** is unknown, so an entry that names a model does not match it.
 - **A Codex tab is not paused through tmux** (the table in [limits.md](limits.md)); a Codex chat is refused through its
   hooks only, and the shape of a Codex hook's refusal is not yet checked against a Codex CLI of this version. TODO: pause

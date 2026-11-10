@@ -1,4 +1,4 @@
-// A failed take recognized again: one request per take whoever asks (the person's «Распознать», or the field
+// A failed take recognized again (HRN-674): one request per take whoever asks (the person's «Распознать», or the field
 // by itself once the link is back), and its state for the bar over the field — busy while the machine recognizes, the
 // reason in words when it could not. A second ask while one runs joins it instead of being dropped.
 import { createKeyedStore } from '@/next/core/store';

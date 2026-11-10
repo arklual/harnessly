@@ -1,4 +1,4 @@
-// Sinopia's side of the host: Sinopia is a builtin app (internal/apps/builtin/sinopia), and what it asks of
+// Sinopia's side of the host (HRN-808): Sinopia is a builtin app (internal/apps/builtin/sinopia), and what it asks of
 // the host — a message to the chat linked to the document, a toast, a question, the shortcut commands of its screens,
 // the tools and the context it offers the chat's agent — goes through the SDK in the page's own process, under the
 // rights of its manifest, not through the host's modules. This is the one place it is wired to the host's work.

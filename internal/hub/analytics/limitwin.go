@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// The history of the rate-limit windows (docs/hub/analytics.md, «Limit windows»): for each subscription account
+// The history of the rate-limit windows (docs/hub/analytics.md, «Limit windows (HRN-786)»): for each subscription account
 // the scope can see, each window with the cycles that ended in the period and how full each one got.
 
 // fullPct is the use from which a cycle counts as run out.

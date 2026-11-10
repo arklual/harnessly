@@ -222,7 +222,7 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 			}
 			srv, has := pkg.MCP[server]
 			if has && srv.Connection != "" && srv.Command == "" {
-				// The person's own connection: the connections' proxy signs the call in as the person. The legacy
+				// The person's own connection: the connections' proxy signs the call in as the person (HRN-800). The legacy
 				// transport's /message follows the server's name.
 				conn, ok := ms.ByCatalog(srv.Connection)
 				if !reg.ConnectionGranted(id, srv.Connection) || !ok {

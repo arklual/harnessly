@@ -8,7 +8,7 @@
 // design's mobile.css keeps it one), its rows a finger tall. A new chat of a person with several machines also says
 // the machine it starts on, a row under the depth that opens a third screen of the machines: another one
 // brings that machine's agents and models, the ones logged in there. Under the depth sit the permission mode, three
-// segments (plan, ask, ask nothing), and under them one row of chips: the fast mode on the models that run it
+// segments (plan, ask, ask nothing), and under them one row of chips: the fast mode on the models that run it (HRN-945)
 // and ultracode, each a switch whose hint (on hover, above it) says what it does or that an ask waits for the agent;
 // both show what the agent was last seen running.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';

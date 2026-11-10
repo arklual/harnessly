@@ -1,4 +1,4 @@
-// The UI slots of apps on a real runtime with HARNESSLY_UI_SLOTS=on: the example package fills the Extensions
+// The UI slots of apps (HRN-753) on a real runtime with HARNESSLY_UI_SLOTS=on: the example package fills the Extensions
 // page of Settings (a settings view and an onboarding step) and puts a button at each machine, and its brand reaches the
 // page. (A crashing view is held by the boundary: see ui-slot.test.tsx.) Screenshots go to SLOT_SHOTS when it is set.
 import { execFileSync } from 'node:child_process';

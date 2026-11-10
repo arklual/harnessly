@@ -109,7 +109,7 @@ func appPublicRoutes(d deps, reg *apps.Registry, version string) []gate.Route {
 		var b struct {
 			ID  string `json:"id"`
 			Sum string `json:"sum"`
-			// Access are the keys the install screen listed.
+			// Access are the keys the install screen listed (HRN-849).
 			Access []string `json:"access"`
 		}
 		if !readSecretBody(r, &b) || b.ID == "" {

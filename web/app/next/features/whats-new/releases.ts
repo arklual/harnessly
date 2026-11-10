@@ -13,6 +13,10 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-10a',
+    items: [{ key: 'stackGlide', icon: 'layers' }],
+  },
+  {
     id: '2026-11-09za',
     items: [
       { key: 'kitChat', icon: 'message-square' },

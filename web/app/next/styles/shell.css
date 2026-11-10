@@ -263,7 +263,7 @@ html:has(.hx-app) body {
 .hx-app[data-side='closed'] .hx-user {
   padding-left: 1px;
 }
-/* On the rail the bell stands under the avatar: the notifications stay one click away. */
+/* On the rail the bell stands under the avatar: the notifications stay one click away (HRN-843). */
 .hx-app[data-side='closed'] .hx-user__bell {
   position: absolute;
   bottom: calc(100% + 2px);

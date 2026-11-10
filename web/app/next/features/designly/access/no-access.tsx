@@ -1,6 +1,6 @@
 // What a person sees on a design they have no place in: who owns it and a way to ask. The runtime hides the project
 // (it is not in their library), so the card is driven by the gateway's «role: null», not by a refusal. Where the gateway
-// answers the common access API the request goes there, to the owner and those who run the access; otherwise
+// answers the common access API (HRN-675) the request goes there, to the owner and those who run the access; otherwise
 // to the older design API.
 import RequestForm from '@/next/features/designly/access/request-form';
 import { askAccess, type IProjectAccess } from '@/next/features/designly/access/api';

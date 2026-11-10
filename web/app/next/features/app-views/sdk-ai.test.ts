@@ -1,4 +1,4 @@
-// What an app spends of the person's model: the SDK in a frame, the real bridge; ai.complete and agents.run
+// What an app spends of the person's model (HRN-853): the SDK in a frame, the real bridge; ai.complete and agents.run
 // reach the host's handlers with their bounds, need their rights, and in the agent's turn ask the person with the
 // prompt.
 import { describe, expect, it, vi } from 'vitest';

@@ -57,7 +57,7 @@ func (p *codexJSON) value() (any, bool) {
 	case c == '[':
 		return p.array()
 	case c == '"':
-		// A copy, not a slice of the line: a kept value held the whole read alive.
+		// A copy, not a slice of the line: a kept value held the whole read alive (HRN-901).
 		s, sliced, ok := p.text()
 		if sliced {
 			s = strings.Clone(s)

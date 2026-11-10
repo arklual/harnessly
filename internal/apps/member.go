@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// An app installed for a space is the same package on every machine of it, and the store keeps it
+// HRN-898. An app installed for a space is the same package on every machine of it, and the store keeps it
 // (team/archives): its view is static, so the hub serves it to the space's members with every machine off, as it serves
 // a guest link. The page is the guest's host page with the member's storage: the user area (the person's own) and the
 // space's, both in the store. What runs on a machine (the chat, an agent, the app's tools and its MCP backend) is not

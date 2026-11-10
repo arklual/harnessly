@@ -1,5 +1,5 @@
 #!/bin/sh
-# usage: tools/ci/test-package-files.sh
+# HRN-949. usage: tools/ci/test-package-files.sh
 set -eu
 # shellcheck source=tools/ci/package-files.sh
 . "$(dirname "$0")/package-files.sh"

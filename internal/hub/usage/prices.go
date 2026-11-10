@@ -59,7 +59,7 @@ func PriceProvider(cli, baseURLHost string) string {
 }
 
 // PriceKey is the price list's key of a model at a provider; "" when the model names none. A Claude model whose family
-// key is not in the list gets no price here, never a neighbour family's.
+// key is not in the list gets no price here, never a neighbour family's (HRN-550).
 func PriceKey(provider, model string) string {
 	switch provider {
 	case ProviderAnthropic:
@@ -81,7 +81,7 @@ type Tokens struct {
 type Book struct {
 	rows map[string][]store.Price // provider + "\x00" + pattern → rows by effective_from
 	// vendors is, for a model id of another vendor, the providers that list it: a Kimi or Grok model that ran through
-	// Claude Code or Codex without its own base URL reaching the hub is still priced by its maker's row.
+	// Claude Code or Codex without its own base URL reaching the hub is still priced by its maker's row (HRN-663).
 	vendors map[string][]string
 }
 
@@ -160,7 +160,7 @@ func i64(v int64) *int64     { return &v }
 func f64(v float64) *float64 { return &v }
 
 // vendorRows are the list prices of the other vendors' models the organizations run, USD per million tokens, as the
-// vendors published them by November 2026; a cached read is the vendor's cache-hit price, there are no cache
+// vendors published them by November 2026 (HRN-663); a cached read is the vendor's cache-hit price, there are no cache
 // writes. Grok 4.7 doubles every rate past a 200K-token prompt.
 var vendorRows = []store.Price{
 	{Provider: ProviderKimi, ModelPattern: "k3.1-pro", Input: 2, Output: 10, CacheRead: 0.2, Unit: "usd", Source: "vendor list 2026-11"},

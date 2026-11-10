@@ -82,7 +82,7 @@ export const warmLog = (): (() => void) => {
   return () => window.cancelIdleCallback(handle);
 };
 
-/** `kind` reads the log through the one access API; without it, the design's older route. */
+/** `kind` reads the log through the one access API (HRN-675); without it, the design's older route. */
 const AccessLog = ({
   project,
   kind,

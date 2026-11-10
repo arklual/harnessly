@@ -66,7 +66,7 @@ type Targets struct {
 	// the person's consent, it is turned off), "" otherwise; nil says nothing more than the hint.
 	AppWhyNot func(text string) string
 	// Resolve asks what the deployment's connections (an issue tracker, a wiki) and its documents provider make of an
-	// address, before any generic site: a zero Link is "none of mine". nil: nothing is asked.
+	// address, before any generic site: a zero Link is "none of mine". nil: nothing is asked (HRN-890).
 	Resolve func(ctx context.Context, text string) Link
 }
 
@@ -648,7 +648,7 @@ func RateDecision(stamps []int64, now int64, limit int, windowMs int64) (bool, [
 	return true, append(recent, now)
 }
 
-// The kinds of addresses (docs/pane-opening.md), each by its exact pattern:
+// The kinds of addresses (HRN-943, docs/pane-opening.md), each by its exact pattern:
 //
 //	document       https://<PortalHost|ArtifactsHost>/a/<slug>, https://<ReaderHost><ReaderPath><slug>  artifacts
 //	board          https://<PortalHost|BoardsHost>/b/<slug>[?k=<key>]                                   artifacts

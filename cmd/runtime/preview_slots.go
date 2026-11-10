@@ -26,6 +26,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/preview"
@@ -646,6 +647,12 @@ func (s *previewSlots) ownOrigin(r *http.Request, slot int) string {
 
 func (s *previewSlots) slotHandler(slot int) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A refusal of the slot is a line of the journal, with the app view's chat and trace when the path names a
+		// live session (HRN-976): a view whose scripts the slot refused reads in one chain with the page's lines.
+		previewDeny := func(w http.ResponseWriter, status int, text string) {
+			journalSlotDenial(r, slot, status, text)
+			previewDeny(w, status, text)
+		}
 		set, secret, ok := s.ready()
 		if !ok {
 			previewDeny(w, 503, locale.Pick("The preview is unavailable", "Превью недоступно"))
@@ -993,4 +1000,35 @@ func appViewSession(own string) *previewSession {
 func (s *previewSession) showsAppViews() bool {
 	port := appViewPort.Load()
 	return port != 0 && s.target.Kind == "port" && int64(s.target.Port) == port
+}
+
+// journalSlotDenial writes down a request a preview slot refused (HRN-976).
+func journalSlotDenial(r *http.Request, slot, status int, text string) {
+	e := journal.Entry{Level: journal.Warn, Source: journal.SourceRuntime, Event: "preview.slot", Method: r.Method,
+		URL: r.URL.Path, Status: status, Text: text, View: "slot " + strconv.Itoa(slot)}
+	if status >= 500 {
+		e.Level = journal.Error
+	}
+	if sess, ok := appViewSessionOf(r.URL.Path); ok {
+		e.Level, e.App, e.View, e.Chat, e.Trace = journal.Error, sess.App, sess.View, sess.Conversation, sess.Trace
+		e.Source = apps.JournalSource(sess.App)
+	} else if isSDKPath(r.URL.Path) {
+		e.Level = journal.Error
+	}
+	journal.Add(e)
+}
+
+// appViewSessionOf is the live view session a path of the view server names (/<token>/...), not renewed by the look.
+func appViewSessionOf(p string) (apps.Session, bool) {
+	sessions := appViewSessions.Load()
+	if sessions == nil {
+		return apps.Session{}, false
+	}
+	token, _, _ := strings.Cut(strings.TrimPrefix(p, "/"), "/")
+	return sessions.Peek(token)
+}
+
+// isSDKPath says whether a path is one of the SDK's own files.
+func isSDKPath(p string) bool {
+	return strings.HasPrefix(p, "/__hl/") || strings.Contains(p, "/__hl/")
 }

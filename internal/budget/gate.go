@@ -97,7 +97,7 @@ func (g *Gate) firstTime(session string, d Decision) bool {
 
 // stopReply refuses a prompt, or ends the turn at a tool call. The reason is shown to the person as it is. Codex's
 // PreToolUse takes only a deny with a reason that is not empty: continue:false is rejected by its CLI and the call
-// would run.
+// would run (HRN-807).
 func stopReply(provider, event, text string) []byte {
 	var v any
 	switch {

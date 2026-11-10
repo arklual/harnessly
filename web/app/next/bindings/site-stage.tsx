@@ -159,7 +159,7 @@ export const NoteCard = ({
   const file = design !== undefined && pageUrl !== undefined ? boardFileOf(design, pageUrl) : null;
   const [text, setTextHere] = useState(props.draft.text);
   // Words that come after the card was attached, cancelled or deleted (the voice written down late) are not the
-  // card's any more: they would open it again and let it be attached twice.
+  // card's any more: they would open it again and let it be attached twice (HRN-673).
   const settled = useRef(false);
   const setText = (value: string) => {
     if (settled.current || props.hidden) return;
@@ -417,7 +417,7 @@ export const useSiteStage = ({
   );
   const connection = useConnection(machine);
   const moveOn = useMoveEnabled(machine);
-  // The chats of every machine: the switch lists the design's chats wherever they are.
+  // The chats of every machine: the switch lists the design's chats wherever they are (HRN-675).
   const everywhere = useConversationList(null);
   const [asked, setAsked] = useState(0);
   const found = useDesignChatsFound(machine, design, tied, asked);
@@ -439,7 +439,7 @@ export const useSiteStage = ({
 
   // Where the chat stands comes back as the person left it on this design (site-layout.ts).
   // Unless the person placed it by hand, the chat of a design being edited stands docked on the left, not over the
-  // page: a place kept only because it was the old default does not count.
+  // page (HRN-845): a place kept only because it was the old default does not count.
   const [kept] = useState(() => {
     const layout = keep ? keptLayout(key) : null;
     return layout?.chosen ? layout : null;
@@ -667,7 +667,7 @@ export const useSiteStage = ({
     leaveTo(next);
     setMin(next === 'island' && empty);
   };
-  // The usual chat's «Продолжить в другой модели» and «… на другой ВМ», for the design's chat too.
+  // The usual chat's «Продолжить в другой модели» and «… на другой ВМ», for the design's chat too (HRN-673).
   const more: IChatMoreItem[] = convId
     ? [
         {

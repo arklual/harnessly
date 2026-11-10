@@ -985,7 +985,7 @@
 .hx-mrow-wrap + .hx-mrow-wrap {
   border-top: 1px solid var(--hx-border);
 }
-/* the move of the machine's data into the hub, under its row. */
+/* HRN-883: the move of the machine's data into the hub, under its row. */
 .hx-mmove {
   display: grid;
   gap: 6px;

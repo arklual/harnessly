@@ -184,7 +184,7 @@ const DesignlySiteBody = ({
   });
   const [project, setProject] = useState<IProject | null>(start.project);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // The kit the project is made from: its chip on the bar, «Из кита» on a picked element, «Показать макет».
+  // The kit the project is made from (HRN-897): its chip on the bar, «Из кита» on a picked element, «Показать макет».
   const kitLink = useKitLink(machine, id);
   // The design's own tabs and their history belong to the window's tab, in a pane to the chat beside it: switching
   // back finds the same page.
@@ -221,13 +221,13 @@ const DesignlySiteBody = ({
   // Who may do what with the project, from the gateway; where there is none (standalone) the design is as it was.
   const gate = useProjectAccess(id);
   const [shareOpen, setShareOpen] = useState(false);
-  // Opened from the viewing mode's «Запросить доступ»: the one dialog opens with the request form (stage «ж»).
+  // Opened from the viewing mode's «Запросить доступ»: the one dialog opens with the request form (HRN-675, stage «ж»).
   const [askOpen, setAskOpen] = useState(false);
   const openShare = (ask: boolean) => {
     setAskOpen(ask);
     setShareOpen(true);
   };
-  // the one «Поделиться» of every kind reads the gateway's common access API; an older gateway answers nothing
+  // HRN-675: the one «Поделиться» of every kind reads the gateway's common access API; an older gateway answers nothing
   // there and the older dialog stays.
   const shared = useResourceView('design', id, gate.state.k === ACCESS.ready);
   // A deck's slides and a video's built formats, as their views read them: what the screen of a link offers.
@@ -363,7 +363,7 @@ const DesignlySiteBody = ({
   const shownPath = shownTab?.hist[shownTab.hi] ?? '';
   // A design is on its own page or in a pane for as long as it is open: which stage it has never changes.
   const useStage: (options: IStageOptions) => IStageWithChat = pane ? usePaneChatStage : useSiteOnlyStage;
-  // The design's chats this machine has: started from it, then the ones that edited its files.
+  // The design's chats this machine has: started from it, then the ones that edited its files (HRN-675).
   const startedHere = project?.design.convs;
   const touchedBy = project?.design.touchedBy;
   const tied = useMemo(
@@ -653,7 +653,7 @@ const DesignlySiteBody = ({
     return { label: t('next.pane.designShare'), onOpen: () => sinopia.gate(() => openShare(false)) };
   })();
 
-  // The versions of the project and of its kit: «Версии» beside the mode switch, the kit's band over the view.
+  // The versions of the project and of its kit (HRN-903): «Версии» beside the mode switch, the kit's band over the view.
   const [versionsOpen, setVersionsOpen] = useState(false);
   const versionsShown = usePresentFlag(versionsOpen && project !== null, VERSIONS_EXIT_MS).mounted;
   const kitInfo = useProjectKit(machine, id);
@@ -676,7 +676,7 @@ const DesignlySiteBody = ({
     return <ProjectAway ownerName={gated?.ownerName ?? ''} onBack={back} />;
   }
 
-  // «Опубликовать как сайт» lives in «Поделиться», where a manager edits a site design.
+  // «Опубликовать как сайт» lives in «Поделиться» (HRN-675), where a manager edits a site design.
   const mayPublish =
     !viewing &&
     gated?.canManage === true &&
@@ -721,7 +721,7 @@ const DesignlySiteBody = ({
       action: shareButton ? { onClick: () => openShare(true), ask: true } : null,
     };
   })();
-  // «Править в ките» on an element of the kit: the project goes onto the draft and the kit's screen opens on
+  // «Править в ките» on an element of the kit (HRN-903): the project goes onto the draft and the kit's screen opens on
   // the element in its editing mode. Not for a kit its maker set for viewing only.
   const pinnedKit = kitInfo.kit?.pin?.id ?? null;
   const editInKit =

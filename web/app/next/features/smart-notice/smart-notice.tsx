@@ -14,6 +14,7 @@ import Icon from '@/next/ui/icon';
 import { PRESENCE, usePresence, usePresentFlag } from '@/next/ui/presence';
 import type { TNoticePlace, TNoticeSound } from '@/next/stores/notices';
 import useGestures, { rise } from './use-gestures';
+import { STACK_DEPTH } from './pager';
 import { RecordingTime, RecordingWave } from '@/next/features/composer/recording';
 import type { Recording } from '@/next/features/composer/types';
 
@@ -141,8 +142,6 @@ const FOLD_MS = 600;
 const GHOST_MS = 240;
 /** A sent answer shows its check this long at most; the plate leaves sooner, once the agent takes the answer. */
 const SENT_HOLD_MS = 6000;
-/** The folded plate shows this many plates under the front one. */
-const PEEKS = 2;
 
 const ACTION: Record<TSmartKind, string> = {
   code: 'next.smart.enterCode',
@@ -552,6 +551,17 @@ const useGhost = (
   }, [ghosts, body, key]);
 };
 
+/** What a plate of the stack shows while paging brings it to the front (pager.ts fades it in): the line it will be. */
+const Peek = ({ item, now, sent }: { item: ISmartItem; now: number; sent: boolean }) => (
+  <span className="hx-sn__peek" aria-hidden="true">
+    <span className="hx-sn__pill">
+      <Chip item={item} now={now} sent={sent} />
+      <b className="hx-sn__title">{item.title}</b>
+      <span className="hx-sn__text">{sent ? t(SENT_TEXT[item.kind]) : item.text}</span>
+    </span>
+  </span>
+);
+
 const SmartNotice = ({
   items,
   mainKey,
@@ -628,6 +638,7 @@ const SmartNotice = ({
   const gestures = useGestures({
     host,
     present: showing,
+    frontKey: shown?.key ?? null,
     edge: place.startsWith('top') ? 'top' : 'bottom',
     open,
     off: busy,
@@ -785,8 +796,8 @@ const SmartNotice = ({
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       const dir = event.key === 'ArrowDown' ? 1 : -1;
-      if (!open && others.length > 0) rise(host.current, dir);
-      step(dir);
+      if (!open && others.length > 0) gestures.page(dir);
+      else step(dir);
       return;
     }
     if (!open || detail.k !== 'question') return;
@@ -884,19 +895,51 @@ const SmartNotice = ({
         </div>
       )}
       <div className="hx-sn__lift">
-        {others.slice(0, PEEKS).map((item, i) => (
+        {others.slice(0, STACK_DEPTH).map((item, i) => (
           <span
             key={item.key}
             className="hx-sn__plate"
             data-depth={i + 1}
             aria-hidden="true"
             onClick={() => {
-              rise(host.current, 1);
-              onMain(item.key);
+              for (let n = 0; n <= i; n++) gestures.page(1);
             }}
-          />
+          >
+            <i className="hx-sn__tint" />
+            {i === 0 && folded && <Peek item={item} now={now} sent={sent.has(item.key)} />}
+          </span>
         ))}
+        {/* Unseen at rest: the one that comes forward from behind the stack, and the one before the front plate,
+            which a page back brings in from the edge (pager.ts). An <i>, so span:last-of-type stays the last seen. */}
+        {others.length > STACK_DEPTH && (
+          <i
+            key={others[STACK_DEPTH].key}
+            className="hx-sn__plate"
+            data-depth={STACK_DEPTH + 1}
+            aria-hidden="true"
+          >
+            <i className="hx-sn__tint" />
+          </i>
+        )}
+        {others.length > 0 && (
+          <i
+            key={`before:${others[others.length - 1].key}`}
+            className="hx-sn__plate"
+            data-depth={-1}
+            aria-hidden="true"
+          >
+            <i className="hx-sn__tint" />
+            {folded && (
+              <Peek
+                item={others[others.length - 1]}
+                now={now}
+                sent={sent.has(others[others.length - 1].key)}
+              />
+            )}
+          </i>
+        )}
         <div ref={shape} className="hx-sn__shape">
+          <i className="hx-sn__tint" aria-hidden="true" />
           <div ref={ghosts} className="hx-sn__ghosts" aria-hidden="true" />
           <div ref={body} className="hx-sn__body" key={bodyKey}>
             {folded && !announcing && (

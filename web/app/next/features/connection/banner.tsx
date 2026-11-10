@@ -2,7 +2,7 @@
 // nothing. The conversation, the draft and the queue stay where they are; the pill says what happens — no connection
 // and a try again in N s with «Переподключиться», then «Подключаемся», then «Снова на связи», which leaves by itself.
 // A short loss (a machine's restart for an update, a blink of the network) passes unseen: messages wait in the outbox
-// and a dictation is kept in the browser anyway, so the pill comes only once the loss has lasted LOSS_GRACE_MS.
+// and a dictation is kept in the browser anyway, so the pill comes only once the loss has lasted LOSS_GRACE_MS (HRN-674).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePillWidth } from '@/next/ui/use-pill-width';
 import { createPortal } from 'react-dom';

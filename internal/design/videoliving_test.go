@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// The living-art kit: the library serves the rig and the art packs, and the art has what the guide promises.
+// The living-art kit (HRN-652): the library serves the rig and the art packs, and the art has what the guide promises.
 
 func TestMotionKitServesTheLivingArt(t *testing.T) {
 	kit := motionKit()

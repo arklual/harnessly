@@ -303,18 +303,51 @@
     translate var(--sn-open-ms) var(--sn-spring),
     opacity 260ms var(--hx-ease-out);
 }
+/* A plate is black with white over it: the deeper, the lighter (#2c2c2e, #48484a); the white is a layer of its own, so
+   paging changes only opacity (features/smart-notice/pager.ts). */
+.hx-sn__plate {
+  display: block;
+  background: var(--sn-bg);
+  font-style: normal;
+}
+.hx-sn__tint {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
 .hx-sn__plate[data-depth='1'] {
   z-index: 2;
-  background: #2c2c2e;
   scale: 0.93;
   translate: 0 calc(var(--sn-away) * (var(--sn-ch) * 0.07 + 9px));
 }
+.hx-sn__plate[data-depth='1'] > .hx-sn__tint {
+  opacity: 0.172;
+}
 .hx-sn__plate[data-depth='2'] {
   z-index: 1;
-  background: #48484a;
   scale: 0.86;
   translate: 0 calc(var(--sn-away) * (var(--sn-ch) * 0.14 + 17px));
 }
+.hx-sn__plate[data-depth='2'] > .hx-sn__tint {
+  opacity: 0.282;
+}
+/* Unseen at rest: the plate that comes forward from behind the stack, and the one a page back brings in from the
+   edge, over the front plate. */
+.hx-sn__plate[data-depth='3'] {
+  z-index: 0;
+  opacity: 0;
+  scale: 0.79;
+  translate: 0 calc(var(--sn-away) * (var(--sn-ch) * 0.21 + 25px));
+  pointer-events: none;
+}
+.hx-sn__plate[data-depth='-1'] {
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* The open card and a leaving plate take the stack under them. */
 .hx-sn[data-open] .hx-sn__plate,
 .hx-sn[data-phase='out'] .hx-sn__plate {
@@ -727,16 +760,76 @@
   }
 }
 /* A plate that has just gone behind (paged away) sinks from the front into its place in the stack. */
-.hx-sn[data-rise='next'] .hx-sn__plate:last-of-type,
-.hx-sn[data-rise='prev'] .hx-sn__plate:first-of-type {
+.hx-sn[data-rise='next'] span.hx-sn__plate:last-of-type,
+.hx-sn[data-rise='prev'] span.hx-sn__plate:first-of-type {
   animation: hx-sn-sink 620ms var(--sn-spring) backwards;
+}
+.hx-sn[data-rise='next'] span.hx-sn__plate:last-of-type > .hx-sn__tint,
+.hx-sn[data-rise='prev'] span.hx-sn__plate:first-of-type > .hx-sn__tint {
+  animation: hx-sn-untint 620ms var(--sn-spring) backwards;
+}
+@keyframes hx-sn-untint {
+  from {
+    opacity: 0;
+  }
+}
+/* Paging (features/smart-notice/pager.ts): the stack is where the gesture and its spring put it, written each frame
+   on the shape and the plates; the stylesheet's own transitions and animations stand aside, only the window's size
+   still flows. */
+.hx-sn[data-paging] .hx-sn__shape,
+.hx-sn[data-paging] .hx-sn__plate {
+  transform-origin: var(--sn-ox) var(--sn-oy);
+  /* The window takes the new front line's size quickly: its line is already there, not blurring in. */
+  transition: clip-path 260ms var(--hx-ease-out);
+  animation: none;
+  will-change: translate, scale, opacity;
+}
+.hx-sn[data-paging] .hx-sn__tint {
+  transition: none;
+  animation: none;
+}
+.hx-sn[data-paging] .hx-sn__ghosts {
+  display: none;
+}
+/* The new front plate's line is already there (the plate brought it in): no blur in on top of it. */
+.hx-sn[data-paging] .hx-sn__body {
+  animation: none;
+}
+/* The line a plate shows while paging brings it to the front: where the shape's own line stands, unseen at rest. */
+.hx-sn__peek {
+  position: absolute;
+  width: max-content;
+  /* Within the window the plates share (the front line's size): a longer line ends in an ellipsis until it is the
+     front one and the window grows to it. */
+  max-width: var(--sn-cw);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-sn__peek .hx-sn__pill {
+  max-width: 100%;
+}
+.hx-sn[data-v='top'] .hx-sn__peek {
+  top: 0;
+}
+.hx-sn[data-v='bottom'] .hx-sn__peek {
+  bottom: 0;
+}
+.hx-sn[data-h='left'] .hx-sn__peek {
+  left: 0;
+}
+.hx-sn[data-h='right'] .hx-sn__peek {
+  right: 0;
+}
+.hx-sn[data-h='center'] .hx-sn__peek {
+  left: 50%;
+  translate: -50% 0;
 }
 @keyframes hx-sn-sink {
   from {
     opacity: 1;
     scale: 1;
     translate: 0 0;
-    background: var(--sn-bg);
   }
 }
 /* The stack's plates are pressed too: the one pressed comes to the front. */

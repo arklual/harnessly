@@ -1,4 +1,4 @@
-// The machine's live browser: a headless Chrome of the machine shows an outside site in the pane's browser
+// The machine's live browser (HRN-680): a headless Chrome of the machine shows an outside site in the pane's browser
 // tab. Its socket, /api/browser/live?tab=<id>, carries the page's pictures as binary JPEG messages and everything else
 // as JSON: what the page opened and whether it loads, the person's mouse, keys, wheel and paste back.
 import { runtimeSocket } from '@/next/core/net/machine';
@@ -27,7 +27,7 @@ export interface ILiveRect {
   height: number;
 }
 
-/** What an agent's action came to; rect is its element's box, for the agent's cursor. */
+/** What an agent's action came to (HRN-683); rect is its element's box, for the agent's cursor. */
 export interface ILiveActed {
   id: string;
   ok: boolean;

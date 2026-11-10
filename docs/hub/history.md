@@ -2,7 +2,7 @@
 
 The hub keeps every person's chats — the list and each chat's feed — so the workspace opens them whole while the
 machine they ran on is off, rebooting or gone. The machine stays what runs the chat: sending a prompt, the live turn,
-the terminal and the preview still need it. Reading does not (everything a person looks at is read from the
+the terminal and the preview still need it. Reading does not (HRN-877: everything a person looks at is read from the
 center).
 
 ## How a chat gets here

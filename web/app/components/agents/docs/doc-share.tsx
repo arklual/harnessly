@@ -290,7 +290,7 @@ const DOC_LINKS: ILinkContext = { kind: LINK_KIND.doc };
 const BOARD_LINKS: ILinkContext = { kind: LINK_KIND.board };
 
 /**
- * «Поделиться» of a document or a board: the one dialog of every kind (stage «д») — people and teams with
+ * «Поделиться» of a document or a board: the one dialog of every kind (HRN-675, stage «д») — people and teams with
  * their roles, the home team first, links without sign-in per recipient (a document's own «Скачивание» and «Копирование
  * текста»). A gateway without the common access API keeps the older dialog; one without any access model (a
  * standalone runtime) keeps a document's old one-link menu, and a board has no button there.

@@ -25,7 +25,7 @@ export interface IFrameAct {
   event?: string;
   tool?: string;
   input?: string;
-  /** The site the person let the agent act on: the live browser checks the page is still there. */
+  /** The site the person let the agent act on: the live browser checks the page is still there (HRN-683). */
   host?: string;
 }
 

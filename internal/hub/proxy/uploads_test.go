@@ -16,7 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// what a person attaches is put into the hub's store by its sha256 and named by the machine's upload id; the
+// HRN-879: what a person attaches is put into the hub's store by its sha256 and named by the machine's upload id; the
 // chat reads it from the hub, the machine on or off, and an upload the hub has not got is read from the machine.
 func TestWorkspaceKeepsTheChatsUploadsInTheHub(t *testing.T) {
 	w := setupWorkspace(t, fleetOn)
@@ -81,7 +81,7 @@ func TestWorkspaceKeepsTheChatsUploadsInTheHub(t *testing.T) {
 	}
 }
 
-// a file the agent handed over is put by the machine into its space's `files` collection; the chat's card reads
+// HRN-879: a file the agent handed over is put by the machine into its space's `files` collection; the chat's card reads
 // it from the hub, and one the hub has not got from the machine's own preview of the path.
 func TestWorkspaceReadsTheHandedOverFilesFromTheHub(t *testing.T) {
 	w := setupWorkspace(t, fleetOn)

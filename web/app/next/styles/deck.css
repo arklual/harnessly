@@ -383,7 +383,7 @@
 .hx-deck__frame[data-on='1'] {
   opacity: 1;
 }
-/* The slide while its board loads: a skeleton of the slide with a spinner, until the board says it is drawn
+/* The slide while its board loads (HRN-900): a skeleton of the slide with a spinner, until the board says it is drawn
    (fonts, pictures, videos in); it fades out as the slide fades in. */
 .hx-deck__slide[data-loading] {
   background: var(--hx-bg-raised);

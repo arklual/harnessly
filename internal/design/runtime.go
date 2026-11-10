@@ -73,7 +73,7 @@ func (l *Library) agentChats() map[string]Chat {
 // empty when the runtime knows no address (the Unix name is no person: self-hosted machines share one).
 type Identity struct {
 	Runtime, Person, PersonID string
-	// Shared: the library is the store's, synced between machines, so a Unix user names no one there.
+	// Shared: the library is the store's (HRN-880), synced between machines, so a Unix user names no one there.
 	Shared bool
 }
 

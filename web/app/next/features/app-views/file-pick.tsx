@@ -1,4 +1,4 @@
-// hl.files.pick: the person picks a file of the chat's folder in the host's own dialog, titled with the app's
+// hl.files.pick (HRN-850): the person picks a file of the chat's folder in the host's own dialog, titled with the app's
 // real name; the view gets that one file's path and text, once, with no mask. Closing the dialog any way but a pick is
 // null. One request at a time, the rest wait their turn.
 import { useEffect, useState, useSyncExternalStore } from 'react';

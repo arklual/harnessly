@@ -1,4 +1,4 @@
-// Files sent into the folder on screen and a new folder in it: what «Диск» could do, now in «Файлы». The calls
+// Files sent into the folder on screen and a new folder in it (HRN-679): what «Диск» could do, now in «Файлы». The calls
 // are «Диск»'s (/api/fs/*): they know the workspace's places by id, and the folder is found among them by its absolute
 // path. A folder outside the places takes neither. The queue is the chat's, not the tab's: the pane keeps only the tab on
 // screen, and files go on while another tab is looked at.

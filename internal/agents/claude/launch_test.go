@@ -351,7 +351,7 @@ func TestEnvPluginDirsFlag(t *testing.T) {
 	}
 }
 
-// hostApps is an app launcher that gives a chat without apps the host's quiet app server.
+// hostApps is an app launcher that gives a chat without apps the host's quiet app server (HRN-975).
 type hostApps struct {
 	fakeApps
 	host string

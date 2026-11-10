@@ -1,4 +1,4 @@
-// a finished turn the snapshot cut (its newest steps only) says it holds part of its steps, so unfolded it
+// HRN-905: a finished turn the snapshot cut (its newest steps only) says it holds part of its steps, so unfolded it
 // loads the rest; the transcript's interrupt line is no step («Остановлено» is said under the turn).
 import { afterEach, describe, expect, it } from 'vitest';
 import { ItemsBuilder } from '@/next/bindings/feed-items';

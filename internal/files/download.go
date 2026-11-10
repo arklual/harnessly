@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// Downloads: a file of any type and size as it is on disk, in ranges so a broken download resumes; a folder
+// Downloads (HRN-679): a file of any type and size as it is on disk, in ranges so a broken download resumes; a folder
 // or several files as one zip written while it is sent, so nothing is held in memory or on disk. What may be handed
 // over is the caller's rule (allow) and the secrets rule, checked for the path asked and for every file in a folder;
 // a link inside a folder is taken only when it leads to a file the same rules allow, a link to a folder is not followed.

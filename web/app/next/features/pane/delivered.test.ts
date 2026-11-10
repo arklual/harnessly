@@ -1,4 +1,4 @@
-// under a hub a file the agent handed over is saved from the hub's store by its sha256, so the card works with
+// HRN-879: under a hub a file the agent handed over is saved from the hub's store by its sha256, so the card works with
 // the machine off; without a store, or without the hash, from the machine as before.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prints the runtime release `runtime-tag` (.gitlab-ci.yml) would cut for HEAD once it is on main: the next patch
+# HRN-912. Prints the runtime release `runtime-tag` (.gitlab-ci.yml) would cut for HEAD once it is on main: the next patch
 # vX.Y.Z after the newest release tag, or nothing when HEAD would not be released (no runtime path changed since that tag)
 # or cannot be told (that tag is not behind HEAD).
 # The main pipeline (release-build) builds the linux-amd64 binaries with this version, and the tag pipeline takes them only

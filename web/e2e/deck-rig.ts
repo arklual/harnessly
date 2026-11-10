@@ -298,7 +298,7 @@ export const deckGateway = (runtime: () => Runtime, project: () => string): IDec
 };
 
 /**
- * The person's word on an app installed with the CLI (such an install waits for it): what the install screen
+ * The person's word on an app installed with the CLI (HRN-849: such an install waits for it): what the install screen
  * does on «Установить», from the page's session — the access the machine lists, granted as shown.
  */
 export const agreeApp = async (p: Page, id: string): Promise<void> => {

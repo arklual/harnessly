@@ -130,7 +130,7 @@ type Hub struct {
 	Proxy   *proxy.Service
 	// Docs is the documents and boards of the installation (HUB_DOCS).
 	Docs *docs.Service
-	// Efficiency serves the figures of the «Эффективность» screen behind the organization flag.
+	// Efficiency serves the figures of the «Эффективность» screen behind the organization flag (HRN-972).
 	Efficiency *efficiency.Service
 	// Automations is the rules and runs of the installation (HUB_AUTOMATIONS).
 	Automations *automations.Service
@@ -154,7 +154,7 @@ type Hub struct {
 	appTokens *appTokens
 	// Store keeps the spaces' collections the machines sync with (docs/hub/store.md); nil when HUB_STORE=off.
 	Store *storehub.Store
-	// Migration is the journal of the move of the machines' data into the store (docs/migrations); nil with
+	// Migration is the journal of the move of the machines' data into the store (docs/migrations, HRN-883); nil with
 	// the store off.
 	Migration *migration.Service
 
@@ -354,7 +354,7 @@ func New(o Options) (*Hub, error) {
 	h.Analytics.UseEvents(h.OrgEvents)
 	h.Analytics.UseFeatures(h.Features)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
-	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features, Workspace: o.Workspace, History: cfg.History})
+	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features, Workspace: o.Workspace, History: cfg.History, VoiceTakes: cfg.VoiceTakes})
 	h.Proxy = px
 	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
 	if cfg.SSH {
@@ -399,13 +399,13 @@ func New(o Options) (*Hub, error) {
 			}
 			h.Migration.UseSidebars(h.db, func() int64 { return now().UnixMilli() })
 		}
-		// guest links read their projects from the store, put into folders of the hub; no machine takes part.
+		// HRN-881: guest links read their projects from the store, put into folders of the hub; no machine takes part.
 		if DesignView != nil {
 			if v := DesignView(h.Store, cfg.DataDir, o.Workspace, log); v != nil {
 				h.Design.UseView(v)
 			}
 		}
-		// an app's guest link opens from the store, with the machine that made it off.
+		// HRN-898: an app's guest link opens from the store, with the machine that made it off.
 		if AppsView != nil && appsView == nil {
 			appsView = AppsView(h.Store, cfg.DataDir, log)
 		}

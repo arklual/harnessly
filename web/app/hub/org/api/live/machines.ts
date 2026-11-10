@@ -1,6 +1,6 @@
 // Машины on `GET …/machines` and the actions of /api/machines/{id} (docs/hub/analytics.md, «Machines»). The load, the
 // hardware, the rented server, the week's spend and the operations in flight come with the machine when the hub has
-// them (machine resources); what it does not send stays null and the screen shows «—».
+// them (machine resources, HRN-633); what it does not send stays null and the screen shows «—».
 import type { HubMachine, MachinesResponse, RestartRequest } from '../../../../hub-api/analytics';
 import type { Member, OrgView, Scope as ApiScope } from '../../../../hub-api/orgs';
 import { OrgApiError } from '../errors';

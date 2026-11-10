@@ -331,7 +331,7 @@ func TestSocketOpensAndSendsFrames(t *testing.T) {
 	}
 }
 
-// A pane that acks its pictures gets at most two on the way: a page that never stops moving sends no more
+// A pane that acks its pictures gets at most two on the way (HRN-711): a page that never stops moving sends no more
 // until the acks come. A page that stands gets one still shot in the screen's own scale, and its caret's blinks do not
 // take the sharp picture away.
 func TestFramesArePacedAndStillShotIsSharp(t *testing.T) {

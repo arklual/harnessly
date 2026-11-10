@@ -44,7 +44,7 @@ export const Hero = ({
   shownKpi,
   teamOrder,
 }: HeroProps) => {
-  // A person of no team role has no daily series yet: that is a note, not a failure.
+  // A person of no team role has no daily series yet (HRN-970): that is a note, not a failure.
   const personal = error instanceof OrgApiError && error.code === 'not_ready';
   const failed = error != null && !fresh && !personal;
   const picture = chart !== null && shownKpi !== null;

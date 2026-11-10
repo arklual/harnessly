@@ -1,4 +1,4 @@
-// The project's kit over its view: a project on the kit's draft says so («Показан черновик кита») and goes
+// The project's kit over its view (HRN-903): a project on the kit's draft says so («Показан черновик кита») and goes
 // back to its version; a project on an older version gets a quiet «Есть версия X» with what changed, a look at its
 // pages on that version, «Обновить» and «Остаться»; a project that is the kit's draft publishes it («Опубликовать
 // версию») or puts the kit back. «Править в ките» switches the project onto the draft. Nothing is updated without

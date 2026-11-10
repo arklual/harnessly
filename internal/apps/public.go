@@ -399,7 +399,7 @@ type PublicSnapshot struct {
 type PublicSnapshotEntry struct {
 	PublicEntry
 	Archive []byte `json:"archive,omitempty"`
-	// Signature is the publisher's signature of the archive, when it has one.
+	// Signature is the publisher's signature of the archive, when it has one (HRN-966).
 	Signature *Signature `json:"signature,omitempty"`
 }
 

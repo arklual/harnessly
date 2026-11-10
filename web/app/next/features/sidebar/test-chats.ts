@@ -1,4 +1,4 @@
-// Test chats: chats an agent made to check something. The sidebar and the search leave them out unless the
+// Test chats (HRN-842): chats an agent made to check something. The sidebar and the search leave them out unless the
 // person asks to see them; a chat that is open is never taken away from under the person.
 import { useSyncExternalStore } from 'react';
 import type { ISidebarChat } from './types';

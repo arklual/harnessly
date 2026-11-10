@@ -50,7 +50,7 @@ export const startOpens = (view: unknown, hasVideo: boolean): TDeckOpens => {
 export const pdfAllowed = (view: unknown, hasPdf: boolean): boolean =>
   hasPdf && isRecord(view) && view.pdf === true;
 
-/** The slide a guest starts on (0-based): the link's «С какого слайда» (1-based `from`), kept within the deck. */
+/** The slide a guest starts on (0-based): the link's «С какого слайда» (1-based `from`, HRN-675), kept within the deck. */
 export const startSlideOf = (view: unknown, count: number): number => {
   if (!isRecord(view) || typeof view.from !== 'number' || !Number.isInteger(view.from) || count < 1) return 0;
   return Math.min(Math.max(view.from, 1), count) - 1;

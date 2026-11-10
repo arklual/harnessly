@@ -163,7 +163,7 @@ type Deps struct {
 	Status  Status
 	Agents  Agents
 	// Delegate starts the first message of an agent tab as a chat nested under the chat of the asking terminal; nil, or
-	// an *ErrNoParent, leaves the tab to be made the old way.
+	// an *ErrNoParent, leaves the tab to be made the old way (HRN-828).
 	Delegate func(context.Context, DelegateRequest) (DelegateResult, error)
 	// ChatTab is the layout tab a chat runs in ("" while it has none): a chat's id is not the id of its tab, and the CLI
 	// names a delegated chat by its own id.
@@ -322,7 +322,7 @@ type call struct {
 	out    []byte
 	json   bool
 	sent   bool
-	// noParent is why a tab create with a first message was not nested under a chat (tab create).
+	// noParent is why a tab create with a first message was not nested under a chat (tab create, HRN-828).
 	noParent string
 	// stream, when set, writes the answer itself after the headers (a server-sent stream).
 	stream func(w http.ResponseWriter)

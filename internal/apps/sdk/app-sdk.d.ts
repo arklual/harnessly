@@ -410,7 +410,7 @@ export interface Harnessly {
   };
   /**
    * The host's shortcut commands of a screen (`deck`, `video`, `site`, `pictures`, `files`), on the keys the person set
-   * for them in Settings. Ask `hl.has('keys.on')` first: an older host has none.
+   * for them in Settings (HRN-808). Ask `hl.has('keys.on')` first: an older host has none.
    */
   keys: {
     /**

@@ -32,7 +32,7 @@ func IsLayoutStateName(name string) bool {
 	return name == "workspaces.json" || layoutStateName.MatchString(name)
 }
 
-// OrganizerFile is the person's pins and projects: the cluster's too, changed while the machine is off. A
+// OrganizerFile is the person's pins and projects: the cluster's too (HRN-882), changed while the machine is off. A
 // deployment may name it with a prefix of its own (<brand>-organizer.json); IsOrganizerName takes both.
 const OrganizerFile = "organizer.json"
 

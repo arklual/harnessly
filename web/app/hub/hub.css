@@ -1768,7 +1768,7 @@ a.k-btn {
   border-color: var(--k-accent, currentColor);
 }
 
-/* ---- the closed network */
+/* ---- the closed network (HRN-966) */
 .hub-net {
   display: grid;
   gap: 1.5rem;

@@ -1,4 +1,4 @@
-// The ring of a step that is about an element inside the design's page: the page's bridge follows it as it
+// The ring of a step that is about an element inside the design's page (HRN-792): the page's bridge follows it as it
 // follows a note's block (`tk:anchors`) and tells where it shows; this element stands over that place in the frame's
 // own pixels, so the tour rings it like any element of the product. Hidden while the page does not show it.
 import { useContext, useLayoutEffect, useRef } from 'react';

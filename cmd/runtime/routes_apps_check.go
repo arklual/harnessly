@@ -24,7 +24,7 @@ const (
 var errNoBrowser = errors.New("this machine has no browser to open the view in (harnessly app logs shows what the person's page reported)")
 
 // runAppCheck opens an app's view in the machine's own browser through a short link, waits for the handshake and
-// answers how the load went. An app that waits for consent or is off is answered as it is, with no browser.
+// answers how the load went (HRN-920). An app that waits for consent or is off is answered as it is, with no browser.
 func runAppCheck(ctx context.Context, d deps, reg *apps.Registry, guests *apps.Guests, id, view string) (apps.LoadCheck, error) {
 	a, err := reg.Find(id)
 	if err != nil {

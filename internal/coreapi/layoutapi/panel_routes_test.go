@@ -286,7 +286,7 @@ func TestCLIDeliverOpensTheFileOnceAndAnswersTheRecord(t *testing.T) {
 	}
 }
 
-// each address opens once. The agent's second `open` of the same document is answered with the first one's id
+// HRN-943: each address opens once. The agent's second `open` of the same document is answered with the first one's id
 // and keeps no intent; another document, or the same one at another place, is a new one.
 func TestCLIPanelOpensTheSameAddressOnce(t *testing.T) {
 	r := panelRig(t)

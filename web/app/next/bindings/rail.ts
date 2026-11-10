@@ -25,7 +25,7 @@ const write = (value: boolean) => {
 /** What the person chose, kept on the device. */
 const stored = (): boolean => (folded ??= read());
 
-/** The sidebar folded for the right pane on a narrow window: drawn folded, never kept. */
+/** The sidebar folded for the right pane on a narrow window: drawn folded, never kept (HRN-674). */
 let foldedForPane = false;
 
 const snapshot = (): boolean => stored() || foldedForPane;
@@ -63,7 +63,7 @@ export const toggleRail = () => {
 
 /**
  * A design opened full screen from the right pane takes the whole window: the open sidebar folds to its rail, and the
- * person can still open it there.
+ * person can still open it there (HRN-673).
  */
 export const foldRailForDesign = () => {
   if (stored()) return;
@@ -83,7 +83,7 @@ export const PANE_FOLD_MAX_W = 1500;
 
 /**
  * The right pane opens on a narrow window: the open sidebar folds to its rail, with the same motion as the person's
- * fold, and what the person chose stays kept as it was. Not on a phone: there the sidebar is a drawer.
+ * fold, and what the person chose stays kept as it was (HRN-674). Not on a phone: there the sidebar is a drawer.
  */
 export const foldRailForPane = (windowWidth: number) => {
   if (snapshot() || windowWidth >= PANE_FOLD_MAX_W) return;

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// The share filesystem probe (GitHub issue 30). A guest link serves project files to people
+// The share filesystem probe (GitHub issue 30, HRN-837). A guest link serves project files to people
 // without a session, and the only thing between a guest's path and the rest of the machine is how openPublic opens it:
 // one lookup confined beneath the project (os.Root) and one handle that keeps its inode if the path is swapped after the
 // lookup. Some sandbox runtimes (gVisor is the one seen) do not keep those guarantees, and the render doctor cannot tell:

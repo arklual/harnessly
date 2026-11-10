@@ -710,7 +710,7 @@ func TestAddTabTakesTheChosenID(t *testing.T) {
 	}
 }
 
-// a GPT chat's relay reads the tab's fast mode off its launch.
+// HRN-945: a GPT chat's relay reads the tab's fast mode off its launch.
 func TestTabLaunchFast(t *testing.T) {
 	r := newRig(t)
 	session := "tk-ws-a1-pane-b2-tab-c3"

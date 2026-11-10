@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
-// AppsViewer is the hub's serving of harnessly apps from the store (internal/hub/appsview). The hub's API
+// AppsViewer is the hub's serving of harnessly apps from the store (internal/hub/appsview, HRN-898). The hub's API
 // takes it through a hook its main sets, because the apps import the agent, whose tests import the API.
 type AppsViewer interface {
 	// ServeHTTP answers an app's guest link (/apps/guest/<token>/...): the token is the whole authority.

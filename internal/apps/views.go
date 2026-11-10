@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/journal"
 )
 
 // An installed app's views are served by a loopback server of the runtime that the right pane's preview opens like any
@@ -55,7 +57,7 @@ const (
 	// WidgetBaseCSSPath is the host's base style of an agent's widget; any view may load it.
 	WidgetBaseCSSPath = "/__hl/widget.css"
 	// UICSSPath is hl-ui.css, the host's primitives (.hl-btn, .hl-card, .hl-stat, …) on the platform's tokens; any view
-	// may load it.
+	// may load it (HRN-695).
 	UICSSPath = "/__hl/hl-ui.css"
 	// EChartsPath is the charts library every view may load (window.echarts).
 	EChartsPath = "/__hl/lib/echarts.js"
@@ -238,10 +240,15 @@ func (s *ViewServer) Close() {
 // Handler answers the views' requests.
 func (s *ViewServer) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// A file the server refuses is also a line of the app's log, so `harnessly app logs` names it.
+		// A file the server refuses is also a line of the app's log (HRN-941), so `harnessly app logs` names it.
 		refuse := func(v viewRefusal) {
 			if v.App != "" {
-				s.reg.LogEventOnce(v.App, v.View, ViewLogServe, "GET "+clip(v.Path, 200)+" — "+strconv.Itoa(v.Status)+" "+v.Code)
+				// The journal's line names the session's chat and trace, so it reads with the page's (HRN-976).
+				token, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
+				sess, _ := s.Sessions.Peek(token)
+				s.reg.LogEventOnceJ(v.App, v.View, ViewLogServe, "GET "+clip(v.Path, 200)+" — "+strconv.Itoa(v.Status)+" "+v.Code,
+					journal.Entry{Level: journal.Error, Event: "view.file", Method: r.Method, URL: "/" + v.Path, Status: v.Status,
+						Text: v.Code + ": " + v.Reason, Chat: sess.Conversation, Trace: sess.Trace})
 			}
 			refuseView(w, r, v)
 		}
@@ -283,6 +290,7 @@ func (s *ViewServer) Handler() http.Handler {
 		// so a gateway that carries the slot's session in the address (an opaque frame sends no cookie) keeps it on them.
 		if name, isSDK := strings.CutPrefix(rest, "__hl/"); isSDK && live {
 			if body, typ, found := sdkFile(name); found {
+				journalServed(sess, "view.sdk", "/__hl/"+name)
 				serveBytes(w, r, typ, body)
 				return
 			}
@@ -346,6 +354,7 @@ func (s *ViewServer) Handler() http.Handler {
 			page = relativeSDK(raw, rel, isJS)
 			if isHTML {
 				page = injectNonceShim(page, sess.Nonce, strings.Repeat("../", strings.Count(rel, "/")+1)+"__hl/bridge-shim.js")
+				journalServed(sess, "view.page", "/"+rel)
 			}
 			size = int64(len(page))
 		}
@@ -496,7 +505,7 @@ var ErrViewNotFound = errors.New("apps: no such view")
 
 // ViewPath is the address of a view's entry on the view server without its session: /<app id>/<entry>. An external
 // entry has none. The page puts the session's token in front.
-// RemoteView is the address of a view the app's own server hosts (delivery mode remote): an https entry whose
+// RemoteView is the address of a view the app's own server hosts (delivery mode remote, HRN-808): an https entry whose
 // host network.frames lists. A package view, or an address the manifest does not let be framed, is not one.
 func (m *Manifest) RemoteView(viewID string) (string, bool) {
 	v := m.view(viewID)
@@ -525,4 +534,11 @@ func SDKFiles() map[string][]byte {
 	return map[string][]byte{
 		"bridge-shim.js": shimJS, "app-sdk.js": sdkJS, "app-sdk.d.ts": sdkDTS, "hl-ui.css": hlUICSS,
 	}
+}
+
+// journalServed writes down a view's page or an SDK file the view server gave (HRN-976): with them the journal tells a
+// view whose page came but whose SDK never reached the machine (stopped on the way) from one whose SDK did not start.
+func journalServed(sess Session, event, path string) {
+	journal.Add(journal.Entry{Level: journal.Info, Source: JournalSource(sess.App), Event: event, URL: path, Status: http.StatusOK,
+		App: sess.App, View: sess.View, Chat: sess.Conversation, Trace: sess.Trace})
 }

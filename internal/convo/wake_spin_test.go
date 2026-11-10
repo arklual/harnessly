@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// times past that the turn cannot act on do not make the actor's clock due again at once — it would turn
+// HRN-969: times past that the turn cannot act on do not make the actor's clock due again at once — it would turn
 // without a pause, a core of the runtime for one chat.
 func TestWakeSkipsTimesTheTurnCannotMove(t *testing.T) {
 	r := newRig(t)

@@ -119,7 +119,7 @@ func (h *hub) setupChanged(settle bool) {
 
 // relinkSettle is how long a change of what this machine offers must hold before the link calls the hub again. Every
 // call cuts the streams the pages read through the link; a runtime that starts, or one busy with a long run, flips the
-// offer back and forth, and six calls in seven minutes after a reboot left the chats unreadable.
+// offer back and forth, and six calls in seven minutes after a reboot left the chats unreadable (HRN-901).
 var relinkSettle = 30 * time.Second
 
 // relinkSoon asks for one call of the hub once the offer has settled: the changes until then are told by that one

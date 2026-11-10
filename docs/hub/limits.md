@@ -89,7 +89,7 @@ What the machine does with an entry, by `mode`:
 | `warn` | a notice in the chat once per entry version | the same |
 | `stop` | a notice; the chat starts | a new chat does not start (the reason and the reset time are shown); a running chat gets the reason at its next prompt or tool call (hook UserPromptSubmit / PreToolUse); a Codex tab is paused through tmux |
 
-## As built
+## As built (HRN-591)
 
 - Rules live in `limit_rules`. `PUT` upserts on the natural key (scope, person, account, model, period, unit). What each
   machine was last sent lives in `machine_budgets` (version, hash of the list, time).

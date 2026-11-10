@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -75,5 +76,35 @@ func TestPreviewHeadersSandboxAtTheHub(t *testing.T) {
 	}
 	if h.Get("Clear-Site-Data") != "" || h.Get("Strict-Transport-Security") != "" || h.Get("Content-Type") != "text/html" {
 		t.Fatalf("headers: %v", h)
+	}
+}
+
+func TestPreviewRefusalTellsTheFrameAndLogsTheTrace(t *testing.T) {
+	var logged strings.Builder
+	s := &Service{log: slog.New(slog.NewTextHandler(&logged, nil))}
+	r := httptest.NewRequest(http.MethodGet, "/m/abc/__pv/1-"+pvKey+"/ui/index.html?__hl_trace=v-7", nil)
+	r.Header.Set("Sec-Fetch-Dest", "iframe")
+	w := httptest.NewRecorder()
+	answered := false
+	s.previewRefused(w, r, "abc", errPreviewOffline, func() { answered = true })
+	if answered || w.Code != http.StatusBadGateway {
+		t.Fatalf("a frame: answered %v, status %d", answered, w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "hlViewError") || !strings.Contains(body, "hub-machine_offline") || !strings.Contains(body, "не на связи") {
+		t.Errorf("the frame's page: %s", body)
+	}
+	if csp := w.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "script-src 'sha256-") || !strings.Contains(csp, "frame-ancestors 'self'") {
+		t.Errorf("csp: %s", csp)
+	}
+	if line := logged.String(); !strings.Contains(line, "trace=v-7") || !strings.Contains(line, "code=machine_offline") || strings.Contains(line, pvKey) {
+		t.Errorf("log: %s", line)
+	}
+
+	plain := httptest.NewRequest(http.MethodGet, "/m/abc/__pv/1-"+pvKey+"/x", nil)
+	plain.Header.Set("X-Hl-Trace", "bad trace!")
+	s.previewRefused(httptest.NewRecorder(), plain, "abc", errPreviewOffline, func() { answered = true })
+	if !answered {
+		t.Error("a request that is not a frame got the frame's page")
 	}
 }

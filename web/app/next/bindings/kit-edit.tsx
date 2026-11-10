@@ -1,4 +1,4 @@
-// The kit screen's editing mode, the way a Sinopia project has it: «Редактировать» opens the kit's draft on
+// The kit screen's editing mode (HRN-903), the way a Sinopia project has it: «Редактировать» opens the kit's draft on
 // the canvas with the draft's chat beside it (the same design chat a project has, working in the draft's folder), what
 // is picked on the canvas goes with the next message as its chip, and «Опубликовать версию» makes the next version. A
 // kit its maker set for viewing only shows «Только просмотр» and is not edited, the server refusing it too; the maker

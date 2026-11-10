@@ -1,4 +1,4 @@
-/* The kit screen: a tree on the left, one canvas in the middle, what is picked on the right. The canvas paints
+/* The kit screen (HRN-897): a tree on the left, one canvas in the middle, what is picked on the right. The canvas paints
    itself (kit-draw.ts reads the --kit-* tones from here); the live pages lie over it at the cells the camera brings near. */
 .hx-kit {
   --kit-ease: cubic-bezier(0.2, 0.8, 0.2, 1);

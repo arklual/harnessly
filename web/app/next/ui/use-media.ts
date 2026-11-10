@@ -12,7 +12,7 @@ interface IQuery {
 
 // One list per query for the whole page, with a subscribe that keeps its identity: every popover of a long list asks
 // whether it is on the phone, and a new MediaQueryList with a fresh listener on each render made switching a view of
-// «Поделиться» stall.
+// «Поделиться» stall (HRN-675).
 const QUERIES = new Map<string, IQuery>();
 
 const queryOf = (query: string): IQuery => {

@@ -1,6 +1,6 @@
-// Обзор: what needs attention, where the money goes, how the shared subscriptions stand. An admin sees the
+// Обзор (HRN-537): what needs attention, where the money goes, how the shared subscriptions stand. An admin sees the
 // tenant (or the whole organization); a team lead sees their team by person; the participant has their own view
-// (overview/member.tsx).
+// (overview/member.tsx, HRN-541).
 import { plural } from './teams/format';
 import { useState } from 'react';
 import { ChartLine, KeyRound, ListChecks, Users } from 'lucide-react';

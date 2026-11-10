@@ -33,7 +33,7 @@ type Access struct {
 	Member string
 	Room   string
 	// Sees, when set, is which paths of the room the caller may read: the others are left out of its changes and
-	// answer 404 (a machine gets only the design projects its people have a role in). Nil: the whole room.
+	// answer 404 (HRN-880: a machine gets only the design projects its people have a role in). Nil: the whole room.
 	Sees func(path string) bool
 	// Writes, when set, is which paths the caller may change; a commit outside them is 403. Nil: whatever it sees.
 	Writes func(path string) bool

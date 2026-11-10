@@ -8,7 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
-// A server whose tools follow its chat says so at initialize; one that does not says nothing of it.
+// A server whose tools follow its chat says so at initialize (HRN-975); one that does not says nothing of it.
 func TestInitializeListChanged(t *testing.T) {
 	init := func(s *Server) string {
 		msg, _ := jsvalue.Parse([]byte(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`))

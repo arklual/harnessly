@@ -1,6 +1,6 @@
 package apps
 
-// The check of a catalog entry before the app is downloaded: each refusal has its kind, so the page says it in
+// The check of a catalog entry before the app is downloaded (HRN-700): each refusal has its kind, so the page says it in
 // its own words next to the entry instead of an install that fails with a text.
 
 // Kinds of refusal.
@@ -28,7 +28,7 @@ type Refusal struct {
 type Precheck struct {
 	Refusals []Refusal `json:"refusals"`
 	Secrets  []string  `json:"secrets"`
-	// Access is what the entry says the app reaches, for the install screen. The package may reach more (its
+	// Access is what the entry says the app reaches, for the install screen (HRN-849). The package may reach more (its
 	// network, servers, plugin parts): the install grants only these keys and the rest waits for consent.
 	Access []Access `json:"access"`
 }

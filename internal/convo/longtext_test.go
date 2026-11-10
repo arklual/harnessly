@@ -20,7 +20,7 @@ func (k keepingUploads) Keep(name string, body []byte) (wire.AttachmentRef, stri
 	return wire.AttachmentRef{ID: "up_TXT", Name: name, Kind: wire.AttachmentFile, Mime: "text/markdown"}, "/data/uploads/up_TXT.md", true
 }
 
-// A long message is not pasted into the agent's box (Claude Code refuses some long pastes without a word): the
+// HRN-841. A long message is not pasted into the agent's box (Claude Code refuses some long pastes without a word): the
 // agent gets its start and the file that holds all of it; the bubble has that file.
 func TestALongMessageGoesToTheAgentAsAFile(t *testing.T) {
 	r := newRig(t)

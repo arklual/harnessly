@@ -439,7 +439,7 @@ func TestWakeUpsAreBounded(t *testing.T) {
 	}
 }
 
-// A message queued for an agent that is starting is delivered: a refusal here made the sender send it again.
+// HRN-621. A message queued for an agent that is starting is delivered: a refusal here made the sender send it again.
 func TestSendQueuedIsDelivered(t *testing.T) {
 	r := newTestRig(t)
 	text, isErr := r.call("tab-root", "delegate_task", map[string]any{"provider": "claude", "prompt": "first"})
@@ -453,7 +453,7 @@ func TestSendQueuedIsDelivered(t *testing.T) {
 	}
 }
 
-// Claude Code swaps an argument named `model` for its own subagent model, so agent_model is what carries the
+// Claude Code swaps an argument named `model` for its own subagent model (HRN-828), so agent_model is what carries the
 // model, and wins when both come.
 func TestDelegateTakesTheModelFromAgentModel(t *testing.T) {
 	r := newTestRig(t)
@@ -540,7 +540,7 @@ func TestPauseIsAnsweredWithAReminderNotAWake(t *testing.T) {
 	}
 }
 
-// A chat held on its usage limit is not reminded: each reminder would be one more refusal. It goes on by
+// A chat held on its usage limit is not reminded: each reminder would be one more refusal (HRN-916). It goes on by
 // itself at the reset, and the turn it ends then is judged as any.
 func TestAChatHeldOnItsLimitIsNotReminded(t *testing.T) {
 	r := newTestRig(t)

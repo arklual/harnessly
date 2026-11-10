@@ -133,6 +133,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 				return
 			}
 			status, out := handle(r.Context(), b)
+			journalBridgeCall(r.Context(), views, b, status, out)
 			secretJSON(w, status, out)
 		}
 	}
@@ -729,7 +730,7 @@ func revealApp(store *secrets.Store, app string, names []string) map[string]stri
 func callAppTool(ctx context.Context, d deps, reg *apps.Registry, appID, tool string, args map[string]any) (json.RawMessage, error) {
 	out, err := callAppToolRaw(ctx, d, reg, appID, tool, args)
 	if err != nil {
-		// The author reads a backend's refusal in `harnessly app logs`: the tool, the code and the short reason,
+		// The author reads a backend's refusal in `harnessly app logs` (HRN-920): the tool, the code and the short reason,
 		// never the arguments or the answer's body.
 		reg.LogEventOnce(appID, "", apps.ViewLogMCP, "tools.call "+clip(tool, 80)+" — "+toolFailure(err))
 	}

@@ -40,7 +40,7 @@ func heapInUse() uint64 {
 
 // A runtime restores every chat it had and reads each one's tail. A loaded feed keeps the entries it built, not the
 // text it read them from: a hundred chats of large transcripts start in little memory, each with its first screen at
-// once (the ids kept were slices of the read, and kept every read — gigabytes — alive).
+// once (HRN-901: the ids kept were slices of the read, and kept every read — gigabytes — alive).
 func TestLoadedFeedsDoNotKeepTheirReads(t *testing.T) {
 	if testing.Short() {
 		t.Skip("reads a hundred transcripts")

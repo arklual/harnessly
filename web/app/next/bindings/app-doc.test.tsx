@@ -155,7 +155,7 @@ describe('a document of an app type, opened', () => {
     expect((await screen.findByTestId('frame')).dataset.readonly).toBe('true');
   });
 
-  // the switch at the head of the bar turns the document between looking and editing, both ways.
+  // HRN-674: the switch at the head of the bar turns the document between looking and editing, both ways.
   it('goes between looking and editing by the parts of the mode switch', async () => {
     runtime({
       kind: 'acme.moodboard',

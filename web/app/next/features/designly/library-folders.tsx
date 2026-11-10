@@ -1,4 +1,4 @@
-// Folders in the library: the crumbs and the tiles above the cards, the dialogs that name, delete and choose a
+// Folders in the library (HRN-860): the crumbs and the tiles above the cards, the dialogs that name, delete and choose a
 // folder. A folder is a shelf, not a right: nothing here changes who sees a project. Tiles and crumbs are drop places
 // for the cards (`data-drop-folder`, use-card-drag.ts).
 import { Menu } from '@base-ui/react/menu';

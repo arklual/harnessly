@@ -1,4 +1,4 @@
-// The Аналитика section's contract. `…/kpis`, `…/kpis/{kpi}/series`, `…/changes`, `…/waste` of
+// The Аналитика section's contract (HRN-538). `…/kpis`, `…/kpis/{kpi}/series`, `…/changes`, `…/waste` of
 // docs/hub (analytics) map onto these shapes; until those contracts land the mock (../mock/analytics.ts) is the
 // reference and live answers `not_ready`.
 import { addDays } from '../dates';

@@ -1,4 +1,4 @@
-// Аналитика: twelve KPIs in three groups, the period and its comparison, the big chart of the selected KPI,
+// Аналитика (HRN-538): twelve KPIs in three groups, the period and its comparison, the big chart of the selected KPI,
 // changes and their effect, signals, wasted money, peers. Who sees what is decided by the data the API returns for
 // the role (a participant gets only their own work and no money of others).
 import './analytics.css';

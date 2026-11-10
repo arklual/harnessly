@@ -59,7 +59,7 @@ export const iconOf = (item: MadeItem): string => {
 /** An epic of the tracker. */
 export const isEpic = (item: MadeItem): boolean => item.task?.type === 'Epic';
 
-/** The key of a task: the tracker says it, else it is the end of the task's address. */
+/** The key of a task (HRN-515): the tracker says it, else it is the end of the task's address. */
 export const taskKey = (item: MadeItem): string =>
   item.task?.key ?? item.ref.slice(item.ref.lastIndexOf('/') + 1);
 

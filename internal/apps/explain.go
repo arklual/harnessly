@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// The layers that decide whether an app is on in a chat, in the order they apply:
+// The layers that decide whether an app is on in a chat, in the order they apply (HRN-699):
 //
 //  1. machine — the app is installed here (installed.json): its version, trust, and whether this harnessly is one it
 //     works with;
@@ -18,7 +18,7 @@ import (
 //  6. wall — whether the agent of a chat with apps runs inside the operating system's wall.
 //
 // Two more lines stand beside the layers: consent — what the app waits for the person to agree to, and where they agree
-// — and views — the errors its views reported lately (viewlog.go).
+// (HRN-849, HRN-913) — and views — the errors its views reported lately (viewlog.go).
 //
 // Explain says what each layer says of one app, so «why is it not in this chat» has an answer line by line.
 
@@ -136,7 +136,7 @@ func Explain(in ExplainInput) []ExplainLine {
 			add("chat", false, "%s", w)
 		}
 	}
-	// The steps of a load are not errors: only the failures are counted.
+	// The steps of a load are not errors: only the failures are counted (HRN-920).
 	n, lastLevel := 0, ""
 	for _, l := range in.ViewLog {
 		if ViewLogFailure(l) {

@@ -50,7 +50,7 @@ type Admit func(r *http.Request) (store.Machine, error)
 // Grant is what a machine may do with one recorded design project: see it (its files come to the machine), edit it.
 type Grant struct{ See, Edit, Own bool }
 
-// Design is the hub's design access as the store needs it: a machine's copy of its space's library holds only
+// Design is the hub's design access as the store needs it (HRN-880): a machine's copy of its space's library holds only
 // the projects its person has a role in, and takes writes only to those they may edit; a project's owner file reaching
 // the store records the project if the hub has no row for it yet.
 type Design interface {
@@ -211,13 +211,13 @@ func (s *Store) PutBlob(ctx context.Context, spaceID, kind, sha string, r io.Rea
 	return s.blobs.Put(ctx, s.Room(spaceID, kind), sha, r)
 }
 
-// DesignRoom is a space's design collection as the hub reads it itself: the views of the projects that no
+// DesignRoom is a space's design collection as the hub reads it itself (HRN-881): the views of the projects that no
 // machine serves.
 func (s *Store) DesignRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindDesign))
 }
 
-// AppsRoom is a space's apps collection as the hub reads it itself: the guest links it serves.
+// AppsRoom is a space's apps collection as the hub reads it itself (HRN-898): the guest links it serves.
 func (s *Store) AppsRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindApps))
 }
@@ -393,7 +393,7 @@ func PersonName(userID string) string {
 	return "p-" + hex.EncodeToString(sum[:16])
 }
 
-// appsRules are what a machine may read and write of its space's apps collection:
+// appsRules are what a machine may read and write of its space's apps collection (HRN-898):
 //
 //   - storage/<app>/user/<person>.json, a person's user area: only their machines;
 //   - storage/<app>/chat/<person>.<chat>.json, a chat's area: only the machines of the person whose chat it is;
@@ -423,7 +423,7 @@ func (a appsRules) may(p string, write bool) bool {
 		ok := p == "team/state.json" || len(parts) == 4 && parts[1] == "archives" && appstore.ValidApp(parts[2]) && strings.HasSuffix(parts[3], ".tgz")
 		return ok && (!write || a.owner)
 	case parts[0] == "guests":
-		// A person's guest links: only their machines put them there; the hub reads them itself.
+		// A person's guest links (HRN-898): only their machines put them there; the hub reads them itself.
 		return len(parts) == 3 && a.person != "" && parts[1] == a.person && hex64(strings.TrimSuffix(parts[2], ".json")) && strings.HasSuffix(parts[2], ".json")
 	case parts[0] == "bundles":
 		// An app's package by the sum of its archive, which the hub checks before it serves a byte of it.
@@ -507,7 +507,7 @@ func (s *Store) appsFilter(ctx context.Context, m store.Machine, acc *filestore.
 	return nil
 }
 
-// filter limits a machine to the design projects its person has a role in: the files of another person's
+// filter limits a machine to the design projects its person has a role in (HRN-880): the files of another person's
 // project never reach a machine that has nothing to do with it, and a write to a project the person may not edit is
 // refused. Paths outside a project folder (the shelves under .folders) and projects the hub has no row for are open.
 func (s *Store) filter(ctx context.Context, m store.Machine, acc *filestore.Access) error {

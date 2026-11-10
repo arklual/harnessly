@@ -10,7 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// A quiet conversation's feed lets go of what it read. Every conversation of a machine holds its feed, and
+// A quiet conversation's feed lets go of what it read (HRN-901). Every conversation of a machine holds its feed, and
 // a feed holds its last 2000 entries twice over (the source's and the built ones): ~4 MB for a busy chat, 1.6 GB for
 // the 395 chats of one account, most of them asleep and opened by nobody. Released, the feed keeps where its read stood
 // and the few answers the actor asks of it on every look; anything else reads the same bytes of the transcript again

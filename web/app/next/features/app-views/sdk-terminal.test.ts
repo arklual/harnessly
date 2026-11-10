@@ -1,4 +1,4 @@
-// An app's own terminal: the SDK in a frame, the real bridge, a terminal the host holds; typing is not
+// An app's own terminal (HRN-852): the SDK in a frame, the real bridge, a terminal the host holds; typing is not
 // counted against the calls a second, and the agent does not type into it without the person's yes.
 import { describe, expect, it, vi } from 'vitest';
 import type { IAppTerminalEvents, IAppTerminalOpen } from '@/next/features/app-views/app-terminal';

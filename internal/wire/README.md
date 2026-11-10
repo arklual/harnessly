@@ -249,7 +249,7 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     gets it from `--settings` (the `ultracode` key: Claude Code never saves it), and one resumed gets it typed again,
     since a new process starts without it. Effort `ultracode` of before is read as `{effort: xhigh, ultracode: true}`:
     what `--effort ultracode` ran.
-33b. **Fast and permission modes.** `models[].fast: true` marks the models with a fast mode (Claude's Opus
+33b. **Fast and permission modes (HRN-945).** `models[].fast: true` marks the models with a fast mode (Claude's Opus
     while Claude Code runs on an API key — a claude.ai subscription has no /fast —, Codex models with a fast service
     tier); `machine.agents[].defaultPermission` is the mode a chat starts in when it
     names none. `Model`, `pendingModel` and `model` carry `fast` (absent is off; in `model`, absent keeps it) and

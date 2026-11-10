@@ -188,7 +188,7 @@ func (f *fakePdfStore) TakeLease(_ context.Context, _, chat string) (bool, error
 	return true, nil
 }
 
-// through a store with leases, any machine that may edit a marked deck builds its PDF, but only the one
+// HRN-881: through a store with leases, any machine that may edit a marked deck builds its PDF, but only the one
 // holding the lease; whether it is behind is the store's revision against the one written beside the PDF.
 func TestDeckPdfThroughTheStoreIsBuiltByTheLeaseHolderByRevision(t *testing.T) {
 	g := newDeckRig(t)

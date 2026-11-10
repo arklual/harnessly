@@ -1,4 +1,4 @@
-// Обзор: the numbers of the first screen for an admin and a team lead. Money is in rubles (the display
+// Обзор (HRN-537): the numbers of the first screen for an admin and a team lead. Money is in rubles (the display
 // currency, `$` next to it is the same money at the month's rate). Shapes to align with the analytics and limits
 // contracts (docs/hub/orgs.md has none of these yet): spend/limits → limits.md, subscriptions/signals → analytics.md.
 import type { Section } from '../types';

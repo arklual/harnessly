@@ -1,4 +1,4 @@
-// The project's kit on its bar: «Кит · v0.6.0», a click opens the kit screen at that version; a newer
+// The project's kit on its bar (HRN-897): «Кит · v0.6.0», a click opens the kit screen at that version; a newer
 // installed version is said quietly beside it, never as a badge.
 import type { IKitLink } from '@/next/features/designly/kit/kit-api';
 import { t } from '@/next/i18n';

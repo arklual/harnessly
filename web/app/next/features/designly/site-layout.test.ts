@@ -23,7 +23,7 @@ describe('site layout', () => {
     expect(parseLayouts(JSON.stringify(Object.fromEntries(kept))).get('m/d1')).toEqual(layout);
   });
 
-  // a place kept before the person placed the chat by hand is not their choice.
+  // HRN-845: a place kept before the person placed the chat by hand is not their choice.
   it('reads an older layout without the mark as not chosen', () => {
     const { chosen: _chosen, ...older } = layout;
     expect(parseLayout(older)?.chosen).toBe(false);

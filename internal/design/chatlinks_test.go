@@ -100,7 +100,7 @@ func TestChatLinksClaudeTools(t *testing.T) {
 		toolUse(t, "Bash", map[string]any{"command": "acme design page list listed; acme design notes get noted 3; acme design history kept"}),
 		toolUse(t, "Bash", map[string]any{"command": "acme design notes set slides 2 --file -"}),
 		// Opening or showing a design to the person, taking its turn, a path in a command that only reads or that stands
-		// in its folder: none of it is work on the design.
+		// in its folder: none of it is work on the design (HRN-674).
 		toolUse(t, "Bash", map[string]any{"command": "acme design claim claimed \"Главная\"; acme design release; acme design panel shown show"}),
 		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/standing/project && acme design check standing > /tmp/out.txt 2>&1; cat " + r.root + "/copied/a.json > /tmp/b.json"}),
 		// A `cd` sets the base of the relative targets after it.
@@ -110,7 +110,7 @@ func TestChatLinksClaudeTools(t *testing.T) {
 		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/cd-quiet && cat a.json > /tmp/x && sed -i s/a/b/ /tmp/y && cp a.json /tmp/z"}),
 		toolUse(t, "Bash", map[string]any{"command": "cp " + r.root + "/source/project/a.png /tmp/a.png; grep -n 'x' " + r.root + "/grepped/a.html | tee /tmp/g.txt"}),
 		toolUse(t, "Write", map[string]any{"file_path": "/home/coder/notes.md", "content": "Главная.dc.html " + board}),
-		// a chat borrowing from a design wrote into its scratchpad by a variable while it stood in the design's
+		// HRN-675: a chat borrowing from a design wrote into its scratchpad by a variable while it stood in the design's
 		// folder; the variable's path is not under the folder, and the design is not that chat's.
 		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/borrowed/project/lib; mkdir -p /tmp/s; S=/tmp/s; sed 's/}/}\\n/g' viz.css > $S/viz.css; wc -l $S/viz.css"}),
 		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/borrowed/project; cp a.css ~/a.css; cat a.css > ${S}/b.css; echo x | tee `pwd`/../x; cd $S && touch y"}),

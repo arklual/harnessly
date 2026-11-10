@@ -7,7 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
 )
 
-// The pulse and the summary are dark until the flag is on; a pulse is read only by its author.
+// The pulse (HRN-987) and the summary are dark until the flag is on; a pulse is read only by its author.
 func TestEfficiencyPulseIsPrivateAndFlagged(t *testing.T) {
 	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"))
 	root := s.SignIn("root@example.com")

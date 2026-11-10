@@ -1,6 +1,6 @@
 package hubproto
 
-// The move of a machine's own data into the hub (docs/migrations): a runtime of a version that keeps its data in
+// The move of a machine's own data into the hub (docs/migrations, HRN-883): a runtime of a version that keeps its data in
 // the hub's store makes an inventory of what it holds only on its disk (the pictures of its chats, the files its agents
 // handed over, the handoff notes, the Sinopia library), puts every object into the store, checks the store has it under
 // its sha256, and reports each object here. The hub keeps the journal in its database, one row per machine × kind ×
@@ -107,7 +107,7 @@ func (s MigrationStatus) MigrationDone() bool {
 	return s.Total > 0 && s.Verified+s.Skipped >= s.Total && s.Failed == 0 && s.Pending == 0
 }
 
-// The machine's sidebar: its projects and its favorites go into its person's sidebar on the hub, merged as
+// The machine's sidebar (HRN-883): its projects and its favorites go into its person's sidebar on the hub, merged as
 // the page merges a machine (a project joins the profile's of its name, the favorites once). The object is one, of
 // MigrationSidebarKind, named MigrationSidebarObject; its sha256 is that of the body sent, and the hub counts it
 // verified once the person's sidebar lists the machine as merged. A hub that keeps no sidebar answers 404.

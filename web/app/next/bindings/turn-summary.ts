@@ -1,4 +1,4 @@
-// A finished turn's summary: when a chat's turn ends, the page asks its machine for a few lines on what the
+// A finished turn's summary (HRN-957): when a chat's turn ends, the page asks its machine for a few lines on what the
 // agent did (the cheapest model writes them, once a turn, whichever page asks); they come back on the record as its
 // recap and go onto the turn's notice as `summary`. Settings → Notifications turns the asking off. A machine that
 // cannot make them refuses, and the notice keeps the start of the answer.

@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/storerev"
 )
 
-// The team's own read and write of a project in the store, through the hub: the person's role is the hub's
+// HRN-881. The team's own read and write of a project in the store, through the hub: the person's role is the hub's
 // (team, membership, the owner), the files are the store's, and no machine takes part — the author's may be off, and
 // so may the reader's. Under a machine the person may open (it names the space), <prefix>/design/store/<project>/:
 //

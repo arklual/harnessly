@@ -17,7 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
-// The organization's accounts: every account its machines used, with who used it this month and what it
+// The organization's accounts (HRN-661): every account its machines used, with who used it this month and what it
 // cost at list prices, and registering one the hub only discovered — what the seed file does (docs/hub/orgs.md,
 // «accounts»), from the screen.
 

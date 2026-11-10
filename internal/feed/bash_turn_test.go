@@ -8,7 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// A bash-mode line typed between turns («! git push …», Claude 2.1.319) was an entry outside any turn: the page
+// HRN-905. A bash-mode line typed between turns («! git push …», Claude 2.1.319) was an entry outside any turn: the page
 // draws turns only, so the line, its output and the agent's answer to it vanished. It opens a turn of its own now: the
 // line as the person's message, the command with its output as a step, the answer as the turn's answer.
 func TestABashModeLineBetweenTurnsOpensATurn(t *testing.T) {
