@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"io"
 	"io/fs"
 	"net/http"
 	"path"
 	"regexp"
 	"strings"
 	"sync"
-	"time"
+
+	"github.com/ly-solutions/harnessly/internal/webstatic"
 )
 
 // ui serves the hub's page: index.html for each route of the app, and the files under /assets/. A route is any path
@@ -23,9 +23,17 @@ type ui struct {
 	// base is the path the hub is served under ("" at the root of its host).
 	base string
 
+	// frames are the origins of the extensions' views the page may frame (frame-src); empty: it frames nothing.
+	frames []string
+
 	mu    sync.Mutex
 	index []byte
-	csp   string
+	// indexGz is index gzipped, made with it.
+	indexGz []byte
+	csp     string
+
+	// static keeps the tags and gzipped copies of the build's files.
+	static webstatic.Cache
 }
 
 var inlineScript = regexp.MustCompile(`(?is)<script\b([^>]*)>(.*?)</script>`)
@@ -55,6 +63,14 @@ func contentSecurityPolicy(index []byte) string {
 	}, "; ")
 }
 
+// withFrames lets the page frame the views of the extensions, by origin; without any the policy is unchanged.
+func withFrames(csp string, origins []string) string {
+	if len(origins) == 0 {
+		return csp
+	}
+	return csp + "; frame-src " + strings.Join(origins, " ")
+}
+
 func newUI(fsys fs.FS, reload bool, base string) *ui {
 	return &ui{fsys: fsys, reload: reload, base: base}
 }
@@ -74,19 +90,20 @@ func underPath(index []byte, base string) []byte {
 	return assetAttrs.ReplaceAll(index, []byte("${1}"+base+"${2}"))
 }
 
-func (u *ui) loadIndex() ([]byte, string, error) {
+// loadIndex returns the page, its gzipped copy and its content security policy.
+func (u *ui) loadIndex() ([]byte, []byte, string, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if u.index != nil && !u.reload {
-		return u.index, u.csp, nil
+		return u.index, u.indexGz, u.csp, nil
 	}
 	b, err := fs.ReadFile(u.fsys, "index.html")
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
 	b = underPath(b, u.base)
-	u.index, u.csp = b, contentSecurityPolicy(b)
-	return u.index, u.csp, nil
+	u.index, u.indexGz, u.csp = b, webstatic.Gzip(b), withFrames(contentSecurityPolicy(b), u.frames)
+	return u.index, u.indexGz, u.csp, nil
 }
 
 func (u *ui) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +126,7 @@ func (u *ui) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (u *ui) serveIndex(w http.ResponseWriter, r *http.Request) {
-	index, csp, err := u.loadIndex()
+	index, gz, csp, err := u.loadIndex()
 	if err != nil {
 		http.Error(w, "The hub page is not available", http.StatusServiceUnavailable)
 		return
@@ -118,39 +135,12 @@ func (u *ui) serveIndex(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-store")
 	h.Set("Content-Security-Policy", csp)
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		_, _ = w.Write(index)
-	}
+	webstatic.WriteBody(w, r, index, gz)
 }
 
-// serveFile serves one file of the build; false when there is none.
+// serveFile serves one file of the build, gzipped for browsers that take it; false when there is none.
 func (u *ui) serveFile(w http.ResponseWriter, r *http.Request, name string) bool {
-	f, err := u.fsys.Open(name)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		return false
-	}
-	rs, ok := f.(io.ReadSeeker)
-	if !ok {
-		b, err := io.ReadAll(f)
-		if err != nil {
-			return false
-		}
-		rs = bytes.NewReader(b)
-	}
-	if strings.HasPrefix(name, "assets/") {
-		// Built files carry a hash in their name: they never change.
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	} else {
-		w.Header().Set("Cache-Control", "no-cache")
-	}
-	http.ServeContent(w, r, path.Base(name), time.Time{}, rs)
-	return true
+	return u.static.Serve(w, r, u.fsys, name)
 }
 
 // noUI is what the hub answers at / when it was built without the page and HUB_WEB_DIR is not set.

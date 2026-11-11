@@ -25,6 +25,8 @@ export const usePaneSources = (mode: 'agent' | 'chat', tab: ITab | null, chatId:
     mode === 'agent' ? sourcePath : null,
     cwd,
     entries,
+    snapshot?.links,
+    snapshot?.activity,
   );
   const shownLinks = useSameValue(links);
   return {

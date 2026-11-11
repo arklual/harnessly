@@ -37,6 +37,9 @@ type Launch struct {
 	SessionCreated func(session string) int64
 	// CodexArgs are the arguments the Codex launcher gets for codex itself.
 	CodexArgs func(workspaceID, resumeID string, launch *agents.Launch) (codex.Start, error)
+	// CodexInput: new Codex chats may start beside an app-server (the structured input channel), so the launcher's
+	// conversation is passed on to the arguments of a fresh launch without apps.
+	CodexInput bool
 	// CodexForkArgs are the arguments that start codex on a fork of a session; nil when the runtime cannot fork.
 	CodexForkArgs func(workspaceID, sessionID string, launch *agents.Launch) (codex.Start, error)
 	// EvalRuns holds eval runs (<runId>/request.json, state.json, stop); EvalRunner is the runner script, run by Node
@@ -501,6 +504,13 @@ func (a *api) codexLaunchArgs(c *call) {
 	if !ok {
 		c.fail(400, "Invalid model or effort")
 		return
+	}
+	if conv := c.trimmedField("conversation"); a.l.CodexInput && resume == "" && fork == "" && wire.ValidConvID(conv) &&
+		(l == nil || len(l.Apps) == 0) {
+		if l == nil {
+			l = &agents.Launch{}
+		}
+		l.Input = conv
 	}
 	var start codex.Start
 	var err error

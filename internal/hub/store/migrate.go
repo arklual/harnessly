@@ -53,6 +53,9 @@ type Options struct {
 	LockTimeout time.Duration
 	// Log gets the migration progress; nil is slog.Default().
 	Log *slog.Logger
+	// Last stops the migrations after this version and skips the schema check; 0 applies them all. It is for the
+	// tests of a migration that moves data: they fill a database as it was before the migration and then open it again.
+	Last int
 }
 
 var schemaName = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`)
@@ -308,6 +311,9 @@ func migrateOn(ctx context.Context, raw *sql.DB, driver Driver, sessionSafe bool
 	}
 
 	for _, m := range ms {
+		if opts.Last > 0 && m.version > opts.Last {
+			return nil
+		}
 		err := step(func(q Q) error {
 			// Looked at again under the lock: a replica that held it before has applied this one already.
 			var n int

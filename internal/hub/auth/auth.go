@@ -50,12 +50,14 @@ type Deps struct {
 
 // Service is the account side of the hub.
 type Service struct {
-	cfg     *config.Config
-	db      *store.DB
-	mailer  mail.Mailer
-	lim     *ratelimit.Limiter
-	log     *slog.Logger
-	now     func() time.Time
+	cfg    *config.Config
+	db     *store.DB
+	mailer mail.Mailer
+	lim    *ratelimit.Limiter
+	log    *slog.Logger
+	now    func() time.Time
+	// ended is OnSessionsEnded.
+	ended   func(userID string)
 	client  *http.Client
 	wa      *webauthn.WebAuthn
 	oauth   map[string]*oauthProvider
@@ -162,6 +164,10 @@ func truncate(s string, n int) string {
 // startSession signs a person in: a new session row, the cookie, an audit line. method is "email", "passkey",
 // "github", …
 func (s *Service) startSession(ctx context.Context, w http.ResponseWriter, r *http.Request, u store.User, method string) error {
+	if u.DisabledAt != nil {
+		s.Audit(ctx, u.ID, "login_refused", r, method+" disabled")
+		return errDisabled
+	}
 	token := newToken()
 	now := s.now().UTC()
 	sess := store.Session{
@@ -234,6 +240,10 @@ func (s *Service) principalFor(ctx context.Context, hash, kind string) (*Princip
 	if err != nil {
 		return nil, err
 	}
+	if u.DisabledAt != nil {
+		_ = st.DeleteSession(ctx, hash)
+		return nil, nil
+	}
 	if now.Sub(sess.LastSeenAt) > sessionTouch {
 		if err := st.TouchSession(ctx, hash, now.UTC()); err != nil {
 			s.log.Warn("session not touched", "error", err)
@@ -257,6 +267,19 @@ func (s *Service) Require(h func(w http.ResponseWriter, r *http.Request, p *Prin
 			return httpx.ErrUnauthenticated
 		}
 		return h(w, r, p)
+	}
+}
+
+// errDisabled is the answer to a sign-in of an account that was switched off.
+var errDisabled = httpx.New(http.StatusForbidden, "account_disabled", "Аккаунт отключён администратором")
+
+// OnSessionsEnded sets what runs after every session of a person was ended at once (they signed out everywhere, or
+// the account was switched off): whatever they still have open must end too.
+func (s *Service) OnSessionsEnded(f func(userID string)) { s.ended = f }
+
+func (s *Service) sessionsEnded(userID string) {
+	if s.ended != nil {
+		s.ended(userID)
 	}
 }
 

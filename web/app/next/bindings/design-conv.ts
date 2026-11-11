@@ -17,7 +17,7 @@ import { recordDesignChat } from '@/next/features/designly/api';
 import type { IModelChoice } from '@/next/features/composer/agents';
 import type { AttachmentRef, ClientId, ConvId, MachineId } from '@/next/protocol/v2';
 import { useConversationList, useConvsAnswered } from '@/next/stores/conversations';
-import { goTo, ROUTE } from '@/next/routes/routes';
+import { goTo, ROUTE, type TRoute } from '@/next/routes/routes';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 
@@ -100,6 +100,10 @@ export interface IDesignFirst {
   attachments: AttachmentRef[];
   /** The words go back to the field: the machine refused the create. */
   onRefused: (text: string) => void;
+  /** Not a design of the library (an app's object): the machine's library does not record the chat. */
+  unlisted?: boolean;
+  /** The chat has its id (an app turns itself on in it). */
+  onCreated?: (conv: ConvId) => void;
 }
 
 /**
@@ -116,6 +120,8 @@ export const startDesignConv = ({
   text,
   attachments,
   onRefused,
+  unlisted = false,
+  onCreated,
 }: IDesignFirst): ClientId | null => {
   if (creatingStore.has(key)) return null;
   const created = createConversation(machine, {
@@ -144,7 +150,8 @@ export const startDesignConv = ({
   void created.conversation.then((id) => {
     if (!id) return;
     // The machine keeps that the chat was started from the design: every machine and page lists it as the design's.
-    void recordDesignChat(machine, design, id).catch(() => undefined);
+    if (!unlisted) void recordDesignChat(machine, design, id).catch(() => undefined);
+    onCreated?.(id);
     bindDesignConv(key, { id, fresh: true });
     creatingStore.patch(key, (have) => have && { ...have, conv: id });
   });
@@ -166,7 +173,13 @@ export interface IDesignConv {
  * becomes the design's last; a chat made here stops being fresh once the machine's list has it. A pick takes `?chat=`
  * off the address.
  */
-export const useDesignConv = (machine: MachineId, design: string, fromChat: string | null): IDesignConv => {
+export const useDesignConv = (
+  machine: MachineId,
+  design: string,
+  fromChat: string | null,
+  /** The screen's address without `?chat=`; a design's own page by default. */
+  address?: TRoute,
+): IDesignConv => {
   restore();
   const key = designKey(machine, design);
   const bound = useKey(designBindingStore, key) ?? null;
@@ -188,7 +201,7 @@ export const useDesignConv = (machine: MachineId, design: string, fromChat: stri
   const pick = (id: string | null) => {
     setOverridden(fromChat);
     // The address stops naming the chat it came from: a reload shows the pick (the design's last chat), not the old one.
-    if (fromChat !== null) goTo({ kind: ROUTE.site, id: design, edit: true }, { replace: true });
+    if (fromChat !== null) goTo(address ?? { kind: ROUTE.site, id: design, edit: true }, { replace: true });
     bindDesignConv(key, id === null ? null : { id, fresh: false });
   };
   return { picked, pick };

@@ -24,9 +24,14 @@ import {
   type ComponentProps,
 } from 'react';
 import { appConfig } from '@/platform/config';
+import { startMachineOf } from '@/next/bindings/start-machine';
+import { QueuedChatScreen } from '@/next/bindings/queued-chat';
+import { queuedChatId, queuedItemOf } from '@/next/commands/queued-chats';
+import { readLastChoice } from '@/next/features/composer/start-choice';
 import { useTheme } from '@/platform/theme';
 import { useAgentTerminal } from '@/next/bindings/agent-terminal';
 import { useRightPane } from '@/next/bindings/right-pane';
+import { useHomePane } from '@/next/bindings/home-pane';
 import { useChatBackground } from '@/next/bindings/chat-background';
 import { useCentralHistory } from '@/next/bindings/use-central';
 import { useProfileSidebarMerge } from '@/next/bindings/use-profile-sidebar';
@@ -39,7 +44,8 @@ import {
   useTabChats,
 } from '@/next/bindings/shell-model';
 import { bootNext, shutdownNext, useBoot } from '@/next/boot';
-import { markSeen, setGoal } from '@/next/commands';
+import { setGoal } from '@/next/commands';
+import { useReadWhileVisible } from '@/next/bindings/read-while-visible';
 import { connectionStore } from '@/next/stores/connection';
 import { useAll } from '@/next/core/store';
 import { hub } from '@/next/core/realtime/hub';
@@ -73,11 +79,12 @@ import { revealMessage } from '@/next/stores/reveal';
 import type { ISearchRow } from '@/next/features/search/search-dialog';
 import AppFrame, { type IAppFrameProps } from '@/next/features/shell/app-frame';
 import {
+  RAIL_MODE,
   foldRailForPane,
-  restoreRailAfterDesign,
-  restoreRailAfterPane,
   toggleRail,
   useRail,
+  useRailFull,
+  useRailMode,
 } from '@/next/bindings/rail';
 import { usePaneOpen } from '@/next/bindings/pane-open';
 import ChatStage from '@/next/features/shell/chat-stage';
@@ -94,6 +101,8 @@ import { usePhone } from '@/next/ui/use-media';
 import Sidebar from '@/next/features/sidebar/sidebar';
 import { useSidebarApps } from '@/next/bindings/use-sidebar-apps';
 import AppMainPage from '@/next/bindings/app-main';
+import ReviewAppPage from '@/next/bindings/review-app';
+import { appStageDesign } from '@/next/features/app-main/app-stage';
 import AppAboutPage from '@/next/bindings/app-page';
 import AppDocPage from '@/next/bindings/app-doc';
 import AppsListPage from '@/next/bindings/apps-list';
@@ -138,9 +147,10 @@ import WhatsNew from '@/next/features/whats-new/whats-new';
 import { REFS_MAX, type Conversation, type ConvId } from '@/next/protocol/v2';
 import { chatRef } from '@/next/features/composer/chat-sources';
 import { addDraftRef } from '@/next/stores/drafts';
-import { isUnread, useConversation, useConvsAnswered } from '@/next/stores/conversations';
+import { useConversation, useConvsAnswered } from '@/next/stores/conversations';
 import { linkReason, useConnection } from '@/next/stores/connection';
-import { useMe } from '@/next/stores/me';
+import { DEFAULT_SETTINGS, useMe } from '@/next/stores/me';
+import { useNoticeColor } from '@/next/bindings/notice-color';
 import { useHomeMachine } from '@/next/stores/machines';
 import { useCentral } from '@/next/stores/central';
 import { useFeed } from '@/next/stores/conversation';
@@ -183,17 +193,18 @@ const CHAT_WAIT_MS = 15_000;
 const CLOCK_MS = 60_000;
 
 /** The frame with the rail read here, so that folding the sidebar draws the frame and not the shell around it. */
-const RailFrame = (props: Omit<IAppFrameProps, 'rail'>) => <AppFrame {...props} rail={useRail()} />;
+const RailFrame = (props: Omit<IAppFrameProps, 'rail' | 'full'>) => (
+  <AppFrame {...props} rail={useRail()} full={useRailFull()} />
+);
 
 /**
- * The right pane opening on a narrow window folds the open sidebar, and its shutting opens it again. Its own
- * component, so that the pane's opening draws nothing of the shell.
+ * The right pane opening on a narrow window folds the open sidebar; its shutting leaves it folded: only the
+ * person opens the sidebar. Its own component, so that the pane's opening draws nothing of the shell.
  */
 const RailFollowsPane = () => {
   const paneOpen = usePaneOpen();
   useEffect(() => {
-    if (!paneOpen) restoreRailAfterPane();
-    else if (!window.matchMedia(PHONE_QUERY).matches) foldRailForPane(window.innerWidth);
+    if (paneOpen && !window.matchMedia(PHONE_QUERY).matches) foldRailForPane(window.innerWidth);
   }, [paneOpen]);
   return null;
 };
@@ -240,9 +251,18 @@ const paneConvOf = (
   design: Conversation | null,
 ): Conversation | null => {
   if (route.kind === ROUTE.chat) return chat;
-  if (route.kind === ROUTE.site) return design;
+  if (route.kind === ROUTE.site || route.kind === ROUTE.app) return design;
   return null;
 };
+
+/** The screens that take the whole window, where the sidebar starts folded. */
+const railModeOf = (route: TRoute) =>
+  route.kind === ROUTE.app ||
+  route.kind === ROUTE.site ||
+  route.kind === ROUTE.appDoc ||
+  route.kind === ROUTE.kit
+    ? RAIL_MODE.full
+    : RAIL_MODE.screen;
 
 /** Which of the sidebar's screens is on: Designly and its designs, Settings, or the chats. */
 const sidebarView = (route: TRoute) => {
@@ -299,17 +319,18 @@ const Shell = ({ owner }: IShellProps) => {
   const boot = useBoot();
   const route = useRoute();
   const me = useMe();
+  // The colour of what pops up, the person's setting: until it comes, the default.
+  useNoticeColor(me.k === 'ready' ? me.me.settings.noticeColor : DEFAULT_SETTINGS.noticeColor);
   const now = useClock();
   useCentralList();
   const update = useAppUpdate();
   const release = useRelease(model.active);
   const currentId = route.kind === ROUTE.chat ? route.id : null;
-  // The sidebar folded for a design opened full screen opens again once the design is left: an app's document opened
-  // full screen («развернуть» from the pane) is such a design too.
-  const onSite = route.kind === ROUTE.site || route.kind === ROUTE.appDoc || route.kind === ROUTE.kit;
-  useEffect(() => {
-    if (!onSite) restoreRailAfterDesign();
-  }, [onSite]);
+  // a new chat that waits in the hub for its machine has an address of its own.
+  const queuedOpen = currentId === null ? null : queuedItemOf(currentId);
+  // An app, a design, an app's document and a kit take the whole window: the sidebar there keeps its own choice,
+  // folded until the person opens it (rail.ts).
+  useRailMode(railModeOf(route));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationsState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -382,10 +403,13 @@ const Shell = ({ owner }: IShellProps) => {
   const feed = useFeed(stageId && isConvId(stageId) ? stageId : null);
   const chatMachine = record?.machineId ?? feed?.machineId ?? null;
   // An open design has the right pane of its chat, as a chat has: the chat it came from, else its last one here.
-  const designBound = useDesignBound(
-    route.kind === ROUTE.site && model.active ? designKey(model.active, route.id) : null,
-  );
-  const designChat = route.kind === ROUTE.site ? (route.chat ?? designBound) : null;
+  // An app opened as the main thing stands in Sinopia's stage: its chat and its pane are found the same way.
+  let designOn: string | null = null;
+  if (route.kind === ROUTE.site) designOn = route.id;
+  else if (route.kind === ROUTE.app) designOn = appStageDesign(route.id, route.object ?? null);
+  const designBound = useDesignBound(designOn && model.active ? designKey(model.active, designOn) : null);
+  const designChat =
+    route.kind === ROUTE.site || route.kind === ROUTE.app ? (route.chat ?? designBound) : null;
   const designRecord = useConversation(designChat && isConvId(designChat) ? designChat : null);
   // A design lives on one machine: its address names it (or its chat does). Opened after a reload while another
   // machine is active, the shell goes to the design's machine by itself, once for that design, as the person had to.
@@ -440,14 +464,12 @@ const Shell = ({ owner }: IShellProps) => {
   }, [currentId, present, listed]);
 
   // Reading the chat reads it: what the agent finished while it is on screen is seen, beside an app's page too.
-  const besideId = route.kind === ROUTE.app ? (route.chat ?? null) : null;
+  const besideRoute = route.kind === ROUTE.app || route.kind === ROUTE.review;
+  let besideId: string | null = null;
+  if (route.kind === ROUTE.app) besideId = designChat;
+  else if (route.kind === ROUTE.review) besideId = route.chat ?? null;
   const beside = useConversation(besideId && isConvId(besideId) ? besideId : null);
-  const reading = route.kind === ROUTE.app ? beside : record;
-  const unreadUpTo = reading && isUnread(reading) ? (reading.lastTurn?.endedAt ?? null) : null;
-  useEffect(() => {
-    if (!reading || unreadUpTo === null || document.visibilityState !== 'visible') return;
-    void markSeen(reading.machineId, reading.id, unreadUpTo);
-  }, [reading, unreadUpTo]);
+  useReadWhileVisible((besideRoute ? beside : record) ?? null);
 
   // Back on a wide window, the phone drawer's state would leave the window inert: it closes.
   useEffect(() => {
@@ -655,7 +677,8 @@ const Shell = ({ owner }: IShellProps) => {
     machineName,
     term.reveal,
     paneStrip,
-    route.kind === ROUTE.site,
+    route.kind === ROUTE.site || route.kind === ROUTE.app,
+    route.kind === ROUTE.site ? route.id : null,
   );
   // A full-screen design has no chat page around it: its chat opens links, files and cards in the pane beside it.
   const designOpeners = {
@@ -671,14 +694,22 @@ const Shell = ({ owner }: IShellProps) => {
   // «/resume» in the field opens the same list of earlier sessions as the start page's link.
   useUiRequest(UI_REQUEST.resume, resumeDialog.show);
   const newChatProject = useNewChatProject();
-  // the machine the next chat starts on, the default one unless another was picked for it; a
-  // pick of a machine that cannot take a chat now is no pick. HRN-870: with the default one down too, the first
-  // machine that answers, so the pill (and in it the machines) stays to pick from.
+  // the machine the next chat starts on, the one picked for it in the pill; a pick of a machine that cannot
+  // take a chat now is no pick. HRN-1036: else not the machine on top as such, but the first of the person's that
+  // answers now and has the agent of the last choice; with none answering, one whose agents the hub remembers, so the
+  // pill and the limits are drawn all the same.
   const newChatMachine = useNewChatMachine();
-  const startOn =
-    model.startMachines.find((m) => m.id === newChatMachine && !m.off)?.id ??
-    model.startMachines.find((m) => !m.off)?.id ??
-    model.active;
+  const [lastProvider] = useState(() => readLastChoice()?.provider ?? null);
+  const startOn = startMachineOf(model.startCandidates, newChatMachine, lastProvider) ?? model.active;
+  // none of the person's machines answers now: a new chat waits in the hub for its machine.
+  const noneAnswers = model.startCandidates.length > 0 && model.startCandidates.every((c) => !c.answers);
+  // The start page's own pane: the tools that need no chat (the machine's, the services, review).
+  const homePane = useHomePane({
+    machine: startOn,
+    machines: model.startMachines,
+    conversations: model.conversations,
+    enabled: boot.k !== 'failed' && !noV2 && route.kind === ROUTE.home,
+  });
   // Not one machine can take a new chat: the field says so instead of a pill with nothing in it.
   const allMachinesOff = model.startMachines.length > 0 && model.startMachines.every((m) => m.off);
   // Picked in the model's popover, for a person with several machines; the default one is no pick.
@@ -688,7 +719,8 @@ const Shell = ({ owner }: IShellProps) => {
         ? {
             current: startOn,
             choices: model.startMachines,
-            onPick: (id: string) => newChatMachineStore.set(id === model.startMachines[0]?.id ? null : id),
+            // A pick is the person's word, the machine on top too: it stays even while that machine does not answer.
+            onPick: (id: string) => newChatMachineStore.set(id),
           }
         : null,
     [startOn, model.startMachines],
@@ -1000,9 +1032,11 @@ const Shell = ({ owner }: IShellProps) => {
       sidebar={sidebar}
       tabs={tabs.strip}
       aside={
-        boot.k !== 'failed' && !noV2 && (route.kind === ROUTE.chat || route.kind === ROUTE.site)
+        boot.k !== 'failed' &&
+        !noV2 &&
+        (route.kind === ROUTE.chat || route.kind === ROUTE.site || route.kind === ROUTE.app)
           ? pane.drawer
-          : null
+          : homePane.drawer || null
       }
       overlays={overlays}
       textSize={me.k === 'ready' ? me.me.settings.textSize : undefined}
@@ -1015,6 +1049,7 @@ const Shell = ({ owner }: IShellProps) => {
         route.kind !== ROUTE.help &&
         route.kind !== ROUTE.learn &&
         route.kind !== ROUTE.app &&
+        route.kind !== ROUTE.review &&
         route.kind !== ROUTE.appAbout &&
         route.kind !== ROUTE.appDoc &&
         route.kind !== ROUTE.kit &&
@@ -1027,7 +1062,7 @@ const Shell = ({ owner }: IShellProps) => {
             drawerOpen={drawerOpen}
             onOpenDrawer={() => setDrawerOpen(true)}
             onNewChat={() => navigate(HOME)}
-            pane={pane.header}
+            pane={pane.header ?? homePane.header}
             terminal={term.header}
             background={bg.header}
             goal={headerGoal}
@@ -1066,6 +1101,12 @@ const Shell = ({ owner }: IShellProps) => {
               resolveProject={model.personSidebar ? machineProjectOf : undefined}
               machines={startPick}
               allMachinesOff={allMachinesOff}
+              queueWhenSilent={noneAnswers}
+              onQueued={(id) => {
+                newChatProjectStore.set(null);
+                newChatMachineStore.set(null);
+                goTo({ kind: ROUTE.chat, id: queuedChatId(id) });
+              }}
               below={<HomeTools tools={homeTools} />}
               onCreated={(id) => {
                 newChatProjectStore.set(null);
@@ -1083,9 +1124,12 @@ const Shell = ({ owner }: IShellProps) => {
           fromHome={arrival.fromHome}
           side={bg.panel}
           paneOpen={pane.open}
-          missing={missing === currentId && !present ? { onHome: () => goTo(HOME) } : null}
+          missing={
+            missing === currentId && !present && queuedOpen === null ? { onHome: () => goTo(HOME) } : null
+          }
         >
-          {present && isConvId(stageId) && chatMachine ? (
+          {queuedOpen !== null && <QueuedChatScreen itemId={queuedOpen} />}
+          {queuedOpen === null && present && isConvId(stageId) && chatMachine ? (
             <ChatView
               conv={stageId}
               machine={chatMachine}
@@ -1100,7 +1144,7 @@ const Shell = ({ owner }: IShellProps) => {
               }}
             />
           ) : (
-            <QuietChat />
+            queuedOpen === null && <QuietChat />
           )}
         </ChatStage>
       )}
@@ -1152,10 +1196,23 @@ const Shell = ({ owner }: IShellProps) => {
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
         <AppMainPage
-          key={`${route.id}/${route.chat ?? ''}/${tabs.activeId}`}
+          key={`${route.id}/${route.object ?? ''}/${route.chat ?? ''}/${tabs.activeId}`}
           machine={model.active}
           id={route.id}
+          object={route.object ?? null}
           chat={route.chat ?? null}
+          open={designOpeners}
+          toolPane={pane.header}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
+      )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.review && model.active && (
+        <ReviewAppPage
+          key={`${route.url ?? ''}/${route.chat ?? ''}/${tabs.activeId}`}
+          machine={model.active}
+          url={route.url ?? null}
+          chat={route.chat ?? null}
+          wt={route.wt ?? null}
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
@@ -1186,6 +1243,7 @@ const Shell = ({ owner }: IShellProps) => {
           key={model.active}
           machine={model.active}
           section={route.section}
+          connect={route.connect}
           name={name ?? login}
           onOpenDrawer={() => setDrawerOpen(true)}
         />

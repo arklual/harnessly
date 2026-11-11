@@ -108,6 +108,49 @@ type LaunchConfig struct {
 	Profiles agents.ProfileLauncher
 	// Apps gives a launch with apps their guard, servers, instructions and wall; nil refuses such a launch.
 	Apps agents.AppLauncher
+	// InputSocket names the socket the app-server of a new chat listens on: the chat then starts as `codex app-server`
+	// with the terminal attached to it (`codex --remote`), so messages reach Codex over the server instead of the
+	// terminal. Nil, or "" for a conversation, starts Codex as ever. Only a fresh chat on Codex's own account and without
+	// apps starts this way; a resumed or forked one, one on a backend profile and one with apps do not.
+	InputSocket func(conversation string) string
+}
+
+// inputSocket is the app-server socket this launch starts with, "" for a launch that starts Codex as ever.
+func (c LaunchConfig) inputSocket(session string, prof agents.CodexProfile, launch *agents.Launch) string {
+	if c.InputSocket == nil || session != "" || launch == nil || launch.Input == "" || len(launch.Apps) > 0 ||
+		prof.KeyEnv != "" || len(prof.Args) > 0 {
+		return ""
+	}
+	return c.InputSocket(launch.Input)
+}
+
+// maxInputPrefix keeps the shell words of an app-server launch well inside what one argument of a command may hold.
+const maxInputPrefix = 64 << 10
+
+// inputPrefix are the shell words a chat with an app-server runs codex behind. They start the server on the socket
+// with the launch's configuration (its `-c` pairs: the hooks, the MCP servers and the instructions are the server's
+// to run), wait for the socket, and define `codex` so that the launcher's own `codex "$@"` attaches the terminal to
+// the server. Every way this can fail ends in the plain start: a server that does not come up, and a terminal that
+// leaves at once with an error, run `codex "$@"` as ever. The server ends with the terminal. "" when the words would
+// be too long to pass.
+func inputPrefix(socket string, args []string) string {
+	server := []string{"command", "codex", "app-server", "--listen", `"unix://$S"`}
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "-c" {
+			server = append(server, "-c", agents.ShellQuote(args[i+1]))
+			i++
+		}
+	}
+	prefix := "S=" + agents.ShellQuote(socket) + `; mkdir -p "$(dirname "$S")"; rm -f "$S"; ` +
+		strings.Join(server, " ") + ` >/dev/null 2>&1 & P=$!; ` +
+		`i=0; while [ ! -S "$S" ] && [ "$i" -lt 50 ] && kill -0 "$P" 2>/dev/null; do sleep 0.1; i=$((i+1)); done; ` +
+		`codex() { r=1; if [ -S "$S" ] && kill -0 "$P" 2>/dev/null; then t=$(date +%s); command codex --remote "unix://$S" "$@"; r=$?; ` +
+		`if [ "$r" -eq 0 ] || [ $(( $(date +%s) - t )) -ge 5 ]; then kill "$P" 2>/dev/null; rm -f "$S"; return "$r"; fi; fi; ` +
+		`kill "$P" 2>/dev/null; rm -f "$S"; command codex "$@"; };`
+	if len(prefix) > maxInputPrefix {
+		return ""
+	}
+	return prefix
 }
 
 // Start is what a Codex launch is built to: codex's own arguments, and the shell words it runs behind (the apps' token
@@ -196,8 +239,12 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 		if err := agents.CheckLaunch(launch); err != nil {
 			return Start{}, false, err
 		}
+		launch = agents.WithLaunchableApps(launch, c.Apps)
+	}
+	if launch != nil && len(launch.Apps) > 0 {
 		if apps, err = c.Apps.Codex(launch.Conversation, launch.Apps); err != nil {
-			return Start{}, false, err
+			// As for Claude: the chat starts without its apps rather than not at all.
+			launch, apps = agents.WithoutApps(launch, c.Apps, err), agents.CodexApps{}
 		}
 	}
 	var hookArgs []string
@@ -258,7 +305,11 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	}
 	// The vendor's provider comes with the model: Codex starts on the profile and asks it for the model.
 	args = append(append(args, prof.Args...), launchArgs...)
-	return Start{Args: args, Prefix: appsPrefix(apps, c.MCP.TokenEnv)}, configParseError, nil
+	start = Start{Args: args, Prefix: appsPrefix(apps, c.MCP.TokenEnv)}
+	if socket := c.inputSocket(session, prof, launch); socket != "" && start.Prefix == "" {
+		start.Prefix = inputPrefix(socket, args)
+	}
+	return start, configParseError, nil
 }
 
 // appsPrefix are the shell words the CLI of a chat with apps runs behind: the apps' environment, the launch's own token
@@ -387,6 +438,10 @@ func (c LaunchConfig) launcherLine(workspaceID, flag, session string, launch *ag
 	flags, err := LauncherFlags(launch)
 	if err != nil {
 		return "", err
+	}
+	if c.inputSocket(session, prof, launch) != "" {
+		// The chat the launcher asks its arguments for, so the runtime names the same socket then.
+		flags = append(flags, "--conversation", agents.ShellQuote(launch.Input))
 	}
 	return strings.Join(append(parts, flags...), " "), nil
 }

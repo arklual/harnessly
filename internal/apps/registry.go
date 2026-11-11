@@ -73,6 +73,8 @@ type Registry struct {
 	onPublicChange func()
 	// consentPolicy says whether the organization's rule gives apps their rights without asking (consent.go).
 	consentPolicy func() bool
+	// orgOff says whether the organization turned an environment item's app off (envinstall.go).
+	orgOff func(link, itemID string) bool
 }
 
 // OnPublicChange sets what is called after PublishPublic. It is not called for a list applied from the platform.
@@ -189,7 +191,12 @@ func (r *Registry) ListAll() ([]Installed, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.mergeEnv(withTeam)
+	all, err := r.mergeEnv(withTeam)
+	if err != nil {
+		return nil, err
+	}
+	// An app that waits for an address of the installation is not there for the person yet.
+	return slices.DeleteFunc(all, Installed.Unconfigured), nil
 }
 
 // Get is one installed app.
@@ -337,6 +344,13 @@ func (r *Registry) Install(dir string, opt InstallOptions) (Installed, Problems,
 		}
 	}
 	if err := writePluginManifest(target, m); err != nil {
+		return Installed{}, ps, err
+	}
+	// The app's own data goes to the new version before the install is written: when a step fails the old version stays.
+	if _, _, err := OpenStorage(filepath.Dir(r.Root)).MigrateData(pkg); err != nil {
+		if !opt.Dev {
+			_ = os.RemoveAll(target)
+		}
 		return Installed{}, ps, err
 	}
 

@@ -14,9 +14,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Stream is the name of the outbox in ingest_cursors.
@@ -56,10 +59,19 @@ type Service struct {
 	mu      sync.Mutex
 	running map[string]bool // machine → a pull is running
 	again   map[string]bool // machine → triggered while running
+	// waiting is since when a machine has had spend the hub was told of and has not stored yet.
+	waiting map[string]time.Time
+	// failures counts the failed pulls of a machine in a row; retry is the pull armed after the last of them, with the
+	// pause of the link's replication (hubproto.ReplRetryWait): a failed pull no longer waits for the next
+	// usage.available, which a machine with no new spend never sends.
+	failures  map[string]int
+	retry     map[string]*time.Timer
+	retryWait func(failures int) time.Duration
 }
 
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, reg: d.Reg, log: d.Log, now: d.Now, timeout: d.Timeout, running: map[string]bool{}, again: map[string]bool{}}
+	s := &Service{db: d.DB, reg: d.Reg, log: d.Log, now: d.Now, timeout: d.Timeout, running: map[string]bool{}, again: map[string]bool{}, waiting: map[string]time.Time{},
+		failures: map[string]int{}, retry: map[string]*time.Timer{}, retryWait: hubproto.ReplRetryWait}
 	if s.log == nil {
 		s.log = slog.Default()
 	}
@@ -76,6 +88,12 @@ func New(d Deps) *Service {
 // Close stops the pulls and waits for them.
 func (s *Service) Close() {
 	s.cancel()
+	s.mu.Lock()
+	for id, t := range s.retry {
+		t.Stop()
+		delete(s.retry, id)
+	}
+	s.mu.Unlock()
 	s.wg.Wait()
 }
 
@@ -93,22 +111,28 @@ func (s *Service) Trigger(machineID string) {
 	if s.ctx.Err() != nil {
 		return
 	}
+	if _, ok := s.waiting[machineID]; !ok {
+		s.waiting[machineID] = s.now()
+	}
 	if s.running[machineID] {
 		s.again[machineID] = true
 		return
 	}
 	s.running[machineID] = true
 	s.wg.Add(1)
-	go s.loop(machineID)
+	safego.Go("ingest loop", func() { s.loop(machineID) })
 }
 
 func (s *Service) loop(machineID string) {
 	defer s.wg.Done()
 	for {
-		if err := s.Pull(s.ctx, machineID); err != nil && s.ctx.Err() == nil {
+		err := s.Pull(s.ctx, machineID)
+		if err != nil && s.ctx.Err() == nil {
+			metrics.UsagePullErrors.Inc()
 			s.log.Warn("usage not pulled", "machine", machineID, "error", err)
 		}
 		s.mu.Lock()
+		s.pulled(machineID, err)
 		if !s.again[machineID] || s.ctx.Err() != nil {
 			delete(s.running, machineID)
 			delete(s.again, machineID)
@@ -118,6 +142,49 @@ func (s *Service) loop(machineID string) {
 		delete(s.again, machineID)
 		s.mu.Unlock()
 	}
+}
+
+// pulled keeps the machine's wait after a pull; s.mu is held. A pull that emptied the outbox ends the wait, and a
+// trigger that came during it starts a new one. A machine that went away ends it too: its spend is out of the hub's
+// reach until it dials again, which triggers a pull. Any other failure leaves the wait running.
+func (s *Service) pulled(machineID string, err error) {
+	var he *httpx.Error
+	offline := errors.As(err, &he) && he.Code == "machine_offline"
+	switch {
+	case err == nil && s.again[machineID]:
+		s.waiting[machineID] = s.now()
+	case err == nil, offline:
+		delete(s.waiting, machineID)
+	}
+	if err == nil || offline || s.ctx.Err() != nil {
+		// Stored, or out of reach until the machine dials again, which triggers a pull of its own.
+		delete(s.failures, machineID)
+		return
+	}
+	s.failures[machineID]++
+	if s.retry[machineID] != nil {
+		return
+	}
+	s.retry[machineID] = time.AfterFunc(s.retryWait(s.failures[machineID]), func() {
+		s.mu.Lock()
+		delete(s.retry, machineID)
+		s.mu.Unlock()
+		s.Trigger(machineID)
+	})
+}
+
+// Lag is how long the spend the hub knows of and has not stored has waited, the longest wait among the machines, and
+// how many machines wait.
+func (s *Service) Lag() (oldest time.Duration, machines int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	for _, since := range s.waiting {
+		if d := now.Sub(since); d > oldest {
+			oldest = d
+		}
+	}
+	return oldest, len(s.waiting)
 }
 
 // Pull reads the machine's outbox until it is empty: each batch is stored in one transaction, then acked.
@@ -144,7 +211,7 @@ func (s *Service) pullOne(ctx context.Context, machineID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	var res hubproto.UsageReadResult
+	var res readResult
 	if err := s.reg.DoInto(ctx, machineID, hubproto.OpUsageRead, hubproto.UsageReadParams{Epoch: cur.Epoch, After: cur.Seq, Max: hubproto.UsageReadMax}, &res, s.timeout); err != nil {
 		return false, err
 	}
@@ -160,18 +227,37 @@ func (s *Service) pullOne(ctx context.Context, machineID string) (bool, error) {
 		return false, nil
 	}
 	received := s.now().UTC()
-	if err := s.db.Tx(ctx, func(tx store.Store) error {
-		if newEpoch && cur.Epoch != "" {
-			if err := tx.ResetSessionSeqs(ctx, machineID); err != nil {
+	records := res.decode()
+	var aside int
+	apply := func(careful bool) error {
+		aside = 0
+		return s.db.Tx(ctx, func(tx store.Store) error {
+			if newEpoch && cur.Epoch != "" {
+				if err := tx.ResetSessionSeqs(ctx, machineID); err != nil {
+					return err
+				}
+			}
+			n, err := s.store(ctx, tx, m, res.Epoch, after, records, received, careful)
+			if err != nil {
 				return err
 			}
-		}
-		if err := s.store(ctx, tx, m, after, res.Records, received); err != nil {
-			return err
-		}
-		return tx.SetCursor(ctx, store.Cursor{MachineID: machineID, Stream: Stream, Epoch: res.Epoch, Seq: max(res.Last, after)})
-	}); err != nil {
+			aside = n
+			return tx.SetCursor(ctx, store.Cursor{MachineID: machineID, Stream: Stream, Epoch: res.Epoch, Seq: max(res.Last, after)})
+		})
+	}
+	err = apply(false)
+	if err != nil && ctx.Err() == nil && !store.Retriable(err) {
+		// One record the hub cannot store must not hold the machine's whole outbox: the batch is stored again record
+		// by record, and the one that fails is set aside with the reason.
+		s.log.Warn("usage batch not stored, storing it record by record", "machine", machineID, "error", err)
+		err = apply(true)
+	}
+	if err != nil {
 		return false, err
+	}
+	if aside > 0 {
+		metrics.UsageQuarantined.Add(int64(aside))
+		s.log.Warn("usage records set aside", "machine", machineID, "records", aside)
 	}
 	if err := s.reg.DoInto(ctx, machineID, hubproto.OpUsageAck, hubproto.UsageAckParams{Epoch: res.Epoch, Seq: max(res.Last, after)}, nil, s.timeout); err != nil {
 		// Stored but not acked: the agent keeps the records and sends them again; calls are deduplicated, sessions and
@@ -181,6 +267,33 @@ func (s *Service) pullOne(ctx context.Context, machineID string) (bool, error) {
 	at := store.Ms(s.now())
 	_ = st.SetCursor(ctx, store.Cursor{MachineID: machineID, Stream: Stream, Epoch: res.Epoch, Seq: max(res.Last, after), AckedAt: &at})
 	return res.More, nil
+}
+
+// readResult is hubproto.UsageReadResult with each record kept as the machine sent it, so a record this hub cannot
+// read is kept whole.
+type readResult struct {
+	Epoch   string            `json:"epoch"`
+	Records []json.RawMessage `json:"records"`
+	Last    int64             `json:"last"`
+	More    bool              `json:"more"`
+}
+
+// rawRecord is a record with its text; bad says why it could not be read at all.
+type rawRecord struct {
+	hubproto.UsageRecord
+	raw json.RawMessage
+	bad string
+}
+
+func (r readResult) decode() []rawRecord {
+	out := make([]rawRecord, len(r.Records))
+	for i, raw := range r.Records {
+		out[i].raw = raw
+		if err := json.Unmarshal(raw, &out[i].UsageRecord); err != nil {
+			out[i].bad = "not a usage record: " + err.Error()
+		}
+	}
+	return out
 }
 
 // batch is what one transaction needs to know about the machine.
@@ -199,14 +312,17 @@ type batch struct {
 	loaded  bool // catalog was read
 }
 
-func (s *Service) store(ctx context.Context, tx store.Store, m store.Machine, after int64, records []hubproto.UsageRecord, received time.Time) error {
+// store writes a batch and returns how many of its records were set aside instead (the quarantine): the ones of a kind
+// this hub does not know, the ones that are not what their kind says and, when careful, the ones whose storing failed.
+// Without careful a record that fails fails the batch.
+func (s *Service) store(ctx context.Context, tx store.Store, m store.Machine, epoch string, after int64, records []rawRecord, received time.Time, careful bool) (int, error) {
 	sp, err := tx.SpaceByID(ctx, m.SpaceID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	prices, err := tx.Prices(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	b := &batch{tx: tx, m: m, space: sp, orgKey: store.OrgKey(sp), book: usage.NewBook(prices), now: store.Ms(received), users: map[string]string{}}
 	// A machine whose clock runs ahead writes records «from the future»; the batch is moved back by the difference. A
@@ -218,50 +334,91 @@ func (s *Service) store(ctx context.Context, tx store.Store, m store.Machine, af
 	if d := newest - b.now; d > skewLimit.Milliseconds() {
 		b.shift = -d
 	}
+	aside := 0
+	quarantine := func(r rawRecord, reason string) error {
+		added, err := tx.QuarantineUsage(ctx, store.QuarantinedUsage{MachineID: m.ID, Epoch: epoch, Seq: r.Seq, Kind: r.Kind, Reason: reason, Record: string(r.raw), CreatedAt: b.now})
+		if added {
+			aside++
+		}
+		return err
+	}
+	const savepoint = "usage_record"
 	last := after
 	for _, r := range records {
+		if r.bad != "" {
+			if err := quarantine(r, r.bad); err != nil {
+				return 0, err
+			}
+			continue
+		}
 		if r.Seq <= last {
 			continue // out of order or already stored: the outbox's seq only grows
 		}
 		last = r.Seq
-		if err := b.record(ctx, r); err != nil {
-			return fmt.Errorf("record %d (%s): %w", r.Seq, r.Kind, err)
+		if careful {
+			if _, err := tx.Q().Exec(ctx, "SAVEPOINT "+savepoint); err != nil {
+				return 0, err
+			}
+		}
+		known, err := b.record(ctx, r.UsageRecord)
+		switch {
+		case err != nil && (!careful || ctx.Err() != nil || store.Retriable(err)):
+			return 0, fmt.Errorf("record %d (%s): %w", r.Seq, r.Kind, err)
+		case err != nil:
+			// What the record wrote before it failed is undone; the rest of the batch stays.
+			if _, rerr := tx.Q().Exec(ctx, "ROLLBACK TO SAVEPOINT "+savepoint); rerr != nil {
+				return 0, rerr
+			}
+			if qerr := quarantine(r, "not stored: "+err.Error()); qerr != nil {
+				return 0, qerr
+			}
+		case !known:
+			if qerr := quarantine(r, "a kind this hub does not read, or a record without what its kind carries"); qerr != nil {
+				return 0, qerr
+			}
+		}
+		if careful {
+			if _, err := tx.Q().Exec(ctx, "RELEASE SAVEPOINT "+savepoint); err != nil {
+				return 0, err
+			}
 		}
 	}
 	if len(b.changed) > 0 {
 		hs, err := tx.CallHours(ctx, b.orgKey, b.changed)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		b.hours = append(b.hours, hs...)
 	}
-	return tx.Rollup(ctx, b.orgKey, b.hours)
+	return aside, tx.Rollup(ctx, b.orgKey, b.hours)
 }
 
-func (b *batch) record(ctx context.Context, r hubproto.UsageRecord) error {
+// record stores one record. known is false for a record this hub cannot read: a kind it does not know yet (a newer
+// agent), or a kind without its fact.
+func (b *batch) record(ctx context.Context, r hubproto.UsageRecord) (known bool, err error) {
 	switch r.Kind {
 	case hubproto.UsageCall:
 		if r.Call != nil {
-			return b.call(ctx, *r.Call)
+			return true, b.call(ctx, *r.Call)
 		}
 	case hubproto.UsageSession:
 		if r.Session != nil {
-			return b.session(ctx, r.Seq, r.At, *r.Session)
+			return true, b.session(ctx, r.Seq, r.At, *r.Session)
 		}
 	case hubproto.UsageTool:
 		if r.Tool != nil {
-			return b.tool(ctx, r.At, *r.Tool)
+			return true, b.tool(ctx, r.At, *r.Tool)
 		}
 	case hubproto.UsageWindow:
 		if r.Window != nil {
-			return b.window(ctx, *r.Window)
+			return true, b.window(ctx, *r.Window)
 		}
 	case hubproto.UsageBalance:
 		if r.Balance != nil {
-			return b.balance(ctx, *r.Balance)
+			return true, b.balance(ctx, *r.Balance)
 		}
 	}
-	return nil // a kind this hub does not know yet, from a newer agent: skipped, not an error
+	return false, nil
 }
 
 func (b *batch) call(ctx context.Context, c hubproto.UsageCallFact) error {

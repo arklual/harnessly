@@ -2,6 +2,7 @@ package docs
 
 import (
 	"bytes"
+	"net/http"
 	"strings"
 )
 
@@ -134,4 +135,12 @@ func themeOf(v string) string {
 		return strings.ToLower(v)
 	}
 	return ""
+}
+
+// frameable sets the terms of a document page the viewer puts in a frame: a sandbox, and the right to be framed by the
+// origin it is served from (the hub's, or the one of a gateway that proxies it under its own address). The hub's blanket
+// X-Frame-Options: DENY would refuse even that, and the browser shows «refused to connect» in the frame.
+func frameable(h http.Header) {
+	h.Del("X-Frame-Options")
+	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-popups; frame-ancestors 'self'")
 }

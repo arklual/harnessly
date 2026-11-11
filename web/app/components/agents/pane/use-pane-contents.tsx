@@ -35,7 +35,7 @@ const SubagentsTab = lazy(() => import('@/components/agents/inspector/subagents-
 const ArtifactsTab = lazy(() => import('@/components/agents/inspector/artifacts-tab'));
 const PeersTab = lazy(() => import('@/components/agents/inspector/peers-tab'));
 const GitLabTab = lazy(() => import('@/components/agents/inspector/gitlab-tab'));
-const GitLabView = lazy(() => import('@/components/agents/inspector/gitlab-view'));
+const ChangePane = lazy(() => import('@/next/legacy/change').then((m) => ({ default: m.ChangePane })));
 const FilesTab = lazy(() => import('@/components/agents/inspector/files-tab'));
 const DiskTab = lazy(() => import('@/components/agents/inspector/disk-tab'));
 const PlanTab = lazy(() => import('@/components/agents/inspector/plan-tab'));
@@ -388,11 +388,12 @@ export const usePaneContents = ({ mode, tab, chatId, provider, launching = false
             jsonlPath={jsonlPath}
             onCount={setChangeCount}
             onOpenCommit={openCommit}
+            conversationId={tabId}
           />
         );
       case 'gitlab':
         return paneTab.target && gitlabRefOf(paneTab.target) ? (
-          <GitLabView url={paneTab.target} sessionName={sessionName} tabId={tabId} />
+          <ChangePane url={paneTab.target} chatId={tabId} />
         ) : (
           <GitLabTab
             paths={workPaths}

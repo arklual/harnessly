@@ -5,28 +5,34 @@ import {
   activateTab,
   activeTab,
   closeOtherTabs,
+  closeKeyClosesWindow,
   closeRightTabs,
   closeTab,
   createTab,
   dedupeTabs,
   HOME_PATH,
   initTabs,
+  mergeTabs,
   moveTab,
   navigateTab,
   nthTab,
   openTab,
   OPEN,
   parseSaved,
+  parseWindow,
   planOpen,
   patchTab,
   resetTabs,
   serialize,
+  serializeWindow,
   startTabs,
   stepTab,
   tabs,
   tabsSnapshot,
   TABS_KEY,
   useTabTitle,
+  WINDOW_KEY,
+  withWindow,
   type ITabsState,
 } from '@/next/stores/tabs';
 
@@ -63,6 +69,24 @@ describe('tabs: open and navigate', () => {
     const s = navigateTab(state('/designly/invite/tok_12345678'), '/designly/p1');
     expect(paths(s)).toEqual(['/designly/p1']);
     expect(serialize(s)).not.toContain('tok_12345678');
+  });
+});
+
+describe('tabs: ⌘W', () => {
+  it('closes the chats one by one, then the start page lets the window go', () => {
+    let s = activateTab(state('/c/a', '/c/b', '/c/c'), 't2');
+    const seen: string[][] = [];
+    while (!closeKeyClosesWindow(s)) {
+      s = closeTab(s, s.active);
+      seen.push(paths(s));
+    }
+    expect(seen).toEqual([['/c/a', '/c/c'], ['/c/a'], [HOME_PATH]]);
+  });
+
+  it('keeps the window while a lone tab still shows something', () => {
+    expect(closeKeyClosesWindow(state('/c/a'))).toBe(false);
+    expect(closeKeyClosesWindow(state(HOME_PATH, '/c/a'))).toBe(false);
+    expect(closeKeyClosesWindow(state(HOME_PATH))).toBe(true);
   });
 });
 
@@ -184,8 +208,16 @@ describe('tabs: restore', () => {
 
 describe('tabs: persist', () => {
   it('round-trips through its JSON and refuses what is not its own', () => {
-    const s = patchTab(state('/c/tab-a', '/'), 't1', { title: 'A', view: { 'site:x:tab': 'p1' } });
-    expect(parseSaved(serialize(s))).toEqual(s);
+    const s = patchTab(state('/c/tab-a', '/'), 't1', {
+      title: 'A',
+      view: { 'site:x:tab': 'p1' },
+      scroll: { '.feed': 240 },
+    });
+    // The shared list has the tabs without what is a window's own; the window's part brings it back.
+    const shared = parseSaved(serialize(s));
+    expect(shared).toEqual(patchTab(s, 't1', { view: null, scroll: null }));
+    expect(withWindow(shared, parseWindow(serializeWindow(s)))).toEqual(s);
+    expect(parseWindow('not json')).toBeNull();
     expect(parseSaved(null)).toBeNull();
     expect(parseSaved('not json')).toBeNull();
     expect(parseSaved(JSON.stringify({ v: 99, tabs: [] }))).toBeNull();
@@ -227,6 +259,79 @@ describe('tabs: persist', () => {
       expect(tabsSnapshot().tabs).toHaveLength(2);
     });
 
+    /** Another window's write, as the browser tells this one. */
+    const fromOtherWindow = (next: ITabsState) => {
+      const value = serialize(next);
+      localStorage.setItem(TABS_KEY, value);
+      act(() => {
+        window.dispatchEvent(new StorageEvent('storage', { key: TABS_KEY, newValue: value }));
+      });
+    };
+
+    it('a tab opened in another window appears here, and this window keeps its own active tab', () => {
+      sessionStorage.clear();
+      startTabs('/c/tab-a', true);
+      tabs.open('/c/tab-b');
+      vi.advanceTimersByTime(400);
+      const mine = tabsSnapshot();
+      const theirs = openTab(parseSaved(localStorage.getItem(TABS_KEY))!, '/designly/afisha', {
+        id: 'other',
+      });
+      fromOtherWindow(theirs);
+      expect(paths(tabsSnapshot())).toEqual(['/c/tab-a', '/c/tab-b', '/designly/afisha']);
+      expect(tabsSnapshot().active).toBe(mine.active);
+      // A change here is written with the other window's tab in it.
+      tabs.open('/settings', { at: 'end' });
+      vi.advanceTimersByTime(400);
+      expect(parseSaved(localStorage.getItem(TABS_KEY))?.tabs.map((tab) => tab.path)).toEqual([
+        '/c/tab-a',
+        '/c/tab-b',
+        '/designly/afisha',
+        '/settings',
+      ]);
+    });
+
+    it('a tab closed in another window goes here; one opened here meanwhile stays', () => {
+      sessionStorage.clear();
+      startTabs('/c/tab-a', true);
+      tabs.open('/c/tab-b', { background: true });
+      vi.advanceTimersByTime(400);
+      const written = parseSaved(localStorage.getItem(TABS_KEY))!;
+      // Opened here and not written yet when the other window's write comes.
+      tabs.open('/c/tab-c', { background: true, at: 'end' });
+      fromOtherWindow(closeTab(written, written.tabs[1].id));
+      expect(paths(tabsSnapshot())).toEqual(['/c/tab-a', '/c/tab-c']);
+    });
+
+    it('a merge that brought nothing of this window is not written back', () => {
+      sessionStorage.clear();
+      startTabs('/c/tab-a', true);
+      vi.advanceTimersByTime(400);
+      const theirs = openTab(tabsSnapshot(), '/c/tab-b', { id: 'other' });
+      fromOtherWindow(theirs);
+      const stored = localStorage.getItem(TABS_KEY);
+      vi.advanceTimersByTime(400);
+      expect(localStorage.getItem(TABS_KEY)).toBe(stored);
+    });
+
+    it('scroll, view state and the active tab are of the window itself and come back after its reload', () => {
+      sessionStorage.clear();
+      startTabs('/c/tab-a', true);
+      tabs.open('/c/tab-b', { background: true });
+      const here = tabsSnapshot().active;
+      tabs.patch(here, { scroll: { '.feed': 120 }, view: { k: 1 } });
+      vi.advanceTimersByTime(400);
+      expect(localStorage.getItem(TABS_KEY)).not.toContain('.feed');
+      expect(sessionStorage.getItem(WINDOW_KEY)).toContain('.feed');
+      // Another window made its own tab active in the shared list.
+      const shared = parseSaved(localStorage.getItem(TABS_KEY))!;
+      localStorage.setItem(TABS_KEY, serialize(activateTab(shared, shared.tabs[1].id)));
+      resetTabs();
+      startTabs('/c/tab-a', true);
+      expect(tabsSnapshot().active).toBe(here);
+      expect(activeTab(tabsSnapshot())).toMatchObject({ scroll: { '.feed': 120 }, view: { k: 1 } });
+    });
+
     it('closing every tab leaves home, and the order is kept', () => {
       startTabs('/a', true);
       tabs.open('/b', { at: 'end' });
@@ -244,6 +349,40 @@ describe('tabs: persist', () => {
       expect(activeTab(tabsSnapshot()).title).toBe('Афиша');
       unmount();
     });
+  });
+});
+
+describe('tabs: two windows', () => {
+  it('takes what the other window opened, renamed and closed, against the list last seen', () => {
+    const base = state('/a', '/b', '/c');
+    const mine = openTab(base, '/mine', { id: 'm', background: true, at: 'end' });
+    const theirs = closeTab(
+      patchTab(openTab(base, '/theirs', { id: 'x', background: true }), 't2', { title: 'B', path: '/b?x=1' }),
+      't3',
+    );
+    const merged = mergeTabs(mine, base, theirs);
+    expect(merged.tabs.map((tab) => tab.id)).toEqual(['t1', 'x', 't2', 'm']);
+    expect(merged.tabs.find((tab) => tab.id === 't2')).toMatchObject({ title: 'B', path: '/b?x=1' });
+    expect(merged.active).toBe('t1');
+  });
+
+  it('keeps the tab on screen here as it is, even when the other window closed or moved it', () => {
+    const base = state('/a', '/b');
+    const mine = patchTab(base, 't1', { path: '/a?here=1' });
+    expect(mergeTabs(mine, base, closeTab(base, 't1')).tabs.map((tab) => tab.path)).toEqual([
+      '/a?here=1',
+      '/b',
+    ]);
+  });
+
+  it('a write that says nothing new leaves the list as it is', () => {
+    const base = state('/a', '/b');
+    expect(mergeTabs(base, base, activateTab(base, 't2'))).toBe(base);
+  });
+
+  it('does not bring back a tab closed here and not written yet', () => {
+    const base = state('/a', '/b');
+    expect(mergeTabs(closeTab(base, 't2'), base, base).tabs.map((tab) => tab.id)).toEqual(['t1']);
   });
 });
 

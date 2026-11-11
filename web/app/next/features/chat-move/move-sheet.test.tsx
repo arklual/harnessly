@@ -194,4 +194,19 @@ describe('continue on another machine', () => {
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
     await screen.findByRole('radio', { name: /Roma VM/ });
   });
+
+  it('a machine that is off: says the chat goes on from the snapshot, files are optional', async () => {
+    const { onMove } = open(async () =>
+      data({
+        source: { ok: true, project: false, dirty: false, busy: false, offline: true, fromSnapshot: true },
+      }),
+    );
+    await screen.findByRole('radio', { name: /Roma VM/ });
+    expect(screen.getByText(/last saved snapshot.*uncommitted changes.*stay on that machine/)).toBeTruthy();
+    expect(screen.getByRole('switch')).toBeTruthy();
+    await waitFor(() => expect((send() as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(send());
+    await waitFor(() => expect(onMove).toHaveBeenCalledTimes(1));
+    expect(onMove.mock.calls[0]?.[0]).toMatchObject({ withoutFiles: false });
+  });
 });

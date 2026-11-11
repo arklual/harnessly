@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/datamove"
+	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -67,6 +69,8 @@ func TestMoveRoutes(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(up, "up_1"), []byte("png"), 0o644)
 	_ = os.WriteFile(filepath.Join(up, "up_1.json"), []byte(`{"id":"up_1","name":"a.png","mime":"image/png"}`), 0o644)
 	_ = os.WriteFile(filepath.Join(up, "up_2.json"), []byte(`{"id":"up_2","name":"b.png","mime":"image/png"}`), 0o644)
+	// A folder where the upload's bytes should be: a failure that waits for a person (a missing file is skipped).
+	_ = os.Mkdir(filepath.Join(up, "up_2"), 0o755)
 	m := datamove.New(datamove.Options{Version: "test", StateFile: filepath.Join(data, "migrations", "m.json"),
 		Sources: []datamove.Source{datamove.Uploads{Dir: up}}, Target: memStore{}, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	moving.Store(m)
@@ -84,7 +88,7 @@ func TestMoveRoutes(t *testing.T) {
 		w = call("GET", "/agents"+page, "", true)
 		_ = json.Unmarshal(w.Body.Bytes(), &st)
 	}
-	if st.Total != 2 || st.Verified != 1 || st.Failed != 1 || st.Failures[0].Code != datamove.CodeGone {
+	if st.Total != 2 || st.Verified != 1 || st.Failed != 1 || st.Failures[0].Code != datamove.CodeRead {
 		t.Fatalf("status = %+v (%s)", st, w.Body)
 	}
 	if w := call("POST", page+"/verify", "", true); w.Code != http.StatusNotFound {
@@ -96,5 +100,21 @@ func TestMoveRoutes(t *testing.T) {
 	w = call("POST", page+"/skip", `{"objects":[{"kind":"uploads","object":"up_2"}]}`, true)
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"marked":1`) {
 		t.Fatalf("skip: %d %s", w.Code, w.Body)
+	}
+}
+
+// A store's answer about uploads in parts, as the move counts it.
+func TestLargeLimitReadsNoLimitAsAnySize(t *testing.T) {
+	for _, tc := range []struct {
+		lim  filestore.UploadLimits
+		want int64
+	}{
+		{filestore.UploadLimits{}, 0},
+		{filestore.UploadLimits{PartSize: 8 << 20}, math.MaxInt64},
+		{filestore.UploadLimits{PartSize: 8 << 20, MaxSize: 2 << 30}, 2 << 30},
+	} {
+		if got := largeLimit(tc.lim); got != tc.want {
+			t.Errorf("largeLimit(%+v) = %d, want %d", tc.lim, got, tc.want)
+		}
 	}
 }

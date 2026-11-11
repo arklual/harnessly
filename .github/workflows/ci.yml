@@ -140,14 +140,22 @@ jobs:
             --set integrations.boards.url=https://boards.example.com --set existingSecret=s > /dev/null
       - name: Hub Helm chart
         run: |
-          helm lint --strict deploy/helm/harnessly-hub -f deploy/helm/harnessly-hub/ci/minimal-values.yaml
-          helm lint --strict deploy/helm/harnessly-hub -f deploy/helm/harnessly-hub/ci/full-values.yaml
-          helm template ci deploy/helm/harnessly-hub -f deploy/helm/harnessly-hub/ci/minimal-values.yaml > /dev/null
-          helm template ci deploy/helm/harnessly-hub -f deploy/helm/harnessly-hub/ci/full-values.yaml > /dev/null
+          for v in minimal full docs apps-own; do
+            helm lint --strict deploy/helm/harnessly-hub -f deploy/helm/harnessly-hub/ci/$v-values.yaml
+            helm template ci deploy/helm/harnessly-hub -f deploy/helm/harnessly-hub/ci/$v-values.yaml > /dev/null
+          done
+          # Documents or boards on without an address or a storage: the chart refuses to render.
+          for args in "docs.storage.type=fs" "docs.url=https://docs.example.com" "boards.storage.type=fs" "boards.url=https://boards.example.com"; do
+            svc=${args%%.*}
+            if helm template ci deploy/helm/harnessly-hub --set publicUrl=https://hub.example.com --set "$svc.enabled=true" --set "$args" > /dev/null 2>&1; then
+              echo "rendered $svc with only $args"; exit 1
+            fi
+          done
       - name: Compose file
         run: |
           docker compose config --quiet
           docker compose -f compose.hub.yaml config --quiet
+          docker compose -f compose.hub.yaml -f compose.docs.yaml -f compose.boards.yaml config --quiet
       - name: Image
         run: docker build --target runtime -t harnessly:ci .
       - name: Hub and machine images

@@ -167,3 +167,15 @@ func TestOptionalMissingIsInstalledAndRemovedOnRollback(t *testing.T) {
 		t.Error("the installed agent stayed after a rollback")
 	}
 }
+
+func TestPlanAddAppsBlocksOnlyAppsThatAreOn(t *testing.T) {
+	p := &Plan{}
+	p.AddApps([]AppCheck{
+		{ID: "a.on", Version: "1.0.0", Errors: []string{"needs >=3"}},
+		{ID: "a.off", Version: "1.0.0", Off: true, Errors: []string{"needs >=3"}},
+		{ID: "a.warn", Version: "1.0.0", Warnings: []string{"soon"}},
+	})
+	if len(p.Apps) != 3 || len(p.Blocking) != 1 || !strings.Contains(p.Blocking[0], "a.on") {
+		t.Fatalf("%+v", p)
+	}
+}

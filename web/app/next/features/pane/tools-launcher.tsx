@@ -24,6 +24,8 @@ export interface ITool {
 export interface IToolGroup {
   id: string;
   label: string;
+  /** A control at the end of the group's label row (the start page's choice of a machine). */
+  aside?: ReactNode;
 }
 
 export interface IToolsLauncherProps {
@@ -169,7 +171,10 @@ const ToolsLauncher = ({ tools, groups, onOpen, onAddress, head, ready = true }:
       <div id={listId} role="listbox" aria-label={t('next.pane.tools')}>
         {shown.map((g) => (
           <section key={g.id} className="hx-tl__group">
-            <div className="hx-tl__label">{g.label}</div>
+            <div className="hx-tl__label">
+              <span className="hx-tl__label-text">{g.label}</span>
+              {g.aside}
+            </div>
             <div className="hx-tl__grid">
               {g.items.map((x) => tile(x, false))}
               {g.quiet.map((x) => tile(x, true))}

@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/history"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // ownerRequest is POST /api/machines/{machineId}/owner (docs/hub/machines.md, «Personal and administered machines»).
@@ -20,7 +20,8 @@ type ownerRequest struct {
 
 // assignOwner makes another person the machine's own one (#57): a machine an administrator added for an employee
 // becomes the employee's, with its id, key, settings and chats kept. Only an owner of the machine's space may.
-func (s *Service) assignOwner(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) assignOwner(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req ownerRequest
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -36,10 +37,7 @@ func (s *Service) assignOwner(w http.ResponseWriter, r *http.Request, p *auth.Pr
 		return httpx.Invalid("history", "move or keep")
 	}
 	ctx := r.Context()
-	m, err := s.Authorize(ctx, p.User.ID, r.PathValue("machineId"), true)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	if _, err := s.spaces.Access(ctx, req.UserID, m.SpaceID); err != nil {
 		return httpx.Invalid("userId", "a member of the machine's space")
 	}

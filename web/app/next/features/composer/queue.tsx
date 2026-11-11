@@ -90,6 +90,8 @@ const pauseNote = (pause: QueuePause | null, launchFailure: LaunchFailure | null
 
 const rowState = (row: QueueRow, paused: boolean, limit: boolean): TRowState => {
   const k = row.state.k;
+  // Taken back and not confirmed yet: on its way out, with nothing to press.
+  if (row.cancelling) return 'sending';
   // Typed, and the agent did not take it: it waits for Повторить like a message that could not go.
   if (k === 'failed' || (k === 'queued' && row.state.reason === 'stalled')) return 'failed';
   if (k === 'submitting' || k === 'typing' || k === 'in-input' || k === 'uploading') return 'sending';
@@ -166,6 +168,7 @@ const Row = ({
   if (state === 'paused') note = pauseNote(props.paused, props.launchFailure ?? null);
   if (state === 'limit') note = t('next.queue.limit');
   if (state === 'sending') note = row.handed ? t('next.message.handed') : t('next.queue.sending');
+  if (row.cancelling) note = t('next.queue.cancelling');
   // Text in the terminal's input line that is not this message holds it back: the person sees why, not a silent wait.
   if (row.state.k === 'queued' && row.state.reason === 'blocked-text') note = t('next.queue.blockedText');
   if (state === 'failed' && row.state.k === 'failed')

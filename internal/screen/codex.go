@@ -1,6 +1,8 @@
 package screen
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"unicode/utf8"
 
@@ -192,6 +194,17 @@ func SameMessage(entry, text string) bool {
 		return false
 	}
 	return e == m || utf8.RuneCountInString(m) >= codexProbeChars && strings.Contains(e, m)
+}
+
+// MessageHash names a message's text the way SameMessage compares it — picture references and white space aside — so
+// the agent's prompt-submit hook and the queue can say «this text» without carrying it. "" for a text with no words.
+func MessageHash(text string) string {
+	m := noSpace(claudeImageRE.ReplaceAllString(text, " "))
+	if m == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(m))
+	return hex.EncodeToString(sum[:8])
 }
 
 // CutShort: a user entry of the transcript is the start of this message and not all of it — Claude took the box while

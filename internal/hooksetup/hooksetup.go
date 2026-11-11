@@ -68,6 +68,8 @@ type Config struct {
 	Budget bool
 	// AppsLiveHook is the live hook of the apps on UserPromptSubmit (claude.HookSettingsConfig.AppsLiveHook); "" for none.
 	AppsLiveHook string
+	// StatusHookCLI is the status hook's own program (claude.HookSettingsConfig.StatusCLI); "" leaves the script alone.
+	StatusHookCLI string
 	// BudgetFile is the limits file as the script spells it (`$HOME/.<name>/budget.json`); "" is the data folder's.
 	BudgetFile string
 }
@@ -298,7 +300,7 @@ func (c Config) MCPConfig(port int, token string) []byte {
 // HookSettings is the `--settings` file Claude is launched with.
 func (w *Writer) HookSettings() []byte {
 	c := claude.HookSettingsConfig{StatusHook: w.StatusHookPath(), PermissionHook: w.PermissionHookPath(), Statusline: w.StatuslinePath(), Allow: w.cfg.Allow,
-		AppsLiveHook: w.cfg.AppsLiveHook}
+		AppsLiveHook: w.cfg.AppsLiveHook, StatusCLI: w.cfg.StatusHookCLI}
 	if w.cfg.Budget {
 		c.BudgetHook = w.BudgetHookPath()
 	}

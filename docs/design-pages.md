@@ -131,6 +131,133 @@ not shipped with the runtime; without one a new project is refused (see [the boa
 new project gets `meta/` with the release new projects start on (`legacy` without releases); a template's own
 `meta/project.json` settings (release, kits, tailwind) are kept, its pages never are.
 
+## Pages written as modules
+
+A page can be written as an ordinary React module and have the library build its board. The module is the source; the
+board `<name>.dc.html` is the result, drawn by the same engine as any board. The same `.tsx` file is the one that goes
+into the product, so a page is never translated by hand between the mockup and the code.
+
+```
+project/
+  pages/home.tsx             the page: imports from the kit, default export is the page's component
+  pages/home.fixtures.ts     its data (any module next to it; the page imports it)
+  components/title.tsx       views shared by pages (any folder of the project)
+  home.dc.html               BUILT from pages/home.tsx: do not edit
+```
+
+```tsx
+import { Root, Button } from "@acme/ui";
+import { events } from "./home.fixtures";
+
+export default function Home() {
+  return (
+    <Root>
+      {events.map((e) => <Button key={e.id}>{e.name}</Button>)}
+    </Root>
+  );
+}
+```
+
+**What a page may import.** Everything else is a build error that names the import and says what is allowed.
+
+- The project's kit package (`kit.package` in the kit's `design-system.json`, e.g. `@acme/ui`), and any subpath that a
+  component's `code.import` names (`@acme/ui/chip`). A name is imported as the component's `code.export`; the build
+  maps it to the kit's browser bundle (`window.<Namespace>.<Component id>`), which the board loads from the kit version the
+  project is pinned to (`meta/project.json` `kit`). A name the kit does not export fails with the list of those it does.
+- `react` (the engine's React). JSX needs no import.
+- Relative files of the project: `.ts .tsx .js .jsx .json`, with or without the extension, or a folder's `index`. Not
+  the kit's files under `ds/`, not styles or images (the kit's CSS is loaded by the board), nothing outside the project.
+- No other package. A page that needs an icon or a chart takes it from the kit.
+
+**Fixtures** are plain modules (`<name>.fixtures.ts`): the page imports its data from there, and in the product the same
+import points at the real data source. Keep the data out of the component.
+
+**The board.** `harnessly design page build <project> [page]` builds `pages/<name>.tsx` into `<name>.dc.html` (all the
+pages of the project without a name). The runtime also rebuilds a board a moment after any code file of the project
+changes. The build is a function of the page's files, the kit version and the builder: the same inputs give the same
+bytes, and the result is kept by the files' versions, so a change that touches no input rebuilds nothing. A board made
+by hand under the same name is never overwritten: the build says so and stops. The board starts with
+`<!-- tk-page: generated from pages/<name>.tsx (in:<hash>) -->`; that line is what marks it as built.
+
+**Read-only board.** A built board is closed to edits in the board itself (an agent's write, the Document API): the
+refusal names the source. Change the `.tsx` (or its fixtures) and the board follows. Editing a built board on the canvas
+is not carried back into the source yet.
+
+**Check.** `harnessly design page check <project>` says, without writing, whether every module has a board that is
+current (exit code 1 when not), and `design check` (the board check) lists the same under `sources`.
+`harnessly design check <project> --strict` reads the page, its local components and the hand-written boards against the
+kit: only its components, the props they declare and its tokens (see «Strict mode» in
+[design-kits.md](agents/design-kits.md#strict-mode)). A project or a kit can turn it on for good (`"strict": true`).
+
+**A page from an old board.** `harnessly design migrate --to tsx <project>` turns boards of the old format
+into pages, by rules, and keeps each only when its page draws the board's picture pixel for pixel
+([migrations/0002-boards-to-tsx.md](migrations/0002-boards-to-tsx.md)). Such a page has two more files:
+`pages/<name>.board.html`, the frame (the old board without its template and logic: its `<head>`, its `<helmet>`, one
+`<x-import component-from-global-scope="__tkPage.default">` where the page goes), and `pages/board-engine/index.ts`,
+shared by the project's migrated pages. A page with a frame is built into the frame, not into the plain board above,
+and draws its whole board, root included. A page's name is the board's: letters of any script, digits, spaces and
+`- _ . , · : ( ) « » — –`.
+
+**The page's script waits for React.** The engine loads React after the board's `<head>` is read, so a page's script
+runs once `window.React` is there; the engine waits for `__tkPage.default` on `window` by itself.
+
+**Going back.** Delete `pages/<name>.tsx`: the board stays as it is and is an ordinary board again, open to edits (its
+first line may stay). A migrated board goes back to its old file, byte for byte, with `harnessly design migrate --to
+board <project>`. Boards written in the old format (`from=`, JSX component files) keep working beside modules; nothing
+here changes how they load, and the engine is the same one, so rolling the engine back needs no change to a page.
+
+## Into the product's code
+
+A page module is already the product's view; `harnessly design code` puts it, and what it needs, into the
+application's repository. It works on the library's folder (no runtime) and is rules over files: the same project, kit
+and profile give the same bytes.
+
+```
+harnessly design code <project> --to <repository> [--dry-run] [--json] [--library DIR] [--kits DIR]
+```
+
+The repository says once where things go, in `sinopia.export.json`:
+
+```json
+{ "v": 1, "root": "src/design", "router": "react-router", "stories": true, "tests": "vitest" }
+```
+
+`root` is the folder the export writes under; `router` is `react-router` (a route table, `<root>/routes.tsx` unless
+`routes` names another file), `next-app` (`app/<route>/page.tsx`, `routes` names the app folder) or `none`.
+
+| File | What | Who owns it |
+| --- | --- | --- |
+| `<root>/pages/<name>.view.tsx` | the page: kit imports from `code`, presets expanded, the library's variables, the fixtures' names as props (`export type <Name>Data`) | the export |
+| `<root>/pages/<name>.fixtures.ts` | the page's fixtures, as they are | the export |
+| `<root>/components/…`, other files the pages import | the local components, with the same rules, at the same paths | the export |
+| `<root>/pages/<name>.stories.tsx` | a story with the fixtures (`stories: true`) | the export |
+| `<root>/pages/<name>.view.test.tsx` | the view renders its fixtures (`tests: "vitest"`) | the export |
+| routes | by the page's `route` in `meta/pages` | the export |
+| `<root>/pages/<name>.container.tsx` | data, state and handlers: written once with the fixtures, never again | the developer |
+
+What a page must be to export: strict (the export runs the strict check first and stops on a finding), a module whose
+default export is `export default function Name()` when it imports data from its fixtures, and fixtures imported by
+name. A board in the old format is listed under `not exported`: `harnessly design migrate --to tsx` turns it into a
+module first. Business logic, requests and rights are not in a mockup: they are the container's.
+
+**Exporting again.** Every file the export writes starts with a line naming its source and the hash of what was
+written (`rev:`). An export rewrites a file only when that hash still matches: a view edited by hand, or a file at an
+export path the export did not write, is a **conflict**, and an export with a conflict writes nothing and names the
+files. A container that is there is kept. Without a change of the mockup, an export changes nothing.
+
+**The proof** of the five checks is the sample in `internal/design/testdata/code` (a neutral kit and the package it
+stands for, a project, an application):
+
+```
+go test ./internal/design -run TestDesignCode                    # the strict gate, the files, the second export, conflicts
+DESIGN_CODE_PROOF=/tmp/p DESIGN_CODE_NODE_MODULES=$PWD/web/node_modules go test ./internal/design -run TestDesignCodeProof
+node web/scripts/design-code-proof.mjs /tmp/p --modules web/node_modules   # tsc on the package, the pixels
+```
+
+The first leaves the mockup's board (built from the module, drawn by the built-in engine), the exported application
+and its build; the script type-checks the application against the package and compares the two pages at 1280×800
+pixel for pixel.
+
 ## Component files are translated by the library
 
 A board's component file (`<x-import … from="lib/card.jsx">`: `.jsx`, `.tsx`, `.ts`, or a `.js` with exports) is

@@ -39,14 +39,28 @@ var appBoundary = sync.OnceValue(func() *apps.Boundary {
 // shipped beside the runtime (a machine's package holds both, and the runtime's own PATH may not reach the agents'
 // one), otherwise harnessly off the agents' PATH.
 func appGuardCommand() string {
-	bin := os.Getenv("HARNESSLY_BIN")
-	if bin == "" {
-		bin = besideRuntime(os.Args[0], os.Executable)
-	}
-	if bin != "" {
+	if bin := appCLIBin(); bin != "" {
 		return agents.ShellQuote(bin) + " hook app-guard"
 	}
 	return ""
+}
+
+// appCLIBin is the harnessly CLI the agents of this machine start: HARNESSLY_BIN, else the one beside the runtime; ""
+// when there is neither.
+func appCLIBin() string {
+	if bin := os.Getenv("HARNESSLY_BIN"); bin != "" {
+		return bin
+	}
+	return besideRuntime(os.Args[0], os.Executable)
+}
+
+// appMCPBin is the CLI whose stdio proxy is the harnessly-app server of a chat; "" keeps the server on the
+// runtime's HTTP endpoint: no CLI is known, or the deployment says so with RUNTIME_APP_MCP_STDIO=0.
+func appMCPBin(getenv func(string) string) string {
+	if getenv("RUNTIME_APP_MCP_STDIO") == "0" {
+		return ""
+	}
+	return appCLIBin()
 }
 
 // appsLiveHookCommand is the live hook of the apps every Claude Code chat runs on UserPromptSubmit: the same
@@ -58,6 +72,15 @@ func appsLiveHookCommand() string {
 		return ""
 	}
 	return strings.TrimSuffix(guard, " hook app-guard") + " hook app-context --live"
+}
+
+// statusHookCommand is the status hook of every Claude Code chat as one program, the same CLI as the guard's; "" keeps
+// the script, as appsLiveHookCommand keeps its hook out.
+func statusHookCommand() string {
+	if bin := appCLIBin(); bin != "" {
+		return agents.ShellQuote(bin) + " hook status"
+	}
+	return ""
 }
 
 // besideRuntime is the harnessly CLI in the runtime's own folder, "" when there is none. The folder is the one the

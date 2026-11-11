@@ -61,6 +61,34 @@ describe('the in-page sign-in', () => {
     expect(screen.getByText('WDJB-MJHT')).toBeTruthy();
   });
 
+  it('copies the device code exactly as shown and keeps the sign-in waiting', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { onCancel } = setup({
+      k: 'waiting',
+      url: 'https://example.test/device',
+      userCode: 'WDJB-MJHT',
+      asksCode: false,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    });
+    expect(writeText).toHaveBeenCalledWith('WDJB-MJHT');
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByText('WDJB-MJHT')).toBeTruthy();
+  });
+
+  it('says so when the browser refuses the copy', async () => {
+    const writeText = vi.fn(() => Promise.reject(new Error('denied')));
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    setup({ k: 'waiting', url: 'https://example.test/device', userCode: 'WDJB-MJHT', asksCode: false });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    });
+    expect(screen.getByRole('button', { name: 'Could not copy: select the code' })).toBeTruthy();
+  });
+
   it('takes the code back in a masked field and empties it as it is sent', async () => {
     const { onSubmitCode } = setup({
       k: 'waiting',

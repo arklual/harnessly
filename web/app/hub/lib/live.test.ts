@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { initialLive, installJobOf, loginOf, parseSpaceEvent, reduceLive } from './live';
+import { initialLive, installJobOf, loginOf, lostSpace, parseSpaceEvent, reduceLive } from './live';
 import type { Job, Login, Machine } from './types';
 
 const machine = (id: string, patch: Partial<Machine> = {}): Machine => ({
@@ -108,5 +108,15 @@ describe('parseSpaceEvent', () => {
     expect(parseSpaceEvent('nope', '{}')).toBeNull();
     expect(parseSpaceEvent('machine', 'not json')).toBeNull();
     expect(parseSpaceEvent('machine', 'null')).toBeNull();
+  });
+});
+
+describe('lostSpace', () => {
+  it('is a refusal of the space itself, not any failure to read it', () => {
+    expect(lostSpace({ code: 'forbidden' })).toBe(true);
+    expect(lostSpace({ code: 'not_found' })).toBe(true);
+    expect(lostSpace({ code: 'internal' })).toBe(false);
+    expect(lostSpace({ code: 'rate_limited' })).toBe(false);
+    expect(lostSpace(null)).toBe(false);
   });
 });

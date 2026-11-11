@@ -68,7 +68,9 @@ func journalQuiet(r *http.Request) bool {
 		strings.HasSuffix(p, "/apps/view-log"), strings.HasSuffix(p, "/apps/session/renew"),
 		strings.Contains(p, "/mcp"), strings.HasPrefix(p, "/api/cli/preview/report"),
 		strings.Contains(p, "/statusline"), strings.Contains(p, "/hooks/"), strings.Contains(p, "/drafts"),
-		strings.Contains(p, "/presence"), strings.Contains(p, "/heartbeat"), strings.Contains(p, "/devtools"):
+		strings.Contains(p, "/presence"), strings.Contains(p, "/heartbeat"), strings.Contains(p, "/devtools"),
+		// The page reports whether it is seen on every focus change: a line each was noise.
+		strings.HasSuffix(p, "/api/push/visibility"):
 		return true
 	}
 	return false

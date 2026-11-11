@@ -19,6 +19,12 @@ func repoURLScript(it hubproto.EnvItem, src source) bool {
 	return it.Kind == hubproto.EnvKindScript && (src.From == "" || src.From == "repo") && src.Repo == "" && src.RepoURL != ""
 }
 
+// packFromURL says whether an item is an environment pack in a repository outside the list: a new commit of that
+// repository is a new version of the pack, which is how a pack reaches the machines without a new harnessly.
+func packFromURL(it hubproto.EnvItem, src source) bool {
+	return it.Kind == hubproto.EnvKindPack && src.Repo == "" && src.RepoURL != ""
+}
+
 // onceHash is what the ledger of a `once` script keys on: its source, and for a script of a repository outside the
 // list also the commit it runs from (head; "" when not known yet).
 func (ex *execution) onceHash(i int, head string) string {
@@ -37,7 +43,7 @@ func (r *Runner) headsMoved(ctx context.Context, st *hubproto.EnvSetupState, all
 	var looks []look
 	for _, it := range setupItems(all) {
 		var src source
-		if len(it.Source) == 0 || json.Unmarshal(it.Source, &src) != nil || !repoURLScript(it, src) || gitURLOK(src.RepoURL) != nil {
+		if len(it.Source) == 0 || json.Unmarshal(it.Source, &src) != nil || !(repoURLScript(it, src) || packFromURL(it, src)) || gitURLOK(src.RepoURL) != nil {
 			continue
 		}
 		looks = append(looks, look{it.ItemID, src.RepoURL, src.Branch})

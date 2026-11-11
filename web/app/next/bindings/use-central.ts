@@ -1,7 +1,8 @@
 // The two hooks that read the cluster's copy of the chats: the list (mounted once in the shell) and one open
 // chat's feed, whatever its machine does (mounted in the chat view).
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { adoptParkedMessages } from '@/next/commands/messages';
+import { startCentralBeat, type CentralBeat } from '@/next/bindings/central-beat';
 import { batch } from '@/next/core/store';
 import { pageClock } from '@/next/core/clock';
 import { applyConvSnapshot, feedStore, importCentralFeed } from '@/next/stores/conversation';
@@ -18,17 +19,37 @@ import { refreshProfileSidebar } from '@/next/stores/profile-sidebar';
 import type { ConvId, MachineId, Queue } from '@/next/protocol/v2';
 
 const REFRESH_MS = 30_000;
+/** A link that changes asks for the list out of turn, but no sooner than this after the last request. */
+const LINK_REFRESH_GAP_MS = 30_000;
 
-/** The list and the person's sidebar: asked on mount, every half minute while the page is visible, and when a link goes down or comes back. */
+/**
+ * The list and the person's sidebar: asked on mount, every half minute while the page is visible, and when a link goes
+ * down or comes back — machines that reconnect together make one request, and a hidden tab asks when it is shown.
+ */
 export function useCentralHistory(links: string): void {
+  const beat = useRef<CentralBeat | null>(null);
   useEffect(() => {
     // The person's sidebar (projects, favorites) comes with the list, on the same beat.
-    const refresh = () => Promise.all([refreshCentral(), refreshProfileSidebar()]);
-    void refresh();
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh();
-    }, REFRESH_MS);
-    return () => clearInterval(timer);
+    const mine = startCentralBeat({
+      refresh: (remerge) => Promise.all([refreshCentral(remerge), refreshProfileSidebar()]),
+      everyMs: REFRESH_MS,
+      minGapMs: LINK_REFRESH_GAP_MS,
+      visible: () => document.visibilityState === 'visible',
+    });
+    beat.current = mine;
+    const shown = () => mine.visibilityChanged();
+    document.addEventListener('visibilitychange', shown);
+    return () => {
+      document.removeEventListener('visibilitychange', shown);
+      mine.stop();
+      beat.current = null;
+    };
+  }, []);
+  const mounted = useRef(false);
+  useEffect(() => {
+    // The mount has asked already; only a change of the links asks again.
+    if (mounted.current) beat.current?.linksChanged();
+    mounted.current = true;
   }, [links]);
 }
 

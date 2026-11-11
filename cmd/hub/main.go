@@ -37,6 +37,7 @@ import (
 	"github.com/ly-solutions/harnessly/web"
 )
 
+// shutdownGrace is how long the standalone sites server waits for its requests when it stops.
 const shutdownGrace = 20 * time.Second
 
 func main() {
@@ -210,29 +211,117 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 		ready <- ln.Addr().String()
 	}
 
-	failed := make(chan error, 1)
+	failed := make(chan error, 3)
 	go func() {
 		if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 			failed <- err
 		}
 	}()
+	// The replicas' hop is served apart from everything a browser or a machine reaches.
+	if hub.Internal != nil {
+		iln, err := net.Listen("tcp", cfg.ReplicaListen)
+		if err != nil {
+			_ = srv.Close()
+			return &diag.Problem{Code: diag.PortBusy, What: "listening on " + cfg.ReplicaListen, Err: err,
+				Fix: "another process holds the port, or the user may not use it: change HUB_REPLICA_LISTEN or stop the other one (`ss -ltnp`)"}
+		}
+		internal := &http.Server{Handler: hub.Internal, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute,
+			ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
+		defer func() { _ = internal.Close() }()
+		log.Info("replica hop listening", "listen", iln.Addr().String())
+		go func() {
+			if err := internal.Serve(iln); !errors.Is(err, http.ErrServerClosed) {
+				failed <- err
+			}
+		}()
+	}
+	// The numbers are served apart as well: they are open to whoever reaches the listener.
+	if cfg.MetricsListen != "" {
+		mln, err := net.Listen("tcp", cfg.MetricsListen)
+		if err != nil {
+			_ = srv.Close()
+			return &diag.Problem{Code: diag.PortBusy, What: "listening on " + cfg.MetricsListen, Err: err,
+				Fix: "another process holds the port, or the user may not use it: change HUB_METRICS_LISTEN or stop the other one (`ss -ltnp`)"}
+		}
+		ms := &http.Server{Handler: hub.Metrics, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second,
+			WriteTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute, ErrorLog: slog.NewLogLogger(log.Handler(), slog.LevelWarn)}
+		defer func() { _ = ms.Close() }()
+		log.Info("metrics listening", "listen", mln.Addr().String())
+		go func() {
+			if err := ms.Serve(mln); !errors.Is(err, http.ErrServerClosed) {
+				failed <- err
+			}
+		}()
+	}
 	select {
 	case err := <-failed:
 		return err
 	case <-ctx.Done():
 	}
 
-	log.Info("hub stopping")
-	stopBackground()
-	// Event streams and agent links never end by themselves: close them first, or Shutdown waits for its grace to run out.
-	hub.Shutdown()
-	sctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
+	log.Info("hub stopping", "grace", cfg.ShutdownGrace, "settle", cfg.DrainSettle, "links", cfg.DrainLinks)
+	return stopHub(stopSteps{
+		grace: cfg.ShutdownGrace, settle: cfg.DrainSettle, window: cfg.DrainLinks,
+		unready: hub.BeginDrain,
+		wait:    waitFor,
+		drainLinks: func(ctx context.Context, window time.Duration) {
+			log.Info("links drained", "asked", hub.DrainLinks(ctx, window))
+		},
+		stopBackground: stopBackground,
+		closeStreams:   hub.Shutdown,
+		shutdown: func(ctx context.Context) error {
+			if err := srv.Shutdown(ctx); err != nil {
+				_ = srv.Close()
+				return fmt.Errorf("shutdown: %w", err)
+			}
+			return nil
+		},
+	})
+}
+
+// stopSteps is what a stop is made of. The order is stopHub's: the steps are named so it can be read, and tested.
+type stopSteps struct {
+	// grace bounds the whole stop; settle and window are the two waits of a drain (config.DrainSettle, DrainLinks).
+	grace, settle, window time.Duration
+	// unready takes the hub out of rotation: not ready, no new links; it still serves.
+	unready func()
+	// wait sleeps for d or until ctx ends.
+	wait func(ctx context.Context, d time.Duration)
+	// drainLinks asks the machines to dial again, one at a time over window.
+	drainLinks func(ctx context.Context, window time.Duration)
+	// stopBackground ends the hub's own loops; closeStreams the event streams and whatever links are left, which
+	// never end by themselves; shutdown waits for the requests under way.
+	stopBackground func()
+	closeStreams   func()
+	shutdown       func(ctx context.Context) error
+}
+
+// stopHub stops a hub without cutting what it serves: it first says it is not ready and waits for the balancer to
+// hear it, then moves its machines away one by one, and only then ends its loops and streams and waits for the
+// requests under way. Everything fits in grace: a step that runs out of it is cut short and the next ones still run.
+func stopHub(s stopSteps) error {
+	ctx, cancel := context.WithTimeout(context.Background(), s.grace)
 	defer cancel()
-	if err := srv.Shutdown(sctx); err != nil {
-		_ = srv.Close()
-		return fmt.Errorf("shutdown: %w", err)
+	s.unready()
+	if s.settle > 0 {
+		s.wait(ctx, s.settle)
 	}
-	return nil
+	if s.window > 0 {
+		s.drainLinks(ctx, s.window)
+	}
+	s.stopBackground()
+	// Event streams and agent links never end by themselves: close them first, or the wait below lasts its whole grace.
+	s.closeStreams()
+	return s.shutdown(ctx)
+}
+
+func waitFor(ctx context.Context, d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	}
 }
 
 func dbKind(cfg *config.Config) string {

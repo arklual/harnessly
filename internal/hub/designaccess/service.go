@@ -17,8 +17,10 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/link"
+	"github.com/ly-solutions/harnessly/internal/hub/resaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const (
@@ -55,6 +57,8 @@ type Deps struct {
 	// machine's: its access rows are found under whichever machine of the space recorded it first, and a change of
 	// them reaches the snapshot of every machine of the space.
 	Shared bool
+	// Kits answers the access dialog of a UI kit, /access/kit/<id>; nil leaves kits unshared.
+	Kits *resaccess.Service
 	// View reads a project from the hub's store for a guest link (internal/hub/designview); nil asks the
 	// machine as before.
 	View Viewer
@@ -74,6 +78,7 @@ type Service struct {
 	notice      Notice
 	shared      bool
 	view        Viewer
+	kits        *resaccess.Service
 
 	mu       sync.Mutex
 	serving  map[string]bool   // machines whose agent serves design-access
@@ -93,7 +98,7 @@ type dayCount struct {
 func New(d Deps) *Service {
 	s := &Service{
 		db: d.DB, reg: d.Reg, log: d.Log, now: d.Now, hubURL: strings.TrimRight(d.HubURL, "/"), platformAPI: d.PlatformAPI,
-		transport: d.Transport, seal: newSealer(d.LinkKey), notice: d.Notice, shared: d.Shared, view: d.View,
+		transport: d.Transport, seal: newSealer(d.LinkKey), notice: d.Notice, shared: d.Shared, view: d.View, kits: d.Kits,
 		serving: map[string]bool{}, prefixes: map[string]string{}, timers: map[string]*time.Timer{},
 		events: map[string]*dayCount{}, tokens: map[string]cachedToken{}, budget: newBudget(),
 	}
@@ -130,7 +135,7 @@ func (s *Service) Connected(m store.Machine, features []string) {
 	s.serving[m.ID] = on
 	s.mu.Unlock()
 	if on {
-		go s.push(context.Background(), m.ID)
+		safego.Go("designaccess push", func() { s.push(context.Background(), m.ID) })
 	}
 }
 
@@ -284,7 +289,7 @@ func (s *Service) Run(ctx context.Context) {
 
 // apiPath: <prefix>/design/access[/...], <prefix>/design/store/<project>/... (team.go), <prefix>/docs/people or the one access API <prefix>/access/{design/...,me,
 // directory} under a platform prefix /api/<name>.
-var apiPath = regexp.MustCompile(`^(/api/[A-Za-z0-9_-]+)(/design/access(?:/.*)?|/design/store/.+|/docs/people|/access/(?:design(?:/.*)?|me|directory))$`)
+var apiPath = regexp.MustCompile(`^(/api/[A-Za-z0-9_-]+)(/design/access(?:/.*)?|/design/store/.+|/design/store-library|/docs/people|/access/(?:design(?:/.*)?|kit(?:/.*)?|me|directory))$`)
 
 // ServeMachine answers the design access API of a machine the person may open; anything else goes to the machine.
 func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) bool {
@@ -306,6 +311,15 @@ func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.U
 			return false
 		}
 		s.people(w, r, m)
+		return true
+	}
+	if rest == storeLibraryPath {
+		if r.Method != http.MethodGet {
+			return false
+		}
+		if err := s.libraryRoute(w, r, u, m); err != nil {
+			s.writeError(w, err)
+		}
 		return true
 	}
 	if sub, ok := strings.CutPrefix(rest, "/design/store/"); ok {

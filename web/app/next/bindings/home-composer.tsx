@@ -22,6 +22,7 @@ import Composer from '@/next/features/composer/composer';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import type { Conversation, ConvId, MachineId } from '@/next/protocol/v2';
 import { clearDraft, NEW_CHAT } from '@/next/stores/drafts';
+import { queueChat } from '@/next/commands/queued-chats';
 import { useDraftField } from '@/next/bindings/use-draft';
 import { useFieldStash } from '@/next/bindings/use-stash';
 import {
@@ -51,6 +52,10 @@ import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 
 const NO_MACHINES = { kind: 'noMachines' } as const satisfies DockNotice;
+const SIGN_IN = {
+  kind: 'signIn',
+  onOpen: () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
+} as const satisfies DockNotice;
 
 /** The folder a new conversation starts in: where the machine's latest one works, else the machine's default one. */
 export const startFolder = (
@@ -77,6 +82,11 @@ interface IHomeComposerProps {
   machines?: IModelPickerProps['machine'];
   /** Not one of the person's machines answers: a warning over the field. */
   allMachinesOff?: boolean;
+  /** none of the person's machines answers now: the chat is left with the hub, which makes it on the machine
+   *  once it answers. */
+  queueWhenSilent?: boolean;
+  /** The chat waits in the hub: the item to open. */
+  onQueued?: (itemId: string) => void;
   /** Over the field, inside the dock: the greeting, which stays over the field's top edge however the dock moves. */
   above?: ReactNode;
   /** Under the field, inside the dock: what stays below the field however far it grows (the places to open). */
@@ -93,6 +103,8 @@ const HomeComposer = ({
   onCreated,
   machines = null,
   allMachinesOff = false,
+  queueWhenSilent = false,
+  onQueued,
   above = null,
   below = null,
 }: IHomeComposerProps) => {
@@ -118,7 +130,7 @@ const HomeComposer = ({
   }, []);
   const defaultCwd = useDefaultCwd(machine);
   const cwd = machine ? startFolder(conversations, machine, defaultCwd ?? null) : null;
-  const { choice, agents, onPick } = useStartChoice(machine);
+  const { choice, agents, onPick, signIn } = useStartChoice(machine);
   // Several models for one prompt (a beta function): the pill's choice and its companions.
   const { multiModel } = useBeta();
   const [more, setMore] = useState<IModelChoice[]>([]);
@@ -152,8 +164,59 @@ const HomeComposer = ({
     onChat: noChat,
   });
 
+  // no machine answers: the chat waits in the hub. One plain message on one model, in a folder or the
+  // machine's own project; what needs the machine now (attachments, several models, the person's project) says so.
+  const queueFirst = useCallback(
+    (on: MachineId, done: (itemId: string) => void) => {
+      if (files.length > 0 || uploads.ready.length > 0) {
+        toast(t('next.queuedChat.noAttachments'), { tone: 'warning' });
+        return;
+      }
+      if (companions.length > 0) {
+        toast(t('next.queuedChat.oneModel'), { tone: 'warning' });
+        return;
+      }
+      if (projectId && resolveProject) {
+        toast(t('next.queuedChat.noProject'), { tone: 'warning' });
+        return;
+      }
+      let where: NewConversation['where'] | null = null;
+      if (projectId) where = { projectId };
+      else if (cwd) where = { cwd };
+      if (!where) {
+        toast(t('next.newChat.noFolder'), { tone: 'warning' });
+        return;
+      }
+      setCreating(true);
+      if (choice) rememberChoice(choice);
+      void queueChat(on, {
+        where,
+        provider: choice?.provider ?? 'claude',
+        ...(choice?.profile ? { profile: choice.profile } : {}),
+        model: choice?.model ? launchModel({ ...choice, model: choice.model }) : null,
+        first: { text: withMentions(mentions, text.trim()), refs },
+      }).then((res) => {
+        setCreating(false);
+        if (!res.ok) {
+          toast(t('next.queuedChat.notQueued'), { tone: 'error' });
+          return;
+        }
+        clearDraft(NEW_CHAT);
+        clearMentions(NEW_CHAT);
+        uploads.reset();
+        toast(t('next.queuedChat.queued'), { tone: 'info' });
+        done(res.item.id);
+      });
+    },
+    [files, uploads, companions, projectId, resolveProject, cwd, choice, mentions, text, refs],
+  );
+
   const onSubmit = useCallback(() => {
     if (creating) return;
+    if (queueWhenSilent && machine && onQueued) {
+      queueFirst(machine, onQueued);
+      return;
+    }
     if (!machine || conversations === null) {
       if (!waiting.current) toast(t('next.newChat.connecting'), { tone: 'info' });
       const asked = read();
@@ -174,6 +237,8 @@ const HomeComposer = ({
       toast(t('next.composer.uploadingWait'), { tone: 'info' });
       return;
     }
+    // The bar over the field says what to do: a chat started on a signed-out agent would only wait for it.
+    if (signIn) return;
     setCreating(true);
     if (choice) rememberChoice(choice);
     const on = machine;
@@ -286,10 +351,14 @@ const HomeComposer = ({
     uploads,
     onCreated,
     choice,
+    signIn,
     companions,
     conversations,
     read,
     resolveProject,
+    queueWhenSilent,
+    onQueued,
+    queueFirst,
   ]);
   useLayoutEffect(() => {
     submitRef.current = onSubmit;
@@ -348,7 +417,7 @@ const HomeComposer = ({
       <div className="hx-dock" data-creating={creating || undefined}>
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
-          <DockBar notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : null)} />
+          <DockBar notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : signIn ? SIGN_IN : null)} />
           <Composer
             enterSends={enterSends}
             value={text}

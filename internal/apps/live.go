@@ -2,6 +2,7 @@ package apps
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -37,15 +38,14 @@ func LaunchNeeds(pkg *Package) string {
 		if len(ag.Context) > 0 {
 			needs = append(needs, "context on activation")
 		}
-		if len(ag.MCP) > 0 {
-			needs = append(needs, "MCP servers")
-		}
 		if ag.Flow != "" || ag.Exclusive {
 			needs = append(needs, "a flow of its own")
 		}
 	}
-	if len(pkg.MCP) > 0 && !slices.Contains(needs, "MCP servers") {
-		needs = append(needs, "MCP servers")
+	// A remote server goes live through the host's harnessly-app server (ProxiedServers); a local one is a process of
+	// the agent's launch.
+	if len(pkg.MCP) > 0 && len(ProxiedServers(pkg)) < len(pkg.MCP) {
+		needs = append(needs, "local MCP servers")
 	}
 	if m.Allows("hooks.agent") {
 		needs = append(needs, "hooks")
@@ -83,7 +83,48 @@ func LiveBrief(a Installed) (string, error) {
 		b.WriteString(text + "\n\n")
 	}
 	b.WriteString(skillList(a))
+	if pkg, _ := CachedPackage(a.Dir); pkg != nil {
+		if servers := ProxiedServers(pkg); len(servers) > 0 {
+			fmt.Fprintf(&b, "\n\nThe tools of its MCP servers (%s) are the mcp__harnessly-app__%s_<server>_<tool> tools.",
+				strings.Join(servers, ", "), PluginName(a.ID))
+		}
+	}
 	return strings.TrimSpace(b.String()), nil
+}
+
+// LiveLine is one app in the short context of every person's turn: its name and where its instructions and
+// skills are.
+func LiveLine(a Installed) string {
+	line := "- " + a.Manifest.Name + " (" + a.ID + ")"
+	var parts []string
+	if ag := a.Manifest.Agent; ag != nil {
+		if ag.Instructions != "" {
+			parts = append(parts, "instructions "+filepath.Join(a.Dir, ag.Instructions))
+		}
+		for _, s := range ag.Skills {
+			parts = append(parts, "skill "+s+" "+filepath.Join(a.Dir, "skills", s, "SKILL.md"))
+		}
+	}
+	if len(parts) > 0 {
+		line += ": " + strings.Join(parts, "; ")
+	}
+	return line
+}
+
+// LiveContext is the short context of every person's turn while apps are on in the chat: which apps, where
+// their words are, their tools and what of them is open beside the chat. lines are LiveLine's; "" with no app.
+func LiveContext(lines, open []string) string {
+	if len(lines) == 0 && len(open) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("# Apps on in this chat\n\nTheir tools are the mcp__harnessly-app__* tools: name the app in each call, and " +
+		"load them with ToolSearch if they are deferred. Before you act for an app, follow its instructions and skills.\n\n")
+	b.WriteString(strings.Join(lines, "\n"))
+	if len(open) > 0 {
+		b.WriteString("\n\nOpen beside this chat: " + strings.Join(open, ", ") + ".")
+	}
+	return b.String()
 }
 
 // LiveNotice is the additionalContext of the agent's next turn after apps were turned on or off in its chat; "" when
@@ -104,4 +145,21 @@ func LiveNotice(on, waiting, off []string) string {
 			": the person turned them off. Their tools are gone; do not follow their instructions any more.")
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+// ProxiedServers are the package's MCP servers the host's harnessly-app server proxies for an agent that runs already
+// the remote ones, an address or the person's connection, by name. A server with a command is not among
+// them.
+func ProxiedServers(pkg *Package) []string {
+	if pkg == nil {
+		return nil
+	}
+	var out []string
+	for name, s := range pkg.MCP {
+		if s.Command == "" && (s.URL != "" || s.Connection != "") {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
 }

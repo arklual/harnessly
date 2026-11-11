@@ -21,7 +21,6 @@
   "workspace.agentComposer.tooManyAttachments": "Не больше {max} вложений в одном сообщении",
   "workspace.agentComposer.uploadFailed": "{name} не загрузился",
   "workspace.agentComposer.uploading": "Загружаем файлы…",
-  "workspace.diffFileList.noChanges": "Изменений нет",
   "workspace.fileEditorDialog.agentFolder": "Рабочая папка текущего агента",
   "workspace.fileEditorDialog.allSaved": "Все изменения сохранены",
   "workspace.fileEditorDialog.closeEditor": "Закрыть редактор",

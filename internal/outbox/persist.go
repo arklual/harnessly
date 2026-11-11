@@ -16,13 +16,18 @@ type State struct {
 	Paused  *wire.QueuePause `json:"paused"`
 	Rev     int64            `json:"rev"`
 	Flight  string           `json:"flight"`
+	// Sends is the number of the last send (Record.Send).
+	Sends int64 `json:"sends,omitempty"`
 	// Gone are the ids of the messages let go and when they ended (GoneKept).
 	Gone map[string]wire.Ms `json:"gone,omitempty"`
+	// Cancelled are the ids of the messages cancelled before the box saw them, and when (CancelKept).
+	Cancelled map[string]wire.Ms `json:"cancelled,omitempty"`
 }
 
 // State is the box to write.
 func (b *Box) State() State {
-	st := State{Items: slices.Clone(b.items), Paused: b.paused, Rev: b.rev, Flight: b.flight, Gone: maps.Clone(b.gone)}
+	st := State{Items: slices.Clone(b.items), Paused: b.paused, Rev: b.rev, Flight: b.flight, Gone: maps.Clone(b.gone),
+		Cancelled: maps.Clone(b.cancelled), Sends: b.sends}
 	for _, r := range b.sorted() {
 		st.Records = append(st.Records, *r)
 	}
@@ -45,8 +50,14 @@ func (b *Box) Restore(st State) {
 		}
 	}
 	b.paused, b.rev, b.flight = st.Paused, max(st.Rev, 1), ""
+	b.sends = st.Sends
+	for _, r := range b.recs {
+		b.sends = max(b.sends, r.Send)
+	}
 	b.gone = map[string]wire.Ms{}
 	maps.Copy(b.gone, st.Gone)
+	b.cancelled = map[string]wire.Ms{}
+	maps.Copy(b.cancelled, st.Cancelled)
 }
 
 // LegacyItem is a message of Legacy's prompt-queue.json.

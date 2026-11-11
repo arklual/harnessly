@@ -290,3 +290,68 @@ func TestDesignGuardHookTakesTheLeaseOnABoard(t *testing.T) {
 		t.Fatalf("a dead runtime lets the edit go on: %d %q", code, out)
 	}
 }
+
+func TestDesignCheckStrict(t *testing.T) {
+	root := t.TempDir()
+	lib, kits := filepath.Join(root, "lib"), filepath.Join(root, "kits")
+	write := func(p, body string) {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(filepath.Join(lib, "x", "meta", "project.json"), `{"v":1,"title":"X","kit":{"id":"acme-ds","version":"1.0.0"}}`)
+	write(filepath.Join(kits, "acme-ds", "1.0.0", "design-system.json"), `{"title": "Acme", "namespace": "Acme",
+  "kit": {"id": "acme-ds", "version": "1.0.0", "source": "library", "package": "@acme/ui"},
+  "groups": [{"id": "g", "title": "G", "components": [{"id": "Button", "description": "Acts", "code": {"import": "@acme/ui", "export": "Button"}, "props": [{"name": "children", "type": "node"}]}]}]}`)
+	page := filepath.Join(lib, "x", "project", "pages", "home.tsx")
+	write(page, "import { Button } from \"@acme/ui\";\nexport default () => <Button>Go</Button>;\n")
+	r := runWith(t, t.TempDir(), nil, "", "design", "check", "x", "--strict", "--library", lib, "--kits", kits)
+	if r.code != 0 || !strings.Contains(r.out, "ok: everything is made of the kit") {
+		t.Fatalf("clean: %d %s %s", r.code, r.out, r.errs)
+	}
+	write(page, "import { Button } from \"@acme/ui\";\nexport default () => <Button size=\"l\">Go</Button>;\n")
+	r = runWith(t, t.TempDir(), nil, "", "design", "check", "x", "--strict", "--library", lib, "--kits", kits)
+	if r.code != 1 || !strings.Contains(r.out, `pages/home.tsx:2:30 strict.prop — Button has no prop "size". Fix: Button declares: children`) {
+		t.Fatalf("finding: %d %s %s", r.code, r.out, r.errs)
+	}
+	r = runWith(t, t.TempDir(), nil, "", "--json", "design", "check", "x", "--strict", "--library", lib, "--kits", kits)
+	var rep design.StrictReport
+	if r.code != 1 || json.Unmarshal([]byte(r.out), &rep) != nil || len(rep.Findings) != 1 || rep.Findings[0].Rule != "strict.prop" {
+		t.Fatalf("json: %d %s", r.code, r.out)
+	}
+}
+
+func TestDesignCodeNeedsAProfile(t *testing.T) {
+	lib, app := t.TempDir(), t.TempDir()
+	r := runWith(t, t.TempDir(), nil, "", "design", "code", "events", "--to", app, "--library", lib)
+	if r.code != 1 || !strings.Contains(r.errs, "sinopia.export.json") {
+		t.Fatalf("no profile: %d %s %s", r.code, r.out, r.errs)
+	}
+	if r := runWith(t, t.TempDir(), nil, "", "design", "code", "events"); r.code != 2 {
+		t.Fatalf("no --to: %d %s", r.code, r.errs)
+	}
+}
+
+func TestDesignMigrateToTSXAndBack(t *testing.T) {
+	root := designLibrary(t)
+	for _, args := range [][]string{
+		{"design", "migrate", "--to", "jsx", "--library", root, "site"},
+		{"design", "migrate", "--to", "tsx", "--library", root},
+		{"design", "migrate", "--to", "tsx", "--force", "--library", root, "site"},
+	} {
+		if r := runWith(t, t.TempDir(), nil, "", args...); r.code != 2 {
+			t.Errorf("%v: %d %s", args, r.code, r.errs)
+		}
+	}
+	// Nothing was migrated: the rollback has nothing to do.
+	r := runWith(t, t.TempDir(), nil, "", "design", "migrate", "--to", "board", "--library", root, "site")
+	if r.code != 0 || !strings.Contains(r.out, "site: 0 board(s) rolled back to boards, 0 kept as they are") {
+		t.Fatalf("rollback: %d %s %s", r.code, r.out, r.errs)
+	}
+	if r := runWith(t, t.TempDir(), nil, "", "design", "migrate", "--to", "board", "--board", "Home", "--library", root, "site"); r.code == 0 {
+		t.Fatalf("a board that was not migrated: %s", r.out)
+	}
+}

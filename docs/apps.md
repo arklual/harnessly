@@ -49,6 +49,8 @@ install points at your folder and is never deleted by `remove`.
 | `network` | no | `connect`, `resources`, `frames`: host names; `*` needs `reason` |
 | `secrets` | no | `{name, description, optional}`; each needs the permission `secrets:<name>`. The person puts the value into the machine's safe from «О приложении», off the chat, under `app/<id>/<name>`. It reaches nobody but the app's MCP servers: the runtime's MCP proxy writes it in place of `${secret:<name>}` in a remote server's `headers` on each call (no file holds it), and a launch writes it in `env` of a local server of a `trusted` app (a folder only that chat's wall opens, removed when the agent is gone). A view, the agent, the host tools and the safe's list never get it. A new value is read at the next launch: no reinstall. An app with a required secret that has no value is «ждёт секрет» (shown in «О приложении»); its chat starts, without the servers that need it |
 | `settings` | no | JSON Schema of an object (`properties` of `string`, `number`, `integer`, `boolean`, with `title`, `description`, `enum`, `default`, `minimum`, `maximum`, `required`). The host draws a form from it in «О приложении» and checks the values against it. They are kept in the `install` storage under `_settings` (a view cannot write that key); a view reads them with `hl.settings.get()`, the agent with the host tool `settings_get` |
+| `kind` | no | `ui`, `runtime` or `tool`: what the package is (see Extensions). Worked out from the contents when absent; when written it must agree with them |
+| `data` | no | `{version, migrations}`: the version of the app's own data and a JSON Patch file for each earlier version (`"1": "migrations/1-to-2.json"`) |
 | `agent` | no | `instructions` and `tools` (`allow`, `deny`, `confirm`) act. `mcp` is what a Sinopia `tool` must name. `skills` is checked against the files (all of `skills/` loads anyway). `context` items with `mode: on-activation` are called on `SessionStart` and `UserPromptSubmit` and reach the agent when the answer changes (`on-demand` is checked, not used); `validators` (`id`, `on` PostToolUse|Stop, `match`, `run`, `maxRetries`) run a package script after a tool call or at Stop and block with its remark on exit code 2, up to `maxRetries`; `exclusive` is checked, not used yet; `flow` is refused: not supported yet |
 | `views` | no | `{id, title, entry, targets}` (`height` is refused: a card sizes itself with `hl.resize`): `entry` is a file of the package or an `https://` address listed in `network.frames` |
 | `icon`, `when`, `storage`, `backend` | no | Refused with «not supported yet»: the host reads them and does nothing. A server is `.mcp.json`; a view keeps its data with `hl.storage` |
@@ -58,8 +60,7 @@ A target with nothing of the app in it is an error, and so is a contribution to 
 
 ## In a chat
 
-`harnessly app enable <id>` (or the chat's app list) turns an app on in a Claude Code chat; Codex chats get apps
-later.
+`harnessly app enable <id>` (or the chat's app list) turns an app on in a Claude Code or a Codex chat.
 
 An app turned on while the chat's agent runs reaches it live when it needs nothing a launch alone gives:
 every Claude Code chat has the `harnessly-app` server from its start, quiet (no tools, no words) while no app is on;
@@ -229,7 +230,8 @@ never sees it), hands the view a nonce in the address's fragment (`#hl-nonce=…
 answers only that origin and that frame. The view serves the SDK itself: `harnessly app sdk ./public/hl` writes
 `bridge-shim.js` (load it first in the page: it reads and removes the nonce and makes the handshake) and `app-sdk.js`.
 A navigation inside the frame ends the bridge, as for a package view: sign the person in before the view's page, or in
-a popup.
+a popup. A site that exists already (an admin panel) takes the loader line instead and tells the agent its forms and
+actions with `state`, `action` and `screen`: see [An existing site](build-apps/11-existing-site.md).
 
 ### Tools of the page for the agent
 
@@ -251,10 +253,23 @@ navigator.modelContext.registerTool({
 await hl.publish({ step: 'items', total: 1200 }); // right context.publish: what the agent reads beside the tools
 ```
 
-The agent lists them with the host tool `page_tools` (with what each view published) and calls one with `page_call`;
-the view runs it in the person's page and its answer comes back. Only a view that is open offers anything: a closed one's
-tools are gone within seconds, and a call it does not answer in a minute is refused. Tools go only to the agent of a chat
-the app is on in. A tool registered with `confirm: true` (or WebMCP's `annotations: { destructiveHint: true }`) runs
+Each tool is an ordinary tool of the agent while the view is open: it is in the `harnessly-app` server under the name
+`<app id with _ for .>__<tool>` (`acme_orders__fill_order`; Claude Code calls it `mcp__harnessly-app__acme_orders__fill_order`)
+with your description and `inputSchema`, and the agent calls it in one step. A name that does not fit 44 characters, or
+that two tools would share, is shortened with a hash of the app and the tool, the same every time. The agent hears of a
+tool registered or taken away at once (`notifications/tools/list_changed`), and on its next turn gets a short block
+(up to 1.5 KB for an app, again only when it changed) with the open window, what it published and the tools' exact names.
+Publish `{ screen: { title, route, prompt }, states: { <name>: { description, schema, value } } }` and the block shows
+the screen, its hint (`prompt`) and the states' values; any other value is shown as it is, cut.
+
+The view runs the tool in the person's page and its answer comes back. Only a view that is open offers anything: a
+closed one's tools are gone within seconds, and a call it does not answer in a minute is refused. A call that comes
+while the window still loads waits up to 15 seconds for the tool, then says what is missing: the window is not open, or
+it is open and has no such tool (with the ones it has). Tools go only to the agent of a chat the app is on in, and a
+window the person opens in the pane of a chat turns the app on in that chat; the manifest's rights and the person's
+consent hold as before. The first time a person opens an app's window in a chat, an agent at rest is given one turn to
+say in a line or two what it can do there (an event of the app, not the person's words; `RUNTIME_APP_OPEN_EVENT=0`
+turns it off). `page_call` is the way that is always there: it is in the agent's tools from its start, and the block of the turn names every tool of the window with its arguments, so an agent that has not heard that the server's tools changed (it started before the app was on) calls `page_call {app, tool, arguments}` and the same tool runs. A call whose arguments do not fit the tool's schema comes back with that schema. The older `page_tools` (the list, with what each view published) still works. A call of a window's tool is a command the runtime writes to its journal on disk (`page-commands.db` in its data folder) before it hands it to the page: `queued → sent → acked → done | failed | rejected | expired | canceled`, and `done` only by the window's answer. The page acknowledges what it takes and is handed an unacknowledged command again under the same id, also after a restart of the runtime; the SDK runs an id once and answers a repeat with the answer it gave (the last 50, kept through a reload of the view where the browser lets it), so write a tool's `run` as usual. A command lives a minute, and is handed to a window only while its caller waits for the answer (a caller that left has ten seconds to come back with the same call, then the command is canceled); one whose term ran out, or whose window changed its screen or its tools since the agent called, never runs, and the agent is told so in words (`expired: …`, `rejected: …` with the screen that is open). Every change of a command's status is in `harnessly logs` under `app.command` with its id. A tool registered with `confirm: true` (or WebMCP's `annotations: { destructiveHint: true }`) runs
 only after the person agrees in a dialog of the page; a refusal comes back to the agent as the call's error.
 
 ### Debug mode
@@ -769,7 +784,7 @@ rights are the manifest's `permissions`, checked by the core.
 | `settings` | a block on Settings → Extensions | `label`, `icon`, `title` |
 | `onboarding` | a step of «First steps» on the same page; the view calls `hl.slot.done()` when it is finished | `label`, `icon`, `order` |
 | `object-action` | a button at an object: a `machine` (Settings → Machines) or a `chat`; the object is `hl.context.data.object` (`{kind, id, name}`) | `objects` (the kinds it is for; all when absent) |
-| `hub-settings` | a page of the hub's settings | declared and checked, not drawn yet (the hub has no apps host) |
+| `hub-settings` | a page of the hub's settings | a Hub extension declares it (`ui` in its entry of the extensions file, see `docs/hub/extensions.md`); the hub draws it under «Расширения» in the same sandbox |
 | `branding` | not a view: the app's `branding` block (`name`, `accent` as `#rrggbb`, `supportUrl`, `tagline`) sets the page title and the accent | |
 
 The slots are off until the runtime starts with `HARNESSLY_UI_SLOTS=on`: without it a slot view is not offered, `open` for
@@ -777,6 +792,45 @@ a slot target answers 403 `slots-off`, and the branding is ignored, so the inter
 load or throws is held by a boundary of its own: the block says it failed and offers a retry, the page stays.
 
 `examples/ext-ui-slots` in the repository fills all of them with a neutral name (`example-corp`).
+
+## Extensions
+
+An app is the one extension package. Three kinds are told apart, in the manifest as `kind` (optional: it is worked out
+from the contents, and when written it has to agree with them):
+
+| Kind | What it is | Contains |
+|---|---|---|
+| `ui` | an extension of the interface | only slot views (`settings`, `onboarding`, `object-action`, `hub-settings`, `branding`); no agent, chat, backend or Sinopia part |
+| `runtime` | an extension of the runtime | views in a pane or a screen, chat cards and commands, Sinopia documents, a backend, maybe an agent profile |
+| `tool` | a tool for the agent | instructions, skills, MCP servers; no view |
+
+A *Hub extension* is a different thing: an address the Hub talks to (`docs/hub/extensions.md`). It is not installed as a
+package, but it can show its settings page in the Hub through the `hub-settings` slot.
+
+The following is under `HARNESSLY_UI_SLOTS=on`; without it nothing here is offered.
+
+- **Lifecycle.** Settings → Extensions installs a package from a folder (it shows what it asks for and what changed
+  before it installs or updates), switches it on and off everywhere, and removes it, keeping its data or with
+  `--purge`. CLI: `harnessly app enable|disable [--everywhere]`, `harnessly app remove [--purge]`. A disabled app is not
+  offered, its tools do not run. An agent cannot switch, remove or configure an app: only a person can.
+- **Settings.** `settings` is a JSON Schema of an object. The core draws the form, validates and keeps the values in the
+  app's install storage (the same place as the setup page of HRN-645); `harnessly app settings <id> [KEY=VALUE…]`
+  reads and writes them.
+- **Secrets.** `secrets` declares names; a person sets a value on the extension's page or with
+  `harnessly app secret set <id> <name>` (stdin). The value lives in the core's safe as `app/<id>/<name>`, and no
+  route returns it. The app gets it only with the `secrets:<name>` permission, as an environment variable of
+  `harnessly app run <id> --secret NAME[=VAR] -- command`; the output is masked.
+- **Data and its versions.** `data: {version, migrations}`: each step names a JSON Patch file for the version it starts
+  from (`"1": "migrations/1-to-2.json"`). An update brings the app's data up to date before it starts; a step that fails
+  leaves the data and the old version as they were.
+- **Compatibility before the core is upgraded.** `harnessly app compat --host <version>` checks every installed app (the
+  `harnessly` range, the permissions, the declared data) against the version that is about to be installed and exits 1 when
+  one would break. `harnessly upgrade plan|apply` runs it with `--apps` (on by default with `HARNESSLY_UI_SLOTS=on`): the
+  plan lists every installed app, and one that is on and does not fit blocks apply (`--force` overrides); one that is off
+  is only shown. `--extensions FILE` stays the check of the Hub's adapters. When the runtime does not answer, the apps are
+  reported as not checked and the upgrade goes on.
+- **Isolation.** A view runs sandboxed, a failing one is held by a boundary of its own, a failing migration or a failing
+  settings check names the app and leaves the rest running.
 
 ## Examples
 
@@ -798,6 +852,5 @@ link, and `harnessly app eval`, and the files of the workspace within an app's m
 the public catalog. The process comes next.
 
 Not built yet: the hub's own catalog and storage of packages (the team's and the public list come from the platform's relay,
-the `apps.team` op and its public counterpart, and are not sent by this repo's hub), the wall for a Codex agent (apps are on in
-Claude Code chats only), `app fork` and `app export`, `app eval init`, evals on
+the `apps.team` op and its public counterpart, and are not sent by this repo's hub), `app fork` and `app export`, `app eval init`, evals on
 Codex, and the check of a published version against the requests the evals made.

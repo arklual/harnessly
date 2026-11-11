@@ -72,7 +72,8 @@ const (
 	S3Unreachable   = "HUB-S001"
 	OIDCUnreachable = "HUB-O001"
 	// Extensions.
-	ExtensionDown = "HUB-E001"
+	ExtensionDown  = "HUB-E001"
+	AppServiceDown = "HUB-E002" // the documents or boards service does not answer /readyz
 	// The move of the machines' data into the store (docs/migrations).
 	MoveFailed = "HUB-M001" // a machine's move stopped on objects with errors
 	// Start.

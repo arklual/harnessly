@@ -72,6 +72,26 @@ func (h *Hub) jwks(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(h.appTokens.signer.JWKS())
 }
 
+// discovery is GET /.well-known/openid-configuration: the issuer and its keys, for a backend that checks the platform's
+// tokens with an OIDC library. The hub signs no ID tokens for sign-in; the document only names the issuer, the keys and
+// the one algorithm. Public, cached; 404 while the hub issues no tokens.
+func (h *Hub) discovery(w http.ResponseWriter, _ *http.Request) {
+	if h.appTokens == nil {
+		http.NotFound(w, nil)
+		return
+	}
+	iss := h.appTokens.signer.Issuer()
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"issuer":                                iss,
+		"jwks_uri":                              iss + apptoken.JWKSPath,
+		"id_token_signing_alg_values_supported": []string{"EdDSA"},
+		"response_types_supported":              []string{"id_token"},
+		"subject_types_supported":               []string{"public"},
+	})
+}
+
 var (
 	errAppTokenOff = httpx.New(http.StatusConflict, hubproto.AppTokenOff, "Хаб не выдаёт токены приложениям")
 	errExchangeOff = httpx.New(http.StatusConflict, hubproto.AppTokenOff, "Обмен токена на токен провайдера входа не настроен")

@@ -139,3 +139,31 @@ func TestMeDayStartHour(t *testing.T) {
 		t.Fatalf("patch: %d %v", code, me)
 	}
 }
+
+// The notices' colour: contrast by default and for a record written before it, contrast or theme taken, else refused.
+func TestMeNoticeColor(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "v2", "me.json")
+	_ = os.MkdirAll(filepath.Dir(file), 0o755)
+	_ = os.WriteFile(file, []byte(`{"settings":{"uiVersion":"next","locale":"en","textSize":"m","enterSends":true},"rev":4}`), 0o600)
+	srv := &wire.Server{Me: &wire.FileMe{Path: file}}
+	_, me := meCall(t, srv, "GET", "/api/v2/me", "")
+	settings, _ := me["settings"].(map[string]any)
+	if settings["noticeColor"] != "contrast" {
+		t.Fatalf("an older record: %v", me)
+	}
+	for _, bad := range []string{`"dark"`, `""`, `1`} {
+		if code, _ := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"noticeColor":`+bad+`}}`); code == 200 {
+			t.Fatalf("%s taken", bad)
+		}
+	}
+	code, me := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"noticeColor":"theme"}}`)
+	settings, _ = me["me"].(map[string]any)["settings"].(map[string]any)
+	if code != 200 || settings["noticeColor"] != "theme" {
+		t.Fatalf("patch: %d %v", code, me)
+	}
+	var st wire.PersonSettings
+	wire.NormalizeSettings(&st)
+	if st.NoticeColor != wire.NoticeColorContrast {
+		t.Fatalf("normalized: %q", st.NoticeColor)
+	}
+}

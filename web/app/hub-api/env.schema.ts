@@ -141,6 +141,7 @@ const source = obj({
   repo: opt(str),
   repoUrl: opt(str),
   path: opt(str),
+  off: opt(bool),
   run: opt(str),
   rerun: opt(lit('once', 'check')),
   check: opt(str),

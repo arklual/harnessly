@@ -175,6 +175,34 @@ func (s *Service) Primary(cap Capability) (Conn, bool) {
 	return *first, true
 }
 
+// OwnToken is the token of the person's own connection of a kind on a host (the primary first), "" without one. It is
+// for a reader that calls the host itself; the token is never shown or logged.
+func (s *Service) OwnToken(kind Kind, host string) string {
+	list, err := s.List()
+	if err != nil {
+		return ""
+	}
+	norm := func(h string) string { return strings.TrimPrefix(strings.ToLower(h), "www.") }
+	var own []Conn
+	for _, c := range list {
+		u, err := url.Parse(c.BaseURL)
+		if c.Env || c.Kind != kind || err != nil || norm(u.Hostname()) != norm(host) {
+			continue
+		}
+		if c.Primary {
+			own = append([]Conn{c}, own...)
+		} else {
+			own = append(own, c)
+		}
+	}
+	for _, c := range own {
+		if cred, err := s.credentials(c); err == nil && strings.TrimSpace(cred[FieldToken]) != "" {
+			return strings.TrimSpace(cred[FieldToken])
+		}
+	}
+	return ""
+}
+
 // Detect finds what a link is.
 func (s *Service) Detect(ctx context.Context, raw string) (*Detection, error) {
 	return Detect(ctx, s.http, raw)

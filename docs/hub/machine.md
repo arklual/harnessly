@@ -155,6 +155,8 @@ the runs are in [environment.md](environment.md#machine-setup); this is who does
   gets no feature, `env.run` is `policy_denied`, and the runtime is told no. `RUNTIME_ENV_SETUP=off` in the runtime's
   environment switches the runner off on the machine itself (the items then stay «машина ещё настраивается»).
   The hub's safe is opt-in on an observe link the same way, with `AGENT_HUB_SAFE=on` ([safe.md](../safe.md)).
+  So are the machine's chats, with `AGENT_HUB_HISTORY=on`: the hub gets a copy of them beside the cluster's, which
+  keeps its own ([history.md](history.md)).
 - **Limits of what is promised.** Scripts run as the person with a minimal environment; they can do what the person can.
   A script by address is fetched over https only (no redirect to http), a repository over https or ssh only. The sandbox
   is for finding what a fresh machine lacks, not for containing a script: without bubblewrap nothing stops a script
@@ -414,6 +416,19 @@ variables.
   `::1`) and only a port a process of that console listens on; once per console; the console belongs to the first
   signed-in person who opened it, anyone else is refused (403); the address is never logged and the listener's answer
   isn't sent back, only its status.
+  **The guided sign-in page (GitHub #69).** The console page opens as a sign-in view, not a terminal: the account and the
+  machine it signs in on, one **Open sign-in page** action (the first `https` address the CLI printed), and where the
+  attempt stands: *preparing*, *waiting for the browser*, *verifying*, *connected*, *failed*, *expired* or *cancelled*,
+  with the time left. The terminal (output, input, keys) is under **Troubleshooting**; it opens by itself when the
+  sign-in waits on no loopback port (it may want a code typed) or has failed. When a console process listens on a
+  loopback port, a collapsed section explains why the browser ends on a page that does not load and takes the pasted
+  address, with the limits above. **Connected** is shown only after the machine agent's own status check of the account
+  (never for the callback's delivery): the agent tells the runtime the state with `POST /api/agent/console-state`
+  (`{"tabId","state","provider","label","expiresAt"}`, machine agent only; states only, never what the CLI printed) and
+  the runtime answers whether the person cancelled. **Cancel** (`POST /api/console/<id>/cancel`, the console's owner
+  only) closes that console's terminal, and the CLI process and listener with it; no other console is touched, and
+  an attempt that ended in a state stays in it (a cancelled one never turns into connected). A sign-in that outlives its
+  timeout ends as expired and its terminal is closed.
 - <a id="cli-sign-in"></a>**Other CLIs (GitHub #58).** A machine signs in more CLIs than the agents the same console
   way. They are described in `cli-logins.json` of the agent's data folder, or in the file `AGENT_CLI_LOGINS_FILE`
   names; an organization's extension pack writes it, and the agent reads it on each use (no restart, no hub setting):
@@ -468,7 +483,7 @@ Both installers (`install.sh` for a single machine, the hub's `/install` for a h
 | `--check` | Looks and changes nothing: the system, curl/tar, tmux and git, free disk, the port, the service manager, Docker, and whether the network works. A failure says what to give: `--ca-file` for a company CA, `--proxy` or `--mirror` for a closed network, `--offline` for none |
 | `--ca-file FILE` | The company CA. Every component gets `SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`, `GIT_SSL_CAINFO` and `REQUESTS_CA_BUNDLE`; the container profile mounts the file read-only |
 | `--proxy URL`, `--no-proxy LIST` | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` for every component. `127.0.0.1`, `localhost` and `::1` (and the hub's host) always go direct |
-| `--mirror URL` | Release files from `URL/vX.Y.Z/…` (and `URL/latest.txt`) instead of github.com. `--npm-registry` and `--pip-index` set the package sources |
+| `--mirror URL` | Release files from `URL/vX.Y.Z/…` (and `URL/latest.txt`, `URL/stable.json` for the [stable channel](../self-host/update-channels.md)) instead of github.com. `--npm-registry` and `--pip-index` set the package sources |
 | `--offline DIR` | Nothing is downloaded: the programs come from `DIR` (see below) |
 | `--docker external\|own\|auto` | Hub installer, container profile. `external` uses only a daemon that already runs; `own` and `auto` start a private `dockerd` under `~/.harnessly/docker` when none runs (root and `dockerd` are needed). A daemon that runs is never touched |
 | `--log FILE` | The step journal; by default `install.log` in the data folder (`~/.harnessly`) |
@@ -497,7 +512,10 @@ machine answers `ownerId` in `GET /api/machines/{id}`.
   command) with the hub's `/dl/manifest.json` two minutes after a start and then every hour. Where it may write the
   folder they are in (the `full` profile, `~/.local/bin`) it downloads what differs, checks it against the manifest's
   SHA-256, puts it in place with a rename and restarts; tmux and the agents in it keep working. Settings → General →
-  Updates shows the state and has «Update now». `RUNTIME_AUTO_UPDATE=0` in `runtime.env` leaves it to the button. The
+  Updates shows the state and has «Update now». `RUNTIME_AUTO_UPDATE=0` in `runtime.env` leaves it to the button.
+  After an update the machine does not update itself again for a day (`RUNTIME_UPDATE_MIN_GAP`, `24h`; `0` for no
+  window): every update restarts the runtime, and a hub that releases several times a day would restart each machine
+  as often. «Update now» and the command are not held back. The
   `dir` profile (`/usr/local/bin`, read-only to the services) and a container cannot update themselves: Settings shows
   the command below.
 - **Fleet mode** (`RUNTIME_UPDATE_MODE=fleet`, off by default): a machine that takes whole releases from a rollout
@@ -508,7 +526,10 @@ machine answers `ownerId` in `GET /api/machines/{id}`.
   registered with this hub (a `machine.json` of the same hub and profile) stays one machine in the hub: nothing is sent
   to the hub and no second record appears. A running agent, tmux and what is in it survive the runtime's restart.
 - **Move or re-register** a machine: run the install command with a new code and `--re-register` (or
-  `harnessly-agent register --force …` and a restart). The old record stays in the hub until you remove it there.
+  `harnessly-agent register --force …` and a restart). A machine that registers again in the space it is in keeps its
+  id, its name and its chats: it proves to the hub, with the key in its `machine.json`, that it is the same machine, and
+  gets new keys. Registered into another space, without its `machine.json`, or after it was removed or switched off in
+  the hub, it is a new machine, and the old record stays in the hub until you remove it there.
 - **Remove**: `curl -fsSL https://hub.example.com/install | sudo sh -s -- --uninstall` (`sudo` for `dir` only; add
   `--profile P` to pick one when several are installed, `--dry-run` to see the plan). It first asks the hub to forget the
   machine (`harnessly-agent unlink`, signed with the machine's own key, so the machine disappears from the hub's list and

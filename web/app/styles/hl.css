@@ -5436,3 +5436,60 @@ body.tw-resizing .xterm {
   outline: none;
   max-height: 30dvh;
 }
+
+/* Changes: the chat's registered work, grouped by repository */
+.tw-work-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tw-work-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-text-secondary);
+}
+.tw-work-group-head span {
+  font-weight: 400;
+}
+.tw-work-tag {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--t-surface-raised);
+  font-size: 10.5px;
+  color: var(--t-text-secondary);
+  white-space: nowrap;
+}
+.tw-work-mr {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  text-decoration: none;
+}
+.tw-work-mr:hover {
+  color: var(--t-text-primary);
+}
+.tw-work-commits {
+  margin: 0;
+  padding: 0 12px 8px;
+  list-style: none;
+  font-size: 12px;
+}
+.tw-work-commits li {
+  padding: 2px 0;
+}
+.tw-work-remote {
+  margin: 0 12px 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 8px;
+  background: var(--t-surface-raised);
+  font-size: 12px;
+  color: var(--t-text-primary);
+  cursor: pointer;
+}
+.tw-work-remote:hover {
+  border-color: var(--t-border);
+}

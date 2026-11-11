@@ -14,6 +14,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // DefaultTZ is the time zone of an organization that has none (an implicit one).
@@ -89,7 +90,7 @@ func NewPusher(d PushDeps) *Pusher {
 	}
 	p.ctx, p.cancel = context.WithCancel(context.Background())
 	p.wg.Add(1)
-	go p.loop()
+	safego.Go("limits loop", func() { p.loop() })
 	return p
 }
 

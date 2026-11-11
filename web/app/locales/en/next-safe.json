@@ -2,7 +2,7 @@
   "next.settings.section.safe": "Safe",
   "next.settings.lead.safe": "Tokens and keys for this machine's agents — not through the chat",
   "next.safe.title": "Secrets",
-  "next.safe.foot": "Values are kept encrypted on this machine and never come back here. An agent gets a secret by name — into a command's environment, not into the chat.",
+  "next.safe.foot": "Values are kept encrypted on this machine only, not in the hub, and never come back here. An agent gets a secret by name — into a command's environment, not into the chat.",
   "next.safe.foot.server": "Values are kept on the server {addr}, not on this machine, and never come back here. An agent gets a secret by name — into a command's environment, not into the chat.",
   "next.safe.foot.hub": "Values are kept in the hub's safe, not on this machine, and never come back here. An agent gets a secret by name — into a command's environment, not into the chat.",
   "next.safe.foot.broken": "The safe should be on a server, but its settings do not work: {error}. New secrets are not taken until it is fixed.",

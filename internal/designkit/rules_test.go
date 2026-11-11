@@ -15,7 +15,7 @@ const kitDocs = "../../docs/agents/design-kits.md"
 // the check does not have: the registry, the code and the docs cannot drift apart.
 func TestRulesAreUsedAndDocumented(t *testing.T) {
 	var src strings.Builder
-	for _, f := range []string{"check.go", "fields.go", "../hlcli/designkit.go"} {
+	for _, f := range []string{"check.go", "fields.go", "strict.go", "../hlcli/designkit.go"} {
 		raw, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatal(err)
@@ -23,7 +23,7 @@ func TestRulesAreUsedAndDocumented(t *testing.T) {
 		src.Write(raw)
 	}
 	used := map[string]bool{}
-	for _, m := range regexp.MustCompile(`(?:k\.add\(|Rule: )"([a-z-]+\.[a-z-]+)"`).FindAllStringSubmatch(src.String(), -1) {
+	for _, m := range regexp.MustCompile(`(?:k\.add\(|Rule: |r\.add\()"([a-z-]+\.[a-z-]+)"`).FindAllStringSubmatch(src.String(), -1) {
 		used[m[1]] = true
 	}
 	raw, err := os.ReadFile(kitDocs)
@@ -35,7 +35,7 @@ func TestRulesAreUsedAndDocumented(t *testing.T) {
 		documented[m[1]] = m[2]
 	}
 	var missing []string
-	for _, r := range Rules {
+	for _, r := range append(append([]Rule{}, Rules...), StrictRules...) {
 		if !used[r.ID] {
 			missing = append(missing, r.ID+": not used by the check")
 		}

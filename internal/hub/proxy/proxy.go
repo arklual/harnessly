@@ -25,15 +25,20 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/machaccess"
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
+	"github.com/ly-solutions/harnessly/internal/webstatic"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 const (
@@ -74,6 +79,14 @@ type Deps struct {
 	History bool
 	// VoiceTakes: the person's dictation recordings are kept here (voicetakes.go); false answers 404.
 	VoiceTakes bool
+	// Fleet is the bus of the workspace page's live channel (fleet.go, GET /api/v2/machines/events); nil: there is none.
+	Fleet *events.FleetBus
+	// Switches are the rollout switches (stale.go, the «fleet-stale» switch); nil: all off. The owner\'s rule of opening a machine
+	// (machaccess.FeatureOwnWork) is one of them.
+	Switches switches.Gate
+	// SlotKey signs the preview slot hosts' handles and cookies (slothost.go); with Config.PreviewSlotDomain it turns the
+	// slot hosts on, still subject to the «preview-slot-host» rollout switch. nil: there are none.
+	SlotKey []byte
 }
 
 // Interceptor answers some requests of a signed-in person to a machine itself; false lets them through to it.
@@ -95,11 +108,21 @@ type Service struct {
 	design  Interceptor
 	gate    FeatureGate
 	web     fs.FS
+	// static keeps the tags and gzipped copies of the workspace page's files.
+	static  webstatic.Cache
 	history bool
 	uploads Uploads
 	vault   *vaultsvc.Service
+	// docs answers the workspace's documents under docsPrefix (UseDocs); nil: the machines answer.
+	docs       http.Handler
+	docsPrefix string
 	// voiceTakes: HUB_VOICE_TAKES.
 	voiceTakes bool
+	fleetBus   *events.FleetBus
+	// switches: the rollout switches; stale: the silent machines and the last lists (stale.go).
+	switches switches.Gate
+	stale    staleBook
+	slotKey  []byte
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
@@ -109,8 +132,14 @@ type Service struct {
 	access     map[string]time.Time
 	trust      map[string]time.Time
 	pages      map[string]workspaceConfig
+	asks       map[string]cardAsk
 	tracked    map[string]map[uint64]context.CancelFunc
-	nextTrack  uint64
+	// inflight counts the requests each person holds to each machine (deadline.go).
+	inflight  map[string]int
+	nextTrack uint64
+
+	// legacy: when the machines of a person without settings of their own were last asked for the old ones.
+	legacy map[string]time.Time
 }
 
 type grantEntry struct {
@@ -127,9 +156,9 @@ type grantCall struct {
 // New makes the proxy.
 func New(d Deps) *Service {
 	s := &Service{
-		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History, voiceTakes: d.VoiceTakes,
+		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History, voiceTakes: d.VoiceTakes, fleetBus: d.Fleet, switches: d.Switches, slotKey: d.SlotKey,
 		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
-		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, tracked: map[string]map[uint64]context.CancelFunc{},
+		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, asks: map[string]cardAsk{}, legacy: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -137,7 +166,7 @@ func New(d Deps) *Service {
 	if s.log == nil {
 		s.log = slog.Default()
 	}
-	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log}
+	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log, Switches: d.Switches}
 	return s
 }
 
@@ -148,6 +177,9 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/machines/{machineId}/browser/ws", s.auth.Require(s.browserWS))
 	s.mountFleet(mux)
 	s.mountWorkspace(mux)
+	if s.slotKeyed() {
+		mux.Handle("POST /api/preview/slot-open", s.auth.Require(s.slotOpen))
+	}
 }
 
 func (s *Service) browserWS(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -362,6 +394,9 @@ func (s *Service) servePath(w http.ResponseWriter, r *http.Request, id string) {
 		s.serveMe(w, r, p.User, settings)
 		return
 	}
+	if s.serveMachineHub(w, r, p, id) {
+		return
+	}
 	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {
 		return
 	}
@@ -416,6 +451,9 @@ func (s *Service) serveRuntimeHost(w http.ResponseWriter, r *http.Request, id st
 	}
 	if me, settings := machineMePath(r.URL.Path, id); me {
 		s.serveMe(w, r, p.User, settings)
+		return
+	}
+	if s.serveMachineHub(w, r, p, id) {
 		return
 	}
 	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {
@@ -665,10 +703,36 @@ func (s *Service) Kick(spaceID, userID string) {
 func runtimeCookie(g hubproto.SessionGrant) string { return g.CookieName + "=" + g.Token }
 
 func (s *Service) forward(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) {
-	if s.reg.Get(m.ID) == nil {
-		s.offline(w, r)
+	raw := w
+	staleKey, staleOn := staleList(r, u.ID, m.ID)
+	staleOn = staleOn && s.staleOn(r.Context(), u, m)
+	if staleOn && (s.reg.Get(m.ID) == nil || s.stale.isDown(m.ID, s.now())) && s.serveStale(w, staleKey) {
 		return
 	}
+	if s.reg.Get(m.ID) == nil {
+		// The machine's own settings are read from the hub's copy while it is away.
+		if !s.serveSettingsCopy(w, r, m.ID) {
+			s.offline(w, r)
+		}
+		return
+	}
+	leave, ok := s.enter(u.ID, m.ID)
+	if !ok {
+		s.upstreamFailed(w, r, errCrowded)
+		return
+	}
+	defer leave()
+	if machineSettingsDoc(r, m.ID) {
+		tee := &usageTee{ResponseWriter: w}
+		defer s.keepMachineSettings(r.Context(), m.ID, r, tee)
+		w = tee
+	}
+	if staleOn {
+		tee := &staleTee{ResponseWriter: w}
+		defer s.keepList(m.ID, staleKey, tee)
+		w = tee
+	}
+	person := s.personHeader(r, u, m.ID)
 	g, err := s.grant(r.Context(), u, m)
 	if err != nil {
 		s.upstreamFailed(w, r, err)
@@ -677,6 +741,10 @@ func (s *Service) forward(w http.ResponseWriter, r *http.Request, u store.User, 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	defer s.track(u.ID+"/"+m.SpaceID, cancel)()
+	if _, kept := s.stale.get(staleKey, s.now()); staleOn && kept {
+		// A list that has a copy waits less for a silent machine: the copy answers instead.
+		ctx = context.WithValue(ctx, staleWaitKey{}, staleListWait)
+	}
 
 	secure := s.cfg.Secure
 	clientIP := s.auth.ClientIP(r)
@@ -693,11 +761,16 @@ func (s *Service) forward(w http.ResponseWriter, r *http.Request, u store.User, 
 			h.Del("Authorization")
 			h.Del("Proxy-Authorization")
 			h.Set("Cookie", runtimeCookie(g))
+			// The person's settings a runtime works by are the hub's word, never the browser's.
+			h.Del(wire.PersonHeader)
+			if person != "" {
+				h.Set(wire.PersonHeader, person)
+			}
 			h.Set("X-Forwarded-Host", pr.In.Host)
 			h.Set("X-Forwarded-Proto", map[bool]string{true: "https", false: "http"}[secure])
 			h.Set("X-Forwarded-For", clientIP)
 		},
-		Transport:     s.transport(m.ID),
+		Transport:     headerDeadline{s.transport(m.ID)},
 		FlushInterval: -1,
 		ModifyResponse: func(res *http.Response) error {
 			// The runtime's cookies are the hub's business: none of them reaches the browser. In path mode a cookie from
@@ -712,6 +785,12 @@ func (s *Service) forward(w http.ResponseWriter, r *http.Request, u store.User, 
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			if r.Context().Err() != nil {
 				return // the person went away, or was shown out
+			}
+			if staleOn && !crowded(err) {
+				s.stale.markDown(m.ID, s.now())
+				if s.serveStale(raw, staleKey) {
+					return
+				}
 			}
 			s.upstreamFailed(w, r, err)
 		},
@@ -741,6 +820,14 @@ func (s *Service) upstreamFailed(w http.ResponseWriter, r *http.Request, err err
 	case errors.As(err, &he) && he.Code == "machine_policy", errors.As(err, &ae) && ae.Code == hubproto.CodePolicyDenied:
 		s.reply(w, r, http.StatusForbidden, "machine_policy", "Запрещено настройками машины",
 			"Владелец машины выключил открытие этой машины из harnessly в её настройках (policy.toml).")
+	case crowded(err):
+		// 503 with Retry-After: the page shows the text and asks again later instead of at once.
+		w.Header().Set("Retry-After", "5")
+		s.reply(w, r, http.StatusServiceUnavailable, "machine_busy", "Машина перегружена",
+			"К машине открыто слишком много запросов сразу. Закройте лишние вкладки или подождите немного.")
+	case errors.Is(err, errHeaderWait):
+		s.log.Info("machine did not start answering in time", "path", httpx.SafePath(r.URL.Path))
+		s.reply(w, r, http.StatusGatewayTimeout, "machine_timeout", "Машина не ответила вовремя", "Попробуйте ещё раз через минуту.")
 	default:
 		s.log.Info("machine did not take the request", "path", httpx.SafePath(r.URL.Path), "error", err)
 		s.reply(w, r, http.StatusBadGateway, "machine_error", "Машина не отвечает", "Попробуйте ещё раз через минуту.")
@@ -755,6 +842,7 @@ func (s *Service) offline(w http.ResponseWriter, r *http.Request) {
 // reply is a page for a browser that navigates, JSON for everything else.
 func (s *Service) reply(w http.ResponseWriter, r *http.Request, status int, code, title, text string) {
 	if isNavigation(r) && strings.Contains(r.Header.Get("Accept"), "text/html") {
+		metrics.CountErrorCode(code) // WriteError counts the other answers
 		s.page(w, r, status, title, text)
 		return
 	}

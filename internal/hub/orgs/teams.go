@@ -7,26 +7,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // Teams, the people in them, roles and the journal of an organization (docs/hub/orgs.md, «Endpoints»).
 
 func (s *Service) mountTeams(mux *http.ServeMux) {
-	mux.Handle("GET /api/orgs/{org}/teams", s.Gate(s.listTeams))
-	mux.Handle("POST /api/orgs/{org}/teams", s.Gate(s.createTeam))
-	mux.Handle("PATCH /api/orgs/{org}/teams/{teamId}", s.Gate(s.renameTeam))
-	mux.Handle("DELETE /api/orgs/{org}/teams/{teamId}", s.Gate(s.deleteTeam))
-	mux.Handle("GET /api/orgs/{org}/scopes/{kind}/{id}/members", s.Gate(s.listMembers))
-	mux.Handle("PUT /api/orgs/{org}/teams/{teamId}/members/{userId}", s.Gate(s.putTeamMember))
-	mux.Handle("DELETE /api/orgs/{org}/teams/{teamId}/members/{userId}", s.Gate(s.deleteTeamMember))
-	mux.Handle("PUT /api/orgs/{org}/grants", s.Gate(s.putGrant))
-	mux.Handle("GET /api/orgs/{org}/audit", s.Gate(s.audit))
+	mux.Handle("GET /api/orgs/{org}/teams", s.OrgGate(s.listTeams))
+	mux.Handle("POST /api/orgs/{org}/teams", s.OrgGate(s.createTeam))
+	mux.Handle("PATCH /api/orgs/{org}/teams/{teamId}", s.OrgGate(s.renameTeam))
+	mux.Handle("DELETE /api/orgs/{org}/teams/{teamId}", s.OrgGate(s.deleteTeam))
+	mux.Handle("GET /api/orgs/{org}/scopes/{kind}/{id}/members", s.OrgGate(s.listMembers))
+	mux.Handle("PUT /api/orgs/{org}/teams/{teamId}/members/{userId}", s.OrgGate(s.putTeamMember))
+	mux.Handle("DELETE /api/orgs/{org}/teams/{teamId}/members/{userId}", s.OrgGate(s.deleteTeamMember))
+	mux.Handle("PUT /api/orgs/{org}/grants", s.OrgGate(s.putGrant))
+	mux.Handle("GET /api/orgs/{org}/audit", s.OrgGate(s.audit))
 }
 
 // chainIn is the scope's chain [org, tenant?, team?], or not found when the scope is not in the organization.
@@ -83,13 +83,11 @@ func event(chain []authz.Scope, actor, action, targetKind, targetID string, befo
 	return e
 }
 
-func (s *Service) listTeams(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) listTeams(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	tenantID := r.URL.Query().Get("tenant")
 	if tenantID == "" {
 		return httpx.Invalid("tenant", "Укажите тенант")
@@ -136,7 +134,8 @@ func (s *Service) listTeams(w http.ResponseWriter, r *http.Request, p *auth.Prin
 	return nil
 }
 
-func (s *Service) createTeam(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) createTeam(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct {
 		TenantID string
 		Name     string
@@ -152,10 +151,7 @@ func (s *Service) createTeam(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		return httpx.Invalid("tenantId", "Выберите тенант")
 	}
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	if ok, retry := s.lim.Allow("team:"+p.User.ID, 60, time.Hour); !ok {
 		return httpx.RateLimited(ratelimit.RetrySeconds(retry))
 	}
@@ -194,7 +190,8 @@ func (s *Service) createTeam(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	return nil
 }
 
-func (s *Service) renameTeam(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) renameTeam(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct{ Name string }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -204,10 +201,7 @@ func (s *Service) renameTeam(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		return err
 	}
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	var t store.Team
 	err = s.db.Tx(ctx, func(st store.Store) error {
 		var chain []authz.Scope
@@ -242,13 +236,11 @@ func (s *Service) renameTeam(w http.ResponseWriter, r *http.Request, p *auth.Pri
 
 // deleteTeam removes a team: its machines keep their tenant and lose the team, its leads lose the role. The journal
 // entry is written at the tenant, since the team's own scope is gone.
-func (s *Service) deleteTeam(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) deleteTeam(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
-	err = s.db.Tx(ctx, func(st store.Store) error {
+	o := *tc.Org
+	err := s.db.Tx(ctx, func(st store.Store) error {
 		t, chain, err := teamIn(ctx, st, o, r.PathValue("teamId"))
 		if err != nil {
 			return err
@@ -498,13 +490,11 @@ func inScope(ctx context.Context, st store.Store, userID string, chain []authz.S
 	return false, nil
 }
 
-func (s *Service) listMembers(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) listMembers(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	sc := authz.Scope{Kind: r.PathValue("kind"), ID: r.PathValue("id")}
 	switch sc.Kind {
 	case store.ScopeOrg, store.ScopeTenant, store.ScopeTeam:
@@ -548,7 +538,8 @@ func memberOf(ctx context.Context, st store.Store, sc authz.Scope, userID string
 
 // putTeamMember adds a member of the tenant to a team. The first team of a person in a tenant becomes their primary
 // one; choosing another primary team is the tenant admin's (the plan's «основную выбирает админ тенанта»).
-func (s *Service) putTeamMember(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) putTeamMember(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct{ IsPrimary *bool }
 	if r.ContentLength != 0 {
 		if err := httpx.Decode(r, &req); err != nil {
@@ -556,18 +547,17 @@ func (s *Service) putTeamMember(w http.ResponseWriter, r *http.Request, p *auth.
 		}
 	}
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
+	var err error
 	userID := r.PathValue("userId")
 	var sc authz.Scope
+	var tenantID string
 	err = s.db.Tx(ctx, func(st store.Store) error {
 		t, chain, err := teamIn(ctx, st, o, r.PathValue("teamId"))
 		if err != nil {
 			return err
 		}
-		sc = chain[len(chain)-1]
+		sc, tenantID = chain[len(chain)-1], t.SpaceID
 		az := authz.New(st)
 		pr := Principal(p)
 		if _, err := az.Can(ctx, pr, authz.Check{Action: authz.Manage, Scope: sc}); err != nil {
@@ -629,6 +619,7 @@ func (s *Service) putTeamMember(w http.ResponseWriter, r *http.Request, p *auth.
 	if err != nil {
 		return err
 	}
+	s.peopleChanged(o.ID, tenantID, userID, false)
 	m, err := memberOf(ctx, s.db.S(), sc, userID)
 	if err != nil {
 		return err
@@ -637,18 +628,19 @@ func (s *Service) putTeamMember(w http.ResponseWriter, r *http.Request, p *auth.
 	return nil
 }
 
-func (s *Service) deleteTeamMember(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) deleteTeamMember(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
+	var err error
 	userID := r.PathValue("userId")
+	var tenantID string
 	err = s.db.Tx(ctx, func(st store.Store) error {
 		t, chain, err := teamIn(ctx, st, o, r.PathValue("teamId"))
 		if err != nil {
 			return err
 		}
+		tenantID = t.SpaceID
 		if _, err := authz.New(st).Can(ctx, Principal(p), authz.Check{Action: authz.Manage, Scope: chain[len(chain)-1]}); err != nil {
 			return err
 		}
@@ -671,13 +663,15 @@ func (s *Service) deleteTeamMember(w http.ResponseWriter, r *http.Request, p *au
 	if err != nil {
 		return err
 	}
+	s.peopleChanged(o.ID, tenantID, userID, false)
 	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
 
 // putGrant gives or takes a role (orgs.md, the rights table). Giving a tenant's admin role to someone outside the
 // tenant makes them its member too; a team's lead must already be a member of the tenant.
-func (s *Service) putGrant(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) putGrant(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct {
 		UserID  string
 		Scope   ScopeView
@@ -694,10 +688,8 @@ func (s *Service) putGrant(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		return httpx.Invalid("granted", "Укажите, выдать роль или снять")
 	}
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
+	var err error
 	sc := authz.Scope{Kind: req.Scope.Kind, ID: req.Scope.ID}
 	switch sc.Kind {
 	case store.ScopeOrg, store.ScopeTenant, store.ScopeTeam:
@@ -705,10 +697,17 @@ func (s *Service) putGrant(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		return httpx.Invalid("scope", "Неизвестная область")
 	}
 	var out *GrantView
+	// The tenant the role is in; "" for a role in the organization as a whole.
+	var tenantID string
 	err = s.db.Tx(ctx, func(st store.Store) error {
 		chain, err := chainIn(ctx, st, o, sc)
 		if err != nil {
 			return err
+		}
+		for _, c := range chain {
+			if c.Kind == store.ScopeTenant {
+				tenantID = c.ID
+			}
 		}
 		target, err := st.UserByID(ctx, req.UserID)
 		if store.IsNotFound(err) {
@@ -784,6 +783,8 @@ func (s *Service) putGrant(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	if err != nil {
 		return err
 	}
+	// A role given or taken changes what the person sees: their streams are ended and open again with the new one.
+	s.peopleChanged(o.ID, tenantID, req.UserID, true)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"grant": out})
 	return nil
 }
@@ -817,13 +818,11 @@ const (
 	auditMaxPage = 200
 )
 
-func (s *Service) audit(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) audit(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	q := r.URL.Query()
 	sc := authz.Scope{Kind: store.ScopeOrg, ID: o.ID}
 	if raw := q.Get("scope"); raw != "" {

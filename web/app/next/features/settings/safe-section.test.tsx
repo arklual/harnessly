@@ -7,7 +7,7 @@ import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { SafePage } from '@/next/bindings/settings-safe';
 import { setFetch } from '@/next/core/net/http';
 import { readAsk, readSecret } from '@/next/features/safe/api';
-import SafeSection, { type ISafeActions } from '@/next/features/settings/safe-section';
+import SafeSection, { safeFoot, type ISafeActions } from '@/next/features/settings/safe-section';
 import { pinLocale } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { PortalContext } from '@/next/ui/portal';
@@ -500,6 +500,34 @@ describe('value request copy', () => {
       );
       expect(screen.getByPlaceholderText(placeholder)).toBeTruthy();
       expect(screen.getByText(note, { exact: true })).toBeTruthy();
+    } finally {
+      pinLocale('en');
+    }
+  });
+});
+
+describe('where the safe says its values are', () => {
+  it.each([
+    ['en', null, 'Values are kept encrypted on this machine only, not in the hub, and never come back here.'],
+    [
+      'ru',
+      null,
+      'Значения хранятся в зашифрованном виде только на этой машине, не в хабе, и сюда не возвращаются.',
+    ],
+    [
+      'en',
+      { mode: 'hub', addr: '', error: '' },
+      "Values are kept in the hub's safe, not on this machine, and never come back here.",
+    ],
+    [
+      'en',
+      { mode: 'vault', addr: 'https://bao.example.com', error: '' },
+      'Values are kept on the server https://bao.example.com, not on this machine, and never come back here.',
+    ],
+  ] as const)('%s: %j', (locale, store, start) => {
+    pinLocale(locale);
+    try {
+      expect(safeFoot(store).startsWith(start)).toBe(true);
     } finally {
       pinLocale('en');
     }

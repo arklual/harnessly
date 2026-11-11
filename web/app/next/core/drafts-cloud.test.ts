@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CLOUD_DELAY_MS, startDraftSync } from '@/next/core/drafts-cloud';
+import {
+  BEHIND_MS,
+  CLOUD_DELAY_MS,
+  CLOUD_EVERY_MS,
+  flushDrafts,
+  startDraftSync,
+} from '@/next/core/drafts-cloud';
 import { memoryKV, startPersistence } from '@/next/core/persist';
 import { hub } from '@/next/core/realtime/hub';
 import { FakeRuntime } from '@/next/core/testing/fake-runtime';
@@ -26,6 +32,10 @@ function withDrafts(rt: FakeRuntime, on = true) {
   const book = new Map<string, Draft>();
   if (on) rt.welcome = { ...rt.welcome, features: [...rt.welcome.features, 'drafts'] };
   const writes: CommandBodies['draft.set'][] = [];
+  /** The machine's convs snapshot carries its register as it is now. */
+  const show = () => {
+    rt.drafts = [...book.values()];
+  };
   rt.handlers.set('draft.set', (cmd) => {
     const b = cmd.body as CommandBodies['draft.set'];
     writes.push(b);
@@ -40,6 +50,7 @@ function withDrafts(rt: FakeRuntime, on = true) {
       at: Date.now(),
     };
     book.set(b.key, d);
+    show();
     const seq = rt.emit('convs', { type: 'draft_upsert', draft: d });
     return { r: 'accepted', ch: 'convs', seq, rev: b.rev };
   });
@@ -47,10 +58,17 @@ function withDrafts(rt: FakeRuntime, on = true) {
   const other = (key: Draft['key'], text: string, silent = false) => {
     const d: Draft = { key, text, rev: (book.get(key)?.rev ?? 0) + 1, deviceId: OTHER, at: Date.now() };
     book.set(key, d);
+    show();
     if (!silent) rt.emit('convs', { type: 'draft_upsert', draft: d });
     return d;
   };
-  return { book, writes, other };
+  /** The machine loses what it kept of a draft (a restart before its saver ran, a draft past the ones it keeps). */
+  const lose = (key: Draft['key'], back?: Draft) => {
+    if (back) book.set(key, back);
+    else book.delete(key);
+    show();
+  };
+  return { book, writes, other, lose };
 }
 
 async function start(on = true) {
@@ -122,12 +140,91 @@ describe('drafts on the machine', () => {
     await typing('один два');
     expect(writes.at(-1)).toEqual(expect.objectContaining({ text: 'один два', rev: 2 }));
     expect(book.get(CONV)?.text).toBe('с телефона');
-    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(BEHIND_MS - CLOUD_DELAY_MS - 500);
     expect(writes).toHaveLength(2);
     rt.emit('convs', { type: 'draft_upsert', draft: late });
     await vi.advanceTimersByTimeAsync(50);
     expect(writes.at(-1)).toEqual(expect.objectContaining({ text: 'один два', rev: 3 }));
     expect(book.get(CONV)).toMatchObject({ text: 'один два', rev: 3 });
+  });
+
+  it("the event of the other device never comes: the page reads the machine's list and writes on top of it", async () => {
+    const { other, book } = await start();
+    await typing('один');
+    other(CONV, 'с телефона', true);
+    await typing('один два');
+    expect(book.get(CONV)?.text).toBe('с телефона');
+    await vi.advanceTimersByTimeAsync(BEHIND_MS + 100);
+    expect(draftText(CONV)).toBe('один два');
+    expect(book.get(CONV)).toMatchObject({ text: 'один два', rev: 3 });
+  });
+
+  it('a machine that lost the draft: after the refusal the field is saved again, and what was typed stays', async () => {
+    const { book, lose, writes } = await start();
+    await typing('первая мысль');
+    await typing('первая мысль, вторая');
+    expect(book.get(CONV)).toMatchObject({ rev: 2 });
+    lose(CONV);
+    await typing('первая мысль, вторая, третья');
+    // Refused: the machine has no draft, the page writes revision 3.
+    expect(writes.at(-1)).toMatchObject({ rev: 3 });
+    expect(book.has(CONV)).toBe(false);
+    await vi.advanceTimersByTimeAsync(BEHIND_MS + 100);
+    expect(draftText(CONV)).toBe('первая мысль, вторая, третья');
+    expect(book.get(CONV)).toMatchObject({ text: 'первая мысль, вторая, третья', rev: 1 });
+    // And it keeps saving.
+    await typing('первая мысль, вторая, третья, четвёртая');
+    expect(book.get(CONV)).toMatchObject({ text: 'первая мысль, вторая, третья, четвёртая', rev: 2 });
+  });
+
+  it('a machine that fell back to an older revision: its revision becomes the base, the field wins', async () => {
+    const { book, lose } = await start();
+    await typing('раз');
+    const first = book.get(CONV)!;
+    await typing('раз два');
+    lose(CONV, first);
+    await typing('раз два три');
+    await vi.advanceTimersByTimeAsync(BEHIND_MS + 100);
+    expect(draftText(CONV)).toBe('раз два три');
+    expect(book.get(CONV)).toMatchObject({ text: 'раз два три', rev: 2 });
+  });
+
+  it('a reload heals too: the snapshot of a machine behind the kept base rebases the field', async () => {
+    const rt = new FakeRuntime();
+    const { book } = withDrafts(rt);
+    const booted = await bootFake({ rt, start: false });
+    // What IndexedDB brought back: a field ahead of a base the machine does not have any more.
+    draftBaseStore.set(CONV, { rev: 7, text: 'было', attachments: [] });
+    setDraftText(CONV, 'было, и дописано до перезагрузки');
+    stop = startDraftSync();
+    hub.start([booted.m], booted.m);
+    await settle();
+    await vi.advanceTimersByTimeAsync(CLOUD_DELAY_MS + 50);
+    expect(book.get(CONV)).toMatchObject({ text: 'было, и дописано до перезагрузки', rev: 1 });
+  });
+
+  it('typing without a pause writes once in two seconds; a pause writes at once', async () => {
+    const { writes } = await start();
+    for (let i = 1; i <= 10; i++) {
+      setDraftText(CONV, 'а'.repeat(i));
+      await vi.advanceTimersByTimeAsync(400);
+    }
+    // Four seconds of keys 400 ms apart: two writes, not one per pause of the old 700 ms and not none.
+    expect(writes).toHaveLength(Math.floor((10 * 400) / CLOUD_EVERY_MS));
+    await vi.advanceTimersByTimeAsync(CLOUD_DELAY_MS);
+    expect(writes.at(-1)?.text).toBe('а'.repeat(10));
+  });
+
+  it('leaving the field or the page (flushDrafts) writes what waits, at once', async () => {
+    const { writes } = await start();
+    setDraftText(CONV, 'ухожу');
+    flushDrafts();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(writes.map((w) => w.text)).toEqual(['ухожу']);
+    setDraftText(CONV, 'ухожу совсем');
+    flushDrafts();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(writes.map((w) => w.text)).toEqual(['ухожу', 'ухожу совсем']);
   });
 
   it('a send clears the draft on the machine too', async () => {

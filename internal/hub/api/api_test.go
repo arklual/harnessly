@@ -35,6 +35,19 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+// A hub being stopped says it is not ready and stays alive, so it leaves the rotation and is not restarted.
+func TestDrainingHubIsNotReadyButAlive(t *testing.T) {
+	s := hubtest.New(t)
+	b := s.Browser()
+	s.Hub.BeginDrain()
+	if r := b.Do("GET", "/readyz", nil); r.Code != 503 || !strings.Contains(string(r.Body), `"draining":true`) {
+		t.Errorf("readyz of a draining hub: %s", r)
+	}
+	if r := b.Do("GET", "/healthz", nil); r.Code != 200 {
+		t.Errorf("healthz of a draining hub: %s", r)
+	}
+}
+
 type configView struct {
 	Version     string
 	PublicURL   string
@@ -122,7 +135,7 @@ func TestConfigFollowsTheSettings(t *testing.T) {
 	}
 
 	// The cloud runs no generic OIDC (docs/hub/architecture.md, OSS and cloud).
-	cloud := hubtest.New(t, append(oidc, hubtest.Env("HUB_EDITION", "cloud"), hubtest.Env("HUB_RUNTIME_DOMAIN", "m.example.test"))...)
+	cloud := hubtest.New(t, append(oidc, hubtest.Cloud("m.example.test"))...)
 	if c := config(t, cloud); c.Edition != "cloud" || len(c.Auth.OIDC) != 0 {
 		t.Errorf("cloud config = %+v", c)
 	}
@@ -342,6 +355,45 @@ func TestRunWritesTheLocalCodeAndStops(t *testing.T) {
 	}
 }
 
+func TestThePagesFilesAreSentGzipped(t *testing.T) {
+	script := strings.Repeat("export const answer = 42; // padding padding padding\n", 200)
+	index := `<!doctype html><script type="module" src="/assets/hub-1a2b.js"></script><div id=app></div>` + strings.Repeat("<!-- padding -->", 200)
+	ui := fstest.MapFS{
+		"index.html":         {Data: []byte(index)},
+		"assets/hub-1a2b.js": {Data: []byte(script)},
+	}
+	s := hubtest.New(t, hubtest.WithOptions(func(o *api.Options) { o.UI = ui }))
+	b := s.Browser()
+
+	// An Accept-Encoding the test sets itself is not undone by the HTTP client.
+	plain := b.Do("GET", "/assets/hub-1a2b.js", nil, "Accept-Encoding", "identity")
+	if plain.Code != 200 || plain.Header.Get("Content-Encoding") != "" || string(plain.Body) != script {
+		t.Fatalf("plain: %d %q, %d bytes", plain.Code, plain.Header.Get("Content-Encoding"), len(plain.Body))
+	}
+	zipped := b.Do("GET", "/assets/hub-1a2b.js", nil, "Accept-Encoding", "gzip, br")
+	if zipped.Code != 200 || zipped.Header.Get("Content-Encoding") != "gzip" || len(zipped.Body)*3 > len(script) {
+		t.Fatalf("gzip: %d %q, %d bytes of %d", zipped.Code, zipped.Header.Get("Content-Encoding"), len(zipped.Body), len(script))
+	}
+	for _, r := range []hubtest.Resp{plain, zipped} {
+		if r.Header.Get("Vary") != "Accept-Encoding" || !strings.Contains(r.Header.Get("Cache-Control"), "immutable") {
+			t.Errorf("headers: %v", r.Header)
+		}
+	}
+	if plain.Header.Get("ETag") == zipped.Header.Get("ETag") {
+		t.Errorf("one tag for both copies: %q", plain.Header.Get("ETag"))
+	}
+	if r := b.Do("GET", "/assets/hub-1a2b.js", nil, "Accept-Encoding", "gzip", "Range", "bytes=0-9"); r.Code != 206 || r.Header.Get("Content-Encoding") != "" || string(r.Body) != script[:10] {
+		t.Errorf("range: %d %q %q", r.Code, r.Header.Get("Content-Encoding"), r.Body)
+	}
+	page := b.Do("GET", "/sign-in", nil, "Accept-Encoding", "gzip")
+	if page.Code != 200 || page.Header.Get("Content-Encoding") != "gzip" || len(page.Body) >= len(index) || page.Header.Get("Cache-Control") != "no-store" {
+		t.Errorf("page: %d %v, %d bytes", page.Code, page.Header, len(page.Body))
+	}
+	if r := b.Do("GET", "/sign-in", nil, "Accept-Encoding", "identity"); r.Header.Get("Content-Encoding") != "" || string(r.Body) != index {
+		t.Errorf("plain page: %q, %d bytes", r.Header.Get("Content-Encoding"), len(r.Body))
+	}
+}
+
 func TestThePageIsServedWithItsPolicy(t *testing.T) {
 	ui := fstest.MapFS{
 		"index.html":         {Data: []byte(`<!doctype html><script>document.documentElement.dataset.theme="dark"</script><script type="module" src="/assets/app-1a2b.js"></script><div id=app></div>`)},
@@ -556,4 +608,32 @@ func readCaps(t *testing.T, s *hubtest.Stack) map[string]bool {
 		out[c.ID] = true
 	}
 	return out
+}
+
+func TestExtensionUIIsOffUntilTheFlag(t *testing.T) {
+	reg, err := ext.NewRegistry([]ext.Spec{{
+		Name: "acme", Kind: "test", URL: "http://127.0.0.1:1", Protocol: "harnessly.test/v1",
+		UI:       []ext.UIView{{ID: "page", Slot: "hub-settings", Label: "Acme", URL: "https://views.example.com/page"}},
+		Branding: &ext.Branding{Name: "Example Corp", Accent: "#336699"},
+	}}, ext.Config{Attempts: 1, Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	with := func(o *api.Options) { o.Ext = reg }
+	// Off: no route, and the page frames nothing.
+	off := hubtest.New(t, hubtest.WithOptions(with))
+	if r := off.Browser().Do("GET", "/api/ext/ui", nil); r.Code != 404 {
+		t.Fatalf("flag off: %d %s", r.Code, r.Body)
+	}
+	t.Setenv("HARNESSLY_UI_SLOTS", "on")
+	on := hubtest.New(t, hubtest.WithOptions(with))
+	r := on.Browser().Do("GET", "/api/ext/ui", nil)
+	var got ext.HostUI
+	r.JSON(&got)
+	if r.Code != 200 || len(got.Views) != 1 || got.Views[0].Origin != "https://views.example.com" || got.Branding == nil || got.Branding.Name != "Example Corp" {
+		t.Fatalf("flag on: %d %+v", r.Code, got)
+	}
+	if strings.Contains(string(r.Body), "127.0.0.1") {
+		t.Errorf("the adapter's own address is in the answer: %s", r.Body)
+	}
 }

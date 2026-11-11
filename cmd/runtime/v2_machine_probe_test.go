@@ -103,3 +103,41 @@ func TestProbeShellNeedsTwoSnapshots(t *testing.T) {
 		t.Fatalf("%d reads", f.reads)
 	}
 }
+
+type freshFake struct {
+	probeFake
+	now      map[string]tmux.PaneInfo
+	nowReads int
+}
+
+func (f *freshFake) ReadAllPanesNow() (map[string]tmux.PaneInfo, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.nowReads++
+	return f.now, f.now != nil
+}
+
+// Servers followed by events answer two looks from one listing: a shell seen twice is checked with a listing made
+// now, once, and an agent that is up by then is not taken for exited.
+func TestProbeConfirmsAShellWithAFreshListing(t *testing.T) {
+	shell := map[string]tmux.PaneInfo{"tk-a": {Command: "bash"}}
+	f := &freshFake{probeFake: probeFake{ok: true, panes: shell}, now: map[string]tmux.PaneInfo{"tk-a": {Command: "claude"}}}
+	m := &v2Tmux{probe: f}
+	m.Probe("tk-a")
+	m.expire()
+	if got := m.Probe("tk-a"); got != (convo.Probe{Session: true, Foreground: true}) || f.nowReads != 1 {
+		t.Fatalf("the agent is up in the fresh listing: %+v, %d fresh listings", got, f.nowReads)
+	}
+	f.mu.Lock()
+	f.now = shell
+	f.mu.Unlock()
+	for i, want := range []convo.Probe{{Session: true, Foreground: true}, {Session: true, Shell: true}, {Session: true, Shell: true}} {
+		m.expire()
+		if got := m.Probe("tk-a"); got != want {
+			t.Fatalf("look %d: %+v", i, got)
+		}
+	}
+	if f.nowReads != 2 {
+		t.Fatalf("%d fresh listings: a confirmed shell is not listed again", f.nowReads)
+	}
+}

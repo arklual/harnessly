@@ -19,6 +19,8 @@ import (
 const (
 	FeatureEnv     = "env"
 	FeatureCatalog = "catalog"
+	// FeaturePacks is the flag of environment packs (features.EnvPacks); off by default.
+	FeaturePacks = "env.packs"
 )
 
 // ChangeKind is the kind of the org_changes rows this package writes.
@@ -52,11 +54,14 @@ type Deps struct {
 	Now func() time.Time
 	// Recommended puts the platform's group «Рекомендованное» into every organization (HUB_ENV_RECOMMENDED).
 	Recommended bool
+	// Install are the installation's values the machines get with every app item (InstallValues).
+	Install map[string]string
 }
 
 // Service is the environment and the catalog of the organizations.
 type Service struct {
 	recommended bool
+	install     map[string]string
 	// applyDelay is the package's applyDelay when the service was made: a test changes that and puts it back while the
 	// service's routines may still read it.
 	applyDelay time.Duration
@@ -73,7 +78,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now, recommended: d.Recommended, applyDelay: applyDelay}
+	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now, recommended: d.Recommended, install: d.Install, applyDelay: applyDelay}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -158,6 +163,8 @@ type world struct {
 	presets  []store.EnvPreset
 	// choices are the people's choices of optional groups: tenant id → user id → group id → on.
 	choices map[string]map[string]map[string]bool
+	// install are the installation's values for the apps' ${install:<name>} (InstallValues).
+	install map[string]string
 }
 
 func loadWorld(ctx context.Context, st store.Store, o store.Org, recommended bool) (*world, error) {
@@ -361,7 +368,7 @@ func (r *rights) visibleTenants(w *world) ([]store.Space, error) {
 
 var kindRu = map[string]string{store.CatalogSkill: "скилл", store.CatalogMCP: "MCP", store.CatalogRepo: "репозиторий", store.CatalogDoc: "документ",
 	store.CatalogScript: "скрипт", store.CatalogAccess: "доступ", store.CatalogPlugin: "плагин", store.CatalogClaudeSettings: "настройки Claude",
-	store.CatalogApp: "приложение"}
+	store.CatalogApp: "приложение", store.CatalogPack: "пакет окружения"}
 
 // whereRu says where a layer is, for the title of a change.
 func (w *world) whereRu(layer, scopeID string) string {

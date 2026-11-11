@@ -29,6 +29,9 @@ const (
 	KindDoc    = "doc"
 	KindDesign = "design"
 	KindApp    = "app"
+	// KindKit is a UI kit: id "<space>/<kit id>". Shared like a design, with a ceiling: only the owner and
+	// people named one by one edit, a team or the company gets view at most (see kit.go).
+	KindKit = "kit"
 )
 
 // Roles, weakest first; a team level is one of none, view, comment, edit.
@@ -58,13 +61,14 @@ var (
 	teamLevels    = map[string]bool{levelNone: true, roleView: true, roleComment: true, roleEdit: true}
 	grantRoles    = map[string]bool{roleManage: true, roleEdit: true, roleComment: true, roleView: true}
 	requestLevels = map[string]bool{roleComment: true, roleEdit: true}
-	kinds         = map[string]bool{KindDoc: true, KindDesign: true, KindApp: true}
+	kinds         = map[string]bool{KindDoc: true, KindDesign: true, KindApp: true, KindKit: true}
 	emailRe       = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 	isoDateRe     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$`)
 )
 
-// Ref names a resource.
-type Ref struct{ Kind, ID string }
+// Ref names a resource. Space is the space the resource belongs to ("" for one no space is known for): every row of
+// the model is read and written within it, so the rows of one space never answer for a resource of another.
+type Ref struct{ Kind, ID, Space string }
 
 // Error is a refusal with the code the page matches on.
 type Error struct{ Code, Message string }
@@ -111,7 +115,9 @@ type resource struct {
 }
 
 type member struct {
-	Email     string
+	Email string
+	// UserID is the person who holds the role; "" for an invitation to the address that nobody has taken yet.
+	UserID    string
 	Role      string
 	GrantedBy string
 	GrantedAt time.Time
@@ -171,11 +177,18 @@ func fold(r resource, m *member, grants []teamGrant, person personTeams, homeOrg
 		}
 		shared = stronger(shared, role)
 	}
+	if r.Kind == KindKit {
+		own, shared = kitPerson(own), kitGroup(shared) // the ceilings are the rule's too, so a stale row cannot lift them
+	}
 	role := stronger(own, shared)
 	ownWins := own != "" && (shared == "" || roleRank[own] > roleRank[shared])
 	byRole := role == roleManage || (role == roleEdit && r.EditorsCanShare)
+	if r.Kind == KindKit {
+		byRole = role == roleEdit && r.EditorsCanShare // a kit's «manage» is the owner's alone
+	}
 	steward := false
-	if teamOn && r.HomeTeam != "" {
+	if teamOn && r.HomeTeam != "" && r.Kind != KindKit { // no steward of a kit: its sharing is the owner's and its editors'
+
 		steward = person.teams[r.HomeTeam].lead || (homeOrg != "" && person.admin[homeOrg])
 	}
 	f := folded{Role: role, CanManage: byRole || steward, Steward: steward}

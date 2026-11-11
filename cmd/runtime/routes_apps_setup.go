@@ -267,7 +267,7 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 					return
 				}
 				_ = reg.Journal(id, apps.JournalEntry{What: "token.call", Class: apps.ClassHigh, OK: true, Detail: server + ": " + srv.Auth.Type})
-				apps.ProxyMCP(w, r, signed, values)
+				apps.ProxyMCPAs(w, r, signed, values, pkg.Manifest.Name)
 				return
 			}
 			if !has || srv.Command != "" || len(srv.Secrets()) == 0 {
@@ -286,7 +286,7 @@ func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
 			}
 			names := slices.Sorted(maps.Keys(values))
 			_ = reg.Journal(id, apps.JournalEntry{What: "secret.call", Class: apps.ClassHigh, OK: true, Detail: server + ": " + strings.Join(names, ", ")})
-			apps.ProxyMCP(w, r, srv, values)
+			apps.ProxyMCPAs(w, r, srv, values, pkg.Manifest.Name)
 		}),
 	}
 }

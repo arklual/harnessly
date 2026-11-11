@@ -139,6 +139,7 @@ func hookFilesConfig(dataDir string) hooksetup.Config {
 		LegacyTmuxSocket: env("RUNTIME_PROMPT_HANDOFF_UNKEYED_SOCKET", os.Getenv("RUNTIME_TMUX_LEGACY_SOCKET")),
 		Budget:           hubMode(),
 		AppsLiveHook:     appsLiveHookCommand(),
+		StatusHookCLI:    statusHookCommand(),
 		Codex: &codex.LauncherScriptConfig{DataDirs: scriptDirs, PortFile: hooksetup.PortFile, TokenFile: hooksetup.TokenFile,
 			LaunchArgsPath: "/api/codex/launch-args", TokenHeaders: headers, TokenEnv: mcpTokenEnv()},
 	}

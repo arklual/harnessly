@@ -8,6 +8,7 @@ workspace. It finds the runtime on this machine by itself: no setup, no login.
 
 SHOW THINGS TO THE PERSON
   harnessly browser <tool> [--json '{...}']  use the built-in agent browser
+  harnessly preview <command>      DevTools of the page open in the pane: network, console, server-log, throttle, block, cache
   harnessly open <target>           open it in the right pane; the person sees it at once, or when they come back
   harnessly panel show|hide         show or hide the whole right pane
   harnessly status                  what you asked the pane for, what the person has seen, what the pane shows
@@ -68,6 +69,8 @@ INSTALLING A RELEASE
   harnessly fleet stage|activate|rollback|status|delta
                                     a runtime release rolled out to this machine, off unless RUNTIME_UPDATE_MODE=fleet
                                     (stage, switch with a health check and rollback, delta). harnessly fleet --help
+  harnessly doctor update [--json]            where this runtime's updates come from: its channel (stable or latest),
+                                    the newest release of it, and why when there is none ("help doctor")
 
 MACHINE
   harnessly selftest [--agent] [--claude PATH]
@@ -110,7 +113,7 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
   harnessly app dev [DIR]           install the folder itself for development: a chat started after an edit gets it
   harnessly app install [DIR]       install a copy of the package on this machine
   harnessly app list | remove ID    the installed apps; uninstall one
-  harnessly app enable|disable ID    turn an app on or off in this chat (the agent gets it when it starts next)
+  harnessly app enable|disable ID    turn an app on or off in this chat (a running agent gets its tools at once where it can)
   harnessly app connect ID CONNECTION [--off]
                                     the person agrees that the app uses their connection (Settings → Connections), or takes it back
   harnessly app explain ID          why the app is on or off here, layer by layer: machine, team, consent, setup,
@@ -138,6 +141,12 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
                                     a standalone app (target app) by link: no account, no chat, no agent
   harnessly app eval [DIR] [--runs N] [--case NAME] [--threshold 0.8] [--no-baseline] [--no-judge]
                                     run evals/*.json on a real agent; exits 1 under the threshold
+
+NOTICES (ask the person in the smart notice, the black plate at the top of their screen)
+  harnessly notice ask --title TEXT -o OPTION -o OPTION [--own] | --kind confirm [--danger] | --kind field
+                                    a choice, a yes/no or a short text; waits and prints {status, value}; exit 4 when
+                                    not answered. Never passwords, keys or sign-ins (refused): those go through SECRETS
+  harnessly notice show --kind status|progress --title TEXT [--progress 0..1] | update ID | close ID
 
 SECRETS (the safe of this machine: tokens and keys the person put in, outside the chat)
   harnessly secret list             the names in the safe and when each was put and last used (never a value)
@@ -191,8 +200,15 @@ THIS MACHINE'S DATA IN THE HUB
   harnessly migrate verify                    ask the hub again for every moved object
 
 DESIGN PROJECTS
+  harnessly design list|state|logs|panel|check|claim|release|who|history|restore   the shared library ("help design")
   harnessly doctor render [--json]            draw a real picture and a 2 s video here and read them back ("help doctor")
+  harnessly design check <project> [--strict] [--board FILE]   check a design: --strict reads it against its kit (only the kit's
+                                    components, props and tokens; the fix with each finding), else draws its boards in Chrome
+  harnessly design code <project> --to <repo> [--dry-run]   turn the page modules into the application's code by its
+                                    sinopia.export.json: views, fixtures, stories, tests, routes; containers are never touched
   harnessly design page list <project>        the pages of a design project: id, title, board file
+  harnessly design page build <project> [page]  build the boards of page modules (pages/<name>.tsx)
+  harnessly design page check <project>       is every page module's board current (fails when not)
   harnessly design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE | --layout KIT/THEME/LAYOUT]
                                     a new page: a permanent id and a board file made from the project's board template
   harnessly design page rename <project> <page> [--title TITLE] [--file NAME.dc.html]
@@ -215,6 +231,7 @@ DESIGN PROJECTS
                                     one time in detail: page, viewport, last actions, errors, requests, jank around it.
                                     T is RFC3339, HH:MM:SS (today), -2m (ago) or now
   harnessly design migrate [--dry-run] [--library DIR] [<project>]
+  harnessly design migrate --to tsx|board [--board NAME] [--dry-run] [--force] [--library DIR] <project>
                                     give every project of a library its meta/ (pages with ids); board files untouched
   harnessly design kit install ID VERSION TARBALL|URL    install a UI kit version for boards ("design kit --help")
   harnessly design kit list                              the installed kits
@@ -262,6 +279,7 @@ counts towards the person's limit of delegated chats until it goes. Only a chat 
 	"docs":         docsUsage,
 	"logs":         logsHelp,
 	"browser":      browserHelp,
+	"preview":      previewHelp,
 	"upgrade":      upgradeHelp,
 	"fleet":        fleetHelp,
 	"design video": videoHelp,
@@ -447,6 +465,14 @@ artifact.json, never a board or an asset, and gives the same ids however often i
   harnessly design migrate --dry-run --library /srv/design
   harnessly design migrate --library /srv/design
 
+design migrate --to tsx turns a project's old boards into page modules (pages/<name>.tsx and its fixtures), by rules,
+and keeps each only when the page draws the board's picture pixel for pixel in Chrome; the others stay boards and the
+report says why. --to board takes them back, byte for byte (--force: also a page edited since).
+
+  harnessly design migrate --to tsx --dry-run --library /srv/design shop
+  harnessly design migrate --to tsx --library /srv/design shop
+  harnessly design migrate --to board --library /srv/design shop
+
 A video (a project of the kind video) is a deck whose boards are scenes; its commands are in "harnessly design video --help":
 
   harnessly design video get shop-video
@@ -454,9 +480,15 @@ A video (a project of the kind video) is a deck whose boards are scenes; its com
   harnessly design video frame shop-video "Intro" --strip 0:6:1s --format 9:16
   harnessly design video check shop-video --scene "Intro"
   harnessly design video render shop-video --draft --wait
-`,
-	"hook": `harnessly hook design-guard | design-release
 
+The shared library, from the shell:
+
+` + designOpsHelp,
+	"hook": `harnessly hook status EVENT | design-guard | design-release
+
+status is the lifecycle hook the runtime gives Claude Code (EVENT: session-start, prompt-submit, stop, ...): the event
+is written to the spool of the data folder and told to the runtime, which reads the spool when a delivery did not
+reach it. It prints nothing and always succeeds.
 design-guard is a Claude Code PreToolUse hook: reads the hook's JSON on stdin and refuses a Write, Edit or shell command
 that writes project/canvas.json of a design project, telling the agent to use "design page". It also takes (or renews)
 the chat's lease on a board (*.dc.html) the call writes, and refuses with the holder's name when another chat holds it,
@@ -498,6 +530,31 @@ the person's own, where those are allowed: its name as the list prints it (any c
 is ever on your side; the message is the bot's, not yours, so write it to the person: short, what happened and what is
 needed from them. Follow the person's instruction of when to write, and never send routine progress. At most 20
 messages a minute; 16000 characters at most.
+`,
+	"notice": `harnessly notice ask --kind choice|confirm|field --title TEXT [--text TEXT] [options] [--timeout D] [--no-wait]
+harnessly notice show --kind status|progress --title TEXT [--text TEXT] [--progress 0..1]
+harnessly notice update ID [--progress 0..1] [--title TEXT] [--text TEXT] | close ID | wait ID
+
+  harnessly notice ask --title "Куда выкатить сборку 482?" -o "На стенд" -o "В тест" -o "Никуда" --own
+  harnessly notice ask --kind confirm --title "Удалить 3 старые таблицы?" --text "orders_tmp, orders_bak" --danger --yes "Удалить"
+  harnessly notice ask --kind field --title "Тема рассылки" --placeholder "Весна 2027"
+  id=$(harnessly notice show --kind progress --title "Собираю сборку 482" --progress 0) ; harnessly notice update $id --progress 0.6
+
+The question appears in the person's smart notice (the black plate at the top) labelled with this chat's name, and the
+command waits (10 minutes by default, --timeout up to a day) and prints JSON {status, value}: status answered,
+dismissed (they said no or closed it), timeout or muted (they turned this chat's notices off); not answered exits 4.
+A choice answers {choice, option} or {text} for own words (--own), a confirm true/false, a field its text.
+Hiding the plate is not an answer: the question waits as a drop in the chat's column.
+
+Kinds: choice (2 to 6 options, -o each, up to 80 characters; the person picks with a click or a digit key), confirm
+(--yes/--no name the buttons, --danger for what cannot be undone: red, never the default), field (--placeholder, one
+line). status goes by itself after a few seconds; progress stays until close or its timeout. A one-time code
+never comes to you here: "harnessly secret run --code" puts it straight into the command that needs it.
+
+Never ask for a password, a key, a token or a sign-in here: there is no such field, and the machine refuses a title or
+an answer that looks like one. For a secret run "harnessly secret ask NAME --why …"; for a site sign-in use the
+browser's sign-in. Ask only for a decision the work cannot go on without: at most 5 new notices a minute per chat,
+one shown per chat at a time (the rest wait their turn), the same question asked again joins the open one.
 `,
 	"ask": `harnessly ask [approve] --to NAME [--bot BOT] [--option TEXT]... [--details TEXT] [--link URL] [--timeout D] QUESTION...
 harnessly ask people | list | wait ID | status ID | cancel ID

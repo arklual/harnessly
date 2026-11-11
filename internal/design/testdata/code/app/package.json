@@ -1,0 +1,1 @@
+{ "name": "acme-events-app", "private": true, "type": "module", "dependencies": { "@acme/ui": "1.0.0", "react": "*", "react-dom": "*" } }

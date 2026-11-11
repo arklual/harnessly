@@ -113,7 +113,8 @@ func Of(cfg Config, c Call, links []string) []wire.TurnOutput {
 		if link := first(links, func(l string) bool { return ArtifactLink(cfg, l) }); link != "" {
 			return []wire.TurnOutput{{Kind: wire.OutputArtifact, Op: wire.OutputCreated, Ref: link, Title: titleOr(cmd, link)}}
 		}
-	case strings.Contains(cmd, "glab mr create") || strings.Contains(cmd, "gh pr create"):
+	case strings.Contains(cmd, "glab mr create") || strings.Contains(cmd, "gh pr create") ||
+		(strings.Contains(cmd, "git push") && strings.Contains(cmd, "merge_request.create")):
 		if link := first(links, mrLinkRe.MatchString); link != "" {
 			return []wire.TurnOutput{{Kind: wire.OutputMR, Op: wire.OutputCreated, Ref: link, Title: titleOr(cmd, mrName(link))}}
 		}

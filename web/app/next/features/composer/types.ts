@@ -45,6 +45,8 @@ export interface QueueRow {
   ahead?: boolean;
   /** Typed in, and the agent has not read it yet: it reads it after its current step. */
   handed?: boolean;
+  /** Taken back, and nobody has confirmed it yet: it may still reach the agent. */
+  cancelling?: boolean;
 }
 
 /** A one-line notice over the field: the machine stopped answering, or the subscription's limit ran out. */
@@ -73,6 +75,8 @@ export type DockNotice =
   | { kind: 'off'; machine: string }
   /** A new chat has no machine to start on: every one of the person's is down. */
   | { kind: 'noMachines' }
+  /** No agent of the machine is signed in: a chat cannot start until one is. */
+  | { kind: 'signIn'; onOpen: () => void }
   | { kind: 'machine'; machine: string; onStop: () => Promise<unknown> }
   /** The key of the chat's vendor was removed: it can be added again or the chat continued in another model. */
   | { kind: 'key'; vendor: string; onOpen: () => void; onContinue: (() => void) | null }

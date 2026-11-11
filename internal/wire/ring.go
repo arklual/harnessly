@@ -35,8 +35,16 @@ type ring struct {
 }
 
 func (r *ring) push(it ringItem) {
-	if r.buf == nil {
-		r.buf = make([]ringItem, RingSize)
+	// Events past RingAge are of no use to a page that comes back: drop them now, not when someone subscribes, so a
+	// channel that went quiet gives its buffer back.
+	r.trim(it.at)
+	if r.n == len(r.buf) && len(r.buf) < RingSize {
+		// The buffer grows with the channel: most channels see a handful of events, not RingSize.
+		grown := make([]ringItem, min(max(8, 2*len(r.buf)), RingSize))
+		for i := 0; i < r.n; i++ {
+			grown[i] = *r.at(i)
+		}
+		r.buf, r.start = grown, 0
 	}
 	if r.n == len(r.buf) {
 		r.buf[r.start] = ringItem{}
@@ -55,6 +63,9 @@ func (r *ring) trim(now time.Time) {
 		r.buf[r.start] = ringItem{}
 		r.start = (r.start + 1) % len(r.buf)
 		r.n--
+	}
+	if r.n == 0 {
+		r.buf, r.start = nil, 0
 	}
 }
 

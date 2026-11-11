@@ -2,7 +2,8 @@
 // that make each kind of waiting, and a field at the bottom it stands over.
 //
 //   ?dev=notifs                    a mock window of the app (chats, a chat, its field) and the buttons in its side
-//   &set=pile                      a code, a question and a permission at once; &set=one a question
+//   &set=pile                      a code, a question and a permission at once; &set=one a question; &set=many ten
+//                                  The side lists the metrics' events as the chat would send them.
 //   &set=drops                     every kind put away into the drops of the right column, long names among them
 //   &open=1                        the card open
 //   &place=top-right|…             where it stands (the middle of the top edge by default); the side switches it
@@ -23,6 +24,21 @@ import { NOTICE_PLACES, type TNoticePlace } from '@/next/stores/notices';
 import { ToastHost, toast } from '@/next/ui/toast';
 import Drops from '@/next/features/smart-notice/drops';
 import { fly, snap } from '@/next/features/smart-notice/fly';
+import { looksSecret } from '@/next/features/smart-notice/looks-secret';
+import {
+  SLOT_ANSWER,
+  slotIcon,
+  slotWaits,
+  type ISlotNotice,
+  type ISlotSource,
+} from '@/next/features/smart-notice/slot-body';
+import { KIND_RANK, useFront, useNewsClock } from '@/next/features/smart-notice/flow';
+import {
+  NOTICE_ACTION,
+  noticeEvent,
+  setNoticeSink,
+  type IUiEvent,
+} from '@/next/features/smart-notice/metrics';
 // The chat's own stylesheets in the chat's order: a class of another feature that happens to share a name shows here
 // as it does in a chat (composer.css once laid its file-drop hint over the drops).
 import '@/next/styles/order';
@@ -38,14 +54,59 @@ const PLACES: readonly { place: TNoticePlace; label: string }[] = [
   { place: 'top-right', label: 'Справа сверху' },
   { place: 'bottom-center', label: 'Над полем' },
 ];
-/** News lives this long here too (bindings/smart-notice.tsx NEWS_MS), longer while held. */
+/** News lives this long here too (bindings/smart-notice.tsx NEWS_MS), its clock paused while held. */
 const NEWS_MS = 7000;
-const GRACE_MS = 2500;
-const NEWS: ReadonlySet<TSmartKind> = new Set([SMART_KIND.done, SMART_KIND.failed, SMART_KIND.limit]);
+const NEWS: ReadonlySet<TSmartKind> = new Set([
+  SMART_KIND.done,
+  SMART_KIND.failed,
+  SMART_KIND.limit,
+  SMART_KIND.info,
+]);
 const twoFrames = (run: () => void) => requestAnimationFrame(() => requestAnimationFrame(run));
 const CHATS = ['Лендинг кофейни', 'Миграция базы', 'Публикация пакета', 'Меню на сайте', 'Отчёт за октябрь'];
 
-type TSample = 'question' | 'permission' | 'code' | 'machine' | 'long' | 'done' | 'failed';
+type TChatSample = 'question' | 'permission' | 'code' | 'machine' | 'long' | 'done' | 'failed';
+/** What apps and agents ask through the open slot, one of each kind. */
+type TSlotSample =
+  | 'slot-choice'
+  | 'slot-confirm'
+  | 'slot-field'
+  | 'slot-code'
+  | 'slot-progress'
+  | 'slot-status'
+  | 'slot-custom';
+type TSample = TChatSample | TSlotSample;
+
+const CI: ISlotSource = { kind: 'app', id: 'ci', name: 'Сборки' };
+const DESIGN: ISlotSource = { kind: 'app', id: 'design', name: 'Дизайн' };
+const MAIL: ISlotSource = { kind: 'app', id: 'mail', name: 'Почта' };
+const MIGRATION: ISlotSource = { kind: 'agent', id: 'tab-b', name: 'Миграция базы' };
+const PUBLISH: ISlotSource = { kind: 'agent', id: 'tab-c', name: 'Публикация пакета' };
+
+const COVERS = `<div class="ink-grid">
+  <button class="ink-tile" data-answer='{"cover":"dark"}'>Тёмная</button>
+  <button class="ink-tile" data-answer='{"cover":"light"}'>Светлая</button>
+  <button class="ink-tile" data-answer='{"cover":"photo"}'>Фото</button>
+</div>
+<p class="ink-muted">Обложка встанет на все письма рассылки.</p>`;
+
+const slotSample = (
+  id: TSlotSample,
+  source: ISlotSource,
+  chatId: string | null,
+  n: Omit<ISlotNotice, 'id' | 'source' | 'createdAt' | 'expiresAt'>,
+): Omit<ISmartItem, 'key' | 'at' | 'until'> & { detail: TSmartDetail } => {
+  const notice: ISlotNotice = { ...n, id, source, createdAt: 0, expiresAt: 0 };
+  return {
+    kind: slotWaits(n.kind) ? SMART_KIND.ask : SMART_KIND.info,
+    chatId,
+    icon: slotIcon(notice),
+    title: source.name,
+    text: n.title,
+    source,
+    detail: { k: 'slot', notice },
+  };
+};
 
 const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { detail: TSmartDetail }> = {
   question: {
@@ -136,18 +197,54 @@ const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { deta
     text: 'Ход прервался',
     detail: { k: 'plain' },
   },
+  'slot-choice': slotSample('slot-choice', CI, null, {
+    kind: 'choice',
+    icon: 'git-branch',
+    title: 'Куда выкатить сборку 482?',
+    options: ['На стенд', 'В тест', 'Никуда'],
+    own: true,
+  }),
+  'slot-confirm': slotSample('slot-confirm', MIGRATION, 'tab-b', {
+    kind: 'confirm',
+    icon: 'triangle-alert',
+    title: 'Удалить 3 старые таблицы?',
+    text: 'orders_2023, orders_tmp, orders_bak — данные в них не восстановить.',
+    yes: 'Удалить',
+    danger: true,
+  }),
+  'slot-field': slotSample('slot-field', PUBLISH, 'tab-c', {
+    kind: 'field',
+    title: 'Как назвать релиз?',
+    text: 'Попадёт в заголовок на странице пакета.',
+    placeholder: 'Например, «Весна»',
+  }),
+  'slot-code': slotSample('slot-code', MAIL, null, {
+    kind: 'code',
+    icon: 'mail',
+    title: 'Код из письма',
+    text: 'Ящик прислал код, чтобы подключить рассылку.',
+    digits: 6,
+  }),
+  'slot-progress': slotSample('slot-progress', CI, null, {
+    kind: 'progress',
+    title: 'Собираю сборку 482',
+    text: 'Тесты · 128 из 200',
+    progress: 0.64,
+  }),
+  'slot-status': slotSample('slot-status', CI, null, {
+    kind: 'status',
+    icon: 'circle-check',
+    title: 'Сборка 482 готова',
+  }),
+  'slot-custom': slotSample('slot-custom', DESIGN, null, {
+    kind: 'custom',
+    icon: 'palette',
+    title: 'Какую обложку взять?',
+    view: COVERS,
+  }),
 };
 
-const RANK: Record<TSmartKind, number> = {
-  code: 0,
-  permission: 1,
-  machine: 2,
-  question: 2,
-  plan: 2,
-  failed: 3,
-  limit: 3,
-  done: 4,
-};
+const RANK = KIND_RANK;
 
 let seq = 0;
 
@@ -165,6 +262,26 @@ const byRank = (list: readonly TGalleryItem[]) => [...list].sort((a, b) => RANK[
 /** Every kind that waits, put away into a drop: the long names show how a line ends. */
 const DROP_SAMPLES: readonly TSample[] = ['machine', 'code', 'permission', 'question', 'long'];
 const allDrops = () => byRank(DROP_SAMPLES.map(made));
+/** Ten at once: what a busy afternoon of several chats brings. */
+const MANY_SAMPLES: readonly TSample[] = [
+  'code',
+  'permission',
+  'question',
+  'question',
+  'long',
+  'machine',
+  'failed',
+  'done',
+  'done',
+  'done',
+];
+const many = () => byRank(MANY_SAMPLES.map(made));
+/** A chat long enough to scroll under the plate: the feed must keep its scroll. */
+const FEED_LINES = Array.from({ length: 36 }, (_, i) =>
+  i % 3 === 0
+    ? `Шаг ${i / 3 + 1}: собрал блок, проверил вёрстку на телефоне и на широком экране.`
+    : 'Поправил отступы по сетке 8pt, сверил цвета с макетом, прогнал проверку ссылок.',
+);
 
 /** What the page starts with: `&set=pile` a code, a question and a permission, `&set=one` a question, `&set=drops`
  *  every waiting kind in the drops. */
@@ -173,6 +290,7 @@ const firstItems = (): readonly TGalleryItem[] => {
   if (set === 'pile') return byRank((['question', 'permission', 'code'] as const).map(made));
   if (set === 'drops') return allDrops();
   if (set === 'one') return [made('question')];
+  if (set === 'many') return many();
   return [];
 };
 
@@ -188,12 +306,8 @@ const Gallery = () => {
   const [arriving, setArriving] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [held, setHeld] = useState(false);
-  const [graceUntil, setGraceUntil] = useState(0);
   const [anchor, setAnchor] = useState<{ x: number; bottom: number } | null>(null);
-  const onHold = useCallback((on: boolean) => {
-    setHeld(on);
-    if (!on) setGraceUntil(Date.now() + GRACE_MS);
-  }, []);
+  const onHold = useCallback((on: boolean) => setHeld(on), []);
   const pick = (next: TNoticePlace) => {
     setPlace(next);
     const url = new URL(window.location.href);
@@ -239,9 +353,21 @@ const Gallery = () => {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => unlockSound(), []);
+  // The metrics' events, newest first, as the chat would send them.
+  const [events, setEvents] = useState<readonly IUiEvent[]>([]);
+  useEffect(() => {
+    setNoticeSink((event) => setEvents((was) => [event, ...was].slice(0, 8)));
+    return () => setNoticeSink(null);
+  }, []);
 
-  const keep = open || held || now < graceUntil;
-  const live = items.filter((i) => !hidden.has(i.key) && (keep || !NEWS.has(i.kind) || now - i.at < NEWS_MS));
+  const keep = open || held;
+  const onClock = useNewsClock(
+    items.filter((i) => NEWS.has(i.kind)),
+    keep,
+    now,
+    NEWS_MS,
+  );
+  const live = items.filter((i) => !hidden.has(i.key) && (!NEWS.has(i.kind) || onClock.has(i.key)));
   const drops = items
     .filter((i) => hidden.has(i.key) && !NEWS.has(i.kind))
     .map((item) => {
@@ -293,7 +419,27 @@ const Gallery = () => {
       ).then(() => setArriving(false));
     });
   };
-  const main = live.find((i) => i.key === mainKey) ?? live[0] ?? null;
+  const main = useFront(live, mainKey, setMainKey, open || held);
+  const closeAll = () => {
+    if (live.length === 0) return;
+    const was = hidden;
+    const gone = live;
+    setOpen(false);
+    setHidden(new Set([...was, ...gone.map((i) => i.key)]));
+    noticeEvent(NOTICE_ACTION.closedAll, { count: gone.length, stack: gone.length, place });
+    toast('Уведомления убраны', {
+      description: gone.some((i) => !NEWS.has(i.kind))
+        ? 'То, что ждёт ответа, — каплями в колонке чата'
+        : undefined,
+      action: {
+        label: 'Вернуть',
+        onClick: () => {
+          setHidden(was);
+          noticeEvent(NOTICE_ACTION.restored, { count: gone.length });
+        },
+      },
+    });
+  };
   const settle = async (item: ISmartItem, said: string) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
     toast(item.title, { description: said });
@@ -320,19 +466,24 @@ const Gallery = () => {
         </div>
         <b className="hx-ng__label">События</b>
         <div className="hx-ng__row">
-          {(Object.keys(SAMPLES) as TSample[]).map((sample) => (
-            <button
-              key={sample}
-              type="button"
-              className="hx-ng__btn"
-              data-testid={`fire-${sample}`}
-              onClick={() => fire(sample)}
-            >
-              {sample}
-            </button>
-          ))}
+          {(Object.keys(SAMPLES) as TSample[])
+            .filter((sample) => !sample.startsWith('slot-'))
+            .map((sample) => (
+              <button
+                key={sample}
+                type="button"
+                className="hx-ng__btn"
+                data-testid={`fire-${sample}`}
+                onClick={() => fire(sample)}
+              >
+                {sample}
+              </button>
+            ))}
           <button type="button" className="hx-ng__btn" data-testid="pile" onClick={pile}>
             стопка
+          </button>
+          <button type="button" className="hx-ng__btn" data-testid="many" onClick={() => setItems(many())}>
+            10 штук
           </button>
           <button type="button" className="hx-ng__btn" data-testid="drops" onClick={putAway}>
             капли
@@ -341,6 +492,36 @@ const Gallery = () => {
             clear
           </button>
         </div>
+        <b className="hx-ng__label">Слот приложений и агента</b>
+        <div className="hx-ng__row">
+          {(Object.keys(SAMPLES) as TSample[])
+            .filter((sample) => sample.startsWith('slot-'))
+            .map((sample) => (
+              <button
+                key={sample}
+                type="button"
+                className="hx-ng__btn"
+                data-testid={`fire-${sample}`}
+                onClick={() => fire(sample)}
+              >
+                {sample.slice(5)}
+              </button>
+            ))}
+        </div>
+        <b className="hx-ng__label">События метрик</b>
+        <ol className="hx-ng__events" data-testid="events">
+          {events.map((e, i) => (
+            <li key={`${e.at}:${i}`}>
+              {e.name === 'harnessly_notice' ? String(e.props.action) : 'жест'}
+              <small>
+                {Object.entries(e.props)
+                  .filter(([k]) => k !== 'action')
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(' ')}
+              </small>
+            </li>
+          ))}
+        </ol>
         <b className="hx-ng__label">Чаты</b>
         <ul className="hx-ng__chats">
           {CHATS.map((chat, i) => (
@@ -358,6 +539,11 @@ const Gallery = () => {
           </p>
           <p className="hx-ng__msg">Собрал главную: шапка с фото, меню из трёх разделов, карта с адресом.</p>
           <p className="hx-ng__msg">Осталось выбрать вариант шапки — спросил в уведомлении.</p>
+          {FEED_LINES.map((line, i) => (
+            <p key={i} className="hx-ng__msg" data-me={i % 6 === 5 || undefined}>
+              {line}
+            </p>
+          ))}
           {params.get('settings') === '1' && (
             <div className="hx-ng__settings">
               <NoticesPage />
@@ -402,6 +588,7 @@ const Gallery = () => {
         onStop={(item, heavy) => settle(item, `stopped ${heavy}`)}
         onOpenMachine={(item) => toast(item.title, { description: 'open machine' })}
         onHide={hideItem}
+        onCloseAll={closeAll}
         arriving={arriving}
         reply={{
           text: replyText,
@@ -416,6 +603,24 @@ const Gallery = () => {
           setTimeout(() => drop(item.key), 1800);
         }}
         onMute={(sound) => toast('Звук выключен', { description: sound })}
+        onSlot={async (notice, value) => {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          const typed = typeof value === 'string' ? value : (value as { text?: unknown }).text;
+          if (typeof typed === 'string' && looksSecret(typed)) return SLOT_ANSWER.secret;
+          const item = live.find((i) => i.sample === notice.id);
+          if (item) void settle(item, `Ответили: ${notice.title}`);
+          return SLOT_ANSWER.ok;
+        }}
+        onSlotDismiss={async (notice) => {
+          const item = live.find((i) => i.sample === notice.id);
+          if (item) drop(item.key);
+        }}
+        onMuteSource={(item) => {
+          const source = item.source;
+          if (!source) return;
+          setItems((was) => was.filter((i) => i.source?.id !== source.id));
+          toast(`Уведомления от «${source.name}» выключены`);
+        }}
         onSettings={() => toast('settings')}
         announceMs={5000}
         returnFocus={() => undefined}

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"html"
+	"strings"
 	"testing"
 )
 
@@ -103,5 +104,34 @@ func TestPageConfigHubLink(t *testing.T) {
 	t.Setenv("RUNTIME_HUB_URL", "https://carrier.example.com")
 	if c := pageConfigFromEnv(); c.HubLink == nil || *c.HubLink != "https://carrier.example.com" {
 		t.Errorf("the carrying hub is the link: %v", c.HubLink)
+	}
+}
+
+// The hub's analytics flag reaches the page only with a hub, and the key is absent while it is off.
+func TestPageConfigHubAnalytics(t *testing.T) {
+	t.Setenv("RUNTIME_HUB_URL", "https://hub.example.com")
+	t.Setenv("RUNTIME_HUB_ANALYTICS", "")
+	if strings.Contains(pageConfigMeta(pageConfigFromEnv()), "hubAnalytics") {
+		t.Error("the key is there while the flag is off")
+	}
+	t.Setenv("RUNTIME_HUB_ANALYTICS", "on")
+	if c := pageConfigFromEnv(); !c.HubAnalytics {
+		t.Error("flag on with a hub: off")
+	}
+	t.Setenv("RUNTIME_HUB_URL", "")
+	if c := pageConfigFromEnv(); c.HubAnalytics {
+		t.Error("flag on without a hub: on")
+	}
+}
+
+// Without RUNTIME_LOCALE the page config names no language, so the page takes the browser's.
+func TestPageConfigLocaleEmptyUntilSet(t *testing.T) {
+	t.Setenv("RUNTIME_LOCALE", "")
+	if got := pageConfigFromEnv().Locale; got != "" {
+		t.Fatalf("locale %q, want empty", got)
+	}
+	t.Setenv("RUNTIME_LOCALE", " ru ")
+	if got := pageConfigFromEnv().Locale; got != "ru" {
+		t.Fatalf("locale %q, want ru", got)
 	}
 }

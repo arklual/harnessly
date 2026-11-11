@@ -16,6 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/designkit"
 	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/filesync"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -79,6 +80,15 @@ func sharedLibrary(dir string) bool {
 // startStore links the runtime to its store and keeps the Sinopia library in step with it until ctx ends. A store
 // that cannot be opened is said in the log and leaves the runtime as it was: the library stays a folder.
 func (f *runtimeGate) startStore(ctx context.Context, cfg gate.Config) func() {
+	// Versions installed before kits had seals are sealed once, here, before anything syncs: from now on a version without a
+	// seal is one still arriving from another machine.
+	if f.kits != nil {
+		if n, err := designkit.SealLegacy(f.kits()); err != nil {
+			agent.Log("warn", "kits: the installed versions were not sealed", agent.F{K: "error", V: err.Error()})
+		} else if n > 0 {
+			agent.Log("info", "kits: installed versions sealed", agent.F{K: "count", V: n})
+		}
+	}
 	o, err := storeOptions(cfg)
 	if err == nil {
 		o.Log = slog.Default()
@@ -110,9 +120,17 @@ func (f *runtimeGate) startStore(ctx context.Context, cfg gate.Config) func() {
 		defer close(done)
 		f.store.SyncFolder(run, filestore.KindDesign, f.library)
 	}()
+	kitsDone := make(chan struct{})
+	go func() {
+		defer close(kitsDone)
+		if f.kits != nil {
+			f.store.SyncFolder(run, filestore.KindKits, f.kits)
+		}
+	}()
 	return func() {
 		stop()
 		<-done
+		<-kitsDone
 		stopApps()
 		f.store.Close()
 	}
@@ -136,7 +154,10 @@ func startAppsCenter(ctx context.Context, l *storelink.Link, dataDir string) fun
 				person = p
 				break
 			}
-			agent.Log("warn", "apps: no store session yet, the storage stays on the machine", agent.F{K: "error", V: err.Error()})
+			// A machine that is not in a space yet is told once, by the store link; the apps wait for the connection.
+			if !errors.Is(err, storelink.ErrNotConnected) {
+				agent.Log("warn", "apps: no store session yet, the storage stays on the machine", agent.F{K: "error", V: err.Error()})
+			}
 			select {
 			case <-run.Done():
 				return
@@ -167,7 +188,7 @@ func librarySynced() bool {
 var linked atomic.Pointer[storelink.Link]
 
 // deliveredMax is the largest handed-over file put into the hub's store; a bigger one is read from the machine only.
-const deliveredMax = 64 << 20
+const deliveredMax = filestore.MaxFileSize
 
 // keepDelivered puts a file the agent handed over into the `files` collection of the hub's store by its sha256
 // (docs/hub/history.md): the chat's card then reads it from the hub, the machine on or off. Only under a hub,

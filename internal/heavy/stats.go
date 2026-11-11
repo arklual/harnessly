@@ -17,10 +17,12 @@ type Stats struct {
 	Dir   string `json:"dir"`
 	Slots int    `json:"slots"`
 	Since string `json:"since"`
-	// Ran took a slot at once; Waited took one after waiting; Refused found none in time and did not run.
+	// Ran took a slot at once; Waited took one after waiting; Refused found none in time and did not run; Remote ran
+	// on the machine of HARNESSLY_HEAVY_REMOTE.
 	Ran     int `json:"ran"`
 	Waited  int `json:"waited"`
 	Refused int `json:"refused"`
+	Remote  int `json:"remote"`
 	// WaitP50Ms and WaitMaxMs are over the calls that waited or were refused.
 	WaitP50Ms int64          `json:"wait_p50_ms"`
 	WaitMaxMs int64          `json:"wait_max_ms"`
@@ -67,6 +69,8 @@ func ReadStats(dir string, since time.Time) (Stats, error) {
 		case "refused":
 			st.Refused++
 			waits = append(waits, ms)
+		case "remote":
+			st.Remote++
 		default:
 			continue
 		}
@@ -117,6 +121,9 @@ func statsCmd(args []string, env Env) int {
 	}
 	fmt.Fprintf(env.Stdout, "heavy checks on this machine in the last %s (%d %s, %s)\n", since, st.Slots, plural(st.Slots, "slot", "slots"), dir)
 	fmt.Fprintf(env.Stdout, "  ran at once  %d\n  waited       %d\n  refused      %d\n", st.Ran, st.Waited, st.Refused)
+	if st.Remote > 0 {
+		fmt.Fprintf(env.Stdout, "  on remote    %d\n", st.Remote)
+	}
 	if st.Waited+st.Refused > 0 {
 		fmt.Fprintf(env.Stdout, "  wait         median %s, longest %s\n",
 			roundWait(time.Duration(st.WaitP50Ms)*time.Millisecond), roundWait(time.Duration(st.WaitMaxMs)*time.Millisecond))

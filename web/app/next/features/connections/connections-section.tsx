@@ -116,9 +116,19 @@ interface IRowProps {
   all: readonly IConn[];
   leaving: boolean;
   actions: IConnActions;
+  /** Starts the person's own connection to this code host. */
+  onOwn: (baseUrl: string) => void;
 }
 
-const ConnRow = ({ conn, all, leaving, actions }: IRowProps) => {
+const CODE_HOSTS: readonly string[] = ['gitlab', 'github'];
+
+/** The deployment's code host with no own connection of the person beside it: it reads, but writes nothing in their name. */
+const readOnlyHost = (conn: IConn, all: readonly IConn[]): boolean =>
+  conn.env &&
+  CODE_HOSTS.includes(conn.kind) &&
+  !all.some((other) => !other.env && other.kind === conn.kind && other.baseUrl === conn.baseUrl);
+
+const ConnRow = ({ conn, all, leaving, actions, onOwn }: IRowProps) => {
   const [panel, setPanel] = useState<TPanel | null>(null);
   const [draft, setDraft] = useState(conn.name);
   const [busy, setBusy] = useState<TAction | null>(null);
@@ -200,6 +210,14 @@ const ConnRow = ({ conn, all, leaving, actions }: IRowProps) => {
               <span className="hx-conn-row__name">{conn.name}</span>
               <span className="hx-conn-row__sub">{subLine(conn)}</span>
               {conn.env && <span className="hx-conn-row__sub">{t('next.connections.env')}</span>}
+              {readOnlyHost(conn, all) && (
+                <span className="hx-conn-row__own">
+                  {t('next.connections.readOnly', { product: kindName(conn.kind) })}
+                  <button type="button" className="hx-conn-row__ownbtn" onClick={() => onOwn(conn.baseUrl)}>
+                    {t('next.connections.connectOwn')}
+                  </button>
+                </span>
+              )}
               {problem !== null && (
                 <span className="hx-conn-row__state">
                   <Icon name="triangle-alert" size="sm" />
@@ -301,13 +319,22 @@ const RowsSkeleton = () => (
   </Delayed>
 );
 
+/** The same address, whatever its trailing slash and letter case of the host. */
+const sameHost = (a: string, b: string): boolean => {
+  const plain = (value: string) => value.trim().replace(/\/+$/, '').toLowerCase();
+  return plain(a) === plain(b);
+};
+
 const ConnectionsSection = ({
   connections,
   failed = null,
   onDetect,
   onConnect,
+  start,
   ...actions
 }: IConnectionsSectionProps) => {
+  // «Подключить свой» of a row of the deployment: the form below finds its address and asks for the token.
+  const [own, setOwn] = useState<string | null>(null);
   const rows = useLeavingList(connections ?? NO_CONNS, (conn) => conn.id, LEAVE_MS);
   if (connections === null)
     return (
@@ -319,18 +346,34 @@ const ConnectionsSection = ({
       </Group>
     );
   const empty = connections.length === 0;
+  // The address of the page's link is found by itself only when it is a code host of the deployment (what the review's
+  // «Подключить свой» sends). Any other one is a stranger's choice: it is shown in the field and waits for «Найти».
+  const known = start !== undefined && connections.some((conn) => conn.env && sameHost(conn.baseUrl, start));
+  const linked = known ? start : undefined;
   return (
     <>
       {rows.length > 0 && (
         <Group title={t('next.connections.title')}>
           {rows.map(({ item, leaving }) => (
-            <ConnRow key={item.id} conn={item} all={connections} leaving={leaving} actions={actions} />
+            <ConnRow
+              key={item.id}
+              conn={item}
+              all={connections}
+              leaving={leaving}
+              actions={actions}
+              onOwn={setOwn}
+            />
           ))}
         </Group>
       )}
       <Group title={empty ? undefined : t('next.connections.add')} foot={t('next.connections.foot')}>
         {empty && <p className="hx-conn-empty">{t('next.connections.empty')}</p>}
-        <ConnectForm onDetect={onDetect} onConnect={onConnect} />
+        <ConnectForm
+          onDetect={onDetect}
+          onConnect={onConnect}
+          start={own ?? linked}
+          prefill={known ? undefined : start}
+        />
       </Group>
     </>
   );

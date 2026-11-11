@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/push"
 )
 
@@ -206,6 +207,25 @@ func serve(f http.Handler, method, url string, h map[string]string) (int, http.H
 	return rec.Code, rec.Result().Header, string(b)
 }
 
+// The health probe carries what following the transcripts costs when the runtime counts it, and nothing of it when
+// it does not.
+func TestHealthCarriesTheTranscriptNumbers(t *testing.T) {
+	data := t.TempDir()
+	var numbers any
+	f := goldenGate(t, Config{PlatformAPI: "/api/platform", DataDir: data, Push: push.New(push.Config{Dir: data}),
+		SessionOK:  func(*http.Request) bool { return true },
+		APIRefusal: func(*http.Request) (int, any, http.Header, bool) { return 0, nil, nil, false },
+		Health:     Health{App: "harnessly", FallbackVersion: "0.0.0-development", Transcripts: func() any { return numbers }}})
+	if code, _, body := serve(f, "GET", "/api/health", nil); code != 200 || body != `{"app":"harnessly","version":"0.0.0-development","commit":null}` {
+		t.Fatalf("%d %s", code, body)
+	}
+	numbers = jsvalue.NewObject("files", 2)
+	if code, _, body := serve(f, "GET", "/api/health", nil); code != 200 ||
+		body != `{"app":"harnessly","version":"0.0.0-development","commit":null,"transcripts":{"files":2}}` {
+		t.Fatalf("%d %s", code, body)
+	}
+}
+
 // The routes that need the previous runtime alive, a manifest file or a configured push are left to the previous
 // runtime without them: the gate hands them on (here to nothing, a 502).
 func TestRoutesStepAsideWithoutWhatTheyNeed(t *testing.T) {
@@ -274,5 +294,81 @@ func TestUsageCacheSurvivesARestart(t *testing.T) {
 	}
 	if tr := restarted.files[codex]; tr == nil || tr.model != "gpt-5.5" || len(tr.rows) != 2 {
 		t.Fatalf("%+v", tr)
+	}
+}
+
+// The health tells a rollout how far the chats are; a runtime that does not say leaves the field out.
+func TestHealthReportsTheChats(t *testing.T) {
+	state := "starting"
+	data := t.TempDir()
+	f := goldenGate(t, Config{PlatformAPI: "/api/platform", DataDir: data, Push: push.New(push.Config{Dir: data}),
+		SessionOK:  func(*http.Request) bool { return true },
+		APIRefusal: func(*http.Request) (int, any, http.Header, bool) { return 0, nil, nil, false },
+		Health: Health{App: "harnessly", FallbackVersion: "0.0.0-development", Alive: func() bool { return true },
+			Chats: func() string { return state }}})
+	for _, want := range []string{"starting", "restoring", "ready"} {
+		state = want
+		if code, _, body := serve(f, "GET", "/agents/api/health", nil); code != 200 ||
+			body != `{"app":"harnessly","version":"0.0.0-development","commit":null,"chats":"`+want+`"}` {
+			t.Fatalf("%s: %d %s", want, code, body)
+		}
+	}
+	state = ""
+	if _, _, body := serve(f, "GET", "/agents/api/health", nil); body != `{"app":"harnessly","version":"0.0.0-development","commit":null}` {
+		t.Fatalf("no state: %s", body)
+	}
+}
+
+// A runtime a rollout left running answers with the release its file names now, not the one it started with.
+func TestHealthFollowsTheReleaseFile(t *testing.T) {
+	data := t.TempDir()
+	for _, v := range []string{"1.0.0", "1.1.0"} {
+		dir := filepath.Join(data, v)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "release.json"), []byte(`{"version":"`+v+`","commit":"c`+v+`"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	current := filepath.Join(data, "current")
+	point := func(v string) {
+		t.Helper()
+		_ = os.Remove(current + ".new")
+		if err := os.Symlink(filepath.Join(data, v), current+".new"); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(current+".new", current); err != nil {
+			t.Fatal(err)
+		}
+	}
+	point("1.0.0")
+	f := goldenGate(t, Config{PlatformAPI: "/api/platform", DataDir: data, Push: push.New(push.Config{Dir: data}),
+		SessionOK:  func(*http.Request) bool { return true },
+		APIRefusal: func(*http.Request) (int, any, http.Header, bool) { return 0, nil, nil, false },
+		Health: Health{App: "harnessly", FallbackVersion: "0.0.0-development", Alive: func() bool { return true },
+			ReleaseFile: filepath.Join(current, "release.json")}})
+	health := func() string {
+		t.Helper()
+		_, _, body := serve(f, "GET", "/agents/api/health", nil)
+		return body
+	}
+	if got := health(); got != `{"app":"harnessly","version":"1.0.0","commit":"c1.0.0"}` {
+		t.Fatalf("at the start: %s", got)
+	}
+	point("1.1.0")
+	if got := health(); got != `{"app":"harnessly","version":"1.1.0","commit":"c1.1.0"}` {
+		t.Fatalf("after the switch: %s", got)
+	}
+	// The file gone for a moment (between two releases): the last answer stands.
+	if err := os.Remove(current); err != nil {
+		t.Fatal(err)
+	}
+	if got := health(); got != `{"app":"harnessly","version":"1.1.0","commit":"c1.1.0"}` {
+		t.Fatalf("without the file: %s", got)
+	}
+	point("1.0.0")
+	if got := health(); got != `{"app":"harnessly","version":"1.0.0","commit":"c1.0.0"}` {
+		t.Fatalf("after the way back: %s", got)
 	}
 }

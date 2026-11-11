@@ -155,3 +155,63 @@ func TestKindRoutes(t *testing.T) {
 		t.Errorf("docs without the app: %d %s", code, body)
 	}
 }
+
+// A type made of a Sinopia site: offered only where the deployment lists the app, made as a site project that
+// the library lists with the app's label, and opened in Sinopia's editor.
+func TestKindRoutesExtendSite(t *testing.T) {
+	lib := t.TempDir()
+	t.Setenv("RUNTIME_DESIGN_LIBRARY_DIR", lib)
+	writeAll(t, map[string]string{
+		filepath.Join(lib, ".template", "artifact.json"):         `{"title":"Шаблон"}`,
+		filepath.Join(lib, ".template", "project", "index.html"): "<!doctype html><title>t</title>",
+	})
+	pkg := t.TempDir()
+	writeAll(t, map[string]string{
+		filepath.Join(pkg, "harnessly", "app.json"): `{
+  "id": "acme.proto", "name": "Прототип", "description": "Прототип мобильного экрана", "version": "0.1.0", "harnessly": ">=0.17", "trust": "sandboxed",
+  "targets": ["sinopia.acme.proto"], "permissions": ["sinopia.kind", "app.extend"],
+  "views": [{ "id": "flow", "entry": "ui/flow.html", "targets": ["sinopia.acme.proto"] }],
+  "sinopia": { "kinds": [{ "id": "acme.proto", "title": "Прототип", "extends": "site", "schemaVersion": 1 }] }
+}`,
+		filepath.Join(pkg, "ui", "flow.html"): "<html></html>",
+	})
+	call, _ := appRig(t)
+	cli := map[string]string{"x-cli-token": "tok"}
+	page := map[string]string{"X-Test-Session": "yes", "Content-Type": "application/json"}
+	post := func(path string, v any) (int, map[string]any) {
+		raw, _ := json.Marshal(v)
+		code, body := call("POST", platformAPI+path, string(raw), page)
+		var out map[string]any
+		_ = json.Unmarshal([]byte(body), &out)
+		return code, out
+	}
+	if code, body := call("POST", "/api/cli/apps/install", `{"dir":"`+pkg+`"}`, cli); code != http.StatusOK {
+		t.Fatalf("install: %d %s", code, body)
+	}
+	agreeRig(t)
+
+	t.Setenv("HARNESSLY_APPS_EXTEND", "")
+	if code, body := call("GET", platformAPI+"/apps/kinds", "", page); code != http.StatusOK || strings.Contains(body, "acme.proto") {
+		t.Fatalf("not listed by the admin, not offered: %d %s", code, body)
+	}
+	if code, out := post("/apps/kinds/create", map[string]any{"kind": "acme.proto"}); code != http.StatusForbidden || out["error"] != "extend-not-allowed" {
+		t.Fatalf("not allowed: %d %v", code, out)
+	}
+
+	t.Setenv("HARNESSLY_APPS_EXTEND", "acme.proto")
+	code, made := post("/apps/kinds/create", map[string]any{"kind": "acme.proto", "title": "Экран входа"})
+	doc, _ := made["document"].(string)
+	if code != http.StatusOK || doc == "" {
+		t.Fatalf("create: %d %v", code, made)
+	}
+	if code, body := call("GET", platformAPI+"/apps/kinds/docs", "", page); code != http.StatusOK || strings.Contains(body, doc) {
+		t.Fatalf("a document made of a site is a project of the library, not an app's card: %d %s", code, body)
+	}
+	if code, out := post("/apps/kinds/open", map[string]any{"document": doc}); code != http.StatusOK || out["extends"] != "site" || out["app"] != "acme.proto" {
+		t.Fatalf("open: %d %v", code, out)
+	}
+	t.Setenv("HARNESSLY_APPS_EXTEND", "")
+	if code, out := post("/apps/kinds/open", map[string]any{"document": doc}); code != http.StatusOK || out["needsApp"] != true || out["reason"] != "extend-not-allowed" {
+		t.Fatalf("taken off the list: %d %v", code, out)
+	}
+}

@@ -35,10 +35,25 @@ interface Sent {
   machine: MachineId;
   op: Op;
   body: Record<string, unknown>;
+  /** When the command last ended (page time); null while it is on its way. */
+  endedAt: number | null;
 }
 
 const sent = new Map<string, Sent>();
 const running = new Map<string, OpHandle>();
+
+/** An ended command is kept this long, for a retry and for its button; then its body and its state are forgotten. */
+export const OP_KEPT_MS = 10 * 60_000;
+/** The ended commands are looked through no more often than this. */
+const SWEEP_EVERY_MS = 60_000;
+let sweptAt = Number.NEGATIVE_INFINITY;
+
+/** Forgets the commands that ended more than OP_KEPT_MS ago. */
+function sweep(now: number): void {
+  if (now - sweptAt < SWEEP_EVERY_MS) return;
+  sweptAt = now;
+  for (const [opId, s] of sent) if (s.endedAt !== null && now - s.endedAt > OP_KEPT_MS) forgetOp(opId);
+}
 
 const retryableFailure = (f: OpFailure): boolean => {
   if (f.r === 'refused') return (RETRYABLE_REFUSE_CODES as readonly string[]).includes(f.code);
@@ -54,7 +69,8 @@ export function runCommand<K extends Op>(
   opId: string = uuidv7(),
 ): OpHandle {
   const full = { ...body, opId } as Record<string, unknown>;
-  sent.set(opId, { machine, op, body: full });
+  sweep(pageClock().now());
+  sent.set(opId, { machine, op, body: full, endedAt: null });
   return execute(opId);
 }
 
@@ -72,6 +88,7 @@ export const sentBody = (opId: string): Sent | undefined => sent.get(opId);
 
 function execute(opId: string): OpHandle {
   const s = sent.get(opId) as Sent;
+  s.endedAt = null;
   const clock = pageClock();
   const limits = limitsOf(s.machine);
   const since = clock.now();
@@ -114,9 +131,16 @@ function execute(opId: string): OpHandle {
     } as const;
     opsStore.set(opId, final);
     return final;
-  })().finally(() => clock.clearTimeout(slowTimer));
+  })().finally(() => {
+    clock.clearTimeout(slowTimer);
+    // Over: only a command on its way needs its promise. A retry that started meanwhile has its own.
+    if (running.get(opId) === handle) {
+      running.delete(opId);
+      s.endedAt = clock.now();
+    }
+  });
 
-  const handle = { opId, done };
+  const handle: OpHandle = { opId, done };
   running.set(opId, handle);
   return handle;
 }

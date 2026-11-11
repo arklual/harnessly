@@ -203,6 +203,8 @@ func (m *Made) take(c outputs.Call, links []string, at wire.Ms) {
 			m.page(out.Ref, out.Title, op, at)
 		case wire.OutputDesign:
 			m.put(MadeLink{Kind: wire.MadeDesign, Ref: out.Ref, Op: out.Op, At: at}, "design:"+out.Ref)
+		case wire.OutputMR:
+			m.put(MadeLink{Kind: wire.MadeMR, Ref: out.Ref, Title: out.Title, Op: out.Op, At: at}, "mr:"+out.Ref)
 		}
 	}
 }

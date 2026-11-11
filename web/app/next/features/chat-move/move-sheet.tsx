@@ -116,7 +116,11 @@ const SheetBody = ({ load, onMove, onClose, prefer = null }: Omit<IMoveSheetProp
   const source = data?.source;
   const dirty = source?.dirty === true;
   const blocked = source ? !source.ok || source.busy : false;
+  // A source that is off: the chat goes on from its last snapshot, the folder's loose changes stay there, and the
+  // files may be missing on the target, which only the target finds out: the switch is offered, never required.
+  const snapshot = source?.fromSnapshot === true;
   const needsSkip = target !== null && (!target.filesOk || dirty);
+  const offerSkip = needsSkip || (snapshot && target !== null);
   const withoutFiles = needsSkip && skipFiles;
   const canSend =
     state.k === 'ready' &&
@@ -167,6 +171,7 @@ const SheetBody = ({ load, onMove, onClose, prefer = null }: Omit<IMoveSheetProp
         {data && source && !source.ok && !source.busy && (
           <p className="hx-mv__note">{t('next.moveVm.noHistory')}</p>
         )}
+        {data && snapshot && <p className="hx-mv__note">{t('next.moveVm.fromSnapshot')}</p>}
         {data && targets.length === 0 && <p className="hx-mv__note">{t('next.moveVm.none')}</p>}
         {data && targets.length > 0 && (
           <div className="hx-mv__list" role="radiogroup" aria-label={t('next.moveVm.title')}>
@@ -218,7 +223,7 @@ const SheetBody = ({ load, onMove, onClose, prefer = null }: Omit<IMoveSheetProp
             )}
           </div>
         )}
-        {needsSkip && (
+        {offerSkip && (
           <button
             type="button"
             role="switch"
@@ -231,7 +236,13 @@ const SheetBody = ({ load, onMove, onClose, prefer = null }: Omit<IMoveSheetProp
             <span className="hx-mv__knob" aria-hidden="true" />
             <span className="hx-mv__skiptxt">
               <strong>{t('next.moveVm.withoutFiles')}</strong>
-              <span>{dirty ? t('next.moveVm.sourceDirty') : t('next.moveVm.filesHint')}</span>
+              <span>
+                {dirty
+                  ? t('next.moveVm.sourceDirty')
+                  : snapshot && !needsSkip
+                    ? t('next.moveVm.snapshotFilesHint')
+                    : t('next.moveVm.filesHint')}
+              </span>
             </span>
           </button>
         )}

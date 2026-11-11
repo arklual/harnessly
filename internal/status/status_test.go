@@ -496,3 +496,135 @@ func TestAHookOfAForeignAgentSessionIsIgnored(t *testing.T) {
 		t.Fatalf("a pane that cannot tell: %s", got)
 	}
 }
+
+// A chat follows its agent's transcript itself: once the keeper knows the chat's tab, its poll reads no transcript
+// and no process tree for it. Any other agent tab is read at every poll, as before.
+func TestPollReadsNoTranscriptOfAChatsTab(t *testing.T) {
+	e := newEnv(t, claudeTab(Idle), &tmux.PaneInfo{PID: 100, Command: "claude"})
+	detect := func(path string) {
+		e.claude.mu.Lock()
+		e.claude.detected = path
+		e.claude.mu.Unlock()
+	}
+	e.claude.setRunning(100, true)
+	detect("/t/a.jsonl")
+	e.m.Poll()
+	if got := e.entry().JSONLPath; got != "/t/a.jsonl" {
+		t.Fatalf("an agent tab's transcript: %q", got)
+	}
+	e.m.d.ChatSession = func(s string) bool { return s == session }
+	detect("/t/b.jsonl")
+	e.m.Poll()
+	if got := e.entry().JSONLPath; got != "/t/a.jsonl" {
+		t.Fatalf("the poll read a chat's transcript: %q", got)
+	}
+	if got := e.entry().CliState; got != Idle {
+		t.Fatalf("a chat's tab after the poll: %s", got)
+	}
+	e.m.d.ChatSession = nil
+	e.m.Poll()
+	if got := e.entry().JSONLPath; got != "/t/b.jsonl" {
+		t.Fatalf("without a chat the poll reads the tab again: %q", got)
+	}
+}
+
+type countingPusher struct {
+	mu    sync.Mutex
+	kinds []string
+}
+
+func (p *countingPusher) Push(_ string, _ Entry, kind string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.kinds = append(p.kinds, kind)
+}
+
+func (p *countingPusher) got() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return strings.Join(p.kinds, ",")
+}
+
+// A chat's actor pushes and snapshots its turn's end itself: for a chat's tab the keeper does neither. Any other agent
+// tab is pushed once and snapshotted at its turn's end, as before.
+func TestChatTurnEndIsLeftToTheChat(t *testing.T) {
+	for _, chat := range []bool{false, true} {
+		e := newEnv(t, claudeTab(Idle), &tmux.PaneInfo{PID: 100, Command: "claude"})
+		p := &countingPusher{}
+		var mu sync.Mutex
+		snapshots := 0
+		e.m.mu.Lock()
+		e.m.d.Push = p
+		e.m.d.TurnEnd = func(string, string) { mu.Lock(); snapshots++; mu.Unlock() }
+		if chat {
+			e.m.d.ChatSession = func(s string) bool { return s == session }
+		}
+		e.m.mu.Unlock()
+		e.m.HandleProviderEvent(agents.Claude, session, agents.Event{Kind: agents.PromptSubmit}, nil)
+		e.m.HandleProviderEvent(agents.Claude, session, agents.Event{Kind: agents.Stop}, nil)
+		e.m.HandleProviderEvent(agents.Claude, session, agents.Event{Kind: agents.Stop}, nil)
+		if chat {
+			// The chat's hooks leave its tab alone; the actor's state moves it.
+			if got := e.entry().CliState; got != Idle {
+				t.Fatalf("a chat's hooks moved its tab: %s", got)
+			}
+			e.m.MirrorChat(session, ChatState{CliState: Busy, Event: EventPromptSubmit})
+			e.m.MirrorChat(session, ChatState{CliState: ReadyForReview, Event: EventStop})
+		}
+		if got := e.entry().CliState; got != ReadyForReview {
+			t.Fatalf("chat=%v: after stop %s", chat, got)
+		}
+		time.Sleep(pushSettle + 500*time.Millisecond)
+		mu.Lock()
+		n := snapshots
+		mu.Unlock()
+		want, wantSnaps := "done", 1
+		if chat {
+			want, wantSnaps = "", 0
+		}
+		if got := p.got(); got != want || n != wantSnaps {
+			t.Fatalf("chat=%v: pushes %q, snapshots %d", chat, got, n)
+		}
+	}
+}
+
+// A chat's tab has one automaton, its actor's: the keeper's own hooks, watchdogs and stops leave it where the actor
+// put it, and the actor's state brings the turn's history as a hook did.
+func TestChatTabFollowsItsActorOnly(t *testing.T) {
+	transcript := filepath.Join(t.TempDir(), "s1.jsonl")
+	_ = os.WriteFile(transcript, nil, 0o600)
+	e := newEnv(t, claudeTab(Idle), &tmux.PaneInfo{Command: "claude", PID: 10})
+	e.m.mu.Lock()
+	e.m.d.ChatSession = func(s string) bool { return s == session }
+	e.m.mu.Unlock()
+	e.m.HandleProviderEvent(agents.Claude, session, agents.Event{Kind: agents.LastUserMsg, Message: "do it"}, nil)
+	e.m.HandleProviderEvent(agents.Claude, session, agents.Event{Kind: agents.PromptSubmit}, nil)
+	e.m.Interrupted(session)
+	if got := e.entry().CliState; got != Idle {
+		t.Fatalf("the keeper moved a chat's tab: %s", got)
+	}
+	e.m.MirrorChat(session, ChatState{CliState: Busy, Event: EventPromptSubmit, Transcript: transcript, AgentSessionID: "a1"})
+	if en := e.entry(); en.CliState != Busy || en.JSONLPath != transcript || en.AgentSessionID.Value() != "a1" {
+		t.Fatalf("after the actor's working: %+v", en)
+	}
+	e.m.MarkAgentGone("t1", true)
+	if got := e.entry().CliState; got != Busy {
+		t.Fatalf("the keeper's gone moved a chat's tab: %s", got)
+	}
+	e.m.MirrorChat(session, ChatState{CliState: ReadyForReview, Event: EventStop})
+	waitFor(t, "history entry", func() bool { return len(e.hist.All()) == 1 })
+	if h := e.hist.All()[0]; *h.Prompt != "do it" || h.TabID != "t1" {
+		t.Fatalf("%+v", h)
+	}
+	if en := e.entry(); en.LastEvent.Val == nil || en.LastEvent.Val.Name != EventStop {
+		t.Fatalf("last event: %+v", en.LastEvent)
+	}
+	// A session that is no chat's is not the mirror's.
+	e.m.mu.Lock()
+	e.m.d.ChatSession = nil
+	e.m.mu.Unlock()
+	e.m.MirrorChat(session, ChatState{CliState: Busy})
+	if got := e.entry().CliState; got != ReadyForReview {
+		t.Fatalf("the mirror moved a tab that is no chat's: %s", got)
+	}
+}

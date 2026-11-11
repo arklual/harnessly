@@ -2,6 +2,7 @@ package convo
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/feed"
@@ -9,6 +10,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/msgindex"
 	"github.com/ly-solutions/harnessly/internal/sessionmeta"
 	"github.com/ly-solutions/harnessly/internal/shots"
+	"github.com/ly-solutions/harnessly/internal/sources"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -38,6 +41,31 @@ type Probe struct {
 	HandOver bool
 }
 
+// SessionForgetter is a Machine that keeps something of every session it was asked about (the last probe, a capture
+// of a tall dialog). ForgetScreen drops what it kept of the screen of a session whose terminal ended; ForgetSession
+// drops everything, for a session nobody will look at again.
+type SessionForgetter interface {
+	ForgetScreen(session string)
+	ForgetSession(session string)
+}
+
+// TranscriptForgetter is a Background that keeps a place in every transcript it read: Forget drops the one of a
+// conversation that is deleted or whose actor was let go.
+type TranscriptForgetter interface {
+	Forget(c wire.Conversation)
+}
+
+// ChannelForgetter is a Publisher that keeps something for every channel: Forget drops a conversation's channel no
+// page holds, and says whether it is gone.
+type ChannelForgetter interface {
+	Forget(ch wire.Channel) bool
+}
+
+// SeqTeller is a Publisher that tells a channel's last seq.
+type SeqTeller interface {
+	Seq(ch wire.Channel) int64
+}
+
 // Profiles knows the backend profiles: another vendor's models behind an agent CLI. A conversation runs on one from its
 // start to its end; the profile is on its record as Model.Profile.
 type Profiles interface {
@@ -53,6 +81,26 @@ type Profiles interface {
 	// Window is the context window of a model of the profile, in tokens; 0 when the profile or the model is not known.
 	Window(profile, model string) int
 }
+
+// Input is the agents' structured channel: a message handed over it is a record with the client's id, and the agent's
+// own protocol says it has it — nothing is typed and no screen is read. Send returns nil once the agent has the
+// message. ErrInputUncertain: it may have it, and only the transcript can say. Any other error: it does not, and the
+// message is typed in the terminal as before.
+type Input interface {
+	Send(ctx context.Context, conv wire.Conversation, m InputMessage) error
+}
+
+// InputMessage is a message for Input: ClientID is the message's own id, the same at every try.
+type InputMessage struct {
+	ClientID string
+	Text     string
+	Images   []string
+	// Steer puts the message into the turn that runs.
+	Steer bool
+}
+
+// ErrInputUncertain: the channel broke after the message was written, and the agent does not show it.
+var ErrInputUncertain = errors.New("the agent's channel did not say whether it took the message")
 
 // Launcher starts agents. Its calls return at once; the steps, the ready and the failure come back through
 // Runtime.Launch*.
@@ -194,11 +242,17 @@ type Logger interface {
 
 // Deps is what a Runtime is built on.
 type Deps struct {
-	MachineID string
-	Publisher Publisher
-	Machine   Machine
-	Launcher  Launcher
-	Uploads   Uploads
+	// epoch is the runtime's, set by New: a conversation stamps its agent state with it.
+	epoch string
+	// startResumes holds a place for each chat resuming its agent after a start (life.go), set by New.
+	startResumes chan struct{}
+	MachineID    string
+	Publisher    Publisher
+	Machine      Machine
+	Launcher     Launcher
+	// Input is the structured channel some conversations take their messages through; nil types every message.
+	Input   Input
+	Uploads Uploads
 	// Refs names the designs a message points at; nil refuses a design reference (unsupported), the other kinds need none.
 	Refs  Refs
 	Clock Clock
@@ -217,6 +271,9 @@ type Deps struct {
 	Background Background
 	// Meta reads the effort and the goal off a Claude transcript; nil knows none.
 	Meta *sessionmeta.Reader
+	// Transcripts reads what a Claude transcript gains once for the feed and the transcript's other readers; nil has
+	// the feed read its transcript itself.
+	Transcripts *transcriptindex.Index
 	// Titler names a conversation from its first message and the agent's first answer, for an agent that wrote no title
 	// of its own (Codex, or Claude before it did); nil never names one, and the first message stays the title.
 	Titler func(p wire.Provider, firstMessage, firstAnswer string) (string, error)
@@ -231,6 +288,9 @@ type Deps struct {
 	// PictureRoots are the folders, besides a conversation's own, a picture its messages name may be shown from (Claude's
 	// scratchpads, the uploads); nil shows none, the conversation's folder included.
 	PictureRoots []string
+	// PaneLinks names the services whose links the right pane tells apart. With it a conversation's snapshot and
+	// channel carry what the pane reads of it (wire.Pane); nil sends none, and the page reads it by itself.
+	PaneLinks *sources.Links
 	// Models are the models an agent CLI takes; nil knows none, and the model command then trusts the id's shape.
 	Models func(p wire.Provider) []wire.AgentModel
 	// Profiles are the backend profiles (Kimi, GLM, Grok) a conversation may run on; nil knows none, and a conversation
@@ -255,6 +315,16 @@ type Deps struct {
 	// IdleStop is after how long without work a chat's terminal is stopped by itself, read at every sweep; nil or 0
 	// never.
 	IdleStop func() time.Duration
+	// IdleFloor is after how long without activity a Claude chat's terminal is stopped whatever IdleStop says and
+	// whoever has the chat open, read at every sweep (life.go, idleWindows); nil or 0: no floor.
+	IdleFloor func() time.Duration
+	// MemoryShort says the machine is short of memory now, and PressureStop is the floor that holds while it is
+	// (0: none). Either nil: memory changes nothing.
+	MemoryShort  func() bool
+	PressureStop func() time.Duration
+	// LegacyLife gives the chats' sessions back to the keepers of the agent tabs (life.go): the tabs' idle sleep and
+	// startup resume act on chats too, and the layouts restore their sessions at a start.
+	LegacyLife bool
 	// Rewinder binds a rewound chat to its new session and keeps the folder's snapshots; nil (or no Terminals): rewind
 	// is refused{unsupported}.
 	Rewinder Rewinder
@@ -286,4 +356,9 @@ type Deps struct {
 	// AlwaysApps are the apps a new chat starts with: the installed ones that ask to be on in every chat. nil or
 	// empty: a new chat has none.
 	AlwaysApps func() []string
+
+	// Notify hears what a chat's agent did that the person is told of or that is kept for later: the end of a turn
+	// (Notice*), a question or permission it waits on. Called on the conversation's actor, so it must not block; nil
+	// tells nobody.
+	Notify func(n Notice)
 }

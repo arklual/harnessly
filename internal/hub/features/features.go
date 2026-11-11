@@ -37,10 +37,19 @@ const (
 	SecretsVault = "secrets.vault"
 	// Efficiency is the «Эффективность» screen's figures: GET /api/orgs/{org}/efficiency/summary.
 	Efficiency = "efficiency"
+	// ChatResume is continuing a chat on another machine of the person while the one it ran on is off, from the resume
+	// snapshot its machine left in the hub's store after each turn (docs/hub/resume.md).
+	ChatResume = "chat.resume"
+	// MachineSeats shows the machines of one server (one hostname in a tenant, a Linux user per person) as one server
+	// with the people's seats in it; the server's load and hardware are counted once.
+	MachineSeats = "machine.seats"
+	// EnvPacks lets an organization put environment packs (tools, hooks, MCP and the safe's rules in a versioned
+	// repository folder) in its catalog (docs/hub/packs.md).
+	EnvPacks = "env.packs"
 )
 
 // Known are the flag names in the order they are shown.
-var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents, UIHXLive, RuntimeFleet, SecretsVault, Efficiency}
+var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents, UIHXLive, RuntimeFleet, SecretsVault, Efficiency, ChatResume, MachineSeats, EnvPacks}
 
 // IsKnown says that name is a flag of the hub.
 func IsKnown(name string) bool { return slices.Contains(Known, name) }

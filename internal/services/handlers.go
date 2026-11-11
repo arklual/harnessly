@@ -209,6 +209,38 @@ func (h *Handlers) GitLabView(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, 200, view)
 }
 
+// changeFile answers both versions of one file of the change (`path`, and `oldPath` when it was renamed); an empty
+// `path` with `oldPath` is a deleted file, `added=1` leaves the old side empty.
+func (h *Handlers) changeFile(w http.ResponseWriter, r *http.Request, url, path string) {
+	oldPath, hasOld := queryString(r, "oldPath")
+	if !hasOld {
+		oldPath = path
+	}
+	if added, _ := queryString(r, "added"); added == "1" {
+		oldPath = ""
+	}
+	for _, p := range []string{path, oldPath} {
+		if _, ok := files.RepoPath([]string{p}); p != "" && !ok {
+			writeJSON(w, r, 400, errorBody("Invalid path"))
+			return
+		}
+	}
+	if path == "" && oldPath == "" {
+		writeJSON(w, r, 400, errorBody("Invalid path"))
+		return
+	}
+	sides, err := h.S.ChangeFile(r.Context(), url, oldPath, path)
+	if err != nil {
+		failed(w)
+		return
+	}
+	if sides == nil {
+		writeJSON(w, r, 404, errorBody(locale.Pick("The service did not return this file", "Сервис не отдал этот файл")))
+		return
+	}
+	writeJSON(w, r, 200, sides)
+}
+
 // ChangeView: GET ?url=, a merge request, pull request, commit or issue of GitLab or GitHub with its checks, discussion
 // and diff. A GitHub link that cannot be read answers a card with the reason (200), so the tab is never empty.
 func (h *Handlers) ChangeView(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +262,10 @@ func (h *Handlers) ChangeView(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, 400, errorBody(locale.Pick("A link to a merge request, pull request, commit or issue is required", "Нужна ссылка на merge request, pull request, коммит или задачу")))
 		return
 	}
+	if path, ok := queryString(r, "path"); ok {
+		h.changeFile(w, r, url, path)
+		return
+	}
 	view, err := h.S.ChangeView(r.Context(), url)
 	if err != nil {
 		failed(w)
@@ -240,6 +276,30 @@ func (h *Handlers) ChangeView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, r, 200, view)
+}
+
+// GitLabPick: GET ?list=projects|mrs|branches|commits&project=&filter=open|review|mine&q=&ref=, one list of the
+// review picker. A GitLab that is off or refuses answers its state (200) with no items.
+func (h *Handlers) GitLabPick(w http.ResponseWriter, r *http.Request) {
+	if _, ok := readBody(w, r); !ok {
+		return
+	}
+	if !h.Session(r) {
+		writeJSON(w, r, 403, errorBody("Forbidden"))
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		writeEmpty(w, 405)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	p := pickRequestOf(func(k string) (string, bool) { return queryString(r, k) })
+	if bad := ValidPick(p); bad != "" {
+		writeJSON(w, r, 400, errorBody("Bad "+bad))
+		return
+	}
+	writeJSON(w, r, 200, h.S.GitLabPick(r.Context(), p))
 }
 
 // LinkMeta: GET ?url= (a tracker issue, a merge request, a published document) or ?key= (a bare task key).

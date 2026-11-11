@@ -141,3 +141,35 @@ func TestAppsFolderInstallRefusedWhereSignaturesAreRequired(t *testing.T) {
 		t.Fatalf("the dev install is the exception: %d %s", code, body)
 	}
 }
+
+func TestAppsPolicyReadsTheOrganizationsOffApps(t *testing.T) {
+	data := t.TempDir()
+	hub := filepath.Join(data, "hub")
+	p := newAppsConsentPolicy(hubLinkDirs(data, ""))
+	write := func(items []hubproto.EnvItem) {
+		t.Helper()
+		raw, _ := json.Marshal(map[string]any{"rev": 1, "hash": hubproto.EnvHash(items), "items": items})
+		if err := os.MkdirAll(hub, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(hub, "environment.json"), raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if p.AppOff(hub, "boards") {
+		t.Fatal("no list, nothing off")
+	}
+	write([]hubproto.EnvItem{
+		{ItemID: "boards", Kind: hubproto.EnvKindApp, Name: "Доски", Layer: "org", Source: json.RawMessage(`{"from":"repo","off":true,"path":"a"}`)},
+		{ItemID: "docs", Kind: hubproto.EnvKindApp, Name: "Документы", Layer: "org", Source: json.RawMessage(`{"from":"repo","path":"b"}`)},
+		{ItemID: "skill1", Kind: "skill", Name: "x", Layer: "org", Source: json.RawMessage(`{"off":true}`)},
+	})
+	if !p.AppOff(hub, "boards") || p.AppOff(hub, "docs") || p.AppOff(hub, "skill1") || p.AppOff(data, "boards") {
+		t.Fatal("only the app item that is off, of its own link")
+	}
+	time.Sleep(10 * time.Millisecond)
+	write([]hubproto.EnvItem{{ItemID: "boards", Kind: hubproto.EnvKindApp, Name: "Доски", Layer: "org", Source: json.RawMessage(`{"from":"repo","path":"a"}`)}})
+	if p.AppOff(hub, "boards") {
+		t.Fatal("turned on again")
+	}
+}

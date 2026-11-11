@@ -262,3 +262,18 @@ func TestReasonOfOneMount(t *testing.T) {
 		t.Errorf("its own mount: %q", r)
 	}
 }
+
+// «ResizeObserver loop» the browser reports as an exception is not a failure, and the journal keeps none.
+func TestBenignResizeObserver(t *testing.T) {
+	for _, e := range []Entry{
+		{Event: "exception", Text: "ResizeObserver loop completed with undelivered notifications."},
+		{Event: "exception", Text: "ResizeObserver loop limit exceeded"},
+	} {
+		if !Benign(e) {
+			t.Fatalf("benign: %+v", e)
+		}
+	}
+	if Benign(Entry{Event: "exception", Text: "TypeError: x is undefined"}) {
+		t.Fatal("a real exception is kept")
+	}
+}

@@ -105,6 +105,15 @@ interface IOutgoingStateProps {
 const OutgoingState = ({ message, phase, onRetry, onResend, onDelete, onEdit }: IOutgoingStateProps) => {
   const action = usePending<'retry' | 'resend' | 'delete' | 'edit'>();
   const busy = isBusy(action.phase);
+  if (message.cancelling && phase !== MESSAGE_PHASE.cancelled && phase !== MESSAGE_PHASE.sent) {
+    // Taken back, not confirmed yet: nothing more to do with it until the machine answers.
+    return (
+      <div className="hx-msg-user__state" data-busy="true" role="status">
+        <span className="hx-spin" aria-hidden="true" />
+        {t('next.message.cancelling')}
+      </div>
+    );
+  }
   if (phase === MESSAGE_PHASE.handed && message.state.k === 'accepted') {
     return (
       <div className="hx-msg-user__state" data-busy="true" role="status">

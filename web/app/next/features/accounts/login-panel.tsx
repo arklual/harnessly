@@ -10,6 +10,7 @@ import Icon from '@/next/ui/icon';
 import SecretField from '@/next/ui/secret-field';
 
 const SURE_MS = 4000;
+const COPIED_MS = 2000;
 
 interface ILoginPanelProps {
   via: LoginVia;
@@ -27,6 +28,7 @@ const LoginPanel = ({ via, account, login, onLogin, onSubmitCode, onCancel, onLo
   const [error, setError] = useState<string | null>(null);
   const [sure, setSure] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [copied, setCopied] = useState<'ok' | 'failed' | null>(null);
   const alive = useRef(true);
   const connected = account.signedIn && account.method === (via === 'console' ? 'key' : 'subscription');
 
@@ -36,6 +38,11 @@ const LoginPanel = ({ via, account, login, onLogin, onSubmitCode, onCancel, onLo
       alive.current = false;
     };
   }, []);
+  useEffect(() => {
+    if (copied === null) return;
+    const timer = window.setTimeout(() => setCopied(null), COPIED_MS);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   useEffect(() => {
     if (!sure) return;
     const timer = window.setTimeout(() => setSure(false), SURE_MS);
@@ -57,6 +64,16 @@ const LoginPanel = ({ via, account, login, onLogin, onSubmitCode, onCancel, onLo
     if (!alive.current) return;
     setSending(false);
     setError(refused);
+  };
+  // Copies the device code exactly as shown (separator included); the pending sign-in is not touched.
+  const copyCode = async (value: string) => {
+    const ok = await (
+      navigator.clipboard?.writeText(value) ?? Promise.reject(new Error('no clipboard'))
+    ).then(
+      () => true,
+      () => false,
+    );
+    if (alive.current) setCopied(ok ? 'ok' : 'failed');
   };
   const leave = async () => {
     if (!sure) {
@@ -125,8 +142,24 @@ const LoginPanel = ({ via, account, login, onLogin, onSubmitCode, onCancel, onLo
               </a>
             )}
             {waiting?.userCode && (
-              <div className="hx-preset__code" aria-label={t('next.login.codeShown')}>
-                {waiting.userCode}
+              <div className="hx-preset__code-row">
+                <div className="hx-preset__code" aria-label={t('next.login.codeShown')}>
+                  {waiting.userCode}
+                </div>
+                <SetButton
+                  tone="ghost"
+                  icon={copied === 'ok' ? 'check' : 'copy'}
+                  result={copied ?? undefined}
+                  onClick={() => void copyCode(waiting.userCode ?? '')}
+                >
+                  {t(
+                    copied === 'ok'
+                      ? 'next.login.copied'
+                      : copied === 'failed'
+                        ? 'next.login.copyFailed'
+                        : 'next.login.copy',
+                  )}
+                </SetButton>
               </div>
             )}
             {waiting?.asksCode && (

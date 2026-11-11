@@ -40,8 +40,23 @@ func (a *Agent) sendDoc(ev any) bool {
 	if len(links) == 0 {
 		return false
 	}
-	links[0].sendText(frame)
+	links[0].sendEvent(docEventName(ev), frame)
 	return true
+}
+
+// docEventName is the name of a document event, the kind it goes as when the hub takes batches.
+func docEventName(ev any) string {
+	switch e := ev.(type) {
+	case evDocPublish:
+		return e.Event
+	case evDocAcl:
+		return e.Event
+	case evDocBound:
+		return e.Event
+	case evDocReply:
+		return e.Event
+	}
+	return ""
 }
 
 // docsConnected says whoever keeps the documents is linked now.

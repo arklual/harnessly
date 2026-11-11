@@ -32,3 +32,21 @@ export const parseLanguage = (value: unknown, extra: boolean): TLanguage | null 
 /** The languages the choice offers. */
 export const offeredLanguages = (extra: boolean): readonly TLanguage[] =>
   extra ? ALL_LANGUAGES : BASE_LANGUAGES;
+
+/**
+ * The first language of the browser's preference list that the page has, or null. `pt` and `zh` alone name the variant
+ * the page has (`pt-BR`, `zh-CN`); a regional tag the page has no text for (`ru-RU`, `en-GB`) falls to its language.
+ */
+export const browserLanguage = (preferred: readonly string[], extra: boolean): TLanguage | null => {
+  const offered: readonly string[] = extra ? ALL_LANGUAGES : BASE_LANGUAGES;
+  const variants: Record<string, string> = { pt: 'pt-BR', zh: 'zh-CN' };
+  for (const tag of preferred) {
+    const lower = tag.toLowerCase();
+    const exact = offered.find((l) => l.toLowerCase() === lower);
+    if (exact) return exact as TLanguage;
+    const base = lower.split('-')[0] ?? '';
+    const near = offered.find((l) => l.toLowerCase() === base) ?? offered.find((l) => l === variants[base]);
+    if (near) return near as TLanguage;
+  }
+  return null;
+};

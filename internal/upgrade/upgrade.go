@@ -34,6 +34,18 @@ type Target struct {
 // Extension is a registered extension: its name and the protocol it is registered with.
 type Extension struct{ Name, Protocol string }
 
+// AppCheck is what the compatibility check of one installed app (harnessly app compat) says about the release.
+type AppCheck struct {
+	ID      string `json:"id"`
+	Kind    string `json:"kind"`
+	Version string `json:"version"`
+	// Off: the app is switched off, so its problem is shown but does not stop apply.
+	Off    bool     `json:"off,omitempty"`
+	Errors []string `json:"errors,omitempty"`
+	// Warnings never stop apply.
+	Warnings []string `json:"warnings,omitempty"`
+}
+
 // Item is one program in the plan.
 type Item struct {
 	Component string `json:"component"`
@@ -54,9 +66,21 @@ type Plan struct {
 	Version    string                   `json:"version"`
 	Items      []Item                   `json:"items"`
 	Extensions []release.ExtensionCheck `json:"extensions"`
-	Data       release.Data             `json:"data"`
+	// Apps is the check of the apps installed on this machine against the release, when it was asked for.
+	Apps []AppCheck   `json:"apps,omitempty"`
+	Data release.Data `json:"data"`
 	// Blocking lists what stops apply: an incompatible extension.
 	Blocking []string `json:"blocking,omitempty"`
+}
+
+// AddApps puts the check of the installed apps into the plan: an app that is on and does not fit stops apply.
+func (p *Plan) AddApps(checks []AppCheck) {
+	for _, a := range checks {
+		p.Apps = append(p.Apps, a)
+		if len(a.Errors) > 0 && !a.Off {
+			p.Blocking = append(p.Blocking, fmt.Sprintf("app %s %s: %s", a.ID, a.Version, strings.Join(a.Errors, "; ")))
+		}
+	}
 }
 
 // Blocked says apply refuses.

@@ -235,3 +235,107 @@ func TestSourcesSurviveARestart(t *testing.T) {
 		t.Errorf("registry: %v %v", info, err)
 	}
 }
+
+func TestAnUnchangedFileIsNotReadAgain(t *testing.T) {
+	s, f, c, path := setup(t)
+	write(t, path, "# Plan\n\nv1\n")
+	if _, fail := s.Publish(Request{Path: path}); fail != nil {
+		t.Fatal(fail)
+	}
+	old := time.Now().Add(-time.Minute)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	c.t = c.t.Add(time.Minute)
+	s.Tick()
+	if _, ok := s.same[path]; !ok {
+		t.Fatal("a settled file found published must be remembered by its size and time")
+	}
+	// The same size and time: the content is not looked at, whatever it is.
+	write(t, path, "# Plan\n\nv2\n")
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	s.Tick()
+	if len(f.calls) != 1 {
+		t.Fatalf("a file with the remembered size and time was read: %d calls", len(f.calls))
+	}
+	// A save moves the time: the new text goes out.
+	write(t, path, "# Plan\n\nv3\n")
+	s.Tick()
+	if len(f.calls) != 2 || f.calls[1]["content"] != "# Plan\n\nv3\n" {
+		t.Fatalf("a saved file must be published: %d calls", len(f.calls))
+	}
+}
+
+func TestAFailedVersionWaitsLongerEachTime(t *testing.T) {
+	s, f, c, path := setup(t)
+	write(t, path, "# Plan\n\nv1\n")
+	if _, fail := s.Publish(Request{Path: path}); fail != nil {
+		t.Fatal(fail)
+	}
+	write(t, path, "# Plan\n\nv2\n")
+	f.status, f.reply = 502, `{}`
+	c.t = c.t.Add(time.Minute)
+	s.Tick()
+	if len(f.calls) != 2 {
+		t.Fatalf("first try: %d calls", len(f.calls))
+	}
+	// The next looks do not ask again until the wait is over.
+	for i := 0; i < 5; i++ {
+		c.t = c.t.Add(5 * time.Second)
+		s.Tick()
+	}
+	if len(f.calls) != 2 {
+		t.Fatalf("asked again inside the wait: %d calls", len(f.calls))
+	}
+	c.t = c.t.Add(defaultDebounce + defaultDebounce/4)
+	s.Tick()
+	if len(f.calls) != 3 {
+		t.Fatalf("second try: %d calls", len(f.calls))
+	}
+	// The second failure doubles the wait.
+	c.t = c.t.Add(defaultDebounce + defaultDebounce/4 + time.Second)
+	s.Tick()
+	if len(f.calls) != 3 {
+		t.Fatalf("asked again inside the doubled wait: %d calls", len(f.calls))
+	}
+	f.status = 0
+	c.t = c.t.Add(retryMost * 2)
+	s.Tick()
+	if len(f.calls) != 4 {
+		t.Fatalf("after the wait: %d calls", len(f.calls))
+	}
+	if st := s.State(path); st.Pending || st.Version != 2 {
+		t.Errorf("after: %+v", st)
+	}
+	if len(s.fails) != 0 || len(s.retryAt) != 0 {
+		t.Errorf("a published version must clear the wait: %v %v", s.fails, s.retryAt)
+	}
+	if got := s.retryWait(20); got < retryMost || got > retryMost+retryMost/4 {
+		t.Errorf("the longest wait: %v", got)
+	}
+}
+
+func TestNothingLinkedIsNothingToWatch(t *testing.T) {
+	s, _, _, path := setup(t)
+	if s.anyLinked() {
+		t.Fatal("an empty registry has no linked file")
+	}
+	write(t, path, "# Plan\n")
+	if _, fail := s.Publish(Request{Path: path}); fail != nil {
+		t.Fatal(fail)
+	}
+	select {
+	case <-s.wake:
+	default:
+		t.Fatal("a first shared file must wake the watcher")
+	}
+	if !s.anyLinked() {
+		t.Fatal("a shared file is linked")
+	}
+	s.Unlink(path)
+	if s.anyLinked() {
+		t.Fatal("an unlinked file is not watched")
+	}
+}

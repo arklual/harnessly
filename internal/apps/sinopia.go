@@ -135,8 +135,12 @@ func (m *Manifest) SinopiaOf() (Sinopia, error) {
 }
 
 // OnInDocument says whether the app turns on in an open document of a kind: it works in that kind, and it asks to be on
-// when a document is open (activation.on has "document").
+// when a document is open (activation.on has "document"), or the kind is its own and extends Sinopia's editor.
 func (m *Manifest) OnInDocument(kind string) bool {
+	if m.extendsKind(kind) && m.HasTarget("sinopia."+kind) {
+		// A document of the app's own type made of Sinopia's: the app is always on in it.
+		return true
+	}
 	return m.Activation != nil && contains(m.Activation.On, OnDocument) && m.HasTarget("sinopia."+kind)
 }
 
@@ -174,6 +178,7 @@ func (s Sinopia) ForKind(kind string) Sinopia {
 // checkSinopia is the part of the manifest check that is about `sinopia`.
 func (m *Manifest) checkSinopia(targets map[string]bool, add func(path, format string, a ...any), warn func(path, format string, a ...any)) {
 	if len(m.Sinopia) == 0 {
+		m.checkPinned(Sinopia{}, add)
 		return
 	}
 	s, err := m.SinopiaOf()
@@ -228,6 +233,7 @@ func (m *Manifest) checkSinopia(targets map[string]bool, add func(path, format s
 	}
 
 	m.checkKinds(s, targets, add)
+	m.checkPinned(s, add)
 
 	seen := map[string]bool{}
 	for i, p := range s.Panels {

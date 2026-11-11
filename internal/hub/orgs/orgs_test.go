@@ -2,6 +2,7 @@ package orgs_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
@@ -36,27 +37,25 @@ func TestFlagOffHidesEverything(t *testing.T) {
 	}
 }
 
-func TestShadowIsForInstanceAdmins(t *testing.T) {
-	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "shadow"))
+// An instance administrator has no view of their own: they list the organizations they have something in.
+func TestInstanceAdminListsOnlyTheirOrganizations(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"))
 	admin := s.SignIn("admin@example.com")
 	anna := s.SignIn("anna@example.com")
-	if r := anna.Do("POST", "/api/orgs", map[string]any{"name": "Acme", "spaceIds": []string{}}); r.Code != 404 {
-		t.Errorf("a person in shadow: %s", r)
-	}
-	if r := anna.Do("GET", "/api/orgs", nil); r.Code != 404 {
-		t.Errorf("a person lists in shadow: %s", r)
-	}
-	v := create(t, admin, "Acme")
+	v := create(t, anna, "Acme")
 	if v.Org.Slug != "acme" || v.Org.Timezone != "Europe/Moscow" || v.Org.Currency != "RUB" {
 		t.Errorf("org = %+v", v.Org)
 	}
-	// The administrator sees every organization in shadow, with their role.
 	var list struct {
 		Orgs []struct{ ID, Role string }
 	}
 	admin.Do("GET", "/api/orgs", nil).JSON(&list)
+	if len(list.Orgs) != 0 {
+		t.Errorf("the administrator's list = %+v", list)
+	}
+	anna.Do("GET", "/api/orgs", nil).JSON(&list)
 	if len(list.Orgs) != 1 || list.Orgs[0].ID != v.Org.ID || list.Orgs[0].Role != "admin" {
-		t.Errorf("list = %+v", list)
+		t.Errorf("the author's list = %+v", list)
 	}
 }
 
@@ -251,4 +250,17 @@ func TestCreateMakesTheFirstTenant(t *testing.T) {
 	if v := create(t, anna, "Gamma"); len(v.Tenants) != 0 {
 		t.Errorf("without tenantName an organization has tenants: %+v", v.Tenants)
 	}
+}
+
+// The number of organizations one person may create is the hub's setting.
+func TestOrgCapIsConfigured(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"), hubtest.Env("HUB_MAX_ORGS_PER_PERSON", "2"))
+	anna := s.SignIn("anna@example.com")
+	create(t, anna, "First")
+	create(t, anna, "Second")
+	if r := anna.Do("POST", "/api/orgs", map[string]any{"name": "Third", "spaceIds": []string{}}); r.Code != http.StatusConflict || !strings.Contains(string(r.Body), "org_limit") {
+		t.Errorf("over the configured cap: %s", r)
+	}
+	// another person's count is their own
+	create(t, s.SignIn("boris@example.com"), "Fourth")
 }

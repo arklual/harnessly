@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 )
 
 // statusWriter remembers the status of a response for the access log. It passes on everything a response can do
@@ -68,6 +69,7 @@ func accessLog(log *slog.Logger, clientIP func(*http.Request) string, next http.
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
+		metrics.ObserveHTTP(r.URL.Path, sw.status)
 		level := slog.LevelDebug
 		switch {
 		case sw.status >= 500:

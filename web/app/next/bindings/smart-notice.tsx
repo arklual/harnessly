@@ -10,6 +10,19 @@
 // put away by hand (not thrown), the black shape flows into the drop, and pressed, out of it back into the card.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useCodeAsks } from '@/next/bindings/code-asks';
+import {
+  SLOT_ANSWER,
+  slotIcon,
+  slotWaits,
+  type ISlotNotice,
+  type TSlotAnswer,
+} from '@/next/features/smart-notice/slot-body';
+import {
+  answerSlot,
+  dismissSlot,
+  muteSlotSource,
+  useSlotNotices,
+} from '@/next/features/smart-notice/slot-api';
 import { firstToPing, soundOn } from '@/next/bindings/notices';
 import { settled } from '@/next/bindings/outcome';
 import { answerQuestion, decidePermission, sendMessage } from '@/next/commands';
@@ -38,16 +51,25 @@ import { addHistory, setHistoryPerson } from '@/next/stores/notice-history';
 import { SAMPLE_CHAT, setNotify, useNotify, type INotice } from '@/next/stores/notices';
 import { setDrops, takeDropBack, useDropBack, type IDrop } from '@/next/stores/smart-drops';
 import { fly, snap } from '@/next/features/smart-notice/fly';
+import { KIND_RANK, useFront, useNewsClock } from '@/next/features/smart-notice/flow';
+import {
+  NOTICE_ACTION,
+  batchSender,
+  noticeEvent,
+  setNoticeSink,
+  type IUiEvent,
+} from '@/next/features/smart-notice/metrics';
+import { platformPath } from '@/next/core/net/machine';
+import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import { toast } from '@/next/ui/toast';
+import { useFieldCovered } from '@/next/stores/field-cover';
 
 /** The newest of what waits tells what came this long in two lines, then folds into the line. */
 export const ANNOUNCE_MS = 5000;
-/** A finished or broken turn stays this long (longer while the pointer is on it); what waits stays until answered. */
+/** A finished or broken turn stays this long, its clock paused while the plate is held; what waits stays until answered. */
 export const NEWS_MS = 7000;
 /** A finished chat written to shows «sent» this long, then goes. */
 const SENT_SHOW_MS = 1800;
-/** News the pointer has just left stays this much longer, so it does not vanish from under the eye. */
-const HOLD_GRACE_MS = 2500;
 /** What waits for the person: put away, it stays as a drop. News put away is gone. */
 const WAITS: ReadonlySet<TSmartKind> = new Set([
   SMART_KIND.code,
@@ -55,6 +77,7 @@ const WAITS: ReadonlySet<TSmartKind> = new Set([
   SMART_KIND.question,
   SMART_KIND.plan,
   SMART_KIND.machine,
+  SMART_KIND.ask,
 ]);
 /** How far over the field of the chat the plate stands, px. */
 const OVER_FIELD_PX = 12;
@@ -62,16 +85,7 @@ const TICK_MS = 1000;
 
 /** The order on the stack: what waits now first (a code by its deadline), then what waits for an answer (the longest
  *  waiting first), then what broke, then what is ready (the newest first). */
-const RANK: Record<TSmartKind, number> = {
-  code: 0,
-  permission: 1,
-  machine: 2,
-  question: 2,
-  plan: 2,
-  failed: 3,
-  limit: 3,
-  done: 4,
-};
+const RANK = KIND_RANK;
 
 export const orderItems = (items: readonly ISmartItem[]): ISmartItem[] =>
   [...items].sort((a, b) => {
@@ -81,6 +95,20 @@ export const orderItems = (items: readonly ISmartItem[]): ISmartItem[] =>
     if (RANK[a.kind] <= RANK[SMART_KIND.question]) return a.at - b.at;
     return b.at - a.at;
   });
+
+/** What apps and agents show through the open slot: titled by who asks, with what they ask in the line. */
+export const itemsOfSlot = (notices: readonly ISlotNotice[]): ISmartItem[] =>
+  notices.map((n) => ({
+    key: `slot:${n.id}`,
+    kind: slotWaits(n.kind) ? SMART_KIND.ask : SMART_KIND.info,
+    chatId: n.conversation || null,
+    icon: slotIcon(n),
+    title: n.source.name,
+    text: n.title,
+    at: n.createdAt,
+    until: null,
+    source: n.source,
+  }));
 
 const GATE_KIND: Record<NonNullable<Conversation['gate']>['kind'], TSmartKind> = {
   question: SMART_KIND.question,
@@ -100,13 +128,62 @@ const summaryOf = (n: INotice): string | null => {
   return typeof said === 'string' && said.trim() !== '' ? said : null;
 };
 
-/** The notices as items: what waits while its chat's gate is open, the rest while it is news, or while `keep` (the card
- *  is open or the plate is held). */
+/** The notices as items: what waits while its chat's gate is open, the rest while it is `live` news (each on its own
+ *  clock, paused while the plate is held: features/smart-notice/flow.ts). */
+const sameItem = (a: ISmartItem, b: ISmartItem): boolean => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)] as (keyof ISmartItem)[]);
+  for (const k of keys) if (a[k] !== b[k]) return false;
+  return true;
+};
+
+/**
+ * The items as they were where nothing changed: an item equal to the one of the same key before is that same object,
+ * and an equal list is the same list. A recompute (the clock's tick, another chat's sync) then changes nothing on screen.
+ */
+export const stableItems = (
+  before: readonly ISmartItem[],
+  next: readonly ISmartItem[],
+): readonly ISmartItem[] => {
+  const was = new Map(before.map((item) => [item.key, item]));
+  const out = next.map((item) => {
+    const old = was.get(item.key);
+    return old && sameItem(old, item) ? old : item;
+  });
+  return out.length === before.length && out.every((item, i) => item === before[i]) ? before : out;
+};
+
+// The list of the render before is state, not a ref: an equal list comes back as that same list (stableItems), so the
+// state is set only when something on screen changed.
+const useStableItems = (next: readonly ISmartItem[]): readonly ISmartItem[] => {
+  const [before, setBefore] = useState<readonly ISmartItem[]>(next);
+  const kept = stableItems(before, next);
+  if (kept !== before) setBefore(kept);
+  return kept;
+};
+
+/**
+ * The detail as it was while the same item's data is fetched again: a refetch of the gates does not turn the open card
+ * back into its loading line.
+ */
+export const steadyDetail = (
+  before: { key: string; detail: TSmartDetail } | null,
+  key: string | null,
+  detail: TSmartDetail,
+): TSmartDetail => (detail.k === 'loading' && before && before.key === key ? before.detail : detail);
+
+const sameDetail = (
+  before: { key: string; detail: TSmartDetail } | null,
+  key: string,
+  detail: TSmartDetail,
+): boolean =>
+  before !== null &&
+  before.key === key &&
+  (before.detail === detail || JSON.stringify(before.detail) === JSON.stringify(detail));
+
 export const itemsOfNotices = (
   notices: readonly INotice[],
   convs: ReadonlyMap<string, Conversation>,
-  now: number,
-  keep: boolean,
+  live: ReadonlySet<string>,
 ): ISmartItem[] =>
   notices.flatMap((n): ISmartItem[] => {
     const base = {
@@ -120,12 +197,12 @@ export const itemsOfNotices = (
       until: null,
     };
     if (n.chatId === SAMPLE_CHAT)
-      return keep || now - n.at < NEWS_MS ? [{ ...base, kind: SMART_KIND.done, chatId: null }] : [];
+      return live.has(n.key) ? [{ ...base, kind: SMART_KIND.done, chatId: null }] : [];
     if (n.kind === 'waiting') {
       const gate = convs.get(n.chatId)?.gate;
       return gate ? [{ ...base, kind: GATE_KIND[gate.kind] }] : [];
     }
-    return keep || now - n.at < NEWS_MS ? [{ ...base, kind: NOTICE_KIND_OF[n.kind] }] : [];
+    return live.has(n.key) ? [{ ...base, kind: NOTICE_KIND_OF[n.kind] }] : [];
   });
 
 /** The machine's codes as items; `skew` is the machine's clock minus this page's. */
@@ -316,19 +393,25 @@ const SmartNoticeHost = ({
   const settings = useNotify();
   const convs = useConversationList(null);
   const codes = useCodeAsks(machine);
+  const slot = useSlotNotices(machine);
   const [open, setOpen] = useState(false);
   const [mainKey, setMainKey] = useState<string | null>(null);
   const [byKeys, setByKeys] = useState(false);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  const now = useTick(notices.length > 0 || codes.asks.length > 0 || machineNotices.length > 0);
-  // Held: the pointer or the focus is on the plate; then a little longer after it leaves.
+  const now = useTick(
+    notices.length > 0 || codes.asks.length > 0 || machineNotices.length > 0 || slot.notices.length > 0,
+  );
+  // Held: the pointer or the focus is on the plate, the card is open, or a reply shows «sent». The news' clocks stand
+  // still meanwhile; let go, each goes on from what it had left.
   const [held, setHeld] = useState(false);
-  const [graceUntil, setGraceUntil] = useState(0);
-  const onHold = useCallback((on: boolean) => {
-    setHeld(on);
-    if (!on) setGraceUntil(Date.now() + HOLD_GRACE_MS);
-  }, []);
-  const keep = open || held || now < graceUntil;
+  const onHold = useCallback((on: boolean) => setHeld(on), []);
+  const [sending, setSending] = useState(0);
+  const keep = open || held || sending > 0;
+  const news = useMemo(
+    () => notices.filter((n) => n.kind !== 'waiting' || n.chatId === SAMPLE_CHAT),
+    [notices],
+  );
+  const live = useNewsClock(news, keep, now, NEWS_MS);
 
   const byId = useMemo(() => new Map<string, Conversation>((convs ?? []).map((c) => [c.id, c])), [convs]);
   const all = useMemo(
@@ -337,12 +420,24 @@ const SmartNoticeHost = ({
         ? orderItems([
             ...itemsOfCodes(codes.asks, codes.skew),
             ...(settings.machine ? itemsOfMachines(machineNotices) : []),
-            ...itemsOfNotices(notices, byId, now, keep),
+            ...itemsOfSlot(slot.notices),
+            ...itemsOfNotices(notices, byId, live),
           ])
         : [],
-    [settings.cards, settings.machine, codes.asks, codes.skew, machineNotices, notices, byId, now, keep],
+    [
+      settings.cards,
+      settings.machine,
+      codes.asks,
+      codes.skew,
+      machineNotices,
+      slot.notices,
+      notices,
+      byId,
+      live,
+    ],
   );
-  const items = useMemo(() => all.filter((item) => !hidden.has(item.key)), [all, hidden]);
+  const stable = useStableItems(all);
+  const items = useMemo(() => stable.filter((item) => !hidden.has(item.key)), [stable, hidden]);
 
   // What waits and was put away is in the drops (a code of the chat on screen is in its column already).
   const drops = useMemo(
@@ -401,7 +496,7 @@ const SmartNoticeHost = ({
     });
     return () => cancelAnimationFrame(frame);
   }, [arrive]);
-  const main = items.find((item) => item.key === mainKey) ?? items[0] ?? null;
+  const main = useFront(items, mainKey, setMainKey, open || held);
   const conv = main?.chatId ? (byId.get(main.chatId) ?? null) : null;
   const sick =
     main?.kind === SMART_KIND.machine
@@ -428,6 +523,17 @@ const SmartNoticeHost = ({
     if (fresh && soundOn(settings, 'urgent') && firstToPing(`code:${fresh.id}`)) playSound('urgent');
   }, [codes.asks, settings]);
 
+  // An app's or an agent's new question sounds as «waits», once.
+  const slotHeard = useRef<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    const asks = slot.notices.filter((n) => slotWaits(n.kind));
+    const before = slotHeard.current;
+    slotHeard.current = new Set(asks.map((n) => n.id));
+    if (before === null || document.visibilityState !== 'visible' || !settings.cards) return;
+    const fresh = asks.find((n) => !before.has(n.id));
+    if (fresh && soundOn(settings, 'wait') && firstToPing(`slot:${fresh.id}`)) playSound('wait');
+  }, [slot.notices, settings]);
+
   // A machine going into the red sounds as urgent, once.
   const sickHeard = useRef<ReadonlySet<string> | null>(null);
   useEffect(() => {
@@ -450,8 +556,12 @@ const SmartNoticeHost = ({
   const question = gate.questions[0] ?? null;
   const permission = gate.permissions[0] ?? null;
 
-  const detail = useMemo((): TSmartDetail => {
+  const fresh = useMemo((): TSmartDetail => {
     if (!main) return { k: 'plain' };
+    if (main.kind === SMART_KIND.ask || main.kind === SMART_KIND.info) {
+      const notice = slot.notices.find((n) => `slot:${n.id}` === main.key);
+      return notice ? { k: 'slot', notice } : { k: 'plain' };
+    }
     if (main.kind === SMART_KIND.code) {
       const ask = codes.asks.find((a) => `code:${a.id}` === main.key);
       return ask ? { k: 'code', why: ask.why, digits: ask.digits } : { k: 'plain' };
@@ -472,8 +582,14 @@ const SmartNoticeHost = ({
     if (main.kind === SMART_KIND.done)
       return { k: 'done', summary: main.summary ?? null, canReply: conv !== null };
     return { k: 'plain' };
-  }, [main, codes.asks, question, permission, sick, stats, conv]);
+  }, [main, slot.notices, codes.asks, question, permission, sick, stats, conv]);
+  // The last detail that was not a loading line, kept as state and replaced only when its content changed.
+  const [lastDetail, setLastDetail] = useState<{ key: string; detail: TSmartDetail } | null>(null);
+  const detail = steadyDetail(lastDetail, main?.key ?? null, fresh);
+  if (main && detail.k !== 'loading' && !sameDetail(lastDetail, main.key, detail))
+    setLastDetail({ key: main.key, detail });
 
+  const covered = useFieldCovered();
   const anchor = useFieldAnchor(settings.place === 'bottom-center' && items.length > 0, currentId ?? '');
 
   const remember = useCallback(
@@ -505,8 +621,41 @@ const SmartNoticeHost = ({
     sendMessage(conv.machineId, { conversationId: conv.id, text });
     remember(item, t('next.smart.history.reply', { text }), 'arrow-up');
     // It folds into «sent» for a moment, then goes.
-    setGraceUntil(Date.now() + SENT_SHOW_MS);
-    window.setTimeout(() => setHidden((was) => new Set(was).add(item.key)), SENT_SHOW_MS);
+    setSending((n) => n + 1);
+    window.setTimeout(() => {
+      setHidden((was) => new Set(was).add(item.key));
+      setSending((n) => n - 1);
+    }, SENT_SHOW_MS);
+  };
+
+  // An answer to an app or an agent: the machine checks it; a text that looks like a key stays here.
+  const onSlot = async (notice: ISlotNotice, value: unknown): Promise<TSlotAnswer> => {
+    if (!machine) return SLOT_ANSWER.failed;
+    const took = await answerSlot(machine, notice.id, value);
+    if (took === SLOT_ANSWER.ok) {
+      slot.drop(notice.id);
+      const item = itemsOfSlot([notice])[0];
+      if (item) remember(item, t('next.smart.history.answer', { text: notice.title }), 'check');
+    }
+    if (took === SLOT_ANSWER.failed) toast(t('next.smart.slot.failed'), { tone: 'error' });
+    return took;
+  };
+  const onSlotDismiss = async (notice: ISlotNotice) => {
+    if (!machine) return;
+    await dismissSlot(machine, notice.id);
+    slot.drop(notice.id);
+  };
+  const onMuteSource = (item: ISmartItem) => {
+    const source = item.source;
+    if (!machine || !source) return;
+    void muteSlotSource(machine, source, true).then(
+      () => {
+        for (const n of slot.notices)
+          if (n.source.kind === source.kind && n.source.id === source.id) slot.drop(n.id);
+        toast(t('next.smart.slot.muted', { name: source.name }));
+      },
+      () => toast(t('next.smart.slot.failed'), { tone: 'error' }),
+    );
   };
 
   const onAnswer = async (item: ISmartItem, answer: { choice: number } | { text: string }) => {
@@ -596,6 +745,39 @@ const SmartNoticeHost = ({
     );
   };
 
+  // «Закрыть все»: what waits goes into its drops, news goes; «Вернуть» puts it all back as it was.
+  const onCloseAll = () => {
+    if (items.length === 0) return;
+    const was = hidden;
+    const gone = items;
+    setOpen(false);
+    setHidden(new Set([...was, ...gone.map((item) => item.key)]));
+    noticeEvent(NOTICE_ACTION.closedAll, { count: gone.length, stack: gone.length, place: settings.place });
+    toast(t('next.smart.closedAll'), {
+      description: gone.some((item) => WAITS.has(item.kind)) ? t('next.smart.closedAllWaits') : undefined,
+      action: {
+        label: t('next.smart.restore'),
+        onClick: () => {
+          setHidden(was);
+          noticeEvent(NOTICE_ACTION.restored, { count: gone.length });
+        },
+      },
+    });
+  };
+
+  // The events go to the machine in batches, and from there to the team's metrics.
+  useEffect(() => {
+    if (!machine) return;
+    const sender = batchSender((events: IUiEvent[]) =>
+      runtimeJson<object>(machine, platformPath('/ui-events'), postJson({ events })),
+    );
+    setNoticeSink(sender.send);
+    return () => {
+      setNoticeSink(null);
+      sender.stop();
+    };
+  }, [machine]);
+
   useKeys(KEY_SCOPE.global, {
     'global.notice': () => {
       if (items.length === 0) {
@@ -620,6 +802,7 @@ const SmartNoticeHost = ({
       open={open && items.length > 0}
       place={settings.place}
       anchor={anchor}
+      covered={covered}
       now={now}
       onOpen={(next) => {
         if (next) setByKeys(false);
@@ -641,6 +824,10 @@ const SmartNoticeHost = ({
         if (of) onOpenMachine(of.id);
       }}
       onHide={onHide}
+      onSlot={onSlot}
+      onSlotDismiss={onSlotDismiss}
+      onMuteSource={onMuteSource}
+      onCloseAll={onCloseAll}
       onMute={(sound) => {
         setNotify({ sounds: { [sound]: false } });
         toast(t('next.smart.muted'), { description: t(`next.notices.settings.sound.${sound}`) });

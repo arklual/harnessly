@@ -8,11 +8,13 @@ package feed
 
 import (
 	"math"
+	"runtime"
 	"slices"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -36,17 +38,32 @@ type windowed interface {
 	BeforeWindow(beforeByte, window int64, max int) transcript.Chunk
 }
 
+// seated is a Source whose place for Since can be written down and set again without a read: what lets a feed at rest
+// come back after a restart of the runtime with its transcript unread (Restore).
+type seated interface {
+	// AtRest says Since from the source's place needs nothing the source holds beyond that place.
+	AtRest() bool
+	// Seat sets where Since goes on from.
+	Seat(offset int64)
+}
+
 // ClaudeSource reads a Claude Code transcript.
 type ClaudeSource struct {
-	Path    string
+	Path string
+	// Index, when set, reads what the transcript gains for the source and for the transcript's other readers at once;
+	// nil has the source read the file itself.
+	Index   *transcriptindex.Index
 	offset  int64
 	pending string
 	carry   transcript.Carry
+	// q is the source's place in the index; nil until the first Since.
+	q *transcriptindex.Queue
 }
 
 func (s *ClaudeSource) Tail(max int) transcript.Chunk {
 	c := transcript.ReadTail(s.Path, max)
 	s.offset, s.pending, s.carry = c.FileSize, "", c.Carry
+	s.seat()
 	return c
 }
 
@@ -57,6 +74,7 @@ func (s *ClaudeSource) Before(beforeByte int64, max int) transcript.Chunk {
 func (s *ClaudeSource) TailWindow(window int64, max int) transcript.Chunk {
 	c := transcript.ReadTailBytes(s.Path, window, max)
 	s.offset, s.pending, s.carry = c.FileSize, "", c.Carry
+	s.seat()
 	return c
 }
 
@@ -64,16 +82,85 @@ func (s *ClaudeSource) BeforeWindow(beforeByte, window int64, max int) transcrip
 	return transcript.ReadBeforeBytes(s.Path, beforeByte, window, max)
 }
 
+// AtRest says a read that starts at the source's place with nothing held reads what this one would.
+func (s *ClaudeSource) AtRest() bool { return s.pending == "" && !s.carry.Open() }
+
+// Seat makes Since go on from offset with nothing held.
+func (s *ClaudeSource) Seat(offset int64) {
+	s.offset, s.pending, s.carry = offset, "", transcript.Carry{}
+	s.seat()
+}
+
 func (s *ClaudeSource) Since() transcript.Incremental {
+	if inc, ok := s.sinceIndexed(); ok {
+		return inc
+	}
 	inc := transcript.ParseIncrementalCarry(s.Path, s.offset, s.pending, s.carry)
 	s.offset, s.pending, s.carry = inc.NewOffset, inc.PendingBuffer, inc.Carry
+	s.seat()
 	return inc
+}
+
+// sinceIndexed is Since off the index: the whole lines the transcript gained after the source's place, read once for
+// all of the transcript's readers. false leaves the read to the source: it has no place in the index yet, it holds
+// the start of a line, the index lost it, or the file ends in a line still being written (which a read of the file
+// may take whole).
+func (s *ClaudeSource) sinceIndexed() (transcript.Incremental, bool) {
+	if s.Index == nil || s.pending != "" || s.q == nil {
+		return transcript.Incremental{}, false
+	}
+	data, from, partial, st := s.q.Take()
+	if st != transcriptindex.Fresh || len(data) > 0 && from != s.offset {
+		return transcript.Incremental{}, false
+	}
+	if len(data) == 0 {
+		if partial {
+			return transcript.Incremental{}, false
+		}
+		return transcript.Incremental{NewEntries: []*jsvalue.Object{}, NewOffset: s.offset, Carry: s.carry}, true
+	}
+	inc := transcript.ParseAppended(data, s.offset, s.carry)
+	if inc.NewOffset == s.offset {
+		// The lines cannot be read, by a read of the file either: the source stays where it is, as it does without
+		// the index, and reads the file itself when the transcript grows again.
+		return inc, true
+	}
+	s.offset, s.carry = inc.NewOffset, inc.Carry
+	return inc, true
+}
+
+// seat tells the index where the source stands after a read of its own. A source that holds the start of a line has
+// no place to give: it reads by itself until the line is whole.
+func (s *ClaudeSource) seat() {
+	if s.Index == nil || s.pending != "" {
+		return
+	}
+	if s.q == nil {
+		s.q = s.Index.Queue(s.Path, "feed", 0)
+		// A source dropped without Close lets go of the transcript all the same.
+		runtime.AddCleanup(s, func(q *transcriptindex.Queue) { q.Close() }, s.q)
+	}
+	s.q.Seat(s.offset)
+}
+
+// Close lets go of the source's place in the index: the transcript is not read for it any more. A later read of the
+// source takes a place again.
+func (s *ClaudeSource) Close() {
+	if s.q != nil {
+		s.q.Close()
+		s.q = nil
+	}
 }
 
 // CodexSource reads a Codex transcript.
 type CodexSource struct {
 	Path string
-	p    *transcript.CodexParser
+	// Index, when set, reads what the transcript gains for the source and for the transcript's other readers at once;
+	// nil has the source read the file itself.
+	Index *transcriptindex.Index
+	p     *transcript.CodexParser
+	// q is the source's place in the index; nil until the first read.
+	q *transcriptindex.Queue
 }
 
 func (s *CodexSource) parser() *transcript.CodexParser {
@@ -83,13 +170,64 @@ func (s *CodexSource) parser() *transcript.CodexParser {
 	return s.p
 }
 
-func (s *CodexSource) Tail(max int) transcript.Chunk { return s.parser().ParseTail(max) }
+func (s *CodexSource) Tail(max int) transcript.Chunk {
+	c := s.parser().ParseTail(max)
+	s.seat()
+	return c
+}
 
 func (s *CodexSource) Before(beforeByte int64, max int) transcript.Chunk {
 	return transcript.ReadCodexBefore(s.Path, beforeByte, max, -1, transcript.CodexOptions{})
 }
 
-func (s *CodexSource) Since() transcript.Incremental { return s.parser().ParseIncremental() }
+func (s *CodexSource) Since() transcript.Incremental {
+	if inc, ok := s.sinceIndexed(); ok {
+		return inc
+	}
+	inc := s.parser().ParseIncremental()
+	s.seat()
+	return inc
+}
+
+// sinceIndexed is Since off the index, as ClaudeSource's: false leaves the read to the parser.
+func (s *CodexSource) sinceIndexed() (transcript.Incremental, bool) {
+	if s.Index == nil || s.q == nil || s.p == nil || s.p.Holding() {
+		return transcript.Incremental{}, false
+	}
+	data, from, partial, st := s.q.Take()
+	if st != transcriptindex.Fresh || len(data) > 0 && from != s.p.Offset() || len(data) == 0 && partial {
+		return transcript.Incremental{}, false
+	}
+	return s.p.ParseAppended(data, from)
+}
+
+// seat tells the index where the source stands after a read of its own; a parser that holds the start of a line has no
+// place to give.
+func (s *CodexSource) seat() {
+	if s.Index == nil || s.p == nil || s.p.Holding() {
+		return
+	}
+	if s.q == nil {
+		s.q = s.Index.Queue(s.Path, "feed", 0)
+		runtime.AddCleanup(s, func(q *transcriptindex.Queue) { q.Close() }, s.q)
+	}
+	s.q.Seat(s.p.Offset())
+}
+
+// Close lets go of the source's place in the index.
+func (s *CodexSource) Close() {
+	if s.q != nil {
+		s.q.Close()
+		s.q = nil
+	}
+}
+
+func (s *CodexSource) AtRest() bool { return s.p != nil && s.p.AtRest() }
+
+func (s *CodexSource) Seat(offset int64) {
+	s.parser().Seat(offset)
+	s.seat()
+}
 
 // TailEntries is how many timeline entries the first read takes from the end at most; older ones come page by page.
 const TailEntries = 2000
@@ -115,6 +253,11 @@ type Update struct {
 	// Events are all of the above as the conversation's channel takes them, in the transcript's order: turn_started,
 	// step, entry_update, and turn_finished of a turn the transcript ended.
 	Events []wire.Event
+	// Read are the source entries the read took, in the transcript's order, for what is gathered from the same read
+	// beside the feed. Whole says they are all the feed holds now (a first read, a transcript read anew), not what
+	// it gained.
+	Read  []*jsvalue.Object
+	Whole bool
 }
 
 // Feed is one conversation's feed. Not safe for concurrent use: the conversation's actor owns it.
@@ -203,7 +346,9 @@ func (f *Feed) loadFrom(c transcript.Chunk) Update {
 	for _, o := range c.Entries {
 		f.raws = append(f.raws, raw{o, -1})
 	}
-	return f.rebuild()
+	u := f.rebuild()
+	u.Read, u.Whole = c.Entries, true
+	return u
 }
 
 // Poll reads what the transcript gained since the last read. The entries' offset is where the read began: their
@@ -223,12 +368,26 @@ func (f *Feed) Poll() Update {
 		return f.Load()
 	}
 	f.size = inc.NewOffset - int64(len(inc.PendingBuffer))
-	var u Update
+	u := Update{Read: inc.NewEntries}
 	for _, o := range inc.NewEntries {
 		f.raws = append(f.raws, raw{o, from})
 		f.apply(&u, f.b.add(o, from))
 	}
 	return u
+}
+
+// Sources are the source entries the feed holds, oldest first: what its reads took, for what starts to be gathered
+// beside the feed after them. Nothing is read from the transcript beyond what a released feed takes back.
+func (f *Feed) Sources() []*jsvalue.Object {
+	if !f.loaded {
+		return nil
+	}
+	f.ensure()
+	out := make([]*jsvalue.Object, len(f.raws))
+	for i, r := range f.raws {
+		out[i] = r.o
+	}
+	return out
 }
 
 // rebuild builds the feed over the raws read, with what the runtime set on it.
@@ -302,6 +461,14 @@ func (f *Feed) PendingTool() (wire.Entry, bool) {
 		}
 	}
 	return wire.Entry{}, false
+}
+
+// Close lets go of what the feed's source holds outside the feed (its place in the transcript index). The feed stays
+// usable: its next read takes a place again.
+func (f *Feed) Close() {
+	if c, ok := f.src.(interface{ Close() }); ok {
+		c.Close()
+	}
 }
 
 // Size is how far the transcript is read: an entry written after it is newer than anything the feed has.

@@ -35,6 +35,8 @@ type v2Designly struct {
 	apps *apps.Registry
 	// links are the designs each conversation's transcript worked on, whatever its folder.
 	links *design.ChatLinks
+	// disk keeps what the library's list reads of the projects' folders and the transcripts between two lists.
+	disk designlyDisk
 
 	mu sync.Mutex
 }
@@ -113,10 +115,15 @@ func (d *v2Designly) state() designlyState {
 // (a teammate's runtime listed a colleague's deck as a site and opened its slide as a plain page). A video is a
 // deck folder with meta/video.json, so it is told first.
 func kindOf(st designlyState, lib *design.Library, id string) wire.DesignKind {
-	if lib.IsVideo(id) {
+	return kindFrom(st, id, lib.IsVideo(id), lib.IsDeck(id))
+}
+
+// kindFrom is kindOf with what the project's folder says already read.
+func kindFrom(st designlyState, id string, video, deck bool) wire.DesignKind {
+	if video {
 		return wire.DesignVideo
 	}
-	if lib.IsDeck(id) {
+	if deck {
 		return wire.DesignSlides
 	}
 	if k, ok := st.Kinds[id]; ok && slicesContainsKind(k) {
@@ -488,7 +495,7 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 	if err != nil {
 		return wire.DesignLibrary{}, err
 	}
-	if !lib.DemoSeeded() {
+	if !d.disk.demoSeeded(lib) {
 		if _, err := d.seedDemo(lib, false); err != nil {
 			if log := lib.Config().Log; log != nil {
 				log("warn", "design: the demo projects were not copied", err)
@@ -503,21 +510,37 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 	// Without an identity nobody is "me": the owners still show.
 	me, _ := lib.IdentityOf(person)
 	now := time.Now()
-	// A document of a type an app adds is opened in the app's editor, not listed as a site, a deck or a video.
+	// A document of a type an app adds is opened in the app's editor, not listed as a site, a deck or a video; one of a
+	// type made of Sinopia's own site is a site with the app's label.
 	var appDocs map[string]string
+	extends := map[string]wire.DesignAppKind{}
 	if d.apps != nil {
 		appDocs = d.apps.DocKinds()
+		if kinds, err := d.apps.Kinds(); err == nil {
+			for _, k := range kinds {
+				if k.Extends != "" {
+					extends[k.ID] = wire.DesignAppKind{ID: k.ID, Title: k.Title, App: k.App, AppName: k.AppName}
+				}
+			}
+		}
 	}
 	for _, a := range arts {
-		if _, ok := appDocs[a.ID]; ok {
-			continue
+		var appKind *wire.DesignAppKind
+		if kind, ok := appDocs[a.ID]; ok {
+			ext, made := extends[kind]
+			if !made {
+				continue
+			}
+			appKind = &ext
 		}
-		item := wire.DesignArtifact{ID: a.ID, Title: a.Title, UpdatedAt: wire.Ms(a.UpdatedAt), Kind: kindOf(st, lib, a.ID), Pinned: st.Pinned[a.ID],
-			ProjectPath: a.ProjectPath, Boards: []wire.DesignBoard{}, Convs: []string{}, Role: wire.DesignRole(lib.RoleOf(a.ID, me, now))}
+		part := d.disk.project(lib, a.ID, readDesignlyProject)
+		item := wire.DesignArtifact{ID: a.ID, Title: a.Title, UpdatedAt: wire.Ms(a.UpdatedAt), Kind: kindFrom(st, a.ID, part.video, part.deck), Pinned: st.Pinned[a.ID],
+			ProjectPath: a.ProjectPath, Boards: []wire.DesignBoard{}, Convs: []string{}, Role: wire.DesignRole(lib.RoleOf(a.ID, me, now)),
+			AppKind: appKind}
 		if a.Cover != nil && *a.Cover != "" {
 			item.Cover = a.Cover
 		}
-		if owner, ok := lib.ReadOwner(a.ID); ok {
+		if owner, ok := part.owner, part.owned; ok {
 			item.Owner = &wire.DesignOwner{Name: owner.Name, Me: owner.Mine(me)}
 			lib.ClaimOnce(a.ID, owner, me)
 		}
@@ -553,16 +576,14 @@ func (d *v2Designly) touched(convs []wire.Conversation) map[string][]string {
 	}
 	transcriptOf := map[string]string{}
 	last := map[string]int64{}
-	paths := make([]string, 0, len(convs))
 	for _, c := range convs {
 		if c.TranscriptPath == "" {
 			continue
 		}
 		transcriptOf[c.ID] = c.TranscriptPath
 		last[c.ID] = int64(c.LastActivityAt)
-		paths = append(paths, c.TranscriptPath)
 	}
-	return design.ChatsOf(d.links.Designs(paths), transcriptOf, last)
+	return design.ChatsOf(d.disk.linked(convs, time.Now(), d.links.Designs), transcriptOf, last)
 }
 
 // backfill reads behind the transcripts of every conversation, for the links of the chats from before; until ctx ends.

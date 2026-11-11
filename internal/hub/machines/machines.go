@@ -24,6 +24,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
@@ -57,6 +59,8 @@ type Deps struct {
 	Automations AutomationsSink
 	// History keeps the machines' chats (internal/hub/history); nil: the hub takes none.
 	History HistorySink
+	// Switches turns on the owner's rule of opening a machine (machaccess.FeatureOwnWork); nil keeps it off.
+	Switches switches.Gate
 	// Provider runs the machines' virtual servers (docs/hub/provider.md); nil means provider.None.
 	Provider provider.Provider
 	// Publisher carries machine.op and machine.status to the organization's live channel; nil: they go to the space's
@@ -137,6 +141,8 @@ type Service struct {
 
 	// res is the state of the resources and operations side (resources.go).
 	res resState
+	// repl is the links that send their data as batches (repl.go).
+	repl replState
 
 	// infoMu serialises the read-modify-write of a machine's info document: the connect routine and the agent's events
 	// all update it.
@@ -164,7 +170,7 @@ func New(d Deps) *Service {
 	if s.tickets == nil {
 		s.tickets = ticket.New(s.now)
 	}
-	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log}
+	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log, Switches: d.Switches}
 	// Live events of a machine reach a stream only while its person may still see the machine (HUB_ACCESS_ENFORCE=on).
 	s.events.SetMachineGate(func(ctx context.Context, userID, machineID string) bool {
 		if !s.acc.Hides() {
@@ -179,21 +185,27 @@ func New(d Deps) *Service {
 	return s
 }
 
+// guard is the tenant guard of the machine routes.
+func (s *Service) guard() tenant.Guard {
+	return tenant.Guard{Auth: s.auth, Spaces: s.spaces, Machines: s}
+}
+
 // Mount registers the endpoints. The ones under a space go on the spaces router (see spaces.Service.Mount).
 func (s *Service) Mount(mux *http.ServeMux) {
 	sub := s.spaces.Sub()
-	sub.Handle("GET /api/spaces/{spaceId}/machines", s.auth.Require(s.list))
-	sub.Handle("POST /api/spaces/{spaceId}/machines/codes", s.auth.Require(s.createCode))
-	sub.Handle("POST /api/spaces/{spaceId}/machines/local", s.auth.Require(s.claimLocal))
+	g := s.guard()
+	sub.Handle("GET /api/spaces/{spaceId}/machines", g.Space(tenant.Member, s.list))
+	sub.Handle("POST /api/spaces/{spaceId}/machines/codes", g.Space(tenant.Owner, s.createCode))
+	sub.Handle("POST /api/spaces/{spaceId}/machines/local", g.Space(tenant.Owner, s.claimLocal))
 
-	mux.Handle("GET /api/machines/{machineId}", s.auth.Require(s.get))
-	mux.Handle("PATCH /api/machines/{machineId}", s.auth.Require(s.rename))
-	mux.Handle("DELETE /api/machines/{machineId}", s.auth.Require(s.remove))
-	mux.Handle("GET /api/machines/{machineId}/open", s.auth.Require(s.open))
-	mux.Handle("POST /api/machines/{machineId}/trust", s.auth.Require(s.trust))
-	mux.Handle("DELETE /api/machines/{machineId}/trust", s.auth.Require(s.trust))
-	mux.Handle("POST /api/machines/{machineId}/preflight", s.auth.Require(s.rerunPreflight))
-	mux.Handle("POST /api/machines/{machineId}/owner", s.auth.Require(s.assignOwner))
+	mux.Handle("GET /api/machines/{machineId}", g.Machine(tenant.Viewer, s.get))
+	mux.Handle("PATCH /api/machines/{machineId}", g.Machine(tenant.Member, s.rename))
+	mux.Handle("DELETE /api/machines/{machineId}", g.Machine(tenant.Owner, s.remove))
+	mux.Handle("GET /api/machines/{machineId}/open", g.Machine(tenant.Member, s.open))
+	mux.Handle("POST /api/machines/{machineId}/trust", g.Machine(tenant.Owner, s.trust))
+	mux.Handle("DELETE /api/machines/{machineId}/trust", g.Machine(tenant.Owner, s.trust))
+	mux.Handle("POST /api/machines/{machineId}/preflight", g.Machine(tenant.Owner, s.rerunPreflight))
+	mux.Handle("POST /api/machines/{machineId}/owner", g.Machine(tenant.Owner, s.assignOwner))
 
 	s.mountOrg(mux)
 	s.mountProvision(mux)
@@ -204,28 +216,43 @@ func (s *Service) Mount(mux *http.ServeMux) {
 // Authorize finds a machine for a person and checks they may act on it: any member for reading and opening, an owner
 // of its space for changing. A machine the person cannot see, and an id that is no machine, are the same forbidden.
 func (s *Service) Authorize(ctx context.Context, userID, machineID string, owner bool) (store.Machine, error) {
+	level := tenant.Member
+	if owner {
+		level = tenant.Owner
+	}
+	m, _, err := s.MachineFor(ctx, userID, machineID, level)
+	return m, err
+}
+
+// MachineFor is the machine of a guarded route (tenant.Guard.Machine) with the person's role in its space. Viewer also
+// asks the machine's access list: a machine the person may not see is not found, as it is in the list of the space.
+func (s *Service) MachineFor(ctx context.Context, userID, machineID string, level tenant.Level) (store.Machine, string, error) {
 	m, err := s.db.S().MachineByID(ctx, machineID)
 	if errors.Is(err, store.ErrNotFound) {
-		return store.Machine{}, httpx.ErrForbidden
+		return store.Machine{}, "", httpx.ErrForbidden
 	}
 	if err != nil {
-		return store.Machine{}, err
+		return store.Machine{}, "", err
 	}
 	if m.SpaceID == "" {
-		return store.Machine{}, httpx.ErrForbidden
+		return store.Machine{}, "", httpx.ErrForbidden
 	}
-	if owner {
+	role := store.RoleOwner
+	if level == tenant.Owner {
 		err = s.spaces.Owner(ctx, userID, m.SpaceID)
 	} else {
-		_, err = s.spaces.Access(ctx, userID, m.SpaceID)
+		role, err = s.spaces.Access(ctx, userID, m.SpaceID)
 	}
 	if err != nil {
-		return store.Machine{}, err
+		return store.Machine{}, "", err
 	}
 	if m.RevokedAt != nil {
-		return store.Machine{}, httpx.ErrNotFound
+		return store.Machine{}, "", httpx.ErrNotFound
 	}
-	return m, nil
+	if level == tenant.Viewer && !s.Visible(ctx, userID, m) {
+		return store.Machine{}, "", httpx.ErrNotFound
+	}
+	return m, role, nil
 }
 
 // Visible says whether the person may see the machine in an inventory: the access list under HUB_ACCESS_ENFORCE=on.
@@ -272,6 +299,8 @@ type info struct {
 	Proxy     json.RawMessage `json:"proxy,omitempty"`
 	// CLIs are the statuses of the machine's other CLIs to sign in, from its cli-logins.json (#58).
 	CLIs json.RawMessage `json:"clis,omitempty"`
+	// Probed is when the hub last asked a fresh link for the preflight and the agents' status (state.go).
+	Probed *probed `json:"probed,omitempty"`
 }
 
 // opensRuntime says whether the hub may open the machine's runtime: not when the machine's last policy refused runtime
@@ -415,12 +444,10 @@ func (s *Service) PublishLogin(m store.Machine, login json.RawMessage) {
 	s.events.PublishMachine(m.SpaceID, m.ID, "login", map[string]any{"machineId": m.ID, "login": login}, true)
 }
 
-func (s *Service) list(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) list(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	ctx := r.Context()
-	spaceID := r.PathValue("spaceId")
-	if _, err := s.spaces.Access(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	spaceID := t.SpaceID
 	ms, err := s.db.S().MachinesBySpace(ctx, spaceID)
 	if err != nil {
 		return err
@@ -440,14 +467,8 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request, p *auth.Principal
 	return nil
 }
 
-func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	m, err := s.Authorize(r.Context(), p.User.ID, r.PathValue("machineId"), false)
-	if err != nil {
-		return err
-	}
-	if !s.Visible(r.Context(), p.User.ID, m) {
-		return httpx.ErrNotFound // the same answer as for a machine that does not exist
-	}
+func (s *Service) get(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	m := *t.Machine
 	v, err := s.View(r.Context(), m)
 	if err != nil {
 		return err
@@ -456,7 +477,8 @@ func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 	return nil
 }
 
-func (s *Service) rename(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) rename(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req patchRequest
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -474,8 +496,9 @@ func (s *Service) rename(w http.ResponseWriter, r *http.Request, p *auth.Princip
 		return err
 	}
 	ctx := r.Context()
-	m, err := s.Authorize(ctx, p.User.ID, r.PathValue("machineId"), true)
-	if err != nil {
+	m := *t.Machine
+	// The route lets every member in (the team and the access list have rights of their own); the name is the owners'.
+	if err := s.spaces.Owner(ctx, p.User.ID, m.SpaceID); err != nil {
 		return err
 	}
 	if err := s.db.S().RenameMachine(ctx, m.ID, name); err != nil {
@@ -491,11 +514,9 @@ func (s *Service) rename(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	return nil
 }
 
-func (s *Service) remove(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	m, err := s.Authorize(r.Context(), p.User.ID, r.PathValue("machineId"), true)
-	if err != nil {
-		return err
-	}
+func (s *Service) remove(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
+	m := *t.Machine
 	if err := s.revokeMachine(r.Context(), m); err != nil {
 		return err
 	}
@@ -521,6 +542,12 @@ func (s *Service) revokeMachine(ctx context.Context, m store.Machine) error {
 	if _, err := s.db.S().RevokeMachine(ctx, m.ID, s.now().UTC()); err != nil {
 		return err
 	}
+	s.Revoked(m)
+	return nil
+}
+
+// Revoked is what follows a machine's revocation in the database: its link closes, and the space is told.
+func (s *Service) Revoked(m store.Machine) {
 	s.reg.Revoke(m.ID)
 	if s.revoked != nil {
 		s.revoked(m.ID)
@@ -528,7 +555,6 @@ func (s *Service) revokeMachine(ctx context.Context, m store.Machine) error {
 	if m.SpaceID != "" {
 		s.events.PublishJSON(m.SpaceID, "machineRemoved", map[string]string{"machineId": m.ID}, false)
 	}
-	return nil
 }
 
 // validRuntimePath says whether p is a path inside the machine's runtime: /m/<id> or /m/<id>/…, with an optional
@@ -545,12 +571,10 @@ func validRuntimePath(p, machineID string) bool {
 	return !strings.HasPrefix(rest, "//")
 }
 
-func (s *Service) open(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) open(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	ctx := r.Context()
-	m, err := s.Authorize(ctx, p.User.ID, r.PathValue("machineId"), false)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	if ok, retry := s.lim.Allow("open:"+p.User.ID, 120, time.Minute); !ok {
 		return httpx.RateLimited(ratelimit.RetrySeconds(retry))
 	}
@@ -598,12 +622,9 @@ func (s *Service) open(w http.ResponseWriter, r *http.Request, p *auth.Principal
 	return nil
 }
 
-func (s *Service) rerunPreflight(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) rerunPreflight(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	ctx := r.Context()
-	m, err := s.Authorize(ctx, p.User.ID, r.PathValue("machineId"), true)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	report, err := s.RunPreflight(ctx, m)
 	if err != nil {
 		return err

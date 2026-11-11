@@ -1,0 +1,36 @@
+.hx-ext {
+  margin-top: 16px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+}
+.hx-ext__h {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-ext__frame {
+  display: block;
+  width: 100%;
+  min-height: 360px;
+  border: 0;
+  background: transparent;
+}
+.hx-ext__fail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  color: var(--hx-text-2, inherit);
+}
+.hx-ext__empty {
+  margin: 16px 0 0;
+  color: var(--hx-text-2, inherit);
+}
+@media (max-width: 640px) {
+  .hx-ext__frame {
+    min-height: 420px;
+  }
+}

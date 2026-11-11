@@ -81,6 +81,31 @@ export type PageOutcome<T, R extends { r: 'refused' } = Refusal> =
 export const getPage = <T>(url: string, read: (v: unknown) => T, timeoutMs: number) =>
   sendPage('GET', url, read, timeoutMs);
 
+/** What a conditional GET brings: the page with its entity tag, or word that the copy the caller holds still stands. */
+export type FreshOutcome<T> =
+  { same: true } | { ok: true; value: T; tag: string | null } | Exclude<PageOutcome<T>, { ok: true }>;
+
+/**
+ * GET of a page the caller may hold already: `tag` is the entity tag of the held copy (null for none), sent as
+ * If-None-Match, and a 304 answers `same` without a body.
+ */
+export async function getPageIfChanged<T>(
+  url: string,
+  read: (v: unknown) => T,
+  timeoutMs: number,
+  tag: string | null,
+): Promise<FreshOutcome<T>> {
+  const res = await timed(
+    url,
+    { method: 'GET', headers: { ...headers(false), ...(tag ? { 'If-None-Match': tag } : {}) } },
+    timeoutMs,
+  );
+  if (typeof res !== 'string' && res.status === 304) return { same: true };
+  const out = await answerPage(res, read);
+  if (!('ok' in out)) return out;
+  return { ...out, tag: typeof res === 'string' ? null : res.headers.get('ETag') };
+}
+
 /**
  * A v2 resource's POST or DELETE without a body: the answer through the strict reader as a page's is; 204 (nothing
  * to say) reads as null.

@@ -14,8 +14,11 @@ import {
   callSecretsPut,
   callBrowser,
   callSettings,
+  callNotice,
   callSinopia,
   callStorage,
+  callUpload,
+  callWorkflow,
   callTool,
   APP_STATE,
   createViewSession,
@@ -26,6 +29,7 @@ import {
 import { watchChatEvents } from '@/next/features/app-views/chat-events';
 import { subscribeFileChanges } from '@/next/features/app-views/file-events';
 import { askFile } from '@/next/features/app-views/file-pick';
+import { useMe } from '@/next/stores/me';
 import {
   AppBridge,
   BridgeError,
@@ -33,6 +37,7 @@ import {
   type IBridgeLogEntry,
   type IViewContext,
   type TTarget,
+  viewUser,
 } from '@/next/features/app-views/bridge';
 import AppFail from '@/next/features/app-views/app-fail';
 import { logCall, logKey } from '@/next/features/app-views/bridge-log';
@@ -54,6 +59,10 @@ import {
   failureOfViewError,
   keepTelling,
   nextFrameState,
+  autoRetryable,
+  AUTO_RETRY_MAX,
+  AUTO_RETRY_MS,
+  SLOW_HINT_MS,
   viewErrorOf,
   watchHandshake,
   withTimeout,
@@ -70,6 +79,7 @@ import { conversationsStore, useConversation } from '@/next/stores/conversations
 import { openAppTerminal } from '@/next/features/app-views/app-terminal';
 import { openAddressTab, openAppTab } from '@/next/features/app-views/open';
 import { agentRows, chatTarget, openConversation, watchAgents } from '@/next/features/app-views/agents';
+import { objectTarget } from '@/next/features/app-views/target';
 import { reaches, subscribeStorageChanges } from '@/next/features/app-views/storage-events';
 import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
@@ -169,6 +179,8 @@ export interface IAppFrameProps {
   inChat?: boolean;
   /** A Document API call of the view that went through (the host may do more: a comment also goes to the chat). */
   onSinopiaCall?: (method: string, params: Record<string, unknown>) => void;
+  /** Where the app is the main thing: `hl.pane.open('object:<slug>')` opens one of its objects, `object:` its home. */
+  onOpenObject?: (object: string | null) => void;
 }
 
 export interface IViewNotice {
@@ -205,13 +217,21 @@ const AppFrame = ({
   readOnly = false,
   notice = null,
   onSinopiaCall,
+  onOpenObject,
   inChat = false,
 }: IAppFrameProps) => {
   const { resolvedTheme } = useTheme();
+  const meState = useMe();
+  const person = meState.k === 'ready' ? meState.me : null;
   const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
   const [opened, setOpened] = useState<IOpened | null>(null);
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
   const [reload, setReload] = useState(0);
+  // The view's own tries again after a failure that may pass (frame-health.ts autoRetryable); a manual retry starts
+  // the count anew.
+  const [autoTries, setAutoTries] = useState(0);
+  // The key of the mount that has waited longer than SLOW_HINT_MS: the skeleton then says so.
+  const [slowKey, setSlowKey] = useState('');
   // Is the view up? Only the handshake says so (frame-health.ts): the frame's `load` also fires for a 404 page.
   const [health, setHealth] = useState<{ key: string; state: TFrameState }>({ key: '', state: LOADING });
   // The most telling thing the view said about its failure before it was up; the timeout then says it.
@@ -249,8 +269,9 @@ const AppFrame = ({
     [key],
   );
   // An app gets a chat only where the person turned it on; the runtime checks the same when it issues the session.
+  // Its window in the pane of a chat is the person turning it on there: the runtime does it as it issues the session.
   const turnedOn = useConversation(conversation)?.apps?.includes(app.id) ?? false;
-  const on = inChat || turnedOn;
+  const on = inChat || turnedOn || (conversation !== null && target === 'pane');
   const chat = on ? conversation : null;
   const work = useHostHandlers(machine, conversation, app, on);
 
@@ -390,15 +411,15 @@ const AppFrame = ({
       theme: viewTheme(resolvedTheme === 'dark' ? 'dark' : 'light'),
       locale: locale(),
       chat: chat ? { id: chat } : null,
-      user: null,
+      user: viewUser(person, doc !== undefined, readOnly),
       ...(readOnly ? { readOnly } : {}),
       ...(data === undefined ? {} : { data }),
     }),
-    [app.id, app.version, target, view.id, resolvedTheme, chat, data, readOnly],
+    [app.id, app.version, target, view.id, resolvedTheme, chat, data, readOnly, person, doc],
   );
-  const latest = useRef({ context, onBridgeCall, onSinopiaCall });
+  const latest = useRef({ context, onBridgeCall, onSinopiaCall, onOpenObject });
   useEffect(() => {
-    latest.current = { context, onBridgeCall, onSinopiaCall };
+    latest.current = { context, onBridgeCall, onSinopiaCall, onOpenObject };
   });
 
   const slotted = opened?.key === key ? opened : null;
@@ -536,6 +557,18 @@ const AppFrame = ({
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
         return callSettings(machine, session);
       },
+      upload: (path, data) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callUpload(machine, session, path, data);
+      },
+      workflow: (op, move) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callWorkflow(machine, session, op, move);
+      },
+      notice: (op, params) => {
+        if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
+        return callNotice(machine, session, op, params);
+      },
       files: (op, path, text) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
         return callFiles(machine, session, op, path, text);
@@ -600,6 +633,14 @@ const AppFrame = ({
       },
       agents: async () => agentRows(machine),
       paneOpen: async (to) => {
+        const object = objectTarget(to);
+        const openObject = latest.current.onOpenObject;
+        if (object !== undefined) {
+          if (!openObject)
+            throw new BridgeError('invalid_params', 'objects open where the app is the main thing');
+          openObject(object);
+          return;
+        }
         const chatId = chatTarget(to);
         if (chatId !== null) {
           // The bridge has checked agents.read; only a conversation of this machine opens.
@@ -609,7 +650,10 @@ const AppFrame = ({
           return;
         }
         if (!openAppTab(to))
-          throw new BridgeError('invalid_params', 'only app:<id>[/<view>] and chat:<id> open from a view');
+          throw new BridgeError(
+            'invalid_params',
+            'only app:<id>[/<view>], chat:<id> and object:<slug> open from a view',
+          );
       },
       sinopia: async (method, params) => {
         if (session === null) throw new BridgeError('host_unavailable', 'this view has no host session');
@@ -781,6 +825,24 @@ const AppFrame = ({
     return () => watch.cancel();
   }, [waiting, send, src]);
 
+  // Slower than usual: the skeleton says so before anything has failed.
+  useEffect(() => {
+    if (state.k !== 'loading') return;
+    const id = setTimeout(() => setSlowKey(key), SLOW_HINT_MS);
+    return () => clearTimeout(id);
+  }, [state.k, key]);
+
+  // A failure that may pass is tried again once, under the skeleton, before the card.
+  const retrying = state.k === 'failed' && autoTries < AUTO_RETRY_MAX && autoRetryable(state.failure);
+  useEffect(() => {
+    if (!retrying) return;
+    const id = setTimeout(() => {
+      setAutoTries((n) => n + 1);
+      setReload((n) => n + 1);
+    }, AUTO_RETRY_MS);
+    return () => clearTimeout(id);
+  }, [retrying]);
+
   // What the view says before the SDK is up (the shim of every page, or the server's page of refusal): a file that did
   // not load, an exception, a blocked request. It goes to the journal, and the most telling of it is the card's reason.
   useEffect(() => {
@@ -895,6 +957,11 @@ const AppFrame = ({
     return () => cancelAnimationFrame(id);
   }, [context]);
 
+  let skeletonText = t('next.appfail.loading', { name: app.name });
+  if (retrying || (autoTries > 0 && state.k === 'loading'))
+    skeletonText = t('next.appfail.retrying', { name: app.name });
+  else if (slowKey === key) skeletonText = t('next.appfail.slow', { name: app.name });
+
   // `load` is not «up»: a 404 page loads too. The frame is shown once the view says it is ready; until then the skeleton
   // is over it, and when it did not start the card takes its place (the frame stays, hidden, in case it connects late).
   return (
@@ -911,22 +978,30 @@ const AppFrame = ({
         data-fit={fit || undefined}
         height={fit ? height : undefined}
       />
-      {state.k !== 'failed' && (
-        <div className="hx-appview__skeleton" data-state={state.k} aria-hidden={state.k === 'ready'}>
+      {(state.k !== 'failed' || retrying) && (
+        <div
+          className="hx-appview__skeleton"
+          data-state={retrying ? 'loading' : state.k}
+          aria-hidden={state.k === 'ready'}
+          aria-busy={state.k !== 'ready'}
+        >
           <Icon name={app.icon || 'layout-grid'} />
-          <span className="hx-appview__skeleton-name">{t('next.appfail.loading', { name: app.name })}</span>
+          <span className="hx-appview__skeleton-name">{skeletonText}</span>
           <span className="hx-appview__skeleton-bar" />
           <span className="hx-appview__skeleton-bar" />
         </div>
       )}
-      {state.k === 'failed' && (
+      {state.k === 'failed' && !retrying && (
         <AppFail
           machine={machine}
           app={app}
           failure={state.failure}
           logKey={logKey(app.id, chat)}
           conversation={conversation}
-          onRetry={() => setReload((n) => n + 1)}
+          onRetry={() => {
+            setAutoTries(0);
+            setReload((n) => n + 1);
+          }}
         />
       )}
     </div>

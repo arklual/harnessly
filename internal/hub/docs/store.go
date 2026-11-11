@@ -7,7 +7,10 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/ly-solutions/harnessly/internal/hub/auth"
+	"github.com/ly-solutions/harnessly/internal/hub/resaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
@@ -52,7 +55,9 @@ type thread struct {
 }
 
 type meta struct {
-	Slug       string
+	Slug string
+	// SpaceID is the space the document belongs to; "" for a document no space is known for.
+	SpaceID    string
 	OwnerEmail string
 	OwnerName  string
 	MachineID  string
@@ -73,63 +78,159 @@ func tsPtr(ms sql.NullInt64) *string {
 	return &s
 }
 
-func (s *Service) meta(ctx context.Context, slug string) (*meta, error) {
-	var m meta
-	var machine, src sql.NullString
-	err := s.db.S().Q().QueryRow(ctx, `SELECT slug, owner_email, owner_name, machine_id, source_path, title, team_level, created_at, updated_at
-		FROM doc_meta WHERE slug = ?`, slug).Scan(&m.Slug, &m.OwnerEmail, &m.OwnerName, &machine, &src, &m.Title, &m.TeamLevel, &m.CreatedAt, &m.UpdatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	m.MachineID, m.SourcePath = machine.String, src.String
-	return &m, nil
+// reach is whose documents a query returns: every query of doc_meta carries its condition on the document's space. A
+// document no space is known for is within everybody's reach here; who may open it is decided from its owner's
+// organizations (see circle).
+type reach struct {
+	cond string
+	args []any
 }
 
-// metas returns the records of the slugs asked for.
-func (s *Service) metas(ctx context.Context, slugs []string) (map[string]meta, error) {
-	out := map[string]meta{}
+// reachAll is the hub itself and the administrators of the installation.
+func reachAll() reach { return reach{cond: "1 = 1"} }
+
+// reachSpace is exactly one space ("" for the documents no space is known for): what a guest link opens.
+func reachSpace(id string) reach { return reach{cond: "COALESCE(space_id, '') = ?", args: []any{id}} }
+
+// reachMachine is what a machine of a space may publish over.
+func reachMachine(spaceID string) reach {
+	return reach{cond: "(space_id IS NULL OR space_id = ?)", args: []any{spaceID}}
+}
+
+// reachPerson is the spaces of the person's organizations, and beyond them only the documents that name the person:
+// their own, and those shared with them (or with an address they have proved) or with a team of theirs.
+func reachPerson(userID, email string, proved []string) reach {
+	email = strings.ToLower(strings.TrimSpace(email))
+	named, addrs := "g.user_id = ?", []any{userID}
+	if len(proved) > 0 {
+		named = "(g.user_id = ? OR (g.user_id IS NULL AND g.email IN (" + strings.TrimSuffix(strings.Repeat("?,", len(proved)), ",") + ")))"
+		for _, v := range proved {
+			addrs = append(addrs, v)
+		}
+	}
+	args := append([]any{userID, userID, email}, addrs...)
+	return reach{cond: `(space_id IS NULL
+		OR space_id IN (SELECT s.id FROM spaces s WHERE s.id IN (SELECT space_id FROM memberships WHERE user_id = ?)
+			OR s.org_id IN (SELECT s2.org_id FROM spaces s2 JOIN memberships m2 ON m2.space_id = s2.id WHERE m2.user_id = ? AND s2.org_id <> ''))
+		OR lower(owner_email) = ?
+		OR EXISTS (SELECT 1 FROM resource_access_people g WHERE g.kind = 'doc' AND g.id = doc_meta.slug
+			AND COALESCE(g.space_id, '') = COALESCE(doc_meta.space_id, '') AND ` + named + `)
+		OR EXISTS (SELECT 1 FROM resource_access_teams g JOIN team_members tm ON tm.team_id = g.team_id WHERE g.kind = 'doc'
+			AND g.id = doc_meta.slug AND COALESCE(g.space_id, '') = COALESCE(doc_meta.space_id, '') AND tm.user_id = ?))`,
+		args: append(args, userID)}
+}
+
+func (s *Service) reachOf(ctx context.Context, p *auth.Principal) reach {
+	if p.Admin {
+		return reachAll()
+	}
+	proved, err := s.db.S().VerifiedEmails(ctx, p.User.ID)
+	if err != nil {
+		s.log.Warn("addresses of a person not read", "error", err)
+	}
+	return reachPerson(p.User.ID, p.User.Email, proved)
+}
+
+const metaCols = `slug, COALESCE(space_id, ''), owner_email, owner_name, machine_id, source_path, title, team_level, created_at, updated_at`
+
+func scanMeta(row interface{ Scan(...any) error }) (meta, error) {
+	var m meta
+	var machine, src sql.NullString
+	err := row.Scan(&m.Slug, &m.SpaceID, &m.OwnerEmail, &m.OwnerName, &machine, &src, &m.Title, &m.TeamLevel, &m.CreatedAt, &m.UpdatedAt)
+	m.MachineID, m.SourcePath = machine.String, src.String
+	return m, err
+}
+
+// meta is the record of a document within reach. elsewhere says the hub has a record of it in a space out of reach:
+// such a document is closed, not unrecorded.
+func (s *Service) meta(ctx context.Context, slug string, r reach) (m *meta, elsewhere bool, err error) {
+	q := s.db.S().Q()
+	got, err := scanMeta(q.QueryRow(ctx, `SELECT `+metaCols+` FROM doc_meta WHERE slug = ? AND `+r.cond, append([]any{slug}, r.args...)...))
+	if err == nil {
+		return &got, false, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, false, err
+	}
+	var n int
+	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM doc_meta WHERE slug = ? AND NOT `+r.cond, append([]any{slug}, r.args...)...).Scan(&n); err != nil {
+		return nil, false, err
+	}
+	return nil, n > 0, nil
+}
+
+// metas returns the records of the slugs asked for that are within reach, and which of the others the hub has a
+// record of in a space out of reach.
+func (s *Service) metas(ctx context.Context, slugs []string, r reach) (map[string]meta, map[string]bool, error) {
+	out, elsewhere := map[string]meta{}, map[string]bool{}
 	if len(slugs) == 0 {
-		return out, nil
+		return out, elsewhere, nil
 	}
 	marks := strings.TrimSuffix(strings.Repeat("?,", len(slugs)), ",")
-	args := make([]any, len(slugs))
-	for i, v := range slugs {
-		args[i] = v
+	args := make([]any, 0, len(slugs)+len(r.args))
+	for _, v := range slugs {
+		args = append(args, v)
 	}
-	rows, err := s.db.S().Q().Query(ctx, `SELECT slug, owner_email, owner_name, machine_id, source_path, title, team_level, created_at, updated_at
-		FROM doc_meta WHERE slug IN (`+marks+`)`, args...)
+	args = append(args, r.args...)
+	q := s.db.S().Q()
+	rows, err := q.Query(ctx, `SELECT `+metaCols+` FROM doc_meta WHERE slug IN (`+marks+`) AND `+r.cond, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	for rows.Next() {
+		m, err := scanMeta(rows)
+		if err != nil {
+			_ = rows.Close()
+			return nil, nil, err
+		}
+		out[m.Slug] = m
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, nil, err
+	}
+	_ = rows.Close()
+	rows, err = q.Query(ctx, `SELECT slug FROM doc_meta WHERE slug IN (`+marks+`) AND NOT `+r.cond, args...)
+	if err != nil {
+		return nil, nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var m meta
-		var machine, src sql.NullString
-		if err := rows.Scan(&m.Slug, &m.OwnerEmail, &m.OwnerName, &machine, &src, &m.Title, &m.TeamLevel, &m.CreatedAt, &m.UpdatedAt); err != nil {
-			return nil, err
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, nil, err
 		}
-		m.MachineID, m.SourcePath = machine.String, src.String
-		out[m.Slug] = m
+		elsewhere[slug] = true
 	}
-	return out, rows.Err()
+	return out, elsewhere, rows.Err()
 }
 
-// putMeta records a document the first time it is published; a later publish keeps the owner and the level.
+// putMeta records a document the first time it is published, in the space of the machine that published it; a later
+// publish keeps the owner and the level. A record no space was known for takes the space of the machine its owner
+// publishes it from again, and its access rows go with it.
 func (s *Service) putMeta(ctx context.Context, m meta) error {
 	now := s.now().UnixMilli()
-	_, err := s.db.S().Q().Exec(ctx, `INSERT INTO doc_meta (slug, owner_email, owner_name, machine_id, source_path, title, team_level, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (slug) DO UPDATE SET title = excluded.title, updated_at = excluded.updated_at,
-			machine_id = COALESCE(excluded.machine_id, doc_meta.machine_id), source_path = COALESCE(excluded.source_path, doc_meta.source_path)`,
-		m.Slug, m.OwnerEmail, m.OwnerName, nullIf(m.MachineID), nullIf(m.SourcePath), m.Title, m.TeamLevel, now, now)
-	return err
+	return s.db.Tx(ctx, func(st store.Store) error {
+		q := st.Q()
+		if _, err := q.Exec(ctx, `INSERT INTO doc_meta (slug, space_id, owner_email, owner_name, machine_id, source_path, title, team_level, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (slug) DO UPDATE SET title = excluded.title, updated_at = excluded.updated_at,
+				space_id = COALESCE(doc_meta.space_id, excluded.space_id),
+				machine_id = COALESCE(excluded.machine_id, doc_meta.machine_id), source_path = COALESCE(excluded.source_path, doc_meta.source_path)
+			WHERE doc_meta.space_id IS NULL OR excluded.space_id IS NULL OR doc_meta.space_id = excluded.space_id`,
+			m.Slug, nullIf(m.SpaceID), m.OwnerEmail, m.OwnerName, nullIf(m.MachineID), nullIf(m.SourcePath), m.Title, m.TeamLevel, now, now); err != nil {
+			return err
+		}
+		if m.SpaceID == "" {
+			return nil
+		}
+		return resaccess.AdoptSpace(ctx, q, resaccess.Ref{Kind: resaccess.KindDoc, ID: m.Slug, Space: m.SpaceID})
+	})
 }
 
-func (s *Service) setLevel(ctx context.Context, slug, level string) error {
-	_, err := s.db.S().Q().Exec(ctx, `UPDATE doc_meta SET team_level = ?, updated_at = ? WHERE slug = ?`, level, s.now().UnixMilli(), slug)
+func (s *Service) setLevel(ctx context.Context, m *meta, level string) error {
+	_, err := s.db.S().Q().Exec(ctx, `UPDATE doc_meta SET team_level = ?, updated_at = ? WHERE slug = ? AND COALESCE(space_id, '') = ?`,
+		level, s.now().UnixMilli(), m.Slug, m.SpaceID)
 	return err
 }
 
@@ -298,16 +399,32 @@ type person struct {
 	Initial string `json:"initial"`
 }
 
-// people finds the people of the installation whose name or address starts with q.
-func (s *Service) people(ctx context.Context, q string) ([]person, error) {
-	like := strings.ToLower(strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(strings.TrimSpace(q))) + "%"
-	rows, err := s.db.S().Q().Query(ctx, `SELECT email, name FROM users WHERE lower(email) LIKE ? ESCAPE '\' OR lower(name) LIKE ? ESCAPE '\'
-		ORDER BY name, email LIMIT 8`, like, like)
+// A search of people needs two characters at least, and a person makes so many a minute.
+const (
+	peopleMinQuery  = 2
+	peoplePerMinute = 120
+)
+
+// people finds, among the people the person shares a space with, those whose name or address starts with q. An
+// administrator of the installation finds anybody.
+func (s *Service) people(ctx context.Context, p *auth.Principal, q string) ([]person, error) {
+	out := []person{}
+	q = strings.TrimSpace(q)
+	if utf8.RuneCountInString(q) < peopleMinQuery {
+		return out, nil
+	}
+	like := strings.ToLower(strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q)) + "%"
+	query := `SELECT email, name FROM users WHERE (lower(email) LIKE ? ESCAPE '\' OR lower(name) LIKE ? ESCAPE '\')`
+	args := []any{like, like}
+	if !p.Admin {
+		query += ` AND id IN (SELECT theirs.user_id FROM memberships mine JOIN memberships theirs ON theirs.space_id = mine.space_id WHERE mine.user_id = ?)`
+		args = append(args, p.User.ID)
+	}
+	rows, err := s.db.S().Q().Query(ctx, query+` ORDER BY name, email LIMIT 8`, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []person{}
 	for rows.Next() {
 		var email, name string
 		if err := rows.Scan(&email, &name); err != nil {

@@ -1,5 +1,5 @@
 import { t, plural } from '@/lib/i18n';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import dayjs from 'dayjs';
 import {
   ArrowUpRight,
@@ -7,20 +7,32 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitCompareArrows,
+  GitPullRequest,
   Loader2,
   RefreshCw,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import IssueKeyText from '@/components/timeline/issue-key-text';
-import { appFetch } from '@/lib/app-path';
+import { appFetch, scopedAppPath } from '@/lib/app-path';
+import {
+  fetchChatWork,
+  fetchMachineChanges,
+  fetchRemoteChanges,
+  groupWork,
+  mrLabel,
+  type IChangeSet,
+  type IChatWork,
+  type IWorkEntry,
+} from '@/lib/chat-work';
 import { parseMultiFileDiff } from '@/lib/parse-git-diff';
+import { goTo, ROUTE } from '@/next/routes/routes';
 import { cn } from '@/lib/utils';
 import type { IDiffCommenting } from '@/components/agents/diff-comment-layer';
 import { addDiffComment } from '@/lib/hl-diff-comments-store';
 import type { ICommitSummary, IRepoChanges } from '@/types/server/hl-changes';
 
-const DiffFileList = dynamic(() => import('@/components/workspace/diff-file-list'), { ssr: false });
+const LocalReview = dynamic(() => import('@/next/legacy/local-review'), { ssr: false });
 
 interface IChangesTabProps {
   paths: string[];
@@ -33,6 +45,8 @@ interface IChangesTabProps {
   onCount?: (count: number) => void;
   /** Opens a commit as a tab of its own (`commitTarget`); without it a commit only unfolds in place. */
   onOpenCommit?: (target: string, title: string) => void;
+  /** The chat: its registered work and its delegated chats' come first; the paths are the fallback. */
+  conversationId?: string | null;
 }
 
 interface IDiffTotals {
@@ -96,8 +110,11 @@ const parseCommitTarget = (target: string): { root: string; sha: string } | null
 /** A path an agent asked the tab for is not a commit: the tab shows the list of changes then. */
 export const isCommitTarget = (target: string): boolean => parseCommitTarget(target) !== null;
 
-const fetchCommitDiff = async (root: string, sha: string): Promise<ICommitDiff> => {
-  const response = await appFetch(`/api/platform/changes?${new URLSearchParams({ root, sha })}`);
+const fetchCommitDiff = async (root: string, sha: string, machineId?: string): Promise<ICommitDiff> => {
+  const path = `/api/platform/changes?${new URLSearchParams({ root, sha })}`;
+  const response = await (machineId
+    ? fetch(scopedAppPath(path, machineId), { credentials: 'same-origin' })
+    : appFetch(path));
   if (!response.ok) throw new Error(String(response.status));
   return (await response.json()) as ICommitDiff;
 };
@@ -111,11 +128,10 @@ interface ICommitViewProps {
 }
 
 /** One commit as a tab of the right panel: its diff with comments on lines. */
-export const CommitView = ({ target, title, sessionName, tabId }: ICommitViewProps) => {
+export const CommitView = ({ target, title }: ICommitViewProps) => {
   const parsed = useMemo(() => parseCommitTarget(target), [target]);
   const repoName = parsed?.root.replace(/\/+$/, '').split('/').at(-1) ?? null;
   const short = parsed?.sha.slice(0, SHORT_SHA) ?? null;
-  const commenting = useDiffCommenting(tabId, repoName, short);
   const [loaded, setLoaded] = useState<{ target: string; diff: ICommitDiff | null } | null>(null);
 
   useEffect(() => {
@@ -137,14 +153,16 @@ export const CommitView = ({ target, title, sessionName, tabId }: ICommitViewPro
   const current = loaded?.target === target ? loaded : null;
   return (
     <div className="tw-rpane-commit">
-      <header className="tw-rpane-commit-head">
-        <h3 className="tw-rpane-commit-title">{title ? <IssueKeyText text={title} /> : short}</h3>
-        <p className="tw-rpane-commit-meta">
-          <GitCommitHorizontal />
-          <code>{short}</code>
-          <span title={parsed.root}>{repoName}</span>
-        </p>
-      </header>
+      {!current?.diff && (
+        <header className="tw-rpane-commit-head">
+          <h3 className="tw-rpane-commit-title">{title ? <IssueKeyText text={title} /> : short}</h3>
+          <p className="tw-rpane-commit-meta">
+            <GitCommitHorizontal />
+            <code>{short}</code>
+            <span title={parsed.root}>{repoName}</span>
+          </p>
+        </header>
+      )}
       {!current && (
         <p className="tw-inspector-muted tw-repo-note">
           <Loader2 className="tw-inline-spin" /> {t('inspector.changesTab.diffLoading')}
@@ -155,12 +173,14 @@ export const CommitView = ({ target, title, sessionName, tabId }: ICommitViewPro
       )}
       {current?.diff && (
         <>
-          <DiffFileList
+          <LocalReview
+            root={parsed.root}
+            name={repoName ?? parsed.root}
+            branch={null}
             diff={current.diff.diff}
-            viewMode="unified"
-            sessionName={sessionName}
-            loadContent={false}
-            commenting={commenting}
+            truncated={current.diff.truncated}
+            sha={parsed.sha}
+            title={title ?? undefined}
           />
           {current.diff.truncated && (
             <p className="tw-inspector-muted tw-repo-note">{t('inspector.changesTab.commitTruncated')}</p>
@@ -177,11 +197,12 @@ interface ICommitRowProps {
   sessionName: string;
   tabId?: string | null;
   onOpenCommit?: (target: string, title: string) => void;
+  /** The machine the repository is on; absent for the page's own. */
+  machineId?: string;
 }
 
-const CommitRow = ({ commit, repo, sessionName, tabId, onOpenCommit }: ICommitRowProps) => {
+const CommitRow = ({ commit, repo, onOpenCommit, machineId }: ICommitRowProps) => {
   const root = repo.root;
-  const commenting = useDiffCommenting(tabId, repo.name, commit.short);
   const [open, setOpen] = useState(false);
   const [diff, setDiff] = useState<ICommitDiff | null>(null);
   const [failed, setFailed] = useState(false);
@@ -189,7 +210,7 @@ const CommitRow = ({ commit, repo, sessionName, tabId, onOpenCommit }: ICommitRo
   const toggle = () => {
     setOpen((value) => !value);
     if (diff || failed) return;
-    fetchCommitDiff(root, commit.sha)
+    fetchCommitDiff(root, commit.sha, machineId)
       .then(setDiff)
       .catch(() => setFailed(true));
   };
@@ -227,7 +248,7 @@ const CommitRow = ({ commit, repo, sessionName, tabId, onOpenCommit }: ICommitRo
           </span>
           <Stat add={commit.additions} del={commit.deletions} />
         </div>
-        {onOpenCommit && (
+        {onOpenCommit && !machineId && (
           <button
             type="button"
             className="tw-icon-button tw-commit-open"
@@ -243,12 +264,14 @@ const CommitRow = ({ commit, repo, sessionName, tabId, onOpenCommit }: ICommitRo
         <div className="tw-commit-diff">
           {diff ? (
             <>
-              <DiffFileList
+              <LocalReview
+                root={root}
+                name={repo.name}
+                branch={repo.branch}
                 diff={diff.diff}
-                viewMode="unified"
-                sessionName={sessionName}
-                loadContent={false}
-                commenting={commenting}
+                truncated={diff.truncated}
+                sha={commit.sha}
+                title={commit.subject}
               />
               {diff.truncated && (
                 <p className="tw-inspector-muted tw-repo-note">{t('inspector.changesTab.commitTruncated')}</p>
@@ -272,10 +295,16 @@ interface IRepoChangesProps {
   sessionName: string;
   tabId?: string | null;
   onOpenCommit?: (target: string, title: string) => void;
+  machineId?: string;
+  /** Chips after the branch in the header (the merge request, a delegated chat's mark). */
+  extra?: ReactNode;
 }
 
-const RepoChanges = ({ repo, sessionName, tabId, onOpenCommit }: IRepoChangesProps) => {
-  const commenting = useDiffCommenting(tabId, repo.name, null);
+const RepoChanges = ({ repo, sessionName, tabId, onOpenCommit, machineId, extra }: IRepoChangesProps) => {
+  const commits = useMemo(
+    () => repo.commits.map((c) => ({ sha: c.sha, title: c.subject, author: c.author, at: null })),
+    [repo.commits],
+  );
   const pending = useMemo(() => diffTotals(repo.diff), [repo.diff]);
   const add = pending.add + repo.commits.reduce((sum, c) => sum + c.additions, 0);
   const del = pending.del + repo.commits.reduce((sum, c) => sum + c.deletions, 0);
@@ -290,6 +319,7 @@ const RepoChanges = ({ repo, sessionName, tabId, onOpenCommit }: IRepoChangesPro
             {repo.branch}
           </span>
         )}
+        {extra}
         <Stat add={add} del={del} />
       </header>
       {repo.commits.length > 0 && (
@@ -311,6 +341,7 @@ const RepoChanges = ({ repo, sessionName, tabId, onOpenCommit }: IRepoChangesPro
                 sessionName={sessionName}
                 tabId={tabId}
                 onOpenCommit={onOpenCommit}
+                machineId={machineId}
               />
             ))}
           </ul>
@@ -324,12 +355,13 @@ const RepoChanges = ({ repo, sessionName, tabId, onOpenCommit }: IRepoChangesPro
             <span>{plural(pending.files, 'inspector.changesTab.files')}</span>
           </h4>
           <div className="tw-repo-diff">
-            <DiffFileList
+            <LocalReview
+              root={repo.root}
+              name={repo.name}
+              branch={repo.branch}
               diff={repo.diff}
-              viewMode="unified"
-              sessionName={sessionName}
-              loadContent={false}
-              commenting={commenting}
+              truncated={repo.truncated}
+              commits={commits}
             />
           </div>
           {repo.truncated && (
@@ -341,15 +373,324 @@ const RepoChanges = ({ repo, sessionName, tabId, onOpenCommit }: IRepoChangesPro
   );
 };
 
+type TWorktreeStatus = 'loading' | 'ready' | 'none' | 'failed';
+
+const lastSegment = (p: string) => p.replace(/\/+$/, '').split('/').at(-1) ?? p;
+
+interface IWorktreeChangesProps {
+  entry: IWorkEntry;
+  /** The chat the tab belongs to: work of another chat is a delegated chat's. */
+  conversationId: string;
+  machineName: string | null;
+  online: boolean;
+  sessionName: string;
+  tabId?: string | null;
+  onOpenCommit?: (target: string, title: string) => void;
+  onCount: (key: string, count: number) => void;
+}
+
+/** One worktree of the chat's work: read on its machine while it is on; a pushed branch from the code host otherwise. */
+const WorktreeChanges = ({
+  entry,
+  conversationId,
+  machineName,
+  online,
+  sessionName,
+  tabId,
+  onOpenCommit,
+  onCount,
+}: IWorktreeChangesProps) => {
+  const key = `${entry.machineId ?? ''}\u0000${entry.conv}\u0000${entry.worktree}`;
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    set: IChangeSet | null;
+    status: TWorktreeStatus;
+  } | null>(null);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const current = loaded?.key === key ? loaded : null;
+  let status: TWorktreeStatus = current?.status ?? 'none';
+  if (!current && online) status = 'loading';
+  const set = current?.set ?? null;
+
+  useEffect(() => {
+    if (!online) return;
+    let cancelled = false;
+    fetchMachineChanges(entry)
+      .then((got) => {
+        if (!cancelled) setLoaded({ key, set: got, status: got ? 'ready' : 'none' });
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded({ key, set: null, status: 'none' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [key, online, entry]);
+
+  useEffect(() => {
+    const files = set ? set.files.length : 0;
+    onCount(key, (set ? set.commits.length : (entry.commits?.length ?? 0)) + files);
+  }, [key, set, entry.commits, onCount]);
+
+  const loadRemote = () => {
+    setLoaded({ key, set: null, status: 'loading' });
+    setRemoteError(null);
+    fetchRemoteChanges(entry)
+      .then((got) => setLoaded({ key, set: got, status: 'ready' }))
+      .catch((err: unknown) => {
+        setRemoteError(err instanceof Error ? err.message : String(err));
+        setLoaded({ key, set: null, status: 'failed' });
+      });
+  };
+
+  const chips = (
+    <>
+      {entry.conv !== conversationId && (
+        <span className="tw-work-tag">{t('inspector.changesTab.delegated')}</span>
+      )}
+      {entry.mr && (
+        <a
+          className="tw-work-tag tw-work-mr"
+          href={entry.mr}
+          target="_blank"
+          rel="noreferrer"
+          title={entry.mr}
+        >
+          {mrLabel(set?.mr ?? entry.mr)}
+        </a>
+      )}
+      {!entry.mr && set?.mr && (
+        <a className="tw-work-tag tw-work-mr" href={set.mr} target="_blank" rel="noreferrer" title={set.mr}>
+          {mrLabel(set.mr)}
+        </a>
+      )}
+    </>
+  );
+  const name = lastSegment(entry.worktree);
+
+  if (status === 'ready' && set?.source === 'machine')
+    return (
+      <RepoChanges
+        repo={{
+          root: entry.worktree,
+          name,
+          branch: set.branch,
+          diff: set.diff,
+          truncated: set.truncated,
+          commits: set.commits,
+          commitsTruncated: false,
+        }}
+        sessionName={sessionName}
+        tabId={tabId}
+        onOpenCommit={onOpenCommit}
+        machineId={entry.machineId}
+        extra={chips}
+      />
+    );
+
+  return (
+    <section className="tw-repo">
+      <header className="tw-repo-head" title={entry.worktree}>
+        <span className="tw-repo-name">{name}</span>
+        {entry.branch && (
+          <span className="tw-repo-branch">
+            <GitBranch />
+            {entry.branch}
+          </span>
+        )}
+        {chips}
+      </header>
+      {status === 'loading' && (
+        <p className="tw-inspector-muted tw-repo-note">
+          <Loader2 className="tw-inline-spin" /> {t('inspector.changesTab.diffLoading')}
+        </p>
+      )}
+      {status === 'ready' && set && (
+        <>
+          <p className="tw-inspector-muted tw-repo-note">{t('inspector.changesTab.fromCodeHost')}</p>
+          {set.commits.length > 0 && (
+            <ul className="tw-work-commits">
+              {set.commits.map((c) => (
+                <li key={c.sha}>
+                  <code>{c.short}</code> <IssueKeyText text={c.subject} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {set.diff && (
+            <div className="tw-repo-diff">
+              <LocalReview
+                root={set.repo}
+                name={set.repo}
+                branch={set.branch}
+                diff={set.diff}
+                truncated={set.truncated}
+              />
+            </div>
+          )}
+          {set.truncated && (
+            <p className="tw-inspector-muted tw-repo-note">{t('inspector.changesTab.repoTruncated')}</p>
+          )}
+        </>
+      )}
+      {(status === 'none' || status === 'failed') && (
+        <div className="tw-repo-block">
+          <p className="tw-inspector-muted tw-repo-note">
+            {online
+              ? t('inspector.changesTab.worktreeGone')
+              : t('inspector.changesTab.machineOffline', { name: machineName ?? entry.machineId ?? '' })}
+          </p>
+          {(entry.commits?.length ?? 0) > 0 && (
+            <p className="tw-inspector-muted tw-repo-note">
+              {plural(entry.commits?.length ?? 0, 'inspector.changesTab.commits')}:{' '}
+              {entry.commits?.slice(0, 10).map((c) => (
+                <code key={c}>{c.slice(0, SHORT_SHA)} </code>
+              ))}
+            </p>
+          )}
+          {entry.remote && entry.branch ? (
+            <button type="button" className="tw-work-remote" onClick={loadRemote}>
+              {t('inspector.changesTab.showBranchDiff')}
+            </button>
+          ) : (
+            <p className="tw-inspector-muted tw-repo-note">{t('inspector.changesTab.notPushed')}</p>
+          )}
+          {status === 'failed' && remoteError && (
+            <p className="tw-inspector-muted tw-repo-note">
+              {t('inspector.changesTab.branchFailed', { reason: remoteError })}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+};
+
+interface IWorkViewProps {
+  work: IChatWork;
+  conversationId: string;
+  sessionName: string;
+  tabId?: string | null;
+  onOpenCommit?: (target: string, title: string) => void;
+  onCount?: (count: number) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
+}
+
+/** The chat's registered work and its delegated chats': repositories, then a worktree (a branch) each. */
+const WorkView = ({
+  work,
+  conversationId,
+  sessionName,
+  tabId,
+  onOpenCommit,
+  onCount,
+  onRefresh,
+  refreshing,
+}: IWorkViewProps) => {
+  const repos = useMemo(() => groupWork(work.entries), [work.entries]);
+  const machines = useMemo(() => new Map(work.machines.map((m) => [m.id, m])), [work.machines]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const report = useCallback(
+    (key: string, n: number) => setCounts((c) => (c[key] === n ? c : { ...c, [key]: n })),
+    [],
+  );
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  useEffect(() => {
+    onCount?.(total);
+  }, [total, onCount]);
+
+  return (
+    <div className="tw-changes">
+      <div className="tw-inspector-summary">
+        <span>{t('inspector.changesTab.workHead')}</span>
+        <button
+          type="button"
+          className="tw-icon-button"
+          aria-label={t('inspector.changesTab.openReview')}
+          title={t('inspector.changesTab.openReview')}
+          onClick={() => goTo({ kind: ROUTE.review, chat: conversationId })}
+        >
+          <GitPullRequest />
+        </button>
+        <button
+          type="button"
+          className="tw-icon-button"
+          aria-label={t('inspector.changesTab.refresh')}
+          title={t('inspector.changesTab.refresh')}
+          onClick={onRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCw className={refreshing ? 'tw-inline-spin' : undefined} />
+        </button>
+      </div>
+      {!work.complete && (
+        <p className="tw-inspector-muted tw-repo-note">{t('inspector.changesTab.scanning')}</p>
+      )}
+      {repos.map((repo) => {
+        const machine = repo.machineId ? machines.get(repo.machineId) : undefined;
+        const online = !repo.machineId || machine?.state !== 'offline';
+        return (
+          <div key={repo.key} className="tw-work-group">
+            <h4 className="tw-work-group-head" title={repo.repo}>
+              {repo.name}
+              {machine && <span>{machine.name}</span>}
+            </h4>
+            {repo.worktrees.map((entry) => (
+              <WorktreeChanges
+                key={`${entry.conv}\u0000${entry.worktree}`}
+                entry={entry}
+                conversationId={conversationId}
+                machineName={machine?.name ?? null}
+                online={online}
+                sessionName={sessionName}
+                tabId={tabId}
+                onOpenCommit={onOpenCommit}
+                onCount={report}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const EMPTY_TEXT = t('inspector.changesTab.empty');
 
-const ChangesTab = ({ paths, sessionName, tabId, jsonlPath, onCount, onOpenCommit }: IChangesTabProps) => {
+const ChangesTab = ({
+  paths,
+  sessionName,
+  tabId,
+  jsonlPath,
+  onCount,
+  onOpenCommit,
+  conversationId,
+}: IChangesTabProps) => {
   const [repos, setRepos] = useState<IRepoChanges[] | null>(null);
   const [loading, setLoading] = useState(false);
+  // The chat's registered work: undefined while it is read, null where there is none to read (no route, no chat).
+  const [work, setWork] = useState<{ conv: string; work: IChatWork | null } | undefined>(undefined);
+  const [workLoading, setWorkLoading] = useState(false);
   const key = paths.join('\n');
+  const currentWork = conversationId && work?.conv === conversationId ? work.work : undefined;
+  const byWork = !!currentWork && currentWork.entries.length > 0;
+
+  const loadWork = useCallback(async () => {
+    if (!conversationId) return;
+    setWorkLoading(true);
+    const got = await fetchChatWork(conversationId);
+    setWork({ conv: conversationId, work: got });
+    setWorkLoading(false);
+  }, [conversationId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadWork();
+  }, [loadWork]);
 
   const load = useCallback(async () => {
-    if (!key) return;
+    if (!key || byWork) return;
     setLoading(true);
     try {
       const response = await appFetch('/api/platform/changes', {
@@ -360,7 +701,7 @@ const ChangesTab = ({ paths, sessionName, tabId, jsonlPath, onCount, onOpenCommi
       if (response.ok) setRepos((await response.json()).repos);
     } catch {}
     setLoading(false);
-  }, [key, jsonlPath]);
+  }, [key, jsonlPath, byWork]);
 
   // Fetches when the set of work paths changes; state lands after the request.
   useEffect(() => {
@@ -379,9 +720,29 @@ const ChangesTab = ({ paths, sessionName, tabId, jsonlPath, onCount, onOpenCommi
   }, [repos]);
 
   useEffect(() => {
-    onCount?.(count);
-  }, [count, onCount]);
+    if (!byWork) onCount?.(count);
+  }, [count, onCount, byWork]);
 
+  if (conversationId && currentWork === undefined)
+    return (
+      <div className="tw-inspector-empty">
+        <Loader2 className="tw-inline-spin" />
+        <p>{t('inspector.changesTab.loading')}</p>
+      </div>
+    );
+  if (conversationId && currentWork && byWork)
+    return (
+      <WorkView
+        work={currentWork}
+        conversationId={conversationId}
+        sessionName={sessionName}
+        tabId={tabId}
+        onOpenCommit={onOpenCommit}
+        onCount={onCount}
+        onRefresh={() => void loadWork()}
+        refreshing={workLoading}
+      />
+    );
   if (!key)
     return (
       <div className="tw-inspector-empty">

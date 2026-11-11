@@ -8,6 +8,12 @@ func SetSocketIdle(d time.Duration) (restore func()) {
 	return func() { socketIdle.Store(old) }
 }
 
+// SetSocketBeat makes the runtime's own beat come every d for one test.
+func SetSocketBeat(d time.Duration) (restore func()) {
+	old := socketBeat.Swap(int64(d))
+	return func() { socketBeat.Store(old) }
+}
+
 // Subscriptions is how many channel subscriptions the hub's sockets hold, and Clients how many sockets it holds.
 func (h *Hub) Subscriptions() int {
 	h.mu.Lock()

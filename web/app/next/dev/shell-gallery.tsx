@@ -15,6 +15,8 @@
 //   &paneTabs=many                     more tabs in the pane's strip, one with a long title
 //   &health=ok|warn|critical           the machine's own verdict (default warn): its dot, banner, card and notification
 //   &theme=light|dark&lang=ru|en       the look and the language of the texts that are keys
+//   &route=doc|board                   an app's object in Sinopia's stage (appstage-demo.tsx), the chat at
+//   &place=chat|right|float|island     the left edge (default), the right one, a window or the field
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ChatHeader from '@/next/features/header/chat-header';
 import NotificationCenter, { type INotification } from '@/next/features/notifications/notification-center';
@@ -29,6 +31,7 @@ import SearchDialog from '@/next/features/search/search-dialog';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { foldText } from '@/next/features/search/highlight';
 import AppFrame from '@/next/features/shell/app-frame';
+import { AppStageDemo, type TDemoKind, type TDemoPlace } from '@/next/dev/appstage-demo';
 import ChatStage from '@/next/features/shell/chat-stage';
 import TabStrip, { PACE, type IStripTab } from '@/next/features/shell/tab-strip';
 import Greeting from '@/next/features/shell/greeting';
@@ -87,6 +90,10 @@ const FAVS = params.get('favs');
 const TABS = params.get('tabs');
 const PANE_TABS_MANY = params.get('paneTabs') === 'many';
 const THEME = params.get('theme') === 'dark' ? 'dark' : 'light';
+const APP_ROUTES: Record<string, TDemoKind> = { doc: 'doc', board: 'board' };
+const APP_PLACES: Record<string, TDemoPlace> = { right: 'right', float: 'float', island: 'island' };
+const APP_ROUTE: TDemoKind | null = APP_ROUTES[params.get('route') ?? ''] ?? null;
+const APP_PLACE: TDemoPlace = APP_PLACES[params.get('place') ?? ''] ?? 'chat';
 pinLocale(params.get('lang') === 'en' ? 'en' : 'ru');
 
 const STRIP_TABS: readonly IStripTab[] = [
@@ -1080,32 +1087,42 @@ const Gallery = () => {
         </>
       }
     >
-      <ChatHeader
-        chat={chat}
-        parent={parentChat && { title: parentChat.title, onOpen: () => setCurrentId(parentChat.id) }}
-        projects={projects}
-        actions={actions}
-        machine={{ card: MACHINE, others: OTHERS }}
-        drawerOpen={drawerOpen}
-        onOpenDrawer={() => setDrawerOpen(true)}
-        onNewChat={() => setCurrentId(null)}
-        terminal={null}
-        pane={{ open: pane, onToggle: () => setPane((current) => !current) }}
-        background={{
-          running: background ? 0 : 2,
-          total: 3,
-          recap: false,
-          open: background,
-          onToggle: () => setBackground((current) => !current),
-        }}
-        bell={{
-          unread: (notifications ?? []).length > 0,
-          open: notif !== null,
-          onToggle: (anchor) => setNotif((current) => (current ? null : { anchor, side: 'bottom' })),
-        }}
-      />
-      {currentId === null && <Greeting name="Пётр" onResume={() => setResume(true)} />}
-      {currentId !== null && (
+      {APP_ROUTE && (
+        <AppStageDemo
+          kind={APP_ROUTE}
+          place={APP_PLACE}
+          onOpenDrawer={() => setDrawerOpen(true)}
+          toolPane={{ open: pane, onToggle: () => setPane((current) => !current) }}
+        />
+      )}
+      {!APP_ROUTE && (
+        <ChatHeader
+          chat={chat}
+          parent={parentChat && { title: parentChat.title, onOpen: () => setCurrentId(parentChat.id) }}
+          projects={projects}
+          actions={actions}
+          machine={{ card: MACHINE, others: OTHERS }}
+          drawerOpen={drawerOpen}
+          onOpenDrawer={() => setDrawerOpen(true)}
+          onNewChat={() => setCurrentId(null)}
+          terminal={null}
+          pane={{ open: pane, onToggle: () => setPane((current) => !current) }}
+          background={{
+            running: background ? 0 : 2,
+            total: 3,
+            recap: false,
+            open: background,
+            onToggle: () => setBackground((current) => !current),
+          }}
+          bell={{
+            unread: (notifications ?? []).length > 0,
+            open: notif !== null,
+            onToggle: (anchor) => setNotif((current) => (current ? null : { anchor, side: 'bottom' })),
+          }}
+        />
+      )}
+      {!APP_ROUTE && currentId === null && <Greeting name="Пётр" onResume={() => setResume(true)} />}
+      {!APP_ROUTE && currentId !== null && (
         <ChatStage key={currentId} paneOpen={pane}>
           {chat?.status === CHAT_STATUS.thinking ? null : (
             <div className="hx-chat">

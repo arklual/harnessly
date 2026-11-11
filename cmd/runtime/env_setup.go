@@ -73,9 +73,9 @@ type setupApps struct {
 	version string
 }
 
-func (s setupApps) Install(dir, itemID string, locked bool) (string, bool, error) {
-	got, changed, err := s.reg.InstallForEnv(dir, apps.EnvInstallOptions{Link: s.link, ItemID: itemID, Locked: locked, HostVersion: s.version, Now: time.Now()})
-	return got.ID, changed, err
+func (s setupApps) Install(dir, itemID string, locked bool, install map[string]string) (string, bool, []string, error) {
+	got, changed, err := s.reg.InstallForEnv(dir, apps.EnvInstallOptions{Link: s.link, ItemID: itemID, Locked: locked, HostVersion: s.version, Now: time.Now(), Install: install})
+	return got.ID, changed, got.Missing, err
 }
 
 func (s setupApps) Has(itemID string) bool { return s.reg.EnvHasItem(s.link, itemID) }

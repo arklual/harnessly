@@ -612,3 +612,22 @@ func TestHookSettingsWithTheAppsLiveHook(t *testing.T) {
 		}
 	}
 }
+
+// The status hook runs as one program when the runtime names it, with the script behind it for a CLI that is gone.
+func TestHookSettingsWithTheStatusProgram(t *testing.T) {
+	c := HookSettingsConfig{StatusHook: "/h/s.sh", Statusline: "/h/l.sh", StatusCLI: "'/bin/harnessly' hook status"}
+	var got struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string
+			}
+		}
+	}
+	if err := json.Unmarshal(HookSettings(c), &got); err != nil {
+		t.Fatal(err)
+	}
+	want := `'/bin/harnessly' hook status stop 2>/dev/null || sh "/h/s.sh" stop`
+	if hooks := got.Hooks["Stop"][0].Hooks; len(hooks) != 1 || hooks[0].Command != want {
+		t.Fatalf("%+v", hooks)
+	}
+}

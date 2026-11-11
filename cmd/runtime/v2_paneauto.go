@@ -6,6 +6,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -17,7 +18,16 @@ type autoOpenPublisher struct {
 	browser *agentbrowser.ProfileAccess
 }
 
-var _ convo.Publisher = autoOpenPublisher{}
+var (
+	_ convo.Publisher        = autoOpenPublisher{}
+	_ convo.ChannelForgetter = autoOpenPublisher{}
+	_ convo.SeqTeller        = autoOpenPublisher{}
+)
+
+// Forget and Seq are the hub's: a deleted conversation's channel is dropped, a conversation that gets its actor back
+// goes on from its channel's seq.
+func (p autoOpenPublisher) Forget(ch wire.Channel) bool { return p.hub.Forget(ch) }
+func (p autoOpenPublisher) Seq(ch wire.Channel) int64   { return p.hub.Seq(ch) }
 
 func (p autoOpenPublisher) Publish(ch wire.Channel, e wire.Event) int64 {
 	if p.browser != nil {
@@ -54,7 +64,7 @@ func (p autoOpenPublisher) Publish(ch wire.Channel, e wire.Event) int64 {
 	}
 	if conv, ok := ch.ConvID(); ok {
 		// Off the actor: the watcher reads the design library and writes the intents.
-		go p.watch.Entry(conv, entry)
+		safego.Go("pane watch entry", func() { p.watch.Entry(conv, entry) })
 	}
 	return seq
 }

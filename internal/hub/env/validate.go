@@ -47,8 +47,11 @@ var sourceKeys = map[string][]string{
 	store.CatalogPlugin: {"marketplace", "plugin"},
 	// Settings of Claude Code: keys set always, keys set only where the person has none, the CLAUDE.md block.
 	store.CatalogClaudeSettings: {"always", "ifAbsent", "claudeMd"},
-	// An app: the folder of its harnessly/app.json in a repository of the list (repo) or at an address (repoUrl, branch).
-	store.CatalogApp: {"from", "repo", "repoUrl", "branch", "path"},
+	// An app: the folder of its harnessly/app.json in a repository of the list (repo) or at an address (repoUrl, branch);
+	// off: the organization turned the app off for everybody (it stays installed, without its menu item and tools).
+	store.CatalogApp: {"from", "repo", "repoUrl", "branch", "path", "off"},
+	// A pack: the same, the folder of its harnessly/pack.json.
+	store.CatalogPack: {"from", "repo", "repoUrl", "branch", "path"},
 }
 
 // objectKeys are the keys whose value is an object of Claude Code's settings.
@@ -60,6 +63,9 @@ var (
 	marketRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
 )
 
+// boolKeys are the keys whose value is a boolean; false is the same as absent and is not kept.
+var boolKeys = []string{"off"}
+
 // listKeys are the keys whose value is a list of strings.
 var listKeys = []string{"args", "secretRefs", "secrets"}
 
@@ -67,7 +73,7 @@ var listKeys = []string{"args", "secretRefs", "secrets"}
 func ValidKind(kind string) bool { _, ok := sourceKeys[kind]; return ok }
 
 // kindsRu lists the kinds for the message of a refused one.
-const kindsRu = "skill, mcp, repo, doc, script, access, plugin или claude-settings"
+const kindsRu = "skill, mcp, repo, doc, script, access, plugin, claude-settings, app или pack"
 
 // CleanText trims a name or a hint and checks its length in characters.
 func CleanText(field, raw string, max int, required bool) (string, error) {
@@ -275,6 +281,16 @@ func CleanSource(kind string, raw json.RawMessage) (json.RawMessage, error) {
 			out[k] = obj
 			continue
 		}
+		if slices.Contains(boolKeys, k) {
+			var b bool
+			if err := json.Unmarshal(v, &b); err != nil {
+				return nil, httpx.Invalid("source."+k, "Нужно true или false")
+			}
+			if b {
+				out[k] = true
+			}
+			continue
+		}
 		if slices.Contains(listKeys, k) {
 			var list []string
 			if err := json.Unmarshal(v, &list); err != nil {
@@ -326,7 +342,7 @@ func CleanSource(kind string, raw json.RawMessage) (json.RawMessage, error) {
 		if len(out) == 0 {
 			return nil, httpx.Invalid("source", "Нужны настройки или текст для CLAUDE.md")
 		}
-	case store.CatalogApp:
+	case store.CatalogApp, store.CatalogPack:
 		if err := cleanApp(out); err != nil {
 			return nil, err
 		}

@@ -15,6 +15,7 @@ import {
   applyNow,
   applyPermission,
   applyQuestion,
+  applyPane,
   applyQueue,
   applyStep,
   applyTurn,
@@ -24,9 +25,21 @@ import {
   removeBackground,
   resetFeed,
   setShots,
+  setPane,
   setPictures,
 } from '@/next/stores/conversation';
+import { noteSnapshotStamp, noteStamp } from '@/next/stores/chat-state';
 import { conversationsStore, convsCachedStore, convsLoadedStore } from '@/next/stores/conversations';
+import {
+  amendConversation,
+  fromLive,
+  fromSnapshot,
+  mergeConversation,
+  mergeConversationFields,
+  mergeMachineList,
+  removeConversation,
+  type Origin,
+} from '@/next/stores/conversation-merge';
 import { favoritesStore } from '@/next/stores/favorites';
 import { applyRemoteDraft, applyRemoteDrafts } from '@/next/core/drafts-cloud';
 import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
@@ -69,11 +82,14 @@ function owns(machine: MachineId, conv: ConvId): boolean {
   return !feed || feed.machineId === machine;
 }
 
-function putConversation(machine: MachineId, c: Conversation): void {
+/** The epoch the machine's revs count in now: what its welcome said. */
+const epochOf = (machine: MachineId): string | null => machinesStore.get(machine)?.epoch ?? null;
+
+function putConversation(machine: MachineId, c: Conversation, from: Origin): void {
   if (!owns(machine, c.id)) return;
   // The channel names the machine, not the record: a record that claims another one is stored as this machine's.
   const own = c.machineId === machine ? c : { ...c, machineId: machine };
-  conversationsStore.patch(c.id, (have) => (have && have.rev >= own.rev ? have : own));
+  mergeConversation(own, from);
 }
 
 /** The fleet has loaded and no longer lists the machine: it was disabled or removed, nothing of it can answer. */
@@ -115,7 +131,7 @@ function adoptStray(machine: MachineId, c: Conversation): void {
       returnToQueue(id, at);
   }
   dropConversationData(c.id);
-  conversationsStore.delete(c.id);
+  removeConversation(c.id);
 }
 
 const ownRecord = (machine: MachineId, id: ConvId): boolean =>
@@ -139,20 +155,20 @@ export function applyMachineEvent(machine: MachineId, e: MachineEvent): void {
 export function applyConvsEvent(machine: MachineId, e: ConvsEvent): void {
   switch (e.type) {
     case 'conversation_upsert':
-      putConversation(machine, e.conv);
+      putConversation(machine, e.conv, fromLive(epochOf(machine)));
       return;
     case 'conversation_state':
       if (!ownRecord(machine, e.id)) return;
-      conversationsStore.patch(e.id, (c) => (c && c.rev < e.rev ? { ...c, state: e.state, rev: e.rev } : c));
+      mergeConversationFields(e.id, e.rev, fromLive(epochOf(machine)), () => ({ state: e.state }));
       return;
     case 'conversation_seen':
       if (!ownRecord(machine, e.id)) return;
-      conversationsStore.patch(e.id, (c) =>
-        c && c.rev < e.rev ? { ...c, seenAt: Math.max(c.seenAt, e.seenAt), rev: e.rev } : c,
-      );
+      mergeConversationFields(e.id, e.rev, fromLive(epochOf(machine)), (c) => ({
+        seenAt: Math.max(c.seenAt, e.seenAt),
+      }));
       return;
     case 'conversation_removed':
-      if (ownRecord(machine, e.id)) conversationsStore.delete(e.id);
+      if (ownRecord(machine, e.id)) removeConversation(e.id);
       return;
     case 'project_upsert':
       projectsStore.set(projectKey(machine, e.project.id), { ...e.project, machineId: machine });
@@ -175,8 +191,7 @@ export function applyConvEvent(machine: MachineId, conv: ConvId, e: ConvEvent): 
       applyTurn(conv, e.turn);
       return;
     case 'quota_exhausted':
-      conversationsStore.patch(conv, (c) => {
-        if (!c) return c;
+      amendConversation(conv, (c) => {
         const before = c.terminalFailure;
         if (
           before?.kind === e.failure.kind &&
@@ -222,6 +237,9 @@ export function applyConvEvent(machine: MachineId, conv: ConvId, e: ConvEvent): 
       return;
     case 'queue_changed':
       applyQueue(conv, e.queue);
+      // The agent state of the chat's own channel: a stamp of a runtime that is gone says nothing of this one.
+      if (e.agent) noteStamp(conv, e.agent, e.agent.epoch === epochOf(machine));
+      if (e.pane) applyPane(conv, e.pane);
       return;
     case 'prompt_state':
       applyPromptState(conv, machine, e.clientId, e.state, e.rev);
@@ -270,20 +288,14 @@ export const storeSink: Sink = {
       return;
     }
     if (s.ch === 'convs') {
-      // What the browser kept gives way to the machine's own list whatever revs it carried (a runtime that started over).
-      if (convsCachedStore.has(machine)) {
-        for (const c of [...conversationsStore.values()])
-          if (c.machineId === machine) conversationsStore.delete(c.id);
-        convsCachedStore.delete(machine);
-      }
-      const ids = new Set(s.data.conversations.map((c) => c.id));
-      for (const c of [...conversationsStore.values()]) {
-        if (c.machineId === machine && !ids.has(c.id)) conversationsStore.delete(c.id);
-      }
-      for (const c of s.data.conversations) {
+      // What the browser kept and what the copy drew give way to the machine's own list by the rule of the merge,
+      // whatever revs they carried; the chats the machine no longer names go after its own are in.
+      const from = fromSnapshot(epochOf(machine));
+      mergeMachineList(machine, s.data.conversations, (c) => {
         adoptStray(machine, c);
-        putConversation(machine, c);
-      }
+        putConversation(machine, c, from);
+      });
+      convsCachedStore.delete(machine);
       const projectIds = new Set(s.data.projects.map((p) => p.id));
       for (const p of [...projectsStore.values()]) {
         if (p.machineId === machine && !projectIds.has(p.id)) projectsStore.delete(projectKey(machine, p.id));
@@ -299,7 +311,11 @@ export const storeSink: Sink = {
     }
     const conv = convOf(s.ch);
     if (!owns(machine, conv)) return;
+    // Before the feed: what it draws of a live turn goes by the state the snapshot was taken at.
+    noteSnapshotStamp(conv, s.data.agent, s.data.agent?.epoch === epochOf(machine));
     applyConvSnapshot(conv, machine, s.mode, s.data, pageClock().now());
+    // The machine's own snapshot says whether its runtime gathers the pane's data; the cluster's copy says nothing.
+    setPane(conv, s.data.pane);
     for (const m of s.data.messages) applyMessage(machine, m);
     forgetEndedElsewhere(conv, machine, new Set(s.data.messages.map((m) => m.clientId)));
     const last = [...s.data.entries].reverse().find((e) => !e.id.startsWith('live:'));

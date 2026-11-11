@@ -93,6 +93,8 @@ flowchart TD
 8. [A worked example](08-worked-example.md): `standup` from start to finish.
 9. [Compatibility](09-compatibility.md): what stays stable across updates.
 10. [Sign-in](10-auth.md): who calls your backend — the platform token, corporate SSO, OAuth, and every refused sign-in.
+11. [An existing site](11-existing-site.md): the agent drives your admin panel — the loader line, state, action, screen, the answer and its issues.
+12. [Notices](12-notices.md): ask the person in the smart notice — choice, confirm, field, code, a view of your own; never secrets.
 
 The [reference](../apps.md) has every field and every call.
 
@@ -103,13 +105,16 @@ in the pages above.
 
 | Thing | State |
 | --- | --- |
-| Manifest `backend.url`, `when`, `storage`, `activation.template`, `views[].height` | Checked, unused |
+| Manifest `backend.url`, `storage`, `activation.template`, `views[].height` | Checked, unused |
+| Manifest `when` | Refused: a condition is set on tool rules by the document's status, `agent.tools.when` ([Statuses](04-sinopia.md#statuses-of-a-document)) |
 | `activation.on`: `manual` | Checked, turns nothing on (`view` is refused). `document`, `always`, `command:/x` and `openView` act |
 | `agent.skills`, `agent.flow`, `agent.exclusive` | Checked, unused. Claude Code loads all of `skills/` whatever the list says |
 | `agent.context` | Items with `mode: on-activation` are sent (see [Agents](05-agents.md#context-the-app-hands-the-agent)); `on-demand` is checked, not used |
 | Events `tool-result`, `tool-input` | Not sent by the page: the event never comes. The `data` event comes to a chat view shown as a widget |
 | `hl.flow.*`, `hl.data.*` | Removed from the SDK: a call rejects with `invalid_params` |
 | `hl.sinopia.render()` | `host_unavailable` |
-| Permissions `ai`, `users.read` | Accepted, no call needs them. `hl.context.user` is always `null` |
+| A tab of the app pinned in the pane beside its document | A view with `pinned: true` on `sinopia.<type>` of a type made of a site ([04](04-sinopia.md#a-document-type-made-of-a-sinopia-site)) |
+| A link to the decision on a version, notifications of a move | `journal[].rev` and `link` of `hl.workflow.get()`, a push to the machine's owner ([04](04-sinopia.md#statuses-of-a-document)); not to people on other machines |
+| Permission `users.read` | Accepted, no call needs it |
 | A server process run by the host | Does not exist. See [Backend](03-backend.md) |
 | Apps in Codex chats | Refused (`unsupported`). A Codex agent can still write and check an app |

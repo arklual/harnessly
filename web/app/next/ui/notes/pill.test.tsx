@@ -52,6 +52,50 @@ describe('AnnotatePill', () => {
     expect(onDismiss).toHaveBeenCalledTimes(2);
   });
 
+  it('has «Annotate» alone when the host asks nothing aside', () => {
+    setup(spot);
+    expect(document.querySelectorAll('.hx-note__pillbtn')).toHaveLength(1);
+  });
+
+  it('puts «Ask aside» beside «Annotate» and hands its press to the host, keeping the words selected', () => {
+    const onPress = vi.fn();
+    const onAside = vi.fn();
+    render(<AnnotatePill target={spot} onPress={onPress} onAside={onAside} onDismiss={vi.fn()} />);
+    const buttons = document.querySelectorAll('.hx-note__pillbtn');
+    expect(buttons).toHaveLength(2);
+    const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true });
+    buttons[1].dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    fireEvent.click(buttons[1]);
+    expect(onAside).toHaveBeenCalledOnce();
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('presses its buttons with A and S when the host asks for keys, not while words are typed', () => {
+    const onPress = vi.fn();
+    const onAside = vi.fn();
+    render(<AnnotatePill target={spot} onPress={onPress} onAside={onAside} keys onDismiss={vi.fn()} />);
+    fireEvent.keyDown(document, { key: 's', code: 'KeyS' });
+    expect(onAside).toHaveBeenCalledOnce();
+    // A Russian layout: the key's place counts, not its letter.
+    fireEvent.keyDown(document, { key: 'ф', code: 'KeyA' });
+    expect(onPress).toHaveBeenCalledOnce();
+    // With a modifier the key is someone else's.
+    fireEvent.keyDown(document, { key: 's', code: 'KeyS', metaKey: true });
+    const field = document.createElement('textarea');
+    document.body.append(field);
+    fireEvent.keyDown(field, { key: 'a', code: 'KeyA' });
+    field.remove();
+    expect(onAside).toHaveBeenCalledOnce();
+    expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  it('takes no keys unless the host asks for them', () => {
+    const { onPress } = setup(spot);
+    fireEvent.keyDown(document, { key: 'a', code: 'KeyA' });
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   it('stays through its exit, in the closing phase, then goes', () => {
     const { view, ...handlers } = setup(spot);
     view.rerender(<AnnotatePill target={null} {...handlers} />);

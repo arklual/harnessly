@@ -52,25 +52,65 @@ own answers and errors intact.
 | variable | |
 |---|---|
 | `HUB_REPLICAS` | `on` / `off` (default `off`) |
-| `HUB_REPLICA_ADDR` | required with the flag: where the other replicas reach this one, e.g. `http://10.0.0.5:8040` |
+| `HUB_REPLICA_LISTEN` | where this replica serves the others, a listener of its own (default `0.0.0.0:8041`); must not be `HUB_LISTEN` |
+| `HUB_REPLICA_ADDR` | required with the flag: where the other replicas reach that listener, e.g. `http://10.0.0.5:8041` |
 | `HUB_REPLICA_SECRET` | required with the flag, at least 16 characters, the same on every replica |
 | `HUB_REPLICA_ID` | optional name of the replica (random by default) |
+| `HUB_SHUTDOWN_GRACE` | how long a stop may take in all (default `20s`); keep it under the time the process is given to stop |
+| `HUB_DRAIN_SETTLE` | how long a stopping replica stays not ready and serving before it touches a link (default `5s` with the flag, `0` without) |
+| `HUB_DRAIN_LINKS` | the window its machines are asked to dial again over (default `10s` with the flag, `0` without) |
 
 The replicas need Postgres (`HUB_DATABASE_URL`): SQLite is a file of one process. They also need the same
-`HUB_SECRET_KEY` (the stored SSH keys are sealed with it) and the same configuration. Keep `/internal/replica/` off the
-public ingress (the secret is the second lock, not the first).
+`HUB_SECRET_KEY` (the stored SSH keys are sealed with it) and the same configuration. The replicas talk at
+`/internal/replica/` on `HUB_REPLICA_LISTEN` only: the public listener answers 404 there. Let nothing but the replicas
+reach that port (a NetworkPolicy, a firewall): the network is the first lock. The second is a signature on every
+request, an HMAC with `HUB_REPLICA_SECRET` over the method, the path, the time and the body, so the secret itself does
+not travel and a request kept for more than half a minute is refused. All replicas must run a build that signs: do not
+roll from an older one with the flag on.
 
 The Helm chart does all of it: with `database.postgres.enabled` or `database.external` and `replicaCount` above 1 (the
 default is 2) it sets `strategy: RollingUpdate` with `maxUnavailable: 0`, passes the pod IP and a secret it generates
-once, and leaves the data volume out. Without a shared database it stays one replica with `Recreate`, as before.
+once, opens the replicas' port on a Service of its own with a NetworkPolicy for the hub's pods only, and leaves the data volume out. Without a shared database it stays one replica with `Recreate`, as before. `strategy.type` names the
+strategy outright; the chart refuses `RollingUpdate` on the SQLite file or with one replica, `HUB_REPLICAS` turned off
+in `extraEnv` under several replicas, and a `terminationGracePeriodSeconds` too short for the drain below. The hub's
+pods prefer nodes apart from each other and from the bundled Postgres (`antiAffinity`, `required: true` to insist).
+
+## A replica that stops
+
+On SIGTERM a replica does not cut what it serves:
+
+1. `/readyz` answers 503 (`/healthz` stays 200) and a machine that dials is answered 409, which an agent reads as
+   «dial again» and does within a second. Requests and the links it holds go on for `HUB_DRAIN_SETTLE` (5 s), the time
+   the Service and the ingress need to stop sending it requests.
+2. It asks its machines to dial again one at a time, spread over `HUB_DRAIN_LINKS` (10 s) with a random pause between
+   two of them, so they reach the other replica one by one and not as a herd.
+3. It ends its loops and the event streams (a page's stream reconnects by itself) and waits for the requests under
+   way, all within `HUB_SHUTDOWN_GRACE` (20 s; the chart sets it to `terminationGracePeriodSeconds` less 5).
+
+Both waits are 0 without `HUB_REPLICAS`: a single process has nowhere to send its machines and stops at once.
+
+## What crosses between replicas
+
+- **Event streams.** What one replica tells its streams (a space's events, the workspace page's pokes, an
+  organization's events, and the kicks of a person who left) it also sends over Postgres `LISTEN/NOTIFY`, on a channel
+  of the hub's schema, and the others give it to their streams. Nothing is kept: a notification a replica did not hear
+  is lost, which costs the page a refetch, as a lost stream does. An event longer than 7900 bytes stays with its
+  replica (`harnessly_hub_events_relay_dropped_total`). The end of a person's streams (they left a space, their role
+  changed) is sent before any event and tried again when the database did not take it; it is still a notification, so
+  a replica that was not listening at that moment keeps the stream until the page reconnects. `LISTEN` needs a connection that stays: behind a pooler in
+  transaction mode it uses `HUB_DB_MIGRATE_URL`, and without one the streams hear only their own replica (the hub
+  says so at the start).
+- **Cursors.** The history cursor of a channel moves only from the value its transaction read; the transaction that
+  lost to another replica's is run again from its read (`store.TxRetry`, four tries). The cursor of a machine's spend
+  never moves back within an epoch.
+- **A link the directory did not take.** The entry is tried three times; a link that still has none is closed, and the
+  agent dials again.
 
 ## What is still in the process
 
-The directory covers the machine links. Other state lives in the process and is per replica: the open event streams of
-people (a person sees the events that happened on the replica serving their stream, plus what that replica reads
-from the database), the abuse limits (they count per replica, so the real ceiling is the number of replicas times the
-limit), and the in-memory caches. A deployment that needs exact limits or cross-replica event streams can pin sign-in
-traffic with the ingress; moving these into the database is not part of this change.
+The abuse limits count per replica (the real ceiling is the number of replicas times the limit), and the caches are
+per replica. A machine's last reported state (`machines.info`) is read, changed and written by the replica that holds
+its link, without a version.
 
 ## Migration
 

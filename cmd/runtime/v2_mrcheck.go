@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/services"
 )
 
@@ -70,7 +71,7 @@ func (c *mrChecker) lookup(ctx context.Context, host, project string, iid int) (
 		}
 		a = &mrAnswer{done: make(chan struct{})}
 		c.known[key] = a
-		go c.ask(a, host, project, iid)
+		safego.Go("merge request check", func() { c.ask(a, host, project, iid) })
 	}
 	c.mu.Unlock()
 	select {

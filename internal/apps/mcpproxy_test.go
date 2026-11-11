@@ -1,6 +1,9 @@
 package apps
 
 import (
+	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -67,5 +70,69 @@ func TestProxyWaitsForMissingSecretAndNeedsHTTPS(t *testing.T) {
 	ProxyMCP(rec, httptest.NewRequest("POST", "/x", nil), MCPServer{URL: "http://x.example.com"}, nil)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("plain http: %d", rec.Code)
+	}
+}
+
+func withProxyTransport(t *testing.T, rt rtFunc) {
+	t.Helper()
+	old := mcpProxyTransport
+	mcpProxyTransport = func(string) http.RoundTripper { return rt }
+	t.Cleanup(func() { mcpProxyTransport = old })
+}
+
+func TestProxyAnswersAToolCallWhenTheServiceIsDown(t *testing.T) {
+	withProxyTransport(t, func(*http.Request) (*http.Response, error) { return nil, errors.New("dial tcp: connection refused") })
+	srv := MCPServer{URL: "https://boards.example.com/mcp"}
+	rec := httptest.NewRecorder()
+	ProxyMCPAs(rec, httptest.NewRequest("POST", "/x", strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"board_read"}}`)), srv, nil, "Boards")
+	var out struct {
+		ID     int `json:"id"`
+		Result struct {
+			IsError bool `json:"isError"`
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"result"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &out) != nil {
+		t.Fatalf("answer: %d %s", rec.Code, rec.Body)
+	}
+	if out.ID != 7 || !out.Result.IsError || len(out.Result.Content) != 1 || out.Result.Content[0].Text != UnavailableText("Boards") {
+		t.Fatalf("a tool result the agent reads: %s", rec.Body)
+	}
+	if strings.Contains(rec.Body.String(), "connection refused") {
+		t.Fatal("the transport's error stays in the runtime")
+	}
+}
+
+func TestProxyAnswersOtherRequestsWithAnErrorOn503(t *testing.T) {
+	withProxyTransport(t, func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: http.NoBody, Header: http.Header{}, Request: r}, nil
+	})
+	srv := MCPServer{URL: "https://docs.example.com/mcp"}
+	rec := httptest.NewRecorder()
+	ProxyMCPAs(rec, httptest.NewRequest("POST", "/x", strings.NewReader(`{"jsonrpc":"2.0","id":"a","method":"tools/list"}`)), srv, nil, "Documents")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"error":{"code":-32000,"message":"The service of Documents is unavailable`) {
+		t.Fatalf("answer: %d %s", rec.Code, rec.Body)
+	}
+	// A notification has nothing to answer: the bare status goes on.
+	rec = httptest.NewRecorder()
+	ProxyMCPAs(rec, httptest.NewRequest("POST", "/x", strings.NewReader(`{"jsonrpc":"2.0","method":"notifications/initialized"}`)), srv, nil, "Documents")
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("notification: %d", rec.Code)
+	}
+}
+
+func TestProxyPassesTheBodyOn(t *testing.T) {
+	var got string
+	withProxyTransport(t, func(r *http.Request) (*http.Response, error) {
+		b, _ := io.ReadAll(r.Body)
+		got = string(b)
+		return &http.Response{StatusCode: 200, Body: http.NoBody, Header: http.Header{}, Request: r}, nil
+	})
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"x"}}`
+	ProxyMCPAs(httptest.NewRecorder(), httptest.NewRequest("POST", "/x", strings.NewReader(body)), MCPServer{URL: "https://a.example.com/mcp"}, nil, "A")
+	if got != body {
+		t.Fatalf("upstream got %q", got)
 	}
 }

@@ -521,11 +521,52 @@ func (s Store) CursorOf(ctx context.Context, machineID, stream string) (Cursor, 
 	return c, err
 }
 
+// SetCursor moves a cursor, forward only: within one epoch a cursor that already stands further is left where it is
+// (two replicas may read one machine's outbox at once, and the slower one must not take the cursor back). A new epoch
+// starts a new count.
 func (s Store) SetCursor(ctx context.Context, c Cursor) error {
 	_, err := s.q.Exec(ctx, `INSERT INTO ingest_cursors (machine_id, stream, epoch, seq, acked_at) VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT (machine_id, stream) DO UPDATE SET epoch = excluded.epoch, seq = excluded.seq, acked_at = excluded.acked_at`,
+		ON CONFLICT (machine_id, stream) DO UPDATE SET epoch = excluded.epoch, seq = excluded.seq, acked_at = excluded.acked_at
+		WHERE ingest_cursors.epoch <> excluded.epoch OR ingest_cursors.seq <= excluded.seq`,
 		c.MachineID, c.Stream, c.Epoch, c.Seq, nullI(c.AckedAt))
 	return err
+}
+
+// HistoryCursor is how far a channel of a machine's history is applied.
+type HistoryCursor struct {
+	Epoch string
+	Seq   int64
+}
+
+// HistoryCursorOf reads a channel's cursor; ok is false when the channel has none yet.
+func (s Store) HistoryCursorOf(ctx context.Context, machineID, ch string) (c HistoryCursor, ok bool, err error) {
+	err = s.q.QueryRow(ctx, `SELECT epoch, seq FROM history_cursors WHERE machine_id = ? AND ch = ?`, machineID, ch).Scan(&c.Epoch, &c.Seq)
+	if IsNotFound(err) {
+		return c, false, nil
+	}
+	return c, err == nil, err
+}
+
+// MoveHistoryCursor moves a channel's cursor from what the transaction read (nil: there was none) to to. When the
+// cursor is no longer what was read, another transaction applied a frame of the channel meanwhile: nothing is written
+// and ErrConflict is returned, so the caller's transaction is rolled back and run again (TxRetry).
+func (s Store) MoveHistoryCursor(ctx context.Context, machineID, ch string, from *HistoryCursor, to HistoryCursor, now time.Time) error {
+	var res sql.Result
+	var err error
+	if from == nil {
+		res, err = s.q.Exec(ctx, `INSERT INTO history_cursors (machine_id, ch, epoch, seq, updated_at) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (machine_id, ch) DO NOTHING`, machineID, ch, to.Epoch, to.Seq, Ms(now))
+	} else {
+		res, err = s.q.Exec(ctx, `UPDATE history_cursors SET epoch = ?, seq = ?, updated_at = ?
+			WHERE machine_id = ? AND ch = ? AND epoch = ? AND seq = ?`, to.Epoch, to.Seq, Ms(now), machineID, ch, from.Epoch, from.Seq)
+	}
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrConflict
+	}
+	return nil
 }
 
 // EnsureAccount returns the account of (org, provider, ref), inserting a when there is none. It never fails on a

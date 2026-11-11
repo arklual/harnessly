@@ -26,6 +26,10 @@ type Hub struct {
 	epoch   string
 	chans   map[Channel]*hubChannel
 	clients map[*client]struct{}
+	// floor is the seq a conversation's channel starts from: past the last seq of every channel the hub let go of in
+	// this epoch, so a channel that comes back never gives a seq a page has seen on it. sweptAt is the last sweep.
+	floor   int64
+	sweptAt time.Time
 
 	// The machine source is subscribed while any socket holds the machine channel, with load while any asked for it.
 	machine     MachineSource
@@ -100,6 +104,9 @@ func (h *Hub) Seq(ch Channel) int64 {
 	if c := h.chans[ch]; c != nil {
 		return c.seq
 	}
+	if _, conv := ch.ConvID(); conv {
+		return h.floor
+	}
 	return 0
 }
 
@@ -107,9 +114,67 @@ func (h *Hub) channel(ch Channel) *hubChannel {
 	c := h.chans[ch]
 	if c == nil {
 		c = &hubChannel{subs: map[*subscription]struct{}{}}
+		if _, conv := ch.ConvID(); conv {
+			c.seq = h.floor
+		}
 		h.chans[ch] = c
 	}
 	return c
+}
+
+// sweepEvery is how often the hub lets go of the conversations' channels nobody holds.
+const sweepEvery = time.Minute
+
+// Sweep lets go of what the quiet channels hold: a channel without a socket gives back the events past RingAge, and
+// a conversation's channel that then has neither a socket nor an event is dropped whole. The hub held a channel, and
+// the buffer of its busiest moment, for every conversation that ever published — the stopped and the deleted ones
+// too. A dropped channel starts again past its last seq (floor): a page that comes back with a cursor of it is given
+// a snapshot, as after any gap.
+func (h *Hub) Sweep() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.sweepLocked(h.now())
+}
+
+func (h *Hub) sweepLocked(now time.Time) {
+	h.sweptAt = now
+	for ch, c := range h.chans {
+		if len(c.subs) > 0 {
+			continue
+		}
+		c.ring.trim(now)
+		if _, conv := ch.ConvID(); conv && c.ring.n == 0 {
+			h.floor = max(h.floor, c.seq+1)
+			delete(h.chans, ch)
+		}
+	}
+}
+
+// Forget drops a conversation's channel that no socket holds, whatever its ring still keeps: the conversation is
+// deleted. It reports whether the channel is gone.
+func (h *Hub) Forget(ch Channel) bool {
+	if _, conv := ch.ConvID(); !conv {
+		return false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c := h.chans[ch]
+	if c == nil {
+		return true
+	}
+	if len(c.subs) > 0 {
+		return false
+	}
+	h.floor = max(h.floor, c.seq+1)
+	delete(h.chans, ch)
+	return true
+}
+
+// Channels is how many channels the hub holds now.
+func (h *Hub) Channels() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.chans)
 }
 
 // Publish gives e the next seq of ch, keeps it in the channel's ring and sends it to the channel's sockets. An event
@@ -146,6 +211,10 @@ func (h *Hub) Publish(ch Channel, e Event) (seq int64) {
 	c.seq++
 	it := ringItem{seq: c.seq, at: h.now(), frame: frame, older: older}
 	c.ring.push(it)
+	if it.at.Sub(h.sweptAt) >= sweepEvery {
+		// The hub has no clock of its own: the events of the live channels are what turns the sweep of the quiet ones.
+		h.sweepLocked(it.at)
+	}
 	for s := range c.subs {
 		s.c.deliver(s, it.forCaps(s.c.caps))
 	}
@@ -261,6 +330,7 @@ func (h *Hub) Reset() {
 	h.mu.Lock()
 	h.epoch = NewEpoch()
 	h.chans = map[Channel]*hubChannel{}
+	h.floor = 0
 	clients := make([]*client, 0, len(h.clients))
 	for c := range h.clients {
 		clients = append(clients, c)

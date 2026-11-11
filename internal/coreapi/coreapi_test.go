@@ -3,6 +3,7 @@ package coreapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/hookspool"
 	"github.com/ly-solutions/harnessly/internal/status"
 )
 
@@ -595,5 +597,62 @@ func TestAccess(t *testing.T) {
 	}
 	if !AccessFor("").Allowed("1.2.3.4:5") || AccessFor("localhost").Allowed("100.64.0.1:1") || !AccessFor("tailscale").Allowed("100.64.0.1:1") {
 		t.Fatal("network access settings")
+	}
+}
+
+// An event the hook wrote while the runtime was away is applied once the runtime reads the spool, before the events
+// that came after it, and an event that arrives twice is applied once.
+func TestHookEventsOfTheSpoolAreAppliedInOrderAndOnce(t *testing.T) {
+	r := newRig(t)
+	path := filepath.Join(t.TempDir(), hookspool.File)
+	ready := false
+	r.cfg.Spool = &hookspool.Queue{Path: path, Apply: r.cfg.ApplyClaudeHook, Ready: func() bool { return ready }}
+	// The runtime is down: the hook can only write.
+	if err := hookspool.Append(path, []byte(`{"id":"e1","event":"prompt-submit","session":"s1","at":1000}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := hookspool.Append(path, []byte(`{"id":"e2","event":"stop","session":"s1","at":2000}`)); err != nil {
+		t.Fatal(err)
+	}
+	// It is up but not taking events yet: a delivery is refused, and its event stays in the spool.
+	if err := hookspool.Append(path, []byte(`{"id":"e3","event":"prompt-submit","session":"s1","at":3000}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.post("/api/status/hook", `{"id":"e3","event":"prompt-submit","session":"s1","at":3000}`); got.code != 503 {
+		t.Fatalf("a delivery before the start: %d %q", got.code, got.body)
+	}
+	if n := len(r.keeper.named("event")); n != 0 {
+		t.Fatalf("%d events applied before the start", n)
+	}
+	// The start reads the spool.
+	ready = true
+	if n := r.cfg.Spool.Drain(); n != 3 {
+		t.Fatalf("the start applied %d events, want 3", n)
+	}
+	kinds := func() string {
+		var out []string
+		for _, c := range r.keeper.named("event") {
+			out = append(out, string(c.args[2].(agents.Event).Kind)+"@"+fmt.Sprint(c.args[3]))
+		}
+		return strings.Join(out, " ")
+	}
+	want := string(agents.PromptSubmit) + "@1000 " + string(agents.Stop) + "@2000 " + string(agents.PromptSubmit) + "@3000"
+	if kinds() != want {
+		t.Fatalf("applied %q, want %q", kinds(), want)
+	}
+	// The hook tries the last one again, and a new event comes written and delivered: one more event, not three.
+	expect(t, r.post("/api/status/hook", `{"id":"e3","event":"prompt-submit","session":"s1","at":3000}`), 204, "")
+	if err := hookspool.Append(path, []byte(`{"id":"e4","event":"stop","session":"s1","at":4000}`)); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, r.post("/api/status/hook", `{"id":"e4","event":"stop","session":"s1","at":4000}`), 204, "")
+	expect(t, r.post("/api/status/hook", `{"id":"e4","event":"stop","session":"s1","at":4000}`), 204, "")
+	if r.cfg.Spool.Drain() != 0 || kinds() != want+" "+string(agents.Stop)+"@4000" {
+		t.Fatalf("applied %q", kinds())
+	}
+	// The script of an agent started earlier sends no id: its event is applied as before.
+	expect(t, r.post("/api/status/hook", `{"event":"stop","session":"s1","at":5000}`), 204, "")
+	if n := len(r.keeper.named("event")); n != 5 {
+		t.Fatalf("%d events, want 5", n)
 	}
 }

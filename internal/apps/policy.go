@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -51,6 +52,8 @@ type Call struct {
 	// Root is the folder the chat started in (Claude Code's CLAUDE_PROJECT_DIR of the hook): a rule's relative mask is
 	// taken from it. The agent moves Cwd with a cd, never Root, so a rule stays on the folders it named; "" takes Cwd.
 	Root string
+	// Status are the statuses of the chat's documents by app (chatstatus.go), for the rules of agent.tools.when.
+	Status map[string][]string
 }
 
 // editTools are the tools an Edit rule names: every built-in tool that writes a file, as Claude Code's own Edit rules do.
@@ -155,7 +158,14 @@ func Decide(apps []*Manifest, call Call) Verdict {
 		if m == nil || m.Agent == nil || m.Agent.Tools == nil {
 			continue
 		}
-		d, rule := decideOne(m.Agent.Tools, PluginName(m.ID), call)
+		// The strictest word over the statuses of the app's documents in the chat: one draft does not lift the rules
+		// of another document that is approved.
+		d, rule := decideOne(m.Agent.Tools, PluginName(m.ID), call, "")
+		for _, st := range call.Status[m.ID] {
+			if sd, srule := decideOne(m.Agent.Tools, PluginName(m.ID), call, st); sd.rank() > d.rank() {
+				d, rule = sd, srule
+			}
+		}
 		if d.rank() > best.Decision.rank() {
 			best = Verdict{Decision: d, App: m.ID, Rule: rule}
 		}
@@ -164,7 +174,7 @@ func Decide(apps []*Manifest, call Call) Verdict {
 }
 
 // decideOne is one app's decision: the most specific matching rule.
-func decideOne(t *ToolPolicy, plugin string, call Call) (Decision, string) {
+func decideOne(t *ToolPolicy, plugin string, call Call, status string) (Decision, string) {
 	bestScore, bestDecision, bestRule := -1, DecideNone, ""
 	try := func(rules []string, d Decision) {
 		for _, rule := range rules {
@@ -180,6 +190,15 @@ func decideOne(t *ToolPolicy, plugin string, call Call) (Decision, string) {
 	try(t.Deny, DecideDeny)
 	try(t.Confirm, DecideConfirm)
 	try(t.Allow, DecideAllow)
+	// The rules of the document's status now; with no document known none of them holds.
+	for _, w := range t.When {
+		if status == "" || !slices.Contains(w.Status, status) {
+			continue
+		}
+		try(w.Deny, DecideDeny)
+		try(w.Confirm, DecideConfirm)
+		try(w.Allow, DecideAllow)
+	}
 	return bestDecision, bestRule
 }
 
@@ -405,6 +424,9 @@ func glob(pattern, s string) bool {
 type Snapshot struct {
 	Apps      []SnapshotApp `json:"apps"`
 	Protected []string      `json:"protected"`
+	// Status is the status of the chat's documents by app, which the guard reads beside the launch (chatstatus.go); a
+	// call that names none is decided by it.
+	Status map[string][]string `json:"-"`
 }
 
 // SnapshotApp is one app of a snapshot.
@@ -430,7 +452,7 @@ type SnapshotApp struct {
 // rolls a channel back, installs for the team, or hands an app out by link.
 var selfCommands = map[string]bool{"enable": true, "on": true, "disable": true, "off": true, "install": true,
 	"dev": true, "remove": true, "rm": true, "uninstall": true,
-	"promote": true, "rollback": true, "team": true, "public": true, "share": true, "unshare": true, "follow": true, "sync": true, "update": true, "connect": true}
+	"settings": true, "secret": true, "promote": true, "rollback": true, "team": true, "public": true, "share": true, "unshare": true, "follow": true, "sync": true, "update": true, "connect": true}
 
 // publishesWide says whether the words after `publish` aim it past dev and beta: at the team's catalog or a space (a
 // --team or --space flag with any value, spelled `--team x` or `--team=x`, with one dash or two), or at any channel but
@@ -505,6 +527,9 @@ func (s Snapshot) Decide(call Call) (Verdict, string) {
 	for _, a := range s.Apps {
 		manifests = append(manifests, &Manifest{ID: a.ID, Agent: &Agent{Tools: a.Tools}})
 		names[a.ID] = a.Name
+	}
+	if call.Status == nil {
+		call.Status = s.Status
 	}
 	v := Decide(manifests, call)
 	return v, v.Reason(names[v.App])

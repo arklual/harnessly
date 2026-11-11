@@ -14,6 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/sidechat"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -144,12 +145,12 @@ func (c *v2SideChat) Serve(w http.ResponseWriter, r *http.Request, conv string) 
 	if ask == nil {
 		ask = sidechat.Ask
 	}
-	go func() {
+	safego.Go("side chat", func() {
 		defer close(events)
 		ask(ctx, sidechat.Run{SessionID: sessionID, Cwd: cwd, Prompt: sidechat.BuildPrompt(req), Model: req.Model,
 			Runtime: sidechat.ReadRuntime(c.runtimeFile), BaseEnv: withAgentEnv(os.Environ(), c.envDir, agents.Claude), ProjectDir: c.projectDir(cwd), Log: coreLog},
 			func(e sidechat.Event) { events <- sidechat.Format(e) })
-	}()
+	})
 	beat := c.heartbeat
 	if beat <= 0 {
 		beat = 15 * time.Second

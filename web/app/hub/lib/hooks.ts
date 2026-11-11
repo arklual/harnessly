@@ -41,6 +41,8 @@ export interface Live {
   /** Set when the machines could not be read; the stream keeps trying on its own. */
   error: ApiError | null;
   reload: () => void;
+  /** How many times the stream opened: more than once means it was ended and came back (a role changed). */
+  opened: number;
   /** Puts a job or login that came from a POST answer in the state before its first event arrives. */
   push: (action: Parameters<typeof reduceLive>[1]) => void;
 }
@@ -53,6 +55,7 @@ export const useSpaceLive = (spaceId: string): Live => {
   const env = useEnv();
   const [state, dispatch] = useReducer(reduceLive, initialLive);
   const [error, setError] = useState<ApiError | null>(null);
+  const [opened, setOpened] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -77,7 +80,13 @@ export const useSpaceLive = (spaceId: string): Live => {
       },
     );
     const es = env.eventSource(eventsUrl(spaceId));
-    es.onopen = () => void load();
+    es.onopen = () => {
+      setOpened((n) => n + 1);
+      void load();
+    };
+    // The hub ends the stream of a person it removed from the space and refuses the next one: reading the machines
+    // again says whether the space is still theirs (lostSpace), without waiting for a reload.
+    es.onerror = () => void load();
     for (const type of EVENT_TYPES) {
       es.addEventListener(type, (m) => {
         const event = parseSpaceEvent(type, m.data);
@@ -90,5 +99,5 @@ export const useSpaceLive = (spaceId: string): Live => {
     };
   }, [env, spaceId, load]);
 
-  return { state, error, reload: () => void load(), push: dispatch };
+  return { state, error, reload: () => void load(), opened, push: dispatch };
 };

@@ -18,6 +18,7 @@ import (
 //	GET  <platform>/apps/kinds          the types of the apps that are on: the list of new documents
 //	GET  <platform>/apps/kinds/docs     the documents of those types the person may see: for the library's list
 //	POST <platform>/apps/kinds/create   a new document of a type: the host makes the project, the app's editor fills it
+//	                                    (a type that extends Sinopia's site: a site project, opened in Sinopia's editor)
 //	POST <platform>/apps/kinds/open     what to open a document with: its type, and the editor, or that the app is missing;
 //	                                    a document of an older format is migrated first, or comes back read-only with the reason
 //	POST <platform>/apps/kinds/revert   puts a migrated document back to the version it was
@@ -75,15 +76,18 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 			return http.StatusInternalServerError, map[string]string{"error": "failed"}
 		}
 		titles := map[string]string{}
+		extends := map[string]bool{}
 		for _, k := range kinds {
 			titles[k.ID] = k.Title
+			extends[k.ID] = k.Extends != ""
 		}
 		lib := designAPI(d).L
 		have := reg.DocKinds()
 		out := []doc{}
 		for _, a := range lib.VisibleToFor(lib.ListArtifacts(), design.PersonIn(ctx)) {
 			kind, ok := have[a.ID]
-			if !ok {
+			// A document of a type made of Sinopia's own is a project of the library's list, with the app's label.
+			if !ok || extends[kind] {
 				continue
 			}
 			title, installed := titles[kind]
@@ -99,6 +103,10 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 		info, _, err := reg.Kind(b.Kind)
 		if errors.Is(err, apps.ErrNotInstalled) {
 			return http.StatusNotFound, notFound
+		}
+		if errors.Is(err, apps.ErrExtendNotAllowed) {
+			return http.StatusForbidden, map[string]string{"error": "extend-not-allowed",
+				"message": "the deployment's admin has not let this app extend Sinopia's editor (HARNESSLY_APPS_EXTEND)"}
 		}
 		if err != nil {
 			agent.Log("warn", "apps: kinds: "+err.Error())
@@ -144,6 +152,14 @@ func kindRoutes(d deps, reg *apps.Registry) []gate.Route {
 		if errors.Is(err, apps.ErrNotInstalled) {
 			// The document stays readable; the app that edits it is not on here.
 			return http.StatusOK, map[string]any{"kind": kind, "needsApp": true}
+		}
+		if errors.Is(err, apps.ErrExtendNotAllowed) {
+			return http.StatusOK, map[string]any{"kind": kind, "needsApp": true, "reason": "extend-not-allowed"}
+		}
+		// A document made of Sinopia's own opens in Sinopia's editor: the page goes there.
+		if info.Extends != "" {
+			return http.StatusOK, map[string]any{"kind": kind, "needsApp": false, "app": info.App, "extends": info.Extends,
+				"target": "sinopia." + kind}
 		}
 		if err != nil {
 			agent.Log("warn", "apps: kinds: "+err.Error())

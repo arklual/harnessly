@@ -137,8 +137,9 @@ func TestAppCertificateReachesItsBackendAndNoOneElse(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize"}`))
 	ProxyMCP(rec, req, MCPServer{URL: srv.URL}, nil)
-	if rec.Code == http.StatusOK {
-		t.Fatal("proxy without it must fail")
+	// A request with an id is answered in JSON-RPC: the failure comes as an error, not as a bare status.
+	if rec.Code == http.StatusOK && !strings.Contains(rec.Body.String(), `"error"`) {
+		t.Fatalf("proxy without it must fail: %d %s", rec.Code, rec.Body.String())
 	}
 	_ = net.IPv4zero
 }

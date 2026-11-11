@@ -41,6 +41,10 @@ type HookSettingsConfig struct {
 	// StatusHook and Statusline are the absolute paths of the two scripts the runtime writes.
 	StatusHook string
 	Statusline string
+	// StatusCLI is the command line of the status hook's own program (`'<cli>' hook status`, hlcli): one process that
+	// writes the event to the spool and delivers it. The script stays behind it for a CLI that is gone or older than
+	// the command. "" runs the script alone.
+	StatusCLI string
 	// Allow are permissions granted without asking (the runtime's own MCP servers, current and former names).
 	Allow []string
 	// PermissionHook is the absolute path of the script Claude's PermissionRequest runs: it asks the runtime for the
@@ -120,7 +124,11 @@ func HookSettings(c HookSettingsConfig) []byte {
 	}
 	hooks := orderedHooks{}
 	for _, e := range HookEvents {
-		cmds := []hookCommand{{Type: "command", Command: `sh "` + c.StatusHook + `" ` + e.Event, Timeout: timeout}}
+		status := `sh "` + c.StatusHook + `" ` + e.Event
+		if c.StatusCLI != "" {
+			status = c.StatusCLI + " " + e.Event + " 2>/dev/null || " + status
+		}
+		cmds := []hookCommand{{Type: "command", Command: status, Timeout: timeout}}
 		if c.BudgetHook != "" && e.Hook == "UserPromptSubmit" {
 			cmds = append(cmds, budgetCommand(c.BudgetHook, e.Hook, timeout))
 		}

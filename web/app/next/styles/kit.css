@@ -356,7 +356,7 @@ button.hx-kit__crumb:hover {
   visibility: hidden;
   transition: none;
 }
-/* The frame that enters the preview slot once: there, never seen. */
+/* The frame that enters the preview slot once (the kit page's, a design's): there, never seen. */
 .hx-kit-enter {
   position: absolute;
   width: 1px;
@@ -920,6 +920,15 @@ button.hx-kit__crumb:hover {
   .hx-kit-chip__note {
     display: none;
   }
+}
+
+/* The app whose document type the project is: a label, not a button. */
+.hx-kit-chip--app {
+  cursor: default;
+}
+.hx-kit-chip--app:hover {
+  border-color: var(--hx-border);
+  color: var(--hx-fg-2);
 }
 
 /* What a board took from the kit, over the slide: a quiet line at its corner, the source layout laid over to compare. */

@@ -58,6 +58,9 @@ type deps struct {
 	// UsageRefresh is how often the usage collector passes over the transcripts in the background, so the facts file
 	// the machine's agent reads stays current (RUNTIME_USAGE_REFRESH, 2m; 0 or off: only when the report is asked for).
 	UsageRefresh time.Duration
+
+	// ChatWork is the live chats' work registry and their list (nil while the core is not up; chat_work.go).
+	ChatWork func() chatWork
 }
 
 // platformAPI is the prefix of the routes the platform's own pages call (peers, commands, file previews…); the

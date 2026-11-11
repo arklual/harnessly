@@ -104,6 +104,20 @@ func (l *Library) serveKitView(w http.ResponseWriter, r *http.Request, q url.Val
 	case len(rest) >= 3 && rest[0] == "ds" && rest[1] == kitThemeFolder(folder, id):
 		l.serveKitFile(w, r, designkit.Resolve(dir, id, version, themeSegs(rest[2:]...)), head)
 		return
+	case len(rest) >= 3 && rest[0] == "ds":
+		// a kit the viewed one is built on: its theme folder under its own name
+		if c, err := designkit.ReadCanvas(dir, id, version, theme); err == nil {
+			for _, bs := range c.Bases {
+				if rest[1] == kitThemeFolder(bs.Folder, bs.Kit) {
+					segs := rest[2:]
+					if bs.Folder != "" {
+						segs = append(strings.Split(bs.Folder, "/"), segs...)
+					}
+					l.serveKitFile(w, r, designkit.Resolve(dir, bs.Kit, bs.Version, segs), head)
+					return
+				}
+			}
+		}
 	}
 	sendHTML(w, 404, l.notFoundPage(), head)
 }
@@ -188,13 +202,34 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 	b.WriteString("<script src=\"./support.js\"></script>\n")
 	// The theme's tokens first (components and the board's own markup read their variables), then its fonts and the
 	// components' styles: the same files, in the same order, a board on the kit loads.
-	for _, css := range []string{"tokens.css", "fonts.css", "components/bundle.css"} {
-		if exists(css) {
-			b.WriteString("<link rel=\"stylesheet\" href=\"" + html.EscapeString(ds+css) + "\">\n")
+	// A kit on a kit loads the kits it is built on first, the outermost base first, each the same way; the
+	// kit's own files come last, so its tokens and styles overrule theirs.
+	type layer struct {
+		ds     string
+		exists func(rel string) bool
+	}
+	var layers []layer
+	for _, bs := range c.Bases {
+		layers = append(layers, layer{"ds/" + kitThemeFolder(bs.Folder, bs.Kit) + "/", func(rel string) bool {
+			segs := strings.Split(rel, "/")
+			if bs.Folder != "" {
+				segs = append(strings.Split(bs.Folder, "/"), segs...)
+			}
+			return designkit.Resolve(dir, bs.Kit, bs.Version, segs) != ""
+		}})
+	}
+	layers = append(layers, layer{ds, exists})
+	for _, ly := range layers {
+		for _, css := range []string{"tokens.css", "fonts.css", "components/bundle.css"} {
+			if ly.exists(css) {
+				b.WriteString("<link rel=\"stylesheet\" href=\"" + html.EscapeString(ly.ds+css) + "\">\n")
+			}
 		}
 	}
-	if exists("components/bundle.js") {
-		b.WriteString("<script src=\"" + html.EscapeString(ds+"components/bundle.js") + "\"></script>\n")
+	for _, ly := range layers {
+		if ly.exists("components/bundle.js") {
+			b.WriteString("<script src=\"" + html.EscapeString(ly.ds+"components/bundle.js") + "\"></script>\n")
+		}
 	}
 	for _, s := range q["s"] {
 		if rel := path.Clean(strings.TrimPrefix(s, "/")); rel != "." && !strings.HasPrefix(rel, "..") && strings.HasSuffix(rel, ".js") && exists(rel) {
@@ -206,12 +241,12 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 	// every board on the kit wraps its content.
 	root := c.Root != "" && c.Root != comp && compNameRe.MatchString(c.Root)
 	if root {
-		b.WriteString("<x-import component-from-global-scope=\"" + c.Namespace + "." + c.Root + "\">")
+		b.WriteString("<x-import component-from-global-scope=\"" + firstNonEmpty(c.RootNs, c.Namespace) + "." + c.Root + "\">")
 	}
 	// The component sits in a marker of no box of its own: `kit render` measures what is drawn without the root's
 	// wrappers around it (their background spans the page), portals included.
 	b.WriteString("<div class=\"kit-subject\" data-kit-subject=\"\">")
-	b.WriteString("<x-import component-from-global-scope=\"" + c.Namespace + "." + comp + "\"")
+	b.WriteString("<x-import component-from-global-scope=\"" + c.NamespaceOf(c.Component(comp)) + "." + comp + "\"")
 	vals := map[string]any{}
 	declared := declaredProps(c, comp)
 	keys := make([]string, 0, len(props))
@@ -239,7 +274,7 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 	b.WriteString("</main>\n</x-dc>\n")
 	// json.Marshal escapes <, > and &: the values cannot close the script.
 	data, _ := json.Marshal(vals)
-	b.WriteString("<script type=\"text/x-dc\" data-dc-script data-props='{}'>\nclass Component extends DCLogic {\n  renderVals() {\n    const ns = window[" + strconv.Quote(c.Namespace) + "];\n" + elementReviver + "    return h(" + string(data) + ");\n  }\n}\n</script>\n</body>\n</html>\n")
+	b.WriteString("<script type=\"text/x-dc\" data-dc-script data-props='{}'>\nclass Component extends DCLogic {\n  renderVals() {\n    const nss = [" + namespaceList(c) + "].filter(Boolean);\n" + elementReviver + "    return h(" + string(data) + ");\n  }\n}\n</script>\n</body>\n</html>\n")
 	return b.String(), true
 }
 
@@ -250,7 +285,8 @@ const elementReviver = `    const h = (v, key) => {
       if (!v || typeof v !== "object") return v;
       if (typeof v.$fn === "string") return v.$fn ? (x) => (x == null ? undefined : x[v.$fn]) : () => undefined;
       if (typeof v.$c !== "string") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, h(x)]));
-      const C = v.$c.split(".").reduce((o, k) => (o ? o[k] : undefined), ns);
+      let C;
+      for (const ns of nss) { C = v.$c.split(".").reduce((o, k) => (o ? o[k] : undefined), ns); if (C) break; }
       if (!C) return null;
       const props = Object.assign({}, h(v.props || {}), key === undefined ? {} : { key });
       const kids = v.children === undefined ? [] : Array.isArray(v.children) ? v.children.map((x) => h(x)) : [h(v.children)];
@@ -266,4 +302,24 @@ func safePropName(k string) bool {
 	}
 	l := strings.ToLower(k)
 	return !strings.HasPrefix(l, "on") && l != "style" && l != "autofocus" && l != "tabindex" && l != "is" && l != "slot"
+}
+
+// namespaceList is the JavaScript list of the namespaces a page of the kit holds, the kit's own first.
+func namespaceList(c *designkit.Canvas) string {
+	var out []string
+	for _, n := range c.Namespaces() {
+		if compNameRe.MatchString(n) {
+			out = append(out, "window["+strconv.Quote(n)+"]")
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }

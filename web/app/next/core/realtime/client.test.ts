@@ -245,6 +245,46 @@ describe('RealtimeClient', () => {
     expect(rt.opened.length).toBe(1);
   });
 
+  it("answers the runtime's own beat with a ping at once, and its own pong with nothing", async () => {
+    const { rt } = await bootFake();
+    const s = lastSocket(rt);
+    const pings = () => s.sent.filter((f) => f.f === 'ping').length;
+    expect(pings()).toBe(0);
+    // A hidden tab: no timer of the page has run, the runtime beats.
+    s.deliver({ f: 'pong', t: 0 });
+    expect(pings()).toBe(1);
+    // The fake answered that ping with its own t: no ping answers a pong of the page's ping.
+    s.deliver({ f: 'pong', t: Date.now() });
+    expect(pings()).toBe(1);
+  });
+
+  it('a stopped socket says so: the machine is not counted as on the line until it starts again', async () => {
+    const { rt, m } = await bootFake();
+    expect(conn(m).k).toBe('live');
+    hub.client(m)!.stop();
+    expect(conn(m)).toEqual({ k: 'offline', retryAt: Number.POSITIVE_INFINITY, cause: 'paused' });
+    expect(secondsToRetry(conn(m), Date.now())).toBeNull();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(rt.opened.length).toBe(1);
+    hub.client(m)!.start();
+    await settle();
+    expect(conn(m).k).toBe('live');
+    expect(rt.opened.length).toBe(2);
+  });
+
+  it('asks for a held channel whole again on resnapshot', async () => {
+    const { rt, m } = await bootFake();
+    const s = lastSocket(rt);
+    const before = subs(s).filter((f) => f.ch === 'convs').length;
+    hub.client(m)!.resnapshot('convs');
+    const again = subs(s).filter((f) => f.ch === 'convs');
+    expect(again).toHaveLength(before + 1);
+    // No cursor: the runtime answers with the whole list, not with the events since.
+    expect(again.at(-1)).not.toHaveProperty('afterSeq');
+    expect(again.at(-1)).not.toHaveProperty('epoch');
+    expect(conversationsStore.size).toBe(10);
+  });
+
   it('counts holders of a channel: the last release unsubscribes', async () => {
     const { rt, m } = await bootFake();
     const a = hub.openConversation(m, CONV);

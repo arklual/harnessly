@@ -10,6 +10,10 @@
 #
 #   docker compose -f compose.hub.yaml logs hub | grep "DEV email code"
 #
+# Documents and boards are off here: they are services of their own, each added by an overlay that starts its published
+# image (docs/apps/documents.md, docs/apps/boards.md):
+#   docker compose -f compose.hub.yaml -f compose.docs.yaml -f compose.boards.yaml up -d
+#
 # On a server with a real name set HUB_PUBLIC_URL (https, TLS in front: docs/hub/deploy.md) and a mail server; see
 # .env.hub.example for every setting. The hub's port is bound to 127.0.0.1: a reverse proxy on the host publishes it.
 #

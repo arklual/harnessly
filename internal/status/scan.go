@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/state"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
@@ -173,12 +174,12 @@ func eachLimited(n, limit int, fn func(i int)) {
 	var wg sync.WaitGroup
 	wg.Add(limit)
 	for range limit {
-		go func() {
+		safego.Go("status scan worker", func() {
 			defer wg.Done()
 			for i := range next {
 				fn(i)
 			}
-		}()
+		})
 	}
 	for i := range n {
 		next <- i
@@ -253,7 +254,7 @@ func (m *Manager) scanAll() {
 	m.syncBackground()
 	m.mu.Unlock()
 	for _, id := range unknown {
-		go m.resolveUnknown(id)
+		safego.Go("status resolve unknown", func() { m.resolveUnknown(id) })
 	}
 }
 
@@ -407,7 +408,10 @@ func (m *Manager) pollTab(st *scannedTab, now float64) {
 	m.mu.Lock()
 	existing := m.tabs[tab.ID]
 	m.mu.Unlock()
-	md := m.readMetadata(st.pane, p, tab)
+	md := emptyMetadata()
+	if existing == nil || m.d.ChatSession == nil || !m.d.ChatSession(tab.SessionName) {
+		md = m.readMetadata(st.pane, p, tab)
+	}
 
 	if existing == nil {
 		state := persistedState(tab)
@@ -430,7 +434,7 @@ func (m *Manager) pollTab(st *scannedTab, now float64) {
 		m.broadcastUpdate(tab.ID, e, nil)
 		m.mu.Unlock()
 		if state == Unknown {
-			go m.resolveUnknown(tab.ID)
+			safego.Go("status resolve unknown", func() { m.resolveUnknown(tab.ID) })
 		}
 		return
 	}

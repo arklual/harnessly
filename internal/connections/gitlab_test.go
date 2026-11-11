@@ -91,7 +91,7 @@ func TestGitLabDetectGitLabCom(t *testing.T) {
 	if d == nil || d.Deployment != Cloud || d.BaseURL != "https://gitlab.com" {
 		t.Fatalf("detection = %+v", d)
 	}
-	if !strings.HasPrefix(d.Methods[0].TokenURL, "https://gitlab.com/-/user_settings/personal_access_tokens?name=harnessly&scopes=read_api") ||
+	if !strings.HasPrefix(d.Methods[0].TokenURL, "https://gitlab.com/-/user_settings/personal_access_tokens?name=harnessly&scopes=api,read_user") ||
 		len(d.Capabilities) != 2 || d.Capabilities[0] != Issues || d.Capabilities[1] != Code {
 		t.Fatalf("methods/capabilities = %+v %+v", d.Methods, d.Capabilities)
 	}

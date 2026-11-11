@@ -37,6 +37,9 @@ type Item struct {
 	SizeMB int
 	// Heavy items wait while the machine is busy.
 	Heavy bool
+	// Optional items only add a feature: their absence is not a problem of the first screen and does not keep the
+	// base package from being done. They are installed all the same where the machine can.
+	Optional bool
 	// Personal items are the runtime's own (the person's data), not the system's.
 	Personal bool
 	// Hosts are the addresses the item needs besides the package mirror.
@@ -86,7 +89,7 @@ var List = []Item{
 		Pkgs: same("chromium", Apt, Dnf, Yum, Pacman, Zypper, Apk), SizeMB: 400, Heavy: true},
 	{ID: "libreoffice", Title: "LibreOffice", Without: "не будет импорта и экспорта PPTX", Bins: []string{"soffice", "libreoffice"},
 		Pkgs:   with(with(same("libreoffice", Dnf, Yum, Pacman, Zypper, Apk), Apt, "libreoffice-impress"), Dnf, "libreoffice-impress"),
-		SizeMB: 700, Heavy: true},
+		SizeMB: 700, Heavy: true, Optional: true},
 	{ID: VoiceID, Title: "Модель голоса", Without: "не будет голосового ввода", SizeMB: 500, Heavy: true, Personal: true,
 		Hosts: []string{"huggingface.co", "github.com"}},
 }

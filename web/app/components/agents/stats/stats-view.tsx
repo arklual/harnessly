@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { CircleHelp, RefreshCw, TriangleAlert } from 'lucide-react';
 import useIsMobile from '@/hooks/use-is-mobile';
 import { formatModelDisplayName } from '@/lib/claude-tokens';
+import { appConfig } from '@/platform/config';
 import { useTeamUsage } from '@/components/agents/stats/use-team-usage';
 import EChart from '@/components/agents/stats/echart';
 import {
@@ -440,7 +441,9 @@ const rateLine = (
 // --- view ---
 
 const StatsView = () => {
-  const { team, error, loading, reload } = useTeamUsage();
+  // RUNTIME_HUB_ANALYTICS: this machine counts nothing, the report comes from the hub.
+  const hubBase = appConfig().hubAnalytics ? appConfig().hubUrl : null;
+  const { team, error, loading, reload } = useTeamUsage(false, hubBase);
   const theme = useChartTheme();
   const [period, setPeriod] = useState<TPeriod>(30);
   const [people, setPeople] = useState<string[]>([]);
@@ -858,7 +861,11 @@ const StatsBody = ({
           value={pct(errRate, 1)}
           delta={comparable ? (errRate !== null && errBefore !== null ? errRate - errBefore : null) : null}
           inverse
-          sub={`${plural(cur.interrupts, 'stats.statsView.interrupts', { n: n0(cur.interrupts) })} · ${plural(cur.denials, 'stats.statsView.denials', { n: n0(cur.denials) })}`}
+          sub={
+            data.missing.has('interrupts')
+              ? undefined
+              : `${plural(cur.interrupts, 'stats.statsView.interrupts', { n: n0(cur.interrupts) })} · ${plural(cur.denials, 'stats.statsView.denials', { n: n0(cur.denials) })}`
+          }
           hint={t('stats.statsView.errorsHint')}
         />
       </div>
@@ -1029,7 +1036,9 @@ const StatsBody = ({
         </Panel>
 
         <Panel span={6} title={t('stats.statsView.whenWeWork')} sub={t('stats.statsView.punchSub')}>
-          {noPrompts ? (
+          {data.missing.has('punchcard') ? (
+            <Empty height={230} text={t('stats.statsView.noHubData')} />
+          ) : noPrompts ? (
             <Empty height={230} />
           ) : (
             <EChart option={punchOption} height={230} ariaLabel={t('stats.statsView.punchAria')} />
@@ -1041,7 +1050,9 @@ const StatsBody = ({
           sub={t('stats.statsView.costByRepo', { period: periodLabel })}
           hint={t('stats.statsView.projectsHint')}
         >
-          {projects.length === 0 ? (
+          {data.missing.has('projects') ? (
+            <Empty height={230} text={t('stats.statsView.noHubData')} />
+          ) : projects.length === 0 ? (
             <Empty height={230} />
           ) : (
             <EChart
@@ -1096,7 +1107,9 @@ const StatsBody = ({
           sub={t('stats.statsView.tasksSub')}
           hint={t('stats.statsView.tasksHint')}
         >
-          {tasks.length === 0 ? (
+          {data.missing.has('tasks') ? (
+            <Empty height={80} text={t('stats.statsView.noHubData')} />
+          ) : tasks.length === 0 ? (
             <Empty height={80} text={t('stats.statsView.noTasks')} />
           ) : (
             <div className="ts-table-wrap">

@@ -21,6 +21,7 @@ export const FEED_ROWS = [
   'design',
   'doc',
   'mr',
+  'mrDone',
   'stand',
   'file',
 ] as const satisfies readonly TShownKind[];

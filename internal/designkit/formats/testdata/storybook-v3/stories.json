@@ -1,0 +1,13 @@
+{ "v": 3, "stories": {
+  "components-button--primary": { "id": "components-button--primary", "title": "Components/Button", "name": "Primary", "kind": "Components/Button", "story": "Primary",
+    "args": { "variant": "primary", "children": "Save", "disabled": false, "size": "xl" },
+    "argTypes": {
+      "variant": { "name": "variant", "description": "visual weight", "type": { "name": "enum", "value": ["primary", "secondary", "ghost"] }, "control": { "type": "select" }, "table": { "defaultValue": { "summary": "primary" } } },
+      "disabled": { "name": "disabled", "description": "greys it out", "type": { "name": "boolean" } },
+      "children": { "name": "children", "type": { "name": "other", "value": "ReactNode", "required": true } },
+      "onClick": { "name": "onClick", "type": { "name": "function" }, "action": "clicked" },
+      "internal": { "table": { "disable": true } },
+      "tone": { "name": "tone", "control": { "type": "radio" }, "options": ["calm", "loud"] } } },
+  "components-button--secondary": { "id": "components-button--secondary", "title": "Components/Button", "name": "Secondary", "args": { "variant": "secondary", "children": "Cancel" } },
+  "docs-intro--page": { "id": "docs-intro--page", "title": "Docs/Intro", "name": "Page", "parameters": { "docsOnly": true } }
+} }

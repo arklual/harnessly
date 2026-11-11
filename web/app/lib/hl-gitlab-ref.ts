@@ -104,6 +104,23 @@ export interface IChangeView {
   comments: IChangeThread[] | null;
   /** Set when the view is only a card made of the link, and says why. */
   limited: TChangeLimit | null;
+  /** For the review screen; GitLab gives them, GitHub not yet. */
+  reviewers?: string[];
+  approvedBy?: string[];
+  approvalsLeft?: number | null;
+  commits?: IChangeCommit[];
+  /** Commits the target branch has that the source lacks. */
+  behind?: number | null;
+  conflicts?: boolean;
+  /** The commits the diff is taken between. */
+  diffRefs?: { base: string | null; head: string | null };
+}
+
+export interface IChangeCommit {
+  sha: string;
+  title: string;
+  author: string | null;
+  at: string | null;
 }
 
 const GITHUB_NAME = '[A-Za-z0-9._-]{1,100}';

@@ -145,7 +145,7 @@ func (i *Instance) idleForLocked(now time.Time) time.Duration {
 		return 0
 	}
 	for _, p := range i.pages {
-		if len(p.viewers) > 0 {
+		if len(p.viewers) > 0 || p.login.heldAt(now) {
 			i.lastActivity = now
 			return 0
 		}

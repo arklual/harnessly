@@ -59,14 +59,14 @@ func (t HostTools) sinopiaOpen() bool {
 	return ok
 }
 
-// Offering is what the server's tools follow: the apps on in the chat and whether a Sinopia document is open beside
-// it. The GET stream tells the client of a change of it (notifications/tools/list_changed).
+// Offering is what the server's tools follow: the apps on in the chat, whether a Sinopia document is open beside it
+// and the tools the open windows of the apps offer (windowtools.go). The GET stream tells the client of a change of it (notifications/tools/list_changed).
 func (t HostTools) Offering() string {
 	var apps []string
 	if t.Enabled != nil {
 		apps = t.Enabled()
 	}
-	return strings.Join(apps, ",") + "|" + strconv.FormatBool(t.sinopiaOpen())
+	return strings.Join(apps, ",") + "|" + strconv.FormatBool(t.sinopiaOpen()) + "|" + t.windowOffering()
 }
 
 var _ mcpserver.Toolset = HostTools{}
@@ -153,14 +153,15 @@ func str(desc string) *jsvalue.Object {
 
 func (t HostTools) Tools() []any {
 	if t.quiet() {
-		return []any{}
+		// The one tool a chat has from its start, whatever turns on later.
+		return []any{PageCallTool()}
 	}
 	app := str("The app's id; omit when only one app is on in this chat.")
 	tool := func(name, desc string, props *jsvalue.Object, required ...any) any {
 		return jsvalue.NewObject("name", name, "description", desc,
 			"inputSchema", jsvalue.NewObject("type", "object", "properties", props, "required", required))
 	}
-	return append([]any{
+	return append(append([]any{
 		tool("open", "Open an app's view in the person's right pane.",
 			jsvalue.NewObject("app", app, "view", str("A view of the app for the pane; omit for its first one."))),
 		tool("data_get", "Read what the app keeps for this chat under a key (the same data its view reads with hl.storage.chat). "+
@@ -200,22 +201,36 @@ func (t HostTools) Tools() []any {
 				"script", str("Its script: a classic script that runs after the markup, optional. Up to 256 KB."),
 				"data", jsvalue.NewObject("description", "Any JSON, as window.widgetData and hl.context.data; up to 64 KB."),
 				"id", str("A widget of this chat to change; omit for a new one.")), "title", "html"),
-		tool("page_tools", "The tools the open views of this chat's apps offer from the page (registered with hl.tools.register or "+
+		tool("page_tools", "Kept for older instructions: every tool of an open window is a tool of this server under its own name "+
+			"(<app>__<tool>), call it directly. The tools the open views of this chat's apps offer from the page (registered with hl.tools.register or "+
 			"navigator.modelContext.registerTool), and what each view published for you to read (hl.publish). A view that is "+
 			"closed offers nothing: open it with `open` first. Answers [{app, tools: [{name, description, inputSchema}], context}].",
 			jsvalue.NewObject("app", str("Only this app's; omit for every app on in this chat."))),
-		tool("page_call", "Call a tool a view of an app offers from the page (see page_tools). The view runs it in the person's page "+
-			"and its answer comes back, or a refusal in words when the view is closed or does not answer within a minute.",
-			jsvalue.NewObject("app", app, "tool", str("The tool's name, as page_tools gives it."),
-				"arguments", jsvalue.NewObject("type", "object", "description", "The tool's arguments, by its inputSchema.")), "tool"),
+		PageCallTool(),
 		tool("catalog", "What an app can use, from the table the manifest check reads: targets, contribution kinds, rights, "+
 			"the bridge methods each right opens and these tools. Ask it instead of guessing names when you write or fix an app.",
 			jsvalue.NewObject("section", str("targets, contributions, permissions, methods or tools; omit for all."))),
-	}, builtinToolList()...)
+	}, builtinToolList()...), t.windowToolDefs()...)
+}
+
+// PageCallTool is the definition of page_call, the tool of the host's server that is always there and always loaded: a
+// running agent learns of an app turned on, or of a window opened, from the block of its turn, and may not have heard
+// that the server's tools changed. It is the one tool a chat with no app on pays for.
+func PageCallTool() any {
+	return jsvalue.NewObject("name", "page_call",
+		"description", "Run a tool of an app's open window by its name; this tool is always here. The «Open window» block of your turn "+
+			"lists every window's tools with their arguments. When a tool listed there is not among your tools under its own name, "+
+			"call it here with the app, that name and the arguments. A window that is still loading is waited for; a call with "+
+			"wrong arguments comes back with the tool's schema. Without `tool` it answers what the window offers and its state.",
+		"inputSchema", jsvalue.NewObject("type", "object", "properties", jsvalue.NewObject(
+			"app", jsvalue.NewObject("type", "string", "description", "The app's id; omit when only one app is on in this chat."),
+			"tool", jsvalue.NewObject("type", "string", "description", "The tool's name as the «Open window» block gives it, whole or without the app before it."),
+			"arguments", jsvalue.NewObject("type", "object", "description", "The tool's arguments.")), "required", []any{}),
+		"_meta", jsvalue.NewObject("anthropic/alwaysLoad", true))
 }
 
 func (HostTools) Has(name string) bool {
-	return slices.Contains([]string{"open", "data_get", "data_set", "settings_get", "ask", "widget_show", "widget_render", "catalog", "page_tools", "page_call", "logs", "check"}, name) || isBuiltinTool(name)
+	return slices.Contains([]string{"open", "data_get", "data_set", "settings_get", "ask", "widget_show", "widget_render", "catalog", "page_tools", "page_call", "logs", "check"}, name) || isBuiltinTool(name) || IsWindowToolName(name)
 }
 
 func isBuiltinTool(name string) bool { _, _, ok := builtinTool(name); return ok }
@@ -223,6 +238,16 @@ func isBuiltinTool(name string) bool { _, _, ok := builtinTool(name); return ok 
 func refuse(msg string) *jsvalue.Object { return mcpserver.TextResult("refused: "+msg, true) }
 
 func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsvalue.Object {
+	// A call the agent's proxy makes again after the runtime restarted: a window's command of that key is
+	// found in the journal and its end waited for as the first call did; any other tool is not run a second time.
+	if t.Pages != nil {
+		if answer, c, err, found := t.Pages.Resume(ctx, t.Conv); found {
+			return pageCallResult(c.App, PageTool{Name: c.Tool}, answer, err)
+		}
+	}
+	if CallRepeats(ctx) {
+		return refuse(LostCall)
+	}
 	if app, tool, ok := builtinTool(name); ok {
 		return t.builtin(app, tool, args)
 	}
@@ -234,6 +259,9 @@ func (t HostTools) Call(ctx context.Context, name string, args *jsvalue.Object) 
 	}
 	if name == "page_tools" {
 		return t.pageTools(args)
+	}
+	if IsWindowToolName(name) {
+		return t.windowCall(ctx, name, args)
 	}
 	// A builtin app (Sinopia) is on wherever its page is open: its page tools need no install in the chat.
 	if name == "page_call" {
@@ -519,6 +547,10 @@ func (t HostTools) pageTools(args *jsvalue.Object) *jsvalue.Object {
 	return mcpserver.TextResult(string(raw), false)
 }
 
+// pageCall is the tool that is always there: a window's tool by its name. A window's tools are tools of
+// their own too (windowtools.go), but those reach a running agent only when it hears that the server's tools changed;
+// this one it has from its start, and the block of its turn (windowcontext.go) gives it the names and the arguments. The
+// tool is waited for as a tool called by its own name is. With no tool named it answers what the window offers.
 func (t HostTools) pageCall(ctx context.Context, a Installed, args *jsvalue.Object) *jsvalue.Object {
 	if t.Pages == nil {
 		return refuse("this host has no page tools")
@@ -528,6 +560,14 @@ func (t HostTools) pageCall(ctx context.Context, a Installed, args *jsvalue.Obje
 	}
 	v, _ := args.Get("tool")
 	tool, _ := v.(string)
+	if tool == "" {
+		// An empty list would say nothing: no window of the app reports to this chat, and the agent is told so and what
+		// to do.
+		if !slices.ContainsFunc(t.windowReports(), func(r PageReport) bool { return r.App == a.ID }) {
+			return refuse(windowNotConnected(a.ID))
+		}
+		return t.pageTools(jsvalue.NewObject("app", a.ID))
+	}
 	var raw json.RawMessage
 	if v, ok := args.Get("arguments"); ok && v != nil {
 		b, err := json.Marshal(v)
@@ -536,20 +576,76 @@ func (t HostTools) pageCall(ctx context.Context, a Installed, args *jsvalue.Obje
 		}
 		raw = b
 	}
-	answer, err := t.Pages.Call(ctx, t.Conv, a.ID, tool, raw)
+	// The name as the window has it, or as the block of the turn and tools/list spell it.
+	w, got := t.awaitWindowTool(ctx, func(w WindowTool) bool {
+		return w.App == a.ID && (w.Tool() == tool || w.Name == tool || HostToolName(w.Name) == tool)
+	})
+	switch got {
+	case windowToolCut:
+		return refuse("the call was cut off")
+	case windowToolAbsent:
+		return refuse(t.pageToolMissing(a.ID, tool))
+	}
+	return t.pageCallTool(ctx, a, w.PageTool, raw)
+}
+
+// pageToolMissing says why page_call found no such tool: the app's window is not open, or it is and offers others.
+func (t HostTools) pageToolMissing(app, tool string) string {
+	reports := t.windowReports()
+	if !slices.ContainsFunc(reports, func(r PageReport) bool { return r.App == app }) {
+		return windowNotConnected(app) + " (asked for " + tool + ")"
+	}
+	var have []string
+	for _, w := range WindowTools(reports) {
+		if w.App == app {
+			have = append(have, w.Tool()+windowToolArgs(w.InputSchema))
+		}
+	}
+	if len(have) == 0 {
+		return "the window of " + app + " is open, but it has registered no tools yet (asked for " + tool + ")"
+	}
+	return "the window of " + app + " is open, but it offers no tool " + tool + "; it offers: " + strings.Join(have, ", ")
+}
+
+// windowNotConnected says that no window of the app reports to the chat, the two ways it comes to that and what to do.
+func windowNotConnected(app string) string {
+	return "the window of " + app + " is not connected to this chat: either its view is not open in the right pane, or the " +
+		"chat's page is not open in a browser (a window lives in the person's page). Open the view with the `open` tool and " +
+		"call again; if that does not help, ask the person to open this chat in the browser"
+}
+
+// pageCallTool takes a call to the view's window and brings its answer back: the one way of page_call and of a window
+// tool called by its own name. Arguments that surely do not follow the tool's schema do not go to the window, and
+// whatever refuses them, the host or the window, the answer carries the schema: the next call can be right.
+func (t HostTools) pageCallTool(ctx context.Context, a Installed, tool PageTool, raw json.RawMessage) *jsvalue.Object {
+	if issues := argIssues(tool.InputSchema, raw); len(issues) > 0 {
+		return refuse(strings.TrimSpace("the arguments do not fit " + tool.Name + ": " + strings.Join(issues, "; ") + ". " +
+			schemaHint(tool.Name, tool.InputSchema)))
+	}
+	answer, err := t.Pages.Call(ctx, t.Conv, a.ID, tool.Name, raw)
+	return pageCallResult(a.ID, tool, answer, err)
+}
+
+// pageCallResult is a command's end as the agent reads it. A refusal names the command's status: the agent tells
+// «not run, repeat it» (rejected, expired) from «the window ran it and it failed».
+func pageCallResult(app string, tool PageTool, answer PageAnswer, err error) *jsvalue.Object {
+	var rejected ErrPageCallRejected
 	switch {
 	case errors.Is(err, ErrPageToolArgs):
 		return refuse("the arguments are too large or not JSON")
 	case errors.Is(err, ErrPageToolGone):
-		return refuse("no open view of " + a.ID + " offers " + tool + ": open the app's view (open) and list page_tools again")
+		return refuse("no open view of " + app + " offers " + tool.Name + ": open the app's view (open) and call it again")
 	case errors.Is(err, ErrPageCallBusy):
 		return refuse("too many page calls wait in this chat")
 	case errors.Is(err, ErrPageCallTimeout):
-		return refuse("the view did not answer within a minute")
+		return refuse("expired: the window of " + app + " did not answer " + tool.Name + " within a minute. The command is over and " +
+			"will not run later; if the window is open (see the «Open window» block of your turn), call the tool again")
+	case errors.As(err, &rejected):
+		return refuse("rejected: " + rejected.Why + ". The command was not run; look at what the window shows now and call again")
 	case err != nil:
-		return refuse("the call was cut off")
+		return refuse("canceled: the call was cut off")
 	case answer.Error != "":
-		return mcpserver.TextResult(answer.Error, true)
+		return mcpserver.TextResult(strings.TrimSpace(answer.Error+"\n\n"+schemaHint(tool.Name, tool.InputSchema)), true)
 	}
 	if len(answer.Result) == 0 {
 		return mcpserver.TextResult("null", false)

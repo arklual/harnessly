@@ -146,6 +146,8 @@ export interface IBaseItem {
   message: string;
   host: string;
   command: string;
+  /** Only adds a feature: not a problem of the first screen while it is missing. */
+  optional: boolean;
 }
 
 export interface IBaseView {
@@ -169,6 +171,7 @@ const readBaseItem = (v: unknown): IBaseItem => {
     message: optStr(o.message),
     host: optStr(o.host),
     command: optStr(o.command),
+    optional: o.optional === true,
   };
 };
 
@@ -204,7 +207,7 @@ export const withBase = (setup: ISetupView | null, base: IBaseView | null): ISet
   if (!base) return setup;
   const own = setup && setup.allowed ? setup : null;
   const items: ISetupItem[] = base.items
-    .filter((b) => b.status !== BASE_STATUS.skipped)
+    .filter((b) => b.status !== BASE_STATUS.skipped && !(b.optional && b.status !== BASE_STATUS.ok))
     .map((b) => ({
       itemId: `base:${b.id}`,
       kind: SETUP_KIND.base,
@@ -215,7 +218,7 @@ export const withBase = (setup: ISetupView | null, base: IBaseView | null): ISet
       base: { status: b.status, host: b.host, command: b.command },
     }));
   const left = base.items
-    .filter((b) => b.status !== BASE_STATUS.ok && b.status !== BASE_STATUS.skipped)
+    .filter((b) => b.status !== BASE_STATUS.ok && b.status !== BASE_STATUS.skipped && !b.optional)
     .map((b) => b.id);
   return {
     allowed: true,

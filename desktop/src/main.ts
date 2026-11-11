@@ -192,6 +192,10 @@ ipcMain.handle('show-notification', (event, title: string, body: string) => {
 ipcMain.handle('open-new-window', () => {
   if (currentUrl) createWindow(currentUrl);
 });
+// ⌘W / Ctrl+W belongs to the page: it closes the chats one at a time and asks for this once none is left.
+ipcMain.handle('close-window', (event) => {
+  fromWindow(event)?.close();
+});
 ipcMain.handle('set-dock-badge', (_e, count: number) => {
   if (process.platform === 'darwin') app.dock?.setBadge(count > 0 ? String(count) : '');
 });
@@ -216,7 +220,15 @@ const bootstrap = async () => {
     app.setAsDefaultProtocolClient(DEEP_LINK_PROTOCOL);
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
+    { role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' },
+    // The stock Window menu binds Ctrl+W to «Close» on Windows and Linux, which would take the key from the page.
+    {
+      label: 'Window',
+      role: 'window',
+      submenu: process.platform === 'darwin'
+        ? [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }]
+        : [{ role: 'minimize' }],
+    },
   ]));
   createWindow(currentUrl);
   const initial = pendingDeepLink ?? findDeepLink(process.argv);

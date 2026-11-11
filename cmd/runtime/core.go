@@ -30,6 +30,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/prompts"
 	"github.com/ly-solutions/harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/sleep"
 	"github.com/ly-solutions/harnessly/internal/sockets"
 	"github.com/ly-solutions/harnessly/internal/state"
@@ -38,6 +39,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/timeline"
 	"github.com/ly-solutions/harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
 	"github.com/ly-solutions/harnessly/internal/vault"
 )
 
@@ -96,7 +98,9 @@ type core struct {
 	history   *history.Store
 	limits    *limits.Cache
 	bg        *background.Reader
-	claude    *claude.Detector
+	// transcripts reads what a transcript gains once for all its readers; nil when switched off.
+	transcripts *transcriptindex.Index
+	claude      *claude.Detector
 	// intents are what agents asked their right panes; panel and vault carry commands to the person's pages.
 	intents *paneintents.Store
 	panel   *panel.Bridge
@@ -123,6 +127,8 @@ type core struct {
 	// is built from (set by main before the core starts).
 	v2  atomic.Pointer[v2Live]
 	v2d *deps
+	// started: start has brought everything up, the agents that ran before the restart included (chats_ready.go).
+	started atomic.Bool
 
 	mu      sync.Mutex
 	m       *status.Manager
@@ -132,13 +138,15 @@ type core struct {
 }
 
 func newCore(cfg coreConfig) *core {
+	transcripts := newTranscriptIndex()
 	c := &core{cfg: cfg, statusHub: sockets.NewHub(), sync: &sockets.SyncServer{Hub: sockets.NewHub()},
-		history: &history.Store{File: filepath.Join(cfg.DataDir, "session-history.json")},
-		limits:  &limits.Cache{File: filepath.Join(cfg.DataDir, "rate-limits.json")},
-		bg:      &background.Reader{UID: os.Getuid()},
-		claude:  claude.NewDetector(cfg.Home)}
+		history:     &history.Store{File: filepath.Join(cfg.DataDir, "session-history.json")},
+		limits:      &limits.Cache{File: filepath.Join(cfg.DataDir, "rate-limits.json")},
+		bg:          &background.Reader{UID: os.Getuid(), Index: transcripts},
+		transcripts: transcripts,
+		claude:      claude.NewDetector(cfg.Home)}
 	c.store = state.New(state.Config{DataDir: cfg.DataDir, Tmux: state.FromTmux(cfg.Tmux), Broadcast: syncBroadcaster{c.sync},
-		Reconciler: reconciler{c}, Prompts: layoutPrompts{c}, AgentTokenHeader: cfg.AgentHeader, MetaKey: cfg.MetaKey, Home: cfg.Home})
+		Reconciler: reconciler{c}, Prompts: layoutPrompts{c}, SessionOwned: c.chatOwns, AgentTokenHeader: cfg.AgentHeader, MetaKey: cfg.MetaKey, Home: cfg.Home})
 	publish := func(e *jsvalue.Object) { c.sync.Broadcast(e) }
 	c.panel = panel.NewBridge(publish, c.sync.Hub.Count)
 	c.vault = vault.NewBridge(publish, c.sync.Hub.Count)
@@ -272,6 +280,7 @@ func (c *core) start() {
 			ms, ok := svc.EnterClock().Take(session)
 			return float64(ms), ok
 		},
+		ChatSession:      c.chatOwns,
 		TurnEnd:          c.turnEnd,
 		AgentLaunched:    c.reload.launched,
 		AskFolderTrust:   env("RUNTIME_FOLDER_TRUST", "") == "ask",
@@ -300,13 +309,18 @@ func (c *core) start() {
 		v.start(ctx)
 		c.v2.Store(v)
 	}
-	// The keeper scans the tabs once their sessions are there again.
+	// The keeper scans the tabs once the sessions of the agents that were up are there again; a stopped chat has none
+	// until something needs it.
 	if err := c.store.RestoreSessions(); err != nil {
 		agent.Log("warn", "core: layout init failed", agent.F{K: "err", V: err.Error()})
 	}
 	m.Start(ctx)
+	safego.Go("hook spool", func() { c.runHookSpool(ctx) })
 	go c.runLimits(ctx, m)
 	go sleeper.Run(ctx, 0, sleepReport)
+	if c.cfg.Tmux != nil {
+		go newSessionSweep(c).run(ctx)
+	}
 	if c.reload != nil {
 		go c.reload.run(ctx, m, svc)
 	}
@@ -316,6 +330,7 @@ func (c *core) start() {
 	if c.resumeAtStart.CompareAndSwap(true, false) && c.agents != nil {
 		c.agents.AutoResume()
 	}
+	c.started.Store(true)
 }
 
 func (c *core) runLimits(ctx context.Context, m *status.Manager) {
@@ -336,6 +351,7 @@ func (c *core) stop() {
 	cancel, svc := c.cancel, c.prompts
 	c.m, c.cancel, c.prompts, c.sleeper = nil, nil, nil, nil
 	c.mu.Unlock()
+	c.started.Store(false)
 	if v := c.v2.Swap(nil); v != nil {
 		v.stop()
 	}
@@ -455,6 +471,9 @@ func (c *core) routes(socketAuth func(*http.Request) bool, cliToken func(*http.R
 			b := readCoreBody(r)
 			if e := b.Object("entry"); e != nil {
 				m.RegisterTab(b.String("tabId"), entryFromJSON(e))
+				if v := c.v2.Load(); v != nil {
+					v.asked() // a tab of the Legacy pages becomes a conversation now, not at the sync's next pass
+				}
 			}
 			w.WriteHeader(http.StatusNoContent)
 		}),

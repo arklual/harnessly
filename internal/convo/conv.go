@@ -1,7 +1,9 @@
 package convo
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -29,6 +31,10 @@ const (
 	restartLoads = 4
 	// LookEvery is how often an actor looks at its pane and reads its transcript when nothing told it to.
 	LookEvery = time.Second
+	// LookResting is how often an agent at rest at its prompt is looked at and its clock turns when nothing told it to:
+	// its hooks say when it starts to work or goes, and a message or a hook wakes its actor at once. A runtime holds a
+	// hundred and more such chats, and each look is a few tmux calls.
+	LookResting = 15 * time.Second
 	// LookStarting is how often a starting agent's pane is looked at: the moment it can take the first message is
 	// noticed by its screen (BootSettle) when the SessionStart hook is late or lost, so a look a second apart made the
 	// first message wait up to a second more for nothing. A look is two tmux calls (pane info, capture) off the actor and
@@ -77,11 +83,28 @@ func (c *conv) lookEvery() time.Duration {
 	case wire.StateStarting:
 		return LookStarting
 	case wire.StateIdle, wire.StateReady:
+		if c.resting() {
+			return LookResting
+		}
 		return 3 * LookEvery
 	case wire.StateStopped, wire.StateGone, wire.StateLaunchFailed:
 		return 10 * LookEvery
 	}
 	return LookEvery
+}
+
+// resting: an agent at its prompt with nothing left running that only a look or the clock would notice — no background
+// task or teammate at work, no model change waiting to be typed.
+func (c *conv) resting() bool {
+	if c.rec.PendingModel != nil {
+		return false
+	}
+	for _, t := range c.bg {
+		if t.Status == wire.BgStatusRunning {
+			return false
+		}
+	}
+	return true
 }
 
 // conv is one conversation's actor state. Only its actor touches it: every method runs on the actor's goroutine (or
@@ -91,7 +114,9 @@ type conv struct {
 	d           *Deps
 	rec         wire.Conversation
 	box         *outbox.Box
-	fd          *feed.Feed
+	// promptHash is the prompt the prompt-submit hook being applied names, "" outside one or when it named none.
+	promptHash string
+	fd         *feed.Feed
 	// fdUses and fdUsedAt are the feed's reads as last seen and when they last grew (releaseQuietFeed).
 	fdUses   int
 	fdUsedAt time.Time
@@ -151,6 +176,9 @@ type conv struct {
 	stateGen           int
 	lookAt             time.Time
 	pumping, pumpAgain bool
+	// inputOff: the structured channel failed this conversation, and its messages are typed from now on. inputTurns: the
+	// channel is live and tells the ends of the turns itself, so the agent's stop hook is not counted a second time.
+	inputOff, inputTurns bool
 	// busyGate: keys of a dialog are on their way; nothing else types meanwhile.
 	busyGate bool
 	// stoppingTerm: the terminal is being stopped off the actor (reap.go).
@@ -164,6 +192,15 @@ type conv struct {
 	// restartAt is when the runtime came back.
 	restartCut, restartSent bool
 	restartAt               time.Time
+	// stoppedAtRestart: the agent had exited when the runtime went down, and nothing has been seen of it since (the
+	// state is unknown until a look); resumableAtRestart is what its stopped state said of a session to resume.
+	stoppedAtRestart, resumableAtRestart bool
+	// startUp: the agent was hot when the runtime went down and is not running now, so the chat resumes it once a
+	// look has found it cold; startGate: that resume takes one of the few places of a start (life.go).
+	startUp, startGate bool
+	// coldAtRestart: the agent was up when the runtime went down and has a session to resume on; the first look
+	// after the start that finds no tmux session makes the chat a stopped, resumable one instead of a lost one.
+	coldAtRestart bool
 	// limitLine is the line of a usage limit on Codex's screen last taken for a hold: the same line seen again is old.
 	limitLine string
 	// terminalFailureTurn is the turn whose terminal provider failure already ended and interrupted it: the transcript
@@ -179,9 +216,13 @@ type conv struct {
 	bgAt      time.Time
 	// bgWake is when the agent's scheduled wakeup comes, as the last read saw it; 0 when none is pending.
 	bgWake wire.Ms
+	// unread: the conversation came back from a restart at rest, its transcript not read (rest.go).
+	unread bool
 	// bgOpened: a person asked for this chat's snapshot, so its ended subagents are worth reading even when its agent is
 	// not running; bgDeadRead: they were, once, since the agent stopped.
 	bgOpened, bgDeadRead bool
+	// pane is what the page's right pane reads of the conversation, nil until a page asked for its snapshot (pane.go).
+	pane *paneFeed
 
 	// metaReading is a read of the transcript's word on the effort and the goal off the actor, metaAt when the last
 	// began; launchUltracode: the tab was started on ultracode (a Legacy tab's launch), which the transcript never says.
@@ -214,13 +255,17 @@ type conv struct {
 	flushedAt            time.Time
 	dirty                bool
 	savedAt              time.Time
+	// saveFails counts the writes that failed in a row, saveRetryAt is when a write that failed inline is tried again.
+	saveFails   int
+	saveRetryAt time.Time
 
 	// mark is the first seq published on the conv channel during a command, markConvs on convs.
 	mark, markConvs int64
 	seq, seqConvs   int64
 
-	// spawn runs work off the actor and gives its result back on it.
+	// spawn runs work off the actor and gives its result back on it; jobs counts the work that has not come back.
 	spawn func(work func() any, done func(any))
+	jobs  int
 }
 
 // gate is an open or recent question or permission.
@@ -265,6 +310,7 @@ func newConv(d *Deps, rec wire.Conversation) *conv {
 	c.summary = rec.Recap
 	c.box = outbox.New(rec.ID, d.Limits, d.Log)
 	c.box.Transcript = func(offset int64, at wire.Ms, text string) (string, bool) { return c.fd.FindUserText(offset, at, text) }
+	c.box.HookConfirms = outbox.ConfirmsByHook(rec.Provider)
 	c.openFeed()
 	return c
 }
@@ -275,9 +321,9 @@ func (c *conv) openFeed() {
 	case c.d.Source != nil:
 		src = c.d.Source(c.rec)
 	case c.rec.Provider == wire.ProviderCodex:
-		src = &feed.CodexSource{Path: c.rec.TranscriptPath}
+		src = &feed.CodexSource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
 	default:
-		src = &feed.ClaudeSource{Path: c.rec.TranscriptPath}
+		src = &feed.ClaudeSource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
 	}
 	c.fd = feed.New(c.rec.ID, c.rec.Provider, src)
 	if c.onProfile() {
@@ -389,17 +435,49 @@ func (c *conv) flush(now time.Time, force bool) {
 
 // --- the automaton ---
 
+// setState is the one place the agent state of a conversation changes. The change takes the record's next revision,
+// and the conversation's own channel learns of it at once with that revision and the runtime's epoch; the convs
+// channel names the same revision when its coalesced event goes. A page that reads both keeps the later of the two.
+func (c *conv) setState(st wire.AgentState) {
+	c.rec.State = st
+	c.rec.Rev++
+	c.stateGen++
+	c.stateDirty, c.dirty = true, true
+	if c.deletedAt == 0 {
+		c.emit(wire.QueueChangedEv{Queue: c.box.Queue(), Agent: c.stamp()})
+	}
+	c.tell(NoticeState)
+}
+
+// sameState compares two agent states field by field: it runs on every input of every conversation, the clock's too,
+// where reflect.DeepEqual was a share of the runtime's CPU of its own.
+func sameState(a, b wire.AgentState) bool {
+	if (a.Wait == nil) != (b.Wait == nil) || a.Wait != nil && *a.Wait != *b.Wait {
+		return false
+	}
+	if (a.TurnID == nil) != (b.TurnID == nil) || a.TurnID != nil && *a.TurnID != *b.TurnID {
+		return false
+	}
+	a.Wait, b.Wait, a.TurnID, b.TurnID = nil, nil, nil, nil
+	return a == b
+}
+
+// stamp is the agent state as the conversation's channel carries it: the state and the version it stands at.
+func (c *conv) stamp() *wire.AgentStamp {
+	return &wire.AgentStamp{State: c.rec.State, Rev: c.rec.Rev, Epoch: c.d.epoch}
+}
+
 func (c *conv) input(in agentstate.Input, now time.Time) {
 	if in.At == 0 {
 		in.At = ms(now)
 	}
 	before := c.rec.State
 	st, effects := agentstate.Next(before, in)
-	if !reflect.DeepEqual(st, before) {
-		c.rec.State = st
-		c.rec.Rev++
-		c.stateGen++
-		c.stateDirty, c.dirty = true, true
+	if !sameState(st, before) {
+		c.setState(st)
+		if st.K != wire.StateUnknown {
+			c.stoppedAtRestart = false
+		}
 		if st.K != wire.StateWorking || before.K != wire.StateWorking || st.Compacting != before.Compacting {
 			c.quietSince = time.Time{}
 		}
@@ -468,7 +546,7 @@ func (c *conv) effects(effects []agentstate.Effect, before wire.AgentState, now 
 		case agentstate.PauseQueue:
 			c.change(c.box.Pause(e.Pause, now), now)
 		case agentstate.PromptSubmitted:
-			c.change(c.box.PromptSubmitted(c.rec.State.TurnID, before.K == wire.StateWorking, now), now)
+			c.change(c.box.PromptSubmittedAs(c.promptHash, c.rec.State.TurnID, before.K == wire.StateWorking, now), now)
 		case agentstate.TurnStarted:
 			c.terminalFailureTurn = ""
 			c.terminalFailures = terminalfailure.NewDetector()
@@ -523,8 +601,11 @@ func (c *conv) effects(effects []agentstate.Effect, before wire.AgentState, now 
 		case agentstate.CompactionStarted, agentstate.CompactionFinished:
 			// The page reads compacting off the state; the compaction entry comes as a step of the transcript.
 		case agentstate.NotifyPerson:
-			// The push of autonomous mode is the sender's (internal/push); it reads the turn's end off convs.
+			c.notify(failedIn(effects))
 		}
+	}
+	if opensGate(effects) && waitingKind(c.rec.State.K) {
+		c.notifyQuestion()
 	}
 }
 
@@ -556,6 +637,7 @@ func (c *conv) endTurn(id string, st wire.TurnStatus, failure *wire.TurnFailure,
 	c.nowVal = nil
 	c.throttle.Reset()
 	c.lastTurn()
+	c.notifyTurnEnded()
 }
 
 // lastTurn keeps the record's summary of the newest turn.
@@ -707,6 +789,7 @@ func (c *conv) feedUpdate(u feed.Update, live bool, now time.Time) {
 // feedUpdateOf: live says whether the entries may be our messages on their way (the user entries go to the outbox);
 // past, that the update is a transcript read as a whole, whose turns that are over open nothing and end nothing now.
 func (c *conv) feedUpdateOf(u feed.Update, live, past bool, now time.Time) {
+	defer c.paneRead(u)
 	c.promptsOf(u)
 	c.indexUpdate(u)
 	// The user entries first: an entry that is our message goes out carrying its client id.
@@ -988,13 +1071,28 @@ func (c *conv) lostTmux() bool {
 func (c *conv) seeing(s seen, now time.Time) {
 	defer c.restartDue(now)
 	c.probe = s.probe
+	cold := c.coldAtRestart && !c.probe.Session
+	c.coldAtRestart = false
 	switch {
+	case cold && c.rec.TerminalStop == nil:
+		// The session did not outlive the runtime (a reboot), and nobody makes one for a chat that may never be
+		// written to again: the chat is cold, and its owner resumes it (life.go).
+		if c.rec.State.K != wire.StateStarting {
+			c.input(agentstate.Input{K: agentstate.Shell, Resumable: true}, now)
+		}
+		return
 	case !c.probe.Session && c.rec.TerminalStop != nil:
 		// The terminal was stopped on purpose: no session is what a stopped chat has, and its agent resumes on the next
 		// message (the resume makes the session again).
 		if c.rec.State.K != wire.StateStarting {
 			c.input(agentstate.Input{K: agentstate.Shell, Resumable: true}, now)
 		}
+		return
+	case !c.probe.Session && (c.rec.State.K == wire.StateStopped || c.rec.State.K == wire.StateUnknown && c.stoppedAtRestart):
+		// A chat whose agent had exited keeps no session either (the runtime starts none for it, and ends the one that
+		// held only a shell): it stays the stopped chat it was, also through a restart of the runtime, and is resumed
+		// by its next message like the one above.
+		c.input(agentstate.Input{K: agentstate.Shell, Resumable: c.rec.State.Resumable || c.resumableAtRestart || c.rec.AgentSessionID != ""}, now)
 		return
 	case !c.probe.Session:
 		if c.rec.State.K != wire.StateStarting {
@@ -1541,6 +1639,69 @@ func (c *conv) pumpWith(pane typist.Pane, look *typist.Screen, now time.Time) {
 	// The chord is pressed only while the tool still runs: the text takes a moment to type, and a tool that ended
 	// meanwhile leaves the model writing, which the chord would cut short.
 	job.Message.HandOverOK = c.handable.Load
+	if c.structured(job) {
+		c.sendStructured(job, pane)
+		return
+	}
+	c.typeJob(job, pane, now)
+}
+
+// structured: the job goes over the agent's structured channel. A line the agent's terminal reads as a command of its
+// own («/compact», «! ls») is typed there, as is a try that only presses Enter or clears the box.
+func (c *conv) structured(job *outbox.Job) bool {
+	m := job.Message
+	return c.d.Input != nil && !c.inputOff && c.rec.Provider == wire.ProviderCodex && !m.EnterOnly && !m.ClearOnly &&
+		!m.Wipe && !commandLine(m.Text)
+}
+
+func commandLine(text string) bool {
+	t := strings.TrimLeft(text, " \t\r\n")
+	return t != "" && (t[0] == '/' || t[0] == '!')
+}
+
+// inputSendLimit is how long one hand-over on the structured channel may take, its connecting included.
+const inputSendLimit = 20 * time.Second
+
+// sendStructured hands the job over the structured channel. Delivered: the message is accepted at once, by the
+// channel's word. Uncertain: it waits in input for the transcript, as a typed message does, and is not sent again.
+// Failed for sure: the conversation goes back to typing, and this very job is typed now.
+func (c *conv) sendStructured(job *outbox.Job, pane typist.Pane) {
+	c.typing = true
+	rec, in := c.rec, c.d.Input
+	msg := InputMessage{ClientID: job.ClientID, Text: job.Message.Text, Images: job.Message.Images, Steer: job.Message.Steer}
+	c.spawn(func() any {
+		ctx, cancel := context.WithTimeout(context.Background(), inputSendLimit)
+		defer cancel()
+		if err := in.Send(ctx, rec, msg); err != nil {
+			return err
+		}
+		return true
+	}, func(r any) {
+		c.typing = false
+		now := c.d.Clock.Now()
+		err, failed := r.(error)
+		switch {
+		case r == true:
+			c.inputTurns = true
+			c.change(c.box.Typed(job.ClientID, typist.Result{Outcome: typist.Sent, Typed: true}, now), now)
+			c.change(c.box.Delivered(job.ClientID, c.rec.State.TurnID, now), now)
+		case failed && errors.Is(err, ErrInputUncertain):
+			c.d.Log.Warn("structured input did not confirm the message; waiting for the transcript", "conv", c.rec.ID, "clientId", job.ClientID)
+			c.change(c.box.Typed(job.ClientID, typist.Result{Outcome: typist.Sent, Typed: true}, now), now)
+		default:
+			// Nothing reached the agent: the same job is typed, and the conversation stays with the terminal.
+			c.inputOff, c.inputTurns = true, false
+			c.d.Log.Warn("structured input failed; the conversation types in the terminal", "conv", c.rec.ID, "err", fmt.Sprint(r))
+			c.typeJob(job, pane, now)
+			return
+		}
+		c.read(now)
+		c.pump(now)
+	})
+}
+
+// typeJob types the job into the agent's terminal.
+func (c *conv) typeJob(job *outbox.Job, pane typist.Pane, now time.Time) {
 	if pane == nil {
 		c.change(c.box.Typed(job.ClientID, typist.Result{Outcome: typist.Failed}, now), now)
 		return
@@ -1555,9 +1716,7 @@ func (c *conv) pumpWith(pane typist.Pane, look *typist.Screen, now time.Time) {
 	c.typing = true
 	session, provider, clock := c.rec.Session, c.rec.Provider, c.d.Clock
 	c.spawn(func() any {
-		unlock := typist.Lock(session)
-		defer unlock()
-		return typist.Type(job.Message, provider, pane, clock)
+		return typist.TypeHeld(session, job.Message, provider, pane, clock)
 	}, func(r any) {
 		c.typing = false
 		now := c.d.Clock.Now()
@@ -1573,6 +1732,13 @@ var ErrResumeBlocked = errors.New("the tab's terminal is busy")
 func (c *conv) resume(now time.Time) {
 	if c.d.Launcher == nil {
 		return
+	}
+	// Whoever resumes the chat first after a start has done what the start owed it.
+	c.startUp = false
+	if c.startGate && c.d.startResumes != nil {
+		c.startGate = false
+		c.d.startResumes <- struct{}{}
+		defer func() { <-c.d.startResumes }()
 	}
 	if err := c.d.Launcher.Resume(c.rec); err != nil {
 		c.d.Log.Warn("resume failed", "conv", c.rec.ID, "err", err)
@@ -1693,11 +1859,12 @@ func (c *conv) releaseQuietFeed(now time.Time) {
 }
 
 // clockEvery is how often the clock turns for nothing in particular: every second for a chat that may move, as seldom as
-// it is looked at for one stopped or gone — 276 gone and 101 stopped chats of one account turning every second were a
-// CPU of the runtime. A deadline, a timer or a message still wakes it on time.
+// it is looked at for one at rest, stopped or gone — 276 gone and 101 stopped chats of one account turning every second
+// were a CPU of the runtime, and so were 139 idle ones. wake still names every real time (the queue, a throttle, a
+// limit, a restart, a wait, a gate, the coalesced record, the title), and a message or a hook turns the actor at once.
 func (c *conv) clockEvery() time.Duration {
 	switch c.rec.State.K {
-	case wire.StateStopped, wire.StateGone, wire.StateLaunchFailed:
+	case wire.StateStopped, wire.StateGone, wire.StateLaunchFailed, wire.StateIdle, wire.StateReady:
 		return c.lookEvery()
 	}
 	return LookEvery
@@ -1771,7 +1938,8 @@ func (c *conv) snapshot(now time.Time) wire.ConvSnapshot {
 	c.bgOpened = true
 	ts, es, before := c.fd.Snapshot(snapshotTurns)
 	return wire.ConvSnapshot{Turns: ts, Entries: es, BeforeTurnID: before, Queue: c.box.Queue(), Messages: c.box.Messages(now),
-		Questions: c.questions(), Permissions: c.permissions(), Background: c.background(), Shots: slices.Clone(c.shots), Pictures: slices.Clone(c.pics.list), Now: c.nowVal}
+		Questions: c.questions(), Permissions: c.permissions(), Background: c.background(), Shots: slices.Clone(c.shots), Pictures: slices.Clone(c.pics.list), Now: c.nowVal,
+		Agent: c.stamp(), Pane: c.paneSnapshot()}
 }
 
 func itoa(n int64) string {

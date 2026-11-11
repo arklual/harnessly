@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"slices"
 
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 	"github.com/ly-solutions/harnessly/internal/panel"
@@ -61,10 +64,62 @@ func (v *v2Live) serveAppTools(done <-chan struct{}) {
 			},
 		}
 	}
+	remote := v.appMCPTools(reg, callers)
 	set := previewOf(v.d)
 	set.appTools.Store(&tools)
 	defer set.appTools.CompareAndSwap(&tools, nil)
+	set.appMCP.Store(&remote)
+	defer set.appMCP.CompareAndSwap(&remote, nil)
 	<-done
+}
+
+// appMCPTools are the harnessly-app server's tools of the apps' own remote MCP servers: for the apps on in the
+// calling chat that its agent did not start with and can use as it runs, each server's tools under the app's name, called
+// from the machine with the host's credentials for the server. What a server refused or failed goes to the journal and
+// to the app's log.
+func (v *v2Live) appMCPTools(reg *apps.Registry, callers *callerCache) func(*http.Request) mcpserver.Toolset {
+	cache := apps.NewRemoteTools()
+	return func(r *http.Request) mcpserver.Toolset {
+		conv, _ := callers.of(r)
+		if conv == "" {
+			return nil
+		}
+		return appMCPFor(v.d, reg, cache, func() []string {
+			rec, _ := v.rt.Record(conv)
+			launched := liveAppsOf.startedWith(rec.Session)
+			var out []string
+			for _, id := range rec.Apps {
+				if !slices.Contains(launched, id) && liveAppsOf.refusal(id, launched) == "" {
+					out = append(out, id)
+				}
+			}
+			return out
+		})
+	}
+}
+
+// appMCPFor is the proxy of the remote servers of the apps on: each reached with the host's credentials for it.
+func appMCPFor(d deps, reg *apps.Registry, cache *apps.RemoteTools, on func() []string) apps.AppMCP {
+	return apps.AppMCP{
+		Package: reg.Package, Cache: cache, Apps: on,
+		ListServer: func(ctx context.Context, app, server string) ([]apps.RemoteTool, error) {
+			raw, err := appServerDo(ctx, d, reg, app, server, listOp)
+			if err != nil {
+				return nil, err
+			}
+			var tools []apps.RemoteTool
+			return tools, json.Unmarshal(raw, &tools)
+		},
+		CallServer: func(ctx context.Context, app, server, tool string, args map[string]any) (json.RawMessage, error) {
+			return appServerDo(ctx, d, reg, app, server, toolOp(tool, args))
+		},
+		Failed: func(ctx context.Context, app, what string, err error) {
+			why := toolFailure(err)
+			reg.LogEventOnce(app, "", apps.ViewLogMCP, clip(what, 120)+" — "+why)
+			journal.Add(journal.Fill(ctx, journal.Entry{Level: journal.Error, Source: journal.SourceRuntime,
+				Event: "mcp.proxy", App: app, Tool: clip(what, 120), Text: why}))
+		},
+	}
 }
 
 // openAppTab asks the pane of the conversation's tab to open an app's tab, as `harnessly open app:<id>` does.
@@ -90,14 +145,16 @@ func (e paneError) Error() string { return string(e) }
 
 const errNoPane = paneError("the chat has no pane")
 
-// noAppTools is the server of an agent the runtime could not place in a chat: it offers nothing (every Claude Code chat
-// has the server, HRN-975, and one with no app on must cost nothing), and refuses a call by name with the reason.
+// noAppTools is the server of an agent the runtime could not place in a chat: it offers the one tool that is always
+// there (an agent placed a moment later must not depend on hearing that the tools changed) and nothing else
+// (every Claude Code chat has the server, HRN-975, and one with no app on costs that one tool), and refuses a call by
+// name with the reason.
 type noAppTools struct{ why string }
 
 var _ mcpserver.Toolset = noAppTools{}
 
 func (noAppTools) Instructions() string { return "" }
-func (noAppTools) Tools() []any         { return []any{} }
+func (noAppTools) Tools() []any         { return []any{apps.PageCallTool()} }
 func (noAppTools) Has(name string) bool { return apps.HostTools{}.Has(name) }
 func (n noAppTools) Call(context.Context, string, *jsvalue.Object) *jsvalue.Object {
 	return mcpserver.TextResult("refused: "+n.why, true)

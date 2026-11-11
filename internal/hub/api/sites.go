@@ -222,7 +222,8 @@ func (h *Hub) siteSession(w http.ResponseWriter, r *http.Request) error {
 	ms := sites.MachineSession{Space: sp.Slug, MachineID: m.ID, Name: m.Name}
 	// The machine may say which person it publishes for (the runtime knows its owner's address). It is believed only
 	// when that person registered the machine, or the hub itself gave them a ticket for it lately (they did sign in to
-	// its runtime through the hub), and is still a member of the space. In every other case, an unknown address, a
+	// its runtime through the hub), is still a member of the space, and their account works. In every other case, an
+	// unknown address, a
 	// non-member, a member who never opened this machine, the session is the machine's own without a person, and the
 	// answer is the same, so it does not tell which addresses exist.
 	var body struct {
@@ -230,7 +231,7 @@ func (h *Hub) siteSession(w http.ResponseWriter, r *http.Request) error {
 	}
 	_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body)
 	if email := strings.ToLower(strings.TrimSpace(body.Person)); email != "" {
-		if u, err := h.db.S().UserByEmail(r.Context(), email); err == nil && (u.ID == m.CreatedBy || h.Tickets.OpenedRecently(u.ID, m.ID)) {
+		if u, err := h.db.S().UserByEmail(r.Context(), email); err == nil && u.DisabledAt == nil && (u.ID == m.CreatedBy || h.Tickets.OpenedRecently(u.ID, m.ID)) {
 			if role, err := h.db.S().Role(r.Context(), sp.ID, u.ID); err == nil && role != "" {
 				ms.PersonID = u.ID
 				if u.Name != "" {

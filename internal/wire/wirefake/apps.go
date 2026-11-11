@@ -2,6 +2,7 @@ package wirefake
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -142,7 +143,7 @@ func (m fakeMR) row(now time.Time, me string) wire.AppRow {
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
-func (f *appsFeed) Feed(_ context.Context) (wire.AppsFeed, error) {
+func (f *appsFeed) Feed(_ context.Context, only []wire.AppID) (wire.AppsFeed, error) {
 	now := time.Now()
 	const day = fakeDay
 	asEpic := func(id, title string) *wire.AppRef {
@@ -205,6 +206,9 @@ func (f *appsFeed) Feed(_ context.Context) (wire.AppsFeed, error) {
 		case wire.AppFailed:
 			out.Apps[i] = wire.AppFeed{ID: app.ID, State: wire.AppFailed, Reason: ptr(wire.AppUnreachable), Host: app.Host, Sections: []wire.AppSection{}}
 		}
+	}
+	if len(only) > 0 {
+		out.Apps = slices.DeleteFunc(out.Apps, func(a wire.AppFeed) bool { return !slices.Contains(only, a.ID) })
 	}
 	return out, nil
 }

@@ -22,7 +22,12 @@ The agent's kill switch turns it off with everything else the hub reaches.
   transcripts.
 - **Project identity.** A project is identified by its git remote (`origin`, else the first remote), normalized:
   `git@example.com:acme/app.git` and `https://example.com/acme/app` are both `git:example.com/acme/app`. The project's
-  folder can differ from machine to machine. A folder without a remote does not sync.
+  folder can differ from machine to machine.
+  A folder without a remote does not sync, unless its person asks for it in one of two ways. A file
+  `.harnessly-memory-project` in the folder, whose first line is a key (letters, digits, `.`, `_`, `-`, at most 64), names
+  the project `dir:<key>`: folders of different machines with the same key are one project, and the key wins over a
+  remote. With `RUNTIME_MEMORY_LOCAL_FOLDERS=on` on the runtime, a folder with neither is the project `dir:<its absolute
+  path>`: machines that keep the folder at the same path share it (a path with a space in it does not sync).
 - **Owner.** A note belongs to the person who owns the machine that sends it (the machine's `created_by`), and only
   while that person still has a role in the machine's space. The request is signed with the machine's key under its own
   domain (`harnessly-agent-memory-v1`) and names no person; a field that tries to is ignored. Two people with machines

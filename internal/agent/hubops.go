@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,6 +67,89 @@ func (h *hub) loginProvider(req map[string]json.RawMessage) (string, error) {
 	return provider(req)
 }
 
+// opConversationsStart starts an automation's conversation (the hub's automations, docs/hub/automations.md).
+const opConversationsStart = "conversations.start"
+
+// automationsOptIn is the operator's switch that lets the hub run its automations on a machine whose own cluster runs it
+// (an observe link): AGENT_HUB_AUTOMATIONS=on, like AGENT_HUB_PEERS. The machine's policy file does not apply to an observe
+// link, so the operator's word is what lets the hub reach the runtime here.
+const automationsOptIn = "AGENT_HUB_AUTOMATIONS"
+
+// automationsOptedIn says whether the operator opted this machine in to the hub's automations.
+func automationsOptedIn() bool { return os.Getenv(automationsOptIn) == "on" }
+
+// automationsServed says whether this link starts the hub's automations and carries their reports: an own link follows
+// the machine's policy (runtime_session), an observe link only the operator's opt-in. The kill switch turns both off.
+func (h *hub) automationsServed(pol hubproto.Policy) bool {
+	if h.policy.Disabled() {
+		return false
+	}
+	if h.observe {
+		return automationsOptedIn()
+	}
+	return pol.RuntimeSession
+}
+
+// opAutomationStart is conversations.start on a hub link: only a run of the hub's automation (runId and resultToken),
+// and only while the link may serve automations (automationsServed): on the hub the machine belongs to, the machine's
+// policy lets the hub reach the runtime; on an observe link, the operator opted in with AGENT_HUB_AUTOMATIONS=on.
+// Anything else is refused as before.
+func (h *hub) opAutomationStart(req map[string]json.RawMessage, pol hubproto.Policy) (any, func(), error) {
+	runID, _ := field[string](req, "runId")
+	resultToken, _ := field[string](req, "resultToken")
+	if runID == "" || resultToken == "" {
+		return nil, nil, hubproto.Errf(hubproto.CodePolicyDenied, "%s is served on a hub link for automation runs only", opConversationsStart)
+	}
+	if !h.automationsServed(pol) {
+		if h.observe {
+			return nil, nil, hubproto.Errf(hubproto.CodePolicyDenied, "%s is not served on an observe link: the operator did not opt in with %s=on", opConversationsStart, automationsOptIn)
+		}
+		return nil, nil, h.allow(opConversationsStart, false, "starting automation conversations through the hub")
+	}
+	started, err := h.a.startConversation(req)
+	h.audit.Record(opConversationsStart, err == nil, map[string]any{"runId": runID})
+	if err != nil {
+		return nil, nil, err
+	}
+	return started, nil, nil
+}
+
+// emitAutomationResult sends an automation's report to the hub the machine belongs to, as its batch when the hub
+// started batches for it.
+func (h *hub) emitAutomationResult(ev evAutomationResult) {
+	if h.observe && !automationsOptedIn() {
+		return
+	}
+	frame, err := marshal(ev)
+	if err != nil {
+		Log("error", "event not encoded", F{"event", ev.Event}, F{"error", err.Error()})
+		return
+	}
+	for _, l := range h.hubLinks() {
+		if l.wants(hubproto.EventAutomationResult) {
+			l.sendEvent(hubproto.EventAutomationResult, frame)
+		}
+	}
+}
+
+// opRepl is repl.start and repl.ack: the kinds the hub names (the chats' frames, the machine's reports, the documents'
+// events) go to it as acknowledged batches (repl.go).
+func (h *hub) opRepl(l *link, op string, req map[string]json.RawMessage) (any, func(), error) {
+	if op == hubproto.OpReplStart {
+		window, _ := field[int](req, "window")
+		kinds, _ := field[[]string](req, "kinds")
+		l.startRepl(hubproto.ReplStart{Window: window, Kinds: kinds})
+		return empty(), nil, nil
+	}
+	kind, _ := field[string](req, "kind")
+	seq, _ := field[int64](req, "seq")
+	retry, _ := field[bool](req, "retry")
+	if o := l.repl.Load(); o != nil {
+		o.ack(kind, seq, retry)
+	}
+	return empty(), nil, nil
+}
+
 // opHistory is history.start and history.ack: the hub's copy of the chats, the same replica as a cluster's.
 func (h *hub) opHistory(op string, req map[string]json.RawMessage) (any, func(), error) {
 	if !h.historyServed() {
@@ -75,7 +160,7 @@ func (h *hub) opHistory(op string, req map[string]json.RawMessage) (any, func(),
 		epoch, _ := field[string](req, "epoch")
 		ackSeq, _ := field[int64](req, "ackSeq")
 		gap, _ := field[bool](req, "gap")
-		h.a.replica.ack(ch, epoch, ackSeq, gap)
+		h.historyReplica().ack(ch, epoch, ackSeq, gap)
 		return empty(), nil, nil
 	}
 	enabled, _ := field[bool](req, "enabled")
@@ -89,7 +174,7 @@ func (h *hub) opHistory(op string, req map[string]json.RawMessage) (any, func(),
 	for ch, c := range in {
 		cursors[ch] = cursor{Epoch: c.Epoch, Seq: c.Seq}
 	}
-	h.a.replica.start(enabled, cursors, known, pending)
+	h.historyReplica().start(enabled, cursors, known, pending)
 	return empty(), nil, nil
 }
 
@@ -114,6 +199,9 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	case hubproto.OpLinkSubscribe:
 		events, _ := field[[]string](req, "events")
 		l.subscribe(events)
+		if slices.Contains(events, hubproto.EventChatWork) {
+			return empty(), func() { h.sendWork(l) }, nil
+		}
 		return empty(), nil, nil
 	case hubproto.OpPreflightRun:
 		ctx, cancel := context.WithTimeout(h.ctx, preflightTimeout)
@@ -186,6 +274,10 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 		return h.opPeers(op, req)
 	case hubproto.OpHistoryStart, hubproto.OpHistoryAck:
 		return h.opHistory(op, req)
+	case hubproto.OpReplStart, hubproto.OpReplAck:
+		return h.opRepl(l, op, req)
+	case opConversationsStart:
+		return h.opAutomationStart(req, pol)
 	case hubproto.OpDocResult, hubproto.OpDocsDeliver:
 		// Served on an observe link only when the operator opted in with AGENT_HUB_DOCS=on (hubdocs.go).
 		return h.opDocs(op, req)
@@ -488,7 +580,7 @@ func (h *hub) opTunnel(l *link, req map[string]json.RawMessage, pol hubproto.Pol
 	if err != nil {
 		return nil, nil, err
 	}
-	return map[string]bool{"opened": true}, start, nil
+	return tunnelOpened(spec), start, nil
 }
 
 // opDesign is design.access (the hub's access snapshot for the runtime to enforce) and design.public.token (a short

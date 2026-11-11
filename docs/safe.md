@@ -163,6 +163,11 @@ A machine connected to a hub can keep its safe on the hub's server without any a
 one service account, each machine reaches only its owner's folder through it. This is for an organisation that gives
 service accounts but not personal Vault access, and for machines that should carry no server credential at all.
 
+The hub does not store the values itself: the hub's safe needs a Vault-compatible server (OpenBao, HashiCorp Vault) the
+hub can reach. So a machine of the compose install (`compose.hub.yaml`) keeps its safe in its own sealed file
+(`RUNTIME_SECRETS_MODE=local`, the default) until an administrator gives the hub a server (`HUB_SECRETS_VAULT_*`), turns
+on `secrets.vault` for the organisation and sets the machine to `hub`. The Safe page says which of the two it is.
+
 ```sh
 # the runtime of the machine
 RUNTIME_SECRETS_MODE=hub

@@ -63,6 +63,8 @@ func (m *moveRuntime) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		say(map[string]any{"bundleEnc": map[string]string{"enc": "aes-256-gcm", "nonce": "n", "ct": "c"}, "fence": "100"})
 	case "import":
 		say(map[string]any{"conversationId": "tab-moved", "existing": false})
+	case "resume":
+		say(map[string]any{"conversationId": "tab-resumed", "existing": false})
 	case "hold":
 		if holdErr {
 			w.WriteHeader(http.StatusConflict)
@@ -85,10 +87,13 @@ type moveFixture struct {
 }
 
 // moveSetup is the owner's two machines, in two organizations' tenants, each with a runtime that takes moves.
-func moveSetup(t *testing.T) *moveFixture {
+func moveSetup(t *testing.T, opts ...hubtest.Option) *moveFixture {
 	t.Helper()
+	if len(opts) == 0 {
+		opts = []hubtest.Option{fleetOn}
+	}
 	f := &fixture{streamEnded: make(chan struct{}, 4)}
-	f.s = hubtest.New(t, fleetOn)
+	f.s = hubtest.New(t, opts...)
 	f.owner = f.s.SignIn("owner@example.com")
 	mf := &moveFixture{fixture: f, src: newMoveRuntime(), dst: newMoveRuntime()}
 	f.spaceID, _ = f.owner.NewSpace("Команда")
@@ -263,5 +268,186 @@ func TestChatMoveToTheSameMachineIsRefused(t *testing.T) {
 	f := moveSetup(t)
 	if r := f.move(f.owner, f.id); r.Code != http.StatusBadRequest || !strings.Contains(string(r.Body), "same_machine") {
 		t.Errorf("move: %s", r)
+	}
+}
+
+var resumeOn = hubtest.Env("HUB_FEATURES_FORCE", "runtime.fleet,chat.resume")
+
+// sourceOff turns the owner's first machine off and waits for the hub to see it.
+func (m *moveFixture) sourceOff(t *testing.T) {
+	t.Helper()
+	m.a.Close()
+	m.s.Eventually("the source to go", func() bool {
+		var l fleetList
+		m.owner.Do("GET", "/api/me/machines", nil).JSON(&l)
+		for _, x := range l.Machines {
+			if x.ID == m.id {
+				return x.Status == "offline"
+			}
+		}
+		return false
+	})
+}
+
+// with chat.resume a chat of a machine that is off goes on on another machine of the person from the
+// snapshot in their resume room; the target reads it itself, the hub passes no key and touches no source.
+func TestChatOfAMachineThatIsOffGoesOnFromItsSnapshot(t *testing.T) {
+	f := moveSetup(t, resumeOn)
+	f.sourceOff(t)
+	r := f.move(f.owner, f.dstID)
+	if r.Code != 200 {
+		t.Fatalf("move: %s", r)
+	}
+	var out struct {
+		TargetMachineID, ConvID string
+		FromSnapshot            bool
+	}
+	r.JSON(&out)
+	if out.TargetMachineID != f.dstID || out.ConvID != "tab-resumed" || !out.FromSnapshot {
+		t.Errorf("answer: %s", r)
+	}
+	if got := f.dst.steps(); got != "resume" {
+		t.Errorf("the target was asked %q", got)
+	}
+	b := f.dst.body("resume")
+	if b["sourceMachine"] != f.id || b["conversationId"] != "tab-src" || b["provider"] != "claude" || b["key"] != nil {
+		t.Errorf("resume: %v", b)
+	}
+	if got := f.src.steps(); got != "" {
+		t.Errorf("the source was asked %q", got)
+	}
+}
+
+func TestChatOfAMachineThatIsOffStaysWithoutTheResumeFlag(t *testing.T) {
+	f := moveSetup(t)
+	f.sourceOff(t)
+	r := f.move(f.owner, f.dstID)
+	if r.Code != http.StatusConflict || !strings.Contains(string(r.Body), "machine_offline") {
+		t.Errorf("move: %s", r)
+	}
+	if got := f.dst.steps(); got != "" {
+		t.Errorf("the target was asked %q", got)
+	}
+}
+
+// A snapshot is the person's own: a machine of another person, even one in a space the person is let into, is never a
+// side of a continuation from it.
+func TestChatResumeNeverCrossesToAnotherPersonsMachine(t *testing.T) {
+	f := moveSetup(t, resumeOn)
+	guest := f.s.SignIn("guest@example.com")
+	guestSpace, _ := guest.NewSpace("Гостевая")
+	guest.Join(guestSpace, f.owner)
+	theirs := newMoveRuntime()
+	guestMachine := guest.Machine(guestSpace, theirs).MachineID
+	f.sourceOff(t)
+
+	// The owner's chat to the guest's machine.
+	if r := f.move(f.owner, guestMachine); r.Code == 200 {
+		t.Errorf("to the guest's machine: %s", r)
+	}
+	// The guest's machine is off: its chats are not the owner's to go on with.
+	other := newMoveRuntime()
+	guestOff := guest.Machine(guestSpace, other)
+	guestOff.Close()
+	if r := f.owner.Do("POST", "/api/v2/chat-move", map[string]any{
+		"opId": "op-2", "machineId": guestOff.MachineID, "convId": "tab-src", "targetMachineId": f.dstID,
+		"provider": "claude", "model": map[string]any{"id": "opus"},
+	}); r.Code == 200 {
+		t.Errorf("from the guest's machine: %s", r)
+	}
+	for name, rt := range map[string]*moveRuntime{"target": f.dst, "guest": theirs, "guest's off": other} {
+		if got := rt.steps(); strings.Contains(got, "resume") {
+			t.Errorf("the %s was asked %q", name, got)
+		}
+	}
+}
+
+// a chat of a machine that is off can be continued from the web: the status offers the menu, the targets
+// are the person's own machines that are up, and nobody is asked about the source.
+func TestChatResumeTargetsOfAMachineThatIsOff(t *testing.T) {
+	f := moveSetup(t, resumeOn)
+	f.sourceOff(t)
+	status := "/api/v2/chat-move/status?machine=" + f.id + "&conv=tab-src"
+	var st struct{ Enabled bool }
+	if r := f.owner.Do("GET", status, nil); r.Code != 200 {
+		t.Fatalf("status: %s", r)
+	} else {
+		r.JSON(&st)
+	}
+	if !st.Enabled {
+		t.Errorf("status of the source that is off: not offered")
+	}
+	var out struct {
+		Source struct {
+			OK, Offline, FromSnapshot, Busy, Dirty bool
+		} `json:"source"`
+		Targets []struct {
+			MachineID string
+			OK        bool
+		} `json:"targets"`
+	}
+	r := f.owner.Do("GET", "/api/v2/chat-move/targets?machine="+f.id+"&conv=tab-src", nil)
+	if r.Code != 200 {
+		t.Fatalf("targets: %s", r)
+	}
+	r.JSON(&out)
+	if !out.Source.OK || !out.Source.Offline || !out.Source.FromSnapshot || out.Source.Busy || out.Source.Dirty {
+		t.Errorf("source: %s", r)
+	}
+	if len(out.Targets) != 1 || out.Targets[0].MachineID != f.dstID || !out.Targets[0].OK {
+		t.Errorf("targets: %s", r)
+	}
+	if got := f.dst.steps(); got != "preflight" {
+		t.Errorf("the target was asked %q", got)
+	}
+	if got := f.src.steps(); got != "" {
+		t.Errorf("the source was asked %q", got)
+	}
+}
+
+func TestChatResumeTargetsStayRefusedWithoutTheFlag(t *testing.T) {
+	f := moveSetup(t)
+	f.sourceOff(t)
+	var st struct{ Enabled bool }
+	f.owner.Do("GET", "/api/v2/chat-move/status?machine="+f.id+"&conv=tab-src", nil).JSON(&st)
+	if st.Enabled {
+		t.Errorf("status offers the menu without the flag")
+	}
+	if r := f.owner.Do("GET", "/api/v2/chat-move/targets?machine="+f.id+"&conv=tab-src", nil); r.Code != http.StatusConflict || !strings.Contains(string(r.Body), "machine_offline") {
+		t.Errorf("targets: %s", r)
+	}
+}
+
+// A machine of another person, even in a space the person is let into, gets no menu and no targets; a machine of the
+// person offers only their own machines as targets.
+func TestChatResumeTargetsNeverCrossToAnotherPerson(t *testing.T) {
+	f := moveSetup(t, resumeOn)
+	guest := f.s.SignIn("guest@example.com")
+	guestSpace, _ := guest.NewSpace("Гостевая")
+	guest.Join(guestSpace, f.owner)
+	theirs := newMoveRuntime()
+	guest.Machine(guestSpace, theirs)
+	off := guest.Machine(guestSpace, newMoveRuntime())
+	off.Close()
+	var st struct{ Enabled bool }
+	f.owner.Do("GET", "/api/v2/chat-move/status?machine="+off.MachineID+"&conv=tab-src", nil).JSON(&st)
+	if st.Enabled {
+		t.Errorf("the menu is offered for someone else's machine")
+	}
+	if r := f.owner.Do("GET", "/api/v2/chat-move/targets?machine="+off.MachineID+"&conv=tab-src", nil); r.Code == 200 {
+		t.Errorf("targets of someone else's machine: %s", r)
+	}
+	f.sourceOff(t)
+	var out struct {
+		Targets []struct{ MachineID string } `json:"targets"`
+	}
+	f.owner.Do("GET", "/api/v2/chat-move/targets?machine="+f.id+"&conv=tab-src", nil).JSON(&out)
+	for _, x := range out.Targets {
+		if x.MachineID != f.dstID {
+			t.Errorf("a machine that is not the person's: %s", x.MachineID)
+		}
+	}
+	if got := theirs.steps(); got != "" {
+		t.Errorf("the guest's machine was asked %q", got)
 	}
 }

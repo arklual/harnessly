@@ -172,9 +172,48 @@ func (s Store) SetRole(ctx context.Context, spaceID, userID, role string) error 
 	return err
 }
 
+// RemoveMember takes a person out of a space together with what being in it gave them: their roles on the space and
+// on its teams, their places in those teams, their lines in the access lists of its machines, the limits set for them
+// there, the roles and requests they hold in its documents (and the invitations waiting for their address), and the
+// sessions they opened on its machines. Their own machines are RevokeMachinesOf. Call it in a transaction.
 func (s Store) RemoveMember(ctx context.Context, spaceID, userID string) error {
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`DELETE FROM machine_access WHERE kind = 'user' AND ref_id = ? AND machine_id IN (SELECT id FROM machines WHERE space_id = ?)`, []any{userID, spaceID}},
+		{`DELETE FROM limit_rules WHERE user_id = ? AND ((scope_kind = 'tenant' AND scope_id = ?)
+			OR (scope_kind = 'team' AND scope_id IN (SELECT id FROM teams WHERE space_id = ?)))`, []any{userID, spaceID, spaceID}},
+		{`DELETE FROM resource_access_people WHERE space_id = ? AND (user_id = ?
+			OR (user_id IS NULL AND email IN (SELECT lower(email) FROM users WHERE id = ?)))`, []any{spaceID, userID, userID}},
+		{`DELETE FROM resource_access_requests WHERE space_id = ? AND (user_id = ?
+			OR (user_id IS NULL AND email IN (SELECT lower(email) FROM users WHERE id = ?)))`, []any{spaceID, userID, userID}},
+		{`DELETE FROM sessions WHERE user_id = ? AND machine_id IN (SELECT id FROM machines WHERE space_id = ?)`, []any{userID, spaceID}},
+	} {
+		if _, err := s.q.Exec(ctx, q.sql, q.args...); err != nil {
+			return err
+		}
+	}
+	if _, err := s.q.Exec(ctx, `DELETE FROM role_grants WHERE user_id = ? AND ((scope_kind = 'tenant' AND scope_id = ?)
+		OR (scope_kind = 'team' AND scope_id IN (SELECT id FROM teams WHERE space_id = ?)))`, userID, spaceID, spaceID); err != nil {
+		return err
+	}
+	if _, err := s.q.Exec(ctx, `DELETE FROM team_members WHERE user_id = ? AND team_id IN (SELECT id FROM teams WHERE space_id = ?)`, userID, spaceID); err != nil {
+		return err
+	}
 	_, err := s.q.Exec(ctx, `DELETE FROM memberships WHERE space_id = ? AND user_id = ?`, spaceID, userID)
 	return err
+}
+
+// LockSpace makes the transaction the only one that changes who is in the space until it ends: two changes made at
+// once are decided one after the other, each on what the other left. False when there is no such space.
+func (s Store) LockSpace(ctx context.Context, spaceID string) (bool, error) {
+	res, err := s.q.Exec(ctx, `UPDATE spaces SET name = name WHERE id = ?`, spaceID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 func (s Store) CountOwners(ctx context.Context, spaceID string) (int, error) {

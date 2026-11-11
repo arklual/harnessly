@@ -12,7 +12,8 @@ import (
 func init() { routeGroups = append(routeGroups, changesRoutes) }
 
 // changesRoutes: the POST of the changes route (slice fsread; the GET is in gitRoutes). It only reads: git in each
-// repository the paths belong to and the head of the conversation's transcript.
+// repository the paths belong to and the head of the conversation's transcript (or sinceMs, when the page knows the
+// start of the work from the chat's registry).
 func changesRoutes(d deps) []gate.JSONRoute {
 	roots := gitread.TranscriptRoots(d.Home)
 	return []gate.JSONRoute{{
@@ -32,6 +33,7 @@ func changesRoutes(d deps) []gate.JSONRoute {
 			h := http.Header{"Cache-Control": {"no-store"}}
 			paths := []string{}
 			transcript := ""
+			var sinceMs *float64
 			v, _ := jsvalue.Parse([]byte(jscompat.DecodeUTF8(body)))
 			if o, ok := v.(*jsvalue.Object); ok {
 				if list, ok := o.Get("paths"); ok {
@@ -46,13 +48,22 @@ func changesRoutes(d deps) []gate.JSONRoute {
 				if s, ok := o.Get("jsonlPath"); ok {
 					transcript, _ = s.(string)
 				}
+				// sinceMs: the start of the work as the chat's registry has it, instead of the transcript's.
+				if s, ok := o.Get("sinceMs"); ok {
+					if n, ok := s.(float64); ok && n > 0 {
+						sinceMs = &n
+					}
+				}
 			}
 			failed := func() (int, any, http.Header) {
 				return http.StatusInternalServerError, gate.Raw{ContentType: "text/plain", Body: []byte("Internal Server Error")}, h
 			}
-			since, err := gitread.ReadSessionStart(transcript, roots)
-			if err != nil {
-				return failed()
+			since := sinceMs
+			if since == nil {
+				var err error
+				if since, err = gitread.ReadSessionStart(transcript, roots); err != nil {
+					return failed()
+				}
 			}
 			repos, err := gitread.CollectChanges(paths, since)
 			if err != nil {

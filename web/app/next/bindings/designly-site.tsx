@@ -9,6 +9,7 @@ import SiteView, {
   type ISitePage,
   type ISiteTab,
 } from '@/next/features/designly/site-view';
+import { usePackExport } from '@/next/features/designly/pack-dialogs';
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
 import { ROLE, claimOwnership, fetchAccess } from '@/next/features/designly/access/api';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
@@ -82,6 +83,10 @@ const PANE_OUTSIDE_SLOT = 5;
  * read across origins. An hour short of the end the slot counts as stale at the next page switch.
  */
 const SLOT_FRESH_MS = 11 * 60 * 60 * 1000;
+/** What the entering frame loads: the slot's cookie is set on the ticket's redirect, whatever the page behind it is. */
+const ENTER_PATH = '/favicon.ico';
+/** How long the entering frame is waited for before the page's frames load anyway (it stays until its load). */
+const ENTER_WAIT_MS = 6000;
 /** The waits before each new read of the library for a project the gateway says is the person's (about 15 s in all). */
 const RETRY_STEPS_MS = [500, 1000, 2000, 4000, 4000, 4000];
 /** How often a project not in the store yet is looked for while its card is shown. */
@@ -186,6 +191,8 @@ const DesignlySiteBody = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   // The kit the project is made from: its chip on the bar, «Из кита» on a picked element, «Показать макет».
   const kitLink = useKitLink(machine, id);
+  // «Перенести на другой инстанс» in the downloads' menu.
+  const packOut = usePackExport(machine);
   // The design's own tabs and their history belong to the window's tab, in a pane to the chat beside it: switching
   // back finds the same page.
   const paneConv = pane?.conv ?? null;
@@ -203,8 +210,7 @@ const DesignlySiteBody = ({
     /** The opening's stamp (core/net/preview): another opening of the slot number changes the stored one. */
     nonce: string | null;
     openedAt: number;
-    /** The page the slot was opened for: its ticket address is good for the first frame only. */
-    path: string;
+    /** The ticket address: spent once by the frame that only enters the slot (never by a frame of the page). */
     enterUrl: string | null;
     /** The slot's origin: the key of the runtime's DevTools record of the page. */
     origin: string | null;
@@ -213,8 +219,16 @@ const DesignlySiteBody = ({
   const [reloadKey, setReloadKey] = useState(0);
   /** Bumped when a stale slot is to be opened anew on a page switch. */
   const [reopen, setReopen] = useState(0);
-  /** Set once the frame has left the ticket address: that address is spent, the slot's plain ones are used. */
-  const [entered, setEntered] = useState(false);
+  /** The opening (its key) whose ticket the entering frame has spent: from then on the slot's plain addresses work. */
+  const [enteredKey, setEnteredKey] = useState<string | null>(null);
+  /** The opening whose entering frame was waited for too long: its page is shown before the frame's load. */
+  const [waitedKey, setWaitedKey] = useState<string | null>(null);
+  /** The opening whose page frames were loaded once more after an entering frame that came late. */
+  const [refreshedKey, setRefreshedKey] = useState<string | null>(null);
+  /** The opening whose page frame met the slot's refusal (the gateway's 401 page tells the page above). */
+  const [refusedKey, setRefusedKey] = useState<string | null>(null);
+  /** The openings of a page (port and reload) already opened anew after a refusal: one more try each, never a loop. */
+  const refusalReopens = useRef(new Set<string>());
   const [attempt, setAttempt] = useState(0);
   // The library has no such project: for a person the gateway turns away that is the card, otherwise the way back.
   const [missing, setMissing] = useState(false);
@@ -389,14 +403,61 @@ const DesignlySiteBody = ({
 
   const slotKey = `${port}|${reloadKey}|${reopen}`;
   const opened = slot?.key === slotKey ? slot : null;
-  // The frame has left the ticket address: it is spent, the pages after it use the slot's plain ones. Set while
-  // rendering, once: the next render has `entered` true and the condition false.
-  if (opened !== null && path !== opened.path && !entered) setEntered(true);
-  const onFirstPage = opened !== null && path === opened.path && !entered;
-  const mayShow = opened !== null;
+  // The ticket is single-use and lives a minute: a frame of the page that carried it would meet «Откройте превью» the
+  // moment it was created again (the stage remounting, a layout restored) or later than that minute. A frame of its own
+  // enters the slot once, and every frame of the page loads the plain addresses after it.
+  const entering = opened !== null && opened.enterUrl !== null && enteredKey !== opened.key;
+  // A frame whose answer never fires load (a 204 of an older runtime, a blocked frame) must not keep the design a
+  // skeleton for ever: after a wait the page goes on. The entering frame stays until its own load, though: the slot's
+  // cookie comes on the ticket's redirect, and a browser may take seconds over it (the gateway's Clear-Site-Data on a
+  // first entry), so a frame taken away at the wait drops the navigation and the cookie with it.
+  const enteringKey = entering ? opened.key : null;
+  useEffect(() => {
+    if (enteringKey === null) return;
+    const timer = window.setTimeout(() => setWaitedKey(enteringKey), ENTER_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [enteringKey]);
+  const waited = opened !== null && waitedKey === opened.key;
+  // Shown before the cookie came, the page's frames met the slot's refusal: once the entering frame loads, they load
+  // their addresses once more (one render without them remounts the frames).
+  const lateKey = opened !== null && !entering && waited && refreshedKey !== opened.key ? opened.key : null;
+  useEffect(() => {
+    if (lateKey === null) return;
+    const timer = window.setTimeout(() => {
+      setRefreshedKey(lateKey);
+      setRefusedKey(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [lateKey]);
+  // A page frame that went on before the entry met the slot's «Откройте превью»: on a loaded machine the entry's
+  // redirect to the design server takes longer than the wait. The refusal is not shown: the frames wait for the entry
+  // behind the loader and load again after it (lateKey). A refusal after the entry means the cookie never came: the slot
+  // is opened anew with a fresh ticket, once per page opening.
+  const slotOriginNow = opened?.origin ?? null;
+  const openedKey = opened?.key ?? null;
+  useEffect(() => {
+    if (slotOriginNow === null || openedKey === null) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== slotOriginNow) return;
+      const said = (event.data as { hlViewError?: { kind?: unknown; status?: unknown } } | null)?.hlViewError;
+      if (said?.kind === 'refused' && said.status === 401) setRefusedKey(openedKey);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [slotOriginNow, openedKey]);
+  const refused = opened !== null && refusedKey === opened.key;
+  const reopenBase = `${port}|${reloadKey}`;
+  const refusedAfterEntry = refused && !entering && lateKey === null;
+  useEffect(() => {
+    if (!refusedAfterEntry || refusalReopens.current.has(reopenBase)) return;
+    refusalReopens.current.add(reopenBase);
+    const timer = window.setTimeout(() => setReopen((n) => n + 1), 0);
+    return () => window.clearTimeout(timer);
+  }, [refusedAfterEntry, reopenBase]);
+  const mayShow = opened !== null && (!entering || (waited && !refused)) && lateKey === null;
   const plainSrc =
     mayShow && opened.origin !== null && path !== null ? slotBoardHref(opened.origin, id, path) : null;
-  const src = mayShow ? (onFirstPage ? opened.enterUrl : plainSrc) : null;
+  const src = mayShow ? plainSrc : null;
   const slotOrigin = opened?.origin ?? null;
   const slotError = opened?.error ?? null;
   const gated = gate.state.k === ACCESS.ready ? gate.state.access : null;
@@ -415,7 +476,8 @@ const DesignlySiteBody = ({
   const sinopia = useSinopia({
     machine,
     id,
-    kind: project?.design.kind ?? null,
+    // A document of an app's type made of a site: only that app's additions hold in it.
+    kind: project?.design.appKind?.id ?? project?.design.kind ?? null,
     conversation: appsChat,
     slotOrigin,
     viewing,
@@ -477,15 +539,13 @@ const DesignlySiteBody = ({
     if (port === null || first === null) return;
     let live = true;
     const key = `${port}|${reloadKey}|${reopen}`;
-    setEntered(false);
-    openPreview(machine, { kind: 'port', port }, pageSlot, boardHref(id, first)).then(
+    openPreview(machine, { kind: 'port', port }, pageSlot, ENTER_PATH).then(
       (slotOpened) => {
         if (!live) return;
         setSlot({
           key,
           nonce: slotOpened.nonce,
           openedAt: Date.now(),
-          path: first,
           enterUrl: slotOpened.enterUrl,
           origin: slotOpened.origin,
           error: null,
@@ -497,7 +557,6 @@ const DesignlySiteBody = ({
           key,
           nonce: null,
           openedAt: Date.now(),
-          path: first,
           enterUrl: null,
           origin: null,
           error: failure.message,
@@ -693,7 +752,15 @@ const DesignlySiteBody = ({
           sendBoardError(words);
         }
       : undefined;
-  const kitChip =
+  // A document of an app's type made of a site carries the app's label on its bar.
+  const appKind = project?.design.appKind ?? null;
+  const appChip =
+    appKind && !pane ? (
+      <span className="hx-kit-chip hx-kit-chip--app" title={appKind.appName}>
+        {appKind.title}
+      </span>
+    ) : null;
+  const linkChip =
     kitLink && !pane ? (
       <KitChip
         link={kitLink}
@@ -707,6 +774,15 @@ const DesignlySiteBody = ({
         }
       />
     ) : null;
+  const kitChip =
+    appChip && linkChip ? (
+      <>
+        {appChip}
+        {linkChip}
+      </>
+    ) : (
+      (appChip ?? linkChip)
+    );
 
   const versions = project ? { open: versionsOpen, onToggle: () => setVersionsOpen((v) => !v) } : undefined;
   const modeButton: ISiteMode | undefined = (() => {
@@ -858,7 +934,11 @@ const DesignlySiteBody = ({
       kit={kitChip}
       devtools={viewing ? undefined : { machine, slot: slotOrigin, artifact: id }}
       images={!viewing && mayEdit && project ? { machine, artifact: id } : undefined}
-      downloads={project ? { machine, artifact: id, archives: mayEdit } : undefined}
+      downloads={
+        project
+          ? { machine, artifact: id, archives: mayEdit, transfer: () => packOut.start([id]) }
+          : undefined
+      }
       memoryKey={id}
     />
   );
@@ -876,7 +956,7 @@ const DesignlySiteBody = ({
       onGo: navigate,
       src,
       frameSrc: (page: string) =>
-        opened !== null && opened.origin !== null ? slotBoardHref(opened.origin, id, page) : null,
+        mayShow && opened.origin !== null ? slotBoardHref(opened.origin, id, page) : null,
       slotError,
       onReload: () => setReloadKey((n) => n + 1),
       stage: viewing ? undefined : stage,
@@ -902,6 +982,20 @@ const DesignlySiteBody = ({
 
   return (
     <>
+      {entering && opened !== null && (
+        <iframe
+          className="hx-kit-enter"
+          src={opened.enterUrl ?? undefined}
+          title=""
+          aria-hidden="true"
+          tabIndex={-1}
+          onLoad={() => {
+            setEnteredKey(opened.key);
+            // A refusal met before the entry is answered by the frames' reload after it, not by another opening.
+            setRefusedKey((was) => (was === opened.key && waitedKey !== opened.key ? null : was));
+          }}
+        />
+      )}
       <SinopiaStage
         machine={machine}
         kind={project?.design.kind ?? null}
@@ -914,6 +1008,7 @@ const DesignlySiteBody = ({
       >
         {kindView()}
       </SinopiaStage>
+      {packOut.dialog}
       {gated !== null && oneDialog !== null && (
         <ResourceShare
           open={shareOpen}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/release"
 	"github.com/ly-solutions/harnessly/internal/upgrade"
@@ -38,7 +40,9 @@ the last apply set aside as <name>.prev. The hub's own update by /dl/manifest.js
   --restart-cmd CMD  run by sh after the programs are replaced, and again after a rollback
   --health-url URL   must answer 200 within 30 s after the restart
   --check-cmd CMD    run by sh after the restart; a non-zero exit rolls back
-  --force            apply although an extension is incompatible
+  --apps             also check the apps installed on this machine (harnessly app compat) against the release; on
+                     by default with HARNESSLY_UI_SLOTS=on. An app that is on and does not fit blocks apply
+  --force            apply although an extension or an app is incompatible
 `
 
 func (c *cli) upgrade(args []string) error {
@@ -54,7 +58,7 @@ func (c *cli) upgrade(args []string) error {
 	fs.SetOutput(c.env.Stderr)
 	var (
 		hub, manifest, sigFile, keyFile, dir, hubBin, extFile, restart, health, check string
-		insecure, force                                                               bool
+		insecure, force, withApps                                                     bool
 	)
 	fs.StringVar(&hub, "hub", "", "")
 	fs.StringVar(&manifest, "manifest", "", "")
@@ -68,6 +72,7 @@ func (c *cli) upgrade(args []string) error {
 	fs.StringVar(&check, "check-cmd", "", "")
 	fs.BoolVar(&insecure, "allow-unsigned", false, "")
 	fs.BoolVar(&force, "force", false, "")
+	fs.BoolVar(&withApps, "apps", strings.EqualFold(c.env.Getenv("HARNESSLY_UI_SLOTS"), "on"), "")
 	if err := fs.Parse(args); err != nil {
 		return usageErr("upgrade: %v", err)
 	}
@@ -157,6 +162,13 @@ func (c *cli) upgrade(args []string) error {
 	if err != nil {
 		return err
 	}
+	if withApps {
+		checks, err := c.appChecks(plan.Version)
+		if err != nil {
+			fmt.Fprintln(c.env.Stderr, "upgrade: the apps were not checked: "+err.Error())
+		}
+		plan.AddApps(checks)
+	}
 	if sub == "plan" {
 		c.printPlan(plan)
 		if plan.Blocked() {
@@ -226,6 +238,16 @@ func (c *cli) printPlan(p *upgrade.Plan) {
 	for _, e := range p.Extensions {
 		c.out("  extension %-20s %-12s %s\n", e.Name, e.Verdict, e.Detail)
 	}
+	for _, a := range p.Apps {
+		state := "ok"
+		switch {
+		case len(a.Errors) > 0 && a.Off:
+			state = "does not fit (off)"
+		case len(a.Errors) > 0:
+			state = "does not fit"
+		}
+		c.out("  app %-26s %-8s %-10s %s\n", a.ID, a.Kind, a.Version, state)
+	}
 	if len(p.Extensions) == 0 {
 		c.out("  extensions: none registered (give --extensions FILE to check them)\n")
 	}
@@ -237,6 +259,32 @@ func (c *cli) printPlan(p *upgrade.Plan) {
 	for _, b := range p.Blocking {
 		c.out("  BLOCKED: %s\n", b)
 	}
+}
+
+// appChecks asks the runtime of this machine whether the apps installed on it fit the release. The runtime
+// being away is no reason to stop an upgrade: the caller says the apps were not checked.
+func (c *cli) appChecks(host string) ([]upgrade.AppCheck, error) {
+	raw, err := c.request("GET", "/api/cli/apps/compat", url.Values{"host": {host}}, nil)
+	if err != nil {
+		return nil, err
+	}
+	var rep apps.CompatReport
+	if err := json.Unmarshal(raw, &rep); err != nil {
+		return nil, errors.New("the runtime's answer is not readable")
+	}
+	var out []upgrade.AppCheck
+	for _, a := range rep.Apps {
+		ck := upgrade.AppCheck{ID: a.ID, Kind: a.Kind, Version: a.Version, Off: a.Disabled}
+		for _, i := range a.Issues {
+			if i.Warning {
+				ck.Warnings = append(ck.Warnings, i.Message)
+			} else {
+				ck.Errors = append(ck.Errors, i.Message)
+			}
+		}
+		out = append(out, ck)
+	}
+	return out, nil
 }
 
 func readManifest(hub, file, sigFile string) (body, sig []byte, err error) {

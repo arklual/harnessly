@@ -96,15 +96,9 @@ type HubMachine struct {
 	ActiveOps []OpView `json:"activeOps"`
 }
 
-// orgsOn says whether the person gets the organizations' API (HUB_ORGS: off is nobody, shadow instance administrators).
-func (s *Service) orgsOn(p *auth.Principal) bool {
-	switch s.cfg.Orgs {
-	case config.OrgsOn:
-		return true
-	case config.OrgsShadow:
-		return p.Admin
-	}
-	return false
+// orgsOn says whether the person gets the organizations' API (HUB_ORGS: off is nobody).
+func (s *Service) orgsOn(_ *auth.Principal) bool {
+	return s.cfg.Orgs == config.OrgsOn
 }
 
 // orgHandler wraps an endpoint of the organizations' screens in the session check and HUB_ORGS.

@@ -16,10 +16,13 @@ import (
 // PersonSettings are a person's settings (spec §5): the cluster keeps them in person_settings, a runtime on its own in
 // <data>/v2/me.json. A patch replaces whole top-level keys.
 type PersonSettings struct {
-	UIVersion      string         `json:"uiVersion"` // legacy | next
-	Locale         string         `json:"locale"`    // ru | en
-	Density        string         `json:"density"`   // compact | full
-	TextSize       string         `json:"textSize"`  // s | m | l
+	UIVersion string `json:"uiVersion"` // legacy | next
+	Locale    string `json:"locale"`    // ru | en
+	Density   string `json:"density"`   // compact | full
+	TextSize  string `json:"textSize"`  // s | m | l
+	// NoticeColor is the colour of what pops up (notices, toasts): contrast — the other of the theme (dark on light, light
+	// on dark); theme — the theme's own.
+	NoticeColor    string         `json:"noticeColor"`
 	EnterSends     bool           `json:"enterSends"`
 	DefaultMachine *string        `json:"defaultMachine"`
 	Notify         NotifySettings `json:"notify"`
@@ -31,6 +34,12 @@ type PersonSettings struct {
 	// DayStartHour is the Moscow hour the person's day starts at (0–23): «today» of the spend is counted from it.
 	DayStartHour int `json:"dayStartHour"`
 }
+
+// The colours of what pops up (PersonSettings.NoticeColor).
+const (
+	NoticeColorContrast = "contrast"
+	NoticeColorTheme    = "theme"
+)
 
 // VoiceEngines are the recognition models a person may pick for dictation: the machine's own, the ChatGPT plan's, OpenAI's,
 // Yandex's.
@@ -93,7 +102,7 @@ type Me struct {
 
 // DefaultSettings are the settings of a person who changed nothing.
 func DefaultSettings() PersonSettings {
-	return PersonSettings{UIVersion: "next", Locale: "ru", Density: "compact", TextSize: "m", EnterSends: true,
+	return PersonSettings{UIVersion: "next", Locale: "ru", Density: "compact", TextSize: "m", NoticeColor: NoticeColorContrast, EnterSends: true,
 		Notify:       NotifySettings{Types: []string{"turn-finished", "question", "permission"}},
 		QuickPrompts: []string{}, Keys: map[string][]string{}, Voice: VoiceSettings{Engine: VoiceEngineLocal, Words: []VoiceWord{}},
 		DayStartHour: DefaultDayStartHour}
@@ -195,6 +204,10 @@ func NormalizeSettings(st *PersonSettings) {
 	if st.Density == "full" {
 		st.Density = "compact"
 	}
+	// A record from before the notices' colour: the default.
+	if st.NoticeColor == "" {
+		st.NoticeColor = NoticeColorContrast
+	}
 	// A record from before the shortcuts has none of them.
 	if st.Keys == nil {
 		st.Keys = map[string][]string{}
@@ -244,6 +257,8 @@ func applySettingsPatch(cur PersonSettings, patch json.RawMessage) (PersonSettin
 			ok = oneOf(raw, &next.Density, "compact", "full")
 		case "textSize":
 			ok = oneOf(raw, &next.TextSize, "s", "m", "l")
+		case "noticeColor":
+			ok = oneOf(raw, &next.NoticeColor, NoticeColorContrast, NoticeColorTheme)
 		case "enterSends":
 			ok = one(raw, &next.EnterSends)
 		case "defaultMachine":

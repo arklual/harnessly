@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -69,6 +70,16 @@ type Server struct {
 
 	mu    sync.Mutex
 	rooms map[string]*Store
+
+	// Uploads in parts (uploads.go): the biggest one (0: no limit), when the expired ones were last removed, the
+	// size of a part and how long a complete waits before it answers 202 (zero: PartSize, finishWait).
+	maxUpload  atomic.Int64
+	lastSweep  atomic.Int64
+	now        func() time.Time
+	partSize   int64
+	finishWait time.Duration
+	// uploadMu serialises the requests of one upload (by its id's hash).
+	uploadMu [64]sync.Mutex
 }
 
 // NewServer builds the API over opened drivers; the caller keeps them and closes them.
@@ -143,6 +154,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("HEAD "+prefix+"/blobs/{sha}", s.room(s.headBlob))
 	mux.HandleFunc("GET "+prefix+"/blobs/{sha}", s.room(s.getBlob))
 	mux.HandleFunc("PUT "+prefix+"/blobs/{sha}", s.room(s.putBlob))
+	mux.HandleFunc("POST "+prefix+"/blobs/missing", s.room(s.missingBlobs))
 	mux.HandleFunc("POST "+prefix+"/commit", s.room(s.commit))
 	mux.HandleFunc("GET "+prefix+"/changes", s.room(s.changes))
 	mux.HandleFunc("GET "+prefix+"/current", s.room(s.current))
@@ -152,6 +164,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST "+prefix+"/leases", s.room(s.leaseTake))
 	mux.HandleFunc("POST "+prefix+"/leases/release", s.room(s.leaseRelease))
 	mux.HandleFunc("GET "+prefix+"/keys", s.room(s.keys))
+	mux.HandleFunc("GET "+prefix+"/uploads", s.room(s.uploadLimits))
+	mux.HandleFunc("POST "+prefix+"/uploads", s.room(s.uploadOpen))
+	mux.HandleFunc("GET "+prefix+"/uploads/{id}", s.room(s.uploadGet))
+	mux.HandleFunc("PUT "+prefix+"/uploads/{id}/parts/{n}", s.room(s.uploadPart))
+	mux.HandleFunc("POST "+prefix+"/uploads/{id}/complete", s.room(s.uploadComplete))
+	mux.HandleFunc("DELETE "+prefix+"/uploads/{id}", s.room(s.uploadCancel))
 	return mux
 }
 
@@ -216,6 +234,26 @@ func (s *Server) headBlob(w http.ResponseWriter, r *http.Request, c caller) {
 	}
 }
 
+// missingBlobs answers a batch of the question headBlob answers for one: the same caller, the same room, the same
+// knowledge (whether the room holds contents with a hash), and nothing of what is in them.
+func (s *Server) missingBlobs(w http.ResponseWriter, r *http.Request, c caller) {
+	var req MissingBlobsRequest
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		http.Error(w, "bad json", http.StatusBadRequest)
+		return
+	}
+	missing, err := c.store.MissingBlobs(r.Context(), req.Shas)
+	switch {
+	case errors.Is(err, ErrBadRequest):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case err != nil:
+		slog.Error("missing blobs", "err", err)
+		http.Error(w, "cannot read", http.StatusInternalServerError)
+	default:
+		writeJSON(w, http.StatusOK, MissingBlobsResponse{Missing: missing})
+	}
+}
+
 func (s *Server) getBlob(w http.ResponseWriter, r *http.Request, c caller) {
 	sha := r.PathValue("sha")
 	f, err := c.store.OpenBlob(r.Context(), sha)
@@ -277,6 +315,10 @@ func (s *Server) commit(w http.ResponseWriter, r *http.Request, c caller) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, ErrNoBlob):
 		http.Error(w, err.Error(), http.StatusPreconditionRequired)
+	case errors.Is(err, ErrSealed):
+		// 403 is what the agent knows as "not taken from this machine": it keeps the file, does not spread it and tries again on
+		// its next pass (the seal may just be early).
+		http.Error(w, err.Error(), http.StatusForbidden)
 	case err != nil:
 		slog.Error("commit", "path", req.Path, "err", err)
 		http.Error(w, "cannot commit", http.StatusInternalServerError)

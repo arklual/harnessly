@@ -1,6 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { pinLocale } from '@/next/i18n';
-import { effortLabel, modelName, modelOf, removedKeyOf, unavailableNote, type IPickerAgent } from './agents';
+import {
+  effortLabel,
+  modelName,
+  modelOf,
+  removedKeyOf,
+  signInNeeded,
+  unavailableNote,
+  type IPickerAgent,
+} from './agents';
 
 beforeAll(() => pinLocale('en'));
 
@@ -38,6 +46,22 @@ describe('an agent that cannot start a chat', () => {
   });
   it('names the ultra depth', () => {
     expect(effortLabel('ultra')).toBe('Ultra');
+  });
+});
+
+describe('a machine where no agent is signed in', () => {
+  const row = (provider: string, status: string, available = status === 'ready') =>
+    ({ provider, name: provider, status, available }) as unknown as IPickerAgent;
+  it('asks for a sign-in when an installed agent is signed out and none else is ready', () => {
+    expect(signInNeeded([row('claude', 'login-required'), row('codex', 'login-required')])).toBe(true);
+    expect(signInNeeded([row('claude', 'login-required'), row('codex', 'missing')])).toBe(true);
+  });
+  it('does not ask while one agent is signed in, the other being signed out', () => {
+    expect(signInNeeded([row('claude', 'login-required'), row('codex', 'ready')])).toBe(false);
+  });
+  it('does not ask for a sign-in where nothing is installed', () => {
+    expect(signInNeeded([row('claude', 'missing'), row('codex', 'missing')])).toBe(false);
+    expect(signInNeeded([])).toBe(false);
   });
 });
 

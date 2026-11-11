@@ -1,6 +1,7 @@
 package launch
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/sleep"
 	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 // ResumeTmux is what the startup resume asks of tmux.
@@ -30,6 +32,9 @@ type ResumeConfig struct {
 	// LastActivity is when a conversation last moved (epoch ms), nil when unknown.
 	LastActivity func(provider, sessionID string) *float64
 	Sleep        sleep.Config
+	// Owned says the tab's tmux session is a chat's, whose owner resumes it itself (convo): such a tab is no target.
+	// nil: no tab is.
+	Owned func(tmuxSession string) bool
 	// ChildPIDs and Cmdline read the processes under a pane.
 	ChildPIDs func(pid int) []int
 	Cmdline   func(pid int) (string, bool)
@@ -83,7 +88,7 @@ func (s *Starter) ResumeTargets(rc ResumeConfig) []Target {
 	remembered := s.startStates
 	s.startStates = nil
 	s.mu.Unlock()
-	skipped := 0
+	skipped, owned := 0, 0
 	type pre struct{ installed, found bool }
 	preflights := map[string]pre{}
 	for _, v := range s.cfg.Store.Workspaces().Array("workspaces") {
@@ -120,13 +125,18 @@ func (s *Starter) ResumeTargets(rc ResumeConfig) []Target {
 			if sid == "" {
 				continue
 			}
-			var last *float64
-			if rc.LastActivity != nil {
-				last = rc.LastActivity(provider, sid)
+			if rc.Owned != nil && rc.Owned(tab.String("sessionName")) {
+				owned++
+				continue
 			}
 			cliState := tab.String("cliState")
 			if st, ok := remembered[tab.String("id")]; ok {
 				cliState = st
+			}
+			// The last activity is read off the transcript: only for a tab it can decide for.
+			var last *float64
+			if rc.LastActivity != nil && sleep.ResumeNeedsActivity(cliState, rc.Sleep) {
+				last = rc.LastActivity(provider, sid)
 			}
 			if !sleep.ShouldResumeAtStartup(cliState, last, now, rc.Sleep) {
 				skipped++
@@ -138,6 +148,9 @@ func (s *Starter) ResumeTargets(rc ResumeConfig) []Target {
 	}
 	if skipped > 0 {
 		s.log(rc, "info", "quiet agent tabs left asleep; their next prompt resumes them", "count", skipped)
+	}
+	if owned > 0 {
+		s.log(rc, "info", "agent tabs of chats left to the chats, which resume their own agents", "count", owned)
 	}
 	return targets
 }
@@ -205,7 +218,10 @@ func (s *Starter) sendResume(rc ResumeConfig, t Target) bool {
 	}
 	line, err := s.cfg.Lines.Resume(t.Provider, t.SessionID, t.WorkspaceID, t.Launch)
 	if err == nil {
-		err = rc.Tmux.SendKeysSeparated(t.TmuxSession, agents.ForAnyShell(s.envSource(t.Provider)+line))
+		// The outbox may be typing a queued message into the same pane: the line waits for the pane like any writer.
+		err = typist.Write(context.Background(), rc.Tmux, t.TmuxSession, func(context.Context) error {
+			return rc.Tmux.SendKeysSeparated(t.TmuxSession, agents.ForAnyShell(s.envSource(t.Provider)+line))
+		})
 	}
 	if err != nil {
 		s.log(rc, "error", "resume failed", "session", t.TmuxSession, "err", err.Error())

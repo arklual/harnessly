@@ -4,11 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
-	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // PulseAnswer is one week of a person's pulse.
@@ -46,19 +45,17 @@ func (s *Service) weekOf(o store.Org) string {
 	return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7)).Format("2006-01-02")
 }
 
-func (s *Service) pulseOrg(r *http.Request, p *auth.Principal) (store.Org, error) {
-	o, err := orgs.Resolve(r.Context(), s.DB.S(), p, r.PathValue("org"))
-	if err != nil {
-		return o, err
-	}
+func (s *Service) pulseOrg(r *http.Request, t *tenant.Ctx) (store.Org, error) {
+	o := *t.Org
 	if s.Features == nil || !s.Features.On(r.Context(), o.ID, features.Efficiency) {
 		return o, httpx.ErrNotFound
 	}
 	return o, nil
 }
 
-func (s *Service) pulseGet(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	o, err := s.pulseOrg(r, p)
+func (s *Service) pulseGet(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
+	o, err := s.pulseOrg(r, t)
 	if err != nil {
 		return err
 	}
@@ -77,14 +74,15 @@ func (s *Service) pulseGet(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	return nil
 }
 
-func (s *Service) pulsePut(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) pulsePut(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct {
 		Speed, Quality, Friction int
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
 	}
-	o, err := s.pulseOrg(r, p)
+	o, err := s.pulseOrg(r, t)
 	if err != nil {
 		return err
 	}
@@ -100,5 +98,5 @@ func (s *Service) pulsePut(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	if err := s.DB.S().PutEffPulse(r.Context(), p.User.ID, s.weekOf(o), req.Speed, req.Quality, req.Friction, now.UnixMilli()); err != nil {
 		return err
 	}
-	return s.pulseGet(w, r, p)
+	return s.pulseGet(w, r, t)
 }

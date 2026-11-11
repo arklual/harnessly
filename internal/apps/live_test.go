@@ -1,17 +1,23 @@
 package apps
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ly-solutions/harnessly/internal/appmcp"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // A chat with no app on has the server all the same: it offers nothing and says nothing, so it costs the agent
 // nothing; an app turned on brings the tools.
 func TestHostToolsQuietWithoutApps(t *testing.T) {
 	none, _ := hostRig(t, nil)
-	if got := none.Tools(); len(got) != 0 {
+	// One tool is there from the start, whatever turns on later.
+	if got := none.Tools(); len(got) != 1 || !strings.Contains(string(jsvalue.Stringify(got[0], "")), `"name":"page_call"`) {
 		t.Fatalf("tools of a chat without apps: %d", len(got))
 	}
 	if got := none.Instructions(); got != "" {
@@ -128,5 +134,49 @@ func TestLauncherHostMCPWithoutApps(t *testing.T) {
 	}
 	if got, err := (&Launcher{Registry: reg}).HostMCP(); err != nil || got != "" {
 		t.Fatalf("no runtime config: %q %v", got, err)
+	}
+}
+
+// With the CLI known the harnessly-app server is its stdio proxy: the address and the token go in the
+// proxy's environment, and the config written before (the server over HTTP) is replaced at the next launch.
+func TestLauncherHostMCPThroughTheCLI(t *testing.T) {
+	data := t.TempDir()
+	reg := &Registry{Root: filepath.Join(data, "apps")}
+	mcp := filepath.Join(data, "preview-mcp.json")
+	_ = os.WriteFile(mcp, []byte(`{"mcpServers":{"host-preview":{"type":"http","url":"http://127.0.0.1:1/api/cli/preview/mcp","headers":{"x-cli-token":"tok"}}}}`), 0o600)
+	old, err := (&Launcher{Registry: reg, MCPConfigPath: mcp}).HostMCP()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := &Launcher{Registry: reg, MCPConfigPath: mcp, CLIBin: "/opt/harnessly/bin/harnessly"}
+	path, err := l.HostMCP()
+	if err != nil || path != old {
+		t.Fatalf("path %q %v", path, err)
+	}
+	read := func(path string) map[string]any {
+		raw, _ := os.ReadFile(path)
+		var cfg struct {
+			Servers map[string]map[string]any `json:"mcpServers"`
+		}
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			t.Fatal(err)
+		}
+		return cfg.Servers[HostServer]
+	}
+	srv := read(path)
+	env, _ := srv["env"].(map[string]any)
+	if srv["type"] != "stdio" || srv["command"] != "/opt/harnessly/bin/harnessly" || fmt.Sprint(srv["args"]) != "[app-mcp]" || srv["url"] != nil || srv["headers"] != nil {
+		t.Fatalf("server: %v", srv)
+	}
+	if env[appmcp.EnvURL] != "http://127.0.0.1:1/api/cli/preview/mcp?server=harnessly-app" || env[appmcp.EnvHeaders] != `{"x-cli-token":"tok"}` {
+		t.Fatalf("env: %v", env)
+	}
+	// A launch with apps carries its own token, not the person's.
+	own, err := l.hostMCP(t.TempDir(), "agent.token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if env, _ := read(own)["env"].(map[string]any); env[appmcp.EnvHeaders] != `{"x-cli-token":"agent.token"}` {
+		t.Fatalf("env of a launch with apps: %v", env)
 	}
 }

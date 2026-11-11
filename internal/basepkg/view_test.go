@@ -90,3 +90,21 @@ func TestSkipProxyAndAskGoToTheInbox(t *testing.T) {
 		t.Fatalf("%+v", in)
 	}
 }
+
+// A missing optional tool (LibreOffice) is no problem of the first screen: the base package is done without it and
+// the one-line command leaves it out.
+func TestViewDoneWithoutTheOptionalTools(t *testing.T) {
+	v := MakeView(Look{LookPath: lookWith(allBut("libreoffice")), Manager: Apt, Voice: Voice{Ready: true}})
+	l := line(v, "libreoffice")
+	if l.Status != Missing || !l.Optional || l.Command == "" {
+		t.Fatalf("the optional tool is still listed: %+v", l)
+	}
+	if !v.Done || v.Command != "" {
+		t.Fatalf("done %v, command %q", v.Done, v.Command)
+	}
+	// A required tool missing still stops it, and the optional one stays out of the command.
+	v = MakeView(Look{LookPath: lookWith(allBut("libreoffice", "jq")), Manager: Apt, Voice: Voice{Ready: true}})
+	if v.Done || !strings.HasSuffix(v.Command, " jq") || strings.Contains(v.Command, "libreoffice") {
+		t.Fatalf("done %v, command %q", v.Done, v.Command)
+	}
+}

@@ -378,3 +378,69 @@ func TestHostMCPWithoutApps(t *testing.T) {
 		t.Fatalf("with apps: %v %q", err, got)
 	}
 }
+
+// failingApps readies no apps at all (the guard did not answer) and names one of them broken beforehand.
+type failingApps struct {
+	fakeApps
+	broken  string
+	fail    error
+	dropped map[string]string
+}
+
+func (f *failingApps) ClaudeFor(conversation string, ids []string, settingsPath string) (agents.ClaudeApps, error) {
+	if f.fail != nil {
+		return agents.ClaudeApps{}, f.fail
+	}
+	return f.fakeApps.ClaudeFor(conversation, ids, settingsPath)
+}
+
+func (f *failingApps) Launchable(ids []string) ([]string, map[string]error) {
+	var ok []string
+	bad := map[string]error{}
+	for _, id := range ids {
+		if id == f.broken {
+			bad[id] = errors.New("not installed")
+		} else {
+			ok = append(ok, id)
+		}
+	}
+	return ok, bad
+}
+
+func (f *failingApps) AppsDropped(_ string, ids []string, why error) {
+	for _, id := range ids {
+		f.dropped[id] = why.Error()
+	}
+}
+
+// A chat does not wait on its apps: a broken app is left out with its reason, and when readying the rest
+// fails the chat starts plain, without the apps' settings, instead of not at all.
+func TestAppsDoNotKeepTheChatFromStarting(t *testing.T) {
+	c := testConfig(t)
+	c.WorkspacePrompt = nil
+	l := launch("opus", "")
+	l.Apps = []string{"acme.a", "acme.gone"}
+	f := &failingApps{broken: "acme.gone", dropped: map[string]string{}}
+	c.Apps = f
+	got, err := c.Flags("", l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.ids, []string{"acme.a"}) || f.dropped["acme.gone"] != "not installed" {
+		t.Fatalf("asked for %v, dropped %v", f.ids, f.dropped)
+	}
+	if !strings.Contains(got, "--plugin-dir '/data/apps/a'") {
+		t.Fatalf("the app that works is not in: %q", got)
+	}
+	f.fail, f.dropped = errors.New("the guard does not answer"), map[string]string{}
+	got, err = c.Flags("", l, nil)
+	if err != nil {
+		t.Fatalf("the chat did not start: %v", err)
+	}
+	if strings.Contains(got, "settings-1.json") || strings.Contains(got, "--plugin-dir '/data/apps/a'") || !strings.Contains(got, "/tmp/hooks.json") {
+		t.Fatalf("the plain chat still has apps: %q", got)
+	}
+	if f.dropped["acme.a"] != "the guard does not answer" || f.dropped["acme.gone"] != "not installed" {
+		t.Fatalf("dropped %v", f.dropped)
+	}
+}

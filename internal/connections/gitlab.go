@@ -95,15 +95,15 @@ func glDetection(base string, dep Deployment, version, edition string) *Detectio
 	}
 }
 
-// glTokenURL is the page that creates a token with the scopes reading needs; before GitLab 16 it lived under the
-// profile.
+// glTokenURL is the page that creates a token with the scopes reading and the review in the person's name need (api:
+// replies, drafts, approvals); before GitLab 16 it lived under the profile.
 func glTokenURL(base, version string) string {
 	if major, _, _ := strings.Cut(version, "."); major != "" {
 		if n, err := strconv.Atoi(major); err == nil && n < 16 {
-			return base + "/-/profile/personal_access_tokens?name=harnessly&scopes=read_api,read_user"
+			return base + "/-/profile/personal_access_tokens?name=harnessly&scopes=api,read_user"
 		}
 	}
-	return base + "/-/user_settings/personal_access_tokens?name=harnessly&scopes=read_api,read_user"
+	return base + "/-/user_settings/personal_access_tokens?name=harnessly&scopes=api,read_user"
 }
 
 // Open implements Provider.

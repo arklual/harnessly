@@ -20,6 +20,7 @@ import {
 import { Menu } from '@base-ui/react/menu';
 import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
 import LibraryBar from '@/next/features/designly/library-bar';
+import { usePackExport, usePackImport } from '@/next/features/designly/pack-dialogs';
 import {
   Crumbs,
   FolderDeleteDialog,
@@ -115,6 +116,8 @@ export interface IDesignCard {
   system?: { id: string; label: string } | null;
   /** For a document of a type an installed app adds: the type's name, shown where a design shows its kind. */
   appKind?: string;
+  /** For a site that is a document of an app's type (made of Sinopia's site): the type's name, its label. */
+  appLabel?: string;
 }
 
 /** What the field sends: the brief with what its kind adds. */
@@ -174,6 +177,16 @@ export interface IDesignlyHomeProps {
   /** What the machine lacks for designs, with the command that fixes it; null when nothing is missing. */
   /** The installed kits, shown above the library's root; absent where kits are not offered. */
   kits?: IKitShelf;
+  /** Moving projects with their kits as one file; absent where the machine cannot. */
+  pack?: IPackTransfer;
+  /** A quiet line over the cards: the library on screen is the hub's copy; null when it is the machine's. */
+  notice?: string | null;
+}
+
+export interface IPackTransfer {
+  machine: MachineId;
+  /** A pack was installed: the library is read again. */
+  onImported: () => void;
 }
 
 export interface IDesignlyVoice {
@@ -629,7 +642,8 @@ const cardSub = (card: IDesignCard, now: number): string => {
   const ago = formatAgoFull(card.updatedAt, now);
   if (card.appKind) return `${card.appKind} · ${ago}`;
   if (card.drawing) return t('next.designly.drawingShort');
-  return `${plural(card.boards, `next.designly.units.${card.kind}`)} · ${ago}`;
+  const units = `${plural(card.boards, `next.designly.units.${card.kind}`)} · ${ago}`;
+  return card.appLabel ? `${card.appLabel} · ${units}` : units;
 };
 
 interface IDesignCardProps {
@@ -647,6 +661,8 @@ interface IDesignCardProps {
   onDelete: (card: IDesignCard) => void;
   onMove: (card: IDesignCard) => void;
   onSelect: (card: IDesignCard) => void;
+  /** «Перенести на другой инстанс»; absent where packs are not offered. */
+  onTransfer?: (card: IDesignCard) => void;
 }
 
 /** «…» of a card: move it, select it, delete it (the owner's). The menu is drawn in a portal, but a click bubbles through
@@ -658,7 +674,11 @@ const CardMenu = ({
   onDelete,
   onMove,
   onSelect,
-}: Pick<IDesignCardProps, 'card' | 'deletable' | 'movable' | 'onDelete' | 'onMove' | 'onSelect'>) => {
+  onTransfer,
+}: Pick<
+  IDesignCardProps,
+  'card' | 'deletable' | 'movable' | 'onDelete' | 'onMove' | 'onSelect' | 'onTransfer'
+>) => {
   const actions = useMenuActions();
   return (
     <Menu.Root actionsRef={actions}>
@@ -699,6 +719,18 @@ const CardMenu = ({
           <Icon name="list-checks" size="sm" />
           <span className="hx-cmenu__txt">{t('next.designly.select')}</span>
         </Menu.Item>
+        {onTransfer && (
+          <Menu.Item
+            className="hx-cmenu__item"
+            onClick={(event) => {
+              event.stopPropagation();
+              onTransfer(card);
+            }}
+          >
+            <Icon name="share" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.pack.transfer')}</span>
+          </Menu.Item>
+        )}
         {deletable && (
           <>
             <Menu.Separator className="hx-cmenu__sep" />
@@ -736,6 +768,7 @@ const DesignCard = memo(
     onDelete,
     onMove,
     onSelect,
+    onTransfer,
   }: IDesignCardProps) => (
     <div
       data-id={card.id}
@@ -783,7 +816,7 @@ const DesignCard = memo(
             </span>
           </button>
         )}
-        {!selecting && !card.appKind && (movable || deletable) && (
+        {!selecting && !card.appKind && (movable || deletable || onTransfer !== undefined) && (
           <CardMenu
             card={card}
             deletable={deletable}
@@ -791,6 +824,7 @@ const DesignCard = memo(
             onDelete={onDelete}
             onMove={onMove}
             onSelect={onSelect}
+            onTransfer={onTransfer}
           />
         )}
         {selecting && (
@@ -839,6 +873,8 @@ const DesignlyHome = ({
   onRetry,
   compose,
   kits,
+  pack,
+  notice = null,
 }: IDesignlyHomeProps) => {
   const [pinning, setPinning] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -1042,6 +1078,13 @@ const DesignlyHome = ({
     });
   });
   const moveOne = useStableFn((card: IDesignCard) => setMoving([card.id]));
+  const packOut = usePackExport(pack?.machine ?? null);
+  const packIn = usePackImport(
+    pack?.machine ?? null,
+    () => pack?.onImported(),
+    (id) => open(id),
+  );
+  const transferOne = useStableFn((card: IDesignCard) => packOut.start([card.id]));
   const deleteOne = useStableFn((card: IDesignCard) => void deleteIds([card.id]).catch(() => undefined));
   const dropped = (ids: string[], target: string) => {
     if (!organizer) return;
@@ -1112,6 +1155,7 @@ const DesignlyHome = ({
                         stopSelecting();
                         setTrashOpen(true);
                       },
+                      onImportPack: pack ? packIn.pick : undefined,
                     }
                   : null
               }
@@ -1149,6 +1193,11 @@ const DesignlyHome = ({
           />
         )}
 
+        {!trashOpen && notice !== null && cards !== null && (
+          <p className="hx-dl__notice" role="status">
+            {notice}
+          </p>
+        )}
         {!trashOpen && cards === null && error !== null && (
           <LoadFailed
             size={LOAD_FAILED_SIZE.page}
@@ -1183,6 +1232,7 @@ const DesignlyHome = ({
                     onDelete={deleteOne}
                     onMove={moveOne}
                     onSelect={toggle}
+                    onTransfer={pack ? transferOne : undefined}
                   />
                 ))}
               </div>
@@ -1252,6 +1302,17 @@ const DesignlyHome = ({
             <Icon name="folder-input" size="sm" />
             {t('next.designly.moveTo')}
           </button>
+          {pack && (
+            <button
+              type="button"
+              className="hx-dl__chip"
+              disabled={selected.size === 0}
+              onClick={() => packOut.start([...selected].filter((id) => projectIds.has(id)))}
+            >
+              <Icon name="share" size="sm" />
+              {t('next.pack.transfer')}
+            </button>
+          )}
           <button
             type="button"
             className="hx-dl__chip"
@@ -1269,6 +1330,8 @@ const DesignlyHome = ({
           </button>
         </div>
       )}
+      {packOut.dialog}
+      {packIn.dialog}
       {organizer && (
         <>
           <FolderNameDialog

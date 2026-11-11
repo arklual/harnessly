@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -101,9 +102,9 @@ func TestAppContextLiveHook(t *testing.T) {
 	status.Store(200)
 	var asked atomic.Value
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var b map[string]string
+		var b map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&b)
-		asked.Store(r.URL.Path + " " + b["session"])
+		asked.Store(fmt.Sprintf("%s %v service=%v", r.URL.Path, b["session"], b["service"]))
 		w.WriteHeader(int(status.Load()))
 		_ = json.NewEncoder(w).Encode(map[string]string{"text": text.Load().(string)})
 	}))
@@ -123,8 +124,13 @@ func TestAppContextLiveHook(t *testing.T) {
 	if !strings.Contains(got, `"additionalContext":"# Apps turned on in this chat"`) || !strings.Contains(got, `"hookEventName":"UserPromptSubmit"`) {
 		t.Fatalf("live words: %q", got)
 	}
-	if a, _ := asked.Load().(string); a != "/api/cli/apps/live-context tab-1" {
+	if a, _ := asked.Load().(string); a != "/api/cli/apps/live-context tab-1 service=false" {
 		t.Fatalf("asked %q", a)
+	}
+	// a reminder the platform typed says so, and only that: the text of a turn never goes to the runtime.
+	run(`{"hook_event_name":"UserPromptSubmit","prompt":"[automatic reminder 1 of 3] Your last message was not a final answer."}`)
+	if a, _ := asked.Load().(string); a != "/api/cli/apps/live-context tab-1 service=true" {
+		t.Fatalf("a service turn: %q", a)
 	}
 	if got := run(`{"hook_event_name":"SessionStart"}`); got != "" {
 		t.Fatalf("another event: %q", got)

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func env(m map[string]string) func(string) (string, bool) {
@@ -68,6 +69,7 @@ func TestLoadOIDCAndCloud(t *testing.T) {
 		t.Errorf("oidc: %+v", c.OIDC)
 	}
 	base["HUB_EDITION"] = "cloud"
+	base["HUB_ORGS"], base["HUB_ACCESS_ENFORCE"], base["HUB_RESOURCE_ACCESS"] = "on", "on", "on"
 	base["HUB_LOCAL_CODE_FILE"] = "/tmp/code"
 	// The cloud runs machines of people who do not trust each other: each on an origin of its own, or not at all.
 	if _, err := Load(env(base)); err == nil || !strings.Contains(err.Error(), "HUB_RUNTIME_DOMAIN") {
@@ -107,6 +109,8 @@ func TestLoadErrors(t *testing.T) {
 		"mr source bad url":   {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "git.example.com"}, "HUB_MR_SOURCE_GITLAB_URL"},
 		"machine trust":       {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MACHINE_TRUST": "maybe"}, "HUB_MACHINE_TRUST"},
 		"oidc email trusted":  {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_OIDC_EMAIL_TRUSTED": "maybe"}, "HUB_OIDC_EMAIL_TRUSTED"},
+		"metrics listen":      {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_METRICS_LISTEN": "8042"}, "HUB_METRICS_LISTEN"},
+		"metrics on public":   {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_LISTEN": "0.0.0.0:8040", "HUB_METRICS_LISTEN": "0.0.0.0:8040"}, "HUB_METRICS_LISTEN"},
 		"missing file":        {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SMTP_URL_FILE": "/nonexistent/x"}, "HUB_SMTP_URL_FILE"},
 	} {
 		_, err := Load(env(tc.env))
@@ -224,7 +228,8 @@ func TestMailInTheLogIsRefusedWhereTheLogIsShared(t *testing.T) {
 
 func TestRuntimeDomainOfItsOwn(t *testing.T) {
 	load := func(hub, runtime string, extra ...string) (*Config, error) {
-		m := map[string]string{"HUB_PUBLIC_URL": hub, "HUB_RUNTIME_DOMAIN": runtime, "HUB_SMTP_URL": "smtp://mail.example.com"}
+		m := map[string]string{"HUB_PUBLIC_URL": hub, "HUB_RUNTIME_DOMAIN": runtime, "HUB_SMTP_URL": "smtp://mail.example.com",
+			"HUB_ORGS": "on", "HUB_ACCESS_ENFORCE": "on", "HUB_RESOURCE_ACCESS": "on"}
 		for i := 0; i+1 < len(extra); i += 2 {
 			m[extra[i]] = extra[i+1]
 		}
@@ -284,7 +289,8 @@ func TestRuntimeDomainOfItsOwn(t *testing.T) {
 
 func TestSitesConfig(t *testing.T) {
 	load := func(hub string, kv ...string) (*Config, error) {
-		m := map[string]string{"HUB_PUBLIC_URL": hub, "HUB_SMTP_URL": "smtp://mail.example.com"}
+		m := map[string]string{"HUB_PUBLIC_URL": hub, "HUB_SMTP_URL": "smtp://mail.example.com",
+			"HUB_ORGS": "on", "HUB_ACCESS_ENFORCE": "on", "HUB_RESOURCE_ACCESS": "on"}
 		for i := 0; i+1 < len(kv); i += 2 {
 			m[kv[i]] = kv[i+1]
 		}
@@ -594,10 +600,14 @@ func TestReplicas(t *testing.T) {
 	if err != nil || !c.Replicas || c.ReplicaAddr != "http://10.0.0.5:8040" {
 		t.Fatalf("on: %+v %v", c, err)
 	}
+	if c.ReplicaListen != "0.0.0.0:8041" {
+		t.Errorf("the replicas' listener by default: %q", c.ReplicaListen)
+	}
 	for name, m := range map[string]map[string]string{
 		"no address":   with("HUB_REPLICAS", "on", "HUB_REPLICA_SECRET", "secretsecretsecret"),
 		"short secret": with("HUB_REPLICAS", "on", "HUB_REPLICA_ADDR", "http://10.0.0.5:8040", "HUB_REPLICA_SECRET", "short"),
 		"bad value":    with("HUB_REPLICAS", "maybe"),
+		"one listener": with("HUB_REPLICAS", "on", "HUB_REPLICA_ADDR", "http://10.0.0.5:8041", "HUB_REPLICA_SECRET", "secretsecretsecret", "HUB_LISTEN", "0.0.0.0:8041"),
 	} {
 		if _, err := Load(env(m)); err == nil {
 			t.Errorf("%s: want an error", name)
@@ -647,6 +657,18 @@ func TestStore(t *testing.T) {
 	if err != nil || c.Store.Off || c.Store.DatabaseURL != "sqlite://"+filepath.Join(data, "store") || c.Store.S3.Endpoint != "" || c.Store.PGPrefix != "" {
 		t.Fatalf("default: %v %+v", err, c.Store)
 	}
+	if c.Store.MaxUpload != 0 {
+		t.Fatalf("an upload limit by default: %d", c.Store.MaxUpload)
+	}
+	m["HUB_STORE_MAX_UPLOAD_MB"] = "2048"
+	if c, err = Load(env(m)); err != nil || c.Store.MaxUpload != 2048<<20 {
+		t.Fatalf("an upload limit: %v %d", err, c.Store.MaxUpload)
+	}
+	m["HUB_STORE_MAX_UPLOAD_MB"] = "-1"
+	if _, err := Load(env(m)); err == nil {
+		t.Fatal("a negative upload limit was taken")
+	}
+	delete(m, "HUB_STORE_MAX_UPLOAD_MB")
 	m["HUB_DATABASE_URL"], m["HUB_DB_MIGRATE_URL"] = "postgres://u:p@pooler/hub", "postgres://u:p@db/hub"
 	if c, err = Load(env(m)); err != nil || c.Store.DatabaseURL != "postgres://u:p@db/hub" || c.Store.PGPrefix != "filestore_" {
 		t.Fatalf("the hub's Postgres, directly: %v %+v", err, c.Store)
@@ -717,5 +739,142 @@ func TestDesignImport(t *testing.T) {
 	m["HUB_DESIGN_IMPORT_GATEWAY"] = "yes"
 	if _, err := Load(env(m)); err == nil {
 		t.Fatal("an unknown mode")
+	}
+}
+
+func TestTunnelMemory(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_SMTP_URL": "smtp://mail.example.com"}
+	c, err := Load(env(base))
+	if err != nil || c.TunnelMemory != 256<<20 {
+		t.Fatalf("default: %d %v", c.TunnelMemory, err)
+	}
+	base["HUB_TUNNEL_MEMORY_MB"] = "64"
+	if c, err = Load(env(base)); err != nil || c.TunnelMemory != 64<<20 {
+		t.Fatalf("set: %d %v", c.TunnelMemory, err)
+	}
+	for _, v := range []string{"0", "-5", "lots"} {
+		base["HUB_TUNNEL_MEMORY_MB"] = v
+		if _, err := Load(env(base)); err == nil || !strings.Contains(err.Error(), "HUB_TUNNEL_MEMORY_MB") {
+			t.Errorf("%q: %v", v, err)
+		}
+	}
+}
+
+// The cloud edition does not start unless organizations, machine access lists and document access are all on; a
+// self-hosted hub starts and says what is off.
+func TestCloudNeedsIsolation(t *testing.T) {
+	on := map[string]string{"HUB_ORGS": "on", "HUB_ACCESS_ENFORCE": "on", "HUB_RESOURCE_ACCESS": "on"}
+	load := func(edition string, change func(m map[string]string)) (*Config, error) {
+		m := map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_SMTP_URL": "smtp://mail.example.com",
+			"HUB_RUNTIME_DOMAIN": "m.example.net", "HUB_EDITION": edition}
+		for k, v := range on {
+			m[k] = v
+		}
+		if change != nil {
+			change(m)
+		}
+		return Load(env(m))
+	}
+	if c, err := load(EditionCloud, nil); err != nil || len(c.Warnings) != 0 {
+		t.Fatalf("the cloud with all three on: %v %v", err, c)
+	}
+	for name, value := range map[string][]string{
+		"HUB_ORGS":            {"", "off"},
+		"HUB_ACCESS_ENFORCE":  {"", "off", "warn"},
+		"HUB_RESOURCE_ACCESS": {"", "off"},
+	} {
+		for _, v := range value {
+			change := func(m map[string]string) {
+				if m[name] = v; v == "" {
+					delete(m, name)
+				}
+			}
+			if _, err := load(EditionCloud, change); err == nil || !strings.Contains(err.Error(), "HUB_EDITION=cloud needs "+name+"=on") {
+				t.Errorf("the cloud with %s=%q: %v", name, v, err)
+			}
+			c, err := load(EditionSelfHosted, change)
+			if err != nil || len(c.Warnings) != 1 || !strings.Contains(c.Warnings[0], name+" is not on") {
+				t.Errorf("self-hosted with %s=%q: %v %v", name, v, err, c)
+			}
+		}
+	}
+	// a self-hosted hub with none of them starts, with a warning for each
+	c, err := load(EditionSelfHosted, func(m map[string]string) {
+		for k := range on {
+			delete(m, k)
+		}
+	})
+	if err != nil || len(c.Warnings) != 3 {
+		t.Errorf("self-hosted with none: %v %v", err, c)
+	}
+}
+
+func TestQuotas(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040"}
+	c, err := Load(env(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.MaxSpaces() != DefaultMaxSpaces || c.MaxOrgs() != DefaultMaxOrgs || c.MaxServers() != DefaultMaxServers {
+		t.Errorf("defaults: %+v", c.Quotas)
+	}
+	var none *Config
+	if none.MaxSpaces() != DefaultMaxSpaces || none.MaxOrgs() != DefaultMaxOrgs || none.MaxServers() != DefaultMaxServers {
+		t.Error("a hub without a configuration has the defaults")
+	}
+	base["HUB_MAX_SPACES_PER_PERSON"], base["HUB_MAX_ORGS_PER_PERSON"], base["HUB_MAX_SERVERS_PER_SPACE"] = "3", "4", "5"
+	if c, err = Load(env(base)); err != nil || c.MaxSpaces() != 3 || c.MaxOrgs() != 4 || c.MaxServers() != 5 {
+		t.Errorf("set: %v %+v", err, c)
+	}
+	for _, name := range []string{"HUB_MAX_SPACES_PER_PERSON", "HUB_MAX_ORGS_PER_PERSON", "HUB_MAX_SERVERS_PER_SPACE"} {
+		for _, v := range []string{"0", "-1", "many"} {
+			m := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040", name: v}
+			if _, err := Load(env(m)); err == nil || !strings.Contains(err.Error(), name) {
+				t.Errorf("%s=%q: %v", name, v, err)
+			}
+		}
+	}
+}
+
+func TestHistoryDeletedKeep(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_SMTP_URL": "smtp://mail.example.com"}
+	for value, want := range map[string]time.Duration{"": 30 * 24 * time.Hour, "7": 7 * 24 * time.Hour, "90": 90 * 24 * time.Hour, "0": 0} {
+		vars := map[string]string{"HUB_HISTORY_DELETED_DAYS": value}
+		for k, v := range base {
+			vars[k] = v
+		}
+		c, err := Load(env(vars))
+		if err != nil || c.HistoryDeletedKeep != want {
+			t.Errorf("HUB_HISTORY_DELETED_DAYS=%q: %v %v, want %v", value, c.HistoryDeletedKeep, err, want)
+		}
+	}
+	for _, value := range []string{"-1", "a month", "1.5", "1", "6"} {
+		vars := map[string]string{"HUB_HISTORY_DELETED_DAYS": value}
+		for k, v := range base {
+			vars[k] = v
+		}
+		if _, err := Load(env(vars)); err == nil {
+			t.Errorf("HUB_HISTORY_DELETED_DAYS=%q was taken", value)
+		}
+	}
+}
+
+func TestLoadServicePublicURLs(t *testing.T) {
+	c, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "http://h",
+		"HUB_BOARDS_URL": "http://boards:8080/", "HUB_ARTIFACTS_URL": "http://artifacts:8080",
+		"HUB_BOARDS_PUBLIC_URL": "https://boards.example.com/"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.BoardsURL != "http://boards:8080" || c.BoardsPublicURL != "https://boards.example.com" {
+		t.Errorf("boards: %q %q", c.BoardsURL, c.BoardsPublicURL)
+	}
+	// Without a public address the machines get the hub's own one.
+	if c.ArtifactsPublicURL != "http://artifacts:8080" {
+		t.Errorf("artifacts public: %q", c.ArtifactsPublicURL)
+	}
+	if _, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_BOARDS_PUBLIC_URL": "boards.example.com"})); err == nil ||
+		!strings.Contains(err.Error(), "HUB_BOARDS_PUBLIC_URL") {
+		t.Errorf("a public address without a scheme: %v", err)
 	}
 }

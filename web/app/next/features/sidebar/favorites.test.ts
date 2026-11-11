@@ -53,9 +53,32 @@ describe('favoritesOf', () => {
     expect(ids(fresh.loose)).toEqual(['d', 'c', 'b', 'a']);
   });
 
-  it('puts a pinned chat the person wrote to last first among the unnamed', () => {
-    const written = chats.map((c) => (c.id === 'a' ? { ...c, lastPromptAt: 999 } : c));
-    expect(ids(favoritesOf(written, { groups: [], loose: [] }).loose)).toEqual(['a', 'd', 'c', 'b']);
+  it('keeps the unnamed favorites still when a message or a reply lands in one', () => {
+    const before = ids(favoritesOf(chats, NO_FAVORITES).loose);
+    const written = chats.map((c) => (c.id === 'a' ? { ...c, lastPromptAt: 999, lastActivityAt: 999 } : c));
+    expect(ids(favoritesOf(written, NO_FAVORITES).loose)).toEqual(before);
+  });
+
+  it('draws the same order whichever copy of the list came last (the machine or the cluster)', () => {
+    // The two copies of one chat differ in their times (the cluster's lags, an agent's reminder counts as a message):
+    // the order of the favorites does not follow them, so the 30 s sync does not shake the list.
+    const machine = chats.map((c, i) => ({ ...c, lastPromptAt: 100 + i, lastActivityAt: 200 + i }));
+    const cluster = chats.map((c, i) => ({ ...c, lastPromptAt: 100 - i, lastActivityAt: 50 - i }));
+    const first = ids(favoritesOf(machine, NO_FAVORITES).loose);
+    for (let n = 0; n < 5; n++) {
+      expect(ids(favoritesOf(cluster, NO_FAVORITES).loose)).toEqual(first);
+      expect(ids(favoritesOf(machine, NO_FAVORITES).loose)).toEqual(first);
+    }
+  });
+
+  it('orders chats created at the same moment by id, not by where they stand in the list', () => {
+    const same = [
+      chat('z', 5, { pinned: true }),
+      chat('m', 5, { pinned: true }),
+      chat('b', 5, { pinned: true }),
+    ];
+    expect(ids(favoritesOf(same, NO_FAVORITES).loose)).toEqual(['b', 'm', 'z']);
+    expect(ids(favoritesOf([...same].reverse(), NO_FAVORITES).loose)).toEqual(['b', 'm', 'z']);
   });
 
   it('puts a chat where the layout says and skips the names of chats that are not pinned', () => {

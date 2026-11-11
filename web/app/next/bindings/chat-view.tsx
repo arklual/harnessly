@@ -30,6 +30,7 @@ import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useFeedItems, withOrigin } from '@/next/bindings/feed-items';
 import { useChatHandoff } from '@/next/bindings/chat-handoff';
 import { useChatMove } from '@/next/bindings/chat-move';
+import { useInheritedMrs } from '@/next/bindings/inherited-mrs';
 import MovedNote from '@/next/features/chat-move/moved-note';
 import { ChatLinks } from '@/next/features/chat/handoff';
 import { chatUrl, terminalStopText } from '@/next/bindings/shell-model';
@@ -53,6 +54,7 @@ import { runsByCall, WorkflowRuns } from '@/next/features/workflows/run';
 import { machineApi } from '@/next/core/net/machine';
 import { ImageHost, type IImageHost } from '@/next/features/chat/image-card';
 import { MessagePictures, type IMessagePictures } from '@/next/features/chat/pictures';
+import { useAgentState } from '@/next/stores/chat-state';
 import { conversationsStore, useConversation, useConversationList } from '@/next/stores/conversations';
 import { convOfRef, parsePeer, PeerActions, type IPeerActions } from '@/next/features/chat/peer';
 import { AskSource, type IAskSource } from '@/next/features/asks/parse';
@@ -159,7 +161,9 @@ const ChatView = ({
   // The chat's workflows by the Workflow call that started each: the feed's card of a call draws its run.
   const background = useBackground(conv);
   const workflowRuns = useMemo(() => runsByCall(background), [background]);
-  const workingSince = record?.state.k === 'working' ? record.state.since : null;
+  const agentState = useAgentState(conv);
+  const workingSince = agentState?.k === 'working' ? agentState.since : null;
+  const inherited = useInheritedMrs(machine, conv, agentState !== null && !BUSY.has(agentState.k));
   const terminalStop = record ? terminalStopText(record) : null;
   const limited = record?.limited ?? null;
   const machineClock = useCallback(() => machineNow(machine), [machine]);
@@ -285,7 +289,7 @@ const ChatView = ({
   // to go on from), while the machine can.
   const canRewind = !!record && !!machineView?.features.includes('rewind');
   const firstTurn = before === null ? (items ?? []).find((item) => item.kind === 'turn')?.key : undefined;
-  const agentBusy = BUSY.has(record?.state.k ?? 'unknown');
+  const agentBusy = BUSY.has(agentState?.k ?? 'unknown');
   const rewindActions = useMemo<IRewindActions | null>(
     () =>
       canRewind
@@ -360,6 +364,7 @@ const ChatView = ({
                       <WorkflowRuns value={workflowRuns}>
                         <Feed
                           items={items}
+                          placeKey={conv}
                           onCopyChatLink={() => copyLink(chatUrl(conv))}
                           failed={notFound || wait.expired}
                           failedReason={notFound ? null : failedReason}
@@ -421,6 +426,8 @@ const ChatView = ({
                           modelLabel={modelLabel}
                           onOpenFile={onOpenFile}
                           onOpenOutput={onOpenOutput}
+                          onReviewMr={(url) => goTo({ kind: ROUTE.review, url, chat: conv })}
+                          inheritedMrs={inherited}
                           onShareFile={(path) => setSharing({ path, open: true })}
                           shown={shown}
                           downloadUrl={(path, output) => downloadUrl(machine, path, output)}
@@ -483,7 +490,7 @@ const ChatView = ({
           onClose={() => setSharing({ path: sharing.path, open: false })}
         />
       )}
-      <SelBar conv={conv} />
+      <SelBar conv={conv} aside={provider === 'claude'} />
       <AppBackground machine={machine} conversation={conv} apps={record?.apps} />
     </AttachmentSrc.Provider>
   );

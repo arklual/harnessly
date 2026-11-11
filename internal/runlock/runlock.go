@@ -1,7 +1,7 @@
-// Package runlock is the single-instance lock of a machine's runtime: a file in the data folder naming the process that
-// holds it and its port. Whoever starts second asks that port's health route; a runtime that answers there keeps the
-// lock and the newcomer gives up, so two runtimes never write one data folder. The file is the previous runtime's own,
-// so either of them sees the other.
+// Package runlock is the single-instance lock of a machine's runtime: an exclusive flock on a guard file in the data
+// folder, held for as long as the process lives, so the kernel drops it when the process dies however it dies. Beside it
+// lies the file naming the holder and its port: it is what a newcomer's refusal quotes, and what a runtime older than
+// the guard is recognised by (that one is asked on its port's health route, as it asked itself).
 package runlock
 
 import (
@@ -19,16 +19,24 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
+// guardSuffix names the guard file after the lock file. The guard is never removed: unlinking a file others may hold
+// open would let two processes lock two different files of one name.
+const guardSuffix = ".flock"
+
 // Lock is a lock this process holds.
 type Lock struct {
-	file string
-	pid  int
+	file  string
+	pid   int
+	guard *os.File
 }
 
-// HeldError: a live runtime holds the lock.
+// HeldError: a live runtime holds the lock. PID and Port are zero when the holder has not named itself yet.
 type HeldError struct{ PID, Port int }
 
 func (e *HeldError) Error() string {
+	if e.PID == 0 {
+		return "another runtime is already running (it holds the lock of this data folder)"
+	}
 	return fmt.Sprintf("another runtime is already running (pid=%d, port=%d)", e.PID, e.Port)
 }
 
@@ -53,16 +61,63 @@ func content(pid, port int, startedAt time.Time) []byte {
 	return append(jsvalue.Stringify(o, "  "), '\n')
 }
 
+// write puts body in place of file in one step, so a reader never sees half of it.
 func write(file string, body []byte) error {
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	tmp := file + "." + strconv.Itoa(os.Getpid()) + ".tmp"
+	if err := os.WriteFile(tmp, body, 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, file); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// errBusy: another process holds the guard.
+var errBusy = errors.New("lock held")
+
+// lockGuard takes the exclusive flock on file without waiting. A nil file with a nil error is a filesystem that has no
+// flock: the holder file's rules then stand alone, as they did before the guard.
+func lockGuard(file string) (*os.File, error) {
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if _, err := f.Write(body); err != nil {
+	for {
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err != syscall.EINTR {
+			break
+		}
+	}
+	switch err {
+	case nil:
+		return f, nil
+	case syscall.EWOULDBLOCK:
 		f.Close()
-		return err
+		return nil, errBusy
+	case syscall.ENOLCK, syscall.ENOSYS, syscall.ENOTSUP, syscall.EINVAL:
+		f.Close()
+		return nil, nil
 	}
-	return f.Close()
+	f.Close()
+	return nil, err
+}
+
+// holder is who the lock file names: zeros when it is missing or does not parse.
+func holder(file string) (pid, port int) {
+	raw, err := os.ReadFile(file)
+	var d data
+	if err != nil || json.Unmarshal(raw, &d) != nil {
+		return 0, 0
+	}
+	if d.PID != nil {
+		pid = int(*d.PID)
+	}
+	if d.Port != nil {
+		port = int(*d.Port)
+	}
+	return pid, port
 }
 
 // alive is process.kill(pid, 0) succeeding: a process another user owns counts as gone, as it did.
@@ -86,8 +141,9 @@ func health(port int) (string, bool) {
 	return app, ok
 }
 
-// Acquire takes the lock for this process on port: a lock left by a process that is gone, or by one that is not a
-// runtime, is taken over; one held by a runtime that answers on its port is a *HeldError.
+// Acquire takes the lock for this process on port. While another process holds the guard it is a *HeldError, whether
+// or not that process answers on its port. With the guard taken, the holder file is only a leftover: of a process that
+// is gone, or of a runtime older than the guard, which is a *HeldError while it answers on its port.
 func Acquire(cfg Config, port int) (*Lock, error) {
 	if cfg.Health == nil {
 		cfg.Health = health
@@ -96,58 +152,48 @@ func Acquire(cfg Config, port int) (*Lock, error) {
 		cfg.Now = time.Now
 	}
 	pid := os.Getpid()
-	l := &Lock{file: cfg.File, pid: pid}
 	if err := os.MkdirAll(filepath.Dir(cfg.File), 0o777); err != nil {
 		return nil, err
 	}
-	body := content(pid, port, cfg.Now())
-	err := write(cfg.File, body)
-	if err == nil {
-		return l, nil
+	guard, err := lockGuard(cfg.File + guardSuffix)
+	heldPID, heldPort := holder(cfg.File)
+	if errors.Is(err, errBusy) {
+		if heldPID == pid {
+			return &Lock{file: cfg.File, pid: pid}, nil
+		}
+		return nil, &HeldError{PID: heldPID, Port: heldPort}
 	}
-	if !errors.Is(err, os.ErrExist) {
+	if err != nil {
 		return nil, err
 	}
-	reclaim := func() (*Lock, error) {
-		_ = os.Remove(cfg.File)
-		return l, write(cfg.File, body)
+	l := &Lock{file: cfg.File, pid: pid, guard: guard}
+	if heldPID != pid && alive(heldPID) {
+		if app, ok := cfg.Health(heldPort); ok && app == cfg.App {
+			l.unlock()
+			return nil, &HeldError{PID: heldPID, Port: heldPort}
+		}
 	}
-	raw, rerr := os.ReadFile(cfg.File)
-	var existing data
-	if rerr != nil || json.Unmarshal(raw, &existing) != nil {
-		return reclaim()
+	if err := write(cfg.File, content(pid, port, cfg.Now())); err != nil {
+		l.unlock()
+		return nil, err
 	}
-	holder := 0
-	if existing.PID != nil {
-		holder = int(*existing.PID)
-	}
-	if holder == pid {
-		return l, nil
-	}
-	if !alive(holder) {
-		return reclaim()
-	}
-	holderPort := 0
-	if existing.Port != nil {
-		holderPort = int(*existing.Port)
-	}
-	if app, ok := cfg.Health(holderPort); ok && app == cfg.App {
-		return nil, &HeldError{PID: holder, Port: holderPort}
-	}
-	return reclaim()
+	return l, nil
 }
 
-// Release removes the lock while it is still this process's.
+func (l *Lock) unlock() {
+	if l.guard != nil {
+		_ = l.guard.Close()
+		l.guard = nil
+	}
+}
+
+// Release removes the holder file while it is still this process's, then lets the guard go.
 func (l *Lock) Release() {
 	if l == nil {
 		return
 	}
-	raw, err := os.ReadFile(l.file)
-	if err != nil {
-		return
-	}
-	var d data
-	if json.Unmarshal(raw, &d) == nil && d.PID != nil && int(*d.PID) == l.pid {
+	defer l.unlock()
+	if pid, _ := holder(l.file); pid == l.pid {
 		_ = os.Remove(l.file)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // «Новый тенант» of an organization (GitHub issue 23): the tenant is made in the organization in one transaction, so a
@@ -23,7 +24,8 @@ var requestIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 // tenantMade runs inside the transaction after the tenant is made and bound; a test fails it to see nothing is left.
 var tenantMade = func(context.Context, store.Store, store.Space) error { return nil }
 
-func (s *Service) createTenant(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) createTenant(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct {
 		Name      string
 		RequestID string
@@ -40,10 +42,7 @@ func (s *Service) createTenant(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	if _, err := authz.New(st).Can(ctx, Principal(p), authz.Check{Action: authz.Manage, Scope: authz.Scope{Kind: store.ScopeOrg, ID: o.ID}}); err != nil {
 		return err
 	}
@@ -59,7 +58,7 @@ func (s *Service) createTenant(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	if n, err := st.CountOwnedSpaces(ctx, p.User.ID); err != nil {
 		return err
-	} else if n >= spaces.MaxOwned {
+	} else if n >= s.cfg.MaxSpaces() {
 		return httpx.Conflict("space_limit", "У вас уже много пространств")
 	}
 	now := s.now().UTC()

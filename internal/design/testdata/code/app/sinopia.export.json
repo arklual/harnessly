@@ -1,0 +1,1 @@
+{ "v": 1, "root": "src/design", "router": "react-router", "stories": true, "tests": "vitest" }

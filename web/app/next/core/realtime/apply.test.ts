@@ -14,7 +14,8 @@ import {
   queueStore,
   turnStore,
 } from '@/next/stores/conversation';
-import { conversationsStore } from '@/next/stores/conversations';
+import { conversationsStore, convsCachedStore } from '@/next/stores/conversations';
+import { FROM_CENTRAL, mergeConversation, originOf, SOURCE } from '@/next/stores/conversation-merge';
 import { favoritesStore } from '@/next/stores/favorites';
 import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
 import { machineOrderStore, putMachines } from '@/next/stores/machines';
@@ -179,6 +180,48 @@ describe('a conversation belongs to the machine of its channel', () => {
       e: { type: 'prompt_state', clientId: msg.clientId, state: { k: 'cancelled' }, rev: msg.rev + 6 },
     } as never);
     expect(messagesStore.get(msg.clientId)).toBe(mine);
+  });
+});
+
+describe('the machine list is merged, not swapped', () => {
+  const convsSnap = (conversations: unknown[]) =>
+    ({ ch: 'convs', data: { conversations, projects: [], defaultCwd: '/' } }) as never;
+
+  it('the list is at no moment empty while a snapshot replaces what the browser kept', async () => {
+    const { rt, m } = await openChat();
+    const mine = () => [...conversationsStore.values()].filter((c) => c.machineId === m);
+    const kept = mine();
+    expect(kept.length).toBeGreaterThan(0);
+    // As a reload leaves it: the list is the cache's, with revs of a runtime that has started over since.
+    convsCachedStore.set(m, true);
+    for (const c of kept) conversationsStore.set(c.id, { ...c, rev: c.rev + 100, title: 'kept' });
+    const gone = { ...kept[0]!, id: 'tab-goneGONE1' as ConvId };
+    conversationsStore.set(gone.id, gone);
+
+    const sizes: number[] = [];
+    const off = conversationsStore.subscribeAll(() => sizes.push(mine().length));
+    storeSink.snapshot(m, convsSnap(rt.conversations));
+    off();
+
+    expect(sizes.length).toBeGreaterThan(0);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(kept.length);
+    expect(conversationsStore.has(gone.id)).toBe(false);
+    for (const c of mine()) {
+      expect(c.title).not.toBe('kept');
+      expect(originOf(c).src).toBe(SOURCE.snapshot);
+    }
+    expect(convsCachedStore.has(m)).toBe(false);
+  });
+
+  it('a live event replaces what the copy drew, whatever rev the copy kept', async () => {
+    const { rt } = await openChat();
+    const st = ev<Extract<ConvsEvent, { type: 'conversation_state' }>>('ev.conversation_state');
+    const have = conversationsStore.get(st.id)!;
+    mergeConversation({ ...have, rev: 0, lastActivityAt: have.lastActivityAt + 1 }, FROM_CENTRAL);
+    expect(originOf(conversationsStore.get(st.id)!).src).toBe(SOURCE.central);
+    rt.emit('convs', { ...st, rev: 1 });
+    expect(conversationsStore.get(st.id)!.state).toEqual(st.state);
+    expect(originOf(conversationsStore.get(st.id)!).src).toBe(SOURCE.live);
   });
 });
 

@@ -119,7 +119,8 @@ func withoutStall(e Event) (Event, bool) {
 		}
 	case QueueChangedEv:
 		if q, ok := queueWithoutStall(e.Queue); ok {
-			return QueueChangedEv{Queue: q}, true
+			e.Queue = q
+			return e, true
 		}
 	}
 	return e, false

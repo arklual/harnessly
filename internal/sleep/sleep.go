@@ -158,6 +158,12 @@ func Pick(candidates []Candidate, now float64, underPressure bool, c Config) []s
 	return out
 }
 
+// ResumeNeedsActivity says whether ShouldResumeAtStartup looks at the conversation's last activity at all: finding
+// it reads the transcript, and a state that decides alone, or no window, needs no read.
+func ResumeNeedsActivity(persistedState string, c Config) bool {
+	return persistedState != "busy" && persistedState != "needs-input" && c.ResumeRecentMs != 0
+}
+
 // ShouldResumeAtStartup: only a conversation that was mid-turn when the runtime stopped gets its agent back, plus,
 // when the window is set, the ones active within it. lastActivityAt is nil when unknown.
 func ShouldResumeAtStartup(persistedState string, lastActivityAt *float64, now float64, c Config) bool {

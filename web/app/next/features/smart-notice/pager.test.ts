@@ -6,6 +6,7 @@ import {
   springDone,
   springStep,
   stackLook,
+  withinOne,
   type ISpring,
 } from '@/next/features/smart-notice/pager';
 
@@ -79,5 +80,15 @@ describe('pageSize and isWheelNotch', () => {
     expect(isWheelNotch({ deltaMode: 1, deltaY: 3 })).toBe(true);
     expect(isWheelNotch({ deltaMode: 0, deltaY: 4 })).toBe(false);
     expect(isWheelNotch({ deltaMode: 0, deltaY: 12.5 })).toBe(false);
+  });
+});
+
+describe('withinOne', () => {
+  it('lets one gesture move the stack by one plate at most, either way', () => {
+    expect(withinOne(0.4, 0)).toBe(0.4);
+    expect(withinOne(3.2, 0)).toBe(1);
+    expect(withinOne(-5, 0)).toBe(-1);
+    // After the stack paged (its position moved back by one), the same gesture cannot go on to the next plate.
+    expect(withinOne(0.6, -1)).toBe(0);
   });
 });

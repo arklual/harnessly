@@ -1,7 +1,7 @@
 /* The gallery of the right pane's tab of a change: a pane of the usual width on the window's background. */
 .hx-gallery-change {
   display: flex;
-  width: 600px;
+  width: 100%;
   height: 100vh;
   padding: 12px;
   box-sizing: border-box;
@@ -10,4 +10,10 @@
 .hx-gallery-change > * {
   flex: 1;
   min-width: 0;
+}
+.hx-gallery-change[data-w='420'] {
+  width: 420px;
+}
+.hx-gallery-change[data-w='670'] {
+  width: 670px;
 }

@@ -122,12 +122,21 @@ func (j *Journal) Add(e Entry) {
 	if j == nil || j.closed.Load() {
 		return
 	}
+	if Benign(e) {
+		return
+	}
 	e = clean(e, j.opts.Now())
 	select {
 	case j.ch <- e:
 	default:
 		j.dropped.Add(1)
 	}
+}
+
+// Benign is a line that is not a failure though the browser reports it as one: «ResizeObserver loop …» says a resize
+// was put off to the next frame. The page, its views and Sinopia send it as an exception; it is not kept.
+func Benign(e Entry) bool {
+	return (e.Event == "exception" || e.Event == "console") && strings.Contains(e.Text, "ResizeObserver loop")
 }
 
 // Flush waits until the lines queued before it are written.

@@ -2,6 +2,7 @@ package machines_test
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -377,7 +378,7 @@ func TestConnectedMachineAsTheAPISendsIt(t *testing.T) {
 	sub := a.Calls("link.subscribe")[0]
 	var events []string
 	_ = json.Unmarshal(sub.Params["events"], &events)
-	if strings.Join(events, ",") != "job,login,agents,preflight,policy" {
+	if strings.Join(events, ",") != "job,login,agents,preflight,policy,automations.result,chatwork" {
 		t.Errorf("subscribed events = %v", events)
 	}
 
@@ -1031,7 +1032,7 @@ func TestNoLocalMachineWithoutTheSetting(t *testing.T) {
 
 func TestCloudHasNoLocalMachine(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "code")
-	f := setup(t, hubtest.Env("HUB_EDITION", "cloud"), hubtest.Env("HUB_RUNTIME_DOMAIN", "m.example.test"), hubtest.Env("HUB_LOCAL_CODE_FILE", file))
+	f := setup(t, hubtest.Cloud("m.example.test"), hubtest.Env("HUB_LOCAL_CODE_FILE", file))
 	if err := f.s.Hub.Machines.EnsureLocalCode(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -1085,5 +1086,101 @@ func TestDialURLKeepsThePathOfTheAgentAddress(t *testing.T) {
 		if got := machines.DialURL(in); got != want {
 			t.Errorf("DialURL(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// again registers b with a fresh code of the space, claiming the id of a registered machine with the given key.
+func (f *fixture) again(t *testing.T, spaceOwner *hubtest.Person, spaceID string, b *hubtest.Agent, claimID string, key ed25519.PrivateKey) (hubtest.Resp, hubproto.RegisterResponse) {
+	t.Helper()
+	code := spaceOwner.NewCode(spaceID, "dir")
+	req := b.RegisterRequest(code, hubproto.ProfileDir, hubproto.ViaCommand)
+	req.Previous = hubproto.SignReregister(key, claimID, code, req.PublicKey)
+	r := f.s.Browser().Do("POST", "/agent/register", req)
+	var res hubproto.RegisterResponse
+	if r.Code == http.StatusOK || r.Code == http.StatusCreated {
+		r.JSON(&res)
+	}
+	return r, res
+}
+
+func TestRegisteringAgainWithTheMachinesKeyKeepsItsID(t *testing.T) {
+	f := setup(t)
+	a := f.s.NewAgent(nil)
+	if r := a.Register(f.owner.NewCode(f.spaceID, "dir"), hubproto.ProfileDir, hubproto.ViaCommand); r.Code != http.StatusCreated {
+		t.Fatal(r)
+	}
+	if r := f.owner.Do("PATCH", "/api/machines/"+a.MachineID, map[string]any{"name": "Сборочная"}); r.Code >= 300 {
+		t.Fatal(r)
+	}
+	stream := f.owner.Events(f.spaceID)
+	b := f.s.NewAgent(nil)
+	r, res := f.again(t, f.owner, f.spaceID, b, a.MachineID, a.Priv)
+	if r.Code != http.StatusOK || res.MachineID != a.MachineID || res.RuntimeBasePath != "/m/"+a.MachineID {
+		t.Fatalf("registering again: %s %+v", r, res)
+	}
+	m, err := f.s.DB.S().MachineByID(context.Background(), a.MachineID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.KeyPub != base64.StdEncoding.EncodeToString(b.Pub) || m.EncPub != base64.StdEncoding.EncodeToString(b.Enc.PublicKey().Bytes()) {
+		t.Error("the machine still has the keys of its previous registration")
+	}
+	if m.Name != "Сборочная" || m.SpaceID != f.spaceID || m.CreatedBy != f.owner.ID {
+		t.Errorf("the machine lost its name, space or owner: %+v", m)
+	}
+	list, err := f.s.DB.S().MachinesBySpace(context.Background(), f.spaceID)
+	if err != nil || len(list) != 1 {
+		t.Errorf("machines of the space = %d %v, want the one machine", len(list), err)
+	}
+	stream.Await("the machine event", func(e hubtest.Event) bool {
+		return e.Name == "machine" && strings.Contains(string(e.Data), a.MachineID)
+	})
+	// The key of the previous registration no longer opens a link; the new one does.
+	if code, _ := a.TryConnect(); code == http.StatusSwitchingProtocols {
+		t.Error("the previous registration's key still dials")
+	}
+	b.MachineID = a.MachineID
+	if code, body := b.TryConnect(); code != http.StatusSwitchingProtocols {
+		t.Errorf("the new key does not dial: %d %s", code, body)
+	}
+}
+
+func TestRegisteringAgainWithoutTheMachinesKeyMakesANewMachine(t *testing.T) {
+	f := setup(t)
+	a := f.s.NewAgent(nil)
+	if r := a.Register(f.owner.NewCode(f.spaceID, "dir"), hubproto.ProfileDir, hubproto.ViaCommand); r.Code != http.StatusCreated {
+		t.Fatal(r)
+	}
+	before, _ := f.s.DB.S().MachineByID(context.Background(), a.MachineID)
+
+	// Somebody who knows the machine's id, but signs with a key of their own.
+	thief := f.s.NewAgent(nil)
+	r, res := f.again(t, f.owner, f.spaceID, thief, a.MachineID, thief.Priv)
+	if r.Code != http.StatusCreated || res.MachineID == a.MachineID || res.MachineID == "" {
+		t.Fatalf("a claim without the key: %s %+v", r, res)
+	}
+
+	// The machine's own key, with a code of another space: the id belongs to the space it is in.
+	other := f.s.SignIn("other@example.com")
+	otherSpace, _ := other.NewSpace("Чужая")
+	mover := f.s.NewAgent(nil)
+	r, res = f.again(t, other, otherSpace, mover, a.MachineID, a.Priv)
+	if r.Code != http.StatusCreated || res.MachineID == a.MachineID {
+		t.Fatalf("a claim from another space: %s %+v", r, res)
+	}
+
+	after, _ := f.s.DB.S().MachineByID(context.Background(), a.MachineID)
+	if after.KeyPub != before.KeyPub || after.EncPub != before.EncPub || after.SpaceID != f.spaceID {
+		t.Error("the machine changed under a claim that did not hold")
+	}
+
+	// A machine that was removed does not come back under its id.
+	if r := f.owner.Do("DELETE", "/api/machines/"+a.MachineID, nil); r.Code != http.StatusNoContent {
+		t.Fatal(r)
+	}
+	back := f.s.NewAgent(nil)
+	r, res = f.again(t, f.owner, f.spaceID, back, a.MachineID, a.Priv)
+	if r.Code != http.StatusCreated || res.MachineID == a.MachineID {
+		t.Fatalf("a removed machine's claim: %s %+v", r, res)
 	}
 }

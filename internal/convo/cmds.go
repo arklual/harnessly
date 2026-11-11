@@ -39,6 +39,10 @@ func (c *conv) do(device string, cmd wire.Command, now time.Time) wire.CmdResult
 		return c.send(m, now)
 	case wire.CancelCmd:
 		ch, code := c.box.Cancel(m.ClientID, now)
+		if code == wire.RefuseNotFound {
+			// The box may have noted the cancel of a message it has not seen yet: the note is kept with the conversation.
+			c.dirty = true
+		}
 		return c.result(ch, code, wire.ResultAccepted, now)
 	case wire.RetryCmd:
 		ch, code := c.box.Retry(m.ClientID, c.fd.FindUser, now)
@@ -104,6 +108,7 @@ func (c *conv) do(device string, cmd wire.Command, now time.Time) wire.CmdResult
 		c.deletedAt, c.dirty = ms(now), true
 		seq := c.emitConvs(wire.ConversationRemovedEv{ID: c.rec.ID})
 		c.closePane()
+		c.forget(c.rec.Session == "" || c.d.Closer == nil)
 		return wire.Accepted(wire.ChannelConvs, seq)
 	case wire.ConversationRestoreCmd:
 		return wire.Refused(wire.RefuseNotFound)
@@ -208,6 +213,8 @@ func (c *conv) restore(_ wire.ConversationRestoreCmd, now time.Time) wire.CmdRes
 }
 
 func (c *conv) seen(upTo wire.Ms, now time.Time) wire.CmdResult {
+	// A mark from a clock ahead of the machine's would read the next answers before they come: read is up to now.
+	upTo = min(upTo, ms(now))
 	if upTo > c.rec.SeenAt {
 		c.rec.SeenAt = upTo
 		c.rec.Rev++
@@ -229,6 +236,10 @@ func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 		return wire.Refused(wire.RefuseForbidden)
 	}
 	d := outbox.Draft{ClientID: m.ClientID, Text: m.Text, Mode: m.Mode, Kind: m.Kind, Attachments: []wire.AttachmentRef{}}
+	if ch, ok := c.box.TakenBack(d, now); ok {
+		// The person took the message back before it came: it is shown as cancelled, and the agent is not woken for it.
+		return c.result(ch, "", wire.ResultAccepted, now)
+	}
 	var items []attach.Item
 	if len(m.AttachmentIDs) > 0 {
 		if c.d.Uploads == nil {
@@ -582,7 +593,8 @@ func (c *conv) interrupt(m wire.InterruptCmd, now time.Time) wire.CmdResult {
 	}
 	session, clock := c.rec.Session, c.d.Clock
 	c.spawn(func() any {
-		unlock := typist.Lock(session)
+		// Stop does not wait behind a message being typed: the pane is taken from its writer, whose try ends there.
+		_, unlock := typist.Preempt(session)
 		defer unlock()
 		return typist.Interrupt(pane, clock)
 	}, func(r any) {

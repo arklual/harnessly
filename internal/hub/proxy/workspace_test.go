@@ -121,6 +121,41 @@ func TestWorkspaceServesTheRuntimePageWithTheHomeMachinesSettings(t *testing.T) 
 	}
 }
 
+func TestWorkspaceFilesAreSentGzipped(t *testing.T) {
+	script := strings.Repeat("export const answer = 42; // padding padding padding\n", 200)
+	w := setupWorkspace(t, fleetOn, hubtest.WithOptions(func(o *api.Options) {
+		o.Workspace = fstest.MapFS{
+			"index.html":         {Data: []byte(workspaceIndex + strings.Repeat("<!-- padding -->", 200))},
+			"assets/app-1a2b.js": {Data: []byte(script)},
+		}
+	}))
+	// An Accept-Encoding the test sets itself is not undone by the HTTP client.
+	plain := w.owner.Do("GET", "/agents/assets/app-1a2b.js", nil, "Accept-Encoding", "identity")
+	if plain.Code != 200 || plain.Header.Get("Content-Encoding") != "" || string(plain.Body) != script {
+		t.Fatalf("plain: %d %q, %d bytes", plain.Code, plain.Header.Get("Content-Encoding"), len(plain.Body))
+	}
+	zipped := w.owner.Do("GET", "/agents/assets/app-1a2b.js", nil, "Accept-Encoding", "gzip, br")
+	if zipped.Code != 200 || zipped.Header.Get("Content-Encoding") != "gzip" || len(zipped.Body)*3 > len(script) {
+		t.Fatalf("gzip: %d %q, %d bytes of %d", zipped.Code, zipped.Header.Get("Content-Encoding"), len(zipped.Body), len(script))
+	}
+	for _, r := range []hubtest.Resp{plain, zipped} {
+		if r.Header.Get("Vary") != "Accept-Encoding" || !strings.Contains(r.Header.Get("Cache-Control"), "immutable") ||
+			r.Header.Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("headers: %v", r.Header)
+		}
+	}
+	if plain.Header.Get("ETag") == zipped.Header.Get("ETag") {
+		t.Errorf("one tag for both copies: %q", plain.Header.Get("ETag"))
+	}
+	if r := w.owner.Do("GET", "/agents/assets/app-1a2b.js", nil, "Accept-Encoding", "gzip", "Range", "bytes=0-9"); r.Code != 206 || r.Header.Get("Content-Encoding") != "" || string(r.Body) != script[:10] {
+		t.Errorf("range: %d %q %q", r.Code, r.Header.Get("Content-Encoding"), r.Body)
+	}
+	page := w.owner.Do("GET", "/agents/", nil, append([]string{"Accept-Encoding", "gzip"}, navigate...)...)
+	if page.Code != 200 || page.Header.Get("Content-Encoding") != "gzip" || page.Header.Get("Cache-Control") != "no-cache" {
+		t.Errorf("page: %d %v", page.Code, page.Header)
+	}
+}
+
 func TestWorkspaceAPIGoesToTheNamedMachineOrTheHomeOne(t *testing.T) {
 	w := setupWorkspace(t, fleetOn)
 	if r := w.owner.Do("GET", "/agents/api/platform/bootstrap", nil); r.Code != 200 || string(r.Body) != w.homeName+" /agents/api/platform/bootstrap" {
@@ -259,5 +294,27 @@ func TestWorkspaceDoesNotWaitOnAHomeMachineThatHangs(t *testing.T) {
 	}
 	if r := owner.Do("GET", "/agents/api/which", nil); r.Code != 200 || !strings.HasPrefix(string(r.Body), otherName+" ") {
 		t.Errorf("the person's own calls go to the machine that answers: %s", r)
+	}
+}
+
+// The workspace's documents are the hub's own: no machine answers them, and the page may frame what comes back.
+func TestWorkspaceDocumentsAreAnsweredByTheHub(t *testing.T) {
+	w := setupWorkspace(t, fleetOn, hubtest.Env("HUB_DOCS", "on"))
+	r := w.owner.Do("GET", "/agents/api/platform/docs/_status", nil)
+	if r.Code != 200 || strings.HasPrefix(string(r.Body), w.homeName+" ") || !strings.Contains(string(r.Body), `"enabled":true`) {
+		t.Fatalf("the hub answers the documents' status: %s", r)
+	}
+	if got := r.Header.Get("X-Frame-Options"); got != "" {
+		t.Errorf("a document under the workspace may be framed by it, got X-Frame-Options %q", got)
+	}
+	if r := w.owner.Do("GET", "/agents/api/platform/docsx", nil); r.Code != 200 || !strings.HasPrefix(string(r.Body), w.homeName+" ") {
+		t.Errorf("another path still goes to the machine: %s", r)
+	}
+}
+
+func TestWorkspaceDocumentsStayWithTheMachineWhenTheHubKeepsNone(t *testing.T) {
+	w := setupWorkspace(t, fleetOn)
+	if r := w.owner.Do("GET", "/agents/api/platform/docs/_status", nil); r.Code != 200 || !strings.HasPrefix(string(r.Body), w.homeName+" ") {
+		t.Errorf("without HUB_DOCS the machine answers: %s", r)
 	}
 }

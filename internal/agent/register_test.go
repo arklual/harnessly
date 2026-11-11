@@ -132,6 +132,34 @@ func TestRegisterRefusesToOverwriteAndForceDoes(t *testing.T) {
 	if first.Ed25519 == second.Ed25519 {
 		t.Error("new registration, same key")
 	}
+	// Registering again with the same hub claims the id held before, signed with the key of that registration.
+	if hub.got[0].Previous != nil {
+		t.Errorf("a first registration claims an id: %+v", hub.got[0].Previous)
+	}
+	claim := hub.got[1].Previous
+	if claim == nil || claim.MachineID != first.MachineID {
+		t.Fatalf("claim = %+v", claim)
+	}
+	held := first.SigningKey().Public().(ed25519.PublicKey)
+	if !hubproto.VerifyReregister(held, claim, "hx_1", hub.got[1].PublicKey) {
+		t.Error("the claim is not signed with the previous registration's key for this code and the new key")
+	}
+}
+
+func TestRegisterAgainWithAnotherHubClaimsNothing(t *testing.T) {
+	one, two := newFakeRegistry(t), newFakeRegistry(t)
+	file := filepath.Join(t.TempDir(), "machine.json")
+	opts := RegisterOptions{Hub: one.srv.URL, Code: "hx_1", Profile: hubproto.ProfileFull, MachineFile: file}
+	if _, err := Register(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	opts.Hub, opts.Force = two.srv.URL, true
+	if _, err := Register(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if len(two.got) != 1 || two.got[0].Previous != nil {
+		t.Errorf("another hub was told of the machine's id here: %+v", two.got)
+	}
 }
 
 func TestRegisterFailureLeavesNoFile(t *testing.T) {

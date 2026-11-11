@@ -107,14 +107,6 @@
   color: var(--hx-fg-1);
   overflow-wrap: anywhere;
   white-space: pre-line;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  overflow: hidden;
-}
-.hx-recap__text[data-open='true'] {
-  display: block;
-  overflow: visible;
 }
 .hx-recap__line {
   display: flex;
@@ -123,20 +115,6 @@
   margin-top: 8px;
   font-size: 12px;
   color: var(--hx-fg-3);
-}
-.hx-recap__more {
-  margin-left: auto;
-  padding: 2px 6px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  font: inherit;
-  color: var(--hx-fg-2);
-  cursor: pointer;
-  transition: background 200ms var(--hx-ease-out);
-}
-.hx-recap__more:hover {
-  background: var(--hx-bg-hover);
 }
 .hx-recap + .hx-shots,
 .hx-recap + .hx-side__sec {
@@ -696,19 +674,10 @@ button.hx-bg__main:hover {
     top: 0;
     margin: 4px auto 6px;
   }
-  .hx-side
-    :is(
-      .hx-bg__state,
-      .hx-bg__on,
-      .hx-bg__last,
-      .hx-side__text,
-      .hx-side__more,
-      .hx-recap__age,
-      .hx-recap__more
-    ) {
+  .hx-side :is(.hx-bg__state, .hx-bg__on, .hx-bg__last, .hx-side__text, .hx-side__more, .hx-recap__age) {
     font-size: 13px;
   }
-  .hx-side :is(.hx-side__head, .hx-side__more, .hx-recap__more) {
+  .hx-side :is(.hx-side__head, .hx-side__more) {
     min-height: 44px;
   }
   .hx-side .hx-bg__stop {

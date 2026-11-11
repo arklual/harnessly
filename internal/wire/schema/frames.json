@@ -647,7 +647,19 @@
         "convs": {"type": "array", "items": {"type": "string", "pattern": "^tab-"}},
         "touchedBy": {"type": "array", "items": {"type": "string", "pattern": "^tab-"}},
         "owner": {"$ref": "#/$defs/DesignOwner"},
-        "role": {"$ref": "#/$defs/DesignRole"}
+        "role": {"$ref": "#/$defs/DesignRole"},
+        "appKind": {"$ref": "#/$defs/DesignAppKind"}
+      }
+    },
+    "DesignAppKind": {
+      "type": "object",
+      "required": ["id", "title", "app", "appName"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "app": {"type": "string", "minLength": 1},
+        "appName": {"type": "string"}
       }
     },
     "DesignRole": {"enum": ["view", "comment", "edit", "manage", "owner"]},
@@ -1195,7 +1207,17 @@
         }
       }
     },
-    "MadeKind": {"enum": ["doc", "board", "design", "task"]},
+    "MadeKind": {"enum": ["doc", "board", "design", "task", "mr"]},
+    "MadeFrom": {
+      "type": "object",
+      "required": ["kind", "id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["subagent", "subchat"]},
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string"}
+      }
+    },
     "MadeTaskRef": {
       "type": "object",
       "required": ["key", "title", "url", "state", "resolved"],
@@ -1233,7 +1255,8 @@
         "at": {"type": "integer", "minimum": 0},
         "cover": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
         "designKind": {"oneOf": [{"$ref": "#/$defs/DesignKind"}, {"type": "null"}]},
-        "task": {"oneOf": [{"$ref": "#/$defs/MadeTaskInfo"}, {"type": "null"}]}
+        "task": {"oneOf": [{"$ref": "#/$defs/MadeTaskInfo"}, {"type": "null"}]},
+        "from": {"$ref": "#/$defs/MadeFrom"}
       }
     },
     "ChatMade": {
@@ -1572,6 +1595,7 @@
         "bgAgents": {"type": "integer", "minimum": 1},
         "bgWait": {"$ref": "#/$defs/BgWait"},
         "terminalStop": {"$ref": "#/$defs/TerminalStop"},
+        "notSavedSince": {"type": "integer", "minimum": 1},
         "terminalFailure": {"$ref": "#/$defs/TerminalFailure"},
         "rewinds": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/RewindMark"}},
         "origin": {"$ref": "#/$defs/Origin"},
@@ -2223,7 +2247,65 @@
         "background": {"type": "array", "items": {"$ref": "#/$defs/BackgroundTask"}},
         "shots": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/Shot"}},
         "pictures": {"type": "array", "maxItems": 60, "items": {"$ref": "#/$defs/Picture"}},
-        "now": {"oneOf": [{"$ref": "#/$defs/Now"}, {"type": "null"}]}
+        "now": {"oneOf": [{"$ref": "#/$defs/Now"}, {"type": "null"}]},
+        "agent": {"$ref": "#/$defs/AgentStamp"},
+        "pane": {"$ref": "#/$defs/Pane"}
+      }
+    },
+    "Pane": {
+      "type": "object",
+      "required": ["count"],
+      "additionalProperties": false,
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "reset": {"type": "boolean"},
+        "links": {"type": "array", "maxItems": 200, "items": {"$ref": "#/$defs/PaneLink"}},
+        "items": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/PaneItem"}}
+      }
+    },
+    "PaneLink": {
+      "type": "object",
+      "required": ["url", "label", "at", "count", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "url": {"type": "string", "minLength": 1},
+        "label": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "at": {"type": "integer", "minimum": 0},
+        "count": {"type": "integer", "minimum": 0},
+        "kind": {"type": "string", "minLength": 1}
+      }
+    },
+    "PaneItem": {
+      "type": "object",
+      "required": ["id", "k", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "k": {"type": "string", "minLength": 1},
+        "at": {"type": "integer", "minimum": 0},
+        "tool": {"type": "string"},
+        "use": {"type": "string"},
+        "path": {"type": "string"},
+        "text": {"type": "string"},
+        "cwd": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "images": {"type": "array", "items": {"type": "string"}},
+        "peer": {
+          "type": "object",
+          "required": ["to", "text"],
+          "additionalProperties": false,
+          "properties": {"to": {"type": "string"}, "text": {"type": "string"}}
+        }
+      }
+    },
+    "AgentStamp": {
+      "type": "object",
+      "required": ["state", "rev", "epoch"],
+      "additionalProperties": false,
+      "properties": {
+        "state": {"$ref": "#/$defs/AgentState"},
+        "rev": {"type": "integer", "minimum": 1},
+        "epoch": {"type": "string", "minLength": 1}
       }
     },
     "MachineEvent": {
@@ -2411,7 +2493,12 @@
           "type": "object",
           "required": ["type", "queue"],
           "additionalProperties": false,
-          "properties": {"type": {"const": "queue_changed"}, "queue": {"$ref": "#/$defs/Queue"}}
+          "properties": {
+            "type": {"const": "queue_changed"},
+            "queue": {"$ref": "#/$defs/Queue"},
+            "agent": {"$ref": "#/$defs/AgentStamp"},
+            "pane": {"$ref": "#/$defs/Pane"}
+          }
         },
         {
           "type": "object",

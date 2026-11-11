@@ -162,7 +162,7 @@ func TestMeSessionsPages(t *testing.T) {
 func TestMeFollowsTheFlag(t *testing.T) {
 	s := hubtest.New(t)
 	anna := s.SignIn("anna@example.com")
-	for _, p := range []string{"/api/me/usage", "/api/me/sessions", "/api/me/kpis"} {
+	for _, p := range []string{"/api/me/usage", "/api/me/sessions", "/api/me/kpis", "/api/me/stats"} {
 		if r := anna.Do("GET", p, nil); r.Code != 404 {
 			t.Errorf("%s with HUB_ORGS off: %s", p, r)
 		}
@@ -220,5 +220,50 @@ func TestMeKPIs(t *testing.T) {
 	}
 	if v := by["cache_hit"]; v.Value != nil || v.Verdict != "too_few" {
 		t.Errorf("cache_hit without token metrics = %+v", v)
+	}
+}
+
+func TestMeStats(t *testing.T) {
+	_, anna, boris := spend(t)
+	var got analytics.MeStatsResponse
+	r := anna.Do("GET", "/api/me/stats", nil)
+	if r.Code != 200 {
+		t.Fatalf("stats: %s", r)
+	}
+	r.JSON(&got)
+	if got.Viewer != "anna@example.com" || len(got.Runtimes) != 1 || got.Runtimes[0].Report == nil {
+		t.Fatalf("answer = %+v", got)
+	}
+	rep := got.Runtimes[0].Report
+	// Her two chats; the subagent is inside s1. s1 started on 2026-10-05 (Moscow), s2 at 01:00 on the 6th.
+	if len(rep.Sessions) != 2 || rep.Sessions[0].ID != "s2" || rep.Sessions[1].ID != "s1" {
+		t.Fatalf("sessions = %+v", rep.Sessions)
+	}
+	s1 := rep.Sessions[1]
+	if s1.Cost != 40 || s1.Prompts != 23 || s1.Model == nil || *s1.Model != "claude-opus-4-6" || s1.Input != 300 || s1.Title != nil || s1.Project != nil {
+		t.Errorf("s1 = %+v", s1)
+	}
+	d5, d6 := rep.Days["2026-10-05"], rep.Days["2026-10-06"]
+	if d5.Prompts != 23 || d5.Sessions != 1 || d5.PRs != 1 || len(d5.Hours) != 24 || d6.Prompts != 8 {
+		t.Errorf("days = %+v %+v", d5, d6)
+	}
+	var cost float64
+	for _, u := range rep.Usage {
+		if len(u) != 10 || u[3] != "" {
+			t.Fatalf("usage row = %v", u)
+		}
+		cost += u[8].(float64)
+	}
+	if cost != 45 {
+		t.Errorf("usage cost = %v, rows %v", cost, rep.Usage)
+	}
+	if len(rep.HubMissing) == 0 {
+		t.Error("no missing blocks named")
+	}
+	// Only one's own.
+	var b analytics.MeStatsResponse
+	boris.Do("GET", "/api/me/stats", nil).JSON(&b)
+	if n := len(b.Runtimes[0].Report.Sessions); n != 1 {
+		t.Errorf("boris sees %d sessions", n)
 	}
 }

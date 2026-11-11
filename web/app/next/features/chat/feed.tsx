@@ -33,6 +33,7 @@ import {
   type TShownKinds,
 } from '@/next/features/chat/outputs';
 import type { TurnOutput } from '@/next/features/chat/types';
+import MrDone, { chatMrs, type IDoneMr } from '@/next/features/chat/mr-done';
 import NowBlock from '@/next/features/chat/now';
 import WaitingLine from '@/next/features/chat/waiting';
 import FeedMenu from '@/next/features/chat/feed-menu';
@@ -56,6 +57,16 @@ import { CatchingUp, FeedLoading, FeedStart, OlderLoading } from '@/next/feature
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 import useFeedAnchor from '@/next/features/chat/use-feed-anchor';
+import {
+  AT_BOTTOM,
+  PLACE,
+  placeAmong,
+  placeOf,
+  rememberPlace,
+  scrollToPlace,
+  type IRowBox,
+  type TFeedPlace,
+} from '@/next/features/chat/feed-place';
 import '@/next/styles/ui.css';
 import '@/next/styles/chat.css';
 
@@ -71,6 +82,18 @@ const NEW_TAIL = 4;
 const REVEAL_MS = 1800;
 /** Turns drawn around the one revealed, when a long feed draws only a window. */
 const REVEAL_AROUND = 3;
+/** Pages of older turns asked at most to reach the row the reader left the chat at. */
+const PLACE_PAGES = 20;
+
+type TRowPlace = Extract<TFeedPlace, { k: typeof PLACE.at }>;
+
+/** The drawn rows from the top, measured one by one as they are read: the place is found without measuring the rest. */
+function* rowBoxes(scroller: HTMLElement): Generator<IRowBox> {
+  for (const row of scroller.querySelectorAll<HTMLElement>('.hx-turnwrap[data-key]')) {
+    const box = row.getBoundingClientRect();
+    yield { key: row.dataset.key ?? '', top: box.top, bottom: box.bottom };
+  }
+}
 
 /** Measured heights of drawn turns, by key: what the spacers of a windowed feed are made of. */
 class HeightCache {
@@ -111,6 +134,11 @@ export interface IFeedProps extends THandlers {
   olderFailed?: string | null;
   onLoadOlder: () => void;
   /**
+   * The chat whose place the feed keeps: going to another chat and back opens the feed where the reader left it (the
+   * bottom when they were there). None: the feed opens at the bottom.
+   */
+  placeKey?: string;
+  /**
    * A message a search result points at: the feed brings its turn into view (loading older turns until it is there)
    * and shows it for a moment, then says it is served. A turn that is not in the chat any more is given up on.
    */
@@ -141,6 +169,10 @@ export interface IFeedProps extends THandlers {
   onOpenFile?: (path: string) => void;
   /** A thing a turn made (a page, a design, a document, a merge request, a stand), in the right pane. */
   onOpenOutput?: (output: TurnOutput) => void;
+  /** A merge request of the chat in the «Ревью кода» app (the block under a finished task). */
+  onReviewMr?: (url: string) => void;
+  /** The merge requests the chat's subchats and subagents opened: the block under a finished task lists them too. */
+  inheritedMrs?: readonly IDoneMr[];
   /** A document file of a turn, shared (the dialog is the host's). */
   onShareFile?: (path: string) => void;
   /** Which kinds of what a turn made get a card (Settings); everything but the plain files when not given. */
@@ -156,6 +188,10 @@ export interface IFeedProps extends THandlers {
  * A turn that one of the person's messages started keeps that message's row: the bubble that went out becomes the
  * turn's prompt in place, with no row leaving and another coming in.
  */
+/** A turn the agent is in now: live in the feed, and not over by the chat's state. */
+const runs = (item: FeedItem): boolean =>
+  item.kind === 'turn' && item.turn.status === 'live' && !item.settled;
+
 const rowKey = (item: FeedItem): string =>
   item.kind === 'turn' && item.prompt?.clientId ? item.prompt.clientId : item.key;
 
@@ -364,6 +400,34 @@ const Feed = (props: IFeedProps) => {
 
   const noteAnchor = useFeedAnchor(scrollerRef, atBottom);
 
+  // The place the reader left this chat at, to go back to when the feed opens; null once it is reached or given up.
+  // A search result that points at a message wins over it.
+  const [leftAt] = useState<TRowPlace | null>(() => {
+    if (!props.placeKey || props.reveal) return null;
+    const place = placeOf(props.placeKey);
+    return place.k === PLACE.at ? place : null;
+  });
+  const goingBack = useRef<TRowPlace | null>(leftAt);
+  const placePages = useRef(0);
+  const placeFrame = useRef(0);
+
+  /** Notes where the reader stands, after the frame's layout: the bottom, or the row at the top edge. */
+  const notePlace = useCallback(() => {
+    if (!latest.current.placeKey || goingBack.current) return;
+    cancelAnimationFrame(placeFrame.current);
+    placeFrame.current = requestAnimationFrame(() => {
+      const scroller = scrollerRef.current;
+      const chat = latest.current.placeKey;
+      if (!scroller || !chat || goingBack.current) return;
+      if (atBottom.current) {
+        rememberPlace(chat, AT_BOTTOM);
+        return;
+      }
+      const place = placeAmong(rowBoxes(scroller), scroller.getBoundingClientRect().top);
+      if (place) rememberPlace(chat, place);
+    });
+  }, []);
+
   // A message a search result pointed at: the turn it is in is drawn (the window moves to it) and brought into view;
   // the older turns are loaded until it is there.
   const { reveal = null, onRevealed, hasOlder: moreOlder, onLoadOlder: loadOlder } = props;
@@ -409,7 +473,8 @@ const Feed = (props: IFeedProps) => {
     frame.current = requestAnimationFrame(() => {
       const scroller = scrollerRef.current;
       const list = (latest.current.items ?? []).map((item) => item.key);
-      if (!scroller || list.length < VIRTUAL_FROM) return;
+      // On the way back to the reader's place the window is the place's, not the bottom's the feed opened at.
+      if (!scroller || list.length < VIRTUAL_FROM || goingBack.current) return;
       const next = feedWindow(list, heights.view(), scroller.scrollTop, scroller.clientHeight);
       const nextRange: IKeyWindow = {
         startKey: list[next.start],
@@ -553,6 +618,50 @@ const Feed = (props: IFeedProps) => {
     lastScrollHeight.current = scroller.scrollHeight;
   }, [items, keys, stick, rewindow]);
 
+  // Back to where the reader left the chat: the row they had at the top edge stands there again, as far under it as it
+  // was. The feed opened at the bottom above; when the row is not drawn yet the window moves to it first.
+  useLayoutEffect(() => {
+    const place = goingBack.current;
+    const scroller = scrollerRef.current;
+    if (!place || !scroller || items === null) return;
+    const at = keys.indexOf(place.key);
+    if (at < 0) return;
+    if (virtual && (at < win.start || at >= win.end)) {
+      setRange({
+        startKey: keys[Math.max(0, at - REVEAL_AROUND)],
+        endKey: keys[Math.min(keys.length - 1, at + REVEAL_AROUND)],
+      });
+      return;
+    }
+    const row = scroller.querySelector<HTMLElement>(`.hx-turnwrap[data-key="${CSS.escape(place.key)}"]`);
+    if (!row) return;
+    goingBack.current = null;
+    atBottom.current = false;
+    setAway(true);
+    scroller.scrollTop += scrollToPlace(
+      place,
+      row.getBoundingClientRect().top,
+      scroller.getBoundingClientRect().top,
+    );
+    lastTop.current = scroller.scrollTop;
+    lastScrollHeight.current = scroller.scrollHeight;
+    noteAnchor();
+  }, [items, keys, range, virtual, win.start, win.end, noteAnchor]);
+
+  // The row is older than the turns loaded: older pages come until it is there. A row that is not in the chat any more
+  // (rewound, cut) is given up on, and the feed stays at the bottom.
+  useEffect(() => {
+    const place = goingBack.current;
+    if (!place || items === null || keys.includes(place.key) || loadingOlder) return;
+    if (moreOlder && olderError === null && placePages.current < PLACE_PAGES) {
+      placePages.current += 1;
+      loadOlder();
+      return;
+    }
+    goingBack.current = null;
+    notePlace();
+  }, [items, keys, loadingOlder, moreOlder, olderError, loadOlder, notePlace]);
+
   // The first page holds only the newest turns: a feed that does not reach OLDER_AHEAD_PX above the viewport never
   // scrolls there, so older turns are asked without a scroll, page after page, until it does or there are none.
   const olderFailed = props.olderFailed ?? null;
@@ -579,6 +688,7 @@ const Feed = (props: IFeedProps) => {
     }
     lastScrollHeight.current = scroller.scrollHeight;
     noteAnchor();
+    notePlace();
     const current = latest.current;
     if (
       scroller.scrollTop < OLDER_AHEAD_PX &&
@@ -589,7 +699,7 @@ const Feed = (props: IFeedProps) => {
     )
       current.onLoadOlder();
     rewindow();
-  }, [rewindow, noteAnchor]);
+  }, [rewindow, noteAnchor, notePlace]);
 
   const toNew = () => {
     const scroller = scrollerRef.current;
@@ -640,6 +750,13 @@ const Feed = (props: IFeedProps) => {
   );
 
   const docs = useMemo(() => docPathsOf(items ?? []), [items]);
+  // The chat's merge requests under a finished task: nothing runs, waits or works.
+  const inheritedMrs = props.inheritedMrs;
+  const mrs = useMemo(() => chatMrs(items ?? [], inheritedMrs), [items, inheritedMrs]);
+  const taskDone = items !== null && !items.some(runs) && !waiting && workingSince === null;
+  const canReview = props.onReviewMr !== undefined;
+  const openMr = useCallback((output: TurnOutput) => latest.current.onOpenOutput?.(output), []);
+  const reviewMr = useCallback((url: string) => latest.current.onReviewMr?.(url), []);
   const canOpenRef = props.onOpenRef !== undefined;
   const refContext = useMemo<IRefContext>(
     () => ({
@@ -710,18 +827,21 @@ const Feed = (props: IFeedProps) => {
                     />
                   ))}
                   {win.bottom > 0 && <Spacer px={win.bottom} />}
-                  {!items.some((x) => x.kind === 'turn' && x.turn.status === 'live') && waiting && (
+                  {!items.some(runs) && waiting && (
                     <div className="hx-msg" data-kind="turn">
                       <WaitingLine agents={waiting.agents} onOpen={waiting.onOpen} />
                     </div>
                   )}
-                  {!items.some((x) => x.kind === 'turn' && x.turn.status === 'live') &&
-                    !waiting &&
-                    workingSince !== null && (
-                      <div className="hx-msg" data-kind="turn">
-                        <NowBlock now={null} startedAt={workingSince} wait={null} machineName={machineName} />
-                      </div>
-                    )}
+                  {!items.some(runs) && !waiting && workingSince !== null && (
+                    <div className="hx-msg" data-kind="turn">
+                      <NowBlock now={null} startedAt={workingSince} wait={null} machineName={machineName} />
+                    </div>
+                  )}
+                  <MrDone
+                    mrs={shown.mrDone && taskDone && mrs.length > 0 ? mrs : null}
+                    onOpen={openMr}
+                    onReview={canReview ? reviewMr : undefined}
+                  />
                   {goalReached !== null && (
                     <div className="hx-turnwrap">
                       <GoalNote text={goalReached.text} onContinue={goalReached.onContinue} />

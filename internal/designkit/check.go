@@ -75,6 +75,11 @@ type checker struct {
 	rep    *CheckReport
 	themes int
 	cur    map[string]*compFacts // the components of the theme being checked, for the readiness
+	// dir is the kits folder the base of a kit that extends is looked for in; "" checks the folder alone.
+	dir string
+	// inherited are the base kit's components of the theme being checked (extends.go).
+	inherited map[string]*Component
+	extending bool
 }
 
 // add reports a problem of rule id (rules.go): the registry gives its level.
@@ -100,7 +105,12 @@ func (k *checker) read(rel string) ([]byte, bool) {
 }
 
 // Check checks the kit folder root: kit.json's themes when it has one, else the folder as one theme.
-func Check(root string) (*CheckReport, error) {
+func Check(root string) (*CheckReport, error) { return CheckIn(root, "") }
+
+// CheckIn is Check for a kit that may extend another: the base is looked for in the kits folder dir, and the child is
+// checked as assembled with it (what it inherits can be named by its presets, parts and samples; what it replaces keeps
+// the base's props). With no dir, a kit that extends is checked as its own files only.
+func CheckIn(root, dir string) (*CheckReport, error) {
 	st, err := os.Stat(root)
 	if err != nil {
 		return nil, err
@@ -108,7 +118,7 @@ func Check(root string) (*CheckReport, error) {
 	if !st.IsDir() {
 		return nil, fmt.Errorf("%s is not a folder", root)
 	}
-	k := &checker{root: root, rep: &CheckReport{Themes: []string{}, Problems: []Problem{}, Level: -1, Readiness: []ComponentReadiness{}}}
+	k := &checker{root: root, dir: dir, rep: &CheckReport{Themes: []string{}, Problems: []Problem{}, Level: -1, Readiness: []ComponentReadiness{}}}
 	folders := map[string]string{}
 	if raw, ok := k.read("kit.json"); ok {
 		var kf kitFile
@@ -173,6 +183,7 @@ type checkComponent struct {
 	Preset      json.RawMessage `json:"preset"`
 	Status      json.RawMessage `json:"status"`
 	ReplacedBy  json.RawMessage `json:"replacedBy"`
+	Todo        []string        `json:"todo"`
 }
 
 func (k *checker) theme(folder string) {
@@ -191,6 +202,7 @@ func (k *checker) theme(folder string) {
 	var all map[string]json.RawMessage
 	_ = json.Unmarshal(raw, &all)
 	omitted := k.identity(mf, all)
+	k.extendsLink(mf, raw)
 	if strings.TrimSpace(m.Title) == "" {
 		k.add("index.title", mf, "no title: the kit screen shows the id instead")
 	}
@@ -216,7 +228,7 @@ func (k *checker) theme(folder string) {
 	k.readiness(folder, omitted)
 	k.assets(folder, mf, m.AssetGroups)
 	k.templates(folder, mf, m.Templates)
-	if comps == 0 && len(m.AssetGroups) == 0 && len(m.Templates) == 0 {
+	if comps == 0 && len(m.AssetGroups) == 0 && len(m.Templates) == 0 && !k.extending {
 		k.add("index.empty", mf, "no groups, assetGroups or templates: the kit screen has no canvas for this theme")
 	}
 	if comps > 0 {
@@ -277,6 +289,9 @@ func (k *checker) groups(folder, mf string, raw json.RawMessage) int {
 	seen := map[string]bool{}
 	descs := map[string]string{}
 	all := map[string]checkComponent{}
+	for id, b := range k.inherited {
+		all[id] = checkComponent{ID: b.ID, Name: b.Name, Description: b.Description, Props: b.Props}
+	}
 	for _, g := range groups {
 		for _, c := range g.Components {
 			all[firstNonEmpty(c.ID, c.Name)] = c
@@ -300,6 +315,11 @@ func (k *checker) groups(folder, mf string, raw json.RawMessage) int {
 				k.add("component.twice", mf, "%s: listed twice", where)
 			}
 			seen[id] = true
+			if b, ok := k.inherited[id]; ok {
+				if why := PropsCompatible(b.Props, c.Props); why != "" {
+					k.add("extends.override", mf, "%s replaces the component of %s and %s: a board written on the base would not draw", where, b.From, why)
+				}
+			}
 			k.component(folder, mf, where, id, c, descs, all)
 		}
 	}
@@ -320,6 +340,9 @@ func (k *checker) component(folder, mf, where, id string, c checkComponent, desc
 			k.add("component.description-same", mf, "%s: same description as %s: an agent cannot tell them apart", where, other)
 		}
 		descs[key] = id
+	}
+	if len(c.Todo) > 0 {
+		k.add("component.todo", mf, "%s: still to write (from an import): %s; delete the todo when it is done", where, strings.Join(c.Todo, "; "))
 	}
 	for _, p := range c.Props {
 		switch {

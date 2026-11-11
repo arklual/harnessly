@@ -1,6 +1,7 @@
 package status
 
 import (
+	"context"
 	"encoding/json"
 	"slices"
 	"time"
@@ -8,13 +9,17 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/background"
 	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/sockets"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 type applyOpts struct {
 	silent bool // no web push
 	// restored: the state the agent was already in before a wrong inactive, not a turn that ended now.
 	restored bool
+	// mirror: the state a chat's actor reached (MirrorChat), the only one a chat's tab takes.
+	mirror bool
 }
 
 // applyCliState moves a tab to a new state with its side effects, in the old order. Callers persist and broadcast.
@@ -22,6 +27,11 @@ type applyOpts struct {
 func (m *Manager) applyCliState(tabID string, e *Entry, next string, o applyOpts) {
 	prev := e.CliState
 	if prev == next {
+		return
+	}
+	// A chat's agent has one automaton, its actor's: the keeper's hooks, polls and watchdogs leave the chat's tab
+	// where the actor put it.
+	if !o.mirror && m.chat(e) {
 		return
 	}
 	prevBusySince := e.BusySince
@@ -46,17 +56,20 @@ func (m *Manager) applyCliState(tabID string, e *Entry, next string, o applyOpts
 	if next == ReadyForReview && e.JSONLPath != "" && !o.restored {
 		time.AfterFunc(historySaveDelay, func() { m.saveHistory(tabID, e, prevBusySince, false) })
 	}
-	if turnEnd(prev, next) && (e.PanelType.Value() == agents.ClaudePanel || e.PanelType.Value() == agents.CodexPanel) && m.d.TurnEnd != nil {
+	// A chat's actor tells its turn's end, its question and its transcript's news itself (convo.Notice): the keeper
+	// neither pushes, nor snapshots, nor reads the transcript for it.
+	chat := m.chat(e)
+	if !chat && turnEnd(prev, next) && (e.PanelType.Value() == agents.ClaudePanel || e.PanelType.Value() == agents.CodexPanel) && m.d.TurnEnd != nil {
 		session := e.TmuxSession
 		time.AfterFunc(turnEndSnapshotDelay, func() { m.d.TurnEnd(tabID, m.d.Tmux.SessionCwd(session)) })
 	}
-	if !o.silent && (next == ReadyForReview || next == NeedsInput) {
-		go m.push(tabID, e, next)
+	if !o.silent && !chat && (next == ReadyForReview || next == NeedsInput) {
+		safego.Go("status push", func() { m.push(tabID, e, next) })
 	}
 	// Idle tabs stay watched too: a turn started by a background task or another session fires no prompt hook.
-	if e.JSONLPath != "" && next != Inactive {
+	if e.JSONLPath != "" && next != Inactive && !chat {
 		m.watch.start(tabID, e.JSONLPath)
-	} else if next == Inactive {
+	} else if next == Inactive || chat {
 		m.watch.stop(tabID)
 	}
 	m.touchBackground(tabID, e, true)
@@ -189,11 +202,11 @@ func (m *Manager) Dismiss(tabID string, exclude *sockets.Client) {
 	if m.d.History == nil {
 		return
 	}
-	go func() {
+	safego.Go("status dismiss", func() {
 		if updated, err := m.d.History.Dismiss(tabID, at); err == nil && updated != nil {
 			m.broadcast(map[string]any{"type": "session-history:update", "entry": updated.Clip()}, nil)
 		}
-	}()
+	})
 }
 
 // Ack: the page answered the question its last notification asked.
@@ -232,6 +245,14 @@ func (m *Manager) updateFromHook(session, event, notificationType string) {
 		m.mu.Unlock()
 		return
 	}
+	if m.chat(e) {
+		// The chat's actor hears the same hook and moves the tab (MirrorChat); the keeper only ends its launch.
+		if event == EventSessionStart && e.LaunchingSince != nil {
+			m.launchEnded(tabID, e)
+		}
+		m.mu.Unlock()
+		return
+	}
 	if !workStates[event] || event == EventNotification && notificationType != "" && !agents.NotificationNeedsInput(notificationType) {
 		m.mu.Unlock()
 		return
@@ -264,14 +285,14 @@ func (m *Manager) updateFromHook(session, event, notificationType string) {
 	}
 	// A turn that ended before its transcript was found (a short answer) is looked for at its end too.
 	resolve := (next == Busy || next == NeedsInput || event == EventStop || event == EventStopFailure) && e.JSONLPath == ""
-	refresh := (event == EventStop || event == EventStopFailure) && e.JSONLPath != ""
+	refresh := (event == EventStop || event == EventStopFailure) && e.JSONLPath != "" && !m.chat(e)
 	transcript, p := e.JSONLPath, m.provider(e)
 	m.mu.Unlock()
 	if resolve {
-		go m.resolveTranscript(tabID, session)
+		safego.Go("status resolve transcript", func() { m.resolveTranscript(tabID, session) })
 	}
 	if refresh && p != nil {
-		go m.refreshSnippet(tabID, e, p, transcript, false)
+		safego.Go("status refresh snippet", func() { m.refreshSnippet(tabID, e, p, transcript, false) })
 		time.AfterFunc(500*time.Millisecond, func() { m.refreshSnippet(tabID, e, p, transcript, true) })
 	}
 }
@@ -509,11 +530,11 @@ func (m *Manager) touchBackground(tabID string, e *Entry, event bool) {
 		return
 	}
 	if e.CliState == Inactive {
-		go m.feed.Remove(tabID)
+		safego.Go("status feed remove", func() { m.feed.Remove(tabID) })
 		return
 	}
 	src := background.Source{TmuxSession: e.TmuxSession, Transcript: e.JSONLPath, Provider: e.AgentProviderID.Value()}
-	go m.feed.Touch(tabID, src, event)
+	safego.Go("status feed touch", func() { m.feed.Touch(tabID, src, event) })
 }
 
 // syncBackground drops tabs that are gone from the feed and touches those it reads under an old source. Called with the
@@ -521,7 +542,7 @@ func (m *Manager) touchBackground(tabID string, e *Entry, event bool) {
 func (m *Manager) syncBackground() {
 	for _, id := range m.feed.TabIDs() {
 		if m.tabs[id] == nil {
-			go m.feed.Remove(id)
+			safego.Go("status feed remove", func() { m.feed.Remove(id) })
 		}
 	}
 	for _, id := range m.order {
@@ -540,10 +561,10 @@ func (m *Manager) RemoveTab(tabID string) {
 	e := m.tabs[tabID]
 	if e != nil && (e.CliState == Busy || e.CliState == NeedsInput) && e.LastUserMessage.Has() && e.LastUserMessage.Value() != "" {
 		busy := e.BusySince
-		go m.saveHistory(tabID, e, busy, true)
+		safego.Go("status save history", func() { m.saveHistory(tabID, e, busy, true) })
 	}
 	m.watch.stop(tabID)
-	go m.feed.Remove(tabID)
+	safego.Go("status feed remove", func() { m.feed.Remove(tabID) })
 	if t := m.compactTimers[tabID]; t != nil {
 		t.Stop()
 		delete(m.compactTimers, tabID)
@@ -641,7 +662,8 @@ func (m *Manager) Interrupt(tabID string) bool {
 	if session == "" {
 		return false
 	}
-	_ = m.d.Tmux.SendRawKeys(session, "Escape")
+	// Stop does not wait behind a message being typed: the pane is taken from its writer.
+	_ = typist.WriteNow(session, func(context.Context) error { return m.d.Tmux.SendRawKeys(session, "Escape") })
 	m.Interrupted(session)
 	return true
 }

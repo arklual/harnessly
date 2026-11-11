@@ -39,6 +39,20 @@ describe('routes', () => {
     expect(parseRoute('/designly/idei-1')).toEqual({ kind: ROUTE.site, id: 'idei-1' });
   });
 
+  it('opens Connections on a code host to sign in to, and only Connections', () => {
+    const route = {
+      kind: ROUTE.settings,
+      section: 'connections',
+      connect: 'https://gitlab.example.com',
+    } as const;
+    expect(routePath(route)).toBe('/settings/connections?connect=https:%2F%2Fgitlab.example.com');
+    expect(parseRoute(routePath(route))).toEqual(route);
+    expect(parseRoute('/settings/general?connect=https://x.io')).toEqual({
+      kind: ROUTE.settings,
+      section: 'general',
+    });
+  });
+
   it('reads the installed apps and an app opened as the main thing with the chat beside it', () => {
     expect(parseRoute('/apps/')).toEqual({ kind: ROUTE.apps });
     expect(routePath({ kind: ROUTE.apps })).toBe('/apps');
@@ -57,6 +71,38 @@ describe('routes', () => {
     // An id is publisher.name; anything else is not an app.
     expect(parseRoute('/apps/extra')).toEqual(HOME);
     expect(placeKeyOf('/apps/acme.cashback?chat=a')).toBe('app:acme.cashback');
+  });
+
+  it('reads the code review: its start, a merge request, the work of a chat', () => {
+    const mr = 'https://gitlab.example.com/team/app/-/merge_requests/12';
+    expect(parseRoute('/review')).toEqual({ kind: ROUTE.review });
+    expect(routePath({ kind: ROUTE.review })).toBe('/review');
+    const opened = routePath({ kind: ROUTE.review, url: mr, chat: 'tab-1' });
+    expect(parseRoute(opened)).toEqual({ kind: ROUTE.review, url: mr, chat: 'tab-1' });
+    expect(parseRoute('/review?chat=tab-1&wt=%2Fsrc%2Fapp')).toEqual({
+      kind: ROUTE.review,
+      chat: 'tab-1',
+      wt: '/src/app',
+    });
+    expect(placeKeyOf(opened)).toBe(`review:${mr}+tab-1`);
+  });
+
+  it('reads an object of an app opened in the app, with or without its chat', () => {
+    expect(parseRoute('/apps/harnessly.docs?o=plan-x1&chat=tab-1')).toEqual({
+      kind: ROUTE.app,
+      id: 'harnessly.docs',
+      object: 'plan-x1',
+      chat: 'tab-1',
+    });
+    expect(routePath({ kind: ROUTE.app, id: 'harnessly.docs', object: 'plan-x1', chat: 'tab-1' })).toBe(
+      '/apps/harnessly.docs?o=plan-x1&chat=tab-1',
+    );
+    expect(routePath({ kind: ROUTE.app, id: 'harnessly.boards', object: 'b1' })).toBe(
+      '/apps/harnessly.boards?o=b1',
+    );
+    // Not an object: the app's home.
+    expect(parseRoute('/apps/harnessly.docs?o=a%2Fb')).toEqual({ kind: ROUTE.app, id: 'harnessly.docs' });
+    expect(placeKeyOf('/apps/harnessly.docs?o=plan-x1')).toBe('app:harnessly.docs/plan-x1');
   });
 
   it('reads Settings with or without a section and writes it back the same', () => {

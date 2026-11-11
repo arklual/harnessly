@@ -78,28 +78,55 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if and (eq .Values.edition "cloud") (not .Values.runtimeDomain) }}
 {{- fail "edition: cloud needs runtimeDomain: machines must run on an origin of their own, not on the hub's (e.g. --set runtimeDomain=run.example.net, a domain that is not a sibling of the hub's)" }}
 {{- end }}
-{{- if and .Values.docs.enabled (not .Values.docs.artifacts.bundled) (not .Values.docs.artifacts.url) }}
-{{- fail "docs.enabled needs an artifacts service: set docs.artifacts.bundled=true, or docs.artifacts.url to one you run (and docs.existingSecret with its token)" }}
+{{- if or (hasKey .Values.docs "artifacts") (kindIs "map" .Values.docs.boards) }}
+{{- fail "docs.artifacts.* and docs.boards.* moved: documents are docs.* (enabled, url, bundled, image, storage, auth, existingSecret) and boards are boards.* with the same keys; see docs/apps/documents.md and docs/apps/boards.md" }}
 {{- end }}
-{{- if and .Values.docs.enabled .Values.docs.boards.bundled (not .Values.docs.boards.image.repository) }}
-{{- fail "docs.boards.bundled needs docs.boards.image.repository: no boards image is published, build it from the boards repository" }}
+{{- range $key := list "docs" "boards" }}
+{{- $v := index $.Values $key }}
+{{- if $v.enabled }}
+{{- if not (regexMatch "^https?://[^/]+" ($v.url | default "")) }}
+{{- fail (printf "%s.enabled needs %s.url: the address machines and browsers open the service at, e.g. --set %s.url=https://%s.example.com" $key $key $key $key) }}
 {{- end }}
-{{- if and .Values.docs.enabled (or (and (not .Values.docs.artifacts.bundled) .Values.docs.artifacts.url) (and (not .Values.docs.boards.bundled) .Values.docs.boards.url)) (not .Values.docs.existingSecret) }}
-{{- fail "docs.existingSecret is required with docs.artifacts.url or docs.boards.url: the chart cannot know the token of a service it does not run" }}
+{{- if not (has $v.auth (list "token" "harnessly")) }}
+{{- fail (printf "%s.auth is %q: token or harnessly" $key $v.auth) }}
+{{- end }}
+{{- if $v.bundled }}
+{{- if not (has $v.storage.type (list "fs" "s3")) }}
+{{- fail (printf "%s.bundled runs the service in this release and needs %s.storage.type: fs (a volume of its own, one replica) or s3 (with %s.storage.s3.existingSecret)" $key $key $key) }}
+{{- end }}
+{{- if and (eq $v.storage.type "s3") (not $v.storage.s3.existingSecret) }}
+{{- fail (printf "%s.storage.type=s3 needs %s.storage.s3.existingSecret: a Secret with the service's S3 settings" $key $key) }}
+{{- end }}
+{{- if not (and $v.image.repository $v.image.tag) }}
+{{- fail (printf "%s.bundled needs %s.image.repository and %s.image.tag" $key $key $key) }}
+{{- end }}
+{{- else if not $v.existingSecret }}
+{{- fail (printf "%s.existingSecret is required with %s.bundled=false: the chart cannot know the token of a service it does not run" $key $key) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if not (has .Values.strategy.type (list "" "Recreate" "RollingUpdate")) }}
+{{- fail (printf "strategy.type is %q: leave it empty (RollingUpdate with several replicas on a shared Postgres, Recreate otherwise), or set Recreate or RollingUpdate" .Values.strategy.type) }}
+{{- end }}
+{{- if and (eq .Values.strategy.type "RollingUpdate") (not (include "hub.multi" .)) }}
+{{- fail "strategy.type: RollingUpdate needs several replicas on a shared database: set replicaCount to 2 or more and database.postgres.enabled=true (or database.external=true with HUB_DATABASE_URL in the Secret). On the SQLite file the old and the new pod would open one file together and corrupt it, and with one replica the machines have nowhere to go while it is replaced" }}
+{{- end }}
+{{- if include "hub.multi" . }}
+{{- $extra := list }}
+{{- range .Values.extraEnv }}{{- if and (eq .name "HUB_REPLICAS") (has (lower (toString .value)) (list "off" "false" "0" "no")) }}{{- $extra = append $extra .name }}{{- end }}{{- end }}
+{{- if $extra }}
+{{- fail "extraEnv turns HUB_REPLICAS off while replicaCount is above 1 on a shared database: the replicas would not find each other's machines. Set replicaCount=1, or drop HUB_REPLICAS from extraEnv" }}
+{{- end }}
+{{- if le (int (include "hub.shutdownGrace" .)) (add (int .Values.drain.settleSeconds) (int .Values.drain.linksSeconds)) }}
+{{- fail (printf "terminationGracePeriodSeconds (%d) is too short for the drain: it must be more than drain.settleSeconds + drain.linksSeconds + 5 (%d), so the requests under way have time left" (int .Values.terminationGracePeriodSeconds) (add (int .Values.drain.settleSeconds) (int .Values.drain.linksSeconds) 5)) }}
+{{- end }}
 {{- end }}
 {{- end }}
 
-{{- define "hub.docsName" -}}
-{{- printf "%s-docs" (include "hub.fullname" .) | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- define "hub.docsSecretName" -}}
-{{- default (include "hub.docsName" .) .Values.docs.existingSecret }}
-{{- end }}
-{{- define "hub.artifactsURL" -}}
-{{- if .Values.docs.artifacts.bundled }}{{ printf "http://%s-artifacts:8080" (include "hub.fullname" .) }}{{ else }}{{ .Values.docs.artifacts.url }}{{ end }}
-{{- end }}
-{{- define "hub.boardsURL" -}}
-{{- if .Values.docs.boards.bundled }}{{ printf "http://%s-boards:8080" (include "hub.fullname" .) }}{{ else }}{{ .Values.docs.boards.url }}{{ end }}
+{{/* The Secret of docs.* or boards.* (dict "root" . "key" "docs"): existingSecret, or the one the chart makes. */}}
+{{- define "hub.appSecretName" -}}
+{{- $v := index .root.Values .key }}
+{{- default (printf "%s-%s" (include "hub.fullname" .root) .key | trunc 63 | trimSuffix "-") $v.existingSecret }}
 {{- end }}
 
 {{/* Several replicas run only on a database that is shared: the in-cluster Postgres or one named by database.external. */}}
@@ -109,4 +136,44 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- define "hub.replicaSecretName" -}}
 {{- printf "%s-replicas" (include "hub.fullname" .) -}}
+{{- end }}
+
+{{/* The strategy of the Deployment: the one asked for, else rolling for several replicas and replacing for one. */}}
+{{- define "hub.strategy" -}}
+{{- if .Values.strategy.type }}{{ .Values.strategy.type }}{{ else if include "hub.multi" . }}RollingUpdate{{ else }}Recreate{{ end }}
+{{- end }}
+
+{{/* Seconds the hub gives its own stop: the pod's grace less a margin for the kubelet. */}}
+{{- define "hub.shutdownGrace" -}}
+{{- sub (int .Values.terminationGracePeriodSeconds) 5 }}
+{{- end }}
+
+{{/*
+The pod's affinity: the one given, else rules that keep the hub's pods apart from each other (several replicas) and
+from the pod of the bundled Postgres, so one node lost does not take the hub and its database, or every replica.
+*/}}
+{{- define "hub.affinity" -}}
+{{- if .Values.affinity }}
+{{- toYaml .Values.affinity }}
+{{- else if and .Values.antiAffinity.enabled (or (include "hub.multi" .) .Values.database.postgres.enabled) }}
+{{- $terms := list }}
+{{- if include "hub.multi" . }}
+{{- $terms = append $terms (dict "topologyKey" .Values.antiAffinity.topologyKey "labelSelector" (dict "matchLabels" (dict "app.kubernetes.io/name" (include "hub.name" .) "app.kubernetes.io/instance" .Release.Name) "matchExpressions" (list (dict "key" "app.kubernetes.io/component" "operator" "DoesNotExist")))) }}
+{{- end }}
+{{- if .Values.database.postgres.enabled }}
+{{- $terms = append $terms (dict "topologyKey" .Values.antiAffinity.topologyKey "labelSelector" (dict "matchLabels" (dict "app.kubernetes.io/name" (include "hub.name" .) "app.kubernetes.io/instance" .Release.Name "app.kubernetes.io/component" "postgres"))) }}
+{{- end }}
+podAntiAffinity:
+  {{- if .Values.antiAffinity.required }}
+  requiredDuringSchedulingIgnoredDuringExecution:
+    {{- toYaml $terms | nindent 4 }}
+  {{- else }}
+  preferredDuringSchedulingIgnoredDuringExecution:
+    {{- range $terms }}
+    - weight: 100
+      podAffinityTerm:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 {{- end }}

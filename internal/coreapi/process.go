@@ -1,6 +1,7 @@
 package coreapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 // ErrResumeLine: the resume line could not be built (a stored id that is no session id, a launcher not written yet);
@@ -127,7 +129,7 @@ func (c *Config) Resume(found FoundTab) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrResumeLine, err)
 	}
-	if err := c.Panes.SendKeys(t.SessionName, line); err != nil {
+	if err := typist.Write(context.Background(), c.Panes, t.SessionName, func(context.Context) error { return c.Panes.SendKeys(t.SessionName, line) }); err != nil {
 		return "", err
 	}
 	c.Keeper.MarkAgentLaunch(t.ID, false)

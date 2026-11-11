@@ -68,6 +68,10 @@ type Config struct {
 	// Console opens a terminal tab of the runtime that runs command, and gives the path that shows it under the
 	// runtime's base path. nil makes the console method fail.
 	Console func(ctx context.Context, provider, command string) (string, error)
+	// ConsoleNote tells the console page where its attempt stands ("waiting", "connected", "failed", "expired",
+	// "cancelled"; expiresAt is Unix milliseconds, 0 when unknown) and answers whether the person cancelled the attempt
+	// on that page. It carries states only, never anything the CLI printed. nil is no notes.
+	ConsoleNote func(ctx context.Context, consoleURL, provider, state string, expiresAt int64) (cancelled bool)
 	// Emit hands a login's new state to the hub.
 	Emit func(hubproto.Login)
 	// Finished is told when a login has ended, so what the agent reports about its CLIs can be refreshed.
@@ -773,6 +777,15 @@ func (m *Manager) console(e *entry) {
 	e.update(func(l *hubproto.Login) {
 		l.State, l.ConsoleURL, l.ExpiresAt = hubproto.LoginWaiting, &url, &expires
 	})
+	note := func(state string) bool {
+		if m.cfg.ConsoleNote == nil {
+			return false
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return m.cfg.ConsoleNote(ctx, url, provider, state, expires)
+	}
+	note("waiting")
 	ttl := time.NewTimer(left)
 	defer ttl.Stop()
 	tick := time.NewTicker(t.StatusEvery)
@@ -780,14 +793,22 @@ func (m *Manager) console(e *entry) {
 	for {
 		select {
 		case <-e.ctx.Done():
+			note("cancelled")
 			e.cancelled()
 			return
 		case <-ttl.C:
+			note("expired")
 			e.finish(hubproto.LoginExpired, "Время на вход вышло, начните заново", nil)
 			return
 		case <-tick.C:
+			// "Connected" is the provider's own status check, never the callback's delivery.
 			if st := m.verified(e); st != nil {
+				note("connected")
 				e.finish(hubproto.LoginDone, "", st)
+				return
+			}
+			if note("waiting") {
+				e.finish(hubproto.LoginCancelled, "", nil)
 				return
 			}
 		}

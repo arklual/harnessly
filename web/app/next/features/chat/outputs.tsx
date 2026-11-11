@@ -8,7 +8,8 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import DeliveryCard from '@/next/features/chat/delivery-card';
 
-export type TShownKind = OutputKind | 'file';
+/** `mrDone`: the block of the chat's merge requests under a finished task (mr-done.tsx). */
+export type TShownKind = OutputKind | 'file' | 'mrDone';
 export type TShownKinds = Readonly<Record<TShownKind, boolean>>;
 
 /** Everything but the plain files: what the feed shows until the host says otherwise. */
@@ -20,6 +21,7 @@ export const SHOWN_BY_DEFAULT: TShownKinds = {
   stand: true,
   delivery: true,
   file: false,
+  mrDone: true,
 } as const;
 
 export interface IOutputsContext {

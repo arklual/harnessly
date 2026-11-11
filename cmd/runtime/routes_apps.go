@@ -17,6 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/egress"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
 	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
@@ -126,6 +127,8 @@ type appViewEntry struct {
 	Icon    string   `json:"icon,omitempty"`
 	Order   int      `json:"order,omitempty"`
 	Objects []string `json:"objects,omitempty"`
+	// Pinned: the app's tab beside a document of its type made of a site.
+	Pinned bool `json:"pinned,omitempty"`
 }
 
 // uiSlotsOn says whether the interface's slots are on (HARNESSLY_UI_SLOTS=on). Off, the page lists no slot view and no
@@ -186,7 +189,7 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 	if m := a.Manifest; m != nil {
 		v.Branding = m.Branding
 		for _, mv := range m.Views {
-			e := appViewEntry{ID: mv.ID, Title: mv.Title, Targets: mv.Targets, Height: mv.Height, Label: mv.Label, Icon: mv.Icon, Order: mv.Order, Objects: mv.Objects}
+			e := appViewEntry{ID: mv.ID, Title: mv.Title, Targets: mv.Targets, Height: mv.Height, Label: mv.Label, Icon: mv.Icon, Order: mv.Order, Objects: mv.Objects, Pinned: mv.Pinned}
 			if strings.HasPrefix(mv.Entry, "https://") {
 				// A view at an address of the app's own server is framed only when its host is listed in network.frames.
 				if u, ok := m.FrameURL(mv.Entry); ok {
@@ -529,12 +532,14 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		}
 		var b struct {
 			ID string `json:"id"`
+			// Purge also forgets the app's settings, secrets in the safe and stored data.
+			Purge bool `json:"purge"`
 		}
 		if !readSecretBody(r, &b) || b.ID == "" {
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
-		if err := reg.Remove(b.ID); errors.Is(err, apps.ErrNotInstalled) {
+		if err := reg.Uninstall(b.ID, b.Purge, safeFor(d).store.Local); errors.Is(err, apps.ErrNotInstalled) {
 			secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
 			return
 		} else if errors.Is(err, apps.ErrTeamApp) || errors.Is(err, apps.ErrEnvApp) {
@@ -779,6 +784,15 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		// An app over the chat's budget is still on: the answer says so, and the person decides what to take off.
 		answer := map[string]any{"conversation": conv, "apps": next}
 		if b.On {
+			// Whether the agent that runs has the app now or with its next start, and why: the command says
+			// which, and does not send the person to restart an agent that already has the tools.
+			live := liveAppsOf.changeIsLive(rec, next)
+			answer["live"] = live
+			if !live && rec.Provider == wire.ProviderClaude {
+				if why := liveAppsOf.refusal(b.ID, liveAppsOf.startedWith(rec.Session)); why != "" {
+					answer["waits"] = why
+				}
+			}
 			total := 0
 			for _, id := range next {
 				if a, err := reg.Get(id); err == nil {
@@ -833,7 +847,15 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	}
 
 	routes := append(appBridgeRoutes(d, reg, storage, viewServer, chats), appAskRoutes(d, appAsks)...)
+	// The commands of app windows are kept in a journal on the disk, so a restart of the runtime loses none.
+	// Without the file (it cannot be made) they live in memory, as they did.
+	if d.DataDir != "" {
+		if err := appPages.OpenCommands(filepath.Join(d.DataDir, apps.PageCommandsFile)); err != nil {
+			journal.Add(journal.Entry{Level: journal.Warn, Source: journal.SourceRuntime, Event: "app.command", Text: "the journal of window commands could not be opened: " + err.Error()})
+		}
+	}
 	routes = append(routes, appPageRoutes(d, reg, appPages, chats)...)
+	routes = append(routes, noticeRoutes(d, reg, viewServer, chats)...)
 	routes = append(routes, appSetupRoutes(d, reg, storage)...)
 	routes = append(routes, appMCPProxyRoute(d, reg))
 	routes = append(routes, sinopiaRoutes(d, reg, viewServer)...)
@@ -841,6 +863,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	routes = append(routes, appWidgetRoutes(d, reg, widgets, chats)...)
 	routes = append(routes, helpRoutes(d)...)
 	routes = append(routes, appPublicRoutes(d, reg, version)...)
+	routes = append(routes, appExtRoutes(d, reg, guests, version)...)
 	routes = append(routes, appShareRoutes(d, reg, guests, version)...)
 	routes = append(routes, appConsentRoutes(d, reg)...)
 	routes = append(routes, appViewLogRoutes(d, reg)...)

@@ -1,0 +1,15 @@
+# Documents and boards are services run elsewhere, with sign-in by the hub's platform token: the chart only points the
+# hub at them.
+publicUrl: https://hub.example.com
+runtimeDomain: run.example.net
+docs:
+  enabled: true
+  bundled: false
+  url: https://docs.example.com
+  auth: harnessly
+  existingSecret: hub-docs
+boards:
+  enabled: true
+  bundled: false
+  url: https://boards.example.com
+  existingSecret: hub-boards

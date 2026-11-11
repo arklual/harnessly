@@ -114,7 +114,7 @@ func firstOf(vs ...string) string {
 // typed in v2 stays; so does one an earlier import took from the tab's name before titles were read this way.
 func (r *Runtime) RetitleImported(t ImportTab) {
 	title := titleOf(t.Title)
-	_ = r.call(context.Background(), t.ID, func(c *conv, now time.Time) {
+	retitle := func(c *conv, now time.Time) {
 		c.launchUltracode = t.LaunchUltracode // the tab's launch is Legacy's to remember, and may be read again
 		if title == "" {
 			// A chat an earlier import named by the terminal's label (the agent's process, the folder) gets its first message.
@@ -132,7 +132,21 @@ func (r *Runtime) RetitleImported(t ImportTab) {
 		}
 		c.rec.Title, c.rec.TitleSource = title, wire.TitleFromAgent
 		c.recResult(now)
-	})
+	}
+	// The take-over calls this for every tab at every pass of its loop: it is no use of the conversation, and a
+	// parked one is woken only when the record it left says the title changes.
+	if a := r.loaded(t.ID); a != nil {
+		_ = r.callOn(context.Background(), a, retitle)
+		return
+	}
+	v := r.view(t.ID)
+	if v == nil || title == "" || v.rec.Title == title {
+		return
+	}
+	if fromName := v.rec.TitleSource == wire.TitleFromUser && v.rec.Title == t.Name; v.rec.TitleSource != wire.TitleFromAgent && !fromName {
+		return
+	}
+	_ = r.call(context.Background(), t.ID, retitle)
 }
 
 // LegacyQueue reads Legacy's prompt-queue.json: tab id → its messages, oldest first. An entry that does not have its
@@ -196,7 +210,7 @@ func legacyItem(raw json.RawMessage) (outbox.LegacyItem, bool) {
 func (r *Runtime) Import(tabs []ImportTab, queues map[string][]outbox.LegacyItem) int {
 	n := 0
 	for _, t := range tabs {
-		if !wire.ValidConvID(t.ID) || r.actor(t.ID) != nil || t.Session != "" && r.ConvOfSession(t.Session) != "" {
+		if !wire.ValidConvID(t.ID) || r.Has(t.ID) || t.Session != "" && r.ConvOfSession(t.Session) != "" {
 			continue
 		}
 		now := r.d.Clock.Now()

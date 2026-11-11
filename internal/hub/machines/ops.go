@@ -13,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/provider"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // The operations on a machine (docs/hub/machines-resources.md, «Operations»): one unfinished operation per machine,
@@ -97,7 +98,7 @@ func (s *Service) runProvider(ctx context.Context, m store.Machine, op store.Mac
 	if err != nil {
 		return op, err
 	}
-	go s.watch(m, fresh, ref, after)
+	safego.Go("machines watch", func() { s.watch(m, fresh, ref, after) })
 	return fresh, nil
 }
 
@@ -356,12 +357,12 @@ func (s *Service) continueReboot(ctx context.Context, m store.Machine, op store.
 	if !waiting {
 		return
 	}
-	go func() {
+	safego.Go("machines continueReboot", func() {
 		bg := context.WithoutCancel(ctx)
 		if _, err := s.runProvider(bg, m, op, func(ctx context.Context, pm provider.Machine) (provider.OpRef, error) { return s.prov.Reboot(ctx, pm) }, nil); err != nil {
 			s.log.Warn("machine not rebooted after the drain", "machine", m.ID, "op", op.ID, "error", err)
 		}
-	}()
+	})
 }
 
 func httpErrText(err error) string {
@@ -431,9 +432,10 @@ func (s *Service) ResumeOps(ctx context.Context) {
 		}
 		switch {
 		case providerKind(op.Kind) && op.ProviderOpID != "":
-			go s.watch(m, op, provider.OpRef{ID: op.ProviderOpID}, s.afterFor(m, op))
+			after := s.afterFor(m, op)
+			safego.Go("machines watch", func() { s.watch(m, op, provider.OpRef{ID: op.ProviderOpID}, after) })
 		case op.Kind == store.OpRestartMachine && op.ProviderOpID != "":
-			go s.watch(m, op, provider.OpRef{ID: op.ProviderOpID}, nil)
+			safego.Go("machines watch", func() { s.watch(m, op, provider.OpRef{ID: op.ProviderOpID}, nil) })
 		case op.Kind == store.OpRestartMachine, providerKind(op.Kind):
 			s.finishOp(ctx, m, op.ID, store.OpFailed, "хаб перезапустился, пока операция ждала")
 		}

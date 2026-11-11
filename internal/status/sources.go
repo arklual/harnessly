@@ -55,6 +55,62 @@ func (m *Manager) HooksMissing(tabID string) bool {
 	return e != nil && e.HooksMissing
 }
 
+// EntryOfSession is the tab of a tmux session and a copy of its entry; false when the keeper has none.
+func (m *Manager) EntryOfSession(session string) (string, Entry, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id, e := m.findBySession(session)
+	if e == nil {
+		return "", Entry{}, false
+	}
+	return id, *e, true
+}
+
+// ChatState is where a chat's actor stands, in the keeper's words: CliState empty leaves the state as it is, Event
+// names the hook the change stands for ("" none).
+type ChatState struct {
+	CliState, Event            string
+	Transcript, AgentSessionID string
+}
+
+// MirrorChat puts the tab of a chat's tmux session where the chat's actor is, with the side effects a change of state
+// has (the turn's history, the queue, the background feed); the tab of a session that is no chat's is left alone.
+func (m *Manager) MirrorChat(session string, s ChatState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tabID, e := m.findBySession(session)
+	if e == nil || !m.chat(e) {
+		return
+	}
+	changed := false
+	if s.Transcript != "" && e.JSONLPath != s.Transcript {
+		e.JSONLPath = s.Transcript
+		changed = true
+	}
+	if s.AgentSessionID != "" && e.AgentSessionID.Value() != s.AgentSessionID {
+		e.AgentSessionID = Some(s.AgentSessionID)
+		changed = true
+	}
+	if s.CliState != "" && s.CliState != e.CliState {
+		if s.Event != "" {
+			e.EventSeq++
+			e.LastEvent = Some(LastEvent{Name: s.Event, At: m.now(), Seq: e.EventSeq})
+		}
+		m.applyCliState(tabID, e, s.CliState, applyOpts{mirror: true})
+		changed = true
+	}
+	if changed {
+		m.persistToLayout(e)
+		m.broadcastUpdate(tabID, e, nil)
+	}
+}
+
+// chat says the entry's tmux session is a chat's, whose actor follows the agent itself. Called with the lock held:
+// ChatSession only reads the chats' own index.
+func (m *Manager) chat(e *Entry) bool {
+	return m.d.ChatSession != nil && e.TmuxSession != "" && m.d.ChatSession(e.TmuxSession)
+}
+
 // TabOfSession is the agent tab of a tmux session ("" when none).
 func (m *Manager) TabOfSession(session string) string {
 	m.mu.Lock()

@@ -58,6 +58,11 @@ export interface MessageView {
   wait: Wait | null;
   /** submitting only: why the last try did not get an answer; the outbox sends again when the machine is back. */
   issue: 'timeout' | 'network' | 'http' | RefuseCode | null;
+  /**
+   * The person took the message back and nobody has confirmed it yet (the page's own fact, not on the wire): the
+   * runtime may still have it or get it. It is «cancelled» only once the runtime (and the cluster's copy) answered.
+   */
+  cancelling?: boolean;
 }
 
 export const messagesStore = createKeyedStore<ClientId, MessageView>();
@@ -182,6 +187,16 @@ export function setConversationOf(id: ClientId, conv: ConvId): void {
   addToConversation(conv, id);
 }
 
+/** The runtime ended the message, or the agent has it: a cancel still waiting for its answer has nothing left to say. */
+const isOver = (s: MessageState): boolean =>
+  s.k === 'cancelled' || s.k === 'done' || s.k === 'in-turn' || s.k === 'accepted';
+
+function withoutCancelling(m: MessageView, next: MessageState): MessageView {
+  if (!m.cancelling || !isOver(next)) return m;
+  const { cancelling: _, ...rest } = m;
+  return rest;
+}
+
 /** prompt_state: the runtime moved a message; older or equal revs change nothing. */
 export function applyPromptState(
   conv: ConvId,
@@ -198,7 +213,7 @@ export function applyPromptState(
   // A message is its machine's: another machine's frame with the same clientId moves nothing.
   if (m.machineId !== machine || m.rev >= rev) return;
   messagesStore.set(id, {
-    ...m,
+    ...withoutCancelling(m, state),
     machineId: machine,
     conversationId: conv,
     state,
@@ -235,6 +250,7 @@ export function applyMessage(machine: MachineId, msg: Message): void {
     refused: null,
     wait: null,
     issue: null,
+    ...(m?.cancelling && !isOver(msg.state) && { cancelling: true }),
   });
   addToConversation(msg.conversationId, msg.clientId);
 }

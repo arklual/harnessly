@@ -166,15 +166,27 @@ export interface ISidebarProps {
   ref?: Ref<HTMLElement>;
 }
 
+/** An app of harnessly's own under «Приложения», always there (the «Ревью кода»). */
+export interface ISidebarBuiltin {
+  id: string;
+  name: string;
+  icon: string;
+  current: boolean;
+  onOpen: () => void;
+}
+
 export interface ISidebarApps {
-  rows: readonly { id: string; name: string; chat: string }[];
+  /** harnessly's own apps, above the installed ones. */
+  builtins?: readonly ISidebarBuiltin[];
+  /** chat: the chat the app was last on in; absent for an environment app no chat has on yet. */
+  rows: readonly { id: string; name: string; chat?: string }[];
   /** The app on screen. */
   current: string | null;
   /** The list of every installed app is on screen. */
   allCurrent: boolean;
-  onOpen: (id: string, chat: string) => void;
+  onOpen: (id: string, chat?: string) => void;
   /** The pointer or the focus is on an app: its window can start getting ready before the click. */
-  onPrepare?: (id: string, chat: string) => void;
+  onPrepare?: (id: string, chat?: string) => void;
   onAll: () => void;
 }
 
@@ -303,6 +315,18 @@ const keepAppsFolded = (folded: boolean) => {
 const APP_ROWS = 3;
 const AppRows = ({ apps }: { apps: ISidebarApps }) => (
   <>
+    {apps.builtins?.map((b) => (
+      <button
+        key={b.id}
+        type="button"
+        className="hx-nav__kid"
+        aria-current={b.current ? 'page' : undefined}
+        onClick={b.onOpen}
+      >
+        <Icon name={b.icon} size="sm" className="hx-nav__kid-icon" />
+        <span className="hx-item__title">{b.name}</span>
+      </button>
+    ))}
     {apps.rows.slice(0, APP_ROWS).map((a) => (
       <button
         key={a.id}
@@ -499,6 +523,7 @@ const Sidebar = ({
     keepAppsFolded(!appsFolded);
     setAppsFolded(!appsFolded);
   };
+  const appRowCount = apps ? apps.rows.length + (apps.builtins?.length ?? 0) : 0;
   const [designsFolded, setDesignsFolded] = useState(readDesignsFolded);
   const foldDesigns = () => {
     keepDesignsFolded(!designsFolded);
@@ -932,11 +957,11 @@ const Sidebar = ({
             current={apps.allCurrent}
             index={3}
             onClick={apps.onAll}
-            expanded={apps.rows.length > 0 && !appsFolded}
+            expanded={appRowCount > 0 && !appsFolded}
             list
-            onFold={apps.rows.length > 0 ? foldApps : undefined}
+            onFold={appRowCount > 0 ? foldApps : undefined}
           >
-            {apps.rows.length > 0 && <AppRows apps={apps} />}
+            {appRowCount > 0 && <AppRows apps={apps} />}
           </NavItem>
         )}
         {more.length > 0 && <MoreMenu items={more} />}

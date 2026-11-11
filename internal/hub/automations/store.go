@@ -7,8 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
@@ -331,9 +333,15 @@ func (s *Service) runByID(ctx context.Context, id string) (Run, error) {
 }
 
 // decide moves a run that awaits approval to approved or rejected; false when it does not await it (any more).
+// An empty owner is a decision that does not come from a person of the hub (the bot behind the notice, which checked
+// who pressed its button).
 func (s *Service) decide(ctx context.Context, id, owner, status string) (Run, bool, error) {
-	res, err := s.db.Exec(ctx, `UPDATE automation_runs SET status = ? WHERE id = ? AND status = ?
-		AND rule_id IN (SELECT id FROM automation_rules WHERE owner_id = ?)`, status, id, StatusAwaitingApproval, owner)
+	q, args := `UPDATE automation_runs SET status = ? WHERE id = ? AND status = ?`, []any{status, id, StatusAwaitingApproval}
+	if owner != "" {
+		q += ` AND rule_id IN (SELECT id FROM automation_rules WHERE owner_id = ?)`
+		args = append(args, owner)
+	}
+	res, err := s.db.Exec(ctx, q, args...)
 	if err != nil {
 		return Run{}, false, err
 	}
@@ -347,51 +355,116 @@ func tokenHash(token string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func (s *Service) fail(ctx context.Context, id, reason string) {
-	if _, err := s.db.Exec(ctx, `UPDATE automation_runs SET status = 'failed', error = ?, finished_at = ? WHERE id = ?`, reason, store.Ms(s.now()), id); err != nil {
-		s.log.Warn("automation run not marked failed", "run", id, "error", err)
-	}
-}
-
-// claim takes the oldest queued run of an enabled rule that is not in its quiet hours and marks it running, with the
-// hash of a fresh result token (returned once). Two replicas cannot take one run: the update only matches while queued.
-func (s *Service) claim(ctx context.Context) (Run, Rule, string, error) {
+// claim takes the oldest queued run of an enabled rule that is not in its quiet hours and has a machine to run on
+// (pick), and marks it running under a lease, with the hash of a fresh result token (returned once). A run whose
+// machine is not connected stays queued and does not hold up the ones behind it. Two replicas cannot take one run: the
+// update only matches while queued.
+func (s *Service) claim(ctx context.Context, pick func(context.Context, Rule) (string, error)) (Run, Rule, string, string, error) {
 	rows, err := s.db.Query(ctx, `SELECT `+prefixCols("r.", runCols)+` FROM automation_runs r JOIN automation_rules ar ON ar.id = r.rule_id
-		WHERE r.status = 'queued' AND ar.enabled = 1 ORDER BY r.created_at, r.id LIMIT 20`)
+		WHERE r.status = 'queued' AND ar.enabled = 1 ORDER BY r.created_at, r.id LIMIT 200`)
 	if err != nil {
-		return Run{}, Rule{}, "", err
+		return Run{}, Rule{}, "", "", err
 	}
 	var queued []Run
 	for rows.Next() {
 		r, err := scanRun(rows)
 		if err != nil {
 			rows.Close()
-			return Run{}, Rule{}, "", err
+			return Run{}, Rule{}, "", "", err
 		}
 		queued = append(queued, r)
 	}
 	rows.Close()
+	rules := map[string]*Rule{}
+	machines := map[string]string{} // rule → its machine, "" when it has none now
 	for _, run := range queued {
-		rule, err := s.ruleByID(ctx, run.RuleID)
-		if err != nil {
+		rule, seen := rules[run.RuleID]
+		if !seen {
+			if r, err := s.ruleByID(ctx, run.RuleID); err == nil {
+				rule = &r
+			}
+			rules[run.RuleID] = rule
+		}
+		if rule == nil || quietNow(*rule, s.now()) {
 			continue
 		}
-		if quietNow(rule, s.now()) {
+		machine, looked := machines[rule.ID]
+		if !looked {
+			m, err := pick(ctx, *rule)
+			if err != nil && !errors.Is(err, errNoMachine) {
+				return Run{}, Rule{}, "", "", err
+			}
+			machine = m
+			machines[rule.ID] = machine
+		}
+		if machine == "" {
 			continue
 		}
 		token := newToken()
-		res, err := s.db.Exec(ctx, `UPDATE automation_runs SET status = 'running', dispatched_at = ?, result_token_hash = ? WHERE id = ? AND status = 'queued'`,
-			store.Ms(s.now()), tokenHash(token), run.ID)
+		now := s.now()
+		res, err := s.db.Exec(ctx, `UPDATE automation_runs SET status = 'running', dispatched_at = ?, result_token_hash = ?, lease_until = ?, attempts = COALESCE(attempts, 0) + 1
+			WHERE id = ? AND status = 'queued'`, store.Ms(now), tokenHash(token), store.Ms(now.Add(startLease)), run.ID)
 		if err != nil {
-			return Run{}, Rule{}, "", err
+			return Run{}, Rule{}, "", "", err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			continue
 		}
 		run.Status = StatusRunning
-		return run, rule, token, nil
+		return run, *rule, token, machine, nil
 	}
-	return Run{}, Rule{}, "", store.ErrNotFound
+	return Run{}, Rule{}, "", "", store.ErrNotFound
+}
+
+// release ends a start that failed: the run goes back to the queue for another try, or is failed with the reason once
+// it was taken maxAttempts times. It touches only a run still being started.
+func (s *Service) release(ctx context.Context, id, reason string) {
+	now := store.Ms(s.now())
+	res, err := s.db.Exec(ctx, `UPDATE automation_runs SET status = 'queued', lease_until = NULL, result_token_hash = NULL, dispatched_at = NULL, error = ?
+		WHERE id = ? AND status = 'running' AND lease_until IS NOT NULL AND COALESCE(attempts, 0) < ?`, reason, id, maxAttempts)
+	if err == nil {
+		if n, _ := res.RowsAffected(); n > 0 {
+			metrics.AutomationsRequeued.Inc()
+			return
+		}
+		_, err = s.db.Exec(ctx, `UPDATE automation_runs SET status = 'failed', lease_until = NULL, error = ?, finished_at = ?
+			WHERE id = ? AND status = 'running' AND lease_until IS NOT NULL`, reason, now, id)
+	}
+	if err != nil {
+		s.log.Warn("automation run not released", "run", id, "error", err)
+	}
+}
+
+// failStart fails a run whose start may have reached the machine without an answer.
+func (s *Service) failStart(ctx context.Context, id, reason string) {
+	if _, err := s.db.Exec(ctx, `UPDATE automation_runs SET status = 'failed', lease_until = NULL, error = ?, finished_at = ? WHERE id = ? AND status = 'running'`,
+		reason, store.Ms(s.now()), id); err != nil {
+		s.log.Warn("automation run not marked failed", "run", id, "error", err)
+	}
+}
+
+// reap puts back the runs whose start was abandoned (their lease ran out: the hub that took them stopped before the
+// conversation was started), fails those taken too many times, and gives up the runs that waited too long for a
+// machine. A run whose conversation was started holds no lease and is never touched here.
+func (s *Service) reap(ctx context.Context) {
+	now := s.now()
+	res, err := s.db.Exec(ctx, `UPDATE automation_runs SET status = 'queued', lease_until = NULL, result_token_hash = NULL, dispatched_at = NULL
+		WHERE status = 'running' AND lease_until IS NOT NULL AND lease_until < ? AND COALESCE(attempts, 0) < ?`, store.Ms(now), maxAttempts)
+	if err == nil {
+		if n, _ := res.RowsAffected(); n > 0 {
+			metrics.AutomationsRequeued.Add(n)
+			s.log.Warn("automation runs put back in the queue: their start was abandoned", "runs", n)
+		}
+		_, err = s.db.Exec(ctx, `UPDATE automation_runs SET status = 'failed', lease_until = NULL, error = ?, finished_at = ?
+			WHERE status = 'running' AND lease_until IS NOT NULL AND lease_until < ?`, "the run did not start in "+strconv.Itoa(maxAttempts)+" attempts", store.Ms(now), store.Ms(now))
+	}
+	if err == nil {
+		_, err = s.db.Exec(ctx, `UPDATE automation_runs SET status = 'failed', error = ?, finished_at = ?
+			WHERE status = 'queued' AND created_at < ?`, "no machine to run on for a day", store.Ms(now), store.Ms(now.Add(-queuedFor)))
+	}
+	if err != nil && ctx.Err() == nil {
+		s.log.Warn("automation runs not swept", "error", err)
+	}
 }
 
 // quietNow says whether the rule may not start a run at this moment. Moscow is a fixed UTC+3.
@@ -414,7 +487,8 @@ func quietNow(r Rule, at time.Time) bool {
 }
 
 func (s *Service) markDispatched(ctx context.Context, id, conversation, machine string) error {
-	_, err := s.db.Exec(ctx, `UPDATE automation_runs SET conversation_id = ?, machine_id = ? WHERE id = ?`, nullable(conversation), machine, id)
+	// The conversation exists: the lease of the start is over, and the run is the conversation's from here.
+	_, err := s.db.Exec(ctx, `UPDATE automation_runs SET conversation_id = ?, machine_id = ?, lease_until = NULL WHERE id = ?`, nullable(conversation), machine, id)
 	return err
 }
 

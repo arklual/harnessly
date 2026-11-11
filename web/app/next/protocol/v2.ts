@@ -678,8 +678,9 @@ export interface Terminal {
 export type DesignKind = 'site' | 'slides' | 'ds' | 'video';
 export const DESIGN_KINDS: readonly DesignKind[] = ['site', 'slides', 'ds', 'video'];
 
-/** What a chat made, opened or changed that the tools home lists: a document, a board, a design, a tracker task. */
-export const MADE_KINDS = ['doc', 'board', 'design', 'task'] as const;
+/** What a chat made, opened or changed that the tools home lists: a document, a board, a design, a tracker task, a merge
+ *  request (the block of merge requests under a finished task reads it). */
+export const MADE_KINDS = ['doc', 'board', 'design', 'task', 'mr'] as const;
 export type MadeKind = (typeof MADE_KINDS)[number];
 /** A task named by another: its epic, or a subtask of an epic. */
 export interface MadeTaskRef {
@@ -710,6 +711,15 @@ export interface MadeItem {
   designKind: DesignKind | null;
   /** A task's place in the tracker; absent for the rest and for a task the tracker did not answer for. */
   task?: MadeTaskInfo;
+  /** The subagent or delegated chat that made it: the chat inherits all they made. Absent for the chat's own. */
+  from?: MadeFrom;
+}
+export const MADE_FROM_KINDS = ['subagent', 'subchat'] as const;
+/** Who made a thing a chat inherits; id is the subchat's conversation or the subagent's; title is empty when unknown. */
+export interface MadeFrom {
+  kind: (typeof MADE_FROM_KINDS)[number];
+  id: string;
+  title: string;
 }
 /** GET /api/v2/conversations/{id}/made, newest first; `complete` is false while the runtime still reads the transcript. */
 export interface ChatMade {
@@ -796,6 +806,15 @@ export interface DesignArtifact {
   touchedBy?: string[];
   owner?: DesignOwner;
   role?: DesignRole;
+  /** The app's document type the project is (made of Sinopia's site): its label; absent for Sinopia's own projects. */
+  appKind?: DesignAppKind;
+}
+/** An app's document type as a project of the library carries it. */
+export interface DesignAppKind {
+  id: string;
+  title: string;
+  app: string;
+  appName: string;
 }
 /** The library: the port of its server on the machine, its folder, its projects. */
 export interface DesignLibrary {
@@ -1340,6 +1359,7 @@ export interface Conversation {
   pendingModel?: PendingModel; // a model change that waits for the agent; absent when none does
   modelLog?: ModelSwitch[]; // the changes applied, oldest first (the last 20); absent when there were none
   terminalStop?: TerminalStop; // the terminal was stopped and the agent is not up again; absent otherwise
+  notSavedSince?: number; // since when the runtime fails to write the chat to its disk (ms); absent while it is saved
   terminalFailure?: TerminalFailure; // the last turn cannot be retried on this target; the person chooses another
   rewinds?: RewindMark[]; // the rewinds to an earlier message, oldest first (the last 10); absent when there were none
   origin?: Origin; // the conversation this one was forked or handed off from; absent for one started anew
@@ -1729,6 +1749,40 @@ export interface Picture {
   id: string;
   text: string;
 }
+/**
+ * What the tools of the right pane read of a conversation, gathered by its runtime from the read of the transcript
+ * that makes the feed (README 71). On a snapshot it is whole: the links newest first, the newest items oldest first.
+ * On `queue_changed` it is what a read added: `items` go after the ones held, `links` (when sent) take the place of
+ * the list held, and `reset` puts both in the place of everything held. `count` moves whenever the chat did.
+ */
+export interface Pane {
+  count: number;
+  reset?: boolean;
+  links?: PaneLink[];
+  items?: PaneItem[];
+}
+/** A link of the agent's answers; `kind` as the pane names links (artifact, mr, issue, web…), open-ended. */
+export interface PaneLink {
+  url: string;
+  label: string | null;
+  at: Ms;
+  count: number;
+  kind: string;
+}
+/** A line of the transcript with only what a tool of the pane reads; `k` is open-ended, an unknown one is left out. */
+export interface PaneItem {
+  id: string;
+  k: string;
+  at: Ms;
+  tool?: string;
+  use?: string;
+  path?: string;
+  text?: string;
+  cwd?: string;
+  files?: string[];
+  images?: string[];
+  peer?: { to: string; text: string };
+}
 export interface Now {
   turnId: TurnId;
   thought: string | null;
@@ -1804,6 +1858,18 @@ export interface ConvSnapshot {
   shots?: Shot[]; // newest first, at most 30; absent when none
   pictures?: Picture[]; // named in the messages, the latest last, at most 60; absent when none
   now: Now | null;
+  agent?: AgentStamp; // the agent state as the snapshot was taken; absent from a runtime that does not stamp it
+  pane?: Pane; // what the right pane reads of the chat; absent from a runtime that does not gather it
+}
+/**
+ * A conversation's agent state with its version, as the conversation's own channel carries it. `rev` is the record's
+ * revision the state stands at (the one the convs channel names for the same change) and `epoch` the runtime's:
+ * within an epoch the higher rev is the later state, whichever channel brought it.
+ */
+export interface AgentStamp {
+  state: AgentState;
+  rev: number;
+  epoch: string;
 }
 // The snapshot invariant: the hub subscribes the channel before it takes the snapshot, so nothing is lost between
 // them. The page drops events with seq ≤ snapshot.seq, and applies every event idempotently by id and rev.
@@ -1849,7 +1915,9 @@ export type ConvEvent =
   | { type: 'turn_finished'; turn: Turn }
   | { type: 'turn_failed'; turn: Turn }
   | { type: 'quota_exhausted'; failure: TerminalFailure }
-  | { type: 'queue_changed'; queue: Queue }
+  // agent: the agent state that changed with it (the channel has no event of its own for the state)
+  // pane: what a read of the transcript added for the right pane (it has no event of its own either)
+  | { type: 'queue_changed'; queue: Queue; agent?: AgentStamp; pane?: Pane }
   | { type: 'prompt_state'; clientId: ClientId; state: MessageState; rev: number }
   | { type: 'message_upsert'; message: Message }
   | { type: 'background_upsert'; task: BackgroundTask }
@@ -1884,7 +1952,12 @@ export type Connection =
   | { k: 'connecting'; attempt: number }
   | { k: 'live'; since: Ms }
   | { k: 'stale'; since: Ms }
-  | { k: 'offline'; retryAt: Ms; cause: 'network' | 'machine-unreachable' | 'unauthorized' | 'proto' };
+  | {
+      k: 'offline';
+      retryAt: Ms;
+      /** paused: the page closed the socket itself (a machine it does not look at, in a hidden tab). */
+      cause: 'network' | 'machine-unreachable' | 'unauthorized' | 'proto' | 'paused';
+    };
 
 // ---- commands: POST /api/v2/cmd/<op>
 
@@ -2480,6 +2553,7 @@ const designKind = oneOf(DESIGN_KINDS);
 const designRole = oneOf(DESIGN_ROLES);
 const designBoard: Decoder<DesignBoard> = object({ title: id, path: id });
 const designOwner: Decoder<DesignOwner> = object({ name: id, me: bool });
+const designAppKind: Decoder<DesignAppKind> = object({ id, title: str, app: id, appName: str });
 const designArtifact: Decoder<DesignArtifact> = object(
   {
     id,
@@ -2492,7 +2566,7 @@ const designArtifact: Decoder<DesignArtifact> = object(
     boards: array(designBoard),
     convs: array(convId),
   },
-  { touchedBy: array(convId), owner: designOwner, role: designRole },
+  { touchedBy: array(convId), owner: designOwner, role: designRole, appKind: designAppKind },
 );
 const madeTaskRef: Decoder<MadeTaskRef> = object({
   key: id,
@@ -2519,7 +2593,7 @@ const madeItem: Decoder<MadeItem> = object(
     cover: nullable(id),
     designKind: nullable(designKind),
   },
-  { task: madeTaskInfo },
+  { task: madeTaskInfo, from: object({ kind: oneOf(MADE_FROM_KINDS), id, title: str }) },
 );
 // A kind of thing this page does not know (a runtime newer than it) is left out of the list, not a reason to refuse it.
 const madeItems: Decoder<MadeItem[]> = (v, p) => {
@@ -2845,6 +2919,7 @@ const conversation: Decoder<Conversation> = object(
     bgAgents: int,
     bgWait,
     terminalStop,
+    notSavedSince: ms,
     terminalFailure,
     rewinds: array(rewindMark),
     origin,
@@ -3089,6 +3164,24 @@ const backgroundTask: Decoder<BackgroundTask> = object(
 );
 const shot: Decoder<Shot> = object({ id, name: str, at: ms }, { agent: str });
 const picture: Decoder<Picture> = object({ id, text: str });
+const paneLink: Decoder<PaneLink> = object({ url: id, label: nullable(str), at: ms, count: int, kind: id });
+const paneItem: Decoder<PaneItem> = object(
+  { id, k: id, at: ms },
+  {
+    tool: str,
+    use: str,
+    path: str,
+    text: str,
+    cwd: str,
+    files: array(str),
+    images: array(str),
+    peer: object({ to: str, text: str }),
+  },
+);
+const pane: Decoder<Pane> = object(
+  { count: int },
+  { reset: bool, links: array(paneLink), items: array(paneItem) },
+);
 const nowShape = {
   turnId,
   thought: nullable(str),
@@ -3117,6 +3210,7 @@ const convsSnapshot: Decoder<ConvsSnapshot> = object(
   },
   { favorites, drafts: array(draft) },
 );
+const agentStamp: Decoder<AgentStamp> = object({ state: agentState, rev: seq, epoch: id });
 const convSnapshot: Decoder<ConvSnapshot> = object(
   {
     turns: array(turn),
@@ -3129,7 +3223,7 @@ const convSnapshot: Decoder<ConvSnapshot> = object(
     background: array(backgroundTask),
     now: nullable(now),
   },
-  { shots: array(shot), pictures: array(picture) },
+  { shots: array(shot), pictures: array(picture), agent: agentStamp, pane },
 );
 
 const finishedTurn: Decoder<Turn> = (v, p) => {
@@ -3187,7 +3281,9 @@ const machineEvent: Decoder<MachineEvent> = variants('type', machineEventKinds, 
   machine_status: { health: machineHealth },
 });
 const convsEvent: Decoder<ConvsEvent> = variants('type', convsEventKinds);
-const convEvent: Decoder<ConvEvent> = variants('type', convEventKinds);
+const convEvent: Decoder<ConvEvent> = variants('type', convEventKinds, undefined, {
+  queue_changed: { agent: agentStamp, pane },
+});
 
 const subShape = object(
   { f: constant('sub'), ch: channel },

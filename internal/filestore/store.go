@@ -11,8 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -31,6 +33,9 @@ type Store struct {
 	meta   RoomMeta
 	blobs  BlobStore
 	policy Policy
+
+	sealMu    sync.Mutex
+	sealCache map[string]KitSeal
 	// closer closes the drivers when the Store owns them (Open); a Server owns its own.
 	closer func() error
 }
@@ -81,6 +86,33 @@ func (s *Store) HasBlob(ctx context.Context, sha string) (bool, error) {
 	return s.blobs.Has(ctx, s.room, sha)
 }
 
+// MissingBlobs tells which of the named contents the room does not hold, each once and in the order asked. Every name
+// must be a sha256 and there may be at most MaxBlobCheck of them.
+func (s *Store) MissingBlobs(ctx context.Context, shas []string) ([]string, error) {
+	if len(shas) > MaxBlobCheck {
+		return nil, fmt.Errorf("%w: more than %d hashes", ErrBadRequest, MaxBlobCheck)
+	}
+	missing := []string{}
+	asked := make(map[string]bool, len(shas))
+	for _, sha := range shas {
+		if !ValidSha(sha) {
+			return nil, fmt.Errorf("%w: sha", ErrBadRequest)
+		}
+		if asked[sha] {
+			continue
+		}
+		asked[sha] = true
+		ok, err := s.blobs.Has(ctx, s.room, sha)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			missing = append(missing, sha)
+		}
+	}
+	return missing, nil
+}
+
 // OpenBlob opens stored contents for reading (os.ErrNotExist when absent).
 func (s *Store) OpenBlob(ctx context.Context, sha string) (io.ReadCloser, error) {
 	if !ValidSha(sha) {
@@ -118,6 +150,23 @@ func (s *Store) Commit(ctx context.Context, req CommitRequest, machine string) (
 		}
 		if !ok {
 			return nil, false, ErrNoBlob
+		}
+	}
+	// A policy of files that never change (a published kit version): what is there is not overwritten or deleted. The
+	// first write of a path is still decided under the room lock (a stale base), so two machines racing for it cannot
+	// both win.
+	if im, ok := s.policy.(Immutable); ok && im.Immutable() {
+		cur, err := s.meta.Current(ctx, req.Path)
+		if err != nil {
+			return nil, false, err
+		}
+		if cur != nil && !cur.Deleted && (req.Deleted || req.Sha != cur.Sha || req.Exec != cur.Exec) {
+			return cur, true, nil
+		}
+	}
+	if _, ok := s.policy.(Kits); ok {
+		if err := s.sealCheck(ctx, req); err != nil {
+			return nil, false, err
 		}
 	}
 	// Checked again under the room lock: a collector may have deleted the blob since the check above.
@@ -216,4 +265,102 @@ func (s *Store) Approval(ctx context.Context) (string, error) { return s.meta.Ap
 // RequireManualApproval switches the room to manual approval for good.
 func (s *Store) RequireManualApproval(ctx context.Context) error {
 	return s.meta.RequireManualApproval(ctx)
+}
+
+// sealCheck is the rule of a sealed kit version. Before the seal, files are added and none changes (Immutable
+// above). The seal may land before its files (a machine sends in any order): it is taken when it is well formed, and
+// from then on the folder takes only the files it lists, with the bytes it lists. Whether a version is whole is the
+// readers' business: it counts as installed only with every listed file in place.
+func (s *Store) sealCheck(ctx context.Context, req CommitRequest) error {
+	prefix := KitSealPrefix(req.Path)
+	if prefix == "" {
+		return nil
+	}
+	sealPath := prefix + KitSealFile
+	seal, err := s.meta.Current(ctx, sealPath)
+	if err != nil {
+		return err
+	}
+	sealed := seal != nil && !seal.Deleted
+	if req.Path == sealPath {
+		if sealed || req.Deleted {
+			return nil // a second seal is the same bytes (a no-op) or a conflict, by the rule above
+		}
+		doc, err := s.readSeal(ctx, req.Sha)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrSealed, err)
+		}
+		// A seal closes the version over what is already there: every file the room holds in it must be listed, with
+		// those bytes. (A file that lands between this check and the seal is harmless: the readers take a version as its
+		// seal lists it and ignore the rest.)
+		listed := make(map[string]KitSealedFile, len(doc.Files))
+		for _, f := range doc.Files {
+			listed[f.Path] = f
+		}
+		have, err := s.meta.Snapshot(ctx, prefix, math.MaxInt64>>1)
+		if err != nil {
+			return err
+		}
+		for _, e := range have {
+			rel := strings.TrimPrefix(e.Path, prefix)
+			if e.Deleted || rel == KitSealFile {
+				continue
+			}
+			if f, ok := listed[rel]; !ok || f.Size != e.Size || f.SHA256 != e.Sha {
+				return fmt.Errorf("%w: %s is in the room but not as the seal lists it", ErrSealed, e.Path)
+			}
+		}
+		return nil
+	}
+	if !sealed {
+		return nil
+	}
+	cur, err := s.meta.Current(ctx, req.Path)
+	if err != nil {
+		return err
+	}
+	if cur != nil && !cur.Deleted {
+		return nil // a file the version has: changing or deleting it is refused as a conflict by the rule above
+	}
+	doc, err := s.readSeal(ctx, seal.Sha)
+	if err != nil {
+		return err
+	}
+	rel := strings.TrimPrefix(req.Path, prefix)
+	for _, f := range doc.Files {
+		if f.Path == rel && !req.Deleted && f.Size == req.Size && f.SHA256 == req.Sha {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s is not in the seal", ErrSealed, req.Path)
+}
+
+// readSeal reads and checks the seal stored as the blob sha.
+func (s *Store) readSeal(ctx context.Context, sha string) (KitSeal, error) {
+	s.sealMu.Lock()
+	c, ok := s.sealCache[sha]
+	s.sealMu.Unlock()
+	if ok {
+		return c, nil
+	}
+	rc, err := s.blobs.Open(ctx, s.room, sha)
+	if err != nil {
+		return KitSeal{}, err
+	}
+	raw, err := io.ReadAll(io.LimitReader(rc, MaxKitSealBytes+1))
+	rc.Close()
+	if err != nil {
+		return KitSeal{}, err
+	}
+	doc, err := ParseKitSeal(raw)
+	if err != nil {
+		return KitSeal{}, err
+	}
+	s.sealMu.Lock()
+	if s.sealCache == nil || len(s.sealCache) > 64 {
+		s.sealCache = map[string]KitSeal{}
+	}
+	s.sealCache[sha] = doc
+	s.sealMu.Unlock()
+	return doc, nil
 }

@@ -12,7 +12,8 @@ export type Section =
   | 'accounts'
   | 'tools'
   | 'efficiency'
-  | 'settings';
+  | 'settings'
+  | 'extensions';
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Админ организации',

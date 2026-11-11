@@ -56,6 +56,17 @@ was made on (`0` for a new file). A stale base answers `409 {"code":"conflict","
 write is a revision of the store under the person's e-mail and the machine `hub`, and every machine of the space takes
 it as it takes any other's.
 
+### The library without the machine
+
+`GET <platform api>/design/store-library` (under any machine of the space the person may open; it may be off) is the
+person's library as the store has it: every project the hub has a row for and the person has a role in, in the shape of the machine's v2 library
+(`artifacts`: title, boards, kind, owner, role, the time of the newest revision), and their own shelves from
+`.folders/` (`layout`). A personal project of someone else is not listed. What only the machine knows is not there and
+`missing` names it: the library server and its boards' pages, the chats, the agents and claims, the checks, the pins.
+The page asks it when the machine has not answered the library in 1.5 s (or refused): it shows the hub's copy with a
+quiet line, keeps the last copy that came, and opens a project's board read-only from `design/store/<project>/f/...`.
+A new project, an import and the agents wait for the machine.
+
 ### The editor's saves and the deck's PDF
 
 The deck and video editor's saves of a recorded project in the store go to the hub, whether the machine the page runs

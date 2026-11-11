@@ -1,0 +1,12 @@
+{ "v": 1, "components": {
+  "components-button": { "id": "components-button", "name": "Button", "path": "./Button.stories.tsx",
+    "description": "The main way to act on a page: submits a form or starts a flow; one primary button per area.",
+    "import": "import { Button } from '@acme/ui';",
+    "stories": [ { "id": "components-button--primary", "name": "Primary", "snippet": "<Button variant=\"primary\">Save</Button>" } ],
+    "reactDocgen": { "props": {
+      "variant": { "description": "visual weight; primary once per area", "required": false, "tsType": { "name": "union", "raw": "'primary' | 'secondary'", "elements": [ { "name": "literal", "value": "'primary'" }, { "name": "literal", "value": "'secondary'" } ] }, "defaultValue": { "value": "'primary'" } },
+      "disabled": { "description": "greys it out and ignores clicks", "tsType": { "name": "boolean" } },
+      "onClick": { "description": "called on click", "tsType": { "name": "signature", "type": "function" } },
+      "children": { "description": "the label", "required": true, "tsType": { "name": "ReactNode" } } } } },
+  "components-tooltip": { "id": "components-tooltip", "name": "Tooltip", "description": "A short hint shown on hover or focus over the element it explains.", "import": "import Tooltip from '@acme/ui/tooltip';" }
+} }

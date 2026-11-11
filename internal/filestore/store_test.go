@@ -153,12 +153,16 @@ func TestChangesCursorAndWake(t *testing.T) {
 			t.Fatal("woke without a write")
 		default:
 		}
-		go func() { time.Sleep(50 * time.Millisecond); write(t, s, "p/c.html", 0, "c1") }()
+		// The write is waited for: a wake that came early (a notification of the writes above still on its way) must
+		// not end the test, and close the database, under the write.
+		wrote := make(chan struct{})
+		go func() { defer close(wrote); time.Sleep(50 * time.Millisecond); write(t, s, "p/c.html", 0, "c1") }()
 		select {
 		case <-wake:
 		case <-time.After(5 * time.Second):
 			t.Fatal("a write must wake the waiters")
 		}
+		<-wrote
 	})
 }
 

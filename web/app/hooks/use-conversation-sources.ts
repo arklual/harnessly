@@ -73,18 +73,21 @@ export interface IConversationSourcesView {
 /**
  * Links, artifacts, boards, merge requests and work paths of the whole conversation from its runtime, merged
  * with the loaded timeline so a fresh reply shows before the next refresh. Without a transcript (a chat) the timeline
- * is all there is.
+ * is all there is. `fedLinks` are the links of the loaded part when the runtime found them itself (the entries then
+ * carry no answers), `fedActivity` a number that moves with the conversation in place of the count of entries.
  */
 const useConversationSources = (
   jsonlPath: string | null,
   cwd: string | null,
   entries: readonly ITimelineEntry[],
+  fedLinks?: readonly IArtifactLink[],
+  fedActivity?: number,
 ): IConversationSourcesView => {
   const key = jsonlPath ? `${jsonlPath}\n${cwd ?? ''}` : null;
   const [loaded, setLoaded] = useState<{ key: string; value: IConversationSources } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [round, setRound] = useState(0);
-  const activity = entries.length;
+  const activity = fedActivity ?? entries.length;
 
   useEffect(() => {
     if (!key || !jsonlPath) return;
@@ -116,8 +119,11 @@ const useConversationSources = (
   }, []);
 
   const local = useMemo(
-    () => ({ links: collectArtifacts(entries), workPaths: collectWorkPaths(entries, cwd) }),
-    [entries, cwd],
+    () => ({
+      links: fedLinks ? [...fedLinks] : collectArtifacts(entries),
+      workPaths: collectWorkPaths(entries, cwd),
+    }),
+    [entries, cwd, fedLinks],
   );
   const server = key ? (loaded?.key === key ? loaded.value : (cache.get(key) ?? null)) : null;
   const failed = key !== null && failure === key;

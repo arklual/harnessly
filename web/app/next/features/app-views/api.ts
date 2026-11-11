@@ -15,6 +15,8 @@ import {
   BridgeError,
   isBridgeCode,
   readSignIn,
+  type IWorkflowMove,
+  type TBridgeCode,
   type TFilesOp,
   type TGitOp,
   type TRunOp,
@@ -36,6 +38,8 @@ export interface IAppView {
   icon?: string;
   order?: number;
   objects?: string[];
+  /** The app's tab in the pane beside a document of its type made of a site. */
+  pinned?: boolean;
 }
 
 export interface IBranding {
@@ -435,6 +439,38 @@ export const callStorage = async (m: MachineId, call: IStorageCall): Promise<unk
   }
 };
 
+/** hl.files.upload: a file the person gave the view, into the chat's workspace: {path, size}. */
+export const callUpload = async (
+  m: MachineId,
+  session: string,
+  path: string,
+  data: string,
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(
+      m,
+      platformPath('/apps/files/upload'),
+      postJson({ session, path, data }),
+    );
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
+/** hl.workflow.get|move: the status of the view's document (routes_apps_workflow.go); the state comes back as is. */
+export const callWorkflow = async (
+  m: MachineId,
+  session: string,
+  op: 'get' | 'move',
+  move?: IWorkflowMove,
+): Promise<unknown> => {
+  try {
+    return await runtimeJson<unknown>(m, platformPath('/apps/workflow'), postJson({ session, op, ...move }));
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
 /** hl.settings.get(): what the person saved in the app's form. The runtime reads the app from the session. */
 export const callSettings = async (m: MachineId, session: string): Promise<unknown> => {
   try {
@@ -446,6 +482,51 @@ export const callSettings = async (m: MachineId, session: string): Promise<unkno
     return r.value ?? {};
   } catch (e) {
     throw asBridgeError(e);
+  }
+};
+
+/** The slot's refusals in the bridge's words (cmd/runtime/routes_notices.go). */
+const NOTICE_CODE: Record<string, TBridgeCode> = {
+  permission: 'permission_denied',
+  'no-secrets': 'policy_blocked',
+  muted: 'policy_blocked',
+  'too-often': 'rate_limited',
+  busy: 'rate_limited',
+  'bad-notice': 'invalid_params',
+  'not-found': 'invalid_params',
+  'no-session': 'host_unavailable',
+  'not-installed': 'host_unavailable',
+};
+
+const noticeCall = async <T>(m: MachineId, body: Record<string, unknown>): Promise<T> => {
+  try {
+    return await runtimeJson<T>(m, platformPath('/notices/app'), postJson(body));
+  } catch (e) {
+    if (e instanceof RuntimeError) {
+      const said = typeof e.body === 'object' && e.body !== null ? (e.body as Record<string, unknown>) : {};
+      const code = typeof said.error === 'string' ? NOTICE_CODE[said.error] : undefined;
+      if (code) throw new BridgeError(code, typeof said.message === 'string' ? said.message : e.message);
+    }
+    throw asBridgeError(e);
+  }
+};
+
+/** hl.notice: the smart notice's slot. An ask opens the notice and waits for it in short calls until it ends. */
+export const callNotice = async (
+  m: MachineId,
+  session: string,
+  op: 'ask' | 'show' | 'update' | 'close',
+  params: Record<string, unknown>,
+): Promise<unknown> => {
+  const opened = await noticeCall<{ id?: string }>(m, { session, op, ...params });
+  if (op !== 'ask' || typeof opened.id !== 'string') return opened;
+  for (;;) {
+    const got = await noticeCall<{ done: boolean; result: unknown }>(m, {
+      session,
+      op: 'wait',
+      id: opened.id,
+    });
+    if (got.done) return got.result;
   }
 };
 

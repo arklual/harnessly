@@ -160,7 +160,7 @@ const McpPart = ({ machine }: { machine: MachineId }) => {
   );
 };
 
-export const ConnectionsPage = ({ machine }: { machine: MachineId }) => {
+export const ConnectionsPage = ({ machine, start }: { machine: MachineId; start?: string }) => {
   const [state, setState] = useState<TLoad>({ k: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
@@ -199,6 +199,7 @@ export const ConnectionsPage = ({ machine }: { machine: MachineId }) => {
       <ConnectionsSection
         connections={state.k === 'ready' ? state.conns : null}
         failed={state.k === 'failed' ? { reason: state.text, onRetry: retry } : null}
+        start={start}
         onDetect={async (url) => {
           const got = outcome(await detectLink(machine, url));
           return 'error' in got ? { error: got.error } : { detection: got.value };

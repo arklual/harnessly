@@ -743,7 +743,7 @@ func TestAnotherHostKeyThanConfirmedIsRefused(t *testing.T) {
 func TestPrivateAddressesAreRefusedInEveryEdition(t *testing.T) {
 	for _, env := range [][]hubtest.Option{
 		nil,
-		{hubtest.Env("HUB_EDITION", "cloud"), hubtest.Env("HUB_RUNTIME_DOMAIN", "m.example.test"), hubtest.Env("HUB_SSH_ALLOW_PRIVATE", "on")},
+		{hubtest.Cloud("m.example.test"), hubtest.Env("HUB_SSH_ALLOW_PRIVATE", "on")},
 	} {
 		s := hubtest.New(t, env...)
 		owner := s.SignIn("owner@example.com")

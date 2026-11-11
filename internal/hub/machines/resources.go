@@ -161,6 +161,10 @@ func (s *Service) machineHandler(write bool, h machineFunc) httpx.Handler {
 		if err != nil {
 			return err
 		}
+		// A reader is also on the machine's access list, as for the machine itself (tenant.Viewer).
+		if !write && !s.Visible(ctx, p.User.ID, m) {
+			return httpx.ErrNotFound
+		}
 		if !s.on(ctx, m.SpaceID) {
 			return errNotEnabled
 		}

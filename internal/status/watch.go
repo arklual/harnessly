@@ -8,6 +8,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const jsonlDebounce = 100 * time.Millisecond
@@ -35,7 +36,7 @@ func (j *jsonlWatch) ensure() bool {
 		return false
 	}
 	j.w = w
-	go j.loop(w)
+	safego.Go("status watch loop", func() { j.loop(w) })
 	return true
 }
 
@@ -147,7 +148,7 @@ func (j *jsonlWatch) changed(path string) {
 func (m *Manager) transcriptChanged(tabID, path string) {
 	m.mu.Lock()
 	e := m.tabs[tabID]
-	if e == nil || e.CliState == Inactive || e.CliState == Cancelled {
+	if e == nil || e.CliState == Inactive || e.CliState == Cancelled || m.chat(e) {
 		m.watch.stop(tabID)
 		m.mu.Unlock()
 		return
@@ -179,7 +180,7 @@ func (m *Manager) transcriptChanged(tabID, path string) {
 	}
 	m.mu.Unlock()
 	if codex && m.d.CodexRateLimits != nil {
-		go m.d.CodexRateLimits(path)
+		safego.Go("codex rate limits", func() { m.d.CodexRateLimits(path) })
 	}
 	m.mu.Lock()
 	interrupt := s.Interrupted && e.CliState == Busy && s.LastEntryTs != nil && *s.LastEntryTs > e.LastInterruptTs && *s.LastEntryTs > e.lastEventAt()

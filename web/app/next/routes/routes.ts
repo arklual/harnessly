@@ -1,6 +1,7 @@
 // The new interface's addresses over @/platform/router: `/` is the greeting, `/c/:id` a chat (its id readable, the
 // colons of a key kept as they are). The development galleries (`?dev=<name>`) are opened by main.tsx.
 import Router, { useRouter } from '@/platform/router';
+import { APP_OBJECT_RE } from '@/next/routes/app-object';
 
 export const ROUTE = {
   home: 'home',
@@ -19,6 +20,7 @@ export const ROUTE = {
   apps: 'apps',
   app: 'app',
   appAbout: 'appAbout',
+  review: 'review',
   help: 'help',
   learn: 'learn',
   settings: 'settings',
@@ -85,10 +87,16 @@ export type TRoute =
   | { kind: typeof ROUTE.tasks }
   /** The installed apps: `/apps`. */
   | { kind: typeof ROUTE.apps }
-  /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it). */
-  | { kind: typeof ROUTE.app; id: string; chat?: string }
+  /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it), `?o=` one of
+   *  the app's objects open (a document, a board) instead of the app's home. */
+  | { kind: typeof ROUTE.app; id: string; chat?: string; object?: string }
   /** The page about an app, installed or not: `/apps/:id/about`. */
   | { kind: typeof ROUTE.appAbout; id: string }
+  /**
+   * The built-in «Ревью кода»: `/review` its start (the merge requests), `?url=` a merge request or commit opened,
+   * `?chat=` the chat beside it — alone, the work of that chat is what is reviewed; `?wt=` the worktree of that work.
+   */
+  | { kind: typeof ROUTE.review; url?: string; chat?: string; wt?: string }
   /**
    * The documentation: `/help` (its first page), `/help/:section` (the section's first page) and `/help/:section/:page`,
    * `#anchor` a heading of it. An older `/help/:page` of the apps guide comes as a section the page resolves.
@@ -97,7 +105,8 @@ export type TRoute =
   /** Settings: `/settings` (the list of sections; on a wide window the first one is open) and `/settings/:section`. */
   /** «Обучение»: the lessons, each a film and a hands-on tour. */
   | { kind: typeof ROUTE.learn }
-  | { kind: typeof ROUTE.settings; section: SettingsSection | null };
+  /** `connect`: Connections opens with this address already found, to sign in to it (`?connect=`). */
+  | { kind: typeof ROUTE.settings; section: SettingsSection | null; connect?: string };
 
 export const HOME: TRoute = { kind: ROUTE.home };
 
@@ -114,7 +123,9 @@ const STATS_RE = /^\/stats\/?$/;
 const EFFICIENCY_RE = /^\/efficiency\/?$/;
 const TASKS_RE = /^\/tasks\/?$/;
 const APPS_RE = /^\/apps\/?$/;
+const REVIEW_RE = /^\/review\/?$/;
 const APP_ABOUT_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/about\/?$/;
+export { APP_OBJECT_RE };
 const APP_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/?$/;
 const HELP_RE = /^\/help(?:\/([a-z0-9][a-z0-9-]{0,62})(?:\/([a-z0-9][a-z0-9-]{0,62}))?)?\/?$/;
 const LEARN_RE = /^\/learn\/?$/;
@@ -168,13 +179,30 @@ export const parseRoute = (path: string): TRoute => {
   if (EFFICIENCY_RE.test(pathname)) return { kind: ROUTE.efficiency };
   if (TASKS_RE.test(pathname)) return { kind: ROUTE.tasks };
   if (APPS_RE.test(pathname)) return { kind: ROUTE.apps };
+  if (REVIEW_RE.test(pathname)) {
+    const url = queryParam(path, 'url');
+    const chat = queryParam(path, 'chat');
+    const wt = queryParam(path, 'wt');
+    return {
+      kind: ROUTE.review,
+      ...(url ? { url } : {}),
+      ...(chat ? { chat } : {}),
+      ...(wt ? { wt } : {}),
+    };
+  }
   if (LEARN_RE.test(pathname)) return { kind: ROUTE.learn };
   const about = APP_ABOUT_RE.exec(pathname);
   if (about?.[1]) return { kind: ROUTE.appAbout, id: about[1] };
   const app = APP_RE.exec(pathname);
   if (app?.[1]) {
     const chat = queryParam(path, 'chat');
-    return { kind: ROUTE.app, id: app[1], ...(chat ? { chat } : {}) };
+    const object = queryParam(path, 'o');
+    return {
+      kind: ROUTE.app,
+      id: app[1],
+      ...(object && APP_OBJECT_RE.test(object) ? { object } : {}),
+      ...(chat ? { chat } : {}),
+    };
   }
   const help = HELP_RE.exec(pathname);
   if (help) {
@@ -193,7 +221,8 @@ export const parseRoute = (path: string): TRoute => {
       (id) => id === (settings[1] === 'models' ? 'accounts' : settings[1]),
     );
     if (!settings[1]) return { kind: ROUTE.settings, section: null };
-    return section ? { kind: ROUTE.settings, section } : HOME;
+    const connect = section === 'connections' ? queryParam(path, 'connect') : null;
+    return section ? { kind: ROUTE.settings, section, ...(connect ? { connect } : {}) } : HOME;
   }
   const appDoc = APP_DOC_RE.exec(pathname);
   if (appDoc?.[1]) {
@@ -277,10 +306,20 @@ export const routePath = (route: TRoute): string => {
       return '/apps';
     case ROUTE.appAbout:
       return `/apps/${route.id}/about`;
-    case ROUTE.app:
-      return route.chat
-        ? `/apps/${route.id}?${new URLSearchParams({ chat: route.chat })}`.replace(/%3A/gi, ':')
-        : `/apps/${route.id}`;
+    case ROUTE.review: {
+      const query = new URLSearchParams();
+      if (route.url) query.set('url', route.url);
+      if (route.chat) query.set('chat', route.chat);
+      if (route.wt) query.set('wt', route.wt);
+      return query.size > 0 ? `/review?${query}`.replace(/%3A/gi, ':') : '/review';
+    }
+    case ROUTE.app: {
+      const query = new URLSearchParams({
+        ...(route.object ? { o: route.object } : {}),
+        ...(route.chat ? { chat: route.chat } : {}),
+      }).toString();
+      return query ? `/apps/${route.id}?${query}`.replace(/%3A/gi, ':') : `/apps/${route.id}`;
+    }
     case ROUTE.help: {
       let base = '/help';
       if (route.section) base += `/${route.section}`;
@@ -290,6 +329,11 @@ export const routePath = (route: TRoute): string => {
     case ROUTE.learn:
       return '/learn';
     case ROUTE.settings:
+      if (route.section && route.connect)
+        return `/settings/${route.section}?${new URLSearchParams({ connect: route.connect })}`.replace(
+          /%3A/gi,
+          ':',
+        );
       return route.section ? `/settings/${route.section}` : '/settings';
     default:
       return '/';
@@ -311,7 +355,7 @@ const plainPathname = (path: string): string => {
 /**
  * The place an address is, as one key: two addresses with the same key show the same thing, so a tab
  * strip keeps one tab for them. A chat is `chat:<id>`; a design `design:<id>`, with `+chat:<id>` when it was opened
- * with a chat; an app `app:<id>`; Designly's library `designly`; every section of Settings `settings`; the start page `home`. Query
+ * with a chat; an app `app:<id>`, `app:<id>/<object>` with an object open; Designly's library `designly`; every section of Settings `settings`; the start page `home`. Query
  * (page, board, panes, view), hash, a trailing slash, escapes and the `/design/` spelling do not make a place; an
  * address that is none of ours is its plain pathname.
  */
@@ -327,9 +371,11 @@ export const placeKeyOf = (path: string): string => {
     case ROUTE.invite:
       return `invite:${route.token}`;
     case ROUTE.app:
-      return `app:${route.id}`;
+      return route.object ? `app:${route.id}/${route.object}` : `app:${route.id}`;
     case ROUTE.appAbout:
       return `about:${route.id}`;
+    case ROUTE.review:
+      return `review:${route.url ?? ''}+${route.chat ?? ''}`;
     case ROUTE.home: {
       const pathname = plainPathname(path);
       return pathname === '/' ? 'home' : pathname;

@@ -3,16 +3,17 @@
    --sn-cw × --sn-ch through clip-path, the size of what it holds; the window springs from a dot into the line, into
    the card and back. Nothing changes the layout while it moves: only clip-path, transform and opacity, which the
    compositor plays on its own even when the page is busy. The springs are real ones (SwiftUI's response and damping,
-   sampled into linear()); opening bounces a little, folding and leaving do not. Black in both themes, as Apple's. */
+   sampled into linear()); opening bounces a little, folding and leaving do not. Black in the light theme, a light card
+   in the dark one (--hx-toast-* in tokens.css). */
 
 .hx-sn {
-  --sn-bg: #000;
-  --sn-fg: #fff;
-  --sn-fg2: rgba(255, 255, 255, 0.64);
-  --sn-fg3: rgba(255, 255, 255, 0.44);
-  --sn-fill: rgba(255, 255, 255, 0.08);
-  --sn-fill2: rgba(255, 255, 255, 0.14);
-  --sn-line: rgba(255, 255, 255, 0.08);
+  --sn-bg: var(--hx-toast-bg);
+  --sn-fg: var(--hx-toast-fg);
+  --sn-fg2: var(--hx-toast-fg2);
+  --sn-fg3: var(--hx-toast-fg3);
+  --sn-fill: var(--hx-toast-fill);
+  --sn-fill2: var(--hx-toast-fill2);
+  --sn-line: var(--hx-toast-line);
   /* response 0.52 s, damping 0.66: 6 % over, settles in 825 ms. */
   --sn-spring: linear(
     0,
@@ -91,35 +92,7 @@
     1
   );
   --sn-fold-ms: 594ms;
-  /* response 0.36 s, critically damped: 520 ms. */
-  --sn-leave: linear(
-    0,
-    0.0604,
-    0.1847,
-    0.319,
-    0.4534,
-    0.5711,
-    0.6651,
-    0.7448,
-    0.8075,
-    0.8541,
-    0.8915,
-    0.9198,
-    0.9402,
-    0.9562,
-    0.968,
-    0.9764,
-    0.9828,
-    0.9876,
-    0.9909,
-    0.9934,
-    0.9952,
-    0.9965,
-    0.9975,
-    0.9982,
-    1
-  );
-  --sn-exit-ms: 520ms;
+  --sn-exit-ms: 260ms;
   --sn-edge: 12px;
   --sn-max: calc(100vw - 16px);
   /* The box the window moves in: as big as the widest and tallest thing the shape holds. */
@@ -174,6 +147,17 @@
 .hx-sn[data-anchored] {
   left: var(--sn-x, 50%);
   bottom: var(--sn-bottom, 24px);
+  transition: opacity 160ms var(--hx-ease-out);
+}
+/* Something opened from the field (the model's picker, the «+» menu) rises where the plate stands: the plate gives way
+   until it closes, or a press on a row under it would land on the plate. */
+.hx-sn[data-covered] {
+  opacity: 0;
+}
+.hx-sn[data-covered] .hx-sn__shape,
+.hx-sn[data-covered] .hx-sn__plate,
+.hx-sn[data-covered] .hx-sn__x {
+  pointer-events: none;
 }
 .hx-sn[data-open] {
   --sn-r: 28px;
@@ -217,9 +201,9 @@
   scale: 0.6;
   translate: 0 calc(var(--sn-away) * -10px);
   transition:
-    scale var(--sn-exit-ms) var(--sn-leave),
-    translate var(--sn-exit-ms) var(--sn-leave),
-    opacity 300ms var(--hx-ease-out) 120ms;
+    scale var(--sn-exit-ms) var(--hx-ease-out),
+    translate var(--sn-exit-ms) var(--hx-ease-out),
+    opacity 220ms var(--hx-ease-out) 40ms;
 }
 
 /* ── The shape ─────────────────────────────────────── */
@@ -303,7 +287,8 @@
     translate var(--sn-open-ms) var(--sn-spring),
     opacity 260ms var(--hx-ease-out);
 }
-/* A plate is black with white over it: the deeper, the lighter (#2c2c2e, #48484a); the white is a layer of its own, so
+/* A plate is the card with --hx-toast-on over it: on black the deeper, the lighter (#2c2c2e, #48484a), on the light
+   card of the dark theme the deeper, the greyer; the layer is one of its own, so
    paging changes only opacity (features/smart-notice/pager.ts). */
 .hx-sn__plate {
   display: block;
@@ -313,9 +298,11 @@
 .hx-sn__tint {
   position: absolute;
   inset: 0;
-  background: #fff;
+  background: rgb(var(--hx-toast-on));
   opacity: 0;
   pointer-events: none;
+  /* A plate that moves up the stack loses its white with the move, not at once and not after it. */
+  transition: opacity 240ms var(--hx-ease-out);
 }
 .hx-sn__plate[data-depth='1'] {
   z-index: 2;
@@ -449,7 +436,7 @@
   stroke-width: 2;
 }
 .hx-sn__ring-bg {
-  stroke: rgba(255, 255, 255, 0.14);
+  stroke: rgb(var(--hx-toast-on) / 0.14);
 }
 .hx-sn__ring-fg {
   stroke: var(--sn-fg);
@@ -538,7 +525,7 @@
   margin: 0;
   padding: 0 4px 0 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgb(var(--hx-toast-on) / 0.05);
   box-shadow: inset 0 0 0 1px var(--sn-line);
   transition:
     background 180ms var(--hx-ease-out),
@@ -581,7 +568,7 @@
   padding: 8px 10px;
   overflow: hidden;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(var(--hx-toast-on) / 0.06);
   font-family: var(--hx-font-mono);
   font-size: 12.5px;
   line-height: 1.5;
@@ -617,6 +604,142 @@
   color: var(--sn-fg);
   font-weight: 500;
 }
+/* What cannot be undone (a slot's confirm with danger): red, and never the first action. */
+.hx-sn__btn[data-tone='danger'] {
+  background: var(--hx-toast-danger);
+  color: var(--hx-toast-danger-ink);
+}
+
+/* The open slot: who asks, over the card — the caller cannot change it. */
+.hx-sn__src {
+  margin: 0 2px 8px;
+  font-size: var(--hx-text-xs);
+  line-height: 1.3;
+  color: var(--sn-fg3);
+}
+/* A text that looks like a key stays in the field, with the way to the safe. */
+.hx-sn__warn {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: rgba(255, 80, 80, 0.14);
+  color: var(--hx-toast-warn);
+  font-size: var(--hx-text-sm);
+  line-height: 1.45;
+  animation: hx-sn-in 260ms var(--hx-ease-out) both;
+}
+.hx-sn__warn .hx-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--hx-toast-warn-icon);
+}
+/* A view of its own (slot-body.tsx SlotView): plain layout and buttons, drawn with the plate's tokens and this kit
+   only — the app's own styles never reach it (docs/build-apps/11-notices.md lists them). */
+.hx-sn__view {
+  --ink-bg: var(--hx-toast-bg);
+  --ink-fg: var(--hx-toast-fg);
+  --ink-fg2: var(--hx-toast-fg2);
+  --ink-fg3: var(--hx-toast-fg3);
+  --ink-fill: var(--hx-toast-fill);
+  --ink-fill2: var(--hx-toast-fill2);
+  --ink-line: var(--hx-toast-line);
+  --ink-danger: var(--hx-toast-danger);
+  --ink-radius: 12px;
+  --ink-radius-lg: 16px;
+  --ink-gap: 8px;
+  width: min(420px, 100%);
+  min-width: 300px;
+  max-height: 320px;
+  margin: 0 0 4px;
+  overflow: hidden;
+  color: var(--ink-fg);
+  font-size: var(--hx-text-sm);
+  line-height: 1.4;
+}
+.hx-sn__view :where(p, h3, h4, ul, ol) {
+  margin: 0 0 var(--ink-gap);
+}
+.hx-sn__view img {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--ink-radius);
+}
+.hx-sn__view .ink-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: var(--ink-gap);
+}
+.hx-sn__view .ink-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ink-gap);
+}
+.hx-sn__view .ink-end {
+  justify-content: flex-end;
+  margin-top: var(--ink-gap);
+}
+.hx-sn__view .ink-tile {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 64px;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--ink-radius);
+  background: var(--ink-fill2);
+  color: var(--ink-fg2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-sn__view .ink-tile:hover,
+.hx-sn__view .ink-tile[data-on] {
+  color: var(--ink-fg);
+}
+.hx-sn__view .ink-tile[data-on] {
+  box-shadow: inset 0 0 0 1.5px rgb(var(--hx-toast-on) / 0.7);
+}
+.hx-sn__view .ink-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-fg);
+  color: var(--ink-bg);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.hx-sn__view .ink-btn[data-tone='soft'] {
+  background: var(--ink-fill2);
+  color: var(--ink-fg);
+  font-weight: 500;
+}
+.hx-sn__view .ink-btn[data-tone='danger'] {
+  background: var(--ink-danger);
+  color: var(--hx-toast-danger-ink);
+}
+.hx-sn__view .ink-panel {
+  padding: 12px;
+  border-radius: var(--ink-radius-lg);
+  background: var(--ink-fill);
+}
+.hx-sn__view .ink-text {
+  color: var(--ink-fg2);
+}
+.hx-sn__view .ink-muted {
+  color: var(--ink-fg3);
+  font-size: var(--hx-text-xs);
+}
+
 .hx-sn__link {
   display: inline-flex;
   align-items: center;
@@ -657,7 +780,7 @@
   padding: 0 2px;
 }
 .hx-sn__others li + li {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgb(var(--hx-toast-on) / 0.05);
 }
 .hx-sn__other .hx-sn__text {
   flex: 1;
@@ -672,16 +795,16 @@
 }
 .hx-sn .hx-otp__cell {
   height: 52px;
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgb(var(--hx-toast-on) / 0.14);
   background: var(--sn-fill);
   color: var(--sn-fg);
 }
 .hx-sn .hx-otp__cell[data-filled] {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: rgb(var(--hx-toast-on) / 0.4);
 }
 .hx-sn .hx-otp:focus-within .hx-otp__cell[data-active] {
   border-color: var(--sn-fg);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 3px rgb(var(--hx-toast-on) / 0.16);
 }
 .hx-sn .hx-otp:focus-within .hx-otp__cell[data-active]::after {
   background: var(--sn-fg);
@@ -696,11 +819,11 @@
 }
 /* The card's field shows the focus as a whole, softly: a brighter edge and fill, never a ring around the text. */
 .hx-sn__field:focus-within {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  background: rgb(var(--hx-toast-on) / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(var(--hx-toast-on) / 0.28);
 }
 .hx-sn :focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline: 2px solid rgb(var(--hx-toast-on) / 0.85);
   outline-offset: 2px;
 }
 
@@ -720,7 +843,7 @@
     translate var(--sn-open-ms) var(--sn-spring);
 }
 .hx-sn[data-phase='out'] .hx-sn__shape {
-  transition: clip-path var(--sn-exit-ms) var(--sn-leave);
+  transition: clip-path var(--sn-exit-ms) var(--hx-ease-out);
 }
 .hx-sn[data-drag] .hx-sn__shape {
   transition: clip-path var(--sn-open-ms) var(--sn-spring);
@@ -734,17 +857,22 @@
     opacity var(--sn-fling-ms, 300ms) cubic-bezier(0.5, 0, 0.75, 0);
 }
 /* The next plate comes to the front out of the stack: from where the first plate behind stood (or, paging back, from
-   in front and above), springing. */
+   in front and above), in one short ease-out move. It is black all the way: a see-through or grey front plate reads as
+   one that is still going. */
 .hx-sn[data-rise] .hx-sn__shape {
-  transition: clip-path var(--sn-open-ms) var(--sn-spring);
-  animation: hx-sn-rise 620ms var(--sn-spring) both;
+  transition: clip-path 240ms var(--hx-ease-out);
+  animation: hx-sn-rise 240ms var(--hx-ease-out) both;
+}
+/* Its line is there with it, not blurring in after the move. */
+.hx-sn[data-rise] .hx-sn__body {
+  animation-duration: 180ms;
+  animation-delay: 0ms;
 }
 .hx-sn[data-rise] .hx-sn__ghosts {
   display: none;
 }
 @keyframes hx-sn-rise {
   from {
-    opacity: 0.6;
     scale: 0.93;
     translate: 0 calc(var(--sn-away) * (var(--sn-ch) * 0.07 + 9px));
   }
@@ -762,11 +890,11 @@
 /* A plate that has just gone behind (paged away) sinks from the front into its place in the stack. */
 .hx-sn[data-rise='next'] span.hx-sn__plate:last-of-type,
 .hx-sn[data-rise='prev'] span.hx-sn__plate:first-of-type {
-  animation: hx-sn-sink 620ms var(--sn-spring) backwards;
+  animation: hx-sn-sink 240ms var(--hx-ease-out) backwards;
 }
 .hx-sn[data-rise='next'] span.hx-sn__plate:last-of-type > .hx-sn__tint,
 .hx-sn[data-rise='prev'] span.hx-sn__plate:first-of-type > .hx-sn__tint {
-  animation: hx-sn-untint 620ms var(--sn-spring) backwards;
+  animation: hx-sn-untint 240ms var(--hx-ease-out) backwards;
 }
 @keyframes hx-sn-untint {
   from {
@@ -863,7 +991,7 @@
   background: var(--sn-bg);
   box-shadow:
     0 14px 40px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+    0 0 0 1px rgb(var(--hx-toast-on) / 0.06);
   transform-origin: center bottom;
   animation: hx-sn-menu-in 220ms var(--sn-spring) both;
 }
@@ -932,7 +1060,7 @@
   margin: 0 2px 14px;
   border: 0;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--hx-toast-on) / 0.12);
   appearance: none;
   overflow: hidden;
 }
@@ -995,8 +1123,12 @@
     transition: opacity 150ms linear;
   }
   .hx-sn[data-rise] .hx-sn__shape,
-  .hx-sn[data-rise] .hx-sn__plate {
+  .hx-sn[data-rise] .hx-sn__plate,
+  .hx-sn[data-rise] .hx-sn__tint {
     animation: none;
+  }
+  .hx-sn__tint {
+    transition: none;
   }
   .hx-sn__menu,
   .hx-sn__menu[data-state='closing'] {
@@ -1028,18 +1160,18 @@
 
 /* The black shape flying between the notice and a drop (features/smart-notice/fly.ts). */
 .hx-sn-fly {
-  --sn-bg: #000;
-  --sn-fg: #fff;
-  --sn-fg2: rgba(255, 255, 255, 0.64);
-  --sn-fg3: rgba(255, 255, 255, 0.44);
-  --sn-fill: rgba(255, 255, 255, 0.08);
-  --sn-fill2: rgba(255, 255, 255, 0.14);
-  --sn-line: rgba(255, 255, 255, 0.08);
+  --sn-bg: var(--hx-toast-bg);
+  --sn-fg: var(--hx-toast-fg);
+  --sn-fg2: var(--hx-toast-fg2);
+  --sn-fg3: var(--hx-toast-fg3);
+  --sn-fill: var(--hx-toast-fill);
+  --sn-fill2: var(--hx-toast-fill2);
+  --sn-line: var(--hx-toast-line);
   position: fixed;
   z-index: 191;
   overflow: hidden;
-  background: #000;
-  color: #fff;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
   pointer-events: none;
 }
 /* The notice coming out of a drop: the flight draws it, the plate shows when it lands (where it already stands, so
@@ -1060,12 +1192,12 @@
 
 /* ── The drops in the chat's right column (features/smart-notice/drops.tsx) ── */
 .hx-sn-drops {
-  --sn-bg: var(--hx-ink-bg);
-  --sn-fg: var(--hx-ink-fg);
-  --sn-fg2: var(--hx-ink-fg2);
-  --sn-fg3: var(--hx-ink-fg3);
-  --sn-fill: var(--hx-ink-fill);
-  --sn-fill2: var(--hx-ink-fill2);
+  --sn-bg: var(--hx-toast-bg);
+  --sn-fg: var(--hx-toast-fg);
+  --sn-fg2: var(--hx-toast-fg2);
+  --sn-fg3: var(--hx-toast-fg3);
+  --sn-fill: var(--hx-toast-fill);
+  --sn-fill2: var(--hx-toast-fill2);
   margin: 4px 0 12px;
 }
 .hx-sn-drops__list {
@@ -1258,7 +1390,7 @@
 }
 .hx-sn :focus-visible,
 .hx-sn-drop :focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline: 2px solid rgb(var(--hx-toast-on) / 0.85);
   outline-offset: 2px;
 }
 /* The drop's main button is the whole line: from the keyboard the capsule itself takes a soft ring around its edge. */
@@ -1353,8 +1485,95 @@
   display: flex;
   align-items: center;
   overflow: hidden;
-  color: #fff;
+  color: var(--hx-toast-fg);
   white-space: nowrap;
   text-overflow: ellipsis;
   pointer-events: none;
+}
+
+/* ── Close and «Закрыть все» ──
+   As on macOS: hovering the plate shows a round × at its corner; on a stack the × grows into «Закрыть все» under the
+   pointer. Not shown while a gesture moves the plate. */
+.hx-sn__x {
+  position: absolute;
+  z-index: 4;
+  top: calc(var(--sn-it) - 8px);
+  left: calc(var(--sn-il) - 8px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 4px;
+  border: 1px solid rgb(var(--hx-toast-on) / 0.16);
+  border-radius: 12px;
+  background: var(--hx-toast-raised);
+  color: var(--sn-fg);
+  font: 500 12px/1 var(--hx-font, inherit);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0;
+  scale: 0.6;
+  visibility: hidden;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    scale 220ms var(--hx-ease-out),
+    visibility 0s linear 220ms;
+}
+.hx-sn__x > .hx-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.hx-sn__x-all {
+  display: none;
+  padding-right: 4px;
+}
+@media (hover: hover) {
+  .hx-sn:hover .hx-sn__x {
+    opacity: 1;
+    scale: 1;
+    visibility: visible;
+    transition:
+      opacity 160ms var(--hx-ease-out) 80ms,
+      scale 220ms var(--hx-ease-out) 80ms,
+      visibility 0s;
+  }
+  .hx-sn__x[data-all]:hover .hx-sn__x-all {
+    display: inline;
+  }
+  .hx-sn__x:hover {
+    background: var(--hx-toast-raised-hover);
+  }
+}
+.hx-sn__x:focus-visible {
+  opacity: 1;
+  scale: 1;
+  visibility: visible;
+  outline: 2px solid rgb(var(--hx-toast-on) / 0.5);
+  outline-offset: 1px;
+}
+.hx-sn__x:focus-visible .hx-sn__x-all {
+  display: inline;
+}
+.hx-sn[data-paging] .hx-sn__x,
+.hx-sn[data-drag] .hx-sn__x,
+.hx-sn[data-fling] .hx-sn__x,
+.hx-sn[data-phase='out'] .hx-sn__x {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.hx-sn__others-head {
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 -6px;
+}
+/* Ten and more: five rows show, the rest scroll inside the card. */
+.hx-sn__others {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }

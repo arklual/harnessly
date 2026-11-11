@@ -26,15 +26,7 @@ const PIPELINE: Record<TPipelineStatus, { icon: typeof CheckCircle2; label: stri
   other: { icon: CircleDashed, label: 'CI' },
 };
 
-export const pipelineLabel = (status: TPipelineStatus): string => PIPELINE[status].label;
-
-/** The icon of a status of a pipeline, a stage or a job, in the colour `tw-ci-<status>` gives its parent. */
-export const PipelineIcon = ({ status }: { status: TPipelineStatus }) => {
-  const { icon: Icon } = PIPELINE[status];
-  return <Icon aria-hidden="true" className={cn(status === 'running' && 'tw-inline-spin')} />;
-};
-
-export const PipelineBadge = ({ pipeline }: { pipeline: IPipeline | null }) => {
+const PipelineBadge = ({ pipeline }: { pipeline: IPipeline | null }) => {
   if (!pipeline)
     return (
       <span className="tw-ci tw-ci-none" title={t('inspector.gitlabTab.noPipeline')}>

@@ -178,3 +178,64 @@ func TestMadeListsTrackerTasksOnlyForAPageThatAsksAndGroupsThemByTheTracker(t *t
 		t.Fatalf("a task the tracker did not answer keeps only its key: %+v", lone)
 	}
 }
+
+// A chat inherits what its subagents and delegated chats made, theirs marked with who made them; a thing the chat
+// made itself stays its own.
+func TestMadeInheritsSubagentsAndSubchats(t *testing.T) {
+	const own = "https://gitlab.example.com/acme/web/-/merge_requests/1"
+	const viaAgent = "https://gitlab.example.com/acme/web/-/merge_requests/2"
+	const viaChat = "https://gitlab.example.com/acme/web/-/merge_requests/3"
+	const deep = "https://gitlab.example.com/acme/web/-/merge_requests/4"
+	mr := func(n int, link string) []string {
+		return pairLines(n, "Bash", `{"command":"glab mr create --title \"Change\""}`, link)
+	}
+	m, rec := madeFixture(t, mr(1, own)...)
+	write := func(path string, lines []string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	agents := filepath.Join(strings.TrimSuffix(rec.TranscriptPath, ".jsonl"), "subagents")
+	write(filepath.Join(agents, "agent-a1.jsonl"), append(mr(2, viaAgent), mr(3, own)...))
+	write(filepath.Join(agents, "agent-a1.meta.json"), []string{`{"description":"Fix the form"}`})
+	dir := filepath.Dir(rec.TranscriptPath)
+	kid := wire.Conversation{ID: "tab-2", Title: "Chart", TranscriptPath: filepath.Join(dir, "k.jsonl"), ParentID: &rec.ID}
+	write(kid.TranscriptPath, mr(4, viaChat))
+	grand := wire.Conversation{ID: "tab-3", TranscriptPath: filepath.Join(dir, "g.jsonl"), ParentID: &kid.ID}
+	write(grand.TranscriptPath, mr(5, deep))
+	other := wire.Conversation{ID: "tab-4", TranscriptPath: filepath.Join(dir, "o.jsonl")}
+	write(other.TranscriptPath, mr(6, "https://gitlab.example.com/acme/web/-/merge_requests/9"))
+	m.chats = func(context.Context) []wire.Conversation { return []wire.Conversation{rec, kid, grand, other} }
+
+	got, err := m.Made(context.Background(), "tab-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := got.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	from := map[string]string{}
+	for _, it := range got.Items {
+		if it.Kind != wire.MadeMR {
+			t.Fatalf("kind %s of %s", it.Kind, it.Ref)
+		}
+		who := "own"
+		if it.From != nil {
+			who = string(it.From.Kind) + ":" + it.From.Title
+		}
+		from[it.Ref] = who
+	}
+	want := map[string]string{own: "own", viaAgent: "subagent:Fix the form", viaChat: "subchat:Chart", deep: "subchat:Chart"}
+	if len(from) != len(want) || len(got.Items) != len(want) {
+		t.Fatalf("items %v, want %v", from, want)
+	}
+	for ref, who := range want {
+		if from[ref] != who {
+			t.Fatalf("%s from %q, want %q", ref, from[ref], who)
+		}
+	}
+}

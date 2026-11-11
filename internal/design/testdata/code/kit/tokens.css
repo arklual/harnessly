@@ -1,0 +1,14 @@
+:root {
+  --acme-color-accent: #2563eb;
+  --acme-color-surface: #ffffff;
+  --acme-color-text: #14161a;
+  --acme-color-muted: #5b6270;
+  --acme-space-2: 8px;
+  --acme-space-4: 16px;
+  --acme-radius-m: 8px;
+  /* the kit's semantic names over the library's variables */
+  --acme-accent: var(--acme-color-accent);
+  --acme-surface: var(--acme-color-surface);
+  --acme-text: var(--acme-color-text);
+  --acme-muted: var(--acme-color-muted);
+}

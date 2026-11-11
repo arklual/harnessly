@@ -2,7 +2,6 @@ package hlcli
 
 import (
 	"encoding/json"
-	"sort"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/designkit"
@@ -75,33 +74,14 @@ type kitNode struct {
 	Address string `json:"address,omitempty"`
 }
 
-func xImport(ns, comp string, props map[string]any) string {
-	var b strings.Builder
-	b.WriteString(`<x-import component-from-global-scope="` + ns + "." + comp + `"`)
-	for _, k := range sortedKeys(props) {
-		if s, ok := props[k].(string); ok {
-			b.WriteString(" " + k + `="` + s + `"`)
-		}
-	}
-	b.WriteString("></x-import>")
-	return b.String()
-}
-
-func sortedKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
+func xImport(ns, comp string, props map[string]any) string { return designkit.XImport(ns, comp, props) }
 
 func findNode(cv *designkit.Canvas, node string) *kitNode {
 	n := &kitNode{Node: node, Theme: cv.Theme}
 	for _, g := range cv.Groups {
 		for _, k := range g.Components {
 			if k.NodeID == node {
-				n.Kind, n.Value, n.Call = designkit.KindComponent, k, xImport(cv.Namespace, k.ID, k.Sample)
+				n.Kind, n.Value, n.Call = designkit.KindComponent, k, xImport(cv.NamespaceOf(&k), k.ID, k.Sample)
 				return n
 			}
 		}
@@ -166,6 +146,12 @@ func (c *cli) kitShow(o kitOptions, pos []string) error {
 	n := findNode(cv, pos[1])
 	if n == nil {
 		return usageErr("no node %q in %s %s (%s)", pos[1], cv.Kit, cv.Version, cv.Theme)
+	}
+	// A component is shown as the kit_component tool answers it: the manifest and the card in one.
+	if n.Kind == designkit.KindComponent {
+		if v := designkit.ComponentOf(o.dir, cv, strings.TrimPrefix(n.Node, "component:")); v != nil {
+			n.Value, n.Call = v, v.Call
+		}
 	}
 	raw, _ := json.MarshalIndent(n, "", "  ")
 	c.out("%s\n", raw)

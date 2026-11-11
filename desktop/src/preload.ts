@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemResources: () => ipcRenderer.invoke('get-system-resources'),
   showNotification: (title: string, body: string) => ipcRenderer.invoke('show-notification', title, body),
   openNewWindow: () => ipcRenderer.invoke('open-new-window'),
+  closeWindow: () => ipcRenderer.invoke('close-window'),
   setDockBadge: (count: number) => ipcRenderer.invoke('set-dock-badge', count),
   setLocale: (locale: string) => ipcRenderer.invoke('set-locale', locale),
   setNativeTheme: (theme: string) => ipcRenderer.invoke('set-native-theme', theme),

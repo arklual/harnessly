@@ -40,6 +40,8 @@ const HOLD_MS = 380;
 /** The list scrolls while the pointer is within this of its top or bottom edge. */
 const SCROLL_ZONE = 44;
 const SCROLL_STEP = 14;
+/** A pointer carried this far past the window's edge has left it: the drag ends there, the row goes back. */
+const OUT_OF_WINDOW = 48;
 /** The let-go element eases into its place, or back to its own, this long: --hx-drag-ms in ui.css. */
 export const SETTLE_MS = 180;
 /** After the owner has had the drop (and its promise, when it gives one, has settled), the new order has this long to come. */
@@ -514,6 +516,9 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       window.removeEventListener('pointercancel', cancel);
       window.removeEventListener('keydown', key, true);
       window.removeEventListener('blur', lost);
+      document.removeEventListener('visibilitychange', hidden);
+      document.documentElement.removeEventListener('mouseleave', left);
+      list.removeEventListener('lostpointercapture', uncaptured);
       if (!t.active) return;
       try {
         list.releasePointerCapture(t.pointerId);
@@ -587,6 +592,17 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
     function move(event: PointerEvent) {
       const t = track;
       if (!t || event.pointerId !== t.pointerId) return;
+      // The button is up, yet no pointerup came: it was let go where this page hears nothing (over the window's frame,
+      // outside a frame or a webview the page lives in). The press ended there: a row picked up is put down where it was
+      // last seen, one not yet picked up is not picked up now, and nothing follows a pointer with no button held.
+      if ((event.buttons & 1) === 0) {
+        finish(t.active);
+        return;
+      }
+      if (t.active && outOfWindow(event)) {
+        finish(false);
+        return;
+      }
       t.x = event.clientX;
       t.y = event.clientY;
       if (!t.active) {
@@ -615,6 +631,23 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
     function lost() {
       finish(false);
     }
+    function hidden() {
+      if (document.visibilityState === 'hidden') finish(false);
+    }
+    // The pointer left the page before the row was picked up (with the row carried, the list holds the pointer and
+    // its moves outside say where it is): a press that goes out of the window picks nothing up.
+    function left() {
+      if (track && !track.active) finish(false);
+    }
+    // The browser took the pointer away from the list (it was let go somewhere the page did not hear, or the system took it).
+    function uncaptured(event: PointerEvent) {
+      if (track?.active && event.pointerId === track.pointerId) finish(false);
+    }
+    const outOfWindow = (event: PointerEvent) =>
+      event.clientX < -OUT_OF_WINDOW ||
+      event.clientY < -OUT_OF_WINDOW ||
+      event.clientX > window.innerWidth + OUT_OF_WINDOW ||
+      event.clientY > window.innerHeight + OUT_OF_WINDOW;
     function key(event: KeyboardEvent) {
       if (event.key !== 'Escape' || !track?.active) return;
       event.stopPropagation();
@@ -622,7 +655,14 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
     }
 
     const down = (event: PointerEvent) => {
-      if (track || busy || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      // A press while one is still tracked: the release of that one never came. A carried row is put down by this press;
+      // a press that had not picked anything up gives way to this one.
+      if (track?.active) {
+        finish(true);
+        return;
+      }
+      if (track) finish(false);
+      if (busy || (event.pointerType === 'mouse' && event.button !== 0)) return;
       const target = event.target as HTMLElement;
       if (target.closest('input, textarea, [data-nodrag]')) return;
       const el = target.closest<HTMLElement>('[data-drag]');
@@ -666,6 +706,9 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       window.addEventListener('pointercancel', cancel);
       window.addEventListener('keydown', key, true);
       window.addEventListener('blur', lost);
+      document.addEventListener('visibilitychange', hidden);
+      document.documentElement.addEventListener('mouseleave', left);
+      list.addEventListener('lostpointercapture', uncaptured);
     };
 
     list.addEventListener('pointerdown', down);

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // The chats of the person leave the machine (part 1): the agent reads the runtime's replica socket
@@ -46,6 +48,14 @@ const (
 	// busy answer stayed behind until the next link.
 	replicaRetryWait    = time.Minute
 	replicaRetryWaitMax = 15 * time.Minute
+	// replicaAckWait is how long a sent frame may stay unacknowledged before the channel goes back to what the cluster
+	// last said it stored and sends from there again, doubled up to replicaAckWaitMax while nothing is acknowledged: a
+	// frame the cluster failed to store, or an ack lost on the way, left the copy without the end of a turn until the
+	// next event of the chat.
+	replicaAckWait    = 8 * time.Second
+	replicaAckWaitMax = 2 * time.Minute
+	// replicaLagWarn is how many events of the machine may wait for an acknowledgement before a resend says so in the log.
+	replicaLagWarn = 1000
 )
 
 // evV2Events carries events `fromSeq`.. of one channel of one epoch.
@@ -81,6 +91,14 @@ type replicaChan struct {
 	sent   int64          // the last seq sent
 	acked  int64
 	reset  bool // the next frame is a new baseline, not a continuation
+
+	// The resend of what was not acknowledged (replicaAckWait).
+	timer    *time.Timer
+	wait     time.Duration // the pause before the next resend; 0 is the first one
+	armAcked int64         // acked when the timer was set: no move since means no ack came
+	held     bool          // the cluster refused the same place twice: the next frame waits for the timer
+	gapAt    int64         // the ackSeq of the last gap
+	gapSeen  bool
 }
 
 // replica is the agent's end of the chat replication. `emit` hands a frame to the cluster links, `connected` says whether
@@ -95,6 +113,7 @@ type replica struct {
 	pause     time.Duration
 	convsWait time.Duration // the first wait for the chat list (replicaConvsWait)
 	retryWait time.Duration // the first wait before a cut chat's backfill goes on (replicaRetryWait)
+	ackWait   time.Duration // the first wait for an ack before a resend (replicaAckWait); 0 never resends on time
 
 	// The tool outputs the cluster's copy gets whole (replica_outputs.go).
 	outQ    chan outputJob
@@ -111,21 +130,43 @@ type replica struct {
 	steps      map[string]string // the chats held whole without the steps of every turn, by their steps cursor
 	generation int               // a new `v2.start` or a new runtime epoch starts a new backfill; the old one stops
 	answered   int               // the generation the runtime's chat list came for
+
+	// work takes the runtime's `work` frames (chatwork.go); nil drops them.
+	work func(frame []byte)
 }
 
 func newReplica(a *Agent) *replica {
+	r := newReplicaWith(func(ev any) {
+		a.broadcast(ev)
+		if a.hub != nil && !a.hub.observe {
+			a.hub.emitHistory(ev) // HRN-879: a hub keeps the chats as a cluster does
+		}
+	}, a.connected)
+	r.work = func(frame []byte) {
+		if a.hub != nil && !a.hub.observe {
+			a.hub.takeWork(frame)
+		}
+	}
+	return r
+}
+
+// newHubReplica is the replica of an observe link's hub (AGENT_HUB_HISTORY=on). It shares nothing with the
+// cluster's: its own state (cursors, acks, baselines, generation), its own socket to the runtime, frames only to the hub.
+func newHubReplica(h *hub) *replica {
+	r := newReplicaWith(h.emitHistory, func() bool { return len(h.hubLinks()) > 0 })
+	r.work = h.takeWork
+	return r
+}
+
+func newReplicaWith(emit func(any), connected func() bool) *replica {
 	return &replica{
-		emit: func(ev any) {
-			a.broadcast(ev)
-			if a.hub != nil && !a.hub.observe {
-				a.hub.emitHistory(ev) // HRN-879: a hub keeps the chats as a cluster does
-			}
-		},
-		connected: a.connected,
+		emit:      emit,
+		connected: connected,
 		askConvs:  func() {},
 		pause:     replicaPause,
 		convsWait: replicaConvsWait,
 		retryWait: replicaRetryWait,
+		ackWait:   replicaAckWait,
 		chans:     map[string]*replicaChan{},
 		outQ:      make(chan outputJob, outputQueue),
 		outSeen:   map[string]int64{},
@@ -188,6 +229,10 @@ func (r *replica) ack(ch, epoch string, ackSeq int64, gap bool) {
 	if !r.enabled || c == nil || epoch != r.epoch {
 		return
 	}
+	if ackSeq > c.acked {
+		// The cluster stores again: the next wait is the first one.
+		c.wait, c.held, c.gapSeen = 0, false, false
+	}
 	c.acked = max(c.acked, ackSeq)
 	keep := c.events[:0]
 	for _, ev := range c.events {
@@ -200,7 +245,85 @@ func (r *replica) ack(ch, epoch string, ackSeq int64, gap bool) {
 		c.sent = ackSeq
 		c.reset = false
 	}
+	if gap {
+		// A gap at the place the last one named is a cluster that cannot store the frame now: sending it at once again
+		// would go round as fast as the link carries. It goes with the timer, after a pause that grows.
+		if c.gapSeen && c.gapAt == ackSeq && r.ackWait > 0 {
+			c.held = true
+			r.armLocked(ch, c)
+			return
+		}
+		c.gapSeen, c.gapAt = true, ackSeq
+	}
 	r.flushLocked(ch, c)
+}
+
+// armLocked sets the channel's resend timer when none runs.
+func (r *replica) armLocked(ch string, c *replicaChan) {
+	if r.ackWait <= 0 || c.timer != nil {
+		return
+	}
+	wait := c.wait
+	if wait <= 0 {
+		wait = r.ackWait
+	}
+	c.armAcked = c.acked
+	c.timer = time.AfterFunc(wait, func() {
+		safego.Run("replica resend "+ch, func() { r.overdue(ch, c) })
+	})
+}
+
+// overdue is the channel's timer: frames that no ack came for since it was set are sent again from what is
+// acknowledged, and the next wait is twice as long.
+func (r *replica) overdue(ch string, c *replicaChan) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	c.timer = nil
+	if !r.enabled || r.chans[ch] != c {
+		return // a new start or a new epoch counts anew
+	}
+	if !c.held {
+		if c.sent <= c.acked {
+			c.wait = 0
+			return
+		}
+		if c.acked > c.armAcked {
+			// Acks come, only not for everything yet.
+			r.armLocked(ch, c)
+			return
+		}
+		c.sent = c.acked
+		c.reset = false
+	}
+	c.held = false
+	base := max(c.wait, r.ackWait)
+	c.wait = min(base*2, replicaAckWaitMax)
+	events, channels := r.lagLocked()
+	level := "info"
+	if events >= replicaLagWarn {
+		level = "warn"
+	}
+	Log(level, "chat replica: no ack, sending again", F{"ch", ch}, F{"from", c.acked + 1}, F{"next", c.wait.String()},
+		F{"unackedEvents", events}, F{"unackedChannels", channels})
+	r.flushLocked(ch, c)
+}
+
+// lag is how far the cluster's copy is behind this machine: the events it has not acknowledged, and the channels they
+// are in.
+func (r *replica) lag() (events int64, channels int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.lagLocked()
+}
+
+func (r *replica) lagLocked() (events int64, channels int) {
+	for _, c := range r.chans {
+		if n := c.last - c.acked; n > 0 {
+			events += n
+			channels++
+		}
+	}
+	return events, channels
 }
 
 // hello is the runtime's first frame on a replica socket: the epoch its seqs belong to.
@@ -263,7 +386,7 @@ func (r *replica) adopt(ch string, c *replicaChan, firstSeq int64) {
 }
 
 func (r *replica) flushLocked(ch string, c *replicaChan) {
-	if !r.connected() {
+	if !r.connected() || c.held {
 		return
 	}
 	for {
@@ -290,6 +413,7 @@ func (r *replica) flushLocked(ch string, c *replicaChan) {
 		r.emit(evV2Events{Event: "v2.events", Ch: ch, Epoch: r.epoch, FromSeq: from, Reset: c.reset || from != c.sent+1, Events: batch})
 		c.reset = false
 		c.sent = from + int64(len(batch)) - 1
+		r.armLocked(ch, c)
 	}
 }
 
@@ -508,10 +632,33 @@ func feedReset(page json.RawMessage) (json.RawMessage, bool) {
 
 // ---- the loopback end -------------------------------------------------------------------------------------------
 
+// replicaSock is the agent's open replica socket of one replica: the cluster's and an observe link's hub's each have
+// a socket of their own, so that neither's chat list request or reconnect reaches the other.
+type replicaSock struct {
+	mu   sync.Mutex
+	conn *websocket.Conn
+}
+
+func (s *replicaSock) send(text string) {
+	s.mu.Lock()
+	conn := s.conn
+	s.mu.Unlock()
+	if conn == nil {
+		return // asked again when the socket opens: its hello does
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), statusSendLimit)
+	defer cancel()
+	_ = conn.Write(ctx, websocket.MessageText, []byte(text))
+}
+
 // startReplica reads the runtime's replica socket for as long as the agent runs.
-func (a *Agent) startReplica(ctx context.Context) {
-	r := a.replica
-	r.askConvs = func() { a.replicaSend(`{"k":"convs"}`) }
+func (a *Agent) startReplica(ctx context.Context) { a.serveReplica(ctx, a.replica, &a.replicaSock) }
+
+// startHubReplica is startReplica for the hub of an observe link, on a socket and a replica of its own.
+func (a *Agent) startHubReplica(ctx context.Context) { a.serveReplica(ctx, a.hubReplica, &a.hubSock) }
+
+func (a *Agent) serveReplica(ctx context.Context, r *replica, sock *replicaSock) {
+	r.askConvs = func() { sock.send(`{"k":"convs"}`) }
 	r.pages = func(conv, before string, limit int, steps bool) (json.RawMessage, error) {
 		q := url.Values{"limit": {strconv.Itoa(limit)}}
 		if before != "" {
@@ -533,10 +680,10 @@ func (a *Agent) startReplica(ctx context.Context) {
 		wait := replicaRetryMin
 		for ctx.Err() == nil {
 			began := time.Now()
-			a.replicaOnce(ctx)
-			a.replicaMu.Lock()
-			a.replicaConn = nil
-			a.replicaMu.Unlock()
+			a.replicaOnce(ctx, r, sock)
+			sock.mu.Lock()
+			sock.conn = nil
+			sock.mu.Unlock()
 			if time.Since(began) > time.Minute {
 				wait = replicaRetryMin
 			}
@@ -555,19 +702,7 @@ const (
 	replicaRetryMax = 30 * time.Second
 )
 
-func (a *Agent) replicaSend(text string) {
-	a.replicaMu.Lock()
-	conn := a.replicaConn
-	a.replicaMu.Unlock()
-	if conn == nil {
-		return // asked again when the socket opens: its hello does
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), statusSendLimit)
-	defer cancel()
-	_ = conn.Write(ctx, websocket.MessageText, []byte(text))
-}
-
-func (a *Agent) replicaOnce(ctx context.Context) {
+func (a *Agent) replicaOnce(ctx context.Context, r *replica, sock *replicaSock) {
 	dialCtx, cancel := context.WithTimeout(ctx, relayHandshake)
 	defer cancel()
 	header := http.Header{}
@@ -581,18 +716,18 @@ func (a *Agent) replicaOnce(ctx context.Context) {
 	}
 	defer conn.CloseNow()
 	conn.SetReadLimit(relayReadLimit)
-	a.replicaMu.Lock()
-	a.replicaConn = conn
-	a.replicaMu.Unlock()
+	sock.mu.Lock()
+	sock.conn = conn
+	sock.mu.Unlock()
 	cctx, ccancel := context.WithCancel(ctx)
 	defer ccancel()
-	go every(cctx, 20*time.Second, false, func() { a.replicaSend(`{"k":"ping"}`) })
+	go every(cctx, 20*time.Second, false, func() { sock.send(`{"k":"ping"}`) })
 	for {
 		_, data, err := conn.Read(cctx)
 		if err != nil {
 			return
 		}
-		a.replica.frame(data)
+		r.frame(data)
 	}
 }
 
@@ -618,6 +753,10 @@ func (r *replica) frame(data []byte) {
 		}
 	case "convs":
 		r.convs(f.Conversations)
+	case "work":
+		if r.work != nil {
+			r.work(data)
+		}
 	}
 }
 

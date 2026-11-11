@@ -57,5 +57,8 @@
   "next.manage.spend.sub.hub": "Across all your machines, as the hub counted",
   "next.manage.spend.sub.local": "On this machine, at API prices",
   "next.manage.spend.empty": "No spend in this period.",
-  "next.manage.spend.aria": "Spend by day"
+  "next.manage.spend.aria": "Spend by day",
+  "next.manage.hubOnly": "From the server",
+  "next.manage.hubUnavailable": "Data from the server is unavailable. Nothing is counted on this machine; the figures appear when the hub answers.",
+  "next.manage.tile.costHub": "Spent"
 }

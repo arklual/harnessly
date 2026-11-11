@@ -89,6 +89,7 @@
   },
   "stats.statsView.noComparison": "The comparison with the previous period appears once the history is longer than the selected period: right now it starts later than the previous period.",
   "stats.statsView.noData": "No data",
+  "stats.statsView.noHubData": "No data in the hub",
   "stats.statsView.noTasks": "No task keys appeared in sessions during this period",
   "stats.statsView.output": "output {value}",
   "stats.statsView.outputLabel": "Output",

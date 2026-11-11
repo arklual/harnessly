@@ -24,7 +24,9 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const (
@@ -83,25 +85,21 @@ func New(d Deps) *Service {
 
 // Mount registers the endpoints.
 func (s *Service) Mount(mux *http.ServeMux) {
-	mux.Handle("GET /api/machines/{machineId}/agents", s.auth.Require(s.agents))
-	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/install", s.auth.Require(s.install))
-	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/check", s.auth.Require(s.check))
-	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/login", s.auth.Require(s.loginStart))
-	mux.Handle("POST /api/machines/{machineId}/logins/{loginId}/code", s.auth.Require(s.loginCode))
-	mux.Handle("DELETE /api/machines/{machineId}/logins/{loginId}", s.auth.Require(s.loginCancel))
-	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/key", s.auth.Require(s.keyDeliver))
-	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/key/verify", s.auth.Require(s.keyVerify))
-	mux.Handle("GET /api/machines/{machineId}/proxy", s.auth.Require(s.proxyGet))
-	mux.Handle("PUT /api/machines/{machineId}/proxy", s.auth.Require(s.proxySet))
-	mux.Handle("DELETE /api/machines/{machineId}/proxy", s.auth.Require(s.proxyClear))
-	mux.Handle("POST /api/machines/{machineId}/env", s.auth.Require(s.envDeliver))
-	mux.Handle("DELETE /api/machines/{machineId}/env/{name}", s.auth.Require(s.envRemove))
-	mux.Handle("POST /api/machines/{machineId}/gitkey", s.auth.Require(s.gitkey))
-}
-
-// owner is the machine of the request, for a person who owns its space.
-func (s *Service) owner(r *http.Request, p *auth.Principal) (store.Machine, error) {
-	return s.machines.Authorize(r.Context(), p.User.ID, r.PathValue("machineId"), true)
+	g := tenant.Guard{Auth: s.auth, Machines: s.machines}
+	mux.Handle("GET /api/machines/{machineId}/agents", g.Machine(tenant.Owner, s.agents))
+	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/install", g.Machine(tenant.Owner, s.install))
+	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/check", g.Machine(tenant.Owner, s.check))
+	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/login", g.Machine(tenant.Owner, s.loginStart))
+	mux.Handle("POST /api/machines/{machineId}/logins/{loginId}/code", g.Machine(tenant.Owner, s.loginCode))
+	mux.Handle("DELETE /api/machines/{machineId}/logins/{loginId}", g.Machine(tenant.Owner, s.loginCancel))
+	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/key", g.Machine(tenant.Owner, s.keyDeliver))
+	mux.Handle("POST /api/machines/{machineId}/agents/{provider}/key/verify", g.Machine(tenant.Owner, s.keyVerify))
+	mux.Handle("GET /api/machines/{machineId}/proxy", g.Machine(tenant.Owner, s.proxyGet))
+	mux.Handle("PUT /api/machines/{machineId}/proxy", g.Machine(tenant.Owner, s.proxySet))
+	mux.Handle("DELETE /api/machines/{machineId}/proxy", g.Machine(tenant.Owner, s.proxyClear))
+	mux.Handle("POST /api/machines/{machineId}/env", g.Machine(tenant.Owner, s.envDeliver))
+	mux.Handle("DELETE /api/machines/{machineId}/env/{name}", g.Machine(tenant.Owner, s.envRemove))
+	mux.Handle("POST /api/machines/{machineId}/gitkey", g.Machine(tenant.Owner, s.gitkey))
 }
 
 // provider reads {provider}: claude and codex are real, gemini is a card that says «Скоро», anything else is no route.
@@ -208,11 +206,10 @@ func checkScope(scope string) error {
 
 // ---- agents ----
 
-func (s *Service) agents(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+func (s *Service) agents(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
+	m := *t.Machine
+	var err error
 	var list []json.RawMessage
 	if r.URL.Query().Get("refresh") == "1" {
 		if list, err = s.machines.RefreshAgents(r.Context(), m); err != nil {
@@ -223,7 +220,7 @@ func (s *Service) agents(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	}
 	if r.URL.Query().Get("refresh") == "1" {
 		// The refresh changed what is kept of the CLIs too.
-		if fresh, err := s.owner(r, p); err == nil {
+		if fresh, err := s.machines.Authorize(r.Context(), p.User.ID, m.ID, true); err == nil {
 			m = fresh
 		}
 	}
@@ -231,7 +228,8 @@ func (s *Service) agents(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	return nil
 }
 
-func (s *Service) install(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) install(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct{ From string }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -243,10 +241,7 @@ func (s *Service) install(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	if err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	jobID := store.RandomHex(16)
 	params := map[string]any{"jobId": jobID, "provider": prov}
 	if req.From != "" {
@@ -260,7 +255,7 @@ func (s *Service) install(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	return nil
 }
 
-func (s *Service) check(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) check(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	var req struct {
 		ProxyURL string `json:"proxyUrl"`
 	}
@@ -271,10 +266,7 @@ func (s *Service) check(w http.ResponseWriter, r *http.Request, p *auth.Principa
 	if err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	params := map[string]any{"provider": prov}
 	if req.ProxyURL != "" {
 		if err := checkProxyURL(req.ProxyURL); err != nil {
@@ -297,16 +289,17 @@ func (s *Service) check(w http.ResponseWriter, r *http.Request, p *auth.Principa
 
 // refreshLater brings the stored statuses up to date without making the person wait.
 func (s *Service) refreshLater(m store.Machine) {
-	go func() {
+	safego.Go("relay refreshLater", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 		defer cancel()
 		if _, err := s.machines.RefreshAgents(ctx, m); err != nil {
 			s.log.Debug("agent statuses not refreshed", "machine", m.ID, "error", err)
 		}
-	}()
+	})
 }
 
-func (s *Service) loginStart(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) loginStart(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct{ Method string }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -314,10 +307,7 @@ func (s *Service) loginStart(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	if req.Method != hubproto.MethodLink && req.Method != hubproto.MethodConsole {
 		return httpx.Invalid("method", "Способ входа — link или console")
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	prov, err := s.loginProvider(r, m, req.Method)
 	if err != nil {
 		return err
@@ -343,7 +333,7 @@ func (s *Service) loginStart(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	return nil
 }
 
-func (s *Service) loginCode(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) loginCode(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	var req struct{ Code string }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -356,10 +346,7 @@ func (s *Service) loginCode(w http.ResponseWriter, r *http.Request, p *auth.Prin
 	if code == "" || len(code) > maxLoginCode {
 		return httpx.Invalid("code", "Вставьте код")
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	if _, err := s.reg.Do(r.Context(), m.ID, hubproto.OpLoginCode, map[string]any{"loginId": id, "code": code}, s.t(callTimeout)); err != nil {
 		return err
 	}
@@ -367,15 +354,12 @@ func (s *Service) loginCode(w http.ResponseWriter, r *http.Request, p *auth.Prin
 	return nil
 }
 
-func (s *Service) loginCancel(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) loginCancel(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	id, err := loginID(r)
 	if err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	if _, err := s.reg.Do(r.Context(), m.ID, hubproto.OpLoginCancel, map[string]any{"loginId": id}, s.t(callTimeout)); err != nil {
 		return err
 	}
@@ -385,7 +369,8 @@ func (s *Service) loginCancel(w http.ResponseWriter, r *http.Request, p *auth.Pr
 
 // ---- keys ----
 
-func (s *Service) keyDeliver(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) keyDeliver(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct{ Envelope hubproto.Envelope }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -397,10 +382,7 @@ func (s *Service) keyDeliver(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	if err := checkEnvelope(req.Envelope); err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	var check hubproto.KeyCheck
 	if err := s.reg.DoInto(r.Context(), m.ID, hubproto.OpKeyDeliver, map[string]any{"provider": prov, "envelope": req.Envelope}, &check, s.t(keyTimeout)); err != nil {
 		return err
@@ -411,15 +393,12 @@ func (s *Service) keyDeliver(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	return nil
 }
 
-func (s *Service) keyVerify(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) keyVerify(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	prov, err := provider(r)
 	if err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	var check hubproto.KeyCheck
 	if err := s.reg.DoInto(r.Context(), m.ID, hubproto.OpKeyVerify, map[string]any{"provider": prov}, &check, s.t(keyTimeout)); err != nil {
 		return err
@@ -431,15 +410,13 @@ func (s *Service) keyVerify(w http.ResponseWriter, r *http.Request, p *auth.Prin
 
 // ---- proxy ----
 
-func (s *Service) proxyGet(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+func (s *Service) proxyGet(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	m := *t.Machine
 	return s.proxyCall(w, r, m, hubproto.OpProxyGet, nil)
 }
 
-func (s *Service) proxySet(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) proxySet(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct{ Scope, URL string }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -450,23 +427,18 @@ func (s *Service) proxySet(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	if err := checkProxyURL(req.URL); err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	s.auth.Audit(r.Context(), p.User.ID, "agent_proxy", r, m.ID+" "+req.Scope)
 	return s.proxyCall(w, r, m, hubproto.OpProxySet, map[string]any{"scope": req.Scope, "url": req.URL})
 }
 
-func (s *Service) proxyClear(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) proxyClear(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	scope := r.URL.Query().Get("scope")
 	if err := checkScope(scope); err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	s.auth.Audit(r.Context(), p.User.ID, "agent_proxy_clear", r, m.ID+" "+scope)
 	return s.proxyCall(w, r, m, hubproto.OpProxyClear, map[string]any{"scope": scope})
 }
@@ -483,7 +455,8 @@ func (s *Service) proxyCall(w http.ResponseWriter, r *http.Request, m store.Mach
 
 // ---- secrets ----
 
-func (s *Service) envDeliver(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) envDeliver(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct {
 		Name     string
 		Envelope hubproto.Envelope
@@ -497,22 +470,17 @@ func (s *Service) envDeliver(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	if err := checkEnvelope(req.Envelope); err != nil {
 		return err
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	return s.envCall(w, r, p, m, hubproto.OpEnvDeliver, map[string]any{"name": req.Name, "envelope": req.Envelope})
 }
 
-func (s *Service) envRemove(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) envRemove(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	name := r.PathValue("name")
 	if !envName.MatchString(name) {
 		return httpx.ErrNotFound
 	}
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+	m := *t.Machine
 	return s.envCall(w, r, p, m, hubproto.OpEnvRemove, map[string]any{"name": name})
 }
 
@@ -538,11 +506,8 @@ func (s *Service) envCall(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	return nil
 }
 
-func (s *Service) gitkey(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	m, err := s.owner(r, p)
-	if err != nil {
-		return err
-	}
+func (s *Service) gitkey(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	m := *t.Machine
 	var res struct {
 		PublicKey string `json:"publicKey"`
 	}

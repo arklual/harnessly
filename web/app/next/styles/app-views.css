@@ -217,3 +217,71 @@
   overflow: hidden;
   pointer-events: none;
 }
+/* The management half of the Extensions page: install review, secret rows, the remove question. */
+.hx-ext__select {
+  width: auto;
+  min-width: 160px;
+  max-width: 100%;
+}
+.hx-ext__secret {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+.hx-ext__secret > .hx-secret,
+.hx-ext__secret > .hx-set__input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.hx-ext__ask {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+}
+.hx-ext__bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border-top: 1px solid var(--hx-border);
+}
+.hx-ext__review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  border-top: 1px solid var(--hx-border);
+}
+.hx-ext__review > :not(.hx-ext__bar) {
+  padding: 0 var(--hx-space-4);
+}
+.hx-ext__review > :first-child {
+  padding-top: var(--hx-space-3);
+}
+.hx-ext__review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--hx-space-2);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+.hx-ext__review-head span,
+.hx-ext__review-line {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  overflow-wrap: anywhere;
+}
+.hx-ext__issue {
+  padding: var(--hx-space-2) var(--hx-space-4);
+  color: var(--hx-danger, var(--hx-fg-1));
+  font-size: var(--hx-text-xs);
+}
+.hx-ext__issue[data-warning] {
+  color: var(--hx-fg-3);
+}

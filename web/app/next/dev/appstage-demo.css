@@ -1,0 +1,121 @@
+/* The made-up chat, document and board of the app stage's gallery (appstage-demo.tsx). */
+.hx-demo-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.hx-demo-chat__feed {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 14px;
+}
+.hx-demo-chat__msg {
+  margin: 0;
+  font-size: var(--hx-text-md);
+  line-height: 1.5;
+  color: var(--hx-fg-1);
+}
+.hx-demo-chat__msg[data-me='true'] {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+}
+.hx-demo-chat__field {
+  margin: 8px 12px 12px;
+  padding: 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-md);
+}
+.hx-demo-doc {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  box-sizing: border-box;
+  color: var(--hx-fg-1);
+  line-height: 1.6;
+}
+.hx-demo-doc h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  line-height: 1.2;
+}
+.hx-demo-doc h2 {
+  margin: 28px 0 8px;
+  font-size: var(--hx-text-lg);
+}
+.hx-demo-doc__meta {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-demo-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--hx-text-sm);
+}
+.hx-demo-doc th,
+.hx-demo-doc td {
+  padding: 8px;
+  border-bottom: 1px solid var(--hx-border);
+  text-align: left;
+}
+.hx-demo-board {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: var(--hx-bg-canvas);
+}
+.hx-demo-board__tools {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+}
+.hx-demo-board__tools span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--hx-fg-2);
+}
+.hx-demo-board__svg {
+  width: min(90%, 640px);
+  height: auto;
+}
+.hx-demo-board__svg rect {
+  fill: var(--hx-bg-raised);
+  stroke: var(--hx-accent);
+  stroke-width: 2;
+}
+.hx-demo-board__svg text {
+  fill: var(--hx-fg-1);
+  font-size: 16px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+.hx-demo-board__svg path {
+  fill: none;
+  stroke: var(--hx-fg-3);
+  stroke-width: 2;
+}

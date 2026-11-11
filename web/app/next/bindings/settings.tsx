@@ -52,12 +52,14 @@ interface ISettingsScreenProps {
   machine: MachineId;
   /** The section in the address; null: the list (a wide window shows the first section beside it). */
   section: SettingsSection | null;
+  /** Connections: an address to sign in to at once. */
+  connect?: string;
   /** The name the sidebar shows for the person. */
   name: string;
   onOpenDrawer: () => void;
 }
 
-const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScreenProps) => {
+const SettingsScreen = ({ machine, section, connect, name, onOpenDrawer }: ISettingsScreenProps) => {
   const active = section ?? 'general';
   const view = useMachine(machine);
   const now = useClock();
@@ -116,7 +118,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
         <PeersPage machine={machine} now={now} pending={pending} />
       </>
     );
-  else if (active === 'connections') body = <ConnectionsPage machine={machine} />;
+  else if (active === 'connections') body = <ConnectionsPage machine={machine} start={connect} />;
   else if (active === 'design') body = <DesignPage machine={machine} />;
   else if (active === 'extensions') body = <ExtensionsPage machine={machine} />;
   else if (active === 'beta') body = <BetaPage />;

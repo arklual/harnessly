@@ -10,6 +10,7 @@ package outbox
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +31,10 @@ const (
 	// sent long ago is «expired», not «unknown», and a page that sends it again does not have it typed a second time.
 	GoneKept = 7 * 24 * time.Hour
 	GoneMax  = 500
+	// CancelKept: the cancel of a message the box has not seen (its send is still on the road, or waits in a hub) is
+	// remembered this long, at most CancelMax of them, so the send that comes after it is not queued.
+	CancelKept = 24 * time.Hour
+	CancelMax  = 200
 	// MaxTries: a message whose typing failed this many times in a row has failed{type-failed}; the tries back off
 	// from retryBase, doubling up to retryMax (1.5 → 3 → 6 → 12 → 24 s).
 	MaxTries  = 10
@@ -40,6 +45,8 @@ const (
 	// A screen that said "wait" (busy, no input line) while the agent says it is free — the last turn's spinner is still
 	// drawn for a moment, the input box is redrawn — is looked at again soon: every waitQuick for the first quickLooks
 	// looks, so a send to a free agent is typed a few polls after the screen frees; past them, every waitAgain.
+	// slowPause: a terminal that did not answer in time for a try is asked again this much later.
+	slowPause  = 5 * time.Second
 	waitQuick  = 100 * time.Millisecond
 	quickLooks = 40
 	waitAgain  = 1500 * time.Millisecond
@@ -133,6 +140,13 @@ type Record struct {
 	ClearLooks int     `json:"clearLooks,omitempty"`
 	// EntryID is the transcript entry the message was accepted as, "" while none is known.
 	EntryID string `json:"entryId,omitempty"`
+	// Send numbers the try that typed the message, in the order the box typed (0: never typed). Two messages with the
+	// same words are two sends: each prompt-submit hook confirms one of them, the oldest not yet confirmed. HookSend is
+	// the send a hook confirmed.
+	Send     int64 `json:"send,omitempty"`
+	HookSend int64 `json:"hookSend,omitempty"`
+	// Retyped: the one retype the box makes by itself for a send nobody confirmed is spent (HookConfirms).
+	Retyped bool `json:"retyped,omitempty"`
 }
 
 // Job is one try to type a message, for the actor to run under the pane lock.
@@ -170,12 +184,31 @@ type Box struct {
 	clearing string
 	// gone are the forgotten messages' ids and when they ended.
 	gone map[string]wire.Ms
+	// cancelled are the ids of messages cancelled before the box saw them, and when.
+	cancelled map[string]wire.Ms
 
 	// Transcript looks for a message's own entry (its text) in the transcript; nil: none to look in. A message that was
 	// typed once is looked for there before it is typed again, and a retry or a restart asks it rather than taking the
 	// first user entry for the message: the transcript, not a timeout, says whether the agent has it.
 	Transcript FindText
+	// HookConfirms: the agent's prompt-submit hook names the prompt it took (ConfirmsByHook). A typed message is then
+	// delivered only by that hook or by its entry in the transcript; a box that no longer shows it proves nothing, and
+	// the box types it again by itself once, and only when neither came within ConfirmWindow. False is the path of an
+	// agent without such a hook, as it was: the screen decides, and a text stuck in the box is typed again.
+	HookConfirms bool
+	// sends is the number of the last send.
+	sends int64
 }
+
+// ConfirmWindow is how long a typed message waits for the agent's word — its hook or its transcript entry — before
+// the box may type it again. The hook is a program the agent starts at the Enter and that delivers within a second or
+// leaves its event in a spool read every 5 s; on a machine loaded several times over its cores both take seconds, and a
+// retype sooner than they can come is a second copy of the message.
+const ConfirmWindow = wire.ConfirmDeadline * time.Millisecond
+
+// ConfirmsByHook says whether a provider's prompt-submit hook names the prompt the agent took. Claude's does; Codex
+// has no such hook, and its messages go the way they went before.
+func ConfirmsByHook(p wire.Provider) bool { return p == wire.ProviderClaude }
 
 // FindText looks for the user entry of a message with this text at or after offset (or, read without its offset,
 // written at or after typedAt).
@@ -196,7 +229,7 @@ func (b *Box) found(r *Record, find Find) (string, bool) {
 // New is an empty box of conversation conv.
 func New(conv string, limits wire.Limits, log Logger) *Box {
 	return &Box{conv: conv, limits: limits, log: log, recs: map[string]*Record{}, rev: 1, waits: map[string]string{},
-		gone: map[string]wire.Ms{}}
+		gone: map[string]wire.Ms{}, cancelled: map[string]wire.Ms{}}
 }
 
 // Queue is the conversation's queue as the wire carries it. An empty queue goes out as [], never null: the page
@@ -283,7 +316,9 @@ type Draft struct {
 // Send queues a message. The same client id again gives back the message it queued (its answer, or its events, were
 // lost on the way): accepted, nothing new, and its whole record goes out again so the page that sent it takes its true
 // state. The id of a message forgotten long ago is too-late: it was delivered, and is never typed a second time. A
-// refusal names its code.
+// message cancelled before it came is kept as cancelled and never queued. A refusal names its code.
+//
+// A message of the line takes its place by when the page made it (place), not by when it arrived.
 func (b *Box) Send(d Draft, agent wire.AgentState, now time.Time) (Change, wire.RefuseCode) {
 	var ch Change
 	if r, ok := b.recs[d.ClientID]; ok {
@@ -291,6 +326,9 @@ func (b *Box) Send(d Draft, agent wire.AgentState, now time.Time) (Change, wire.
 	}
 	if _, ok := b.gone[d.ClientID]; ok {
 		return ch, wire.RefuseTooLate
+	}
+	if ch, ok := b.TakenBack(d, now); ok {
+		return ch, ""
 	}
 	switch {
 	case blankText(d.Text) && len(d.Attachments) == 0:
@@ -315,12 +353,74 @@ func (b *Box) Send(d Draft, agent wire.AgentState, now time.Time) (Change, wire.
 		b.gather(&ch, r, now)
 		b.pushUrgent(d.ClientID, d.Mode)
 	} else {
-		b.items = append(b.items, d.ClientID)
+		at := len(b.items)
+		if d.Auto == "" {
+			at = b.place(d.ClientID)
+		}
+		if at < len(b.items) {
+			// The lists of messages are ordered by CreatedAt, then by client id: it stands before the one it goes ahead of.
+			r.Message.CreatedAt = min(ms, b.recs[b.items[at]].Message.CreatedAt)
+		}
+		b.items = slices.Insert(b.items, at, d.ClientID)
 	}
 	b.rev++
 	ch.add(wire.MessageUpsertEv{Message: r.Message})
 	ch.add(wire.QueueChangedEv{Queue: b.Queue()})
 	return ch, ""
+}
+
+// TakenBack answers the send of a message that was cancelled before the box saw it: the message is kept as cancelled,
+// never queued, and its record goes out so every page shows it as taken back. False when no such cancel is remembered.
+func (b *Box) TakenBack(d Draft, now time.Time) (Change, bool) {
+	var ch Change
+	if _, ok := b.cancelled[d.ClientID]; !ok || b.recs[d.ClientID] != nil {
+		return ch, false
+	}
+	delete(b.cancelled, d.ClientID)
+	ms := now.UnixMilli()
+	r := &Record{Message: wire.Message{
+		ClientID: d.ClientID, ConversationID: b.conv, Text: d.Text, Attachments: nonNil(d.Attachments), Refs: d.Refs,
+		Mode: d.Mode, Kind: d.Kind, CreatedAt: ms, State: wire.MessageState{K: wire.MsgCancelled, By: wire.CancelledByUser}, Rev: 1,
+	}, EndedAt: ms}
+	b.recs[d.ClientID] = r
+	ch.add(wire.MessageUpsertEv{Message: r.Message})
+	if b.log != nil {
+		b.log.Info("message cancelled before it came", "conversationId", b.conv, "clientId", d.ClientID)
+	}
+	return ch, true
+}
+
+// madeAt is when the page made a message, by its client id: a UUIDv7 opens with the page's clock in ms (48 bits).
+// False for any other id.
+func madeAt(id string) (int64, bool) {
+	if len(id) != 36 || id[8] != '-' || id[13] != '-' || id[14] != '7' || id[18] != '-' || id[23] != '-' {
+		return 0, false
+	}
+	v, err := strconv.ParseInt(id[:8]+id[9:13], 16, 64)
+	return v, err == nil
+}
+
+// place is where a new message of the line goes: after everything, or — when it was made before messages that still
+// wait their turn and came ahead of it (its own send was late on the road) — before them, so the agent gets the
+// person's messages in the order they were written. It never goes ahead of a message that is urgent, the launch's
+// first, stalled, sent again by the person, written by the runtime, or whose id says nothing of its time: those keep
+// the place they have, and a message with such an id goes last, as it came.
+func (b *Box) place(id string) int {
+	at := len(b.items)
+	made, ok := madeAt(id)
+	if !ok {
+		return at
+	}
+	for at > 0 {
+		p := b.recs[b.items[at-1]]
+		was, ok := madeAt(p.Message.ClientID)
+		if !ok || was <= made || p.Message.Mode != wire.ModeQueue || p.Message.Auto != "" || p.Message.Attempts > 0 ||
+			p.First || p.Carried || p.Stalled {
+			break
+		}
+		at--
+	}
+	return at
 }
 
 // urgency orders the modes at the head of the line: a steer goes into the running turn, so it is not held up by a "now"
@@ -371,22 +471,51 @@ func resync(r *Record) Change {
 	return ch
 }
 
-// Cancel takes a queued message out; one already typed is too late, one that is over is only shown as it is.
+// Cancel takes a queued message out; one already typed is too late, one that is over is only shown as it is. A
+// message the box does not know is not-found, and the cancel is remembered: its send, when it comes, is not queued.
 func (b *Box) Cancel(clientID string, now time.Time) (Change, wire.RefuseCode) {
 	var ch Change
 	r, ok := b.recs[clientID]
 	switch {
 	case !ok:
+		if _, gone := b.gone[clientID]; !gone {
+			// Its send may still be on the road, or wait in a hub: the cancel is remembered for it (TakenBack).
+			b.takeBack(clientID, now.UnixMilli())
+		}
 		return ch, wire.RefuseNotFound
 	case over(r.Message.State.K):
 		return resync(r), ""
 	case r.Message.State.K != wire.MsgQueued && r.Message.State.K != wire.MsgFailed:
+		return ch, wire.RefuseTooLate
+	case b.awaited(r, now):
+		// Typed, and the agent's word on it may still come: it cannot be taken back as if it had never been sent.
 		return ch, wire.RefuseTooLate
 	}
 	b.dropItem(clientID)
 	b.set(&ch, r, wire.MessageState{K: wire.MsgCancelled, By: wire.CancelledByUser}, now)
 	ch.add(wire.QueueChangedEv{Queue: b.Queue()})
 	return ch, ""
+}
+
+// awaited: the message was typed, nobody confirmed it, and it stands in the line only for the window in which the
+// agent's hook or its transcript entry may still come (HookConfirms) before the one retype.
+func (b *Box) awaited(r *Record, now time.Time) bool {
+	return b.HookConfirms && r.Message.State.K == wire.MsgQueued && r.Send > 0 && r.Retyped && !r.Stalled &&
+		r.NextTry > now.UnixMilli()
+}
+
+// takeBack remembers the cancel of a message the box has not seen, at most CancelMax of them (the oldest go first).
+func (b *Box) takeBack(id string, at wire.Ms) {
+	b.cancelled[id] = at
+	for len(b.cancelled) > CancelMax {
+		oldest, when := "", wire.Ms(0)
+		for k, v := range b.cancelled {
+			if oldest == "" || v < when || v == when && k < oldest {
+				oldest, when = k, v
+			}
+		}
+		delete(b.cancelled, oldest)
+	}
 }
 
 // Find looks for a message's user entry in the transcript at or after offset, or (a line read without its offset,
@@ -413,6 +542,7 @@ func (b *Box) Retry(clientID string, find Find, now time.Time) (Change, wire.Ref
 		}
 	}
 	r.Message.Attempts++
+	r.Retyped = false
 	r.Tries, r.NextTry, r.Blocked, r.BlockedSince, r.WaitSince, r.EndedAt = 0, 0, 0, 0, now.UnixMilli(), 0
 	b.items = append([]string{clientID}, b.items...)
 	b.rev++

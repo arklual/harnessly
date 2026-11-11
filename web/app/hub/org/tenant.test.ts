@@ -71,7 +71,6 @@ describe('the old space address of a tenant', () => {
   it('keeps the old screens when organizations are off, the route has no new place or the hub fails', async () => {
     const l = lookup({ tenants: { acme: ['product'] } });
     expect(await orgTargetFor(config('off'), '/s/:slug', 'product', undefined, l)).toBeNull();
-    expect(await orgTargetFor(config('shadow'), '/s/:slug', 'product', undefined, l)).toBeNull();
     expect(await orgTargetFor(config('on'), '/s/:slug/sites/new', 'product', undefined, l)).toBeNull();
     expect(await orgTargetFor(config('on'), '/s/:slug/setup/:step', 'product', 'agents', l)).toBeNull();
     expect(
@@ -172,6 +171,23 @@ describe('machine codes', () => {
     );
     expect(await api.spaceMachines('sp1')).toEqual([{ id: 'm1', name: 'build', status: 'online' }]);
     expect(calls[0]).toMatchObject({ method: 'GET', url: '/api/spaces/sp1/machines' });
+  });
+});
+
+describe('the machine next to the hub', () => {
+  it('takes it into the tenant with one call to the space endpoint', async () => {
+    const { calls, api } = hub(() =>
+      json({ machine: { id: 'm9', name: 'Эта машина', status: 'online', via: 'local' } }),
+    );
+    expect(await api.claimLocalMachine('sp 1')).toEqual({ id: 'm9', name: 'Эта машина', status: 'online' });
+    expect(calls).toEqual([{ method: 'POST', url: '/api/spaces/sp%201/machines/local', body: {} }]);
+  });
+
+  it('says that somebody took it already', async () => {
+    const { api } = hub(() => json({ error: 'not_found', message: '' }, 404));
+    const e = await api.claimLocalMachine('sp1').catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(OrgApiError);
+    expect(orgErrorText(e)).toMatch(/уже подключили/);
   });
 });
 

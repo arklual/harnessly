@@ -321,8 +321,22 @@ func (a AppsFeed) Validate() error {
 }
 
 // AppsSource reads the apps. It never waits longer than its own budget: an app that does not answer in time is `failed`.
+// `only` names the apps to read; empty: all of them.
 type AppsSource interface {
-	Feed(ctx context.Context) (AppsFeed, error)
+	Feed(ctx context.Context, only []AppID) (AppsFeed, error)
+}
+
+// appsAsked is the apps a request names in `?app=` (repeated); none: all. An unknown one is an error.
+func appsAsked(r *http.Request) ([]AppID, error) {
+	var only []AppID
+	for _, v := range r.URL.Query()["app"] {
+		id := AppID(v)
+		if err := in("app", id, AppIDs); err != nil {
+			return nil, err
+		}
+		only = append(only, id)
+	}
+	return only, nil
 }
 
 // apps serves GET /api/v2/apps. It reads and changes nothing, so it needs no guard against other origins.
@@ -335,7 +349,12 @@ func (s *Server) apps(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	feed, err := s.Apps.Feed(r.Context())
+	only, err := appsAsked(r)
+	if err != nil {
+		refuse(w, RefuseBadRequest)
+		return
+	}
+	feed, err := s.Apps.Feed(r.Context(), only)
 	if err != nil {
 		jsonlog.Log("warn", "v2: the apps feed failed", jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)

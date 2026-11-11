@@ -28,6 +28,7 @@ import {
   messagesStore,
 } from '@/next/stores/messages';
 import { opsStore } from '@/next/stores/ops';
+import { OP_KEPT_MS } from '@/next/commands/run';
 import type {
   ClientFrame,
   ConvEvent,
@@ -194,18 +195,26 @@ describe('a message from draft to its end', () => {
     expect(msg(id)).toMatchObject({ rev: 1, state: { k: 'queued' } });
   });
 
-  it("Delete on a waiting message is the page's own: it goes at once, offline too, and nothing sends it later", async () => {
+  it('Delete on a message whose try got no answer is «cancelling» until the machine answers, and nothing sends it later', async () => {
     const { rt, m } = await openChat();
     rt.gatewayErrors = 99;
     const id = sendMessage(m, { conversationId: CONV, text: 'Не нужно' });
     await settle();
     expect(msg(id)).toMatchObject({ state: { k: 'submitting' }, issue: 'http' });
-    cancelMessage(id);
-    expect(msg(id).state).toEqual({ k: 'cancelled', by: 'user' });
+    // The try may have reached the runtime: the page does not call it cancelled on its own word.
+    const h = cancelMessage(id)!;
+    expect(msg(id)).toMatchObject({ state: { k: 'submitting' }, cancelling: true });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(msg(id)).toMatchObject({ state: { k: 'submitting' }, cancelling: true });
+    // The machine is back: the cancel reaches it, and the runtime, which never had the message, remembers the cancel.
+    rt.handlers.set('cancel', () => ({ r: 'refused', code: 'not-found' }));
     rt.gatewayErrors = 0;
     await vi.advanceTimersByTimeAsync(60_000);
+    expect((await h.done).k).toBe('done');
     expect(rt.commands.filter((c) => c.op === 'send')).toEqual([]);
-    expect(msg(id).state.k).toBe('cancelled');
+    expect(rt.commands.filter((c) => c.op === 'cancel').map((c) => c.body)).toMatchObject([{ clientId: id }]);
+    expect(msg(id).state).toEqual({ k: 'cancelled', by: 'user' });
+    expect(msg(id).cancelling).toBeUndefined();
   });
 
   it('a refusal ends failed{refused} with its code; only retryable codes offer a retry', async () => {
@@ -454,6 +463,26 @@ describe('a stale queued row of a message that was delivered', () => {
     const st = await finish(cancelMessage(id)!);
     expect(st.k).toBe('failed');
     expect(msg(id).state.k).toBe('queued');
+  });
+});
+
+describe('what the page remembers of its commands', () => {
+  it('forgets a command ten minutes after it ended; one still on its way and a recent one stay', async () => {
+    const { m } = await openChat();
+    const old = runCommand(m, 'conversation.rename', { id: CONV, title: 'Раз' });
+    expect((await finish(old)).k).toBe('done');
+    expect(opsStore.get(old.opId)?.k).toBe('done');
+    // Still within its time: a retry finds it.
+    await vi.advanceTimersByTimeAsync(OP_KEPT_MS - 60_000);
+    runCommand(m, 'conversation.rename', { id: CONV, title: 'Полтора' });
+    expect(opsStore.has(old.opId)).toBe(true);
+    await vi.advanceTimersByTimeAsync(3 * 60_000);
+    // The next command is what looks through the ended ones.
+    const fresh = runCommand(m, 'conversation.rename', { id: CONV, title: 'Два' });
+    expect(opsStore.has(old.opId)).toBe(false);
+    expect(retryCommand(old.opId)).toBeNull();
+    await finish(fresh);
+    expect(retryCommand(fresh.opId)).not.toBeNull();
   });
 });
 

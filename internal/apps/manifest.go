@@ -92,10 +92,17 @@ type Manifest struct {
 	Backend     *Backend        `json:"backend,omitempty"`
 	// Budget is what the app may spend a day through `ai` and `agents.run` (spend.go).
 	Budget *Budget `json:"budget,omitempty"`
+	// Workflow is the statuses of the app's documents and the moves between them (workflow.go).
+	Workflow *Workflow `json:"workflow,omitempty"`
 	// Delivery, Points and Aliases are the host's own apps' (builtin.go): an installed app is a package and has none.
 	Delivery string      `json:"delivery,omitempty"`
 	Points   []PointDecl `json:"points,omitempty"`
 	Aliases  []AliasDecl `json:"aliases,omitempty"`
+	// Kind says which of the extension kinds the package is: "ui", "runtime" or "tool", see ext.go. Empty is
+	// worked out from what the package contains.
+	Kind string `json:"kind,omitempty"`
+	// Data is the version of the app's own data in hl.storage and the steps that bring older data to it.
+	Data *DataSpec `json:"data,omitempty"`
 }
 
 // Activation is how the app turns on and what it opens when it does.
@@ -163,6 +170,17 @@ type ToolPolicy struct {
 	Allow   []string `json:"allow,omitempty"`
 	Deny    []string `json:"deny,omitempty"`
 	Confirm []string `json:"confirm,omitempty"`
+	// When are rules that hold only while the document the chat works on is in one of the statuses (workflow.go); they
+	// join the rules above, and the most specific rule decides as ever.
+	When []ToolWhen `json:"when,omitempty"`
+}
+
+// ToolWhen is a set of rules for some statuses of the app's workflow.
+type ToolWhen struct {
+	Status  []string `json:"status"`
+	Allow   []string `json:"allow,omitempty"`
+	Deny    []string `json:"deny,omitempty"`
+	Confirm []string `json:"confirm,omitempty"`
 }
 
 // View is a page of the app: a tab, a full screen, a card in the chat or a Sinopia panel.
@@ -179,6 +197,9 @@ type View struct {
 	Icon    string   `json:"icon,omitempty"`
 	Order   int      `json:"order,omitempty"`
 	Objects []string `json:"objects,omitempty"`
+	// Pinned: the view is the app's tab in the chat's right pane beside a document of its type made of a Sinopia site
+	// the first tab, never closed, shown only in the app's own documents.
+	Pinned bool `json:"pinned,omitempty"`
 }
 
 // Branding is the product's name and accent as an app sets them, for the `branding` target. Declared values, no code: the
@@ -412,7 +433,7 @@ func (m *Manifest) Check() Problems {
 		notYet("icon")
 	}
 	if m.When != "" {
-		notYet("when")
+		add("when", "not supported: a condition is set on tool rules by the document's status, agent.tools.when")
 	}
 	if len(m.Storage) > 0 {
 		notYet("storage")
@@ -420,6 +441,7 @@ func (m *Manifest) Check() Problems {
 	if m.Backend != nil {
 		notYet("backend")
 	}
+	m.checkWorkflow(add)
 	switch m.Trust {
 	case TrustDeclarative, TrustSandboxed, TrustTrusted:
 	case "":
@@ -534,6 +556,10 @@ func (m *Manifest) Check() Problems {
 		for field, hosts := range map[string][]string{"connect": n.Connect, "resources": n.Resources, "frames": n.Frames} {
 			for i, h := range hosts {
 				path := fmt.Sprintf("network.%s[%d]", field, i)
+				if field == "frames" && installAt(h, true) {
+					// The address of a service of the installation, put in when the app is installed.
+					continue
+				}
 				if h == "*" {
 					if strings.TrimSpace(n.Reason) == "" {
 						add(path, "* needs network.reason")
@@ -654,12 +680,12 @@ func (m *Manifest) Check() Problems {
 		views[v.ID] = true
 		if v.Entry == "" {
 			add(path+".entry", "is required: ui/<file>.html or https://… of the app's server")
-		} else if strings.HasPrefix(v.Entry, "https://") {
+		} else if strings.HasPrefix(v.Entry, "https://") || installAt(v.Entry, false) {
 			if m.Network == nil || !hostListed(m.Network.Frames, v.Entry) {
 				add(path+".entry", "the host of %q must be in network.frames", v.Entry)
 			}
 		}
-		if m.Trust == TrustDeclarative && strings.HasPrefix(v.Entry, "https://") {
+		if m.Trust == TrustDeclarative && (strings.HasPrefix(v.Entry, "https://") || installAt(v.Entry, false)) {
 			add(path+".entry", "a declarative app serves its views from the package")
 		}
 		if v.Height != "" {
@@ -721,6 +747,7 @@ func (m *Manifest) Check() Problems {
 		add("sinopia", "sinopia contributions need a sinopia target")
 	}
 	m.checkSinopia(targets, add, warn)
+	m.checkExtension(targets, add, warn)
 
 	// Rights the app asks for and has no use of are a warning: people see the list at install.
 	if seen["pane.open"] && !targets[TargetPane] && !targets[TargetApp] {

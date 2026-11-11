@@ -6,6 +6,7 @@ import { orgErrorText } from '../../../org/api/errors';
 import type { TeamsView } from '../../../org/api/teams';
 import type { OrgApi } from '../../../org/api';
 import { useOrg } from '../../../org/context';
+import { useOrgPeople } from '../../../org/events';
 
 export interface Op {
   /** The screen's guess of the view after the action. */
@@ -90,6 +91,10 @@ export const useTeams = (slug: string): TeamsState => {
     [api, org, slug, key],
   );
 
+  // Somebody else changed the people of the organization: the view is read again behind the screen.
+  const refresh = useCallback(() => setTick((n) => n + 1), []);
+  useOrgPeople(refresh);
+
   const base = state.key === key ? state.base : null;
   const ops = useMemo(() => (pending.key === key ? pending.ops : []), [pending, key]);
   const view = useMemo(() => (base ? ops.reduce((v, op) => op.patch(v), base) : null), [base, ops]);
@@ -97,7 +102,7 @@ export const useTeams = (slug: string): TeamsState => {
     view,
     error: state.key === key ? state.error : null,
     reload,
-    refresh: useCallback(() => setTick((n) => n + 1), []),
+    refresh,
     apply,
     busy: ops.length > 0,
     problem,

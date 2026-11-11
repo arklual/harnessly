@@ -15,7 +15,8 @@ import type {
 } from '../../../org/api/machines';
 import { useOrg } from '../../../org/context';
 import { useLoad } from '../../../org/hooks';
-import { applyOverlay, sizeText } from './calc';
+import { seatsOn } from '../../flag';
+import { applyOverlay, countByServers, sizeText } from './calc';
 
 const POLL_MS = 3_000;
 
@@ -30,7 +31,12 @@ export const useMachineList = () => {
     setSeen(loaded.data);
     if (Object.keys(over).length > 0) setOver({});
   }
-  const data = useMemo(() => (loaded.data ? applyOverlay(loaded.data, over) : null), [loaded.data, over]);
+  const seats = seatsOn(shell.features);
+  const data = useMemo(() => {
+    if (!loaded.data) return null;
+    const list = applyOverlay(loaded.data, over);
+    return seats ? countByServers(list) : list;
+  }, [loaded.data, over, seats]);
   const patch = useCallback((m: OrgMachine) => setOver((o) => ({ ...o, [m.id]: m })), []);
   return { data, error: loaded.error, reload: loaded.reload, refresh: loaded.refresh, patch };
 };

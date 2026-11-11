@@ -1,10 +1,22 @@
 // A tenant's machines for an admin or a lead: the tiles, the search, and the machines by team or as one list.
 import { useMemo, useState } from 'react';
 
-import type { MachinesList, OrgMachine } from '../../../org/api/machines';
+import type { MachinesList } from '../../../org/api/machines';
 import { useNow } from '../../../lib/hooks';
-import { flatRows, machinesWord, searchGroups, tenantTiles } from './calc';
-import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles, useMachineSort } from './parts';
+import { useOrg } from '../../../org/context';
+import { seatsOn } from '../../flag';
+import { flatRows, foldGroups, machinesWord, searchGroups, tenantTiles } from './calc';
+import {
+  AddCta,
+  Group,
+  MachineRows,
+  MlLink,
+  SearchBox,
+  Seg,
+  TableHead,
+  Tiles,
+  useMachineSort,
+} from './parts';
 
 type View = 'team' | 'flat';
 
@@ -22,11 +34,15 @@ export const TenantView = ({
   onOpen: (id: string) => void;
   onAdd?: () => void;
 }) => {
+  const seats = seatsOn(useOrg().shell.features);
   const now = useNow(60_000);
   const [q, setQ] = useState('');
   const [view, setView] = useState<View>('team');
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const tiles = useMemo(() => tenantTiles(list.summary, list.groups, now), [list, now]);
+  const tiles = useMemo(
+    () => tenantTiles(list.summary, seats ? foldGroups(list.groups) : list.groups, now),
+    [list, now, seats],
+  );
   const shown = useMemo(() => searchGroups(list.groups, q), [list.groups, q]);
   const ms = useMachineSort();
   const rows = ms.sort(useMemo(() => flatRows(list.groups, q), [list.groups, q]));
@@ -59,9 +75,7 @@ export const TenantView = ({
               >
                 <div className="mt mt--in">
                   <TableHead />
-                  {groupRows.map((m: OrgMachine) => (
-                    <MachineRow key={m.id} m={m} mode="team" now={now} onOpen={onOpen} />
-                  ))}
+                  <MachineRows machines={groupRows} mode="team" now={now} onOpen={onOpen} seats={seats} />
                 </div>
               </Group>
             );
@@ -71,9 +85,7 @@ export const TenantView = ({
       {view === 'flat' && rows.length > 0 && (
         <div className="mt">
           <TableHead sorting={ms} />
-          {rows.map((m) => (
-            <MachineRow key={m.id} m={m} mode="flat-tenant" now={now} onOpen={onOpen} />
-          ))}
+          <MachineRows machines={rows} mode="flat-tenant" now={now} onOpen={onOpen} seats={seats} />
         </div>
       )}
       {!searching && list.groups.length === 0 && (

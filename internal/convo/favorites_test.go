@@ -184,3 +184,29 @@ func TestTheGroupsAreFew(t *testing.T) {
 		t.Fatalf("over the limit: %+v", res)
 	}
 }
+
+// the pinned ones the layout does not name keep one order whatever the agents do: by creation, newest first,
+// then by id; activity (a reply, a reminder that counts as a message) never moves them.
+func TestPinnedByCreationIgnoresActivity(t *testing.T) {
+	convs := []wire.Conversation{
+		{ID: "tab-a", Pinned: true, CreatedAt: 10, LastActivityAt: 900, LastPromptAt: 900},
+		{ID: "tab-x", Pinned: false, CreatedAt: 99, LastActivityAt: 999},
+		{ID: "tab-c", Pinned: true, CreatedAt: 30, LastActivityAt: 1, LastPromptAt: 1},
+		{ID: "tab-b", Pinned: true, CreatedAt: 30, LastActivityAt: 500, LastPromptAt: 500},
+		{ID: "tab-d", Pinned: true, CreatedAt: 20, LastActivityAt: 2, LastPromptAt: 2},
+	}
+	want := []string{"tab-b", "tab-c", "tab-d", "tab-a"}
+	if got := pinnedByCreation(convs); !reflect.DeepEqual(got, want) {
+		t.Fatalf("order = %v, want %v", got, want)
+	}
+	for i := range convs {
+		convs[i].LastActivityAt, convs[i].LastPromptAt = wire.Ms(5000-i), wire.Ms(5000+i)
+	}
+	reversed := append([]wire.Conversation{}, convs...)
+	for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
+		reversed[i], reversed[j] = reversed[j], reversed[i]
+	}
+	if got := pinnedByCreation(reversed); !reflect.DeepEqual(got, want) {
+		t.Fatalf("after activity = %v, want %v", got, want)
+	}
+}

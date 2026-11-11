@@ -544,7 +544,9 @@ func TestOpIdempotency(t *testing.T) {
 func TestRecordCommands(t *testing.T) {
 	r := newRig(t)
 	r.open()
-	if res := r.do(wire.SeenCmd{OpID: "s1", ConversationID: wire.SeenAll, UpTo: wire.Ms(r.clock.Now().UnixMilli()) + 5}); res.R != wire.ResultAccepted {
+	r.clock.Sleep(time.Second)
+	// A mark from a clock ahead of the machine's reads only up to the machine's now: the next answer is still new.
+	if res := r.do(wire.SeenCmd{OpID: "s1", ConversationID: wire.SeenAll, UpTo: wire.Ms(r.clock.Now().UnixMilli()) + 5000}); res.R != wire.ResultAccepted {
 		t.Fatalf("seen: %+v", res)
 	}
 	if n := len(r.events(wire.EvConversationSeen)); n != 1 {
@@ -565,7 +567,7 @@ func TestRecordCommands(t *testing.T) {
 		t.Fatalf("restore: %+v", res)
 	}
 	cs, _ = r.rt.Conversations(context.Background())
-	if len(cs.Conversations) != 1 || !cs.Conversations[0].Pinned || cs.Conversations[0].SeenAt != wire.Ms(r.clock.Now().UnixMilli())+5 {
+	if len(cs.Conversations) != 1 || !cs.Conversations[0].Pinned || cs.Conversations[0].SeenAt != wire.Ms(r.clock.Now().UnixMilli()) {
 		t.Fatalf("restored: %+v", cs.Conversations)
 	}
 }

@@ -14,7 +14,13 @@ import (
 )
 
 const (
+	hubPauseMin = time.Second
 	hubPauseMax = 30 * time.Second
+	// hubLinkSettled is how long a link has to live before the next trouble starts from the shortest pause again: a link
+	// the hub takes and drops at once is no sign that calling fast is welcome.
+	hubLinkSettled = time.Minute
+	// A machine whose link another one keeps taking over (two agents with one key) calls ever more rarely.
+	hubReplacedPauseMax = 5 * time.Minute
 	// A hub that does not know this machine's key, or whose clock is far from ours, answers 401 for as long as that
 	// holds; asking every second would only fill its log.
 	hubRejectedPause = time.Minute
@@ -23,7 +29,7 @@ const (
 
 // dialHub keeps one signed outbound socket to the hub: the machine calls the hub, never the other way round.
 func (h *hub) dialHub(ctx context.Context) {
-	pause := time.Second
+	pause := &hubBackoff{}
 	for ctx.Err() == nil {
 		if h.policy.Disabled() {
 			if !sleepCtx(ctx, switchPoll) {
@@ -31,18 +37,58 @@ func (h *hub) dialHub(ctx context.Context) {
 			}
 			continue
 		}
-		retryIn, stop := h.dialOnce(ctx, &pause)
+		retryIn, stop := h.dialOnce(ctx, pause)
 		if stop {
 			return
 		}
 		delay := retryIn
 		if delay == 0 {
-			delay = pause
-			pause = min(pause*2, hubPauseMax)
+			delay = pause.next()
 		}
 		if !sleepCtx(ctx, delay) {
 			return
 		}
+	}
+}
+
+// hubBackoff is the pause between calls to the hub. Every agent of a hub loses its link at the same moment when the
+// hub restarts, so the pause is drawn at random from the whole of a window that doubles with each call in a row (full
+// jitter): the calls spread out instead of arriving together.
+type hubBackoff struct {
+	window   time.Duration // the next pause is drawn from [0, window); 0 means hubPauseMin
+	replaced int           // links in a row that another link of this machine took over
+	rnd      func() float64
+}
+
+func (b *hubBackoff) random() float64 {
+	if b.rnd != nil {
+		return b.rnd()
+	}
+	return rand.Float64()
+}
+
+// next is the pause before the next call after one that failed or a link that ended.
+func (b *hubBackoff) next() time.Duration {
+	window := max(b.window, hubPauseMin)
+	b.window = min(window*2, hubPauseMax)
+	return time.Duration(b.random() * float64(window))
+}
+
+// nextReplaced is the pause after another link of this machine took this one over: it doubles up to
+// hubReplacedPauseMax, and is never short, so that two agents with one key do not push each other out every second.
+func (b *hubBackoff) nextReplaced() time.Duration {
+	window := hubReplacedPauseMax
+	if b.replaced < 16 {
+		window = min(hubPauseMin<<b.replaced, hubReplacedPauseMax)
+	}
+	b.replaced++
+	return window/2 + time.Duration(b.random()*float64(window/2))
+}
+
+// ended is told how long a link lived: only one that settled brings the pauses back to the shortest.
+func (b *hubBackoff) ended(lived time.Duration) {
+	if lived >= hubLinkSettled {
+		b.window, b.replaced = 0, 0
 	}
 }
 
@@ -59,7 +105,7 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 
 // dialOnce makes one call and serves the link until it ends. It says how long to wait before the next call (0: the
 // usual backoff) or that there is to be none.
-func (h *hub) dialOnce(ctx context.Context, pause *time.Duration) (time.Duration, bool) {
+func (h *hub) dialOnce(ctx context.Context, pause *hubBackoff) (time.Duration, bool) {
 	m := h.machine
 	host, err := hubproto.DialHost(m.DialURL)
 	if err != nil {
@@ -112,7 +158,7 @@ func (h *hub) dialOnce(ctx context.Context, pause *time.Duration) (time.Duration
 		h.setLink(false, "the hub did not take the call: HTTP "+strconv.Itoa(res.StatusCode))
 		return 0, false
 	}
-	*pause = time.Second
+	linked := time.Now()
 	Log("info", "dialled the hub", F{"url", m.DialURL})
 
 	heard := make(chan struct{}, 1)
@@ -132,6 +178,7 @@ func (h *hub) dialOnce(ctx context.Context, pause *time.Duration) (time.Duration
 	}()
 	err = h.a.serveLink(conn, heard, true)
 	close(done)
+	pause.ended(time.Since(linked))
 	switch websocket.CloseStatus(err) {
 	case hubproto.CloseRevoked:
 		h.revoke()
@@ -143,9 +190,8 @@ func (h *hub) dialOnce(ctx context.Context, pause *time.Duration) (time.Duration
 	case hubproto.CloseSwitchedOff:
 		return time.Minute, false
 	case hubproto.CloseReplaced:
-		// A newer link of this machine took over: call again at once.
-		*pause = time.Second
-		return time.Second, false
+		// A newer link of this machine took over: call again, later each time it happens in a row.
+		return pause.nextReplaced(), false
 	}
 	return 0, false
 }

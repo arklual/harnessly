@@ -37,6 +37,52 @@ harnessly fleet status   --root /opt/harnessly [--json]
   while one runs (a lock in `<root>`).
 - **rollback** puts back the release `deployed.json` names as the previous one.
 
+### Several services on one machine
+
+A machine that runs one runtime per person must not start them together: a runtime's start is its heaviest minute, and
+all of them at once can take the machine down. Name the services in `RUNTIME_FLEET_SERVICES` and `activate` restarts
+them **one at a time**, in that order: `RUNTIME_FLEET_RESTART` runs once per service with its name in `FLEET_SERVICE`,
+then the service's own health address must answer with the release's version and with its chats loaded, and the next
+service waits until those chats are back (at most `RUNTIME_FLEET_SETTLE_TIMEOUT`; a runtime that takes longer does not
+fail the release).
+
+```
+RUNTIME_FLEET_SERVICES=runtime-anna=http://127.0.0.1:8122/api/health,runtime-boris=http://127.0.0.1:8123/api/health
+RUNTIME_FLEET_RESTART='systemctl restart "$FLEET_SERVICE"'
+```
+
+The runtime's `/api/health` carries `"chats"`: `starting` until its conversations are loaded (it listens and serves
+nothing yet), `restoring` while they answer and the rest of the start still runs, then `ready`. A health answer without
+the field (another program, an older runtime) is judged by its version alone. The first service that fails stops the
+rollout; only the services restarted so far go back to the previous release, one at a time, and the others never left
+it.
+
+### The units of the services
+
+Several runtimes per machine mean several systemd units for each of them, and writing them with a script that asks
+systemd about every pair in turn does not fit a loaded machine (one `systemctl` can take 25-90 s). `activate` does it as
+a whole when `RUNTIME_FLEET_UNITS_SPEC` names a spec file: it renders the units, writes the files whose text changed
+(each through a temporary file and a rename), asks systemd for **one** `daemon-reload` and **one**
+`enable --no-reload` for the new units, and only then restarts the services. If the check of the new release fails,
+the units are put back and systemd is reloaded once more, together with the services.
+
+The spec is JSON (`"schema": 1`): `vars` (for every template), `pairs` (one object of `vars` per person's pair, with an
+optional `host` that limits it to the machine of that name), `files` and `remove`. A file has a `path` and a `content`,
+both Go templates (`text/template`, a missing key is an error) over `{{.version}}`, `{{.release}}` (the folder
+`current` points at), `{{.host}}` and the variables; `perPair` renders it once for each pair of the machine, `enable`
+enables a new unit. A file that renders to nothing must not exist and is removed. Paths stay inside the unit folder.
+
+`harnessly fleet units --spec FILE --dir DIR --host NAME --version V [--apply] [--json]` shows what the spec comes to
+without touching anything (with `--apply` it writes and reloads): compare a new spec with the units a machine has
+before turning the step on.
+
+### A window between rollouts
+
+`RUNTIME_FLEET_MIN_GAP=24h` makes the machine refuse an activation that comes sooner than that after the last one:
+`activate` exits **4** with nothing changed, and the caller tries again later. `activate --force` is the rollout a
+person asked for and goes through. `rollback` is never held back. The hourly update from the hub has the same window
+as `RUNTIME_UPDATE_MIN_GAP` ([machine.md](machine.md)).
+
 After a successful activation the newest `RUNTIME_FLEET_KEEP` releases (3) stay, with the active and the previous one;
 the rest are removed unless something still uses them.
 
@@ -65,6 +111,12 @@ caller sends the whole release. A delta that holds anything but its parts is ref
 | `RUNTIME_FLEET_RESTART` | A shell command that restarts the services that run from `<root>/current`. |
 | `RUNTIME_FLEET_HEALTH_URL` | The address that reports the version the services serve. |
 | `RUNTIME_FLEET_HEALTH_TIMEOUT` | Seconds to wait for it (90). |
+| `RUNTIME_FLEET_SERVICES` | `name=health address` pairs, comma-separated: restart one service at a time (above). |
+| `RUNTIME_FLEET_SETTLE_TIMEOUT` | Seconds the next service waits for the chats of the one before it (300). |
+| `RUNTIME_FLEET_MIN_GAP` | The shortest time between two activations (`24h`, `90m`); unset or `0` is no window. |
+| `RUNTIME_FLEET_UNITS_SPEC` | The units spec above; unset keeps the units as they are. |
+| `RUNTIME_FLEET_UNIT_DIR` | The unit folder (`/etc/systemd/system`). |
+| `RUNTIME_FLEET_HOST` | The machine's name for the spec's `host` (the short host name). |
 | `RUNTIME_FLEET_KEEP` | Releases kept (3). |
 | `RUNTIME_FLEET_PARTS` | Top-level names a delta may replace (`bin,.harnessly-release.json`). |
 

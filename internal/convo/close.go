@@ -24,5 +24,8 @@ func (c *conv) closePane() {
 			return
 		}
 		c.input(agentstate.Input{K: agentstate.Gone, GoneReason: wire.GoneTabClosed}, c.d.Clock.Now())
+		if c.deletedAt != 0 {
+			c.forget(true)
+		}
 	})
 }

@@ -309,19 +309,33 @@ func (c *conv) limitOnScreen(plain string, now time.Time) {
 // cutAtRestart: the runtime came back to a conversation that was at work when it went down. Its agent still running
 // (tmux outlived the runtime) goes on by itself; one that is not was cut short, and goes on once it is back.
 func (c *conv) cutAtRestart(was wire.AgentState, now time.Time) {
-	if was.K != wire.StateWorking || c.rec.Session == "" || c.d.Machine == nil {
+	// A chat that was stopped is not cut short; it is remembered as stopped for the look that finds it without a
+	// session (see seeing).
+	c.stoppedAtRestart, c.resumableAtRestart = was.K == wire.StateStopped, was.K == wire.StateStopped && was.Resumable
+	if !hotAtStop(was.K) || c.rec.Session == "" || c.d.Machine == nil {
+		c.ownAtRestart(was, true)
 		return
 	}
-	if pr := c.d.Machine.Probe(c.rec.Session); pr.Session && pr.Foreground {
+	pr := c.d.Machine.Probe(c.rec.Session)
+	running := pr.Session && pr.Foreground
+	c.ownAtRestart(was, running)
+	if was.K != wire.StateWorking || running {
 		return
 	}
 	c.restartCut, c.restartSent, c.restartAt = true, false, now
 }
 
-// restartDue sends the word to go on to a chat a restart cut short, once its agent has been looked at: the queue
-// brings the agent back (a stopped one is resumed; a lost terminal comes back with the startup's resume, or after
-// RestartResumeAfter by the chat's own).
+// restartDue is what a start owes a chat whose agent was hot when the runtime went down, once the agent has been
+// looked at: the word to go on, and the agent itself (life.go).
 func (c *conv) restartDue(now time.Time) {
+	c.restartWord(now)
+	c.startUpDue(now)
+}
+
+// restartWord sends the word to go on to a chat a restart cut short: the queue brings the agent back (a stopped one
+// is resumed; with Deps.LegacyLife a lost terminal comes back with the tabs' startup resume, or after
+// RestartResumeAfter by the chat's own).
+func (c *conv) restartWord(now time.Time) {
 	if !c.restartCut {
 		return
 	}

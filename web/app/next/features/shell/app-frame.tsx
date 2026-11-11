@@ -11,6 +11,8 @@ import { drawerState } from '@/next/features/shell/drawer-state';
 export interface IAppFrameProps {
   /** The desktop sidebar is folded to its rail. */
   rail: boolean;
+  /** A screen that takes the whole window (an app, a design): the open sidebar is narrower there. */
+  full?: boolean;
   /** The phone drawer is out. */
   drawerOpen: boolean;
   onDrawerChange: (open: boolean) => void;
@@ -40,6 +42,7 @@ const ENTRANCE_MS = 2400;
  */
 const AppFrame = ({
   rail: wantRail,
+  full = false,
   drawerOpen,
   onDrawerChange,
   sidebar,
@@ -94,6 +97,7 @@ const AppFrame = ({
         data-peek={peek ?? undefined}
         data-tabs={tabs ? 'on' : undefined}
         data-text={textSize}
+        data-full={full || undefined}
         data-play={play}
         data-hidden={hidden || undefined}
       >

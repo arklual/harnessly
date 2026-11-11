@@ -884,3 +884,13 @@
     margin-top: var(--hx-space-4);
   }
 }
+
+/* An app in Sinopia's stage (app-stage.tsx): the view fills the browser box under the strip. */
+.hx-appstage__body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

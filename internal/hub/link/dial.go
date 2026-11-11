@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -18,6 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 var (
@@ -43,6 +45,9 @@ type Hooks struct {
 	Connected func(l *Link, m store.Machine)
 	// Event runs for each event the agent sends, in order.
 	Event func(l *Link, m store.Machine, ev Event)
+	// Bulk names the events that may be dropped when the hub is behind (Link.Bulk); BulkLost runs after some were.
+	Bulk     func(name string) bool
+	BulkLost func(l *Link, m store.Machine)
 	// Unlink runs when a machine asked, signed with its own key, to be removed (DELETE /agent/v1): the hub revokes it.
 	Unlink func(r *http.Request, m store.Machine) error
 	// Disconnected runs when the link ends; current says it was still the machine's link (not replaced by a newer one).
@@ -72,6 +77,8 @@ type Dialer struct {
 	serving  sync.WaitGroup
 	stopMu   sync.Mutex
 	stopping bool
+	// refusing is set by Refuse: new dials are answered 409 while the links already taken go on.
+	refusing atomic.Bool
 }
 
 // enter counts a link about to be served; false once the dialer is closing.
@@ -159,6 +166,10 @@ func (d *Dialer) Sweep() {
 }
 
 func (d *Dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if d.refusing.Load() && !d.closing() {
+		http.Error(w, "hub draining", http.StatusConflict)
+		return
+	}
 	if !d.enter() {
 		http.Error(w, "hub stopping", http.StatusServiceUnavailable)
 		return
@@ -181,6 +192,10 @@ func (d *Dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = conn.Close(websocket.StatusCode(hubproto.CloseProtocolOld), "protocol 2 required")
 		return
 	}
+	l.Bulk = d.Hooks.Bulk
+	if d.Hooks.BulkLost != nil {
+		l.BulkLost = func() { d.Hooks.BulkLost(l, m) }
+	}
 	d.Reg.Add(l)
 	if d.closing() {
 		// Close ran between enter and Add: its CloseAll did not see this link.
@@ -189,10 +204,10 @@ func (d *Dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.log().Info("agent linked", "machine", m.ID, "version", l.AgentVersion)
 	if d.Hooks.Connected != nil {
 		d.serving.Add(1)
-		go func() {
+		safego.Go("link connected", func() {
 			defer d.serving.Done()
 			d.Hooks.Connected(l, m)
-		}()
+		})
 	}
 	err = l.Serve(context.Background(), func(ev Event) {
 		if d.Hooks.Event != nil {

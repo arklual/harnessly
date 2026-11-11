@@ -168,6 +168,8 @@ func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 	head.BlockedSince = 0
 	b.flight, b.typing = head.Message.ClientID, true
 	head.TypedOffset, head.TypedAt, head.Submitted, head.Steered = size, ms(now), false, p.steer
+	b.sends++
+	head.Send = b.sends
 	deadline := wire.TypingDeadline + int64(len(head.Images))*1500
 	b.set(&ch, head, wire.MessageState{K: wire.MsgTyping, Wait: &wire.Wait{SlowAt: ms(now) + wire.WaitSlowMs, DeadlineAt: ms(now) + deadline}}, now)
 	ch.add(wire.QueueChangedEv{Queue: b.Queue()})
@@ -363,6 +365,10 @@ func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 	}
 	enterOnly := r.EnterOnly
 	r.EnterOnly = false
+	if !res.Typed && !enterOnly && res.Outcome != typist.Sent && r.HookSend != r.Send {
+		// No key went in: the try was no send, and no hook is its.
+		r.Send = 0
+	}
 	switch res.Outcome {
 	case typist.Sent:
 		if res.AsPath && b.log != nil {
@@ -391,6 +397,22 @@ func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 		b.stuck(&ch, r, now)
 		return ch
 	case typist.Failed:
+		if b.HookConfirms && res.Typed && r.hooked() {
+			// A key failed after the agent's hook had come for the message: it is with the agent, not to be typed again.
+			b.accept(&ch, r, nil, now)
+			return ch
+		}
+		if res.Lost {
+			// The pane was taken from the try (the person's Stop, the hold's term): not a failure of the message. It
+			// keeps the head of the line and is not delivered; if its Enter did go in, the hook or the transcript says so
+			// before it is typed again.
+			r.NextTry = ms(now) + retryBase.Milliseconds()
+			if b.log != nil {
+				b.log.Info("typing cut short; the message stays first in the queue", "conversationId", b.conv,
+					"clientId", clientID, "typed", res.Typed, "err", errText(res.Err))
+			}
+			break
+		}
 		r.Tries++
 		r.Message.Attempts++
 		if r.Tries >= MaxTries {
@@ -411,6 +433,14 @@ func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 		r.NextTry = ms(now) + min(retryBase<<(r.Blocked-1), blockedMax).Milliseconds()
 	default:
 		r.NextTry = ms(now) + r.waitFor().Milliseconds()
+		if res.Slow {
+			// The terminal answers too slowly to type into: the message keeps its place and is tried after a pause.
+			r.NextTry = ms(now) + slowPause.Milliseconds()
+			if b.log != nil {
+				b.log.Warn("terminal too slow to type into; the message stays queued", "conversationId", b.conv,
+					"clientId", clientID, "nextMs", slowPause.Milliseconds(), "err", errText(res.Err))
+			}
+		}
 	}
 	if enterOnly {
 		// The restart's own text is no longer in the box: whether it went in is the transcript's to say; a try that
@@ -438,6 +468,12 @@ func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 // stuck: a try's Enters all left the text in the box, and the typist took it out. It is typed again from the head of
 // the line, backing off like a failed try; MaxTries in a row fail it, retryable.
 func (b *Box) stuck(ch *Change, r *Record, now time.Time) {
+	if b.HookConfirms {
+		// The screen showed the text in the box after every Enter — and a screen drawn late shows the same of a
+		// message the agent took. Its hook or its entry says which, so the retype waits for them.
+		b.unconfirmed(ch, r, ConfirmWindow, now)
+		return
+	}
 	b.flight = ""
 	r.Tries++
 	r.Message.Attempts++
@@ -449,6 +485,43 @@ func (b *Box) stuck(ch *Change, r *Record, now time.Time) {
 	if b.log != nil {
 		b.log.Warn("message stuck in the input box; it is typed again", "conversationId", b.conv,
 			"clientId", r.Message.ClientID, "try", r.Tries, "nextMs", r.NextTry-ms(now))
+	}
+	if !slices.Contains(b.items, r.Message.ClientID) {
+		b.items = append([]string{r.Message.ClientID}, b.items...)
+		b.rev++
+	}
+	ch.add(wire.QueueChangedEv{Queue: b.Queue()})
+	b.positions(ch, wire.QueuedAgentBusy, now)
+}
+
+// unconfirmed: a typed message that neither the hook nor the transcript confirmed (HookConfirms). The first time it
+// goes back to the head of the line to be typed once more, after wait — the time the agent's word may still come in,
+// which accepts it where it stands. The second time it stalls: something beyond this message is wrong, and the person
+// decides. So a message is typed twice at most by the box itself, and only with no sign that the agent has it.
+func (b *Box) unconfirmed(ch *Change, r *Record, wait time.Duration, now time.Time) {
+	if b.flight == r.Message.ClientID {
+		b.flight, b.typing = "", false
+	}
+	if id, ok := b.found(r, nil); ok {
+		b.accept(ch, r, &id, now)
+		return
+	}
+	if r.hooked() {
+		// Its hook came while it was being typed: the agent has it, whatever the screen showed afterwards.
+		b.accept(ch, r, nil, now)
+		return
+	}
+	if r.Retyped {
+		b.stall(ch, r, now)
+		return
+	}
+	r.Retyped = true
+	r.Message.Attempts++
+	r.EnterOnly, r.Rechecks, r.RecheckAt = false, 0, 0
+	r.NextTry = ms(now) + wait.Milliseconds()
+	if b.log != nil {
+		b.log.Warn("typed message not confirmed by the agent; it is typed once more", "conversationId", b.conv,
+			"clientId", r.Message.ClientID, "send", r.Send, "nextMs", wait.Milliseconds())
 	}
 	if !slices.Contains(b.items, r.Message.ClientID) {
 		b.items = append([]string{r.Message.ClientID}, b.items...)
@@ -471,8 +544,28 @@ func errText(err error) string {
 // in a turn when the hook came: a normal message typed just as the agent began a turn of its own (a background task's
 // notice, a timer) is in Claude's queue the same way, not read, and is told so — see handOver.
 func (b *Box) PromptSubmitted(turn *string, working bool, now time.Time) Change {
+	return b.PromptSubmittedAs("", turn, working, now)
+}
+
+// PromptSubmittedAs is PromptSubmitted for a hook that names the prompt the agent took (hash, screen.MessageHash of
+// it). It confirms one send: the oldest typed message with these words that no hook confirmed yet — so two messages
+// with the same words take a hook each, and a prompt the person typed in the terminal confirms nothing. A message
+// that went back to the line because its try seemed lost is accepted where it stands and is not typed again.
+// A hook that names no prompt (hash "": Codex, a Claude started before its hook carried one) is the message on its
+// way's, as before.
+func (b *Box) PromptSubmittedAs(hash string, turn *string, working bool, now time.Time) Change {
 	var ch Change
 	r := b.recs[b.flight]
+	if hash != "" {
+		if r = b.sentAs(hash); r == nil {
+			return ch
+		}
+		r.HookSend = r.Send
+		if r.Message.ClientID != b.flight {
+			b.confirmAside(&ch, r, turn, now)
+			return ch
+		}
+	}
 	switch {
 	case r == nil:
 	case r.Steered:
@@ -485,6 +578,69 @@ func (b *Box) PromptSubmitted(turn *string, working bool, now time.Time) Change 
 		b.join(&ch, r, turn, now)
 	}
 	return ch
+}
+
+// Delivered: the agent's structured channel says it has this very message, named by its client id. It is accepted
+// without an entry (the transcript gives it one when it is read) and joins the running turn when it was steered. No
+// hook is waited for, and none that comes later confirms this send a second time.
+func (b *Box) Delivered(clientID string, turn *string, now time.Time) Change {
+	var ch Change
+	r := b.recs[clientID]
+	if r == nil {
+		return ch
+	}
+	if k := r.Message.State.K; k != wire.MsgTyping && k != wire.MsgInInput {
+		return ch
+	}
+	r.HookSend = r.Send
+	b.accept(&ch, r, nil, now)
+	b.join(&ch, r, turn, now)
+	return ch
+}
+
+// hooked: the agent's prompt-submit hook came for this send — while it was typed (Submitted) or by its hash.
+func (r *Record) hooked() bool { return r.Submitted || r.Send > 0 && r.HookSend == r.Send }
+
+// sentAs is the send a hook with this hash confirms: the oldest typed message with these words still waiting for the
+// agent's word, nil when there is none.
+func (b *Box) sentAs(hash string) *Record {
+	var oldest *Record
+	for _, r := range b.recs {
+		if r.Send == 0 || r.HookSend == r.Send || oldest != nil && oldest.Send < r.Send {
+			continue
+		}
+		switch r.Message.State.K {
+		case wire.MsgTyping, wire.MsgInInput, wire.MsgQueued, wire.MsgFailed:
+		default:
+			continue
+		}
+		if screen.MessageHash(r.Message.Text) == hash {
+			oldest = r
+		}
+	}
+	return oldest
+}
+
+// confirmAside takes the hook of a message that is not on its way: one in Claude's own queue is only known to be
+// there (its entry says when it is read); one back in the line or failed after a try that seemed lost is with the
+// agent after all — accepted, out of the line, its place given to the ones behind it.
+func (b *Box) confirmAside(ch *Change, r *Record, turn *string, now time.Time) {
+	st := r.Message.State.K
+	if st != wire.MsgQueued && st != wire.MsgFailed {
+		return
+	}
+	if b.log != nil {
+		b.log.Info("message confirmed by the agent's hook after all", "conversationId", b.conv,
+			"clientId", r.Message.ClientID, "state", string(st), "send", r.Send)
+	}
+	queued, reason := slices.Contains(b.items, r.Message.ClientID), r.Reason
+	b.dropItem(r.Message.ClientID)
+	b.accept(ch, r, nil, now)
+	b.join(ch, r, turn, now)
+	if queued {
+		ch.add(wire.QueueChangedEv{Queue: b.Queue()})
+		b.positions(ch, reason, now)
+	}
 }
 
 // handOver makes a normal message what a steered one is: typed into a turn that was already running, it sits in
@@ -665,6 +821,11 @@ func (b *Box) Tick(now time.Time) Change {
 			b.fail(&ch, r, wire.MsgFailedUnconfirmed, true, now)
 		case st.K == wire.MsgInInput && st.Wait != nil && t >= st.Wait.DeadlineAt && !mine,
 			st.K == wire.MsgTyping && !mine && t-r.TypedAt >= wire.ConfirmDeadline:
+			if b.HookConfirms {
+				// The window is over with no word from the agent: the one retype, then the stall.
+				b.unconfirmed(&ch, r, 0, now)
+				continue
+			}
 			b.stall(&ch, r, now)
 		case st.K == wire.MsgQueued && st.Wait != nil && t >= st.Wait.DeadlineAt:
 			b.fail(&ch, r, wire.MsgFailedExpired, true, now)
@@ -678,6 +839,11 @@ func (b *Box) Tick(now time.Time) Change {
 	for id, at := range b.gone {
 		if t-at > GoneKept.Milliseconds() {
 			delete(b.gone, id)
+		}
+	}
+	for id, at := range b.cancelled {
+		if t-at > CancelKept.Milliseconds() {
+			delete(b.cancelled, id)
 		}
 	}
 	return ch
@@ -743,7 +909,7 @@ func (b *Box) unstall(r *Record, find Find, now time.Time) Change {
 			return ch
 		}
 	}
-	r.Stalled, r.ClearBox = false, false
+	r.Stalled, r.ClearBox, r.Retyped = false, false, false
 	r.Message.Attempts++
 	r.Tries, r.NextTry, r.Blocked, r.BlockedSince, r.Waits, r.WaitSince = 0, 0, 0, 0, 0, ms(now)
 	b.rev++

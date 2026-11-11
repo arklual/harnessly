@@ -5,6 +5,7 @@ package preflight
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/cliversion"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
@@ -46,7 +48,11 @@ type Claude struct {
 	Installed  bool    `json:"installed"`
 	Version    *string `json:"version"`
 	BinaryPath *string `json:"binaryPath"`
-	LoggedIn   bool    `json:"loggedIn"`
+	// LoggedIn is what `claude auth status` says (exit 0); a probe that ran out of time counts as signed in, as it
+	// does not prove the opposite. A ~/.claude folder says nothing: the CLI makes it on its first start, signed in or not.
+	LoggedIn bool `json:"loggedIn"`
+	// Unchecked: the runtime's screen reading was not checked against this version (cliversion's table).
+	Unchecked bool `json:"unchecked,omitempty"`
 }
 
 type Codex struct {
@@ -73,6 +79,9 @@ type Checker struct {
 	Env []string
 	// Shell is the person's login shell ("" — the account's, else $SHELL, else /bin/bash).
 	Shell string
+	// AuthDir is the login folder a managed machine keeps Claude's sign-in in ("" — the CLI's own): the chats get it
+	// as CLAUDE_SECURESTORAGE_CONFIG_DIR, so the probe asks with it too.
+	AuthDir string
 
 	mu       sync.Mutex
 	result   *Result
@@ -82,9 +91,33 @@ type Checker struct {
 	codexMu sync.Mutex
 	codex   *Codex
 	codexAt time.Time
+
+	claudeMu sync.Mutex
+	claude   *Claude
+	claudeAt time.Time
 }
 
-func New(home string) *Checker { return &Checker{Home: home, Env: os.Environ()} }
+func New(home string) *Checker {
+	return &Checker{Home: home, Env: os.Environ(), AuthDir: authDirOf(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"))}
+}
+
+// authDirOf reads `auth_directory` from the machine's runtime config, the folder its chats sign in from.
+func authDirOf(file string) string {
+	if file == "" {
+		return ""
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return ""
+	}
+	var cfg struct {
+		AuthDirectory string `json:"auth_directory"`
+	}
+	if json.Unmarshal(raw, &cfg) != nil || !filepath.IsAbs(cfg.AuthDirectory) {
+		return ""
+	}
+	return cfg.AuthDirectory
+}
 
 // Runtime is the cached answer, checked again once it is older than 30 seconds; concurrent callers share one check.
 func (c *Checker) Runtime() Result {
@@ -120,6 +153,9 @@ func (c *Checker) Invalidate() {
 	c.codexMu.Lock()
 	c.codex = nil
 	c.codexMu.Unlock()
+	c.claudeMu.Lock()
+	c.claude = nil
+	c.claudeMu.Unlock()
 }
 
 func (c *Checker) check() Result {
@@ -133,7 +169,7 @@ func (c *Checker) check() Result {
 		r.Tmux = Tmux{Tool: t, Compatible: tmuxCompatible(t)}
 	}()
 	go func() { defer wg.Done(); r.Git = c.tool(path, "git", "--version") }()
-	go func() { defer wg.Done(); r.Claude = c.claude(path) }()
+	go func() { defer wg.Done(); r.Claude = c.claudeStatus(path) }()
 	go func() { defer wg.Done(); r.Codex = c.codexStatus(path) }()
 	wg.Wait()
 	return r
@@ -325,20 +361,80 @@ func exists(p string) bool {
 	return err == nil
 }
 
-func (c *Checker) claude(path string) Claude {
+// cliVersion is what an agent's CLI prints for --version. The CLI is started once per binary: the answer is kept
+// while the file the name resolves to along path stays the same (cliversion.Of), so a preflight — the page asks one
+// every half a minute, and every launch reads it — does not start a CLI each time.
+func (c *Checker) cliVersion(name, path string) (string, error) {
+	bin, err := lookPath(name, path)
+	if err != nil {
+		return "", err
+	}
+	return cliversion.Of(bin, func() (string, error) { return run(name, c.withPath(path), path, "--version") })
+}
+
+func (c *Checker) claudeProbe(path string) Claude {
 	var r Claude
-	if out, err := run("claude", c.withPath(path), path, "--version"); err == nil {
+	if out, err := c.cliVersion("claude", path); err == nil {
 		r.Installed, r.Version = true, Version(out)
+		if r.Version != nil {
+			r.Unchecked = cliversion.Note(cliversion.Claude, *r.Version) == cliversion.Unchecked
+		}
 	}
 	if !r.Installed {
 		if dir := filepath.Join(c.Home, ".local", "bin"); exists(filepath.Join(dir, "claude")) {
 			r.BinaryPath = &dir
 		}
 	}
-	if r.Installed || r.BinaryPath != nil {
-		r.LoggedIn = exists(filepath.Join(c.Home, ".claude"))
+	if r.Installed {
+		r.LoggedIn = c.claudeLoggedIn(path)
 	}
 	return r
+}
+
+// claudeStatus is kept for a minute on its own, like Codex's: it starts the CLI, which may reach for the network.
+func (c *Checker) claudeStatus(path string) Claude {
+	c.claudeMu.Lock()
+	defer c.claudeMu.Unlock()
+	if c.claude != nil && time.Since(c.claudeAt) < codexTTL {
+		return *c.claude
+	}
+	r := c.claudeProbe(path)
+	c.claude, c.claudeAt = &r, time.Now()
+	return r
+}
+
+// claudeLoggedIn asks the CLI itself whether it holds a sign-in (a subscription, a key, a cloud provider): it exits 0
+// when it does. A probe that ran out of time proves nothing, so it counts as signed in. So does a home that keeps
+// credentials or names its own endpoint or key in the CLI's settings: the runtime gives those to the chat, not to this
+// probe, and a machine that worked must not lose its agent to a stricter check.
+func (c *Checker) claudeLoggedIn(path string) bool {
+	env := c.withPath(path)
+	if c.AuthDir != "" {
+		env = append(env, "CLAUDE_SECURESTORAGE_CONFIG_DIR="+c.AuthDir)
+	}
+	_, err := run("claude", env, path, "auth", "status")
+	return err == nil || errors.Is(err, errTimedOut) || c.claudeConfigured()
+}
+
+// claudeConfigured reports whether the home holds a sign-in of the CLI or settings that bring one.
+func (c *Checker) claudeConfigured() bool {
+	if c.AuthDir != "" && exists(filepath.Join(c.AuthDir, ".credentials.json")) {
+		return true
+	}
+	dir := filepath.Join(c.Home, ".claude")
+	if exists(filepath.Join(dir, ".credentials.json")) {
+		return true
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		return false
+	}
+	for _, name := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "apiKeyHelper"} {
+		if strings.Contains(string(raw), `"`+name+`"`) {
+			return true
+		}
+	}
+	return false
 }
 
 // codexStatus is kept for a minute on its own, as the previous runtime kept it.
@@ -355,11 +451,14 @@ func (c *Checker) codexStatus(path string) Codex {
 
 func (c *Checker) probeCodex(path string) Codex {
 	env := c.withPath(path)
-	out, err := run("codex", env, path, "--version")
+	out, err := c.cliVersion("codex", path)
 	if err != nil {
 		return Codex{}
 	}
 	r := Codex{Installed: true, Version: Version(out), LoggedIn: true}
+	if r.Version != nil {
+		cliversion.Note(cliversion.Codex, *r.Version)
+	}
 	if _, err := run("codex", env, path, "login", "status"); err != nil && !errors.Is(err, errTimedOut) {
 		r.LoggedIn = false
 	}

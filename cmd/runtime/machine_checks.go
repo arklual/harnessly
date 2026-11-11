@@ -75,6 +75,8 @@ type machineProbe struct {
 	Reach func(ctx context.Context, url string) error
 	// GitEmail is the account's git user.email.
 	GitEmail func() string
+	// SetGitIdentity writes git's global user.name and user.email for the account.
+	SetGitIdentity func(name, email string) error
 	// LookPath finds a program on the runtime's PATH.
 	LookPath func(string) (string, error)
 	// Exists says a file is there.
@@ -245,6 +247,8 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 		identity := machineCheck{ID: "git_identity", OK: email != "", Title: "git user.email"}
 		if !identity.OK {
 			identity.FixCommand = `git config --global user.name "Your Name" && git config --global user.email you@example.com`
+			// The person who opened the page is who commits here: their email is the one the sign-in carries.
+			identity.Fixable = p.SetGitIdentity != nil && personFrom(ctx).Email != ""
 		}
 		add(identity)
 	}
@@ -420,6 +424,12 @@ func (p machineProbe) fix(ctx context.Context, id string) error {
 	switch id {
 	case "local_bin_path":
 		return p.fixPath()
+	case "git_identity":
+		who := personFrom(ctx)
+		if p.SetGitIdentity == nil || who.Email == "" || p.GitEmail() != "" {
+			return errNoFix
+		}
+		return p.SetGitIdentity(who.Name, who.Email)
 	case "cli":
 		if p.Update == nil || p.Update.Status().Mode != "auto" {
 			return errNoFix
@@ -434,6 +444,37 @@ func (p machineProbe) fix(ctx context.Context, id string) error {
 }
 
 var errNoFix = errors.New("this check has no fix the runtime may make")
+
+type personKey struct{}
+
+// withPerson tells the checks who has the page open: the name and the email of the sign-in.
+func withPerson(ctx context.Context, name, email string) context.Context {
+	return context.WithValue(ctx, personKey{}, gitPerson{Name: name, Email: email})
+}
+
+// withSessionPerson puts the page session's person into the context of a check; nobody when the session names no one.
+func withSessionPerson(ctx context.Context, d deps, r *http.Request) context.Context {
+	if d.Claims == nil {
+		return ctx
+	}
+	claims := d.Claims(r)
+	if claims == nil {
+		return ctx
+	}
+	str := func(k string) string { s, _ := claims[k].(string); return strings.TrimSpace(s) }
+	email := str("email")
+	if email == "" && strings.Contains(str("sub"), "@") {
+		email = str("sub")
+	}
+	return withPerson(ctx, str("name"), email)
+}
+
+type gitPerson struct{ Name, Email string }
+
+func personFrom(ctx context.Context) gitPerson {
+	p, _ := ctx.Value(personKey{}).(gitPerson)
+	return p
+}
 
 // --- the machine as it is ------------------------------------------------------------------------------------------
 
@@ -511,6 +552,28 @@ func gitEmail(path string) func() string {
 	}
 }
 
+// setGitIdentity writes the person's name (when the sign-in has one) and email into git's global config.
+func setGitIdentity(path string) func(name, email string) error {
+	return func(name, email string) error {
+		set := func(key, value string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "git", "config", "--global", key, value)
+			cmd.Env = append(os.Environ(), "PATH="+path)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("git config %s: %w: %s", key, err, strings.TrimSpace(string(out)))
+			}
+			return nil
+		}
+		if name != "" {
+			if err := set("user.name", name); err != nil {
+				return err
+			}
+		}
+		return set("user.email", email)
+	}
+}
+
 // ownVoice is the runtime's recognition engine where this machine has no service of the operator's.
 func ownVoice(dataDir string) func() *engine.Engine {
 	return func() *engine.Engine {
@@ -544,7 +607,8 @@ func newMachineProbe(d deps, self *selfupdate.Updater) machineProbe {
 		GOOS:         runtime.GOOS, Home: d.Home, DataDir: d.DataDir, BinDir: binDir, User: name, Shell: shell,
 		Tools: tools.Runtime, ShellPath: tools.ShellPath, HasDecoder: dictation.HasDecoder, Voice: ownVoice(d.DataDir),
 		Update: self, Free: freeBytes, Reach: reach, GitEmail: func() string { return gitEmail(tools.ShellPath())() },
-		LookPath: exec.LookPath, Exists: pathExists, Invalidate: tools.Invalidate, ReadFile: os.ReadFile,
+		SetGitIdentity: func(name, email string) error { return setGitIdentity(tools.ShellPath())(name, email) },
+		LookPath:       exec.LookPath, Exists: pathExists, Invalidate: tools.Invalidate, ReadFile: os.ReadFile,
 		AppsBoundary: func() (bool, error) {
 			root := apps.Open(d.DataDir).Root
 			if _, err := os.Stat(root); err != nil {
@@ -563,10 +627,11 @@ func machineCheckRoutes(d deps, self *selfupdate.Updater) []gate.Route {
 	answer := func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
+		ctx = withSessionPerson(ctx, d, r)
 		checks := probe.run(ctx)
 		// The self-test needs tmux: without it the tmux check already says what is wrong.
 		if d.Tmux != nil && tmuxReady(checks) {
-			checks = append(checks, newSelftest(d.Tmux).run(ctx)...)
+			checks = append(checks, withScreenChecks(newSelftest(d.Tmux).run(ctx))...)
 		}
 		peerJSON(w, http.StatusOK, map[string]any{"checks": checks})
 	}
@@ -611,6 +676,7 @@ func machineCheckRoutes(d deps, self *selfupdate.Updater) []gate.Route {
 				}
 				ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Minute)
 				defer cancel()
+				ctx = withSessionPerson(ctx, d, r)
 				if err := probe.fix(ctx, body.ID); err != nil {
 					status := http.StatusInternalServerError
 					if errors.Is(err, errNoFix) {

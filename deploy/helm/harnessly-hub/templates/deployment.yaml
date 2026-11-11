@@ -7,21 +7,26 @@ metadata:
     {{- include "hub.labels" . | nindent 4 }}
 spec:
   {{- if include "hub.multi" . }}
-  # Several replicas on a shared Postgres, rolled one at a time: a machine's link has an owner with a lease and a
-  # fencing token in the database, and a request reaches the owner over the replicas' internal hop (docs/hub/replicas.md).
+  # Several replicas on a shared Postgres: a machine's link has an owner with a lease and a fencing token in the
+  # database, and a request reaches the owner over the replicas' internal hop (docs/hub/replicas.md).
   replicas: {{ int .Values.replicaCount }}
+  {{- else }}
+  # One replica: a second hub on the same SQLite file would corrupt it, and without a shared database the agent links
+  # live in this process only.
+  replicas: 1
+  {{- end }}
   strategy:
+    {{- if eq (include "hub.strategy" .) "RollingUpdate" }}
+    # Rolled one at a time and never below the count: a new pod is ready before an old one is told to stop, and the
+    # old one moves its machines away before it goes (drain below).
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 0
-      maxSurge: 1
-  {{- else }}
-  # One replica, replaced and not rolled: a second hub on the same SQLite file would corrupt it, and without a shared
-  # database the agent links live in this process only.
-  replicas: 1
-  strategy:
+      maxSurge: {{ .Values.strategy.maxSurge }}
+    {{- else }}
+    # Replaced and not rolled: the old pod is gone before the new one starts.
     type: Recreate
-  {{- end }}
+    {{- end }}
   selector:
     matchLabels:
       {{- include "hub.selectorLabels" . | nindent 6 }}
@@ -30,6 +35,12 @@ spec:
       annotations:
         {{- if not .Values.existingSecret }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.metrics.enabled }}
+        # The convention of a Prometheus that finds pods by annotation; one that uses ServiceMonitors ignores them.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.metrics.port | quote }}
+        prometheus.io/path: /metrics
         {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -59,6 +70,16 @@ spec:
             - name: http
               containerPort: 8040
               protocol: TCP
+            {{- if include "hub.multi" . }}
+            - name: replica
+              containerPort: 8041
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
           env:
             # The release the hub says it is: the image's tag (internal/hub/buildinfo).
             - name: HUB_VERSION
@@ -218,16 +239,31 @@ spec:
             - name: HUB_DATABASE_URL
               value: "postgres://harnessly:$(POSTGRES_PASSWORD)@{{ include "hub.postgresName" . }}:5432/harnessly?sslmode=disable"
             {{- end }}
+            {{- if .Values.metrics.enabled }}
+            # A listener of its own: /metrics is served without sign-in and is on no Service and no Ingress.
+            - name: HUB_METRICS_LISTEN
+              value: "0.0.0.0:{{ .Values.metrics.port }}"
+            {{- end }}
             {{- if include "hub.multi" . }}
             - name: HUB_REPLICAS
               value: "on"
+            # A stop: not ready for drain.settleSeconds, then the machines are asked to dial again over
+            # drain.linksSeconds, and the rest of the grace is for the requests under way.
+            - name: HUB_SHUTDOWN_GRACE
+              value: "{{ include "hub.shutdownGrace" . }}s"
+            - name: HUB_DRAIN_SETTLE
+              value: "{{ int .Values.drain.settleSeconds }}s"
+            - name: HUB_DRAIN_LINKS
+              value: "{{ int .Values.drain.linksSeconds }}s"
             # Defined before HUB_REPLICA_ADDR: Kubernetes expands $(NAME) from the variables above it.
             - name: POD_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+            - name: HUB_REPLICA_LISTEN
+              value: "0.0.0.0:8041"
             - name: HUB_REPLICA_ADDR
-              value: "http://$(POD_IP):8040"
+              value: "http://$(POD_IP):8041"
             - name: HUB_REPLICA_ID
               valueFrom:
                 fieldRef:
@@ -241,21 +277,35 @@ spec:
             {{- if .Values.docs.enabled }}
             - name: HUB_DOCS
               value: "on"
-            - name: HUB_DOCS_TOKEN
+            # The hub calls a bundled service in the cluster; machines and browsers get the public address.
+            - name: HUB_ARTIFACTS_URL
+              value: {{ ternary (printf "http://%s-artifacts:8080" (include "hub.fullname" .)) (.Values.docs.url | trimSuffix "/") .Values.docs.bundled | quote }}
+            - name: HUB_ARTIFACTS_PUBLIC_URL
+              value: {{ .Values.docs.url | trimSuffix "/" | quote }}
+            - name: HUB_ARTIFACTS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "hub.docsSecretName" . }}
+                  name: {{ include "hub.appSecretName" (dict "root" . "key" "docs") }}
                   key: token
-            - name: HUB_ARTIFACTS_URL
-              value: {{ include "hub.artifactsURL" . | quote }}
-            - name: HUB_ARTIFACTS_TOKEN
-              value: "$(HUB_DOCS_TOKEN)"
-            {{- with (include "hub.boardsURL" .) }}
-            - name: HUB_BOARDS_URL
-              value: {{ . | quote }}
-            - name: HUB_BOARDS_TOKEN
-              value: "$(HUB_DOCS_TOKEN)"
+            {{- if eq .Values.docs.auth "harnessly" }}
+            - name: HUB_ARTIFACTS_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hub.appSecretName" (dict "root" . "key" "docs") }}
+                  key: accessToken
             {{- end }}
+            {{- end }}
+            {{- if .Values.boards.enabled }}
+            # The hub calls a bundled service in the cluster; machines and browsers get the public address.
+            - name: HUB_BOARDS_URL
+              value: {{ ternary (printf "http://%s-boards:8080" (include "hub.fullname" .)) (.Values.boards.url | trimSuffix "/") .Values.boards.bundled | quote }}
+            - name: HUB_BOARDS_PUBLIC_URL
+              value: {{ .Values.boards.url | trimSuffix "/" | quote }}
+            - name: HUB_BOARDS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hub.appSecretName" (dict "root" . "key" "boards") }}
+                  key: token
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -266,6 +316,11 @@ spec:
             {{- with .Values.extraEnvFrom }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- with .Values.preStop }}
+          lifecycle:
+            preStop:
+              {{- toYaml . | nindent 14 }}
+          {{- end }}
           startupProbe:
             {{- toYaml .Values.startupProbe | nindent 12 }}
           livenessProbe:
@@ -294,9 +349,9 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with (include "hub.affinity" . | trim) }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- . | nindent 8 }}
       {{- end }}
       {{- with .Values.tolerations }}
       tolerations:

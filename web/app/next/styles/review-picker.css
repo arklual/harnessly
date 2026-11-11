@@ -1,0 +1,167 @@
+/* «Ревью» of the pane: a project, then its merge requests, branches or a branch's commits, as one column of rows. */
+.hx-rp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 14px 16px 24px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.hx-rp__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+.hx-rp__crumb {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hx-rp__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-3);
+}
+.hx-rp__search:focus-within {
+  box-shadow: 0 0 0 2px var(--hx-accent-soft);
+}
+.hx-rp__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  outline: none;
+}
+.hx-rp__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-rp__list > li {
+  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+.hx-rp__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-rp__row:hover,
+.hx-rp__row:focus-visible {
+  background: var(--hx-bg-hover);
+  outline: none;
+}
+.hx-rp__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-rp__title {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-rp__sub {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-rp__sub code {
+  font-family: var(--hx-font-mono);
+}
+.hx-rp__meta {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-rp__draft {
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+}
+.hx-rp__skel {
+  height: 48px;
+  border-radius: var(--hx-radius-sm);
+}
+.hx-rp__empty,
+.hx-rp__note {
+  margin: 12px 4px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-rp__note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.hx-rp__note p {
+  margin: 0;
+}
+.hx-rp__paste {
+  display: flex;
+  padding: 4px 0;
+  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+
+/* A change in a pane: the review app's viewer fills the tab and scrolls inside. */
+.hx-rp-change {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The tools' note about what waits for a chat. */
+/* What stays in a chat: one quiet line over the tools. */
+.hx-rp-chatonly {
+  margin: 10px 4px 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+}
+
+@media (max-width: 640px) {
+  .hx-rp {
+    padding: 10px 16px 20px;
+  }
+  .hx-rp__meta {
+    display: none;
+  }
+}

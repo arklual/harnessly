@@ -1,8 +1,8 @@
 // Package memsync keeps a person's Claude Code memory the same on all of the person's machines (docs/hub/memory-sync.md).
 //
 // Only the memory notes sync: <projects>/<entry>/memory/*.md, nothing else of the project. A project is known on every
-// machine by the same id, its git remote (the folder differs from machine to machine); a folder without a remote does
-// not sync. The hub keeps the notes of the machine's person; which person that is, the hub decides, not this package.
+// machine by the same id, its git remote (the folder differs from machine to machine). A folder without a remote syncs
+// only when its person asks for it: by a key file in the folder (KeyFile) or, with LocalFolders on, by the folder's path. The hub keeps the notes of the machine's person; which person that is, the hub decides, not this package.
 //
 // A sync is pull, then push, by the version of each note the machine saw last (kept in .harnessly-sync.json beside the
 // notes). A note changed on both sides is a conflict: the local note stays as it is and the other version lands beside
@@ -168,6 +168,53 @@ func NormalizeRemote(remote string) string {
 		return ""
 	}
 	return "git:" + strings.ToLower(host+"/"+path)
+}
+
+// KeyFile is the file in a folder whose first line names the folder's project, whatever its remote or path:
+// `dir:<key>` is the id. The same key in folders of different machines is one project.
+const KeyFile = ".harnessly-memory-project"
+
+var keyRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+
+// FolderKey is the project id a folder names for itself in its KeyFile ("dir:<key>"), "" without a valid one.
+func FolderKey(cwd string) string {
+	raw, err := os.ReadFile(filepath.Join(cwd, KeyFile))
+	if err != nil {
+		return ""
+	}
+	line, _, _ := strings.Cut(string(raw), "\n")
+	if k := strings.TrimSpace(line); keyRe.MatchString(k) {
+		return "dir:" + k
+	}
+	return ""
+}
+
+// PathID is the id of a folder without a remote, by its absolute path ("dir:<path>"); "" for a path that is no id (a
+// space in it) or for a relative one. Machines that keep the folder at the same path share the project.
+func PathID(cwd string) string {
+	if !filepath.IsAbs(cwd) {
+		return ""
+	}
+	id := "dir:" + filepath.ToSlash(filepath.Clean(cwd))
+	if !hubproto.MemoryProjectOK(id) {
+		return ""
+	}
+	return id
+}
+
+// FolderID is the id of the project in cwd: its KeyFile, else its git remote; with localFolders a folder that has
+// neither is known by its path. "" when the folder has no id and does not sync.
+func FolderID(ctx context.Context, cwd string, localFolders bool) string {
+	if id := FolderKey(cwd); id != "" {
+		return id
+	}
+	if id := ProjectID(ctx, cwd); id != "" {
+		return id
+	}
+	if localFolders {
+		return PathID(cwd)
+	}
+	return ""
 }
 
 // ProjectID is the id of the project in cwd: its git remote (origin, else the first one); "" without a remote.

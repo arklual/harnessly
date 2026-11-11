@@ -1,0 +1,29 @@
+/* Acme tokens */
+@import url("fonts.css");
+:root, [data-theme="light"] {
+  /* Page background behind cards. */
+  --acme-surface-0: #f6f7f9;
+  --acme-surface-1: #ffffff; /* Cards and inputs. */
+  --acme-text: #16181d;
+  --acme-accent: #3b5bdb;
+  --acme-link: var(--acme-accent);
+  --acme-on-accent: white;
+  --acme-space-2: 8px;
+  --acme-space-4: 16px;
+  --acme-radius-m: 8px;
+  --acme-shadow-1: 0 1px 2px rgba(0, 0, 0, .08);
+  --acme-font-sans: "Acme Sans", system-ui, sans-serif;
+  --acme-z-modal: 40;
+  --acme-ring: color-mix(in oklch, var(--acme-accent) 40%, transparent);
+  --acme-ease: cubic-bezier(.2, .8, .2, 1);
+}
+[data-theme="dark"] {
+  --acme-surface-0: #0f1115;
+  --acme-surface-1: #181b21;
+  --acme-text: #eceef2;
+  --acme-accent: #7c94f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --acme-text: #eceef2; }
+}
+.card:hover { --card-shadow: 0 4px 8px red; }

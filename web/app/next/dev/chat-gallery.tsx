@@ -2047,7 +2047,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
       <MessagePictures.Provider value={scene.pictures ?? null}>
         <WorkflowRuns value={flowRuns}>
           <RewindActions value={rewindActions}>
-            <SelBar conv={CONV} />
+            <SelBar conv={CONV} aside />
             <DelegatedChats.Provider value={scene.delegated ?? NO_DELEGATED}>
               <Feed
                 items={scene.items}

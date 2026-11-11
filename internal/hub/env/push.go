@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Caller sends an operation to a machine over its link (link.Registry).
@@ -38,8 +39,12 @@ func MachineItems(w *world, spaceID, teamID, owner string, setup bool, ex Extra)
 		if e.GroupOff {
 			continue
 		}
+		src := json.RawMessage(e.Source)
+		if e.Kind == hubproto.EnvKindApp {
+			src = withInstall(src, w.install)
+		}
 		it := hubproto.EnvItem{ItemID: e.ID, Kind: e.Kind, Name: e.Name, Layer: e.Layer, Pinned: e.Pinned,
-			Source: hubproto.CanonicalJSON(json.RawMessage(e.Source))}
+			Source: hubproto.CanonicalJSON(src)}
 		if setup {
 			it.Order = order[e.ID]
 		} else if e.Kind == hubproto.EnvKindScript || e.Kind == hubproto.EnvKindAccess {
@@ -51,9 +56,48 @@ func MachineItems(w *world, spaceID, teamID, owner string, setup bool, ex Extra)
 		if !ex.Apps && e.Kind == hubproto.EnvKindApp {
 			continue
 		}
+		if !ex.Packs && e.Kind == hubproto.EnvKindPack {
+			continue
+		}
 		out = append(out, it)
 	}
 	hubproto.SortEnvItems(out)
+	return out
+}
+
+// InstallValues are the installation's values an app's package may name as ${install:<name>}: the addresses of the
+// optional services of the installation. A service without an address is absent, and its app stays «не настроено» on
+// the machines.
+func InstallValues(boardsURL, artifactsURL string) map[string]string {
+	out := map[string]string{}
+	if boardsURL != "" {
+		out["boardsUrl"] = boardsURL
+	}
+	if artifactsURL != "" {
+		out["artifactsUrl"] = artifactsURL
+	}
+	return out
+}
+
+// withInstall adds the installation's values to an app item's source as "install". Without values the source is as
+// the catalog has it, so an installation with no optional service sends the same list as before.
+func withInstall(src json.RawMessage, values map[string]string) json.RawMessage {
+	if len(values) == 0 {
+		return src
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(src, &obj); err != nil || obj == nil {
+		return src
+	}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		return src
+	}
+	obj["install"] = raw
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return src
+	}
 	return out
 }
 
@@ -90,6 +134,8 @@ type PushDeps struct {
 	Every time.Duration
 	// Recommended: the platform's group is in every organization (Deps.Recommended).
 	Recommended bool
+	// Install: the installation's values for the apps (Deps.Install).
+	Install map[string]string
 }
 
 // Pusher keeps the environment lists of the machines current: it computes each machine's list, sends env.set when the
@@ -116,6 +162,7 @@ type Pusher struct {
 	// setup is whether a machine, at its last hello, had the feature environment.setup; a machine absent has not said yet.
 	setup       map[string]bool
 	recommended bool
+	install     map[string]string
 	// extra: the kinds beyond the setup the machine does (environment.claude, environment.apps).
 	extra map[string]Extra
 	// newRuns are the times a machine started runs of its own, for the hourly bound.
@@ -125,7 +172,7 @@ type Pusher struct {
 
 // NewPusher starts the pusher.
 func NewPusher(d PushDeps) *Pusher {
-	p := &Pusher{recommended: d.Recommended, db: d.DB, reg: d.Reg, feat: d.Features, log: d.Log, now: d.Now, every: d.Every, pub: d.Publisher, kick: make(chan struct{}, 1), held: map[string]string{}, setup: map[string]bool{}, extra: map[string]Extra{}, newRuns: map[string][]time.Time{}}
+	p := &Pusher{recommended: d.Recommended, install: d.Install, db: d.DB, reg: d.Reg, feat: d.Features, log: d.Log, now: d.Now, every: d.Every, pub: d.Publisher, kick: make(chan struct{}, 1), held: map[string]string{}, setup: map[string]bool{}, extra: map[string]Extra{}, newRuns: map[string][]time.Time{}}
 	if p.log == nil {
 		p.log = slog.Default()
 	}
@@ -137,7 +184,7 @@ func NewPusher(d PushDeps) *Pusher {
 	}
 	p.ctx, p.cancel = context.WithCancel(context.Background())
 	p.wg.Add(1)
-	go p.loop()
+	safego.Go("env loop", func() { p.loop() })
 	return p
 }
 
@@ -156,6 +203,7 @@ func (p *Pusher) Connected(machineID string, hello hubproto.Hello) {
 	p.extra[machineID] = Extra{
 		Claude: p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvClaude),
 		Apps:   p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvApps),
+		Packs:  p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvPacks),
 		// The rule for apps does not need the setup: the runtime reads it from the list's file.
 		AppsConsent: slices.Contains(hello.Features, hubproto.FeatureEnvAppsConsent),
 	}
@@ -175,10 +223,10 @@ func (p *Pusher) Connected(machineID string, hello hubproto.Hello) {
 		p.Kick()
 	}
 	if after {
-		go func() {
+		safego.Go("env Connected", func() {
 			defer p.wg.Done()
 			p.afterHello(p.ctx, machineID)
-		}()
+		})
 	}
 }
 
@@ -282,6 +330,7 @@ func (p *Pusher) world(ctx context.Context, st store.Store, spaceOrg string, wor
 		if w, err = loadWorld(ctx, st, o, p.recommended); err != nil {
 			return nil, err
 		}
+		w.install = p.install
 	}
 	worlds[spaceOrg] = w
 	return w, nil
@@ -346,12 +395,14 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 type Extra struct {
 	Claude bool
 	Apps   bool
+	// Packs: the machine installs environment packs (hubproto.FeatureEnvPacks).
+	Packs bool
 	// AppsConsent: the machine keeps the organization's rule for apps (hubproto.FeatureEnvAppsConsent).
 	AppsConsent bool
 }
 
 // All is every kind: a list as the newest agent would hold it.
-var All = Extra{Claude: true, Apps: true, AppsConsent: true}
+var All = Extra{Claude: true, Apps: true, Packs: true, AppsConsent: true}
 
 // AppsConsentFor is the rule for apps a machine is sent: hubproto.AppsConsentAuto when the organization gives apps their
 // rights without asking and the machine keeps the rule, else "" (ask: the field is not sent, and the hash is the

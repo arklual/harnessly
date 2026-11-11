@@ -106,3 +106,28 @@ func TestEnvironmentRefusesATrustedApp(t *testing.T) {
 		t.Fatalf("trusted: %v", err)
 	}
 }
+
+func TestEnvironmentAppTheOrganizationTurnedOffIsNotListedAndStaysInstalled(t *testing.T) {
+	r := newRegistry(t)
+	dir := versioned(t, "acme.kit", "1.0.0")
+	if _, _, err := r.InstallForEnv(dir, EnvInstallOptions{Link: "own", ItemID: "item-kit", HostVersion: TemplateVersion, Now: teamNow}); err != nil {
+		t.Fatal(err)
+	}
+	off := false
+	r.SetOrgOff(func(link, itemID string) bool { return off && link == "own" && itemID == "item-kit" })
+	if _, err := r.Get("acme.kit"); err != nil {
+		t.Fatalf("on: %v", err)
+	}
+	off = true
+	all, err := r.ListAll()
+	if err != nil || len(all) != 0 {
+		t.Fatalf("off is not listed at all: %v %+v", err, all)
+	}
+	if !r.EnvHasItem("own", "item-kit") {
+		t.Fatal("off keeps the install")
+	}
+	off = false
+	if _, err := r.Get("acme.kit"); err != nil {
+		t.Fatalf("on again: %v", err)
+	}
+}

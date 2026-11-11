@@ -30,10 +30,12 @@ import (
 	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/limits"
+	"github.com/ly-solutions/harnessly/internal/memlimit"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/selfupdate"
 	"github.com/ly-solutions/harnessly/internal/storelink"
+	"github.com/ly-solutions/harnessly/internal/telemetry"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/updatecheck"
@@ -135,6 +137,8 @@ type runtimeGate struct {
 	envSetup []*envsetup.Runner
 	// library is the folder of the Sinopia library, store the store it syncs with (nil: none, docs/hub/store.md).
 	library func() string
+	// kits is the folder of the UI kits (published versions), synced with the store's kits collection.
+	kits func() string
 	// revisions makes the store's revisions the Sinopia library's history.
 	revisions func(design.Revisions)
 	store     *storelink.Link
@@ -212,7 +216,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			MCPPath: env("RUNTIME_MCP_PATH", "/api/cli/preview/mcp"), ScriptDataDirs: scriptDirs,
 			TokenHeaders: cli.Headers, SkillsPluginDir: skillsPluginDir(cfg.DataDir), PassServiceEnv: integ.Enabled(),
 			SafePrompt:            true,
-			CodexContainerSandbox: env("RUNTIME_CODEX_SANDBOX", "codex") == "container"}),
+			CodexContainerSandbox: env("RUNTIME_CODEX_SANDBOX", "codex") == "container",
+			CodexAppServer:        os.Getenv("RUNTIME_CODEX_APPSERVER")}),
 		Launch:     launchConfigFromEnv(home, cfg.DataDir),
 		Timeline:   timelineConfigFromEnv(cfg.DataDir),
 		Standalone: cfg.Standalone()})
@@ -385,6 +390,14 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			}
 			return 0
 		},
+		ChatWork: func() chatWork {
+			if c := ref.running(); c != nil {
+				if v := c.v2.Load(); v != nil && v.work != nil {
+					return v
+				}
+			}
+			return nil
+		},
 		MachineKit: &machineKitRef{},
 		FirstWorkspace: func() error {
 			c := ref.running()
@@ -472,7 +485,12 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		go ref.c.start()
 	}
 	f.Add(hubRoutes(d)...)
-	f.Add(f.AsRoutes(machineSliceRoutes(d, cfg.Listen, cfg.Upstream, pusher, hooks)...)...)
+	f.Add(f.AsRoutes(machineSliceRoutes(d, cfg.Listen, cfg.Upstream, pusher, hooks, func() string {
+		if !f.SliceOn("core") {
+			return ""
+		}
+		return ref.c.chatsState()
+	})...)...)
 	f.Add(voiceRoutes(d)...)
 	liveBrowser := newLiveBrowser(d)
 	defer liveBrowser.Close()
@@ -496,7 +514,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(peerRoutes(d, ref.c)...)
 	f.Add(memoryRoutes(d)...)
 	checker, checkOn := newUpdateChecker(cfg.Standalone())
-	self := newSelfUpdater()
+	self := newSelfUpdater(cfg.DataDir)
 	f.Add(updateRoutes(d, checker, checkOn, self)...)
 	f.Add(machineCheckRoutes(d, self)...)
 	f.Add(moveRoutes(d)...)
@@ -508,12 +526,15 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(secretRoutes(d, ref.c)...)
 	setupRunners := envSetupRunners(d, os.Getenv("AGENT_HUB_OBSERVE_FILE"), cfg.Version)
 	// The organization's rule for apps comes with the hub's list (apps_consent_policy.go).
-	apps.Open(d.DataDir).SetConsentPolicy(newAppsConsentPolicy(hubLinkDirs(d.DataDir, os.Getenv("AGENT_HUB_OBSERVE_FILE"))).On)
+	appsPolicy := newAppsConsentPolicy(hubLinkDirs(d.DataDir, os.Getenv("AGENT_HUB_OBSERVE_FILE")))
+	apps.Open(d.DataDir).SetConsentPolicy(appsPolicy.On)
+	apps.Open(d.DataDir).SetOrgOff(appsPolicy.AppOff)
 	f.Add(envSetupRoutes(d, setupRunners)...)
 	f.Add(basepkgRoutes(d)...)
 	f.Add(connectionRoutes(d)...)
 	f.Add(mcpRoutes(d)...)
 	f.Add(journalRoutes(d)...)
+	f.Add(uiEventRoutes(d, func() *telemetry.Queue { return ref.c.cfg.Telemetry })...)
 	f.Add(appRoutes(d, ref.c)...)
 	f.Add(v2Routes(d, ref.c)...)
 	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
@@ -529,6 +550,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	}
 	rg := &runtimeGate{Gate: f, terms: terms, browser: remoteBrowser, agentBrowser: agentBrowser, core: ref, tmux: tm, home: home, self: self,
 		envSetup: setupRunners, library: func() string { return designAPI(d).L.Root() },
+		kits:      func() string { return designAPI(d).L.KitsDir() },
 		revisions: func(r design.Revisions) { designAPI(d).L.UseRevisions(r) }}
 	if checkOn {
 		rg.update = checker
@@ -566,6 +588,11 @@ func runtimePort(cfg gate.Config) int {
 	return portOf(cfg.Upstream)
 }
 
+// runtimeMemory is the runtime's soft memory limit: what it keeps is a fraction of what reading transcripts and
+// screens throws away, and a machine full of agents has no memory to lend to garbage. A forty-eighth of the machine
+// (half a gigabyte of 24), never under 384 MiB nor over 2 GiB, and under a unit's cap when the unit has one.
+var runtimeMemory = memlimit.Policy{CapShare: 0.7, MachineDiv: 48, Min: 384 << 20, Max: 2 << 30}
+
 func main() {
 	if ran, err := subcommand(os.Args[1:]); ran {
 		if err != nil {
@@ -573,6 +600,7 @@ func main() {
 		}
 		return
 	}
+	memlimit.Apply(runtimeMemory)
 	cfg, err := gate.LoadConfig()
 	if err != nil {
 		fail(err)
@@ -620,6 +648,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		standaloneSlots.close()
 		return err
 	}
+	defer watchTmux(ctx, f.tmux).Stop()
 	defer f.browser.Close()
 	defer f.agentBrowser.Close()
 	defer f.core.c.v2d.BrowserTools.Close()
@@ -671,6 +700,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	case <-ctx.Done():
 		agent.Log("info", "shutting down")
 		f.LogCounts()
+		selfKeeper.stop()
 		terms.Shutdown()
 		shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()

@@ -8,7 +8,7 @@ center).
 ## How a chat gets here
 
 1. The machine's agent says `history` in its `hello` (a machine of the hub with a runtime next to it; an observe link of
-   a cluster's machine does not — the cluster keeps that copy).
+   a cluster's machine only when the operator opted in, see below).
 2. The hub subscribes it to `history.events` and `history.backfill` and tells it where its copy stands
    (`history.start`): the last seq stored of each channel, the revision of every chat it has, and the chats it does not
    hold whole yet (`pending`), each with the turn its walk goes on before.
@@ -23,6 +23,43 @@ center).
 Nothing is sent before the hub's `history.start`. The owner of what a machine sends is the person who added the machine,
 never anything a frame says. `HUB_HISTORY=off` switches it off: the hub subscribes to nothing and the workspace asks the
 home machine, as before.
+
+## A chat deleted on its machine
+
+The machine owns its chats and the hub's rows are a copy ([data-owners.md](data-owners.md)). When a chat is deleted on
+the machine, the runtime's `conversation_removed` marks the copy (`history_conversations.deleted_at`): the chat leaves
+the list, the feed and the search at once, and its rows stay for `HUB_HISTORY_DELETED_DAYS` (30 by default; `0` keeps
+them for good). After that a background sweep removes the chat's entries and turns, then its row and the cursor of its
+channel. A chat that is not marked is never touched, and a chat the machine sends again loses the mark.
+
+The sweep is gentle on purpose, the first pass over an old database included: a statement removes at most 500 rows,
+statements are 200 ms apart, and a pass stops at 20 000 rows or 50 chats; passes are ten minutes apart, the first one
+two minutes after the start. With several replicas one of them holds the job (`job_leases`, the lease outlives the
+time between passes) and the others skip their passes until it stops coming. `harnessly_hub_history_chats_purged_total`,
+`harnessly_hub_history_rows_purged_total` and `harnessly_hub_history_purge_errors_total` show it.
+
+The mark comes only from the live event. A delete the hub never got as an event (the runtime restarted before the hub
+had read its `convs` channel that far) leaves the copy unmarked and listed until the chat list is reconciled; that
+reconciliation is not built yet.
+
+## A machine the hub only observes
+
+A machine run by a closed cluster is linked to the hub as an observer and keeps handing its chats to the cluster. The
+operator hands them to the hub as well with `AGENT_HUB_HISTORY=on` in the agent's environment. Without the
+variable nothing changes: the observe link offers no `history` and answers `history.start` as unsupported. The kill
+switch turns it off like the rest of the link.
+
+The hub's copy is a second consumer of the runtime's replica, and the two never share a thing (a replica has state: a
+cursor, an ack and a baseline per channel, and a new `start` throws that state away). The agent runs a replica of its own
+for the hub, on its own socket to the runtime (`/api/v2/replica` serves every connection apart, each with its own
+`hello` and chat list), and its frames go to the hub link only. The cluster's `v2.start`, `v2.ack` and its stream are
+never touched by the hub's `history.start`, `history.ack`, a hole in the hub's channel or a hub link that went away,
+and the other way round. The cost is a second reader on the runtime: its events are published once more, and the hub's
+backfill reads the pages of the chats again at the backfill's pace.
+
+The hub takes it as from any machine with the feature: the owner is the person who added the machine, and the chats are
+read as those of a machine of theirs (`GET history/conversations`), though the machine itself «only observes» and
+does not open.
 
 ## Secrets
 
@@ -80,3 +117,31 @@ collection for a person: what it would read there is not checked against who ask
 other is sent on to the machine.
 
 The page is told whether to do this by `centralUploads` in its settings (true when the hub has a store).
+
+## Work of a chat
+
+The «Changes» tab shows the git work of a chat and of the chats it delegated (delegate_task), on any machine, open or
+closed. The work is registered, not guessed from the chat's text:
+
+- **On the machine.** The runtime's observer (`internal/chatwork`) follows the chats' feeds: a file a write tool wrote
+  registers its worktree; a folder a shell command named becomes work when the command changed git (a commit, a new
+  worktree or branch, a push) and the chat committed there; at the end of each turn every worktree of the chat is
+  looked at again (head, branch, uncommitted changes, the commits made since the chat began, the origin, a merge
+  request a push or `glab mr create` printed). The records live in `<data>/chatwork.json`.
+- **Old chats.** The first time the tab asks (`POST <platform>/work {conversationId}`), the transcripts of the chat and
+  of its delegated chats on that machine are looked through once for the same signs; what they show is registered as
+  `scan` work.
+- **To the hub.** The replica socket hands the records to the agent (`{"k":"work"}`: all of them when it opens, then
+  each change); the agent forwards them as `chatwork` events and sends everything it keeps again when a link subscribes.
+  The hub keeps the newest record of each chat's worktree in `chat_work`, under the machine's owner.
+- **Reading.** `GET <platform api>/history/conversations/<id>/work` is the person's work of the chat and of the chats
+  delegated from it at any depth (by `history_conversations.parent_id`, filled from the records, and by the work's own
+  parent), on the person's machines. The page merges it with the machine's own answer. A worktree's diff is read on its
+  machine (`POST <platform>/changes {paths, sinceMs}`); when the machine is off or the worktree is gone and the branch
+  is pushed, `POST <platform>/work/remote {remote, branch}` reads the branch against its base from the code host through
+  the connection on the remote's host.
+
+The draft remarks of the «Ревью кода» app are kept here too (`review_notes`):
+`GET …/history/conversations/<id>/review-notes` lists the person's remarks on the chat's work, `PUT …/review-notes/<note>`
+keeps one (new or changed, at most 500 a chat) and `DELETE` forgets it. They are read and written under the person's id
+only, so nobody else sees them; sending them to the agent is the page's job, one message into the chat's queue.

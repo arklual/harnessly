@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/acme-ui/tokens.css">
+<script src="ds/acme-ui/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<x-import component-from-global-scope="Acme.Root" theme="light">
+  <x-import component-from-global-scope="Acme.Card">
+    <x-import component-from-global-scope="Acme.Button" variant="primary">Save</x-import>
+  </x-import>
+</x-import>
+</x-dc>
+</body>
+</html>

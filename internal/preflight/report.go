@@ -86,6 +86,9 @@ func (c *Checker) Report(ctx context.Context, o ReportOptions) hubproto.Prefligh
 		Codex:  hubproto.ToolState{Installed: r.Codex.Installed, Version: r.Codex.Version},
 	}
 	rep.Checks = checks(rep, node)
+	if r.Claude.Unchecked {
+		rep.Checks = append(rep.Checks, uncheckedCLICheck("Claude Code", versionText(r.Claude.Version)))
+	}
 	if skew, ok := clockSkew(ctx, o); ok {
 		rep.Checks = append(rep.Checks, clockCheck(skew))
 	}
@@ -118,6 +121,13 @@ func checks(rep hubproto.PreflightReport, node Tool) []hubproto.Check {
 		nodeCheck.Level, nodeCheck.Message = hubproto.LevelWarn, "Node.js "+versionText(rep.Tools.Node.Version)+" слишком старый. Codex не поставить без Node.js 20+"
 	}
 	return append(out, tmux, git, nodeCheck)
+}
+
+// uncheckedCLICheck warns of an agent's CLI whose version the runtime's screen reading was not checked against. It
+// is a warning, never a failure: the CLI's vendor ships versions on its own schedule.
+func uncheckedCLICheck(name, version string) hubproto.Check {
+	return hubproto.Check{ID: "cli_version", Level: hubproto.LevelWarn,
+		Message: name + " " + version + " не проверен с этой версией harnessly: экран агента читается в осторожном режиме"}
 }
 
 func diskCheck(d hubproto.Disk) hubproto.Check {

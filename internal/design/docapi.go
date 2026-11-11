@@ -1,6 +1,8 @@
 package design
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -107,6 +109,26 @@ func (l *Library) DocPages(project string) ([]Page, error) {
 }
 
 // DocRev is the time of the project's newest board, in ms: it changes when any board is written.
+// DocContentHash is a sha256 of a document's pages, by their ids and contents, in the order of the model: what the
+// document is, whatever the files' times say (a status of an app's document is pinned to it, apps/workflow.go). ""
+// when the project has no model.
+func (l *Library) DocContentHash(project string) string {
+	m := l.ReadModel(project)
+	if m == nil {
+		return ""
+	}
+	h := sha256.New()
+	for _, p := range m.Pages {
+		raw, err := os.ReadFile(filepath.Join(l.ProjectDir(project), pageFileOf(p.File)))
+		if err != nil {
+			raw = nil
+		}
+		fmt.Fprintf(h, "%d:%s%d:", len(p.ID), p.ID, len(raw))
+		h.Write(raw)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 func (l *Library) DocRev(project string) int64 {
 	var rev int64
 	m := l.ReadModel(project)
@@ -719,6 +741,9 @@ func (l *Library) DocPatch(project string, ops []DocOp, who DocActor, now time.T
 		}
 		if err := l.checkBoardLock(r.w.page, r.next); err != nil {
 			return DocPatched{}, err
+		}
+		if reason := l.BuiltBoardReason(project, r.w.page.File); reason != "" {
+			return DocPatched{}, docErr(DocErrLocked, reason, reason)
 		}
 	}
 	if len(results) > 0 {

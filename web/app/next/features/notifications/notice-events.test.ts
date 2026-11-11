@@ -32,9 +32,20 @@ describe('what in a chat makes a notice', () => {
     expect(noticeEventOf(conv({ lastTurn: turn({}), seenAt: 300 }), true)).toBe(null);
   });
 
-  it('is a question that waits, keyed by when it began to wait', () => {
+  it('is a question that waits, keyed by its gate, not by when the state was stamped', () => {
     const event = noticeEventOf(conv({ state: { k: 'waiting-question', since: 50, questionId: 'q' } }), true);
     expect(event).toMatchObject({ kind: 'waiting', key: `${base.id}:question:50` });
+    const gated = (since: number) =>
+      noticeEventOf(
+        conv({
+          state: { k: 'waiting-question', since, questionId: 'q' },
+          gate: { kind: 'question', id: 'g-1' },
+        } as never),
+        true,
+      );
+    // The same wait stamped anew by a sync is the same notice.
+    expect(gated(50)?.key).toBe(`${base.id}:question:g-1`);
+    expect(gated(90)?.key).toBe(gated(50)?.key);
   });
 
   it('is a finished unread turn with the start of its answer', () => {

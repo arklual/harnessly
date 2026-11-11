@@ -103,6 +103,7 @@
   },
   "stats.statsView.noComparison": "Сравнение с прошлым периодом появится, когда истории станет больше выбранного периода: сейчас она начинается позже, чем прошлый период.",
   "stats.statsView.noData": "Нет данных",
+  "stats.statsView.noHubData": "Нет данных в хабе",
   "stats.statsView.noTasks": "За период в сессиях не встретилось номеров задач",
   "stats.statsView.output": "выход {value}",
   "stats.statsView.outputLabel": "Выход",

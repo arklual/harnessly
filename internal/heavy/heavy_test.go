@@ -91,6 +91,7 @@ type fixture struct {
 	env                    map[string]string
 	stdout, stderr         bytes.Buffer
 	execd                  []string
+	wd                     string
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -108,7 +109,7 @@ func newFixture(t *testing.T) *fixture {
 		}
 	}
 	write(filepath.Join(f.launchers, "go"), "#!/bin/sh\n# Installed by harnessly ("+Marker+")\nexit 99\n")
-	write(filepath.Join(f.real, "go"), "#!/bin/sh\necho \"args=$* slot=$HARNESSLY_HEAVY_SLOT procs=$GOMAXPROCS flags=$GOFLAGS path=$PATH\"\nexit ${FAKE_EXIT:-0}\n")
+	write(filepath.Join(f.real, "go"), "#!/bin/sh\necho \"dir=$PWD args=$* slot=$HARNESSLY_HEAVY_SLOT procs=$GOMAXPROCS flags=$GOFLAGS path=$PATH\"\nexit ${FAKE_EXIT:-0}\n")
 	f.env = map[string]string{
 		"PATH":                 f.launchers + ":" + f.real,
 		"HARNESSLY_HEAVY_DIR":  f.slots,
@@ -133,6 +134,12 @@ func (f *fixture) run(args ...string) int {
 		Exec: func(path string, argv, env []string) error {
 			f.execd = append([]string{path}, argv...)
 			return nil
+		},
+		Getwd: func() (string, error) {
+			if f.wd == "" {
+				return os.Getwd()
+			}
+			return f.wd, nil
 		},
 	})
 }

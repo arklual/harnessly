@@ -1326,6 +1326,12 @@ button.hx-nav__add {
     display: block;
   }
 }
+/* The drawer over an app or a design on a narrow window: narrower, the app stays in sight beside it. */
+@media (max-width: 900px) {
+  .hx-app[data-full] .hx-sidebar {
+    width: min(76vw, 280px);
+  }
+}
 @media (max-width: 900px) and (prefers-reduced-motion: reduce) {
   .hx-sidebar {
     transition-duration: 1ms;

@@ -42,6 +42,9 @@ type EnvInstall struct {
 	Locked   bool      `json:"locked,omitempty"`
 	At       int64     `json:"at"`
 	Manifest *Manifest `json:"manifest"`
+	// Missing are the installation's addresses the package asks for and the hub gave none of: the app is installed but
+	// not configured, and the person does not see it (Installed.Unconfigured).
+	Missing []string `json:"missing,omitempty"`
 }
 
 type envFile struct {
@@ -88,6 +91,15 @@ func (r *Registry) envHas(id string) bool {
 	return err == nil && slices.ContainsFunc(e.Installs, func(i EnvInstall) bool { return i.ID == id })
 }
 
+// SetOrgOff sets what says whether the organization turned off the app of a link's environment item; nil (the default,
+// a machine without a hub) turns nothing off. It is called with the registry's lock held, so it must not use the
+// registry.
+func (r *Registry) SetOrgOff(off func(link, itemID string) bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.orgOff = off
+}
+
 // EnvHasItem: the app of the link's environment item is installed.
 func (r *Registry) EnvHasItem(link, itemID string) bool {
 	r.mu.Lock()
@@ -106,6 +118,10 @@ func (r *Registry) mergeEnv(list []Installed) ([]Installed, error) {
 	out := list
 	for _, ei := range e.Installs {
 		if slices.ContainsFunc(list, func(a Installed) bool { return a.ID == ei.ID }) {
+			continue
+		}
+		if r.orgOff != nil && r.orgOff(ei.Link, ei.ItemID) {
+			// The organization turned the app off: it stays installed with its data, and is not there for anybody.
 			continue
 		}
 		out = append(out, Installed{
@@ -127,6 +143,8 @@ type EnvInstallOptions struct {
 	Locked      bool
 	HostVersion string
 	Now         time.Time
+	// Install are the installation's values the hub gave with the item (${install:<name>} of the package).
+	Install map[string]string
 }
 
 // InstallForEnv installs the app in dir as the environment's. It reports changed false when the same version from the
@@ -150,6 +168,9 @@ func (r *Registry) InstallForEnv(dir string, opt EnvInstallOptions) (EnvInstall,
 	sum, err := dirSum(pkg.Dir)
 	if err != nil {
 		return EnvInstall{}, false, err
+	}
+	if extra := installSum(packageInstallNames(pkg.Dir), opt.Install); extra != "" {
+		sum += "+" + extra
 	}
 
 	r.mu.Lock()
@@ -196,14 +217,28 @@ func (r *Registry) InstallForEnv(dir string, opt EnvInstallOptions) (EnvInstall,
 		return EnvInstall{}, false, fmt.Errorf("%w: %s is added by %s", ErrKindTaken, kind, other)
 	}
 
+	from, missing := pkg.Dir, []string(nil)
+	if len(packageInstallNames(pkg.Dir)) > 0 {
+		// The installation's values go into a copy of their own first: a package they make invalid leaves the version
+		// in place as it was.
+		stage := filepath.Join(r.Root, "env-stage", m.ID)
+		defer os.RemoveAll(stage)
+		if err := copyPackage(pkg.Dir, stage); err != nil {
+			return EnvInstall{}, false, err
+		}
+		if missing, err = fillInstall(stage, &m, opt.Install); err != nil {
+			return EnvInstall{}, false, err
+		}
+		from = stage
+	}
 	target := filepath.Join(r.Root, "env", m.ID, m.Version)
-	if err := copyPackage(pkg.Dir, target); err != nil {
+	if err := copyPackage(from, target); err != nil {
 		return EnvInstall{}, false, err
 	}
 	if err := writePluginManifest(target, m); err != nil {
 		return EnvInstall{}, false, err
 	}
-	ei := EnvInstall{Link: opt.Link, ItemID: opt.ItemID, ID: m.ID, Version: m.Version, Sum: sum, Dir: target, Locked: opt.Locked, At: opt.Now.UnixMilli(), Manifest: m}
+	ei := EnvInstall{Link: opt.Link, ItemID: opt.ItemID, ID: m.ID, Version: m.Version, Sum: sum, Dir: target, Locked: opt.Locked, At: opt.Now.UnixMilli(), Manifest: m, Missing: missing}
 	var old *EnvInstall
 	if at >= 0 {
 		prev := e.Installs[at]
@@ -219,6 +254,21 @@ func (r *Registry) InstallForEnv(dir string, opt EnvInstallOptions) (EnvInstall,
 		_ = os.RemoveAll(old.Dir)
 	}
 	return ei, true, nil
+}
+
+// fillInstall puts the installation's values into the copy in target and reads its manifest again; missing are the
+// names left without a value. A package whose values make it invalid (an address that is not https) is refused.
+func fillInstall(target string, m **Manifest, values map[string]string) ([]string, error) {
+	missing, err := fillInstallFiles(target, values)
+	if err != nil {
+		return nil, err
+	}
+	filled, ps := LoadPackage(target)
+	if filled == nil || len(ps.Errors()) > 0 {
+		return nil, fmt.Errorf("%w: with the installation's addresses: %s", ErrInvalid, ps.Error())
+	}
+	*m = filled.Manifest
+	return missing, nil
 }
 
 // PruneEnv takes off the link's environment installs whose item is not among keep, and deletes their copies; the

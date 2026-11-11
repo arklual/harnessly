@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,7 +36,18 @@ const (
 	defaultDebounce = 30 * time.Second
 	defaultPoll     = 5 * time.Second
 	callTimeout     = 90 * time.Second
+	// retryMost is the longest wait between two tries of a version the catalog did not take.
+	retryMost = 10 * time.Minute
+	// stampSettled: a file changed less than this ago is read whatever its size and time say, since two saves may share
+	// a timestamp.
+	stampSettled = 2 * time.Second
 )
+
+// stamp is what a look at a file costs nothing to compare: while it stays, the content is the one last read.
+type stamp struct {
+	size int64
+	mod  time.Time
+}
 
 // Source is a file and the document made of it.
 type Source struct {
@@ -107,6 +119,14 @@ type Service struct {
 	loaded  bool
 	// busy: paths being published now, so the watcher and a click do not make two versions at once.
 	busy map[string]bool
+	// same: the size and time each file had when its content was last found published (or refused), so an unchanged
+	// file is not read again every poll.
+	same map[string]stamp
+	// fails and retryAt hold back a version the catalog did not take: each failure doubles the wait.
+	fails   map[string]int
+	retryAt map[string]time.Time
+	// wake ends Run's wait for a first linked file.
+	wake chan struct{}
 }
 
 // New prepares a service.
@@ -120,7 +140,8 @@ func New(cfg Config) *Service {
 	if cfg.Poll <= 0 {
 		cfg.Poll = defaultPoll
 	}
-	s := &Service{cfg: cfg, sources: map[string]*Source{}, busy: map[string]bool{}}
+	s := &Service{cfg: cfg, sources: map[string]*Source{}, busy: map[string]bool{}, same: map[string]stamp{},
+		fails: map[string]int{}, retryAt: map[string]time.Time{}, wake: make(chan struct{}, 1)}
 	if s.cfg.Call == nil {
 		s.cfg.Call = func(route string, body any) (int, []byte, error) {
 			return agent.CallLocal(cfg.HTTP, cfg.DataDir, cfg.AgentTokenHeader, route, body, callTimeout)
@@ -241,9 +262,16 @@ func (s *Service) Publish(req Request) (State, *Failure) {
 	src := &Source{Path: req.Path, Slug: newSlug, Title: title, Conversation: req.Conversation, Hash: hashOf(content), Version: version, Linked: true, PublishedAt: s.cfg.Now()}
 	s.mu.Lock()
 	s.sources[req.Path] = src
+	delete(s.same, req.Path)
+	delete(s.fails, req.Path)
+	delete(s.retryAt, req.Path)
 	st := stateOf(src, false)
 	s.save()
 	s.mu.Unlock()
+	select {
+	case s.wake <- struct{}{}:
+	default:
+	}
 	return st, nil
 }
 
@@ -355,22 +383,59 @@ func (s *Service) Unlink(path string) (State, bool) {
 	}
 	src.Linked = false
 	src.RefusedHash, src.RefusedLine = "", 0
+	delete(s.same, path)
+	delete(s.fails, path)
+	delete(s.retryAt, path)
 	s.save()
 	return stateOf(src, false), true
 }
 
-// Run watches the linked files until ctx ends.
+// Run watches the linked files until ctx ends. With no linked file there is nothing to look at: it waits for the
+// first one to be shared.
 func (s *Service) Run(ctx context.Context) {
-	tick := time.NewTicker(s.cfg.Poll)
+	tick := time.NewTimer(s.cfg.Poll)
 	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			s.Tick()
+		}
+		s.Tick()
+		if !s.anyLinked() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-s.wake:
+			}
+		}
+		tick.Reset(s.cfg.Poll)
+	}
+}
+
+func (s *Service) anyLinked() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.load()
+	for _, src := range s.sources {
+		if src.Linked {
+			return true
 		}
 	}
+	return false
+}
+
+// retryWait is how long a version waits after its n-th failure in a row: the debounce doubled each time, spread, and
+// never longer than retryMost.
+func (s *Service) retryWait(n int) time.Duration {
+	wait := s.cfg.Debounce
+	for i := 1; i < n && wait < retryMost; i++ {
+		wait *= 2
+	}
+	if wait > retryMost {
+		wait = retryMost
+	}
+	return wait + rand.N(wait/4+1)
 }
 
 // Tick looks at every linked file once: a changed one, with its last version older than the debounce, becomes a new
@@ -380,7 +445,7 @@ func (s *Service) Tick() {
 	s.load()
 	var due []Source
 	for _, src := range s.sources {
-		if src.Linked && !s.busy[src.Path] && s.cfg.Now().Sub(src.PublishedAt) >= s.cfg.Debounce {
+		if src.Linked && !s.busy[src.Path] && s.cfg.Now().Sub(src.PublishedAt) >= s.cfg.Debounce && !s.cfg.Now().Before(s.retryAt[src.Path]) {
 			due = append(due, *src)
 		}
 	}
@@ -392,12 +457,31 @@ func (s *Service) Tick() {
 }
 
 func (s *Service) republish(src Source) {
+	var at stamp
+	settled := false
+	if info, err := os.Stat(src.Path); err == nil {
+		at = stamp{size: info.Size(), mod: info.ModTime()}
+		settled = time.Since(at.mod) >= stampSettled
+	}
+	if settled {
+		s.mu.Lock()
+		seen, ok := s.same[src.Path]
+		s.mu.Unlock()
+		if ok && seen == at {
+			return
+		}
+	}
 	content, fail := readFile(src.Path)
 	if fail != nil {
 		return // the file is gone or unreadable for now: the document keeps its last version
 	}
 	h := hashOf(content)
 	if h == src.Hash || h == src.RefusedHash {
+		if settled {
+			s.mu.Lock()
+			s.same[src.Path] = at
+			s.mu.Unlock()
+		}
 		return
 	}
 	s.mu.Lock()
@@ -424,10 +508,15 @@ func (s *Service) republish(src Source) {
 		if fail.Status == 422 {
 			cur.RefusedHash, cur.RefusedLine = h, fail.Line
 			s.save()
+			return
 		}
-		// Any other failure is tried again at the next tick.
+		// Any other failure is tried again, each time after a longer wait.
+		s.fails[src.Path]++
+		s.retryAt[src.Path] = s.cfg.Now().Add(s.retryWait(s.fails[src.Path]))
 		return
 	}
+	delete(s.fails, src.Path)
+	delete(s.retryAt, src.Path)
 	cur.Hash, cur.Version, cur.PublishedAt = h, version, s.cfg.Now()
 	cur.RefusedHash, cur.RefusedLine = "", 0
 	s.save()

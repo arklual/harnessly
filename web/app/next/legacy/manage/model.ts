@@ -10,7 +10,7 @@ import {
   type ITotals,
   type TPeriod,
 } from '@/components/agents/stats/aggregate';
-import type { MeLimit, MeLimits, MeSession } from '@/next/features/manage/hub-types';
+import type { MeLimit, MeLimits, MeSession, MeUsage } from '@/next/features/manage/hub-types';
 
 export type LimitTone = 'ok' | 'warn' | 'stop';
 
@@ -74,4 +74,28 @@ export interface HistoryRow {
 export const historyRows = (sessions: IPersonSession[], hub: MeSession[] | null): HistoryRow[] => {
   const byKey = new Map((hub ?? []).map((s) => [s.key, s]));
   return sessions.map((session) => ({ session, hub: byKey.get(session.id) ?? null }));
+};
+
+/** The tiles and the recent list from the hub alone (RUNTIME_HUB_ANALYTICS): no local report behind them. */
+export interface HubSummary {
+  cost: number;
+  sessions: number;
+  mrs: number;
+  recent: MeSession[];
+}
+
+export const hubSummary = (
+  me: { usage: MeUsage; sessions: { sessions: MeSession[] } },
+  period: number,
+): HubSummary => {
+  const since = Date.now() - period * 86_400_000;
+  const inWindow = me.sessions.sessions
+    .filter((s) => s.endedAt === null || Date.parse(s.endedAt) >= since)
+    .sort((a, b) => Date.parse(b.endedAt ?? '9999') - Date.parse(a.endedAt ?? '9999'));
+  return {
+    cost: me.usage.days.slice(-period).reduce((sum, d) => sum + d.cost, 0),
+    sessions: inWindow.length,
+    mrs: inWindow.filter((s) => s.outcome === 'mr_open').length,
+    recent: inWindow,
+  };
 };

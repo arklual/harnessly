@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -732,5 +733,114 @@ func TestTabLaunchFast(t *testing.T) {
 	}
 	if _, ok := r.s.TabLaunchFast("tk-ws-a1-pane-b2-tab-gone"); ok {
 		t.Fatal("a missing tab")
+	}
+}
+
+// At start only the tabs whose agents were up get their missing sessions back: a stopped chat lives without one.
+func TestRestoreSessionsLeavesStoppedChatsWithoutASession(t *testing.T) {
+	r := newRig(t)
+	if err := r.s.InitLayouts(); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := r.s.CreateWorkspace(r.home, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := ws.String("id")
+	tab := func(name, panel, cliState string) string {
+		o := jsvalue.NewObject("id", "tab-"+name, "sessionName", "tk-"+id+"-pane-a-tab-"+name, "name", "", "order", 0, "cwd", r.home)
+		if panel != "" {
+			o.Set("panelType", panel)
+		}
+		if cliState != "" {
+			o.Set("cliState", cliState)
+		}
+		return string(jsvalue.Stringify(o, ""))
+	}
+	states := map[string]string{"busy": "busy", "asks": "needs-input", "idle": "idle", "review": "ready-for-review",
+		"stopped": "inactive", "fresh": ""}
+	var tabs []string
+	for _, name := range []string{"busy", "asks", "idle", "review", "stopped", "fresh"} {
+		tabs = append(tabs, tab(name, "claude-code", states[name]))
+	}
+	tabs = append(tabs, tab("codex", "codex-cli", "inactive"), tab("shell", "", ""), tab("kept", "claude-code", "inactive"))
+	r.writeLayout(id, `{"root":{"type":"pane","id":"pane-a","tabs":[`+strings.Join(tabs, ",")+`],"activeTabId":"tab-busy"},"activePaneId":"pane-a","updatedAt":"x"}`)
+	r.s.LayoutChangedByCluster(id)
+	for s := range r.tm.sessions {
+		delete(r.tm.sessions, s)
+	}
+	// A stopped chat's session that is still there is nobody's to end here.
+	kept := "tk-" + id + "-pane-a-tab-kept"
+	r.tm.sessions[kept] = true
+	r.tm.calls = nil
+
+	if err := r.s.RestoreSessions(); err != nil {
+		t.Fatal(err)
+	}
+	var made []string
+	for _, c := range r.tm.calls {
+		if c[0] != "create" {
+			t.Fatalf("unexpected tmux call %v", c)
+		}
+		made = append(made, strings.TrimPrefix(c[1].(string), "tk-"+id+"-pane-a-tab-"))
+	}
+	sort.Strings(made)
+	if want := []string{"asks", "busy", "idle", "review"}; !reflect.DeepEqual(made, want) {
+		t.Fatalf("sessions made for %v, want %v", made, want)
+	}
+	if !r.tm.sessions[kept] {
+		t.Fatal("a session that was there is gone")
+	}
+	// The tabs stay in the layout, with or without a session.
+	if got := len(AllTabs(r.s.Layout(id))); got != len(tabs) {
+		t.Fatalf("%d tabs left of %d", got, len(tabs))
+	}
+
+	// A start that finds nothing owed makes nothing.
+	r.tm.calls = nil
+	if err := r.s.RestoreSessions(); err != nil || len(r.tm.calls) != 0 {
+		t.Fatalf("second start: %v, calls %v", err, r.tm.calls)
+	}
+}
+
+// A tab whose session is a chat's gets none at a start, whatever its agent was doing: the chat's owner makes it when
+// the chat needs it.
+func TestRestoreSessionsLeavesOwnedSessionsToTheirOwner(t *testing.T) {
+	r := newRig(t)
+	if err := r.s.InitLayouts(); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := r.s.CreateWorkspace(r.home, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := ws.String("id")
+	prefix := "tk-" + id + "-pane-a-tab-"
+	tab := func(name string) string {
+		return string(jsvalue.Stringify(jsvalue.NewObject("id", "tab-"+name, "sessionName", prefix+name, "name", "", "order", 0,
+			"cwd", r.home, "panelType", "claude-code", "cliState", "busy"), ""))
+	}
+	r.writeLayout(id, `{"root":{"type":"pane","id":"pane-a","tabs":[`+tab("chat")+","+tab("tab")+`],"activeTabId":"tab-chat"},"activePaneId":"pane-a","updatedAt":"x"}`)
+	r.s.LayoutChangedByCluster(id)
+	for s := range r.tm.sessions {
+		delete(r.tm.sessions, s)
+	}
+	r.tm.calls = nil
+	r.s.cfg.SessionOwned = func(session string) bool { return session == prefix+"chat" }
+
+	if err := r.s.RestoreSessions(); err != nil {
+		t.Fatal(err)
+	}
+	var made []string
+	for _, c := range r.tm.calls {
+		if c[0] == "create" {
+			made = append(made, c[1].(string))
+		}
+	}
+	if want := []string{prefix + "tab"}; !reflect.DeepEqual(made, want) {
+		t.Fatalf("sessions made for %v, want %v", made, want)
+	}
+	if got := len(AllTabs(r.s.Layout(id))); got != 2 {
+		t.Fatalf("%d tabs left of 2", got)
 	}
 }

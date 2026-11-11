@@ -19,6 +19,10 @@ import (
 // function: the view gets the result, the app's package and the agent never see them. A person without the connection,
 // or not signed in, leaves the app «ждёт вход»: the call is refused, not failed.
 func callConnectionTool(ctx context.Context, ms *mcpconn.Service, granted bool, decl apps.MCPServer, tool string, args map[string]any) (json.RawMessage, error) {
+	return connectionDo(ctx, ms, granted, decl, toolOp(tool, args))
+}
+
+func connectionDo(ctx context.Context, ms *mcpconn.Service, granted bool, decl apps.MCPServer, op mcpOp) (json.RawMessage, error) {
 	if !granted {
 		return nil, &apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a connection the person has not agreed to for it: " + decl.Connection}
 	}
@@ -28,7 +32,7 @@ func callConnectionTool(ctx context.Context, ms *mcpconn.Service, granted bool, 
 		return nil, &apps.BridgeError{Code: apps.CodeAuthRequired, Message: apps.AuthRequiredMessage, SignIn: signIn,
 			Detail: "the person has no connection " + decl.Connection}
 	}
-	return callSignedIn(ctx, ms, conn, signIn, tool, args)
+	return signedInDo(ctx, ms, conn, signIn, op)
 }
 
 // callAppOAuthTool is hl.tools.call for an app's own server with auth oauth: the person signs in to the server itself,
@@ -36,18 +40,22 @@ func callConnectionTool(ctx context.Context, ms *mcpconn.Service, granted bool, 
 // the safe). Not signed in yet: auth_required naming the app's server, which the host's «Войти» signs in to
 // (POST <platform>/apps/signin).
 func callAppOAuthTool(ctx context.Context, ms *mcpconn.Service, app, server string, _ apps.MCPServer, srv apps.MCPServer, tool string, args map[string]any) (json.RawMessage, error) {
+	return appOAuthDo(ctx, ms, app, server, srv, toolOp(tool, args))
+}
+
+func appOAuthDo(ctx context.Context, ms *mcpconn.Service, app, server string, srv apps.MCPServer, op mcpOp) (json.RawMessage, error) {
 	signIn := &apps.SignIn{App: app, Server: server}
 	conn, ok := ms.ByOwner(appOwner(app, server))
 	if !ok || conn.URL == "" || !sameServer(conn.URL, srv.URL) {
 		return nil, &apps.BridgeError{Code: apps.CodeAuthRequired, Message: apps.AuthRequiredMessage, SignIn: signIn,
 			Detail: "nobody signed in to the app's server yet"}
 	}
-	return callSignedIn(ctx, ms, conn, signIn, tool, args)
+	return signedInDo(ctx, ms, conn, signIn, op)
 }
 
-// callSignedIn calls a tool of a server the connections' service signs in to: a token it no longer takes is renewed
-// once and the call repeated; a refusal names where to sign in.
-func callSignedIn(ctx context.Context, ms *mcpconn.Service, conn mcpconn.Server, signIn *apps.SignIn, tool string, args map[string]any) (json.RawMessage, error) {
+// signedInDo sends op to a server the connections' service signs in to: a token it no longer takes is renewed once
+// and the request repeated; a refusal names where to sign in.
+func signedInDo(ctx context.Context, ms *mcpconn.Service, conn mcpconn.Server, signIn *apps.SignIn, op mcpOp) (json.RawMessage, error) {
 	if conn.Transport != mcpconn.HTTP {
 		return nil, &apps.BridgeError{Code: apps.CodeHostNotAllowed, Message: apps.ToolRefused, Detail: "a view calls Streamable HTTP servers only"}
 	}
@@ -56,14 +64,14 @@ func callSignedIn(ctx context.Context, ms *mcpconn.Service, conn mcpconn.Server,
 		return nil, signInRefusal(err, signIn)
 	}
 	srv := apps.MCPServer{URL: conn.URL, Headers: flatHeaders(header), Credentialed: conn.Auth != mcpconn.AuthNone}
-	result, err := apps.CallTool(ctx, srv, tool, args)
+	result, err := op(ctx, srv)
 	var be *apps.BridgeError
 	if errors.As(err, &be) && be.Code == apps.CodeAuthExpired && conn.Auth != mcpconn.AuthNone {
 		if header, err = ms.Reauthorize(ctx, conn.ID); err != nil {
 			return nil, signInRefusal(err, signIn)
 		}
 		srv.Headers = flatHeaders(header)
-		result, err = apps.CallTool(ctx, srv, tool, args)
+		result, err = op(ctx, srv)
 	}
 	return result, withSignIn(err, signIn)
 }

@@ -31,7 +31,7 @@ import (
 const exitRestart = 75
 
 // newSelfUpdater is the updater of a runtime a hub carries and install.sh installed; nil for any other runtime.
-func newSelfUpdater() *selfupdate.Updater {
+func newSelfUpdater(dataDir string) *selfupdate.Updater {
 	// Fleet mode (RUNTIME_UPDATE_MODE=fleet, off unless asked for): the machine takes whole releases from its rollout
 	// (`harnessly fleet`), so it neither pulls binaries from the hub nor replaces them by itself.
 	if selfupdate.FleetOn(os.Getenv) {
@@ -67,6 +67,9 @@ func newSelfUpdater() *selfupdate.Updater {
 		HubURL: hub, Files: files, GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, Auto: auto,
 		Sudo:    strings.HasPrefix(dir, "/usr/"),
 		Applied: restartAfterUpdate,
+		// RUNTIME_UPDATE_MIN_GAP ("24h", "90m", 0 for none): the machine does not update itself more often than that.
+		MinGap:    selfupdate.GapFromEnv(os.Getenv("RUNTIME_UPDATE_MIN_GAP"), selfupdate.DefaultMinGap),
+		StateFile: filepath.Join(dataDir, "selfupdate.json"),
 		Log: func(msg string, err error) {
 			agent.Log("warn", msg, agent.F{K: "error", V: err.Error()})
 		},

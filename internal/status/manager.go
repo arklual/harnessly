@@ -8,6 +8,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/background"
 	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/sockets"
 )
 
@@ -105,7 +106,7 @@ func (m *Manager) provider(e *Entry) Provider { return m.d.Providers[providerOfP
 // Start scans every tab, then keeps them current until ctx ends.
 func (m *Manager) Start(ctx context.Context) {
 	m.ctx = ctx
-	go m.persistLoop(ctx)
+	safego.Go("status persist loop", func() { m.persistLoop(ctx) })
 	m.scanAll()
 	m.mu.Lock()
 	m.scanned = true
@@ -117,9 +118,9 @@ func (m *Manager) Start(ctx context.Context) {
 	for _, id := range early {
 		m.MarkAgentLaunch(id, false)
 	}
-	go m.pollLoop(ctx)
+	safego.Go("status poll loop", func() { m.pollLoop(ctx) })
 	for _, id := range heal {
-		go m.recoverEntrySession(id)
+		safego.Go("status recover session", func() { m.recoverEntrySession(id) })
 	}
 	if m.d.Queue != nil {
 		m.mu.Lock()
@@ -128,12 +129,12 @@ func (m *Manager) Start(ctx context.Context) {
 		for _, id := range ids {
 			m.d.Queue.Schedule(id, queueSettle)
 		}
-		go m.queueWatchdog(ctx)
+		safego.Go("status queue watchdog", func() { m.queueWatchdog(ctx) })
 	}
-	go func() {
+	safego.Go("status shutdown", func() {
 		<-ctx.Done()
 		m.shutdown()
-	}()
+	})
 }
 
 func (m *Manager) queueWatchdog(ctx context.Context) {
@@ -175,7 +176,7 @@ func (m *Manager) enqueuePersist(fn func()) {
 	select {
 	case m.persist <- fn:
 	default:
-		go func() { m.persist <- fn }()
+		safego.Go("status persist enqueue", func() { m.persist <- fn })
 	}
 }
 

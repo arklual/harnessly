@@ -1,12 +1,14 @@
 package state
 
 import (
+	"context"
 	"math"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 // Every read-modify-write of a layout holds that workspace's lock; tmux is started and stopped outside it, and the
@@ -194,7 +196,7 @@ func (s *Store) AddTab(wsID, paneID string, o TabOptions) (*jsvalue.Object, erro
 			return nil, err
 		}
 		if o.Command != "" {
-			if err := s.cfg.Tmux.SendKeys(session, o.Command); err != nil {
+			if err := typist.Write(context.Background(), s.cfg.Tmux, session, func(context.Context) error { return s.cfg.Tmux.SendKeys(session, o.Command) }); err != nil {
 				s.cfg.Tmux.KillSession(session)
 				return nil, err
 			}
@@ -302,7 +304,7 @@ func (s *Store) RestartTab(wsID, paneID, tabID, command string) error {
 		return failed
 	}
 	if command != "" && !lost {
-		if err := s.cfg.Tmux.SendKeys(session, command); err != nil {
+		if err := typist.Write(context.Background(), s.cfg.Tmux, session, func(context.Context) error { return s.cfg.Tmux.SendKeys(session, command) }); err != nil {
 			return failed
 		}
 	}

@@ -54,7 +54,7 @@ first. A file that changes while the pack is written fails the export instead of
 Importing the same pack again changes nothing: the library remembers (`<library>/.pack-imports.json`) which project a
 pack's project became, even after it was edited here. Nothing goes out to the network.
 
-Not in this stage: buttons in the interface, taking a folder of projects as a unit, a pack in the hub's shared storage. The pack carries no `.owner.json` (a hidden file stays out), so an imported project has no recorded owner.
+Not in this stage: buttons in the interface, taking a folder of projects as a unit, a pack in the hub's shared storage. The pack carries no `.owner.json` (a hidden file stays out), so the import writes one: the importer owns what it brought, as a project they made.
 
 ## Перенос на другой инстанс
 
@@ -100,3 +100,33 @@ Not in this stage: buttons in the interface, taking a folder of projects as a un
 4. Проект, на новом: `tar -C <библиотека> -xzf p.tgz`. Если такой id уже занят, сначала переименовать папку в архиве
    или распаковать во временную папку и переложить. Закрепление, id страниц и заметки живут в `meta/`, поэтому
    папка копируется целиком.
+
+## Kits between the machines of one instance
+
+Under a hub the kits folder syncs like the library does, as the `kits` collection of the space: `<kit id>/<version>/<file>`.
+A published version is immutable: a file already in the room is not overwritten and not deleted (a different write
+is answered as a conflict, and the machine keeps its own copy in `.conflicts`); the same bytes again are no news. A
+draft is a project of the library and syncs there. Staging folders and every hidden name stay on their machine.
+Access is the store's: a live session of a machine of the space. Kits with a restricted license (a corporate font) sync
+to the space's machines too; leaving the space still goes through `--accept-restricted`.
+
+### The seal of a version
+
+A version is one unit: `<id>/<version>/kit.sealed.json` (a plain name, so it syncs) lists its files with sizes and sha256
+and a hash over the list. Every install writes it last.
+
+- **Installed means sealed and whole.** `kit list`, `kit show`, a project's pin, `kit check` and the exports see a version
+  only when its seal is there and every listed file is in place with the listed bytes. A version still arriving from
+  another machine is not installed yet; a file the seal does not list is not part of the version (not served, listed or
+  exported). Looked at again every 10 s, hashed again when a file's size or time moves.
+- **The room.** Before the seal, files may be added to a version and none changes. The seal is taken when it is well
+  formed (it may come before its files); after it the folder takes only the files it lists with the bytes it lists, and
+  nothing is changed or deleted. The refused write is a 403: the machine keeps the file and does not send it.
+- **A race.** Two machines laying out one version with different bytes: whoever's file or seal lands first stays; the
+  other machine's copy goes to `.conflicts` in its kits folder, with the winner's bytes in its place.
+- **Versions from before seals.** The runtime seals them in one pass when it starts, before anything syncs, and marks the
+  kits folder (`.seal-required`); from then on a version without a seal is one still arriving. In a kits folder without
+  the mark (nothing has started on it) a version without a seal is installed as it always was.
+- `kit install --force` replaces a local version and seals the new one; the room refuses it, so it stays local.
+
+Writers are machines of one space, as for the library.

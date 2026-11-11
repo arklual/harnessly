@@ -29,6 +29,12 @@ export function addQuote(conv: ConvId, text: string, note: string | null): void 
   flush();
 }
 
+/** A quote under a name its giver keeps (a review's comment put into the field), so the same name takes it out again. */
+export function putQuote(conv: ConvId, quote: Pick<Quote, 'id' | 'text' | 'note'>): void {
+  quotesStore.patch(conv, (have) => [...(have ?? NONE).filter((q) => q.id !== quote.id), quote]);
+  flush();
+}
+
 /** A name for a feed annotation, given before it is in the field: its mark keeps it from the first press. */
 export const nextFeedNoteId = (): string => {
   seq += 1;

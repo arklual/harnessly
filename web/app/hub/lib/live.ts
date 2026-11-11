@@ -69,6 +69,10 @@ export const reduceLive = (state: LiveState, action: LiveAction): LiveState => {
   }
 };
 
+/** The hub no longer lets the person into the space (removed from it, or the space is gone): by the error's code. */
+export const lostSpace = (error: { code: string } | null): boolean =>
+  error !== null && (error.code === 'forbidden' || error.code === 'not_found');
+
 export const EVENT_TYPES = ['machine', 'machineRemoved', 'job', 'login', 'members'] as const;
 
 /** Reads the `data:` line of one SSE message; null when it is not the JSON of the contract. */

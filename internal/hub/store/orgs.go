@@ -464,3 +464,10 @@ func (s Store) SetMachineDisabled(ctx context.Context, machineID string, at *tim
 	_, err := s.q.Exec(ctx, `UPDATE machines SET disabled_at = ? WHERE id = ?`, nullMs(at), machineID)
 	return err
 }
+
+// CountOrgsBy is how many organizations the person created.
+func (s Store) CountOrgsBy(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := s.q.QueryRow(ctx, `SELECT COUNT(*) FROM orgs WHERE created_by = ?`, userID).Scan(&n)
+	return n, err
+}

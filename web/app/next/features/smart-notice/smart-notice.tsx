@@ -7,7 +7,15 @@
 // implementation for every width: on the phone it is as wide as the screen less a margin.
 import '@/next/styles/smart-notice.css';
 
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type RefObject,
+} from 'react';
 import { t } from '@/next/i18n';
 import CodeField, { CODE_FIELD, type TCodeFieldState } from '@/next/ui/code-field';
 import Icon from '@/next/ui/icon';
@@ -15,8 +23,10 @@ import { PRESENCE, usePresence, usePresentFlag } from '@/next/ui/presence';
 import type { TNoticePlace, TNoticeSound } from '@/next/stores/notices';
 import useGestures, { rise } from './use-gestures';
 import { STACK_DEPTH } from './pager';
+import { NOTICE_ACTION, NOTICE_INPUT, noteInput, noticeEvent } from './metrics';
 import { RecordingTime, RecordingWave } from '@/next/features/composer/recording';
 import type { Recording } from '@/next/features/composer/types';
+import SlotBody, { sourceLabel, type ISlotNotice, type ISlotSource, type TSlotAnswer } from './slot-body';
 
 export const SMART_KIND = {
   code: 'code',
@@ -27,6 +37,10 @@ export const SMART_KIND = {
   failed: 'failed',
   limit: 'limit',
   done: 'done',
+  /** An app's or an agent's question through the open slot. */
+  ask: 'ask',
+  /** An app's or an agent's status or progress through the open slot. */
+  info: 'info',
 } as const;
 export type TSmartKind = (typeof SMART_KIND)[keyof typeof SMART_KIND];
 
@@ -36,6 +50,7 @@ export const WAITING_KINDS: ReadonlySet<TSmartKind> = new Set([
   SMART_KIND.permission,
   SMART_KIND.question,
   SMART_KIND.plan,
+  SMART_KIND.ask,
 ]);
 
 export interface ISmartItem {
@@ -53,6 +68,8 @@ export interface ISmartItem {
   until: number | null;
   /** A finished chat's short recap, when the machine made one. */
   summary?: string | null;
+  /** Who asks through the open slot (an app or an agent): the label over the card. */
+  source?: ISlotSource | null;
 }
 
 /** What the open card shows for its main item, read by the binding. */
@@ -64,7 +81,9 @@ export type TSmartDetail =
   | { k: 'code'; why: string; digits: number }
   | { k: 'machine'; text: string; level: number; heavy: readonly ISmartHeavy[] }
   /** A finished turn: the chat's short recap (when the machine made one) and a field to write on to the agent. */
-  | { k: 'done'; summary: string | null; canReply: boolean };
+  | { k: 'done'; summary: string | null; canReply: boolean }
+  /** What an app or an agent asks through the open slot. */
+  | { k: 'slot'; notice: ISlotNotice };
 
 /** The words written in the card's field and the voice that dictates into them (the chat field's own dictation). */
 export interface ISmartReply {
@@ -101,6 +120,8 @@ export interface ISmartNoticeProps {
   /** The plate's place; the middle of the bottom edge stands at `anchor` (the field of the chat) when there is one. */
   place: TNoticePlace;
   anchor: { x: number; bottom: number } | null;
+  /** Something opened from the field (the model's picker, the «+» menu) rises where the plate stands over it. */
+  covered?: boolean;
   now: number;
   onOpen: (open: boolean) => void;
   onMain: (key: string) => void;
@@ -116,7 +137,15 @@ export interface ISmartNoticeProps {
   /** Takes the item off the plate (swept aside, «Скрыть», ⌫): the chat still waits, the centre keeps its row. */
   /** Put away: `from` is where the plate stood when it was put away by hand (null when thrown off by a gesture). */
   onHide: (item: ISmartItem, from: DOMRect | null) => void;
+  /** «Закрыть все»: everything on the plate at once (what waits into its drops, news gone), with «Вернуть». */
+  onCloseAll: () => void;
   onMute: (sound: TNoticeSound) => void;
+  /** Answers a notice of the open slot; the machine checks it (a text that looks like a key comes back as secret). */
+  onSlot: (notice: ISlotNotice, value: unknown) => Promise<TSlotAnswer>;
+  /** The person turns a notice of the slot down (a code's «Отмена»). */
+  onSlotDismiss: (notice: ISlotNotice) => Promise<void>;
+  /** «Не показывать от …»: the person turns the item's source off. */
+  onMuteSource: (item: ISmartItem) => void;
   onSettings: () => void;
   /** A plate is new for this long: it tells what came in two lines with its main button. */
   announceMs: number;
@@ -135,7 +164,7 @@ export interface ISmartNoticeProps {
 }
 
 /** How long the plate takes to leave when nothing waits any more, ms (--sn-exit-ms in styles/smart-notice.css). */
-export const SMART_EXIT_MS = 520;
+export const SMART_EXIT_MS = 260;
 /** How long the card takes to fold back into the line: the shape settles then, it does not bounce (--sn-fold-ms). */
 const FOLD_MS = 600;
 /** The content the shape held before keeps fading this long over the new one (hx-sn-out). */
@@ -152,6 +181,8 @@ const ACTION: Record<TSmartKind, string> = {
   failed: 'next.smart.open',
   limit: 'next.smart.open',
   done: 'next.smart.open',
+  ask: 'next.smart.answer',
+  info: 'next.smart.look',
 };
 
 /** The sound a kind rings with, so the menu can silence it; none for those that ring no sound of their own. */
@@ -164,6 +195,8 @@ const SOUND_OF: Record<TSmartKind, TNoticeSound | null> = {
   done: 'done',
   failed: null,
   limit: null,
+  ask: 'wait',
+  info: null,
 };
 const MENU_EXIT_MS = 160;
 const SENT_TEXT: Record<TSmartKind, string> = {
@@ -175,6 +208,8 @@ const SENT_TEXT: Record<TSmartKind, string> = {
   failed: 'next.smart.sent',
   limit: 'next.smart.sent',
   done: 'next.smart.sent',
+  ask: 'next.smart.sent',
+  info: 'next.smart.sent',
 };
 
 const RING_R = 16.5;
@@ -252,11 +287,14 @@ const ReplyField = ({
   busy,
   placeholder,
   onSend,
+  check,
 }: {
   reply: ISmartReply;
   busy: boolean;
   placeholder: string;
   onSend: (text: string) => void;
+  /** Stops a text before it is sent (it stays in the field). */
+  check?: (text: string) => boolean;
 }) => {
   const input = useRef<HTMLInputElement | null>(null);
   const rec = reply.recording;
@@ -293,6 +331,7 @@ const ReplyField = ({
         event.preventDefault();
         const text = reply.text.trim();
         if (!text) return;
+        if (check && !check(text)) return;
         flyAway(input.current);
         onSend(text);
         reply.setText('');
@@ -305,6 +344,7 @@ const ReplyField = ({
         placeholder={placeholder}
         aria-label={placeholder}
         disabled={busy}
+        autoComplete="off"
         enterKeyHint="send"
         onChange={(event) => reply.setText(event.target.value)}
       />
@@ -343,6 +383,8 @@ const Body = ({
   onCancelCode,
   onStop,
   onReply,
+  onSlot,
+  onSlotDismiss,
   reply,
 }: {
   item: ISmartItem;
@@ -350,12 +392,28 @@ const Body = ({
   busy: boolean;
   run: (work: () => Promise<void>) => void;
   reply: ISmartReply;
-} & Pick<ISmartNoticeProps, 'onAnswer' | 'onDecide' | 'onCode' | 'onCancelCode' | 'onStop' | 'onReply'>) => {
+} & Pick<
+  ISmartNoticeProps,
+  'onAnswer' | 'onDecide' | 'onCode' | 'onCancelCode' | 'onStop' | 'onReply' | 'onSlot' | 'onSlotDismiss'
+>) => {
   const [code, setCode] = useState('');
   const [codeState, setCodeState] = useState<TCodeFieldState>(CODE_FIELD.idle);
   const [note, setNote] = useState<string | null>(null);
 
   if (detail.k === 'loading') return <div className="hx-sn__wait" aria-busy="true" />;
+  if (detail.k === 'slot')
+    return (
+      <SlotBody
+        notice={detail.notice}
+        busy={busy}
+        run={run}
+        onSlot={onSlot}
+        onDismiss={onSlotDismiss}
+        field={(placeholder, onSend, check) => (
+          <ReplyField reply={reply} busy={busy} placeholder={placeholder} onSend={onSend} check={check} />
+        )}
+      />
+    );
   if (detail.k === 'question')
     return (
       <>
@@ -552,7 +610,7 @@ const useGhost = (
 };
 
 /** What a plate of the stack shows while paging brings it to the front (pager.ts fades it in): the line it will be. */
-const Peek = ({ item, now, sent }: { item: ISmartItem; now: number; sent: boolean }) => (
+const Peek = memo(({ item, now, sent }: { item: ISmartItem; now: number; sent: boolean }) => (
   <span className="hx-sn__peek" aria-hidden="true">
     <span className="hx-sn__pill">
       <Chip item={item} now={now} sent={sent} />
@@ -560,7 +618,8 @@ const Peek = ({ item, now, sent }: { item: ISmartItem; now: number; sent: boolea
       <span className="hx-sn__text">{sent ? t(SENT_TEXT[item.kind]) : item.text}</span>
     </span>
   </span>
-);
+));
+Peek.displayName = 'Peek';
 
 const SmartNotice = ({
   items,
@@ -569,6 +628,7 @@ const SmartNotice = ({
   open,
   place,
   anchor,
+  covered = false,
   now,
   onOpen,
   onMain,
@@ -580,7 +640,11 @@ const SmartNotice = ({
   onStop,
   onOpenMachine,
   onHide,
+  onCloseAll,
   onMute,
+  onSlot,
+  onSlotDismiss,
+  onMuteSource,
   onSettings,
   announceMs,
   returnFocus,
@@ -623,7 +687,10 @@ const SmartNotice = ({
     if (!shown) return;
     const at = items.findIndex((item) => item.key === shown.key);
     const next = items[(at + dir + items.length) % items.length];
-    if (next && next.key !== shown.key) onMain(next.key);
+    if (next && next.key !== shown.key) {
+      onMain(next.key);
+      noticeEvent(NOTICE_ACTION.paged, { kind: next.kind, stack: items.length, place });
+    }
   };
   const hide = (thrown = false) => {
     if (!shown) return;
@@ -633,6 +700,12 @@ const SmartNotice = ({
     // By hand, the plate goes as the shape flows away: the next one rises, the last one goes out at once.
     if (!thrown && others.length > 0) rise(host.current, 1);
     if (!thrown && others.length === 0 && host.current) host.current.dataset.gone = '';
+    noticeEvent(WAITING_KINDS.has(shown.kind) ? NOTICE_ACTION.dropped : NOTICE_ACTION.closed, {
+      kind: shown.kind,
+      stack: items.length,
+      place,
+      ms: Date.now() - shown.at,
+    });
     onHide(shown, from);
   };
   const gestures = useGestures({
@@ -651,6 +724,30 @@ const SmartNotice = ({
     },
     onMenu: () => setMenuOn(true),
     onStep: step,
+  });
+
+  const openChat = (item: ISmartItem) => {
+    noticeEvent(NOTICE_ACTION.chatOpened, { kind: item.kind, stack: items.length, place });
+    onOpenChat(item);
+  };
+
+  // The metrics: each item once when it comes on the plate, the card each time it opens.
+  const seenKeys = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const seen = (seenKeys.current ??= new Set());
+    for (const item of items) {
+      if (seen.has(item.key)) continue;
+      seen.add(item.key);
+      noticeEvent(NOTICE_ACTION.shown, { kind: item.kind, stack: items.length, place });
+    }
+  }, [items, place]);
+  // Once per opening, not per item chosen inside the open card.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    const on = open && shown !== null;
+    if (on && !wasOpen.current && shown)
+      noticeEvent(NOTICE_ACTION.opened, { kind: shown.kind, ms: Date.now() - shown.at, place });
+    wasOpen.current = on;
   });
 
   // The menu takes the focus when it opens; a press outside it puts it away.
@@ -740,8 +837,15 @@ const SmartNotice = ({
 
   const run = (work: () => Promise<void>) => {
     setBusy(true);
+    const item = shown;
     void work()
       .then(() => {
+        noticeEvent(NOTICE_ACTION.answered, {
+          kind: item.kind,
+          stack: items.length,
+          place,
+          ms: Date.now() - item.at,
+        });
         const key = shown.key;
         setSent((was) => new Set(was).add(key));
         onOpen(false);
@@ -760,6 +864,7 @@ const SmartNotice = ({
   };
 
   const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    noteInput(NOTICE_INPUT.keys);
     if (event.key === 'Escape' && menuOn) {
       event.preventDefault();
       setMenuOn(false);
@@ -785,6 +890,12 @@ const SmartNotice = ({
     if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
       event.preventDefault();
       setMenuOn(true);
+      return;
+    }
+    if ((event.key === 'Delete' || event.key === 'Backspace') && event.shiftKey) {
+      event.preventDefault();
+      onCloseAll();
+      returnFocus();
       return;
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -816,6 +927,7 @@ const SmartNotice = ({
 
   const isSent = sent.has(shown.key);
   const v = place.startsWith('top') ? 'top' : 'bottom';
+  const anchored = anchor !== null && place === 'bottom-center';
   const h = place.split('-')[1];
 
   return (
@@ -824,7 +936,8 @@ const SmartNotice = ({
       className="hx-sn"
       data-v={v}
       data-h={h}
-      data-anchored={(anchor !== null && place === 'bottom-center') || undefined}
+      data-anchored={anchored || undefined}
+      data-covered={(anchored && covered) || undefined}
       data-phase={entered && present.state === PRESENCE.open ? 'in' : 'out'}
       data-open={open || undefined}
       data-folding={folding || undefined}
@@ -861,7 +974,7 @@ const SmartNotice = ({
               type="button"
               role="menuitem"
               className="hx-sn__item"
-              onClick={act(() => onOpenChat(shown))}
+              onClick={act(() => openChat(shown))}
             >
               <Icon name="external-link" size="sm" />
               {t('next.smart.openChat')}
@@ -882,6 +995,17 @@ const SmartNotice = ({
             <Icon name="eye-off" size="sm" />
             {t('next.smart.menu.hide')}
           </button>
+          {shown.source && (
+            <button
+              type="button"
+              role="menuitem"
+              className="hx-sn__item"
+              onClick={act(() => onMuteSource(shown))}
+            >
+              <Icon name="bell-off" size="sm" />
+              {t('next.smart.slot.muteSource', { name: shown.source.name })}
+            </button>
+          )}
           {sound !== null && (
             <button type="button" role="menuitem" className="hx-sn__item" onClick={act(() => onMute(sound))}>
               <Icon name="bell-off" size="sm" />
@@ -968,21 +1092,16 @@ const SmartNotice = ({
                     <span className="hx-sn__text">{shown.text}</span>
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className="hx-sn__btn"
-                  onClick={() =>
-                    WAITING_KINDS.has(shown.kind) || shown.kind === SMART_KIND.machine
-                      ? onOpen(true)
-                      : onOpenChat(shown)
-                  }
-                >
-                  {t(ACTION[shown.kind])}
-                </button>
+                {(WAITING_KINDS.has(shown.kind) || shown.kind === SMART_KIND.machine) && (
+                  <button type="button" className="hx-sn__btn" onClick={() => onOpen(true)}>
+                    {t(ACTION[shown.kind])}
+                  </button>
+                )}
               </div>
             )}
             {!folded && (
               <div className="hx-sn__card" role="dialog" aria-label={shown.title}>
+                {shown.source && <p className="hx-sn__src">{sourceLabel(shown.source)}</p>}
                 <div className="hx-sn__head">
                   <Chip item={shown} now={now} large sent={isSent} />
                   <b className="hx-sn__name">{shown.title}</b>
@@ -1000,6 +1119,8 @@ const SmartNotice = ({
                   onCancelCode={onCancelCode}
                   onStop={onStop}
                   onReply={onReply}
+                  onSlot={onSlot}
+                  onSlotDismiss={onSlotDismiss}
                   reply={reply}
                 />
                 {shown.kind === SMART_KIND.machine && (
@@ -1019,9 +1140,16 @@ const SmartNotice = ({
                 )}
                 {shown.chatId !== null && (
                   <div className="hx-sn__foot">
-                    <button type="button" className="hx-sn__link" onClick={() => onOpenChat(shown)}>
+                    <button type="button" className="hx-sn__link" onClick={() => openChat(shown)}>
                       {t('next.smart.openChat')}
                       <Icon name="arrow-up-right" size="sm" />
+                    </button>
+                  </div>
+                )}
+                {others.length > 0 && (
+                  <div className="hx-sn__others-head">
+                    <button type="button" className="hx-sn__link" onClick={onCloseAll}>
+                      {t('next.smart.closeAll')}
                     </button>
                   </div>
                 )}
@@ -1043,6 +1171,18 @@ const SmartNotice = ({
             )}
           </div>
         </div>
+        {folded && (
+          <button
+            type="button"
+            className="hx-sn__x"
+            data-all={others.length > 0 || undefined}
+            aria-label={others.length > 0 ? t('next.smart.closeAll') : t('next.smart.close')}
+            onClick={() => (others.length > 0 ? onCloseAll() : hide())}
+          >
+            <Icon name="x" size="sm" />
+            {others.length > 0 && <span className="hx-sn__x-all">{t('next.smart.closeAll')}</span>}
+          </button>
+        )}
       </div>
     </div>
   );

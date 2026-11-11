@@ -40,6 +40,9 @@ type Launch struct {
 	// kept on the tab: the apps' launch records it in the launch's own folder (internal/apps), where the guard's journal
 	// reads which chat a launch belongs to. Empty when the runtime does not know the chat at that point.
 	Conversation string `json:"-"`
+	// Input is the chat whose structured input channel this launch may start (Codex's app-server beside the terminal).
+	// The runtime sets it for a new chat when that channel is on; "" starts the agent as ever. Not kept with the tab.
+	Input string `json:"-"`
 }
 
 // AppIDRe: an app id goes into file names and the launch line, so it stays this strict (internal/apps checks the same).
@@ -116,6 +119,58 @@ type ClaudeApps struct {
 	// Retoken copies an MCP config of the runtime's (one that carries the person's token in its headers) with the
 	// launch's token in its place, and gives the copy's path; nil when the launch has no token of its own.
 	Retoken func(mcpConfigPath string) (string, error)
+}
+
+// LaunchableApps says which of a launch's apps can be readied for an agent now (installed, for a chat, its files
+// readable) and why each other one cannot. A launch goes on with the ones that can.
+type LaunchableApps interface {
+	Launchable(ids []string) (ok []string, bad map[string]error)
+}
+
+// AppsDropper is told of the apps a chat starts without, and why: the app's log and the machine's journal say so.
+type AppsDropper interface {
+	AppsDropped(conversation string, ids []string, why error)
+}
+
+// WithLaunchableApps is the launch with only the apps that can be readied; the others are reported to the launcher
+// and left out, so one broken app does not keep the chat from starting.
+func WithLaunchableApps(l *Launch, apps AppLauncher) *Launch {
+	if l == nil || len(l.Apps) == 0 {
+		return l
+	}
+	check, ok := apps.(LaunchableApps)
+	if !ok {
+		return l
+	}
+	kept, bad := check.Launchable(l.Apps)
+	if len(bad) == 0 {
+		return l
+	}
+	if d, ok := apps.(AppsDropper); ok {
+		for _, id := range l.Apps {
+			if why, isBad := bad[id]; isBad {
+				d.AppsDropped(l.Conversation, []string{id}, why)
+			}
+		}
+	}
+	out := *l
+	out.Apps = kept
+	return &out
+}
+
+// WithoutApps is the launch with none of its apps: what readied them failed (the guard did not answer, the wall or the
+// token could not be made), and the chat starts all the same, plain, rather than not at all. The launcher is told why;
+// the apps can be turned on again in the running chat.
+func WithoutApps(l *Launch, apps AppLauncher, why error) *Launch {
+	if l == nil || len(l.Apps) == 0 {
+		return l
+	}
+	if d, ok := apps.(AppsDropper); ok {
+		d.AppsDropped(l.Conversation, l.Apps, why)
+	}
+	out := *l
+	out.Apps = nil
+	return &out
 }
 
 // ErrNoApps: a launch names apps and this machine has none.

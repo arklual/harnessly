@@ -24,6 +24,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Linker reaches a machine.
@@ -51,10 +52,11 @@ type Service struct {
 	log    *slog.Logger
 	now    func() time.Time
 	prefix string
+	client *http.Client
 }
 
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, links: d.Links, log: d.Log, now: d.Now}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, links: d.Links, log: d.Log, now: d.Now, client: &http.Client{}}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -115,6 +117,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET "+p+"/runs", s.guard(s.listRuns))
 	mux.Handle("POST "+p+"/runs/{id}/decision", s.guard(s.decision))
 	mux.Handle("POST "+p+"/hook", httpx.Handler(s.hook))
+	mux.Handle("POST "+p+"/callback", httpx.Handler(s.callback))
 }
 
 type ruleBody struct {
@@ -280,8 +283,8 @@ func (s *Service) listRuns(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	return nil
 }
 
-// decision is the owner's answer to a finished run: {action: "approve"|"reject"}. The hub only records it; merging or
-// closing the merge request is left to whoever reads the status (docs/hub/automations.md).
+// decision is the owner's answer to a finished run: {action: "approve"|"reject"}. The hub records it and, when it is set
+// up for GitLab, merges or closes the run's merge request (actions.go, docs/hub/automations.md).
 func (s *Service) decision(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
 	var b struct {
 		Action string `json:"action"`
@@ -303,7 +306,8 @@ func (s *Service) decision(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	if !ok {
 		return errDecided
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"run": run})
+	out := s.settle(r.Context(), run)
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"run": out.Run, "merged": out.Merged, "reason": out.Reason})
 	return nil
 }
 
@@ -384,7 +388,7 @@ func (s *Service) Event(m store.Machine, ev link.Event) {
 	if json.Unmarshal(ev.Raw, &e) != nil || e.RunID == "" || e.ResultToken == "" {
 		return
 	}
-	go func() {
+	safego.Go("automations Event", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		// What the conversation wrote is kept only when it looks like what it should be.
@@ -401,6 +405,10 @@ func (s *Service) Event(m store.Machine, ev link.Event) {
 		}
 		if err := s.recordResult(ctx, e.RunID, e.ResultToken, e.Summary, e.BugIssueID, e.MRURL); err != nil {
 			s.log.Warn("automation report not taken", "machine", m.ID, "run", e.RunID, "error", err)
+			return
 		}
-	}()
+		if run, err := s.runByID(ctx, e.RunID); err == nil {
+			s.notify(ctx, run)
+		}
+	})
 }

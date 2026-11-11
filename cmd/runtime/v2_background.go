@@ -35,9 +35,18 @@ const (
 )
 
 var (
-	_ convo.Background = v2Background{}
-	_ convo.Waker      = v2Background{}
+	_ convo.Background          = v2Background{}
+	_ convo.Waker               = v2Background{}
+	_ convo.TranscriptForgetter = v2Background{}
 )
+
+// Forget drops the reader's place in the transcript of a conversation that is deleted or parked; a later read of it
+// starts from the file's beginning.
+func (b v2Background) Forget(c wire.Conversation) {
+	if b.reader != nil && c.TranscriptPath != "" {
+		b.reader.Forget(c.TranscriptPath)
+	}
+}
 
 // devServer: the command serves something a person opens in a browser.
 var devServer = regexp.MustCompile(`(?i)\b(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:dev|start|serve|preview)|vite|next\s+dev|ng\s+serve|webpack(?:-dev-server|\s+serve)|astro\s+dev|nuxt\s+dev|uvicorn|flask\s+run|rails\s+s(?:erver)?|php\s+-S|http\.server|live-server|dev\s*server)\b`)

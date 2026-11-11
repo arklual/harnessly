@@ -49,6 +49,12 @@ func (i *Instance) restoreTabs(ctx context.Context, c *cdp.Conn) error {
 		p := newPage(old)
 		p.ID, p.WindowID, p.Crashed = result.ID, 0, false
 		i.mu.Lock()
+		if before := i.pages[old.ID]; before != nil && before.login != nil {
+			p.login = before.login
+			p.login.mu.Lock()
+			p.login.ask.Tab = p.ID
+			p.login.mu.Unlock()
+		}
 		delete(i.pages, old.ID)
 		i.pages[p.ID] = p
 		for conv, id := range i.current {

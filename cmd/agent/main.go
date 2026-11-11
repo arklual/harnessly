@@ -11,13 +11,16 @@ import (
 	"syscall"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/memlimit"
 )
 
 func main() {
 	if code, handled := agent.RunCLI(os.Args[1:], os.Stdout, os.Stderr); handled {
 		os.Exit(code)
 	}
-	softMemoryLimit()
+	// The usage feed reads transcripts of hundreds of megabytes: its garbage, not what it keeps, is what reaches a small
+	// unit cap first.
+	memlimit.Apply(memlimit.Policy{CapShare: 0.7})
 	cfg, err := agent.LoadConfig()
 	if err != nil {
 		agent.Log("error", "agent failed to start", agent.F{K: "error", V: err.Error()})

@@ -4,9 +4,17 @@
 // runs in. What the agent asks its pane to show (`harnessly open`, the runtime's own auto-open) is the new pane's
 // (bindings/pane-intents.ts): it opens these tools through `show`. When Legacy goes, these tools are written for the new
 // interface and this folder goes with it.
-import { Suspense, use, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
-import useTimeline from '@/hooks/use-timeline';
-import useTimelineSnapshotStore from '@/hooks/use-timeline-snapshot-store';
+import {
+  Suspense,
+  lazy,
+  use,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { PaneSurfaceShownContext } from '@/hooks/use-pane-surface-shown';
 import { usePaneContents } from '@/components/agents/pane/use-pane-contents';
 import { PANE_KINDS } from '@/components/agents/pane/pane-registry';
@@ -29,6 +37,7 @@ import { loadLegacyTab } from '@/next/commands/pages';
 import ArtifactsView from '@/next/features/artifacts/artifacts-view';
 import { changeLookOf } from '@/next/legacy/change-tab';
 import { artifactItemOf, artifactRequestOf } from '@/next/legacy/artifacts';
+import { PaneSource } from '@/next/legacy/pane-source';
 import { useLinkRestored } from '@/next/stores/connection';
 import type { Conversation, LegacyTab } from '@/next/protocol/v2';
 
@@ -123,7 +132,7 @@ export interface ILegacyPane {
   /** The person brought the tab forward: it is read. */
   pick: (id: string) => void;
   render: (id: string) => ReactNode;
-  /** What the pane keeps mounted beside its tabs: the timeline the contents read, the file viewer over the chat. */
+  /** What the pane keeps mounted beside its tabs: what the contents read of the chat, the file viewer over it. */
   extras: ReactNode;
 }
 
@@ -184,27 +193,30 @@ const LegacyStyles = ({ need, children }: { need: boolean; children: ReactNode }
   return children;
 };
 
-/** Keeps the Legacy timeline of the conversation in the snapshot store while mounted: the contents read it there. */
-const Timeline = ({ tab, provider, machineId }: { tab: ITab; provider: string; machineId: string }) => {
-  const timeline = useTimeline({
-    sessionName: tab.sessionName,
-    agentSessionId: tab.agentState?.sessionId ?? null,
-    panelType: provider === 'codex' ? 'codex-cli' : 'claude-code',
-    machineId,
-  });
-  useEffect(() => {
-    useTimelineSnapshotStore.getState().publish(tab.sessionName, {
-      entries: timeline.entries,
-      jsonlPath: timeline.jsonlPath,
-      sessionId: timeline.sessionId,
-      tasks: timeline.tasks,
-    });
-  }, [tab.sessionName, timeline.entries, timeline.jsonlPath, timeline.sessionId, timeline.tasks]);
-  return null;
-};
+const VaultTab = lazy(() => import('@/components/agents/vault/vault-tab'));
+
+const LegacyWait = () => (
+  <div className="hx-legacy__wait" aria-busy="true">
+    <Skeleton className="hx-legacy__sk" />
+    <Skeleton className="hx-legacy__sk" />
+  </div>
+);
+
+/** «Сейф» of the start page's pane: Legacy's vault, which is the person's and needs no chat. */
+export const LegacyVault = () => (
+  <Guarded title={t('next.load.tool')} fallback={<LegacyWait />} onRetry={() => window.location.reload()}>
+    <LegacyStyles need>
+      <div className="hx-legacy tw-rpane-panel tw-rpane-panel-vault" data-kind="vault">
+        <Suspense fallback={<LegacyWait />}>
+          <VaultTab />
+        </Suspense>
+      </div>
+    </LegacyStyles>
+  </Guarded>
+);
 
 export interface ILegacyPaneOptions {
-  /** The pane is out: the timeline its contents read is kept. */
+  /** The pane is out: what its contents read of the chat is kept. */
   open: boolean;
   /** A tab came forward in Legacy's pane (the agent opened it): it comes forward in the new one. `switched`: it is
    *  only the front of the conversation just come to, which the new pane may have kept its own front for. */
@@ -348,9 +360,7 @@ export const useLegacyPane = (conv: Conversation | null, options: ILegacyPaneOpt
     },
     extras: (
       <>
-        {options.open && tab && conv && (
-          <Timeline tab={tab} provider={conv.provider} machineId={conv.machineId} />
-        )}
+        {options.open && tab && conv && <PaneSource tab={tab} conv={conv} />}
         <Suspense fallback={null}>
           <LegacyStyles need={contents.viewing !== null}>
             <FileViewer

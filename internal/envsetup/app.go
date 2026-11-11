@@ -1,6 +1,8 @@
 package envsetup
 
 import (
+	"strings"
+
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -34,10 +36,13 @@ func (ex *execution) app(i int) {
 		return
 	}
 	defer w.cleanup()
-	id, changed, err := ex.r.Apps.Install(ex.hostPath(w.file), it.ItemID, it.Pinned)
+	id, changed, missing, err := ex.r.Apps.Install(ex.hostPath(w.file), it.ItemID, it.Pinned, src.Install)
 	switch {
 	case err != nil:
 		ex.fail(i, "приложение не поставлено: "+err.Error())
+	case len(missing) > 0:
+		// Not an error: the installation has no such service, and the app stays out of sight until it does.
+		ex.done(i, hubproto.EnvSkipped, "не настроено: у хаба нет адреса сервиса ("+strings.Join(missing, ", ")+")")
 	case changed:
 		ex.done(i, hubproto.EnvOK, "поставлено: "+id)
 	default:

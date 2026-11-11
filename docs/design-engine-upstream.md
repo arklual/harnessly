@@ -52,3 +52,20 @@ artifact of the design type in the browser and pass it with `--canvas`.
 - Projects keep the engine they were made with, so a change here reaches only new projects and those upgraded by hand.
 - The format is the vendor's. If a board made on the built-in engine is opened on the vendor's, it should draw the same.
   Anything of our own goes outside the format, not into it.
+
+## Pages migrated from boards
+
+`harnessly design migrate --to tsx` ([migrations/0002-boards-to-tsx.md](migrations/0002-boards-to-tsx.md))
+turns old boards into page modules. Its rules come from the format as our engine and `format.md` define it, never from
+the vendor's code; whether the project's engine (the vendor's, for most projects) draws a page as it drew its board is
+learned the black-box way: the command draws both in Chrome and keeps a page only when not one pixel differs. A new
+release can draw a migrated page differently from its old board. After moving a project onto a new release, roll its
+pages back and migrate them again (`--to board`, then `--to tsx`): what the release changed shows up as boards that stay
+boards, with the number of pixels that differ.
+
+- A migrated board keeps the project's `support.js`: the frame is the old board's own file around the page.
+- The page's script waits for the engine's React: an engine that loads React later or from elsewhere still draws it.
+- `pages/board-engine/index.ts` does what the format says a board does (values for `{{ }}`, the logic's lifecycle,
+  components on `window`). When the format gains a behaviour, add it there and to the rules in
+  `internal/design/boardtsx.go` together, with a case in `migratetsx_test.go`.
+

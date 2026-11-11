@@ -1,11 +1,13 @@
 package status
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 // trustWindow is how long after a launch the screen is read for a trust dialog while the agent sent no event yet.
@@ -51,10 +53,17 @@ func (m *Manager) acceptTrust(tabID, session, pane string) bool {
 	}
 	m.trustNext[tabID] = now + wait
 	m.mu.Unlock()
-	for _, key := range keys {
-		if err := m.d.Tmux.SendRawKeys(session, key); err != nil {
-			return false
+	// The agent does not start until the dialog is answered: the answer does not wait for the pane.
+	err := typist.WriteNow(session, func(context.Context) error {
+		for _, key := range keys {
+			if err := m.d.Tmux.SendRawKeys(session, key); err != nil {
+				return err
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return false
 	}
 	if answers {
 		m.d.Log("info", "folder trust dialog answered yes", "tabId", tabID, "agent", prompt.Agent, "folder", prompt.FolderPath)

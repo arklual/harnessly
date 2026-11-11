@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import type { MachineId } from '@/next/protocol/v2';
@@ -110,6 +110,22 @@ const mount = (onMissing: () => void = () => undefined) =>
     />,
   );
 const src = () => screen.getByTestId('src').textContent;
+// The frame that spends the ticket (never seen); the page's own frame waits for it.
+const enterSrc = () => document.querySelector('.hx-kit-enter')?.getAttribute('src') ?? null;
+const enterFrame = async () => {
+  await act(async () => {
+    const frame = document.querySelector('.hx-kit-enter');
+    if (frame) fireEvent.load(frame);
+  });
+};
+// The slot gateway's 401 page in a frame tells the page above (hlViewError, deploy preview-gateway frameTell).
+const refusedBySlot = async (origin: string) => {
+  await act(async () => {
+    window.dispatchEvent(
+      new MessageEvent('message', { origin, data: { hlViewError: { kind: 'refused', status: 401 } } }),
+    );
+  });
+};
 const click = async (name: string) => {
   await act(async () => {
     screen.getByText(name).click();
@@ -144,11 +160,102 @@ describe('DesignlySite page switch', () => {
   it('opens the slot once for two pages', async () => {
     mount();
     await act(async () => {});
-    expect(src()).toBe(`${ORIGIN}/enter?t=1`);
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=1`);
+    expect(src()).toBe('');
+    await enterFrame();
+    expect(enterSrc()).toBeNull();
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
     await click('b');
     expect(open).toHaveBeenCalledTimes(1);
     expect(src()).toBe(`${ORIGIN}/a/d1/p/b.html`);
     await click('a');
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
+  });
+
+  it('shows the page when the entering frame never loads', async () => {
+    mount();
+    await act(async () => {});
+    expect(src()).toBe('');
+    // A 204 fires no load in a browser: the page must not stay a skeleton for it.
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
+    // The entering frame is not taken away by the wait: its navigation carries the slot's cookie.
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=1`);
+  });
+
+  it('keeps the entering frame past the wait and reloads the page once it enters late', async () => {
+    mount();
+    await act(async () => {});
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    // A slow ticket redirect: the frame is still entering, the page waits.
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=1`);
+    expect(src()).toBe('');
+    await act(async () => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=1`);
+    // The entry lands after the page was shown without the cookie: the page's frame is dropped for one render…
+    await enterFrame();
+    expect(enterSrc()).toBeNull();
+    expect(src()).toBe('');
+    // …and loads its address again, now with the cookie; the slot is not opened anew.
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+  it('hides the slot refusal met before the entry and reloads after it, without a new opening', async () => {
+    mount();
+    await act(async () => {});
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
+    // The page's frame met «Откройте превью»: the gateway's page tells the page above.
+    await refusedBySlot(ORIGIN);
+    expect(src()).toBe('');
+    await enterFrame();
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the slot anew once when the page is refused after the entry', async () => {
+    mount();
+    await act(async () => {});
+    await enterFrame();
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
+    await refusedBySlot(ORIGIN);
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=2`);
+    await enterFrame();
+    await refusedBySlot(ORIGIN);
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(open).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores a refusal from another origin', async () => {
+    mount();
+    await act(async () => {});
+    await enterFrame();
+    await refusedBySlot('https://other.example');
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
     expect(open).toHaveBeenCalledTimes(1);
     expect(src()).toBe(`${ORIGIN}/a/d1/p/a.html`);
   });
@@ -163,8 +270,8 @@ describe('DesignlySite page switch', () => {
     await click('b');
     await act(async () => {});
     expect(open).toHaveBeenCalledTimes(3);
-    expect(open.mock.calls[2][1]).toBe('/a/d1/p/b.html');
-    expect(src()).toBe(`${ORIGIN}/enter?t=3`);
+    expect(open.mock.calls[2][1]).toBe('/favicon.ico');
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=3`);
   });
 
   it('reopens the slot when another window stamped it', async () => {
@@ -174,7 +281,7 @@ describe('DesignlySite page switch', () => {
     await click('b');
     await act(async () => {});
     expect(open).toHaveBeenCalledTimes(2);
-    expect(src()).toBe(`${ORIGIN}/enter?t=2`);
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=2`);
   });
 
   it('reopens the slot when an older panel opened it', async () => {
@@ -186,7 +293,7 @@ describe('DesignlySite page switch', () => {
     await click('b');
     await act(async () => {});
     expect(open).toHaveBeenCalledTimes(2);
-    expect(src()).toBe(`${ORIGIN}/enter?t=2`);
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=2`);
   });
 
   it('reopens the slot when an older panel opened it without a machine', async () => {
@@ -211,6 +318,7 @@ describe('DesignlySite page switch', () => {
   it('keeps the slot when only another slot number was opened', async () => {
     mount();
     await act(async () => {});
+    await enterFrame();
     await act(async () => {
       await openPreview(M, { kind: 'port', port: 5200 }, 3, '/');
     });
@@ -226,8 +334,41 @@ describe('DesignlySite page switch', () => {
     await click('b');
     await act(async () => {});
     expect(open).toHaveBeenCalledTimes(2);
-    expect(open.mock.calls[1][1]).toBe('/a/d1/p/b.html');
-    expect(src()).toBe(`${ORIGIN}/enter?t=2`);
+    expect(open.mock.calls[1][1]).toBe('/favicon.ico');
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=2`);
+  });
+
+  // a chat leaves and comes back from the sidebar: the design mounts again on the pages it was left on. The
+  // ticket of the new opening is spent by the entering frame alone; a frame of the page never carries it, so a page
+  // frame created again (the stage remounting, a layout restored) cannot meet a spent ticket.
+  it('enters a fresh slot when the chat comes back, and shows its page on the plain address', async () => {
+    const view = mount();
+    await act(async () => {});
+    await enterFrame();
+    await click('b');
+    expect(src()).toBe(`${ORIGIN}/a/d1/p/b.html`);
+    view.unmount();
+    mount();
+    await act(async () => {});
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=2`);
+    expect(src()).toBe('');
+    await enterFrame();
+    expect(src()).not.toContain('/enter');
+    expect(enterSrc()).toBeNull();
+  });
+
+  it('never gives the ticket address to the page frame, before or after entering', async () => {
+    mount();
+    const seen = new Set<string>();
+    for (let i = 0; i < 3; i += 1) {
+      await act(async () => {});
+      seen.add(src() ?? '');
+    }
+    await enterFrame();
+    await click('b');
+    seen.add(src() ?? '');
+    expect([...seen].some((address) => address.includes('/enter'))).toBe(false);
   });
 
   it('reload asks for a fresh slot', async () => {
@@ -236,7 +377,7 @@ describe('DesignlySite page switch', () => {
     await click('reload');
     await act(async () => {});
     expect(open).toHaveBeenCalledTimes(2);
-    expect(src()).toBe(`${ORIGIN}/enter?t=2`);
+    expect(enterSrc()).toBe(`${ORIGIN}/enter?t=2`);
   });
 });
 
@@ -309,7 +450,8 @@ describe('DesignlySite project not in the library', () => {
     shown = library;
     await pass(4000);
     expect(missing).not.toHaveBeenCalled();
-    expect(src()).toBe(`${ORIGIN}/enter?t=1`);
+    // The slot is being entered, or (the entering frame waited out) the page is already shown.
+    expect(enterSrc() === `${ORIGIN}/enter?t=1` || src() === `${ORIGIN}/a/d1/p/a.html`).toBe(true);
   });
 
   // the wait shows the design's frame with its loader, never an empty screen.
@@ -341,7 +483,7 @@ describe('DesignlySite project not in the library', () => {
     shown = library;
     await pass(16_000);
     expect(away()).toBeNull();
-    expect(src()).toBe(`${ORIGIN}/enter?t=1`);
+    expect(enterSrc() === `${ORIGIN}/enter?t=1` || src() === `${ORIGIN}/a/d1/p/a.html`).toBe(true);
   });
 
   it('leaves at once where the gateway knows no role of its own', async () => {

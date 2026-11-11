@@ -153,9 +153,12 @@ type RegisterRequest struct {
 	Profile      Profile `json:"profile"`
 	Via          Via     `json:"via"`
 	AgentVersion string  `json:"agentVersion"`
+	// Previous is set by a machine that registers again over a registration it still holds: the hub keeps the machine's
+	// id when the proof holds, so the chats and everything else filed under that id stay with the machine.
+	Previous *Reregister `json:"previous,omitempty"`
 }
 
-// RegisterResponse is the hub's 201.
+// RegisterResponse is the hub's 201 (200 when the machine kept the id of its previous registration).
 type RegisterResponse struct {
 	MachineID       string  `json:"machineId"`
 	DialURL         string  `json:"dialUrl"`

@@ -35,6 +35,10 @@ this process is seen at once, one made by another replica within that time. A ta
 
 The instance's own domains and keys never belong in the rows or the code: they come from the configuration.
 
+## Known switches
+
+- `preview-slot-host`: preview slots on an origin of their own ([preview-slots.md](preview-slots.md)).
+
 ## API
 
 Only an administrator of the installation (a switch belongs to the installation, not to an organization):

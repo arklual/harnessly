@@ -5,6 +5,7 @@
 package timeline
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/proc"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 const (
@@ -611,7 +613,7 @@ func (s *Server) resume(cn *conn, id, tmuxSession string) {
 		fail(err)
 		return
 	}
-	if err := s.d.Tmux.SendKeys(tmuxSession, line); err != nil {
+	if err := typist.Write(context.Background(), s.d.Tmux, tmuxSession, func(context.Context) error { return s.d.Tmux.SendKeys(tmuxSession, line) }); err != nil {
 		fail(err)
 		return
 	}

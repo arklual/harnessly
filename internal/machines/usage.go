@@ -16,6 +16,8 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/pricing"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 )
 
 // The spend history of the limits forecast, from the person's Claude Code and Codex transcripts: every model call's
@@ -239,6 +241,7 @@ func (t *transcript) clone() *transcript {
 // update brings the transcript up to the file; false when the file cannot be read.
 func (t *transcript) update(path string, st os.FileInfo, keepFrom float64) bool {
 	f, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return false
 	}
@@ -278,12 +281,35 @@ func (t *transcript) update(path string, st os.FileInfo, keepFrom float64) bool 
 	return true
 }
 
+// follow is update without the file: the transcript moved on by the whole lines the shared read holds of a file a
+// conversation is live on. false leaves it to a read of the file: nothing is read of the file yet, or it ends in a
+// line still being written. The start of a followed file is not compared again: it is the file the conversation
+// writes.
+func (t *transcript) follow(lines *transcriptindex.Follower, path string, st os.FileInfo, keepFrom float64) bool {
+	if lines == nil || t.offset == 0 || t.size != t.offset || st.Size() < t.offset {
+		return false
+	}
+	data, partial, ok := lines.Take(path, t.offset)
+	if !ok || partial {
+		return false
+	}
+	for len(data) > 0 {
+		i := bytes.IndexByte(data, '\n') // the lines are whole
+		t.line(bytes.TrimSuffix(data[:i], []byte("\r")), keepFrom)
+		t.offset += int64(i) + 1
+		data = data[i+1:]
+	}
+	t.size, t.mtime = t.offset, st.ModTime()
+	return true
+}
+
 // rowsNow are the rows with a trailing unfinished line read too, as reading the whole file would.
 func (t *transcript) rowsNow(path string, keepFrom float64) []msgRow {
 	if t.size == t.offset {
 		return t.rows
 	}
 	f, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return t.rows
 	}
@@ -305,6 +331,9 @@ type Usage struct {
 	// transcripts takes a while.
 	CacheFile string
 	Now       func() time.Time
+	// Lines, when set, gives what a transcript a conversation is live on gained, read once for all its readers, so
+	// such a transcript is not opened for its rows; nil reads every transcript from the file.
+	Lines *transcriptindex.Follower
 
 	mu         sync.Mutex
 	files      map[string]*transcript
@@ -406,8 +435,13 @@ func (u *Usage) Build() map[string]*Activity {
 			t = &transcript{provider: it.provider}
 		}
 		if st.Size() != t.size || !st.ModTime().Equal(t.mtime) {
-			if !t.update(it.path, st, keepFrom) {
-				continue
+			if !t.follow(u.Lines, it.path, st, keepFrom) {
+				if !t.update(it.path, st, keepFrom) {
+					continue
+				}
+				if t.size == t.offset {
+					u.Lines.Seat(it.path, t.offset)
+				}
 			}
 			dirty = true
 		}

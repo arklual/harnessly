@@ -19,7 +19,6 @@ describe('organization step', () => {
 
   it('is due only with HUB_ORGS=on, an owned space and no postponement', () => {
     expect(orgStepDue(config('on'), me('owner'))).toBe(true);
-    expect(orgStepDue(config('shadow'), me('owner'))).toBe(false);
     expect(orgStepDue(config('off'), me('owner'))).toBe(false);
     expect(orgStepDue(config('on'), me('member'))).toBe(false);
   });

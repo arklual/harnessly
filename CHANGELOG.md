@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `HUB_SWITCHES`: rollout switch rows written at every start from the instance's configuration, so a repository turns
+  a feature on for one person without an administrator's session.
+- Memory sync for folders without a git remote: a `.harnessly-memory-project` file names the project of a
+  folder, and `RUNTIME_MEMORY_LOCAL_FOLDERS=on` makes the folder's path its id (docs/hub/memory-sync.md).
+- The hub answers the Efficiency screen's overview and personal tab: `GET /api/orgs/{org}/efficiency/overview` and
+  `/me` count the spend and calls from the hourly rollup and the shares from the metrics machines already send, with no
+  transcript scanner; what nothing measures is `null`. Only a person whose rollout switch `hub-efficiency` is on gets them
+  (the others get 404 and the web asks the gateway as before). The markers drawn over the charts come from
+  `HUB_EFFICIENCY_MARKERS`, stored again at every start without doubling.
+- Apps as a system of extensions (under `HARNESSLY_UI_SLOTS=on`, off by default): the manifest names the `kind`
+  of an extension (`ui`, `runtime`, `tool`) and the version of its data with JSON Patch migrations (`data`); Settings →
+  Extensions in the hub and `harnessly app disable|remove [--purge]|settings|secret|run|compat` install, update, switch
+  off and remove it, with or without its data, over the settings and secrets the core keeps; an update
+  migrates the data first and leaves it as it was when a step fails. `harnessly upgrade plan|apply --apps` checks the
+  installed apps against the release and stops on one that is on and does not fit. The hub shows an extension's
+  `hub-settings` and `branding` views in sandboxed frames (`/api/ext/ui`).
 - The machine's own projects and favorites go into its person's sidebar on the hub by the move (kind
   `sidebar`, `POST /store/migration/v1/sidebar`): merged as the page merges a machine, without the page open; the
   journal counts it verified once the sidebar lists the machine. A hub with its history off keeps it skipped
@@ -138,6 +154,12 @@ All notable changes to this project are documented here. The format follows
 - `hub doctor` checks the database and its migrations, the sites' S3 bucket, OpenID providers, the public address, the
   proxy settings and the clock; problems and startup errors carry a code (`HUB-…`), what to do and a link
   (`docs/hub/doctor.md`). `--offline` skips what needs the public address.
+- Apps as an extension system (`HARNESSLY_UI_SLOTS=on`): `kind` (`ui`, `runtime`, `tool`), install, update, disable and remove
+  (with or without data) in Settings → Extensions and `harnessly app`, settings forms and secrets kept by the core (a
+  secret reaches the app only with `secrets:<name>`, through `harnessly app run`), data migrated by version with JSON
+  Patch, `harnessly app compat --host` as the compatibility pre-check. The Hub draws `hub-settings` views and branding of
+  its extensions in a sandbox: `ui` and `branding` in the extensions file, `GET /api/ext/ui`, a «Расширения» section
+ .
 - UI slots for apps (`HARNESSLY_UI_SLOTS=on`, off by default): view targets `settings`, `onboarding`, `object-action` and
   `hub-settings`, an app `branding` block, `hl.slot.done()`, a Settings → Extensions page and machine buttons drawn from
   packages in the existing sandboxed frame; a failing view is held by a boundary. The hub's own page is declared but not
@@ -353,6 +375,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `HUB_ORGS` is `off` or `on`: the value `shadow` (instance administrators only) is gone, and a hub that
+  still has it in its environment stops at start and says which values to set. Every variable the hub reads is in one
+  registry (`internal/hub/config/flags.go`) with the area that owns it; a temporary switch carries the day it is due to
+  be removed, and the tests fail on a variable that is read and not registered.
 - The agent's Chrome is held to rules: it goes out only through an egress proxy shared with the pane's live
   browser, which refuses private networks, link-local and the machine's own addresses (by the address a name resolves
   to) and on `localhost` opens only the machine's dev servers, never the runtime's port; `file:`, `chrome:`,

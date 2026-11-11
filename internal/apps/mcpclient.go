@@ -22,6 +22,57 @@ import (
 // the call goes from the machine, so the address must be a public one, or the host one the deployment's admin listed
 // as internal (DeployNetwork), which may also be plain http.
 func CallTool(ctx context.Context, srv MCPServer, tool string, args map[string]any) (json.RawMessage, error) {
+	if args == nil {
+		args = map[string]any{}
+	}
+	return Request(ctx, srv, "tools/call", map[string]any{"name": tool, "arguments": args})
+}
+
+// RemoteTool is a tool of a remote MCP server as its tools/list gives it: the definition is kept as the server wrote it.
+type RemoteTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description,omitempty"`
+	InputSchema json.RawMessage `json:"inputSchema,omitempty"`
+	Annotations json.RawMessage `json:"annotations,omitempty"`
+}
+
+// maxRemoteTools caps what one server may offer through the host: a server that lists more is cut.
+const maxRemoteTools = 200
+
+// ListTools is the tools a remote MCP server offers (tools/list, its pages followed), under the same rules as CallTool.
+func ListTools(ctx context.Context, srv MCPServer) ([]RemoteTool, error) {
+	var out []RemoteTool
+	cursor := ""
+	for page := 0; page < 10 && len(out) < maxRemoteTools; page++ {
+		params := map[string]any{}
+		if cursor != "" {
+			params["cursor"] = cursor
+		}
+		raw, err := Request(ctx, srv, "tools/list", params)
+		if err != nil {
+			return nil, err
+		}
+		var list struct {
+			Tools      []RemoteTool `json:"tools"`
+			NextCursor string       `json:"nextCursor"`
+		}
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return nil, &BridgeError{Code: CodeHostUnavailable, Message: ToolError, Detail: "tools/list: " + err.Error()}
+		}
+		out = append(out, list.Tools...)
+		if list.NextCursor == "" || list.NextCursor == cursor {
+			break
+		}
+		cursor = list.NextCursor
+	}
+	if len(out) > maxRemoteTools {
+		out = out[:maxRemoteTools]
+	}
+	return out, nil
+}
+
+// Request sends one request to an app's remote MCP server after its initialize: a new session each time.
+func Request(ctx context.Context, srv MCPServer, method string, params map[string]any) (json.RawMessage, error) {
 	u, err := url.Parse(srv.URL)
 	if err != nil || u.Hostname() == "" {
 		return nil, &BridgeError{Code: CodeHostNotAllowed, Message: ToolRefused, Detail: "the MCP server has no address"}
@@ -51,10 +102,7 @@ func CallTool(ctx context.Context, srv MCPServer, tool string, args map[string]a
 	if _, err := c.rpc(ctx, 0, "notifications/initialized", map[string]any{}); err != nil {
 		return nil, err
 	}
-	if args == nil {
-		args = map[string]any{}
-	}
-	return c.rpc(ctx, 2, "tools/call", map[string]any{"name": tool, "arguments": args})
+	return c.rpc(ctx, 2, method, params)
 }
 
 // noRedirects: an answer that redirects is the answer (and an error): the call never goes where the server points it.

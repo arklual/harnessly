@@ -48,7 +48,7 @@ func TestMachinesSliceWithoutTheCore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Add(f.AsRoutes(machineSliceRoutes(d, "127.0.0.1:0", old.Addr().String(), sender, hooks)...)...)
+	f.Add(f.AsRoutes(machineSliceRoutes(d, "127.0.0.1:0", old.Addr().String(), sender, hooks, nil)...)...)
 	do := func(method, path, body string) (int, string) {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Cookie", "session-token=good")

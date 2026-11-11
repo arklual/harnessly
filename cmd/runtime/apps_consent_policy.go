@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -19,6 +20,9 @@ import (
 // a dev edit that would wait for the person gets its rights at once (apps.ConsentPolicy), and what waited when the rule
 // came on is granted. A machine without a hub has no such file and asks as before. Turned off, the rule takes nothing
 // back. Nothing on the machine writes the rule but the agent from the hub's word: the runtime has no route for it.
+//
+// The same list carries the organization's switch of an app item (source.off): an environment app whose item is off is
+// not listed on the machine (no menu item, no tools, no views) and stays installed, so turning it on again is instant.
 
 // appsPolicyEvery is how often the rule and the dev folders are looked at while the runtime runs.
 const appsPolicyEvery = 3 * time.Second
@@ -26,6 +30,8 @@ const appsPolicyEvery = 3 * time.Second
 // appsConsentPolicy reads the rule from the link folders, each file read again only when it changed.
 type appsConsentPolicy struct {
 	files []string
+	// links are the link folders, in the order of files.
+	links []string
 
 	mu   sync.Mutex
 	seen map[string]policySeen
@@ -35,12 +41,15 @@ type policySeen struct {
 	mod  time.Time
 	size int64
 	auto bool
+	// off are the app items the organization turned off.
+	off []string
 }
 
 func newAppsConsentPolicy(linkDirs []string) *appsConsentPolicy {
 	p := &appsConsentPolicy{seen: map[string]policySeen{}}
 	for _, d := range linkDirs {
 		p.files = append(p.files, filepath.Join(d, "environment.json"))
+		p.links = append(p.links, d)
 	}
 	return p
 }
@@ -51,27 +60,51 @@ func (p *appsConsentPolicy) On() bool {
 	defer p.mu.Unlock()
 	on := false
 	for _, f := range p.files {
-		fi, err := os.Stat(f)
-		if err != nil {
-			delete(p.seen, f)
-			continue
-		}
-		if s, ok := p.seen[f]; ok && s.mod.Equal(fi.ModTime()) && s.size == fi.Size() {
+		if s, ok := p.readLocked(f); ok {
 			on = on || s.auto
-			continue
 		}
-		auto := readAppsConsent(f) == hubproto.AppsConsentAuto
-		p.seen[f] = policySeen{mod: fi.ModTime(), size: fi.Size(), auto: auto}
-		on = on || auto
 	}
 	return on
 }
 
-// readAppsConsent is the rule of one list file: the one the agent wrote with a list whose hash holds (envkeeper.go).
-func readAppsConsent(path string) string {
+// AppOff says whether the organization turned off the app item of the link's list (apps.Registry.SetOrgOff).
+func (p *appsConsentPolicy) AppOff(link, itemID string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i, f := range p.files {
+		if p.links[i] != link {
+			continue
+		}
+		if s, ok := p.readLocked(f); ok && slices.Contains(s.off, itemID) {
+			return true
+		}
+	}
+	return false
+}
+
+// readLocked is what one list file says, read again only when it changed; false for a file that is not there.
+func (p *appsConsentPolicy) readLocked(f string) (policySeen, bool) {
+	fi, err := os.Stat(f)
+	if err != nil {
+		delete(p.seen, f)
+		return policySeen{}, false
+	}
+	if s, ok := p.seen[f]; ok && s.mod.Equal(fi.ModTime()) && s.size == fi.Size() {
+		return s, true
+	}
+	consent, off := readEnvList(f)
+	s := policySeen{mod: fi.ModTime(), size: fi.Size(), auto: consent == hubproto.AppsConsentAuto, off: off}
+	p.seen[f] = s
+	return s, true
+}
+
+// readEnvList is the rule for apps of one list file and its app items the organization turned off: the list the agent
+// wrote, whose hash holds (envkeeper.go). A file that is missing, unreadable, broken or whose hash does not hold says
+// ask and nothing off.
+func readEnvList(path string) (string, []string) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return ""
+		return "", nil
 	}
 	var h struct {
 		Hash        string             `json:"hash"`
@@ -79,9 +112,18 @@ func readAppsConsent(path string) string {
 		Items       []hubproto.EnvItem `json:"items"`
 	}
 	if json.Unmarshal(raw, &h) != nil || h.Hash == "" || hubproto.EnvHash(h.Items) != h.Hash {
-		return ""
+		return "", nil
 	}
-	return h.AppsConsent
+	var off []string
+	for _, it := range h.Items {
+		var src struct {
+			Off bool `json:"off"`
+		}
+		if it.Kind == hubproto.EnvKindApp && json.Unmarshal(it.Source, &src) == nil && src.Off {
+			off = append(off, it.ItemID)
+		}
+	}
+	return h.AppsConsent, off
 }
 
 // watchAppsConsent grants, while the rule is on, what waits: at once when the rule comes on, and the dev folders that

@@ -88,7 +88,12 @@ export const setDocThreadStatus = async (
   );
 
 export const markDocRead = async (slug: string): Promise<void> => {
-  await appFetch(`${BASE}/${encodeURIComponent(slug)}/read`, { method: 'POST' });
+  // A change declares JSON: the hub's CSRF guard refuses a bare POST.
+  await appFetch(`${BASE}/${encodeURIComponent(slug)}/read`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+  });
 };
 
 /** The page of one version when `version` is given (its id), else the current one. */

@@ -210,3 +210,35 @@ func TestProjectNames(t *testing.T) {
 		t.Errorf("EntryName = %q", got)
 	}
 }
+
+func TestFolderWithoutRemote(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	if got := FolderID(ctx, dir, false); got != "" {
+		t.Errorf("a folder without a remote synced: %q", got)
+	}
+	if got := FolderID(ctx, dir, true); got != "dir:"+filepath.ToSlash(dir) {
+		t.Errorf("by path = %q", got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, KeyFile), []byte("team-notes\nignored\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, local := range []bool{false, true} {
+		if got := FolderID(ctx, dir, local); got != "dir:team-notes" {
+			t.Errorf("by key (local=%v) = %q", local, got)
+		}
+	}
+	// A key that is no key is no key: the folder falls back to what it had.
+	if err := os.WriteFile(filepath.Join(dir, KeyFile), []byte("has space\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := FolderKey(dir); got != "" {
+		t.Errorf("bad key accepted: %q", got)
+	}
+	if got := PathID("relative/dir"); got != "" {
+		t.Errorf("relative path = %q", got)
+	}
+	if got := PathID("/with space/dir"); got != "" {
+		t.Errorf("path with a space = %q", got)
+	}
+}

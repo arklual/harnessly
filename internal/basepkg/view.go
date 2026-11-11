@@ -20,6 +20,8 @@ type ViewItem struct {
 	Host    string `json:"host,omitempty"`
 	// Command installs it by hand (the machine has no service that does).
 	Command string `json:"command,omitempty"`
+	// Optional: the item only adds a feature; without it the base package is still done.
+	Optional bool `json:"optional,omitempty"`
 }
 
 // View is GET <platform>/basepkg: how the base package stands here.
@@ -27,7 +29,7 @@ type View struct {
 	// Service: a root service installs the system part on this machine; without it the person runs Command.
 	Service bool       `json:"service"`
 	Running bool       `json:"running"`
-	Done    bool       `json:"done"` // nothing is left to do: every item is ok or skipped
+	Done    bool       `json:"done"` // nothing is left to do: every item but the optional ones is ok or skipped
 	Proxy   string     `json:"proxy"`
 	Command string     `json:"command,omitempty"` // everything missing in one line
 	At      int64      `json:"at,omitempty"`
@@ -74,7 +76,7 @@ func MakeView(l Look) View {
 	var missing []Item
 	v.Done = true
 	for _, it := range List {
-		line := ViewItem{ID: it.ID, Title: it.Title, Without: it.Without}
+		line := ViewItem{ID: it.ID, Title: it.Title, Without: it.Without, Optional: it.Optional}
 		switch {
 		case it.Personal:
 			line.Status, line.Message, line.Host = voiceStatus(l, it)
@@ -94,11 +96,11 @@ func MakeView(l Look) View {
 		default:
 			line.Status = Missing
 			line.Command = Command(l.Manager, []Item{it})
-			if line.Command != "" {
+			if line.Command != "" && !it.Optional {
 				missing = append(missing, it)
 			}
 		}
-		if line.Status != OK && line.Status != Skipped {
+		if line.Status != OK && line.Status != Skipped && !it.Optional {
 			v.Done = false
 		}
 		v.Items = append(v.Items, line)

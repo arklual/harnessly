@@ -33,6 +33,8 @@ func rule(t *testing.T, s *Service, name string, limits Limits) Rule {
 	return r
 }
 
+func anyMachine(context.Context, Rule) (string, error) { return "m1", nil }
+
 func noon() time.Time { return time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC) } // 12:00 Moscow
 
 func TestRuleNameUnique(t *testing.T) {
@@ -82,11 +84,11 @@ func TestClaimAndResult(t *testing.T) {
 	ctx := context.Background()
 	r := rule(t, s, "a", Limits{})
 	out, _ := s.queueRun(ctx, r, "f1", json.RawMessage(`{"k":1}`))
-	run, _, token, err := s.claim(ctx)
+	run, _, token, _, err := s.claim(ctx, anyMachine)
 	if err != nil || run.ID != out.RunID || token == "" {
 		t.Fatalf("claim: %v %+v", err, run)
 	}
-	if _, _, _, err := s.claim(ctx); err != store.ErrNotFound {
+	if _, _, _, _, err := s.claim(ctx, anyMachine); err != store.ErrNotFound {
 		t.Fatalf("second claim should find nothing: %v", err)
 	}
 	if err := s.recordResult(ctx, run.ID, "wrong", "x", "", ""); err == nil {
@@ -116,7 +118,7 @@ func TestClaimSkipsQuietRule(t *testing.T) {
 	if _, err := s.queueRun(context.Background(), r, "f", json.RawMessage(`{}`)); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, err := s.claim(context.Background()); err != store.ErrNotFound {
+	if _, _, _, _, err := s.claim(context.Background(), anyMachine); err != store.ErrNotFound {
 		t.Fatalf("quiet rule claimed: %v", err)
 	}
 }

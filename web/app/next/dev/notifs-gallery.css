@@ -174,3 +174,20 @@
     display: none;
   }
 }
+.hx-ng__events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.hx-ng__events li {
+  display: flex;
+  flex-direction: column;
+}
+.hx-ng__events small {
+  color: var(--hx-fg-muted, #888);
+  font-size: 11px;
+}

@@ -56,4 +56,20 @@ spec:
                 port:
                   number: {{ $port }}
     {{- end }}
+    {{- range $key := list "docs" "boards" }}
+    {{- $v := index $.Values $key }}
+    {{- if and $v.enabled $v.bundled $v.ingress }}
+    # The {{ $key }} service at its own address ({{ $key }}.url).
+    - host: {{ (urlParse $v.url).hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ printf "%s-%s" $fullName (ternary "artifacts" "boards" (eq $key "docs")) }}
+                port:
+                  number: 8080
+    {{- end }}
+    {{- end }}
 {{- end }}

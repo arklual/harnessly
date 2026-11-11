@@ -6,12 +6,14 @@ import { useNow } from '../../../lib/hooks';
 import { navigate } from '../../../lib/router';
 import type { MachinesList } from '../../../org/api/machines';
 import { useOrg } from '../../../org/context';
+import { seatsOn } from '../../flag';
 import { Btn, Icon, usePop } from '../../ui';
 import {
   filterLabel,
   filterOptions,
   filterTenants,
   flatRows,
+  foldGroups,
   groupLimit,
   groupSt,
   num,
@@ -21,7 +23,17 @@ import {
   type TenantFilter,
   toggleTenant,
 } from './calc';
-import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles, useMachineSort } from './parts';
+import {
+  AddCta,
+  Group,
+  MachineRows,
+  MlLink,
+  SearchBox,
+  Seg,
+  TableHead,
+  Tiles,
+  useMachineSort,
+} from './parts';
 import { useSentinel } from './use-sentinel';
 
 type View = 'tenant' | 'flat';
@@ -143,13 +155,17 @@ export const OrgView = ({
   onAdd?: () => void;
 }) => {
   const { shell } = useOrg();
+  const seats = seatsOn(shell.features);
   const now = useNow(60_000);
   const [q, setQ] = useState('');
   const [view, setView] = useState<View>('tenant');
   const [filter, setFilter] = useState<TenantFilter>(NO_FILTER);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [more, setMore] = useState(0);
-  const tiles = useMemo(() => orgTiles(list.summary, list.groups), [list]);
+  const tiles = useMemo(
+    () => orgTiles(list.summary, seats ? foldGroups(list.groups) : list.groups),
+    [list, seats],
+  );
   const inFilter = useMemo(() => filterTenants(list.groups, filter), [list.groups, filter]);
   const shown = useMemo(() => searchGroups(inFilter, q), [inFilter, q]);
   const ms = useMachineSort();
@@ -205,9 +221,7 @@ export const OrgView = ({
               >
                 <div className="mt mt--in">
                   <TableHead />
-                  {groupRows.map((m) => (
-                    <MachineRow key={m.id} m={m} mode="group" now={now} onOpen={onOpen} />
-                  ))}
+                  <MachineRows machines={groupRows} mode="group" now={now} onOpen={onOpen} seats={seats} />
                 </div>
                 <button
                   type="button"
@@ -229,9 +243,13 @@ export const OrgView = ({
       {view === 'flat' && rows.length > 0 && (
         <div className="mt">
           <TableHead sorting={ms} />
-          {rows.slice(0, rLimit).map((m) => (
-            <MachineRow key={m.id} m={m} mode="flat-org" now={now} onOpen={onOpen} />
-          ))}
+          <MachineRows
+            machines={rows.slice(0, rLimit)}
+            mode="flat-org"
+            now={now}
+            onOpen={onOpen}
+            seats={seats}
+          />
           {rows.length > rLimit && <Sentinel rows onHit={next} more={more} />}
         </div>
       )}

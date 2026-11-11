@@ -28,8 +28,13 @@ harnessly design kit export <id> [--version V] [--out FILE] [--with-sources] [--
 harnessly design kit import <file-or-url> [--as-id ID] [--as-version V] [--dry-run] [--dir DIR] [--header 'Name: value']
 harnessly design kit search <id> <words…> [--theme T] [--version V] [--dir DIR]
 harnessly design kit show <id> <node> [--theme T] [--version V] [--dir DIR]
+harnessly design kit add npm:<package>[@<version>]|shadcn:<registry> [<folder>] [--id ID] [--namespace NS] [--title T]
+        [--version V] [--root Comp] [--css <package>/<file>.css,…] [--registry URL] [--from DIR] [--no-render] [--json]
+harnessly design kit update <folder> [--version V] [--from DIR] [--no-render] [--json]
 harnessly design kit check <folder> [--render] [--levels] [--json]
 harnessly design kit render <folder> [--shots] [--only ID,ID] [--json]
+harnessly design kit convert <folder> --to dtcg|css|tailwind|tailwind4|design-md [--out FILE] [--json]
+harnessly design kit convert <folder> --from dtcg|css|design-md|storybook|figma <source> [--mode ID] [--css] [--dry-run] [--json]
 
 A UI kit is installed once by version and boards load it from /kit/<id>/<version>/... instead of carrying a copy.
 
@@ -58,6 +63,20 @@ A UI kit is installed once by version and boards load it from /kit/<id>/<version
             and tokens.css (light and dark), components/bundle.js and bundle.css, a card per component — with a
             provider (Root), a plain component (Button) and a compound one (Card with its parts). It passes check;
             replace the components with yours and check after each change.
+  add       make a library kit from a package in one command: npm:<package>[@<version>] (a private registry by
+            --registry or the .npmrc of this folder; a token from the environment the .npmrc names) or
+            shadcn:<registry> (shadcn:ui is shadcn/ui; a folder or an address of another registry's built items).
+            It installs the package into a build folder (the user cache; --from DIR uses a folder that already has
+            node_modules and installs nothing), bundles its exports with esbuild on the page's React 18 into
+            components/bundle.js (+ bundle.css in @layer kit-<id>; shadcn's classes compiled by Tailwind), reads every
+            component's props from its types (TypeScript), writes its CSS variables as tokens.json + tokens.css, a card
+            per component, code {import, export}, a first sample, then draws every component in headless Chrome:
+            one that does not draw alone loses its sample and is listed. The report ends with what it could not read
+            and what a person writes. <folder> is ./<id> when not given. --no-render skips the drawing.
+  update    bring a kit made by add to a new version of its package (--version V; the newest when not given; a
+            shadcn kit is fetched again and takes --version as its own): the bundle, props, tokens and the cards'
+            Props and In code are rebuilt, everything a person wrote is kept, and the report says which components
+            and props were added, removed or changed. kit add on a folder add made does the same.
   check     check a kit folder before packing it (or a project's ds/<folder>/): its identity, the canvas fields,
             tokens.json's shape, a card and a purpose for every component, the bundle's place and styles. Errors
             make it exit 1. --render also draws every component and layout (see render). The summary says how far the
@@ -68,6 +87,22 @@ A UI kit is installed once by version and boards load it from /kit/<id>/<version
             and components that draw nothing. --shots writes the canvas's pictures (_harnessly/thumbs/…) and their
             "thumb" fields into design-system.json: run it as the last step of a build.
 
+  convert   move a kit's tokens, descriptions and component drafts to and from other formats; the kit's own format stays
+            the only one inside. <folder> is a kit theme folder (the one with design-system.json). Every run lists what
+            it did not carry, so nothing is lost without a word.
+              --to dtcg        W3C Design Tokens: groups, $value/$type, {a.b} aliases; a mode other than the first in
+                               $extensions.mode; kit-only members in $extensions.harnessly (our import reads them back)
+              --to css         CSS variables: the first mode under :root, the others under [data-theme="<mode>"]
+              --to tailwind    Tailwind v3 preset (theme.extend) pointing at the variables;  --to tailwind4: @theme inline
+              --to design-md   one DESIGN.md (front matter with tokens, prose with colours/type/components) for other agents
+            Without --out the text goes to standard output and the report to standard error.
+              --from dtcg|figma|css|design-md <file>   tokens into tokens.json, merged by name (a new name is added, the
+                               same name replaced, nothing deleted); --mode ID says the file holds that colour mode only
+              --from storybook <build folder|index.json|stories.json>   component drafts into design-system.json with
+                               a card each and a "todo" list of what a person still writes; nothing is invented
+            After an import the report lists what is still to write, then the result of kit check. tokens.css is
+            rewritten only with --css. --dry-run changes nothing.
+
 The kits folder is --dir, else $RUNTIME_DESIGN_KITS_DIR, else design-kits in the runtime's data folder (the same
 default the runtime serves from).
 `
@@ -75,7 +110,7 @@ default the runtime serves from).
 // designKit is "design kit ..."; args are what follows "kit".
 func (c *cli) designKit(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design kit takes: init|check|render|install|list|export|import|search|show")
+		return usageErr("design kit takes: init|add|update|check|render|convert|install|list|export|import|search|show")
 	}
 	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
 		c.out("%s", kitHelp)
@@ -99,8 +134,14 @@ func (c *cli) designKit(args []string) error {
 		return c.kitShow(opt, pos)
 	case "init":
 		return c.kitInit(opt, pos)
+	case "add":
+		return c.kitAdd(opt, pos)
+	case "update":
+		return c.kitUpdate(opt, pos)
 	case "check":
 		return c.kitCheck(opt, pos)
+	case "convert":
+		return c.kitConvert(opt, pos)
 	case "render":
 		return c.kitRender(opt, pos)
 	case "list", "ls":
@@ -125,6 +166,10 @@ type kitOptions struct {
 	render, shots, levels         bool
 	only                          string
 	id, namespace, title, source  string
+	to, from, mode                string
+	css                           bool
+	noRender                      bool
+	root, cssFiles, registry      string
 }
 
 func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
@@ -175,6 +220,28 @@ func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
 			o.title, err = value()
 		case "source":
 			o.source, err = value()
+		case "to":
+			o.to, err = value()
+		case "mode":
+			o.mode, err = value()
+		case "css":
+			// convert takes --css alone; add takes --css <files>.
+			if hasVal {
+				o.cssFiles = val
+			} else if i+1 < len(args) && strings.Contains(args[i+1], ".css") {
+				i++
+				o.cssFiles = args[i]
+			} else {
+				o.css = true
+			}
+		case "no-render":
+			o.noRender = true
+		case "root":
+			o.root, err = value()
+		case "registry":
+			o.registry, err = value()
+		case "from": // convert: the format; add and update: a folder with node_modules
+			o.from, err = value()
 		case "version":
 			o.version, err = value()
 		case "out", "o":
@@ -498,12 +565,12 @@ func (c *cli) kitCheck(opt kitOptions, pos []string) error {
 	if len(pos) != 1 {
 		return usageErr("design kit check takes one folder: harnessly design kit check ./dist/kit")
 	}
-	rep, err := designkit.Check(pos[0])
+	rep, err := designkit.CheckIn(pos[0], opt.dir)
 	if err != nil {
 		return fail("%v", err)
 	}
 	if opt.render && rep.Errors() == 0 {
-		items, err := design.RenderKit(pos[0], design.KitRenderOptions{Only: onlySet(opt.only)})
+		items, err := design.RenderKit(pos[0], design.KitRenderOptions{Only: onlySet(opt.only), KitsDir: opt.dir})
 		if err != nil {
 			return fail("render: %v", err)
 		}
@@ -536,7 +603,7 @@ func (c *cli) kitRender(opt kitOptions, pos []string) error {
 	if len(pos) != 1 {
 		return usageErr("design kit render takes one folder: harnessly design kit render ./dist/kit --shots")
 	}
-	items, err := design.RenderKit(pos[0], design.KitRenderOptions{Shots: opt.shots, Only: onlySet(opt.only)})
+	items, err := design.RenderKit(pos[0], design.KitRenderOptions{Shots: opt.shots, Only: onlySet(opt.only), KitsDir: opt.dir})
 	if err != nil {
 		return fail("%v", err)
 	}

@@ -97,25 +97,26 @@ type Library struct {
 	// shareFS is the share filesystem probe's last result (sharefs.go).
 	shareFS shareFSCache
 
-	mu       sync.Mutex
-	locks    map[string]*sync.Mutex
-	listing  listingCache
-	srv      *server
-	bg       background
-	bgStarts sync.WaitGroup
-	live     liveState
-	timeline timelineState
-	tabs     func() ([]Chat, bool)
-	identity identityCache
-	hist     historyState
-	modes    modesState
-	sources  sourcesState
-	texts    sync.Map
-	releases releasesState
-	osUser   func() string
-	hashed   *hashIndex
-	pinned   pinnedState
-	kitPins  kitPinState
+	mu         sync.Mutex
+	locks      map[string]*sync.Mutex
+	listing    listingCache
+	srv        *server
+	bg         background
+	bgStarts   sync.WaitGroup
+	live       liveState
+	timeline   timelineState
+	tabs       func() ([]Chat, bool)
+	identity   identityCache
+	hist       historyState
+	modes      modesState
+	sources    sourcesState
+	texts      sync.Map
+	releases   releasesState
+	osUser     func() string
+	hashed     *hashIndex
+	pinned     pinnedState
+	kitPins    kitPinState
+	pageBuilds pageBuildState
 	// revs is the store's history when the library syncs with one (revisions.go); nil keeps the git history.
 	revs      atomic.Pointer[revisionsBox]
 	pinMu     sync.Mutex

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -108,6 +109,9 @@ type hub struct {
 	// bg counts the goroutines the link starts (loops, probes, refreshes): stop waits for them, so nothing writes into
 	// the data folder after Run has returned.
 	bg sync.WaitGroup
+
+	// work is the chats' work the runtime said, for the hub (chatwork.go).
+	work workCache
 }
 
 // hasSecret says whether a variable is in the environment the machine's chats start with: the agent's env files, or
@@ -208,11 +212,12 @@ func (h *hub) start(ctx context.Context) error {
 	})
 	h.logins = agentlogin.New(ctx, agentlogin.Config{
 		Shell: h.shell, EnvDir: cfg.EnvDir, Dir: filepath.Join(h.dir, "agent-login"), Version: cfg.Version,
-		Status:   h.oneStatus,
-		Console:  h.openConsole,
-		Emit:     func(l hubproto.Login) { h.emit(hubproto.EventLogin, "login", l) },
-		Finished: func(string) { h.goBG(func() { h.refreshAgents(true) }) },
-		CLI:      func(id string) (agentlogin.CLI, bool) { return agentlogin.FindCLI(h.clisFile(), id) },
+		Status:      h.oneStatus,
+		Console:     h.openConsole,
+		ConsoleNote: h.noteConsole,
+		Emit:        func(l hubproto.Login) { h.emit(hubproto.EventLogin, "login", l) },
+		Finished:    func(string) { h.goBG(func() { h.refreshAgents(true) }) },
+		CLI:         func(id string) (agentlogin.CLI, bool) { return agentlogin.FindCLI(h.clisFile(), id) },
 	})
 	h.goBG(func() {
 		t := time.NewTicker(switchPoll)
@@ -295,7 +300,7 @@ func (h *hub) emit(event, key string, value any) {
 	}
 	for _, l := range h.hubLinks() {
 		if l.wants(event) {
-			l.sendText(frame)
+			l.sendEvent(event, frame)
 		}
 	}
 }
@@ -305,6 +310,9 @@ func (h *hub) emit(event, key string, value any) {
 func (h *hub) emitHistory(ev any) {
 	var name string
 	var frame any
+	// wait is how long a batch may wait for room in its window: live events never wait under the replica's lock
+	// (their channel sends again from its ack), a page of the backfill waits on its own goroutine.
+	var wait time.Duration
 	switch e := ev.(type) {
 	case evV2Events:
 		name = hubproto.EventHistoryEvents
@@ -312,6 +320,7 @@ func (h *hub) emitHistory(ev any) {
 	case evV2Backfill:
 		name = hubproto.EventHistoryBackfill
 		frame = hubproto.HistoryBackfill{Ch: e.Ch, Events: e.Events}
+		wait = replBackfillWait
 	default:
 		return
 	}
@@ -328,6 +337,19 @@ func (h *hub) emitHistory(ev any) {
 	if err != nil {
 		return
 	}
+	// A link the hub started batches on gets the frame as the batch of its kind; the others as the old event.
+	old := links[:0:0]
+	for _, l := range links {
+		if o := l.repl.Load(); o.has(name) {
+			o.push(name, raw, wait)
+			continue
+		}
+		old = append(old, l)
+	}
+	links = old
+	if len(links) == 0 {
+		return
+	}
 	var body map[string]json.RawMessage
 	if json.Unmarshal(raw, &body) != nil {
 		return
@@ -342,9 +364,6 @@ func (h *hub) emitHistory(ev any) {
 		l.sendText(out)
 	}
 }
-
-// historyServed: the agent reads the runtime's chats for the hub (a hub's own machine with a runtime next to it).
-func (h *hub) historyServed() bool { return h.a.cfg.RuntimePort != 0 && !h.observe }
 
 // setLink records whether the link is up, and why not when it is not.
 func (h *hub) setLink(linked bool, note string) {
@@ -487,7 +506,7 @@ func (h *hub) hello() hubproto.Hello {
 	// The runtime ships in the same release and does the setup; an own link takes it only under the policy's `setup`.
 	offered := h.setupOffered()
 	if offered {
-		features = append(features, hubproto.FeatureEnvSetup, hubproto.FeatureEnvClaude, hubproto.FeatureEnvApps)
+		features = append(features, hubproto.FeatureEnvSetup, hubproto.FeatureEnvClaude, hubproto.FeatureEnvApps, hubproto.FeatureEnvPacks)
 	}
 	h.mu.Lock()
 	h.setupSaid = offered
@@ -507,6 +526,7 @@ func (h *hub) hello() hubproto.Hello {
 	if h.historyServed() {
 		features = append(features, hubproto.FeatureHistory)
 	}
+	features = append(features, hubproto.FeatureRepl)
 	if h.docsServed() {
 		features = append(features, hubproto.FeatureDocs)
 	}
@@ -660,4 +680,34 @@ func (h *hub) openConsole(_ context.Context, _, command string) (string, error) 
 		url = "/?tab=" + tab.TabID
 	}
 	return h.machine.RuntimeBasePath + url, nil
+}
+
+// noteConsole tells the console page of an attempt where it stands, and whether the person cancelled it there. Only the
+// state goes: the page learns nothing the CLI printed, and a failed note changes nothing about the login.
+func (h *hub) noteConsole(_ context.Context, consoleURL, provider, state string, expiresAt int64) bool {
+	i := strings.LastIndex(consoleURL, "/console/")
+	if i < 0 {
+		return false
+	}
+	label := provider
+	switch provider {
+	case hubproto.ProviderClaude:
+		label = "Claude"
+	case hubproto.ProviderCodex:
+		label = "Codex"
+	default:
+		if c, ok := agentlogin.FindCLI(h.clisFile(), provider); ok {
+			label = c.Label
+		}
+	}
+	raw, err := h.a.callRuntime(h.a.cfg.RuntimeAPI+"/console-state", map[string]any{
+		"tabId": strings.Trim(consoleURL[i+len("/console/"):], "/"), "state": state, "provider": provider, "label": label, "expiresAt": expiresAt})
+	if err != nil {
+		return false
+	}
+	var out struct {
+		Cancelled bool `json:"cancelled"`
+	}
+	_ = json.Unmarshal(raw, &out)
+	return out.Cancelled
 }

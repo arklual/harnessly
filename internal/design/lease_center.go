@@ -283,6 +283,7 @@ func (c *centerLeases) sweep(l *Library, now int64, runtime string, chat func(ta
 	var res SweepResult
 	list, err := c.all()
 	if err != nil {
+		res.Offline = true
 		return res
 	}
 	seen := map[string]bool{}
@@ -296,6 +297,7 @@ func (c *centerLeases) sweep(l *Library, now int64, runtime string, chat func(ta
 		if strings.HasPrefix(cl.Owner.TabID, leaseUIPrefix) {
 			continue // a person's own edit in the page: it renews the lease itself and runs out by the TTL
 		}
+		res.Own++
 		view, here := chat(cl.Owner.TabID)
 		if !here {
 			since, had := missing[key]
@@ -336,6 +338,7 @@ func (c *centerLeases) sweep(l *Library, now int64, runtime string, chat func(ta
 			delete(missing, k)
 		}
 	}
+	res.Own -= len(res.Released)
 	return res
 }
 

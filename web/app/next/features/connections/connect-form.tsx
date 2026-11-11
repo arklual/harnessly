@@ -31,6 +31,10 @@ export interface IConnectFormProps {
   onDetect: (url: string) => Promise<TDetectResult>;
   /** Resolves null when the connection is kept, else the words of why not. */
   onConnect: (input: IConnectInput) => Promise<string | null>;
+  /** An address to find at once (from «Подключить свой GitLab» of the review): the card asks for the token straight. */
+  start?: string;
+  /** An address only shown in the field: it came from outside the page (a link) and is found by «Найти». */
+  prefill?: string;
 }
 
 /** The values a method takes, from what was typed: its own fields only, trimmed. */
@@ -114,8 +118,8 @@ const FieldInput = ({ field, value, disabled, invalid, focus, onChange, onSubmit
   );
 };
 
-const ConnectForm = ({ onDetect, onConnect }: IConnectFormProps) => {
-  const [url, setUrl] = useState('');
+const ConnectForm = ({ onDetect, onConnect, start, prefill }: IConnectFormProps) => {
+  const [url, setUrl] = useState(start ?? prefill ?? '');
   const [detection, setDetection] = useState<IDetection | null>(null);
   const [methodId, setMethodId] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -139,8 +143,8 @@ const ConnectForm = ({ onDetect, onConnect }: IConnectFormProps) => {
   const method = shown === null ? null : (shown.methods.find((m) => m.id === methodId) ?? firstMethod(shown));
   const hasSecret = method !== null && method.fields.some((field) => field.secret);
 
-  const detect = async () => {
-    const link = url.trim();
+  const detect = async (asked?: string) => {
+    const link = (asked ?? url).trim();
     if (link === '' || busy !== null) return;
     setBusy(BUSY.detect);
     setError(null);
@@ -187,6 +191,21 @@ const ConnectForm = ({ onDetect, onConnect }: IConnectFormProps) => {
     setName('');
     setError(null);
   };
+
+  // The address it was opened with is found at once; a new one (another «Подключить свой») is found again.
+  const [started, setStarted] = useState<string | null>(null);
+  if (start && start !== started) {
+    setStarted(start);
+    setUrl(start);
+  }
+  useEffect(() => {
+    if (!started) return;
+    // Found after the paint, as a press of «Найти» would: the form shows the address first.
+    const timer = setTimeout(() => void detect(started), 0);
+    return () => clearTimeout(timer);
+    // Only a new address to start from finds again; the person's own typing is found by «Найти».
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started]);
 
   return (
     <div className="hx-conn-form">

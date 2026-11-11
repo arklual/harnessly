@@ -12,6 +12,7 @@ import (
 const doctorHelp = `harnessly doctor render [--json]
 harnessly doctor share [--library DIR] [--json]
 harnessly doctor preview [--json]
+harnessly doctor update [--json]
 
 Checks that this machine can draw designs: renders a real picture (PNG) and a 2-second MP4 with the built-in engine's
 browser pipeline, then reads the video back with ffprobe (codec, length, size). Prints each step with its result; a
@@ -29,6 +30,10 @@ doctor preview asks the running runtime for its preview slots' public origins (R
 ones it names under RUNTIME_PREVIEW_DOMAIN) and resolves each name: a name that does not resolve (NXDOMAIN) leaves the
 panel without a view over https although the slots listen here, and the command exits 1. A name of another address is
 said, not failed: a reverse proxy or a balancer may stand there (docs/deploy.md, "Preview domains").
+
+doctor update asks the running runtime where its updates come from: the update channel (RUNTIME_UPDATE_CHANNEL: stable,
+the default, or latest), the running version, the newest release of the channel, and the reason when the channel has
+no answer. A machine a hub carries follows its hub and has no channel (docs/update-channels.md).
 `
 
 // harnessly doctor render: the render kit's real check.
@@ -43,8 +48,11 @@ func (c *cli) doctor(args []string) error {
 	if args[0] == "preview" {
 		return c.doctorPreview(args[1:])
 	}
+	if args[0] == "update" {
+		return c.doctorUpdate(args[1:])
+	}
 	if args[0] != "render" {
-		return usageErr("unknown doctor check %q (there are: render, share, preview)", args[0])
+		return usageErr("unknown doctor check %q (there are: render, share, preview, update)", args[0])
 	}
 	for _, a := range args[1:] {
 		if a != "--json" {
@@ -222,6 +230,83 @@ func (c *cli) doctorPreview(args []string) error {
 	}
 	if failed {
 		return exitCode(1)
+	}
+	return nil
+}
+
+// updateReport is the runtime's GET /api/cli/update.
+type updateReport struct {
+	Current         string `json:"current"`
+	Latest          string `json:"latest"`
+	URL             string `json:"url"`
+	UpdateAvailable bool   `json:"updateAvailable"`
+	Channel         string `json:"channel"`
+	Note            string `json:"note"`
+	Source          string `json:"source"`
+	Machine         *struct {
+		Mode     string `json:"mode"`
+		UpToDate bool   `json:"upToDate"`
+		Checked  bool   `json:"checked"`
+		Version  string `json:"version"`
+		Error    string `json:"error"`
+	} `json:"machine"`
+}
+
+// harnessly doctor update: where this runtime's updates come from and what its channel offers.
+func (c *cli) doctorUpdate(args []string) error {
+	for _, a := range args {
+		if a != "--json" {
+			return usageErr("doctor update takes only --json, got %q", a)
+		}
+	}
+	raw, err := c.request("GET", "/api/cli/update", nil, nil)
+	if err != nil {
+		return err
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var rep updateReport
+	if err := json.Unmarshal(raw, &rep); err != nil {
+		return fail("the runtime answered something else: %v", err)
+	}
+	c.out("version: %s\n", rep.Current)
+	switch rep.Source {
+	case "releases":
+		c.out("updates: the published releases, channel %s (RUNTIME_UPDATE_CHANNEL)\n", rep.Channel)
+		switch {
+		case rep.Note != "":
+			c.out("[warn] %s\n", rep.Note)
+		case rep.UpdateAvailable:
+			c.out("newer on this channel: %s  %s\n", rep.Latest, rep.URL)
+		case rep.Latest != "":
+			c.out("this channel is at %s: nothing newer\n", rep.Latest)
+		default:
+			c.out("no answer from the channel yet (the first check runs at start)\n")
+		}
+	case "hub":
+		c.out("updates: the programs this machine's hub serves; the channel is chosen where the hub is installed\n")
+	case "fleet":
+		c.out("updates: a rollout brings whole releases to this machine (fleet mode); no channel\n")
+	default:
+		c.out("updates: this runtime looks for none (a build from source, or RUNTIME_UPDATE_CHECK=0)\n")
+	}
+	if m := rep.Machine; m != nil {
+		state := "not checked yet"
+		switch {
+		case m.Error != "":
+			state = "check failed: " + m.Error
+		case m.Checked && m.UpToDate:
+			state = "up to date"
+		case m.Checked:
+			state = "an update is waiting"
+		}
+		c.out("machine programs: %s mode, %s", m.Mode, state)
+		if m.Version != "" {
+			c.out(" (%s)", m.Version)
+		}
+		c.out("\n")
 	}
 	return nil
 }

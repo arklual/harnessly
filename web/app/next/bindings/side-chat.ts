@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { askSideChat, type ISideTurn } from '@/next/features/pane/side-chat-api';
 import type { ISideMessage } from '@/next/features/pane/side-chat';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
+import { takeSideAsk, useSideAsk } from '@/next/stores/side-ask';
 import { t } from '@/next/i18n';
 
 let seq = 0;
@@ -86,5 +87,9 @@ export const useSideChat = (machine: MachineId | null, conv: ConvId | null) => {
     setMessages([]);
   };
 
-  return { messages, busy, ask, stop, retry, clear };
+  // Words of this chat sent here («Ask aside»): the field takes them, then they are off the store.
+  const asked = useSideAsk(conv);
+  const quote = asked && { quote: asked.quote, nonce: asked.nonce };
+
+  return { messages, busy, ask, stop, retry, clear, quote, takeQuote: takeSideAsk };
 };

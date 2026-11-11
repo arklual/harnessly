@@ -16,8 +16,8 @@ export const clipQuote = (text: string, max: number) =>
 /** The comment row's exit and the bar's, as long as hx-note-pop-out / hx-note-bar-out in notes-shared.css. */
 export const NOTE_OUT_MS = 160;
 /** A row that would run past these edges opens on the other side of its dot. */
-export const NOTE_ROW_W = 280;
-export const NOTE_ROW_H = 96;
+export const NOTE_ROW_W = 320;
+export const NOTE_ROW_H = 120;
 
 interface INoteRowProps {
   /** The words the row opens with; with `onValue` the host keeps them (a dictation writes into them). */
@@ -34,9 +34,9 @@ interface INoteRowProps {
   onCancel: () => void;
   /** Before the field: the host's own button or the mark's number. */
   lead?: ReactNode;
-  /** Between the field and 🗑: the host's tools (the microphone, «cancel»). */
+  /** In the foot before ↑: the host's tools (the microphone). */
   tools?: ReactNode;
-  /** Under the line, the whole width: what the host unfolds (a block's settings, a picture to draw). */
+  /** Between the field and the foot, the whole width: what the host unfolds (a block's settings, a picture to draw). */
   more?: ReactNode;
   okLabel?: string;
   /** ✓ waits: the words are wanted, or they are on their way. */
@@ -56,7 +56,8 @@ const grow = (field: HTMLTextAreaElement | null) => {
   field.style.height = `${field.scrollHeight}px`;
 };
 
-/** The comment of one mark: a field and ✓; Enter keeps it, Esc leaves it; 🗑 takes the mark away. */
+/** The comment of one mark, as a card: the field over a foot of «Отменить», 🗑, the host's tools and ↑; Enter keeps it,
+ *  Esc or «Отменить» leaves it; 🗑 takes the mark away. */
 export const NoteRow = ({
   comment,
   onValue,
@@ -110,46 +111,61 @@ export const NoteRow = ({
         if (event.target === event.currentTarget) onGroundDouble?.();
       }}
     >
-      {lead}
-      <textarea
-        ref={field}
-        className="hx-note__input"
-        rows={1}
-        value={text}
-        autoFocus
-        disabled={busy}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        onChange={(event) => (onValue ?? setOwn)(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-            event.preventDefault();
-            commit();
-          }
-        }}
-      />
-      {tools}
-      {onRemove && (
-        <button
-          type="button"
-          className="hx-note__btn"
-          aria-label={removeLabel ?? t('next.pane.annot.remove')}
-          onClick={onRemove}
-        >
-          <Icon name="trash-2" size="sm" />
-        </button>
-      )}
-      <button
-        type="submit"
-        className="hx-note__btn"
-        data-primary
-        aria-label={okLabel ?? t('next.pane.annot.save')}
-        aria-disabled={okDisabled || busy || undefined}
-        aria-busy={busy || undefined}
-      >
-        <Icon name="check" size="sm" />
-      </button>
+      <div className="hx-note__line">
+        {lead}
+        <textarea
+          ref={field}
+          className="hx-note__input"
+          rows={1}
+          value={text}
+          autoFocus
+          disabled={busy}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          onChange={(event) => (onValue ?? setOwn)(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              commit();
+            }
+          }}
+        />
+      </div>
       {more && <div className="hx-note__more">{more}</div>}
+      <div className="hx-note__foot">
+        <button type="button" className="hx-note__cancel" onClick={onCancel}>
+          {t('next.pane.annot.cancel')}
+        </button>
+        {onRemove && (
+          <button
+            type="button"
+            className="hx-note__btn hx-note__del hx-tipped"
+            aria-label={removeLabel ?? t('next.pane.annot.remove')}
+            onClick={onRemove}
+          >
+            <Icon name="trash-2" size="sm" />
+            <span className="hx-tip" data-pos="below">
+              {removeLabel ?? t('next.pane.annot.remove')}
+            </span>
+          </button>
+        )}
+        <span className="hx-note__gap" />
+        {tools}
+        <button
+          type="submit"
+          className="hx-note__btn hx-tipped"
+          data-primary
+          aria-label={okLabel ?? t('next.pane.annot.save')}
+          aria-disabled={okDisabled || busy || undefined}
+          aria-busy={busy || undefined}
+        >
+          <Icon name="arrow-up" />
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {okLabel ?? t('next.pane.annot.save')}
+            <kbd>↵</kbd>
+          </span>
+        </button>
+      </div>
     </form>
   );
 };

@@ -95,10 +95,16 @@ span.hx-tbrowser__wide {
     display: none;
   }
 }
+/* The surface the launcher lies on: the pane's own tone in the pane (it differs from --hx-bg-raised in the light theme),
+   so the sticky field's backing and the band under it are of the pane's colour and never show as a stripe (HRN-1164). */
 .hx-tl {
+  --tl-surface: var(--hx-bg-raised);
   max-width: 720px;
   margin: 0 auto;
   padding: 14px 16px 24px;
+}
+.hx-pane .hx-tl {
+  --tl-surface: var(--hx-bg-pane);
 }
 .hx-tl__search {
   position: sticky;
@@ -112,8 +118,8 @@ span.hx-tbrowser__wide {
   border-radius: 10px;
   /* The field's own tone is see-through (--hx-bg-active): laid over the pane's surface it is one opaque colour, so what
      scrolls under it never shows. The band under it keeps the cards off the field's edge. */
-  background: linear-gradient(var(--hx-bg-active), var(--hx-bg-active)), var(--hx-bg-raised);
-  box-shadow: 0 8px 0 0 var(--hx-bg-raised);
+  background: linear-gradient(var(--hx-bg-active), var(--hx-bg-active)), var(--tl-surface);
+  box-shadow: 0 8px 0 0 var(--tl-surface);
   color: var(--hx-fg-3);
 }
 .hx-tl__search input {
@@ -136,17 +142,52 @@ span.hx-tbrowser__wide {
 .hx-tl__search:focus-within {
   box-shadow:
     0 0 0 2px var(--hx-accent-soft),
-    0 8px 0 0 var(--hx-bg-raised);
+    0 8px 0 0 var(--tl-surface);
 }
 .hx-tl__group {
   animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
 }
 .hx-tl__label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 18px 4px 6px;
   color: var(--hx-fg-2);
   font-size: var(--hx-text-xs);
   font-weight: var(--hx-weight-medium);
   letter-spacing: 0.02em;
+}
+.hx-tl__label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The start page's choice of a machine, at the end of its label: quiet until hovered. */
+.hx-tl__pick {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-block: -4px;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background-color var(--hx-dur-sm) var(--hx-ease-out),
+    color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-tl__pick:hover,
+.hx-tl__pick[data-popup-open] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg);
+}
+.hx-tl__pick:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
 }
 /* Tiles as the design has them: three across a usual pane, two on a phone. */
 .hx-tl__grid {
@@ -1971,15 +2012,17 @@ input.hx-tbrowser__url:focus {
   width: 100%;
 }
 
-/* While the width slides (use-pane-motion.ts) what is inside keeps the wider of the two widths and the pane's edge
-   clips it. The pane has no frame of its own: its tone is all that sets it apart from the window. */
+/* «Во всю ширину» and back (use-pane-motion.ts): the pane keeps the wider of the two boxes, in the pane's tone, and its
+   left edge slides by clip-path; what is inside is laid out at the new width, at the right, where it stays. */
 .hx-pane[data-resizing] {
-  overflow: clip;
   border-radius: 16px;
+  background: var(--hx-bg-pane);
+  will-change: clip-path;
 }
 .hx-pane[data-resizing] > .hx-browser {
   flex: none;
   width: var(--hx-inner-w);
+  margin-left: auto;
 }
 
 /* The header's buttons that move into the strip are as big as its own. */

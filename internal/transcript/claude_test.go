@@ -286,3 +286,18 @@ func TestClaudeParseJSON(t *testing.T) {
 		}
 	}
 }
+
+// A line longer than MaxLineBytes is counted as an error and left out; the lines around it are read.
+func TestClaudeSkipsAnOversizedLine(t *testing.T) {
+	old := MaxLineBytes
+	MaxLineBytes = 256
+	defer func() { MaxLineBytes = old }()
+	line := func(uuid, text string) string {
+		return `{"type":"user","uuid":"` + uuid + `","timestamp":"2026-01-01T00:00:00.000Z","message":{"role":"user","content":"` + text + `"}}`
+	}
+	content := line("u1", "first") + "\n" + line("u2", strings.Repeat("x", 400)) + "\n" + line("u3", "third") + "\n"
+	r := parseClaude(content, textAt{firstLine: -1})
+	if r.errorCount != 1 || len(r.entries) != 2 {
+		t.Fatalf("errors = %d, entries = %d; want 1 and 2", r.errorCount, len(r.entries))
+	}
+}

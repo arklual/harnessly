@@ -19,7 +19,15 @@ export interface IEfficiencyResource<T> {
 const BASE = '/api/platform/efficiency';
 /** What the hub answers itself: the summary and the weekly pulse, per organization, behind the `efficiency` flag. */
 const HUB_PATHS = ['/summary', '/pulse'];
-const isHubPath = (path: string): boolean => HUB_PATHS.some((p) => path === p || path.startsWith(`${p}?`));
+/**
+ * What the hub answers from the data machines already send: the overview and the personal tab. The hub answers a
+ * person only when their rollout switch `hub-efficiency` is on; otherwise it says 404, like when it cannot be reached, and
+ * the gateway answers as before.
+ */
+const HUB_FALLBACK_PATHS = ['/overview', '/me'];
+const matches = (list: string[], path: string): boolean =>
+  list.some((p) => path === p || path.startsWith(`${p}?`));
+const isHubPath = (path: string): boolean => matches(HUB_PATHS, path) || matches(HUB_FALLBACK_PATHS, path);
 const hubOrigin = (): string => appConfig().hubUrl ?? '';
 
 let orgPromise: Promise<string | null> | null = null;
@@ -41,14 +49,23 @@ const hubOrg = (): Promise<string | null> => {
 /** One request of the screen: the hub's endpoint for the summary and the pulse, the machine's gateway for the rest. */
 const request = async (path: string, init?: RequestInit): Promise<Response> => {
   if (!isHubPath(path)) return appFetch(`${BASE}${path}`, init);
+  const optIn = matches(HUB_FALLBACK_PATHS, path);
   const org = await hubOrg();
   // No organization or no hub to ask: the same «not there yet» the gateway gave before the scanner was deployed.
-  if (!org) return new Response(null, { status: 404 });
-  const hubPath = path.replace(/\?.*$/, '');
-  return fetch(`${hubOrigin()}/api/orgs/${encodeURIComponent(org)}/efficiency${hubPath}`, {
-    credentials: 'include',
-    ...init,
-  });
+  if (!org) return optIn ? appFetch(`${BASE}${path}`, init) : new Response(null, { status: 404 });
+  // The hub keeps the query's `scope` and `days`; the path part names the endpoint.
+  const hubPath = optIn ? path : path.replace(/\?.*$/, '');
+  try {
+    const res = await fetch(`${hubOrigin()}/api/orgs/${encodeURIComponent(org)}/efficiency${hubPath}`, {
+      credentials: 'include',
+      ...init,
+    });
+    if (optIn && (res.status === 404 || res.status === 501)) return appFetch(`${BASE}${path}`, init);
+    return res;
+  } catch (e) {
+    if (optIn && !init?.signal?.aborted) return appFetch(`${BASE}${path}`, init);
+    throw e;
+  }
 };
 /** The backend answers these until the efficiency scanner is deployed: not a failure, the data is just not there yet. */
 const NOT_DEPLOYED = new Set([404, 501]);

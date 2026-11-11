@@ -1,8 +1,11 @@
 package proxy
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -20,9 +23,12 @@ import (
 //
 //	GET <platform api>/history/conversations                            the list, which machines are on, the chats
 //	GET <platform api>/history/conversations/<id>?before=&limit=        a page of a chat, oldest turn first
+//	GET <platform api>/history/conversations/<id>/work                   the work in git of the chat and its delegated chats
 //	GET <platform api>/history/conversations/<id>/turns/<turn>/entries  the steps of one folded turn
 //	GET <platform api>/history/conversations/<id>/entries/<entry>/output the whole output of a tool
 //	GET <platform api>/history/conversations/<id>/rewinds/<n>/turns      the turns rewind n left behind
+//	GET <platform api>/history/conversations/<id>/review-notes           the person's draft review remarks on the chat
+//	PUT|DELETE <platform api>/history/conversations/<id>/review-notes/<note>  keep or forget one of them
 //	GET <platform api>/history/search?q=&limit=                          the person's messages that hold the words
 //	GET <platform api>/history/sidebar                                   the person's projects and favorites, with its rev
 //	PUT <platform api>/history/sidebar {baseRev, doc}                    writes it on baseRev; 409 with the current one
@@ -41,9 +47,70 @@ type historyMachine struct {
 	State string `json:"state"`
 }
 
+// listChats reads the chats of the list; a variable so that a test can count the reads.
+var listChats = history.List
+
+// chatListTag is the entity tag of the list: the person, the version of their chats and the machines as the answer names
+// them (a machine that goes on or off changes the answer). It is a weak tag: a proxy that compresses the answer keeps
+// a weak tag as it is.
+func chatListTag(userID, version string, machines, others []historyMachine) string {
+	h := sha256.New()
+	_, _ = io.WriteString(h, userID+"\x00"+version)
+	for _, list := range [][]historyMachine{machines, others} {
+		_, _ = io.WriteString(h, "\n")
+		for _, m := range list {
+			_, _ = io.WriteString(h, m.ID+"\x00"+m.Name+"\x00"+m.State+"\x00")
+		}
+	}
+	return `W/"` + hex.EncodeToString(h.Sum(nil)[:12]) + `"`
+}
+
+// noneMatch is true when If-None-Match names the tag (compared weakly) or any tag.
+func noneMatch(values []string, tag string) bool {
+	want := strings.TrimPrefix(tag, "W/")
+	for _, v := range values {
+		for _, part := range strings.Split(v, ",") {
+			part = strings.TrimSpace(part)
+			if part == "*" || strings.TrimPrefix(part, "W/") == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// serveMachineHub answers, on a machine's own page (/m/<id>/…), the paths that belong to the hub and not to the runtime:
+// the hub's copy of the chats (history) and where a chat went (chat-move). The page asks for them under the machine's
+// base, as the platform's page asks its gateway; the runtime next to it has neither route and would answer 404, so a
+// clean installation (hub and one machine, no gateway) read no chats there. It reports whether the request was answered.
+func (s *Service) serveMachineHub(w http.ResponseWriter, r *http.Request, p *auth.Principal, id string) bool {
+	rest, ok := strings.CutPrefix(r.URL.Path, "/m/"+id)
+	if !ok {
+		return false
+	}
+	rest = strings.TrimPrefix(rest, workspaceBase)
+	switch {
+	case s.history && historyPath.MatchString(rest):
+		s.serveHistory(w, r, p, rest)
+		return true
+	case rest == "/api/v2/chat-move" || strings.HasPrefix(rest, "/api/v2/chat-move/"):
+		clone := r.Clone(r.Context())
+		u := *r.URL
+		u.Path, u.RawPath = rest, ""
+		clone.URL = &u
+		s.serveMove(w, clone, p.User)
+		return true
+	}
+	return false
+}
+
 func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.Principal, rest string) {
 	if strings.HasSuffix(rest, "/history/sidebar") {
 		s.serveSidebar(w, r, p)
+		return
+	}
+	if m := reviewNotesPath.FindStringSubmatch(rest); m != nil {
+		s.serveReviewNotes(w, r, p, m[1], m[2])
 		return
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -61,8 +128,13 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 		}
 	}
 	list, err := s.fleet(r.Context(), p.User.ID, true)
-	if err != nil {
+	if errors.Is(err, errFleetOff) {
 		list = nil // no fleet for this person: the copy is empty, not an error
+	} else if err != nil {
+		// A failure is not «off»: answered as one, the page switched the person's sidebar to a machine's own and back
+		// with the next answer, and the favorites jumped between the two layouts.
+		s.fail(w, r, err)
+		return
 	}
 	// The copy is the person's own list: only their own machines are in it (machines, ids). The ones they reach as an
 	// administrator are named apart (others), for their state and name; their chats are never listed or searched here.
@@ -116,7 +188,20 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"query": q.Get("q"), "hits": hits, "indexing": false})
 	case len(parts) == 0:
-		chats, err := history.List(ctx, s.db, p.User.ID, ids)
+		// The page asks for the list again and again; one that has not changed is answered by its tag alone, before
+		// any record is read. The tag is taken first: a write that lands after it only makes the next answer a full one.
+		version, err := history.ListVersion(ctx, s.db, p.User.ID)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		tag := chatListTag(p.User.ID, version, machines, others)
+		w.Header().Set("ETag", tag)
+		if noneMatch(r.Header.Values("If-None-Match"), tag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		chats, err := listChats(ctx, s.db, p.User.ID, ids)
 		if err != nil {
 			s.fail(w, r, err)
 			return
@@ -158,6 +243,28 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 			"conversation": withMachine(page.Conversation, page.MachineID),
 			"turns":        page.Turns, "entries": page.Entries, "beforeTurnId": page.BeforeTurnID,
 		})
+	case len(parts) == 2 && parts[1] == "work":
+		// The work of the chat and of the chats it delegated, on any of the person's machines (open or closed chats).
+		entries, err := history.Work(ctx, s.db, p.User.ID, parts[0], reachable)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		named := map[string]historyMachine{}
+		for _, m := range list {
+			if st, ok := state[m.ID]; ok {
+				named[m.ID] = historyMachine{ID: m.ID, Name: m.Name, State: st}
+			}
+		}
+		used := []historyMachine{}
+		seen := map[string]bool{}
+		for _, e := range entries {
+			if m, ok := named[e.MachineID]; ok && !seen[e.MachineID] {
+				seen[e.MachineID] = true
+				used = append(used, m)
+			}
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"conversationId": parts[0], "machines": used, "entries": entries})
 	case len(parts) == 4 && parts[1] == "turns" && parts[3] == "entries" && turnID.MatchString(parts[2]):
 		_, entries, err := history.TurnEntries(ctx, s.db, p.User.ID, parts[0], parts[2], reachable)
 		if errors.Is(err, history.ErrNotFound) {
@@ -212,7 +319,11 @@ func (s *Service) serveSidebar(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	ctx := r.Context()
-	list, _ := s.fleet(ctx, p.User.ID, true)
+	list, err := s.fleet(ctx, p.User.ID, true)
+	if err != nil && !errors.Is(err, errFleetOff) {
+		s.fail(w, r, err) // not «no sidebar»: see serveHistory (HRN-1167)
+		return
+	}
 	if len(personal(list)) == 0 { // the projects and favorites are of the person's own machines' chats
 		if r.Method == http.MethodPut {
 			httpx.WriteError(w, r, httpx.ErrNotFound)

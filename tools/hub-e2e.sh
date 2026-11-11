@@ -17,7 +17,7 @@
 # E2E_DATABASE_URL=postgres://user@host:port/emptydb?sslmode=disable runs the hub on that (empty) Postgres database
 # instead of SQLite; pg_dump (on PATH or in /usr/lib/postgresql/*/bin) then also searches the database for the secrets.
 #
-# E2E_HUB_ORGS sets HUB_ORGS (shadow by default: the instance admin moves the space into an organization midway).
+# E2E_HUB_ORGS sets HUB_ORGS (on by default: the owner moves the space into an organization midway).
 #
 # Needs: go, curl, jq, tmux. For the UI: web/dist-hub (pnpm build:hub; this script runs it when pnpm exists and the folder
 # is missing) and, for the machine's page, web/dist (pnpm build) so the runtime is built with the page in it.
@@ -191,7 +191,7 @@ mkdir -p "$T/hub"
 (
 	export HUB_LISTEN="127.0.0.1:$HUB_PORT" HUB_PUBLIC_URL="$HUB" HUB_DATA_DIR="$T/hub" HUB_DIST_DIR="$T/dist"
 	export HUB_LOCAL_CODE_FILE="$T/hub/local-code" HUB_LOG_LEVEL=info HUB_EDITION=self-hosted HUB_SIGNUP=open
-	export HUB_ORGS="${E2E_HUB_ORGS:-shadow}"
+	export HUB_ORGS="${E2E_HUB_ORGS:-on}"
 	if [ -n "$DB_URL" ]; then export HUB_DATABASE_URL="$DB_URL"; fi
 	if [ -n "$WEB_DIR" ]; then export HUB_WEB_DIR="$WEB_DIR"; fi
 	if [ "$HAVE_PAGE" = 1 ]; then export HUB_FEATURES_FORCE=runtime.fleet; fi
@@ -510,7 +510,7 @@ BACK=$(curl -sS -o "$T/back.html" -w '%{http_code}' -H 'Sec-Fetch-Dest: iframe' 
 expect "a reload of the frame past the prefix gets the way back" "$BACK" 200
 check "…it asks the pane to reopen the path" grep -q 'hl-preview-reload' "$T/back.html"
 
-# --- organizations: a space moves into one (HUB_ORGS=shadow, docs/hub/orgs.md) ------------------------------------
+# --- organizations: a space moves into one (HUB_ORGS=on, docs/hub/orgs.md) ------------------------------------
 
 step "The space moves into an organization: its machine stays online, the open runtime keeps its session"
 call "$OWNER" POST /api/orgs "{\"name\":\"Тестовая организация\",\"spaceIds\":[\"$SID\"]}"

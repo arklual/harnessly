@@ -21,6 +21,7 @@ import {
   dismissAllNotices,
   dismissNotice,
   dropNotices,
+  noticesSnapshot,
   notifySnapshot,
   pushNotice,
   SAMPLE_CHAT,
@@ -69,6 +70,38 @@ export const soundOn = (settings: INotifySettings, sound: TNoticeSound | null): 
 
 const pageInFront = (): boolean => document.visibilityState === 'visible' && document.hasFocus();
 
+/**
+ * A notice whose chat stands at another event goes only once the chat has stood there this long: a sync that shows the
+ * record for a moment as it was (another copy of it, a reconnect) does not take the notice away and bring it back.
+ */
+export const DROP_SETTLE_MS = 1500;
+
+/**
+ * The notices to take away now. `leaving` (kept by the caller) remembers since when each notice's chat stands elsewhere;
+ * a chat back at the notice's event forgets it. `current` is each chat's event now (absent: not known yet).
+ */
+export const settledDrops = (
+  leaving: Map<string, number>,
+  notices: readonly INotice[],
+  current: ReadonlyMap<string, string | null>,
+  now: number,
+): ReadonlySet<string> => {
+  const drop = new Set<string>();
+  const listed = new Set<string>();
+  for (const n of notices) {
+    listed.add(n.key);
+    if (!current.has(n.chatId) || current.get(n.chatId) === n.key) {
+      leaving.delete(n.key);
+      continue;
+    }
+    const since = leaving.get(n.key) ?? now;
+    leaving.set(n.key, since);
+    if (now - since >= DROP_SETTLE_MS) drop.add(n.key);
+  }
+  for (const key of [...leaving.keys()]) if (!listed.has(key) || drop.has(key)) leaving.delete(key);
+  return drop;
+};
+
 export interface INoticesOptions {
   /** Whose notices: one list per person on this browser. */
   person: string;
@@ -83,6 +116,10 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
   const convs = useConversationList(null);
   /** Each chat's event at the last look; absent: not looked at yet, so what it stands at is not news. */
   const seen = useRef(new Map<string, string | null>());
+  /** Since when each notice's chat stands at another event (settledDrops). */
+  const leaving = useRef(new Map<string, number>());
+  const settleTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(settleTimer.current), []);
   const current = useRef(currentId);
   const open = useRef(onOpenChat);
   // Before the effects below, which read them.
@@ -109,6 +146,8 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
       if (before === undefined || !event || event.key === before) continue;
       if (!settings.kinds[event.kind]) continue;
       if (conv.id === current.current && pageInFront()) continue;
+      // Back at an event it still shows (it only looked away for a moment): no new notice, no sound.
+      if (noticesSnapshot().some((n) => n.key === event.key)) continue;
       sound = louder(sound, soundOf(event.kind, conv));
       fresh.push({
         key: event.key,
@@ -120,7 +159,13 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
         at: Date.now(),
       });
     }
-    dropNotices((n) => now.has(n.chatId) && now.get(n.chatId) !== n.key);
+    const settle = () => {
+      const drop = settledDrops(leaving.current, noticesSnapshot(), now, Date.now());
+      if (drop.size > 0) dropNotices((n) => drop.has(n.key));
+      window.clearTimeout(settleTimer.current);
+      if (leaving.current.size > 0) settleTimer.current = window.setTimeout(settle, DROP_SETTLE_MS);
+    };
+    settle();
     fresh.forEach(pushNotice);
     const last = fresh[fresh.length - 1];
     if (!last) return;

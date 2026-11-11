@@ -63,7 +63,7 @@ Every right has a class of risk. The class forbids nothing: it orders the instal
 | `storage` | low | Keep data of the app per chat, per document and per person. | `harnessly/storage.delete`, `harnessly/storage.get`, `harnessly/storage.keys`, `harnessly/storage.set` |
 | `storage.space.write` | medium | Write the storage area shared by the whole space. | — |
 | `files.read:<mask>` | medium | Read workspace files matching the mask. | `harnessly/files.list`, `harnessly/files.read`, `harnessly/files.search` |
-| `files.write:<mask>` | medium | Write workspace files matching the mask. | `harnessly/files.write` |
+| `files.write:<mask>` | medium | Write workspace files matching the mask. | `harnessly/files.upload`, `harnessly/files.write` |
 | `files.watch` | medium | Hear which files under the files.read masks change (hl.files.watch); the names, not the contents. | `harnessly/files.unwatch`, `harnessly/files.watch` |
 | `git.read` | medium | See git status, diffs and history of the chat's folder (secret files left out). | `harnessly/git.diff`, `harnessly/git.log`, `harnessly/git.status` |
 | `events:<kind>` | medium | Hear what happens in the chat: turn (the agent's turn ended), tool (the agent called a tool), message (a message came). | `harnessly/events.subscribe` |
@@ -78,12 +78,14 @@ Every right has a class of risk. The class forbids nothing: it orders the instal
 | `hooks.agent` | critical | Hear each tool call of the chat's agent before it runs, and stop it or add context for the agent (hl.hooks.on). The call is never changed. A view that does not answer in 5 s lets it through, and the journal says so. | `harnessly/hooks.result`, `harnessly/hooks.subscribe` |
 | `hooks.strict` | critical | Strict mode of hooks.agent: a call the app's view did not answer in time, or with no view open, is stopped instead of let through. | — |
 | `background` | critical | Run a view of the app hidden in the page while the app is on in a chat, without the person opening it: its hooks and events work in every such chat. | — |
+| `notices` | low | Ask the person in the smart notice (a choice, a confirm, a short field, code cells, a view of its own) and show a status or a progress there (hl.notice). Never passwords, keys or sign-ins: those go through the safe. | `harnessly/notice.ask`, `harnessly/notice.close`, `harnessly/notice.show`, `harnessly/notice.update` |
 | `notify` | low | Show the person a notification. | `harnessly/notify` |
-| `tools.page` | medium | Offer tools from the view's page that the agent of the chat calls (hl.tools.register, navigator.modelContext.registerTool). | `harnessly/tools.register`, `harnessly/tools.result` |
-| `context.publish` | medium | Publish what the view shows for the agent of the chat to read (hl.publish). | `harnessly/context.publish` |
+| `tools.page` | medium | Offer tools from the view's page that the agent of the chat calls (hl.tools.register, hl.state, hl.action, navigator.modelContext.registerTool). | `harnessly/tools.register`, `harnessly/tools.result` |
+| `context.publish` | medium | Publish what the view shows for the agent of the chat to read (hl.publish, hl.state, hl.screen). | `harnessly/context.publish` |
 | `sinopia.read` | medium | Read the Sinopia document the view is shown in. | `harnessly/sinopia.document`, `harnessly/sinopia.fields`, `harnessly/sinopia.mark`, `harnessly/sinopia.node`, `harnessly/sinopia.query`, `harnessly/sinopia.selection` |
 | `sinopia.write` | medium | Change the Sinopia document: patches, fields, new boards. | `harnessly/sinopia.boards.add`, `harnessly/sinopia.patch`, `harnessly/sinopia.setFields` |
 | `sinopia.comment` | low | Comment on the Sinopia document. | `harnessly/sinopia.comment` |
+| `app.extend` | high | Make a document type of the app's own out of a Sinopia site: its documents open in Sinopia's editor with the app's tab and panels. Only where the deployment's admin lists the app (HARNESSLY_APPS_EXTEND). | — |
 | `sinopia.kind` | low | Add Sinopia document types of the app's own. | — |
 | `sinopia.export` | low | Render the document to a file. Refused for now: not supported yet. | `harnessly/sinopia.render` |
 | `ai` | high | Call a model on the person's behalf, within the app's budget of the day (manifest `budget.usdPerDay`, $0.50 by default, $5 at most). | `harnessly/ai.complete` |
@@ -114,13 +116,20 @@ Every right has a class of risk. The class forbids nothing: it orders the instal
 | `harnessly/storage.delete` | `storage` | `hl.storage.<scope>.delete(key)` | Remove a key. |
 | `harnessly/storage.keys` | `storage` | `hl.storage.<scope>.keys()` | The keys of an area. |
 | `harnessly/settings.get` | — | `hl.settings.get()` | The app's settings as the person saved them. |
+| `harnessly/workflow.get` | — | `hl.workflow.get()` | The status of the view's document by the manifest's workflow: its version, status, the moves this person may make and the journal. |
+| `harnessly/workflow.move` | — | `hl.workflow.move(to, {version, hash, note})` | Move the document's current version to another status; the host checks the move and the person's project role, and refuses a version that is not the current one as conflict. |
 | `harnessly/notify` | `notify` | `hl.notify(text)` | A notification to the person. |
+| `harnessly/notice.ask` | `notices` | `hl.notice.ask(spec)` | Ask the person in the smart notice and wait: a choice, a confirm, a short field, code cells or a view of its own (spec.kind). {status: answered\|dismissed\|timeout\|muted, value}. Never a password, key or sign-in: refused as no-secrets. |
+| `harnessly/notice.show` | `notices` | `hl.notice.show(spec)` | Show a status or a progress in the smart notice without waiting: {id}. |
+| `harnessly/notice.update` | `notices` | `hl.notice.update(id, {progress, title, text})` | Move a progress or change a status the app showed. |
+| `harnessly/notice.close` | `notices` | `hl.notice.close(id)` | Take away a notice the app showed. |
 | `harnessly/files.read` | `files.read` | `hl.files.read(path)` | Read a workspace file inside the app's mask. |
 | `harnessly/files.write` | `files.write` | `hl.files.write(path, text)` | Write a workspace file inside the app's mask. |
 | `harnessly/files.list` | `files.read` | `hl.files.list(folder)` | The files and folders of a folder that the app's masks reach. |
 | `harnessly/files.search` | `files.read` | `hl.files.search(text, {glob, case, limit})` | Lines that hold a text in the files the app may read; with a glob alone, the files by name. |
 | `harnessly/files.watch` | `files.watch` | `hl.files.watch(onChange)` | Start hearing which files under the masks change: harnessly/notifications/files-changed {paths}. |
 | `harnessly/files.unwatch` | `files.watch` | `the function hl.files.watch returns` | Stop hearing file changes. |
+| `harnessly/files.upload` | `files.write` | `hl.files.upload(file, path)` | Put a file the person gave the view (hl.files.choose or a drop on hl.files.dropZone) into the chat's workspace, inside the app's write masks: {path, size}. Up to 4 MB. |
 | `harnessly/files.pick` | — | `hl.files.pick({accept})` | The person picks a file of the chat's folder in the host's dialog; the view gets its path and text once, no mask needed. null when the person closes it. |
 | `harnessly/git.status` | `git.read` | `hl.git.status()` | The branch and the changed files of the chat's folder. |
 | `harnessly/git.diff` | `git.read` | `hl.git.diff({path, staged, ref})` | The unified diff of the chat's folder or a path in it. |
@@ -141,9 +150,9 @@ Every right has a class of risk. The class forbids nothing: it orders the instal
 | `harnessly/terminal.close` | `terminal.pty` | `terminal.close()` | End the shell of a terminal and everything it started. |
 | `harnessly/terminal.read` | `terminal.read` | `hl.terminal.read({terminal, lines})` | What the chat's terminals show, as text: {terminals: [{id, text}]}; id "agent" is the agent's own, the others the chat's shells; lines of history, 200 by default, 2000 at most. |
 | `harnessly/events.subscribe` | `events` | `hl.events.on(kind, fn)` | Hear the chat's events of the kinds the app holds events:<kind> for: harnessly/notifications/event {kind, at, …}. |
-| `harnessly/tools.register` | `tools.page` | `hl.tools.register(tool, run)` | Offer the view's tools to the agent; the whole list each time. |
+| `harnessly/tools.register` | `tools.page` | `hl.tools.register(tool, run), hl.state(name, options), hl.action(name, options)` | Offer the view's tools to the agent; the whole list each time. hl.state offers <name>_set (a patch in, {ok, value, issues} out), hl.action a tool of its own name ({ok, result, issues}; one that mutates asks the person first). |
 | `harnessly/tools.result` | `tools.page` | — | The view's answer to an agent's call of its tool (the SDK sends it). |
-| `harnessly/context.publish` | `context.publish` | `hl.publish(data)` | What the view shows, for the agent to read with page_tools. |
+| `harnessly/context.publish` | `context.publish` | `hl.publish(data), hl.state(name, options), hl.screen(options)` | What the view shows, for the agent to read: it is in the agent's context on its next turn. With a state or a screen it is {screen, states} and the view's own data goes under data. |
 | `harnessly/ui.toast` | — | `hl.ui.toast(text, {tone, description})` | A short message at the bottom of the page; tone info, success, warning or error, and a second line. |
 | `harnessly/ui.confirm` | — | `hl.ui.confirm(text)` | A yes/no question in the host's own dialog. |
 | `harnessly/keys.on` | — | `hl.keys.on(scope, handlers)` | Run the host's shortcut commands of a screen (deck, video, site, pictures, files) while the view is up, on the keys the person set for them: harnessly/notifications/key {command, chord}. |
@@ -178,8 +187,8 @@ The server `harnessly-app`, in a chat with apps on. The last ones are the builti
 | `ask` | Put a choice to the person in the app's view and wait for the answer. |
 | `widget_show` | Show an app's chat view in the feed with the data given. |
 | `widget_render` | Draw a widget written on the spot in the feed. |
-| `page_tools` | The tools and the context the open views of the chat's apps offer from the page. |
-| `page_call` | Call a tool an open view offers; the view runs it in the person's page. |
+| `page_tools` | The tools and the context the open views of the chat's apps offer from the page. Each tool is also a tool of its own, <app id with _ for .>__<tool>. |
+| `page_call` | Call a tool an open view offers, by its name; the view runs it in the person's page. The same as calling the tool by its own name, and always there: an agent that has not heard of the window's own tools calls them here, by the block of its turn. Waits for a window that loads; wrong arguments come back with the tool's schema. |
 | `catalog` | The places, rights, methods and contribution kinds an app can use. |
 | `sinopia_document` | The Sinopia document: its kind, title, boards and revision. Of of `harnessly.sinopia`. |
 | `sinopia_selection` | The elements the person picked in the editor now. Of of `harnessly.sinopia`. |

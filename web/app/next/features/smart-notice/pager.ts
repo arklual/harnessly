@@ -68,6 +68,9 @@ export const pageTarget = (pos: number, velocity: number): number => {
   return Math.max(-1, Math.min(1, Math.round(projected)));
 };
 
+/** One gesture moves the stack by one plate at most: its position stays within a plate of where it began. */
+export const withinOne = (pos: number, base: number): number => Math.max(base - 1, Math.min(base + 1, pos));
+
 export interface ISpring {
   x: number;
   v: number;
@@ -102,6 +105,48 @@ interface IPagerOptions {
   host: () => HTMLElement | null;
   /** The front plate has become `dir` (1 the next one, −1 the one before): React makes it the front. */
   onStep: (dir: 1 | -1) => void;
+  /** The stack came to rest: how smooth its motion was, for the metrics (frames longer than LONG_FRAME_MS). */
+  onFrames?: (frames: IFrames) => void;
+}
+
+/** A frame longer than this missed the screen's beat (60 Hz: 16.7 ms; one missed is 33). */
+export const LONG_FRAME_MS = 25;
+
+export interface IFrames {
+  ms: number;
+  frames: number;
+  long: number;
+}
+
+/** Counts the frames while the stack moves (a frame loop of its own, so a gesture that paints rarely counts too). */
+class FrameMeter {
+  private raf = 0;
+  private t0 = 0;
+  private last = 0;
+  private frames = 0;
+  private long = 0;
+
+  start() {
+    if (this.raf) return;
+    this.t0 = performance.now();
+    this.last = this.t0;
+    this.frames = 0;
+    this.long = 0;
+    const tick = (now: number) => {
+      if (now - this.last > LONG_FRAME_MS) this.long += 1;
+      this.frames += 1;
+      this.last = now;
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+
+  stop(): IFrames | null {
+    if (!this.raf) return null;
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    return { ms: Math.round(performance.now() - this.t0), frames: this.frames, long: this.long };
+  }
 }
 
 /**
@@ -129,6 +174,7 @@ export class StackPager {
   private dragging = false;
   /** The plates drawn by the last frame: one React has just added comes in out of nothing. */
   private seen = new WeakSet<Element>();
+  private meter = new FrameMeter();
 
   constructor(private readonly options: IPagerOptions) {}
 
@@ -144,19 +190,26 @@ export class StackPager {
     this.base = this.pos;
   }
 
-  /** The finger has gone `dy` px down the screen since `grab`. */
+  /** The finger has gone `dy` px down the screen since `grab`: one to one, up to one plate. */
   drag(dy: number) {
     if (!this.live) return;
-    this.pos = this.base + (dy * this.sign) / this.page;
+    this.pos = withinOne(this.base + (dy * this.sign) / this.page, this.base);
     this.cross();
     this.paint();
   }
 
-  /** A trackpad moved what it scrolls `dy` px down the screen. */
-  nudge(dy: number) {
+  /** A trackpad's gesture begins: what it moves from here on is one plate at most. */
+  begin() {
     if (!this.live) this.start();
     this.stopSpring();
-    this.pos += (dy * this.sign) / this.page;
+    this.base = this.pos;
+  }
+
+  /** A trackpad moved what it scrolls `dy` px down the screen (after `begin`): one to one, up to one plate. */
+  nudge(dy: number) {
+    if (!this.live) this.begin();
+    this.stopSpring();
+    this.pos = withinOne(this.pos + (dy * this.sign) / this.page, this.base);
     this.cross();
     this.paint();
   }
@@ -165,7 +218,8 @@ export class StackPager {
   release(vy: number) {
     if (!this.live) return;
     this.vel = (vy * this.sign * 1000) / this.page;
-    this.springTo(pageTarget(this.pos, this.vel));
+    // The speed carries it to the next plate, never past the one the gesture may reach.
+    this.springTo(withinOne(pageTarget(this.pos, this.vel), this.base));
   }
 
   /** A wheel's click `dy` down the screen: one page that way. */
@@ -178,6 +232,7 @@ export class StackPager {
   step(dir: 1 | -1) {
     if (!this.live) this.start();
     const from = this.target ?? Math.round(this.pos);
+    this.base = from;
     this.springTo(Math.max(-2, Math.min(2, from + dir)));
   }
 
@@ -216,6 +271,7 @@ export class StackPager {
     this.sign = away < 0 ? 1 : -1;
     host.dataset.paging = '';
     delete host.dataset.rise;
+    this.meter.start();
     this.live = true;
     this.dragging = true;
   }
@@ -292,6 +348,8 @@ export class StackPager {
   private finish() {
     this.live = false;
     this.dragging = false;
+    const frames = this.meter.stop();
+    if (frames && frames.frames > 2) this.options.onFrames?.(frames);
     const host = this.options.host();
     if (!host) return;
     for (const el of host.querySelectorAll<HTMLElement>(

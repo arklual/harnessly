@@ -140,6 +140,23 @@ func (s *ViewSessions) expired(sess *Session, now time.Time) bool {
 	return now.Sub(sess.seen) > SessionIdle || now.Sub(sess.created) > SessionMax
 }
 
+// Mounted are the live sessions of the views the page mounted beside a chat: what of the apps is open there.
+func (s *ViewSessions) Mounted(conv string) []Session {
+	if s == nil || conv == "" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.Now()
+	var out []Session
+	for _, sess := range s.byID {
+		if sess.Conversation == conv && !s.expired(sess, now) {
+			out = append(out, *sess)
+		}
+	}
+	return out
+}
+
 func (s *ViewSessions) sweep(now time.Time) {
 	for k, sess := range s.byID {
 		if s.expired(sess, now) {

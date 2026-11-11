@@ -14,8 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // A chat moves between two machines of one person (flag runtime.fleet). The move itself is the runtime's own
@@ -184,6 +186,12 @@ func (s *Service) moveStatus(w http.ResponseWriter, r *http.Request, u store.Use
 		writeMoveFail(w, failBadReq)
 		return
 	}
+	if s.reg.Get(src.m.ID) == nil {
+		// A machine that is off remembers nothing, but its chat can still go on from the snapshot: the menu is
+		// offered where the person could continue it at all, the targets then say where.
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"enabled": s.resumeFrom(r.Context(), u, src), "moved": nil, "offline": true})
+		return
+	}
 	var st struct {
 		Moved *struct {
 			MachineID      string `json:"machineId"`
@@ -238,6 +246,10 @@ func (s *Service) moveTargets(w http.ResponseWriter, r *http.Request, u store.Us
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), moveProbeTime)
 	defer cancel()
+	if s.reg.Get(src.m.ID) == nil {
+		s.moveResumeTargets(ctx, w, r, u, src)
+		return
+	}
 	var d struct {
 		Project    *json.RawMessage `json:"project"`
 		Clean      bool             `json:"clean"`
@@ -274,13 +286,59 @@ func (s *Service) moveTargets(w http.ResponseWriter, r *http.Request, u store.Us
 	var wg sync.WaitGroup
 	for i, f := range rest {
 		wg.Add(1)
-		go func() {
+		safego.Go("proxy moveTargets", func() {
 			defer wg.Done()
 			targets[i] = s.probeTarget(ctx, u, f, d.Project)
-		}()
+		})
 	}
 	wg.Wait()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"source": source, "targets": targets})
+}
+
+// moveResumeTargets is where the chat of a machine that is off can go on from its snapshot (flag chat.resume,
+// HRN-1115): the person's own machines that are up and for which resumeOn would say yes. The source is not asked (it
+// does not answer), so its fields are only what is known: nothing about its folder. A source the snapshot is not the
+// person's, or without the flag, is refused as it always was.
+func (s *Service) moveResumeTargets(ctx context.Context, w http.ResponseWriter, r *http.Request, u store.User, src moveSide) {
+	if !s.resumeFrom(ctx, u, src) {
+		writeMoveFail(w, offlineFail(src.m))
+		return
+	}
+	list, err := s.fleet(ctx, u.ID, false)
+	if err != nil {
+		if errors.Is(err, errFleetOff) {
+			writeMoveFail(w, failOff)
+			return
+		}
+		s.fail(w, r, err)
+		return
+	}
+	var rest []moveSide
+	var names []FleetMachine
+	for _, f := range list {
+		if f.ID == src.m.ID || !f.Online {
+			continue
+		}
+		dst, fail := s.moveAdmit(ctx, u.ID, f.ID, failNoRight)
+		if fail != nil || !s.resumeOn(ctx, u, src, dst) {
+			continue
+		}
+		rest, names = append(rest, dst), append(names, f)
+	}
+	targets := make([]moveTarget, len(rest))
+	var wg sync.WaitGroup
+	for i := range rest {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			targets[i] = s.probeTarget(ctx, u, names[i], nil)
+		}()
+	}
+	wg.Wait()
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"source":  map[string]any{"ok": true, "project": false, "dirty": false, "busy": false, "offline": true, "fromSnapshot": true},
+		"targets": targets,
+	})
 }
 
 // probeTarget asks a machine of the fleet what it would need to take the chat.
@@ -361,6 +419,10 @@ func (s *Service) moveRun(w http.ResponseWriter, r *http.Request, u store.User) 
 		return
 	}
 	if s.reg.Get(src.m.ID) == nil {
+		if s.resumeOn(ctx, u, src, dst) {
+			s.moveResume(w, r, u, src, dst, req)
+			return
+		}
 		writeMoveFail(w, offlineFail(src.m))
 		return
 	}
@@ -416,5 +478,37 @@ func (s *Service) moveRun(w http.ResponseWriter, r *http.Request, u store.User) 
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{
 		"targetMachineId": dst.m.ID, "targetName": dst.m.Name, "convId": imp.ConversationID,
+	})
+}
+
+// resumeOn says whether a chat of a machine that is off may go on on another from its resume snapshot (flag
+// chat.resume): only between two machines of the person themselves. A machine the person merely
+// administers is never a side: its snapshots are another person's.
+func (s *Service) resumeOn(ctx context.Context, u store.User, src, dst moveSide) bool {
+	return s.resumeFrom(ctx, u, src) && dst.m.CreatedBy == u.ID && s.gate.On(ctx, store.OrgKey(dst.sp), features.ChatResume)
+}
+
+// resumeFrom says whether the person may continue chats of this machine from its snapshots at all: the machine is
+// theirs and its organization has the flag.
+func (s *Service) resumeFrom(ctx context.Context, u store.User, src moveSide) bool {
+	return s.gate != nil && u.ID != "" && src.m.CreatedBy == u.ID && s.gate.On(ctx, store.OrgKey(src.sp), features.ChatResume)
+}
+
+// moveResume continues the chat on the target from the snapshot its machine left in the person's resume room. The
+// target reads the room and the person's key itself; the hub passes neither. The source, off, is not sealed: when it
+// is back, its copy of the chat is still there as it was.
+func (s *Service) moveResume(w http.ResponseWriter, r *http.Request, u store.User, src, dst moveSide, req moveRequest) {
+	var imp struct {
+		ConversationID string `json:"conversationId"`
+	}
+	if fail := s.moveCall(r.Context(), u, dst.m, "resume", map[string]any{
+		"sourceMachine": src.m.ID, "conversationId": req.ConvID, "provider": req.Provider, "profile": req.Profile,
+		"model": map[string]string{"id": req.Model.ID, "effort": req.Model.Effort}, "withoutFiles": req.WithoutFiles,
+	}, &imp); fail != nil {
+		writeMoveFail(w, fail)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"targetMachineId": dst.m.ID, "targetName": dst.m.Name, "convId": imp.ConversationID, "fromSnapshot": true,
 	})
 }

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 	"modernc.org/sqlite"
 )
@@ -50,6 +51,9 @@ type DB struct {
 	sql    *sql.DB
 	driver Driver
 	opts   Options
+	// listenURL is where a connection that stays can be made for LISTEN: the direct URL beside a pooler in transaction
+	// mode, else the database's own. Empty when there is none (SQLite, a pooler without a direct URL).
+	listenURL string
 }
 
 // Driver says which dialect this database speaks.
@@ -121,7 +125,10 @@ func ConnectWith(ctx context.Context, databaseURL string, opts Options) (*DB, er
 		if err != nil {
 			return nil, err
 		}
-		db = &DB{sql: raw, driver: Postgres, opts: opts}
+		db = &DB{sql: raw, driver: Postgres, opts: opts, listenURL: databaseURL}
+		if opts.Pooler == PoolerTransaction {
+			db.listenURL = opts.MigrateURL
+		}
 	default:
 		return nil, fmt.Errorf("database url: unsupported scheme %q", u.Scheme)
 	}
@@ -209,6 +216,48 @@ func (db *DB) Tx(ctx context.Context, fn func(s Store) error) error {
 		return err
 	}
 	return t.Commit()
+}
+
+// ErrConflict is what fn returns inside TxRetry when a row it read was changed by another transaction before it
+// wrote: the transaction is rolled back and run again from its first read.
+var ErrConflict = errors.New("store: changed by another transaction")
+
+// txAttempts bounds TxRetry: a transaction that lost this many times in a row is given up.
+const txAttempts = 4
+
+// TxRetry is Tx run again when it lost to another transaction: fn said ErrConflict, Postgres reported a
+// serialization failure or a deadlock, or SQLite stayed busy. fn must do nothing but its queries, as it may run
+// several times. After txAttempts the last error is returned.
+func (db *DB) TxRetry(ctx context.Context, fn func(s Store) error) error {
+	var err error
+	for attempt := 1; ; attempt++ {
+		if err = db.Tx(ctx, fn); err == nil || attempt >= txAttempts || !Retriable(err) || ctx.Err() != nil {
+			return err
+		}
+		t := time.NewTimer(time.Duration(attempt) * 5 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return err
+		case <-t.C:
+		}
+	}
+}
+
+// Retriable says whether a transaction that failed with err may simply be run again.
+func Retriable(err error) bool {
+	if errors.Is(err, ErrConflict) {
+		return true
+	}
+	var pe *pgconn.PgError
+	if errors.As(err, &pe) {
+		return pe.Code == "40001" || pe.Code == "40P01" // serialization_failure, deadlock_detected
+	}
+	var se *sqlite.Error
+	if errors.As(err, &se) {
+		return se.Code()&0xff == 5 || se.Code()&0xff == 6 // SQLITE_BUSY, SQLITE_LOCKED
+	}
+	return false
 }
 
 // PendingMigrations names the embedded migrations not applied yet, and Unknown the applied versions this build has no

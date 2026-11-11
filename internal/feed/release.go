@@ -2,6 +2,7 @@ package feed
 
 import (
 	"bytes"
+	"maps"
 	"math"
 	"os"
 	"slices"
@@ -36,21 +37,7 @@ func (f *Feed) Release() bool {
 	if !f.loaded || f.rel != nil || f.b.openID() != "" {
 		return false
 	}
-	r := &releasedFeed{start: f.start, size: f.size, more: f.more, context: f.b.context, model: f.b.model,
-		tasks: slices.Clone(f.b.tasks.all())}
-	for _, e := range f.b.entries {
-		if e.Rev > 1 {
-			if r.revs == nil {
-				r.revs = map[string]int64{}
-			}
-			r.revs[e.ID] = e.Rev
-		}
-	}
-	uses := f.uses
-	if t := f.LastTurn(); t != nil {
-		r.lastTurn, r.snippet = t, f.Snippet(*t)
-	}
-	f.uses = uses
+	r := f.kept()
 	f.raws = nil
 	f.b = newBuilder(f.conv, f.provider)
 	f.b.vendor = f.vendor
@@ -119,7 +106,7 @@ func (f *Feed) pollReleased() (Update, bool) {
 	}
 	f.ensure()
 	f.size = inc.NewOffset - int64(len(inc.PendingBuffer))
-	var u Update
+	u := Update{Read: inc.NewEntries}
 	for _, o := range inc.NewEntries {
 		f.raws = append(f.raws, raw{o, from})
 		f.apply(&u, f.b.add(o, from))
@@ -160,4 +147,94 @@ func lineBounds(path string, from, to int64) (int64, int64) {
 		}
 		at += int64(n)
 	}
+}
+
+// kept is what the feed would keep if released now.
+func (f *Feed) kept() *releasedFeed {
+	r := &releasedFeed{start: f.start, size: f.size, more: f.more, context: f.b.context, model: f.b.model,
+		tasks: slices.Clone(f.b.tasks.all())}
+	for _, e := range f.b.entries {
+		if e.Rev > 1 {
+			if r.revs == nil {
+				r.revs = map[string]int64{}
+			}
+			r.revs[e.ID] = e.Rev
+		}
+	}
+	uses := f.uses
+	if t := f.LastTurn(); t != nil {
+		r.lastTurn, r.snippet = t, f.Snippet(*t)
+	}
+	f.uses = uses
+	return r
+}
+
+// Saved is a feed at rest written down: what a released feed keeps, and what the runtime set on the feed beyond the
+// transcript. A feed made again over the same transcript takes it (Restore) and stands where the saved one stood
+// without reading a byte; the first read of its entries reads the same bytes of the transcript the saved one held.
+type Saved struct {
+	Start    int64               `json:"start"`
+	Size     int64               `json:"size"`
+	More     bool                `json:"more,omitempty"`
+	LastTurn *wire.Turn          `json:"lastTurn,omitempty"`
+	Snippet  string              `json:"snippet,omitempty"`
+	Context  int64               `json:"context,omitempty"`
+	Model    string              `json:"model,omitempty"`
+	Tasks    []wire.Task         `json:"tasks,omitempty"`
+	Revs     map[string]int64    `json:"revs,omitempty"`
+	Clients  map[string]string   `json:"clients,omitempty"`
+	Ends     map[string]SavedEnd `json:"ends,omitempty"`
+}
+
+// SavedEnd is the end the runtime gave a turn the transcript left open.
+type SavedEnd struct {
+	Status  wire.TurnStatus   `json:"status"`
+	Failure *wire.TurnFailure `json:"failure,omitempty"`
+	At      wire.Ms           `json:"at"`
+}
+
+// Save is the feed as Restore takes it; false when the feed is not at rest: nothing read yet, a turn open, a source
+// that cannot go on from a place written down, or one holding a line half read.
+func (f *Feed) Save() (Saved, bool) {
+	src, ok := f.src.(seated)
+	if !ok || !f.loaded || !src.AtRest() {
+		return Saved{}, false
+	}
+	r := f.rel
+	if r == nil {
+		if f.b.openID() != "" {
+			return Saved{}, false
+		}
+		r = f.kept()
+	}
+	s := Saved{Start: r.start, Size: r.size, More: r.more, LastTurn: r.lastTurn, Snippet: r.snippet, Context: r.context,
+		Model: r.model, Tasks: r.tasks, Revs: r.revs, Clients: f.clients}
+	for id, e := range f.ends {
+		if s.Ends == nil {
+			s.Ends = map[string]SavedEnd{}
+		}
+		s.Ends[id] = SavedEnd{Status: e.status, Failure: e.failure, At: e.at}
+	}
+	return s, true
+}
+
+// Restore makes a feed that read nothing yet stand where the saved one stood, released; false when its source cannot
+// go on from a place written down. The caller knows the transcript is the one the feed was saved over, unchanged.
+func (f *Feed) Restore(s Saved) bool {
+	src, ok := f.src.(seated)
+	if !ok || f.loaded {
+		return false
+	}
+	src.Seat(s.Size)
+	f.start, f.more, f.size, f.loaded = s.Start, s.More, s.Size, true
+	// The task list is never nil on the wire: an empty one was left out of the file.
+	f.rel = &releasedFeed{start: s.Start, size: s.Size, more: s.More, lastTurn: s.LastTurn, snippet: s.Snippet,
+		context: s.Context, model: s.Model, tasks: append([]wire.Task{}, s.Tasks...), revs: maps.Clone(s.Revs)}
+	for id, c := range s.Clients {
+		f.clients[id] = c
+	}
+	for id, e := range s.Ends {
+		f.ends[id] = end{status: e.Status, failure: e.Failure, at: e.At}
+	}
+	return true
 }

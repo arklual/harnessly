@@ -31,6 +31,7 @@ func openState(dir string) (*state, error) {
 	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(`
 CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, rev INTEGER NOT NULL, sha TEXT NOT NULL, size INTEGER NOT NULL, mtime INTEGER NOT NULL, deleted INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS files_sha ON files (sha);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS base (path TEXT PRIMARY KEY, contents BLOB NOT NULL);
 CREATE TABLE IF NOT EXISTS quarantine (path TEXT PRIMARY KEY, rev INTEGER NOT NULL, reason TEXT NOT NULL, since INTEGER NOT NULL);`); err != nil {
@@ -60,6 +61,24 @@ func (s *state) put(path string, k known) error {
 ON CONFLICT(path) DO UPDATE SET rev = excluded.rev, sha = excluded.sha, size = excluded.size, mtime = excluded.mtime, deleted = excluded.deleted`,
 		path, k.Rev, k.Sha, k.Size, k.Mtime, d)
 	return err
+}
+
+// withSha lists up to limit paths believed to hold the contents with this fingerprint locally.
+func (s *state) withSha(sha string, limit int) ([]string, error) {
+	rows, err := s.db.Query(`SELECT path FROM files WHERE sha = ? AND deleted = 0 LIMIT ?`, sha, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 // live lists the paths believed to exist locally, under prefix ("" for all).

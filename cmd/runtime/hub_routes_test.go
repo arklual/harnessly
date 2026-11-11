@@ -385,3 +385,37 @@ func TestHubLoadAndRestartRoutes(t *testing.T) {
 		t.Fatal("the runtime did not exit")
 	}
 }
+
+func TestHubAnalyticsNeedsHubAndFlag(t *testing.T) {
+	cases := []struct {
+		hub, flag string
+		want      bool
+	}{
+		{"", "", false},
+		{"", "on", false},
+		{"https://hub.example.com", "", false},
+		{"https://hub.example.com", "off", false},
+		{"https://hub.example.com", "on", true},
+	}
+	for _, c := range cases {
+		t.Setenv("RUNTIME_HUB_URL", c.hub)
+		t.Setenv("RUNTIME_HUB_ANALYTICS", c.flag)
+		if got := hubAnalytics(); got != c.want {
+			t.Errorf("hub %q flag %q: %v", c.hub, c.flag, got)
+		}
+	}
+}
+
+func TestHubAnalyticsUsageRefusesWithoutCounting(t *testing.T) {
+	t.Setenv("RUNTIME_HUB_URL", "https://hub.example.com")
+	t.Setenv("RUNTIME_HUB_ANALYTICS", "on")
+	ok := func(*http.Request) bool { return true }
+	r := httptest.NewRequest(http.MethodGet, "/api/platform/stats", nil)
+	if code, _, _ := hubAnalyticsUsage(ok)(r); code != http.StatusServiceUnavailable {
+		t.Fatalf("authorized: %d", code)
+	}
+	no := func(*http.Request) bool { return false }
+	if code, _, _ := hubAnalyticsUsage(no)(r); code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized: %d", code)
+	}
+}

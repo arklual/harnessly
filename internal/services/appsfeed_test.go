@@ -149,6 +149,12 @@ func (r *appsRig) service(t *testing.T, mutate func(*Config)) *Service {
 	return New(cfg)
 }
 
+// readsOver returns when the read behind that holds the lock is over.
+func readsOver(lock *sync.Mutex) {
+	lock.Lock()
+	defer lock.Unlock()
+}
+
 func appOf(t *testing.T, feed wire.AppsFeed, id wire.AppID) wire.AppFeed {
 	t.Helper()
 	if err := feed.Validate(); err != nil {
@@ -357,6 +363,13 @@ func TestAppsAnswersAreKeptOnlyWhenReady(t *testing.T) {
 		s.apps.last[id] = e
 	}
 	s.apps.mu.Unlock()
+	// An older answer is shown at once, and read again behind; the read that fails drops it.
+	if a := appOf(t, s.Apps(context.Background()), wire.AppTracker); a.State != wire.AppReady {
+		t.Fatalf("the kept answer is shown while it is read again: %+v", a)
+	}
+	for _, id := range wire.AppIDs {
+		readsOver(s.apps.locks[id])
+	}
 	if a := appOf(t, s.Apps(context.Background()), wire.AppTracker); a.State != wire.AppFailed {
 		t.Fatalf("%+v", a)
 	}

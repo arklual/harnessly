@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/datamove"
+	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/filesync"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
@@ -39,8 +41,11 @@ var moving atomic.Pointer[datamove.Mover]
 type storeTarget struct{ l *storelink.Link }
 
 func moveErr(err error) error {
-	if errors.Is(err, filesync.ErrUnauthorized) {
+	switch {
+	case errors.Is(err, filesync.ErrUnauthorized):
 		return fmt.Errorf("%w: %v", datamove.ErrUnauthorized, err)
+	case errors.Is(err, filesync.ErrTooBig):
+		return fmt.Errorf("%w: %v", datamove.ErrTooBig, err)
 	}
 	return err
 }
@@ -50,8 +55,37 @@ func (t storeTarget) HasBlob(ctx context.Context, kind, sha string) (bool, error
 	return ok, moveErr(err)
 }
 
+func (t storeTarget) MissingBlobs(ctx context.Context, kind string, shas []string) (map[string]bool, error) {
+	missing, err := t.l.Client(kind).MissingBlobs(ctx, shas)
+	return missing, moveErr(err)
+}
+
 func (t storeTarget) PutBlob(ctx context.Context, kind, sha string, data []byte) error {
 	return moveErr(t.l.Client(kind).PutBlob(ctx, sha, data))
+}
+
+func (t storeTarget) LargeLimit(ctx context.Context, kind string) (int64, error) {
+	lim, err := t.l.Client(kind).UploadLimits(ctx)
+	if err != nil {
+		return 0, moveErr(err)
+	}
+	return largeLimit(lim), nil
+}
+
+// largeLimit is the biggest object a store takes in parts: none from an older store, any size from one without a
+// limit.
+func largeLimit(lim filestore.UploadLimits) int64 {
+	switch {
+	case lim.PartSize <= 0:
+		return 0
+	case lim.MaxSize <= 0:
+		return math.MaxInt64
+	}
+	return lim.MaxSize
+}
+
+func (t storeTarget) PutLarge(ctx context.Context, kind, sha string, size int64, r io.ReaderAt) error {
+	return moveErr(t.l.Client(kind).PutLarge(ctx, sha, size, r))
 }
 
 // hubJournal is the hub's journal of the move.

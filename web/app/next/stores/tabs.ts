@@ -2,7 +2,12 @@
 // designs, Settings, Apps — is a tab, the way a browser keeps its pages. The address is the active tab's place: going
 // anywhere moves the active tab there, a new tab is opened on purpose (⌘-click, the middle button, «+»). Each tab keeps
 // what it is cheap to keep: its place, the scroll of its page and the little a view asks to keep (useTabState). The
-// list is this browser's: localStorage, read once, written a moment after a change; private mode only forgets it.
+// list is this browser's: localStorage, written a moment after a change; private mode only forgets it.
+//
+// Two windows of the app share the list and neither owns it: each hears the other's write (the storage event) and
+// merges it by tab id against the list it last saw there, so a tab opened in one window appears in the other and a tab
+// closed in one goes in the other. What is a window's own (which tab is active, each tab's scroll and view state)
+// is kept per window, in sessionStorage, and survives a reload of that window.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { placeKeyOf } from '@/next/routes/routes';
 
@@ -28,6 +33,8 @@ export interface ITabsState {
 export const HOME_PATH = '/';
 /** The localStorage keys: the list, and whether the strip is on (Settings → General). */
 export const TABS_KEY = 'hx-tabs';
+/** The sessionStorage key of what is this window's own: its active tab, the scroll and the view state of its tabs. */
+export const WINDOW_KEY = 'hx-tabs-window';
 export const TOP_TABS_KEY = 'hx-top-tabs';
 const VERSION = 1;
 /** More than this is not a working set any more; the oldest are left out of what is kept. */
@@ -100,8 +107,92 @@ export const parseSaved = (raw: string | null): ITabsState | null => {
   }
 };
 
+/** The shared list: the tabs without what is a window's own. `active` is the last writer's, for a window opened anew. */
 export const serialize = (state: ITabsState): string =>
-  JSON.stringify({ v: VERSION, tabs: state.tabs.slice(-MAX_TABS), active: state.active });
+  JSON.stringify({
+    v: VERSION,
+    tabs: state.tabs.slice(-MAX_TABS).map(({ id, path, title, leftAt }) => ({ id, path, title, leftAt })),
+    active: state.active,
+  });
+
+/** What a window keeps for itself. */
+export interface IWindowTabs {
+  active: string;
+  scroll: Readonly<Record<string, ITab['scroll']>>;
+  view: Readonly<Record<string, ITab['view']>>;
+}
+
+export const serializeWindow = (state: ITabsState): string => {
+  const scroll: Record<string, ITab['scroll']> = {};
+  const view: Record<string, ITab['view']> = {};
+  for (const tab of state.tabs) {
+    if (tab.scroll) scroll[tab.id] = tab.scroll;
+    if (tab.view) view[tab.id] = tab.view;
+  }
+  return JSON.stringify({ v: VERSION, active: state.active, scroll, view });
+};
+
+export const parseWindow = (raw: string | null): IWindowTabs | null => {
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw) as { v?: unknown; active?: unknown; scroll?: unknown; view?: unknown };
+    if (data.v !== VERSION || typeof data.active !== 'string') return null;
+    const record = (x: unknown) => (typeof x === 'object' && x !== null ? (x as Record<string, never>) : {});
+    return { active: data.active, scroll: record(data.scroll), view: record(data.view) };
+  } catch {
+    return null;
+  }
+};
+
+/** The shared list as this window sees it: its own active tab, scroll and view state over the list's. */
+export const withWindow = (saved: ITabsState | null, own: IWindowTabs | null): ITabsState | null => {
+  if (!saved || !own) return saved;
+  const tabs = saved.tabs.map((tab) => ({
+    ...tab,
+    scroll: own.scroll[tab.id] ?? tab.scroll,
+    view: own.view[tab.id] ?? tab.view,
+  }));
+  return { tabs, active: tabs.some((tab) => tab.id === own.active) ? own.active : saved.active };
+};
+
+/**
+ * Another window wrote the list. `base` is the list this window last saw in the storage (its own last write or the
+ * last one it merged): a tab of `base` that `theirs` lacks was closed there, a tab `theirs` has and `base` lacks was
+ * opened there; what only `mine` has was opened here and not written yet, what `mine` lacks of `base` was closed
+ * here. The tab on screen here stays and keeps its place; the others take the place and the name they have there.
+ * Scroll and view state are never taken: they are each window's own.
+ */
+export const mergeTabs = (mine: ITabsState, base: ITabsState | null, theirs: ITabsState): ITabsState => {
+  const inBase = new Set((base?.tabs ?? []).map((tab) => tab.id));
+  const there = new Map(theirs.tabs.map((tab) => [tab.id, tab]));
+  const here = new Set(mine.tabs.map((tab) => tab.id));
+  const tabs: ITab[] = [];
+  for (const tab of mine.tabs) {
+    const other = there.get(tab.id);
+    if (tab.id === mine.active) tabs.push(tab);
+    else if (other) tabs.push({ ...tab, path: other.path, title: other.title, leftAt: other.leftAt });
+    else if (!inBase.has(tab.id)) tabs.push(tab);
+  }
+  // A tab opened there stands after the tab it follows there, or at the end.
+  theirs.tabs.forEach((tab, index) => {
+    if (here.has(tab.id) || inBase.has(tab.id)) return;
+    const before = theirs.tabs
+      .slice(0, index)
+      .reverse()
+      .find((x) => tabs.some((y) => y.id === x.id));
+    const at = before ? tabs.findIndex((x) => x.id === before.id) + 1 : tabs.length;
+    tabs.splice(at, 0, { ...tab, scroll: null, view: null, leftAt: tab.leftAt ?? Date.now() });
+  });
+  const same =
+    tabs.length === mine.tabs.length &&
+    tabs.every((tab, i) => {
+      const was = mine.tabs[i];
+      return (
+        tab.id === was.id && tab.path === was.path && tab.title === was.title && tab.leftAt === was.leftAt
+      );
+    });
+  return same ? mine : dedupeTabs({ tabs, active: mine.active });
+};
 
 export interface IInit {
   state: ITabsState;
@@ -205,6 +296,13 @@ export const closeTab = (state: ITabsState, id: string): ITabsState => {
   return { tabs, active: next.id };
 };
 
+/**
+ * What ⌘W does: while the window shows anything but a lone start page it closes the active tab (the last one turns
+ * into the start page); with only the start page left there is nothing of ours to close, so the window goes.
+ */
+export const closeKeyClosesWindow = (state: ITabsState): boolean =>
+  state.tabs.length === 1 && activeTab(state).path === HOME_PATH;
+
 /** Every tab but this one goes. */
 export const closeOtherTabs = (state: ITabsState, id: string): ITabsState => {
   const kept = state.tabs.find((tab) => tab.id === id);
@@ -255,38 +353,66 @@ export const nthTab = (state: ITabsState, digit: number): ITabsState => {
 
 // ── The store ──
 
-const storage = {
+const storageOf = (pick: () => Storage) => ({
   read(key: string): string | null {
     try {
-      return localStorage.getItem(key);
+      return pick().getItem(key);
     } catch {
       return null;
     }
   },
   write(key: string, value: string) {
     try {
-      localStorage.setItem(key, value);
+      pick().setItem(key, value);
     } catch {
       // Private mode or a full storage: the tabs work for this page and are forgotten on reload.
     }
   },
-};
+});
+const storage = storageOf(() => localStorage);
+const windowStorage = storageOf(() => sessionStorage);
 
 const listeners = new Set<() => void>();
 let state: ITabsState | null = null;
 let started = false;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
+/** The shared list as this window last saw it in the storage: what a merge reads the other window's changes against. */
+let seen: ITabsState | null = null;
+let unStorage: (() => void) | null = null;
+/** The list changed in this window since it was last written (a merge of another window's write does not count). */
+let unwritten = false;
 
 const persistNow = () => {
+  if (persistTimer !== null) clearTimeout(persistTimer);
   persistTimer = null;
-  if (state) storage.write(TABS_KEY, serialize(state));
+  if (!state) return;
+  windowStorage.write(WINDOW_KEY, serializeWindow(state));
+  // What only another window changed is in the storage already, and so is a list whose scroll alone moved: written
+  // again, it would only make the other windows merge a write that says nothing.
+  if (!unwritten) return;
+  unwritten = false;
+  const shared = serialize(state);
+  if (seen && serialize(seen) === shared) return;
+  storage.write(TABS_KEY, shared);
+  seen = parseSaved(shared);
 };
 
-const commit = (next: ITabsState) => {
+const commit = (next: ITabsState, own = true) => {
   if (next === state) return;
   state = next;
+  if (own) unwritten = true;
   if (persistTimer === null) persistTimer = setTimeout(persistNow, PERSIST_MS);
   for (const listener of [...listeners]) listener();
+};
+
+/** Another window wrote the list: its tabs come into this window's, and this window's own stay. */
+const onStorage = (event: StorageEvent) => {
+  if (event.key !== TABS_KEY || !state) return;
+  const theirs = parseSaved(event.newValue);
+  if (!theirs) return;
+  const merged = mergeTabs(state, seen, theirs);
+  seen = theirs;
+  commit(merged, false);
 };
 
 const subscribe = (listener: () => void) => {
@@ -303,8 +429,13 @@ export const tabsSnapshot = (): ITabsState => (state ??= homeState());
 export const startTabs = (path: string, restore: boolean): string | null => {
   if (started) return null;
   started = true;
-  const init = initTabs(parseSaved(storage.read(TABS_KEY)), path, restore);
+  seen = parseSaved(storage.read(TABS_KEY));
+  const init = initTabs(withWindow(seen, parseWindow(windowStorage.read(WINDOW_KEY))), path, restore);
   state = init.state;
+  if (typeof window !== 'undefined' && !unStorage) {
+    window.addEventListener('storage', onStorage);
+    unStorage = () => window.removeEventListener('storage', onStorage);
+  }
   for (const listener of [...listeners]) listener();
   return init.go;
 };
@@ -330,6 +461,10 @@ export const resetTabs = () => {
   persistTimer = null;
   state = null;
   started = false;
+  seen = null;
+  unwritten = false;
+  unStorage?.();
+  unStorage = null;
 };
 
 export const useTabs = (): ITabsState => useSyncExternalStore(subscribe, tabsSnapshot, tabsSnapshot);

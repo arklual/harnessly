@@ -130,7 +130,7 @@ func hashTree(root string, skip func(rel string) bool) ([]ExportFile, error) {
 		}
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
-		if skip != nil && skip(rel) {
+		if rel == SealFile || skip != nil && skip(rel) { // the seal describes the files, it is not one of them
 			return nil
 		}
 		n, sum, err := hashFile(p)
@@ -195,8 +195,12 @@ func BuildManifest(dir, id, version string, opt ExportOptions) (*Manifest, error
 	if root == "" {
 		return nil, fmt.Errorf("%s %s is not installed", id, version)
 	}
+	inVersion := map[string]bool{}
+	for _, f := range Files(dir, id, version) {
+		inVersion[f] = true
+	}
 	files, err := hashTree(root, func(rel string) bool {
-		return rel == ExportManifest || (!opt.WithSources && (rel == SourcesDir || strings.HasPrefix(rel, SourcesDir+"/")))
+		return rel == ExportManifest || !inVersion[rel] || (!opt.WithSources && (rel == SourcesDir || strings.HasPrefix(rel, SourcesDir+"/")))
 	})
 	if err != nil {
 		return nil, err
@@ -209,6 +213,16 @@ func BuildManifest(dir, id, version string, opt ExportOptions) (*Manifest, error
 		now = opt.Now
 	}
 	rec := readKitRecord(root)
+	// The base of a kit on a kit travels with it: the version it was published with is required.
+	for _, t := range Themes(dir, id, version) {
+		if raw, err := readThemeFile(dir, id, version, t.Folder, ManifestFile); err == nil {
+			if ex, ok := ExtendsOf(raw); ok {
+				if v, info := ResolveBase(dir, id, version, ex, []string{id}); info.Error == "" && !slices.Contains(rec.Requires, Require{ID: ex.Kit, Version: v}) {
+					rec.Requires = append(rec.Requires, Require{ID: ex.Kit, Version: v})
+				}
+			}
+		}
+	}
 	m := &Manifest{Schema: exportSchema, ID: id, Version: version, ExportedAt: now().UTC().Format(time.RFC3339),
 		Upstream: rec.Upstream.Tested, Requires: rec.Requires, Restricted: restrictedFiles(rec, files),
 		WithSources: opt.WithSources, Files: files, SHA256: treeSum(files)}
@@ -381,7 +395,11 @@ func Import(dir string, src io.Reader, opt ImportOptions) (ImportResult, error) 
 	}
 
 	if target := Resolve(dir, id, version, nil); target != "" {
-		have, err := hashTree(target, func(rel string) bool { return rel == ExportManifest })
+		inTarget := map[string]bool{}
+		for _, f := range Files(dir, id, version) {
+			inTarget[f] = true
+		}
+		have, err := hashTree(target, func(rel string) bool { return rel == ExportManifest || !inTarget[rel] })
 		if err != nil {
 			return res, err
 		}

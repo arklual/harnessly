@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 )
 
 // Event is one thing that happened in a space.
@@ -45,6 +47,17 @@ type Broker struct {
 	subs   map[string]map[*Sub]struct{}
 	closed bool
 	gate   func(ctx context.Context, userID, machineID string) bool
+	tap    func(spaceID string, e Event)
+	// out, when set, gets what this process published, for the other replicas (Relay).
+	out func(relayMsg)
+}
+
+// SetTap sets a listener that hears every event published to any space, after the streams were given it and outside
+// the broker's lock: how another channel of the hub (the fleet stream) follows what the spaces are told.
+func (b *Broker) SetTap(tap func(spaceID string, e Event)) {
+	b.mu.Lock()
+	b.tap = tap
+	b.mu.Unlock()
 }
 
 // SetMachineGate sets the rule that decides, per event and per stream at delivery time, whether a person may see a
@@ -94,8 +107,13 @@ func (b *Broker) Unsubscribe(s *Sub) {
 
 // Publish sends an event to the space's streams; it never waits for a slow one.
 func (b *Broker) Publish(spaceID string, e Event) {
+	b.publish(spaceID, e, true)
+}
+
+// publish delivers to this process's streams. own says the event happened here: then the tap hears it and the other
+// replicas are told; an event taken from another replica only reaches the streams.
+func (b *Broker) publish(spaceID string, e Event, own bool) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	for s := range b.subs[spaceID] {
 		if e.OwnersOnly && !s.owner {
 			continue
@@ -103,9 +121,21 @@ func (b *Broker) Publish(spaceID string, e Event) {
 		select {
 		case s.ch <- e:
 		default:
+			metrics.StreamsDropped.Inc()
 			delete(b.subs[spaceID], s)
 			s.close()
 		}
+	}
+	tap, out := b.tap, b.out
+	b.mu.Unlock()
+	if !own {
+		return
+	}
+	if tap != nil {
+		tap(spaceID, e)
+	}
+	if out != nil {
+		out(relayMsg{Bus: relaySpace, Key: spaceID, Name: e.Name, Data: e.Data, OwnersOnly: e.OwnersOnly, Machine: e.MachineID})
 	}
 }
 
@@ -130,6 +160,16 @@ func (b *Broker) PublishMachine(spaceID, machineID, name string, data any, owner
 // Kick ends the streams of a user in a space (they left, were removed, or their role changed): the page reconnects
 // and is told again what it may see.
 func (b *Broker) Kick(spaceID, userID string) {
+	b.kick(spaceID, userID)
+	b.mu.Lock()
+	out := b.out
+	b.mu.Unlock()
+	if out != nil {
+		out(relayMsg{Bus: relaySpaceKick, Key: spaceID, User: userID})
+	}
+}
+
+func (b *Broker) kick(spaceID, userID string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for s := range b.subs[spaceID] {

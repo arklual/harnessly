@@ -61,6 +61,11 @@ export interface IUsageReport {
   sessions: IUsageSession[];
   /** Set while the first pass over the transcripts is still running. */
   collecting: { done: number; total: number } | null;
+  /**
+   * Set by the hub's report (`/api/me/stats`): the blocks of the page it holds no facts for — `punchcard` (hours of the
+   * day), `projects`, `tasks`, `interrupts` (interrupts and refusals). Absent in a runtime's own report.
+   */
+  hubMissing?: string[];
 }
 
 export interface ITeamUsageRuntime {

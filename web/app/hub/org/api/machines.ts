@@ -91,6 +91,8 @@ export interface OrgMachine {
   managed?: MachineManaged | null;
   /** False when the hub only observes the machine: there is no runtime of it to open here. */
   opensRuntime?: boolean;
+  /** The hostname the machine reported; machines of one server share it. */
+  host?: string;
 }
 
 export interface MachineGroup {

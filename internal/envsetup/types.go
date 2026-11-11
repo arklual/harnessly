@@ -128,9 +128,10 @@ func (r *Runner) exec(ctx context.Context, c Cmd) (int, error) {
 // source is what any setup kind's source may hold (docs/hub/environment.md).
 // Apps is the runtime's app registry as the setup sees it.
 type Apps interface {
-	// Install puts the app in dir on the machine as the environment item's; changed is false when the same version
-	// from the same files is already there.
-	Install(dir, itemID string, locked bool) (id string, changed bool, err error)
+	// Install puts the app in dir on the machine as the environment item's, with the installation's values the hub
+	// gave (${install:<name>}); changed is false when the same version from the same files is already there. missing
+	// are the values the app asks for and the hub has none of: the app is there but not configured.
+	Install(dir, itemID string, locked bool, install map[string]string) (id string, changed bool, missing []string, err error)
 	// Has: the item's app is installed.
 	Has(itemID string) bool
 	// Prune takes off the environment's apps whose item is not among keep.
@@ -157,6 +158,8 @@ type source struct {
 	Rerun    string   `json:"rerun"`
 	Check    string   `json:"check"`
 	Secrets  []string `json:"secrets"`
+	// app: the installation's values for ${install:<name>} of the package, which the hub adds
+	Install map[string]string `json:"install"`
 	// plugin
 	Marketplace string `json:"marketplace"`
 	Plugin      string `json:"plugin"`

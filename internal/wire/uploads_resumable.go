@@ -15,6 +15,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Uploads of any size in chunks, on the same store as the one-shot PUT: the page opens a session
@@ -182,7 +184,7 @@ func (s *Server) UploadCreate(w http.ResponseWriter, r *http.Request) {
 			map[string]any{"free": free, "need": body.Size})
 		return
 	}
-	go u.sweep()
+	safego.Go("wire uploads sweep", func() { u.sweep() })
 	id := newUploadID()
 	f, err := os.OpenFile(u.partFile(id), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {

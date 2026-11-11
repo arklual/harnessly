@@ -29,7 +29,6 @@ A scope is written `kind:id` in query strings (`org:k3…`, `tenant:a7…`, `tea
 | Value | The endpoints below |
 | --- | --- |
 | `off` | answer 404 `not_found`, as if they did not exist |
-| `shadow` | answer instance administrators only (`User.isAdmin`); anyone else gets 404 |
 | `on` | answer everyone, by the rights below |
 
 ## Rights
@@ -181,8 +180,8 @@ All need a session; `{org}` is the organization's id or slug.
 
 | Method, path | Who | Request | Response |
 | --- | --- | --- | --- |
-| `GET /api/orgs` | any | | `{ orgs: (Org & { role: GrantRole \| 'member' })[], looseSpaces: SpaceRef[] }` — organizations the person has anything in (a grant, a tenant membership); in `shadow` an instance admin gets every organization. `looseSpaces`: their spaces with no organization (the onboarding step offers to move those they own) |
-| `POST /api/orgs` | any (`shadow`: instance admin) | `{ name, spaceIds: string[], tenantName?: string }` (name 1–60; `spaceIds` may be empty; `tenantName` makes the first tenant, owned by the author: empty string means «Основное», absent means none, as before) | 201 `OrgView` — makes the organization, makes the author its admin, and moves the listed spaces into it: each must be a space the author owns and in no organization, else 403 `forbidden_scope` (`details.spaceId`) and nothing is made. One transaction, journal `org.create` and `tenant.move` per space |
+| `GET /api/orgs` | any | | `{ orgs: (Org & { role: GrantRole \| 'member' })[], looseSpaces: SpaceRef[] }` — organizations the person has anything in (a grant, a tenant membership). `looseSpaces`: their spaces with no organization (the onboarding step offers to move those they own) |
+| `POST /api/orgs` | any | `{ name, spaceIds: string[], tenantName?: string }` (name 1–60; `spaceIds` may be empty; `tenantName` makes the first tenant, owned by the author: empty string means «Основное», absent means none, as before) | 201 `OrgView` — makes the organization, makes the author its admin, and moves the listed spaces into it: each must be a space the author owns and in no organization, else 403 `forbidden_scope` (`details.spaceId`) and nothing is made. One transaction, journal `org.create` and `tenant.move` per space |
 | `GET /api/orgs/{org}` | anyone with something in it | | `OrgView` — tenants and teams the person can view (a member: their tenant and their teams only) |
 | `PATCH /api/orgs/{org}` | org admin | `{ name?, timezone?, currency?, appsConsent? }` | `{ org: Org }` |
 | `POST /api/orgs/{org}/tenants` | org admin | `{ name, requestId? }` (name 1–60; `requestId` 8–64 of `A-Za-z0-9_-`, one per press of «Дальше») | 201 `{ tenant: Tenant, space: Space }` — makes the tenant in the organization in one transaction, the author its owner; journal `tenant.create`. The same `requestId` again: 200 with the tenant it made, never a second one; a `requestId` that made a space elsewhere: 409 `conflict` `request_reused`. A failure leaves nothing |

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -15,19 +16,21 @@ type User struct {
 	IsAdmin     bool
 	CreatedAt   time.Time
 	LastLoginAt *time.Time
+	// DisabledAt is when the account was switched off: it signs in nowhere and holds no session. nil: it works.
+	DisabledAt *time.Time
 }
 
-const userCols = `id, email, name, is_admin, created_at, last_login_at`
+const userCols = `id, email, name, is_admin, created_at, last_login_at, disabled_at`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
 	var admin int
 	var created int64
-	var last sql.NullInt64
-	if err := row.Scan(&u.ID, &u.Email, &u.Name, &admin, &created, &last); err != nil {
+	var last, disabled sql.NullInt64
+	if err := row.Scan(&u.ID, &u.Email, &u.Name, &admin, &created, &last, &disabled); err != nil {
 		return User{}, err
 	}
-	u.IsAdmin, u.CreatedAt, u.LastLoginAt = admin != 0, fromMs(created), fromNullMs(last)
+	u.IsAdmin, u.CreatedAt, u.LastLoginAt, u.DisabledAt = admin != 0, fromMs(created), fromNullMs(last), fromNullMs(disabled)
 	return u, nil
 }
 
@@ -315,6 +318,35 @@ func (s Store) DeleteUserSessions(ctx context.Context, userID, kind string) erro
 	return err
 }
 
+// DeleteOtherSessions ends every session of a user except the one with the hash keep ("" keeps none).
+func (s Store) DeleteOtherSessions(ctx context.Context, userID, keep string) error {
+	_, err := s.q.Exec(ctx, `DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?`, userID, keep)
+	return err
+}
+
+// DisableUser switches an account off at the moment at and ends every session it holds; false when there is no such
+// account or it is off already. Call it in a transaction.
+func (s Store) DisableUser(ctx context.Context, userID string, at time.Time) (bool, error) {
+	res, err := s.q.Exec(ctx, `UPDATE users SET disabled_at = ? WHERE id = ? AND disabled_at IS NULL`, Ms(at), userID)
+	if err != nil {
+		return false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false, nil
+	}
+	return true, s.DeleteUserSessions(ctx, userID, "")
+}
+
+// EnableUser switches an account back on; false when it was not off.
+func (s Store) EnableUser(ctx context.Context, userID string) (bool, error) {
+	res, err := s.q.Exec(ctx, `UPDATE users SET disabled_at = NULL WHERE id = ? AND disabled_at IS NOT NULL`, userID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // DeleteMachineSessions ends the runtime-origin sessions of a machine.
 func (s Store) DeleteMachineSessions(ctx context.Context, machineID string) error {
 	_, err := s.q.Exec(ctx, `DELETE FROM sessions WHERE machine_id = ?`, machineID)
@@ -454,4 +486,46 @@ func (s Store) AuthEventsByUser(ctx context.Context, userID string, limit int) (
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// VerifiedEmails lists the addresses the person has proved (an identity whose provider vouches for the address), in
+// lower case. An address another person has proved too stands for neither of them and is left out.
+func (s Store) VerifiedEmails(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.q.Query(ctx, `SELECT DISTINCT lower(email) FROM identities WHERE user_id = ? AND email_verified = 1 AND email <> ''
+		AND NOT EXISTS (SELECT 1 FROM identities o WHERE o.email_verified = 1 AND lower(o.email) = lower(identities.email) AND o.user_id <> identities.user_id)
+		ORDER BY 1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var e string
+		if err := rows.Scan(&e); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// UserIDByVerifiedEmail is the one person who has proved the address, or "" when nobody has or several have.
+func (s Store) UserIDByVerifiedEmail(ctx context.Context, email string) (string, error) {
+	rows, err := s.q.Query(ctx, `SELECT DISTINCT user_id FROM identities WHERE email_verified = 1 AND lower(email) = ? LIMIT 2`, strings.ToLower(strings.TrimSpace(email)))
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return "", err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil || len(ids) != 1 {
+		return "", err
+	}
+	return ids[0], nil
 }

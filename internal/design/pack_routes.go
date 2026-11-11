@@ -54,7 +54,7 @@ func (a *API) packImport(r *http.Request) Answer {
 		}
 		src = f
 	}
-	res, err := a.L.PackImport(src, PackImportOptions{DryRun: dry})
+	res, err := a.L.PackImport(src, PackImportOptions{DryRun: dry, Person: a.person(r)})
 	var pe *PackError
 	switch {
 	case errors.As(err, &pe) && len(pe.Conflict) > 0:

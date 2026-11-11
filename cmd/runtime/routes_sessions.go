@@ -27,6 +27,7 @@ func getAt(r *http.Request, p string) bool { return r.Method == http.MethodGet &
 func sessionRoutes(d deps) []gate.JSONRoute {
 	detector := agentdetect.New(d.Home, d.Tmux)
 	claude := sessions.NewClaudeLister(d.Home)
+	claude.Lines = transcriptLines("sessions")
 	codex := sessions.NewCodexLister(d.Home)
 	tools := d.Tools
 	if tools == nil {

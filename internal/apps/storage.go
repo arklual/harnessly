@@ -2,7 +2,10 @@ package apps
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -242,6 +245,56 @@ func (s *Storage) SetIf(app string, scope Scope, owner, key string, value json.R
 	}
 	s.emit(Change{App: app, Scope: scope, Owner: owner, Key: key})
 	return version, nil
+}
+
+// HostUpdate changes one of the host's own keys of an area (appstore.HostKeyPrefix, as WorkflowKey), which no view
+// reaches: change gets the value kept (nil for none) and answers the new one, or nil to leave it as it is.
+func (s *Storage) HostUpdate(app string, scope Scope, owner, key string, change func(old json.RawMessage) (json.RawMessage, error)) (json.RawMessage, error) {
+	if !strings.HasPrefix(key, appstore.HostKeyPrefix) {
+		return nil, ErrStorageArgs
+	}
+	var out json.RawMessage
+	err := s.update(app, scope, owner, true, func(a *appstore.Area) (bool, error) {
+		old := a.Values[key]
+		next, err := change(old)
+		if err != nil {
+			return false, err
+		}
+		if next == nil {
+			out = old
+			return false, nil
+		}
+		a.Values[key] = next
+		a.Versions[key]++
+		out = next
+		return true, nil
+	})
+	if err == nil {
+		s.emit(Change{App: app, Scope: scope, Owner: owner, Key: key})
+	}
+	return out, err
+}
+
+// ContentHash is a sha256 of an area's values without the host's own keys: what the app keeps of a document, so a
+// change of it is a change of the document's version (workflow.go).
+func (s *Storage) ContentHash(app string, scope Scope, owner string) (string, error) {
+	files, rel, unlock, err := s.where(app, scope, owner)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+	ctx, cancel := s.ctx()
+	defer cancel()
+	a, err := appstore.Read(ctx, files, rel)
+	if err != nil {
+		return "", err
+	}
+	h := sha256.New()
+	for _, k := range a.Keys() {
+		fmt.Fprintf(h, "%d:%s%d:", len(k), k, len(a.Values[k]))
+		h.Write(a.Values[k])
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // update changes an area where it is kept, and remembers what a center's area is now.

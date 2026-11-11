@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Spec registers one adapter. It is what the hub's extensions file lists (HUB_EXTENSIONS_FILE, a JSON array).
@@ -32,6 +34,9 @@ type Spec struct {
 	// MaxAnswerBytes is the biggest answer taken from the adapter; zero means 1 MiB. A bigger answer is refused as too
 	// large, never cut.
 	MaxAnswerBytes int64 `json:"maxAnswerBytes,omitempty"`
+	// UI and Branding are what the adapter brings to the hub's web (ui.go); both are off unless HARNESSLY_UI_SLOTS=on.
+	UI       []UIView  `json:"ui,omitempty"`
+	Branding *Branding `json:"branding,omitempty"`
 }
 
 // MaxAnswerLimit is the most maxAnswerBytes may raise the answer limit to: 64 MiB.
@@ -56,7 +61,7 @@ func (s Spec) Validate() error {
 	case s.MaxAnswerBytes < 0 || s.MaxAnswerBytes > MaxAnswerLimit:
 		return fmt.Errorf("extension %q: maxAnswerBytes is between 0 and %d", s.Name, MaxAnswerLimit)
 	}
-	return nil
+	return s.validateUI()
 }
 
 // LoadSpecs reads the extensions file.
@@ -176,7 +181,7 @@ func (r *Registry) Check(ctx context.Context) {
 	r.mu.Unlock()
 	for _, e := range list {
 		wg.Add(1)
-		go func() {
+		safego.Go("ext Check", func() {
 			defer wg.Done()
 			d, err := e.client.Describe(ctx, e.spec.Protocol)
 			r.mu.Lock()
@@ -195,7 +200,7 @@ func (r *Registry) Check(ctx context.Context) {
 				}
 				e.st.Error = err.Error()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

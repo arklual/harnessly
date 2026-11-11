@@ -17,9 +17,12 @@ import (
 // transcript that grows with the file (a poll costs only the bytes written since the previous one).
 
 const (
-	maxSourceIndexes  = 64
-	sourceChunkBytes  = 8 * 1024 * 1024
-	touchedTTL        = 4 * time.Second
+	maxSourceIndexes = 64
+	sourceChunkBytes = 8 * 1024 * 1024
+	touchedTTL       = 4 * time.Second
+	// touchedWait is how long the listing waits for a scan of the transcripts. A cold one (after a restart every
+	// chat's transcript is read from the start) takes minutes on a loaded machine, longer than the page waits.
+	touchedWait       = 2 * time.Second
 	inferredEditMs    = 10 * 60_000
 	sourcesBashTool   = "Bash"
 	sourcesCodexMarks = "/.codex/sessions/"
@@ -47,6 +50,14 @@ type sourcesState struct {
 	clock   int64
 	file    map[string]*sync.Mutex
 	touched *touchedEntry
+	// scan is the scan under way; requests share it instead of each reading the transcripts again.
+	scan *touchedScan
+}
+
+type touchedScan struct {
+	key  string
+	done chan struct{}
+	v    touched
 }
 
 type touchedEntry struct {
@@ -174,8 +185,9 @@ func (l *Library) allowedTranscript(p string) bool {
 	return false
 }
 
-// conversationSources are the work paths (newest first) and the edited files of a transcript.
-func (l *Library) conversationSources(p string) (paths []string, edits []boardEditPath, ok bool) {
+// conversationSources are the work paths (newest first) and the edited files of a transcript; keep is how many
+// transcripts the caller reads in one pass, so the cache never drops one it is about to need again.
+func (l *Library) conversationSources(p string, keep int) (paths []string, edits []boardEditPath, ok bool) {
 	if p == "" || !l.allowedTranscript(p) {
 		return nil, nil, false
 	}
@@ -210,7 +222,7 @@ func (l *Library) conversationSources(p string) (paths []string, edits []boardEd
 	}
 	s.clock++
 	ix.used = s.clock
-	for len(s.indexes) > maxSourceIndexes {
+	for len(s.indexes) > max(maxSourceIndexes, keep) {
 		oldest, at := "", int64(-1)
 		for k, v := range s.indexes {
 			if at < 0 || v.used < at {
@@ -298,11 +310,18 @@ func boardOfEditedPath(root, target string) (ref, board string, ok bool) {
 func (l *Library) scanTouched(known map[string]bool, chats []Chat) touched {
 	root := l.Root()
 	t := touched{refs: map[string][]string{}, edits: map[string][]boardEdit{}}
+	// A cache smaller than one pass misses on every transcript when they are read in the same order each time.
+	keep := 0
+	for _, c := range chats {
+		if agentPanels[c.PanelType] && c.Transcript != "" {
+			keep++
+		}
+	}
 	for _, c := range chats {
 		if !agentPanels[c.PanelType] || c.Transcript == "" {
 			continue
 		}
-		paths, edits, ok := l.conversationSources(c.Transcript)
+		paths, edits, ok := l.conversationSources(c.Transcript, keep)
 		if !ok {
 			continue
 		}
@@ -361,16 +380,40 @@ func (l *Library) touchedByTab(known map[string]bool, chats []Chat) touched {
 	key := strings.Join(keys, "\n")
 	s := &l.sources
 	s.mu.Lock()
-	if c := s.touched; c != nil && c.key == key && time.Since(c.at) < touchedTTL {
+	last := s.touched
+	if last != nil && last.key == key && time.Since(last.at) < touchedTTL {
 		s.mu.Unlock()
-		return c.v
+		return last.v
+	}
+	sc := s.scan
+	if sc == nil || sc.key != key {
+		sc = &touchedScan{key: key, done: make(chan struct{})}
+		s.scan = sc
+		go func() {
+			v := l.scanTouched(known, chats)
+			s.mu.Lock()
+			s.touched = &touchedEntry{at: time.Now(), key: key, v: v}
+			if s.scan == sc {
+				s.scan = nil
+			}
+			s.mu.Unlock()
+			sc.v = v
+			close(sc.done)
+		}()
 	}
 	s.mu.Unlock()
-	v := l.scanTouched(known, chats)
-	s.mu.Lock()
-	s.touched = &touchedEntry{at: time.Now(), key: key, v: v}
-	s.mu.Unlock()
-	return v
+	wait := time.NewTimer(touchedWait)
+	defer wait.Stop()
+	select {
+	case <-sc.done:
+		return sc.v
+	case <-wait.C:
+	}
+	// The scan goes on and the next poll takes its result; until then the last one, else no agents yet.
+	if last != nil {
+		return last.v
+	}
+	return touched{refs: map[string][]string{}, edits: map[string][]boardEdit{}}
 }
 
 var stateOrder = map[string]int{"busy": 0, "needs-input": 1, "ready-for-review": 2, "idle": 3}

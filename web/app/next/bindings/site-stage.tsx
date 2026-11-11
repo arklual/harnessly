@@ -73,7 +73,7 @@ import {
 import { usePageDraft } from '@/next/features/designly/page-drafts';
 import { boardFileOf, useBoardVeils } from '@/next/features/designly/image-gen/canvas';
 import type { Conversation, ConvId, MachineId, Now } from '@/next/protocol/v2';
-import { goTo, ROUTE } from '@/next/routes/routes';
+import { goTo, ROUTE, type TRoute } from '@/next/routes/routes';
 import { useConnection } from '@/next/stores/connection';
 import { useFeed, useNow } from '@/next/stores/conversation';
 import { useConversation, useConversationList } from '@/next/stores/conversations';
@@ -391,6 +391,12 @@ export interface IStageOptions {
   open?: TChatOpeners;
   /** The design's own page keeps where its chat stands; the right pane's copy has its own choice (pane-chat.ts). */
   keep?: boolean;
+  /**
+   * An app's object or home in Sinopia's stage instead of a design of the library: its chats are not recorded in the
+   * library nor asked of other machines, a pick of a chat leaves `?chat=` for `address`, and a chat made here is handed
+   * to `onCreated` (the app turns itself on in it).
+   */
+  app?: { address: TRoute; onCreated: (conv: ConvId) => void };
 }
 
 /** Everything the site view needs to show the chat beside it and the field over it. */
@@ -406,9 +412,10 @@ export const useSiteStage = ({
   onOpenDrawer,
   open,
   keep = false,
+  app,
 }: IStageOptions): ISiteStage => {
   const key = designKey(machine, design);
-  const current = useDesignConv(machine, design, fromChat);
+  const current = useDesignConv(machine, design, fromChat, app?.address);
   const { picked } = current;
   const machines = useMachines();
   const machineNames = useMemo(
@@ -420,7 +427,7 @@ export const useSiteStage = ({
   // The chats of every machine: the switch lists the design's chats wherever they are.
   const everywhere = useConversationList(null);
   const [asked, setAsked] = useState(0);
-  const found = useDesignChatsFound(machine, design, tied, asked);
+  const found = useDesignChatsFound(machine, design, tied, asked, app !== undefined);
   // A pick in the switch: the chat on screen gives way, the next one comes in.
   const [epoch, setEpoch] = useState(0);
   const swap = useSwap(picked, epoch);
@@ -524,6 +531,7 @@ export const useSiteStage = ({
       text: words,
       attachments,
       onRefused: (back) => setDraft(designDraft, { text: back, attachments: [] }),
+      ...(app ? { unlisted: true, onCreated: app.onCreated } : {}),
     });
   };
 
@@ -812,6 +820,11 @@ export const useSiteStage = ({
         return;
       }
       sendFirst(words, []);
+    },
+    fill: (words) => {
+      leaveTo('chat');
+      setMin(false);
+      setText(words);
     },
     // A board's error card sends its error to the design's chat: the chat opens where the person sees it, and the
     // message goes (the design's first one makes the chat).

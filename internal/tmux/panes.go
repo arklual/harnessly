@@ -29,8 +29,16 @@ func (t *Tmux) readPanesOn(socket string) (map[string]PaneInfo, bool) {
 		}
 		return nil, false
 	}
+	return t.parsePanes(socket, strings.Split(strings.TrimSpace(r.stdout), "\n"), func(_, said string, pid int) string {
+		return ForegroundCommand(said, pid)
+	}), true
+}
+
+// parsePanes reads the lines of a paneFormat listing of one server; foreground settles a pane's program from what
+// tmux said of it.
+func (t *Tmux) parsePanes(socket string, lines []string, foreground func(session, tmuxSaid string, pid int) string) map[string]PaneInfo {
 	panes := map[string]PaneInfo{}
-	for _, line := range strings.Split(strings.TrimSpace(r.stdout), "\n") {
+	for _, line := range lines {
 		if line == "" {
 			continue
 		}
@@ -42,16 +50,26 @@ func (t *Tmux) readPanesOn(socket string) (map[string]PaneInfo, bool) {
 			continue
 		}
 		pid := int(leadingInt(f[3]))
-		panes[f[0]] = PaneInfo{Command: ForegroundCommand(f[1], pid), Path: f[2], PID: pid, WindowActivity: leadingInt(f[4])}
+		panes[f[0]] = PaneInfo{Command: foreground(f[0], f[1], pid), Path: f[2], PID: pid, WindowActivity: leadingInt(f[4])}
 	}
-	return panes, true
+	return panes
 }
 
 // ReadAllPanes is every pane of the runtime's sessions on every server, by session name (for a session with several
 // panes, the last one listed). ok is false when any server did not answer — timed out or failed for another reason —
 // which a caller must not read as "no panes": a loaded machine can keep list-panes past its timeout, and every working
 // agent would look gone at once. A server that is not running is no panes.
+//
+// While the servers are watched (see Watch) the answer is what their events last said, and no tmux is started.
 func (t *Tmux) ReadAllPanes() (map[string]PaneInfo, bool) {
+	if panes, ok := t.watchedPanes(); ok {
+		return panes, true
+	}
+	return t.pollAllPanes()
+}
+
+// pollAllPanes asks every server with a tmux command of its own.
+func (t *Tmux) pollAllPanes() (map[string]PaneInfo, bool) {
 	sockets := t.Sockets()
 	per := make([]map[string]PaneInfo, len(sockets))
 	oks := make([]bool, len(sockets))

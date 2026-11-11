@@ -2,8 +2,12 @@
 // A frame that shows an app of a chat keeps here what its view registered; while any is kept, the chat's page reports
 // them to the runtime every few seconds (a report runs out there in 15 s, so a closed view's tools go with it) and takes
 // the agent's calls, which go to the frame of the app that offers the tool and come back with its answer.
+//
+// A call is a command of the runtime's journal. The page names itself and says it acknowledges what it takes:
+// the runtime then hands a command again, under the same id, until the page says it has it, and the page runs an id
+// once, however many times it comes. A runtime that does not hear acknowledgements hands each call once, as before.
 import { platformPath } from '@/next/core/net/machine';
-import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
+import { postJson, RuntimeError, runtimeJson } from '@/next/core/net/runtime-json';
 import type { IPageTool } from '@/next/features/app-views/bridge';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 
@@ -15,6 +19,15 @@ export const CALL_POLL_MS = 1000;
 const CALL_TIMEOUT_MS = 55_000;
 /** A hook has five seconds at the runtime; the page lets it go a little earlier. */
 const HOOK_TIMEOUT_MS = 4800;
+/** How many times an answer is sent before the page gives it up, and the pause between two tries. */
+const ANSWER_TRIES = 4;
+const ANSWER_RETRY_MS = 1000;
+/** How many answered calls a chat's page remembers, to answer a call that comes again without running it twice. */
+export const ANSWERS_KEPT = 50;
+
+// The name of this page among the pages of a chat: the runtime hands an unacknowledged command back to the page that
+// took it, and to another only when this one has gone silent.
+const PAGE_ID = `p${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36)}`;
 
 export interface IPageCall {
   id: string;
@@ -23,6 +36,8 @@ export interface IPageCall {
   arguments: unknown;
   /** The agent's own tool call, for the view's hook (hooks.agent): arguments are {tool, input}. */
   hook?: boolean;
+  /** When the command's term runs out at the runtime, in ms since the epoch; an older runtime does not say. */
+  expiresAt?: number;
 }
 
 interface IOffer {
@@ -79,6 +94,12 @@ interface IChat {
   offers: Map<string, IOffer>;
   /** The calls sent to a frame and not answered yet, with the frame they went to: only that frame answers. */
   waiting: Map<string, { frame: string; done: (a: TAnswer) => void }>;
+  /** The runtime hears acknowledgements: it said so in its answer to a poll. */
+  acks: boolean;
+  /** The calls this page has and has not answered yet: the same id coming again is not run again. */
+  running: Set<string>;
+  /** The last answers this page gave, by call: a call that comes again after its answer is answered from here. */
+  answered: Map<string, TAnswer>;
   stop: (() => void) | null;
 }
 
@@ -105,12 +126,52 @@ const report = (chat: IChat) =>
     postJson({ conversation: chat.conversation, apps: reportsOf(chat.offers.values()) }),
   );
 
-const answer = (chat: IChat, id: string, a: TAnswer) =>
-  runtimeJson<object>(
+const pause = (ms: number) => new Promise<void>((done) => window.setTimeout(done, ms));
+
+const postAnswer = async (chat: IChat, id: string, a: TAnswer) => {
+  for (let n = 0; n < ANSWER_TRIES; n += 1) {
+    try {
+      await runtimeJson<object>(
+        chat.machine,
+        platformPath('/apps/page-calls/answer'),
+        postJson({ conversation: chat.conversation, id, ...a }),
+      );
+      return;
+    } catch (e) {
+      // The runtime answered, in words: the command is over or is not its own. Another try changes nothing.
+      if (e instanceof RuntimeError && typeof e.body === 'object' && e.body !== null) return;
+      if (!chat.acks) return;
+      await pause(ANSWER_RETRY_MS);
+    }
+  }
+};
+
+/** Sends the answer of a call and lets its id go; the answer is kept for the call coming again. */
+const answer = async (chat: IChat, id: string, a: TAnswer) => {
+  chat.answered.set(id, a);
+  for (const old of chat.answered.keys()) {
+    if (chat.answered.size <= ANSWERS_KEPT) break;
+    chat.answered.delete(old);
+  }
+  await postAnswer(chat, id, a);
+  chat.running.delete(id);
+};
+
+/**
+ * Tells the runtime this page has the command. false when the command is over there, or the word did not get through:
+ * the page then does not run it (an unacknowledged command is handed out again).
+ */
+const acknowledge = (chat: IChat, id: string): Promise<boolean> => {
+  if (!chat.acks) return Promise.resolve(true);
+  return runtimeJson<{ dead?: boolean }>(
     chat.machine,
-    platformPath('/apps/page-calls/answer'),
-    postJson({ conversation: chat.conversation, id, ...a }),
-  ).catch(() => undefined);
+    platformPath('/apps/page-calls/ack'),
+    postJson({ conversation: chat.conversation, id, page: PAGE_ID }),
+  ).then(
+    (r) => r.dead !== true,
+    () => false,
+  );
+};
 
 /** The frame of the app that offers the tool; the newest frame wins when two views offer it. */
 export const offerFor = (
@@ -150,11 +211,33 @@ const runHook = (chat: IChat, call: IPageCall) => {
   offer.hook?.(call.id, call.arguments);
 };
 
-const run = async (chat: IChat, call: IPageCall) => {
+/** Takes a call the runtime handed out: one that this page already has is not run again. */
+const take = async (chat: IChat, call: IPageCall) => {
   if (call.hook === true) {
     runHook(chat, call);
     return;
   }
+  if (chat.running.has(call.id)) {
+    // It came again because the answer is long in coming: the page says it still has it.
+    void acknowledge(chat, call.id);
+    return;
+  }
+  chat.running.add(call.id);
+  const done = chat.answered.get(call.id);
+  if (done !== undefined) {
+    // The answer was given and did not reach the runtime: it goes again, the tool does not run again.
+    await postAnswer(chat, call.id, done);
+    chat.running.delete(call.id);
+    return;
+  }
+  if (!(await acknowledge(chat, call.id))) {
+    chat.running.delete(call.id);
+    return;
+  }
+  await run(chat, call);
+};
+
+const run = async (chat: IChat, call: IPageCall) => {
   const found = offerFor(chat.offers.entries(), call);
   if (found === null) {
     void answer(chat, call.id, { error: 'the view that offered this tool was closed' });
@@ -170,6 +253,11 @@ const run = async (chat: IChat, call: IPageCall) => {
     }
     if (!(await found[1].ask(tool, shown).catch(() => false))) {
       void answer(chat, call.id, { error: DECLINED });
+      return;
+    }
+    // The person may have thought longer than the command lives: the agent was told it ran out, so it does not run.
+    if (!(await acknowledge(chat, call.id))) {
+      chat.running.delete(call.id);
       return;
     }
   }
@@ -206,12 +294,15 @@ const start = (chat: IChat): (() => void) => {
       callTimer = window.setTimeout(poll, CALL_POLL_MS);
       return;
     }
-    runtimeJson<{ calls: IPageCall[] }>(
+    runtimeJson<{ calls: IPageCall[]; ack?: boolean }>(
       chat.machine,
-      platformPath(`/apps/page-calls?conversation=${encodeURIComponent(chat.conversation)}`),
+      platformPath(
+        `/apps/page-calls?conversation=${encodeURIComponent(chat.conversation)}&page=${PAGE_ID}&ack=1`,
+      ),
     ).then(
       (r) => {
-        for (const call of r.calls) void run(chat, call);
+        chat.acks = r.ack === true;
+        for (const call of r.calls) void take(chat, call);
         if (live) callTimer = window.setTimeout(poll, CALL_POLL_MS);
       },
       () => {
@@ -232,7 +323,16 @@ const chatFor = (machine: MachineId, conversation: ConvId): IChat => {
   const key = chatKey(machine, conversation);
   let chat = chats.get(key);
   if (!chat) {
-    chat = { machine, conversation, offers: new Map(), waiting: new Map(), stop: null };
+    chat = {
+      machine,
+      conversation,
+      offers: new Map(),
+      waiting: new Map(),
+      acks: false,
+      running: new Set(),
+      answered: new Map(),
+      stop: null,
+    };
     chats.set(key, chat);
   }
   return chat;

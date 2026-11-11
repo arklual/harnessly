@@ -139,6 +139,11 @@ func TestDocsPublishCommentAndRights(t *testing.T) {
 		}
 		return false
 	})
+	// The team level reaches the people of the author's space, not everyone signed in.
+	if r := mate.Do("GET", "/api/platform/docs/plan", nil); r.Code == 200 {
+		t.Fatalf("outsider detail after acl: %s", r)
+	}
+	owner.Join(id, mate)
 	if r := mate.Do("GET", "/api/platform/docs/plan", nil); r.Code != 200 {
 		t.Fatalf("teammate detail after acl: %s", r)
 	}
@@ -172,8 +177,15 @@ func TestDocsPublishCommentAndRights(t *testing.T) {
 		t.Fatalf("owner public: %s", r)
 	}
 	// The page carries the hub's frame script and a sandbox.
-	if r := owner.Do("GET", "/api/platform/docs/plan/content", nil); r.Code != 200 || !strings.Contains(r.String(), "data-hub-doc-frame") {
+	r = owner.Do("GET", "/api/platform/docs/plan/content", nil)
+	if r.Code != 200 || !strings.Contains(r.String(), "data-hub-doc-frame") {
 		t.Fatalf("content: %s", r)
+	}
+	// the viewer frames this page on its own origin (the hub's, or a gateway's that proxies it), so the hub's
+	// blanket X-Frame-Options: DENY must not reach it: the browser answered the frame with «refused to connect».
+	if r.Header.Get("X-Frame-Options") != "" || !strings.Contains(r.Header.Get("Content-Security-Policy"), "frame-ancestors 'self'") ||
+		!strings.Contains(r.Header.Get("Content-Security-Policy"), "sandbox") {
+		t.Fatalf("content headers: %v", r.Header)
 	}
 	if r := owner.Do("PUT", "/api/platform/docs/plan/source/block", map[string]any{}); r.Code != http.StatusNotImplemented {
 		t.Fatalf("block: %s", r)

@@ -240,6 +240,13 @@
 .hx-dl__body {
   min-height: 100%;
 }
+.hx-dl__notice {
+  max-width: 1120px;
+  margin: var(--hx-space-3) auto 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+
 .hx-dl__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -1544,4 +1551,45 @@ html[data-card-dragging='true'] {
   .hx-dl-folder {
     transition: none;
   }
+}
+/* The portable pack's dialogs: export confirmation and import review. */
+.hx-pack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.hx-pack__file {
+  display: none;
+}
+.hx-pack__note {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}
+.hx-pack__note[data-tone='warn'] {
+  color: var(--hx-fg-1);
+}
+.hx-pack__what {
+  margin: 0;
+  color: var(--hx-fg-1);
+  font-weight: 600;
+}
+.hx-pack__list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}
+.hx-pack__aside {
+  margin-left: 8px;
+  color: var(--hx-fg-2);
+}
+.hx-pack__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }

@@ -21,6 +21,9 @@ import {
   renameFavGroup,
 } from '@/next/commands';
 import { failureText, settled } from '@/next/bindings/outcome';
+import { LINK, startCandidateOf, type IStartCandidate, type Link } from '@/next/bindings/start-machine';
+import { cancelQueuedChat, queuedItemOf, useQueuedChats } from '@/next/commands/queued-chats';
+import { queuedRows } from '@/next/features/queued-chat/rows';
 import type { IMachineNotice } from '@/next/features/notifications/from-machines';
 import { hub } from '@/next/core/realtime/hub';
 import { chatStatusOf, statusNoteOf } from '@/next/features/sidebar/status';
@@ -51,7 +54,11 @@ import type {
   Project,
 } from '@/next/protocol/v2';
 import { connectionStore, useConnection } from '@/next/stores/connection';
-import { byActivity, conversationsStore, useConversationList } from '@/next/stores/conversations';
+import {
+  conversationsByActivity,
+  conversationsStore,
+  useConversationList,
+} from '@/next/stores/conversations';
 import { sameItems, useAll } from '@/next/core/store';
 import {
   homeMachineStore,
@@ -254,6 +261,8 @@ const copyText = async (text: string) => {
 };
 
 const machineOfChat = (id: string): MachineId => {
+  // A chat that waits in the hub has no machine's record yet.
+  if (queuedItemOf(id) !== null) throw new Error(t('next.queuedChat.notYet'));
   const record = [...conversationsStore.values()].find((c) => c.id === id);
   if (!record) throw new Error(t('next.refuse.not-found'));
   return record.machineId;
@@ -312,7 +321,11 @@ export const isEmptyChat = (
  * machine's chats; the tabs read them all, or a tab of another machine would lose its status on a switch.)
  */
 /** Every machine's chats, newest first. */
-const useEveryChat = () => useAll(conversationsStore, (s) => [...s.values()].sort(byActivity), sameItems);
+const useEveryChat = () => useAll(conversationsStore, conversationsByActivity, sameItems);
+
+/** The machines whose link is live, sorted (a stable list for the memos). */
+const useLiveMachines = () =>
+  useAll(connectionStore, (s) => [...s.keys()].filter((m) => s.get(m)?.k === 'live').sort(), sameItems);
 
 /** The machines whose link is down, sorted (a stable list for the memos). */
 const useDownMachines = () =>
@@ -406,6 +419,8 @@ export interface IShellModel {
   otherMachines: readonly IMachineChoice[];
   /** Every machine a new chat may start on, the default one first. */
   startMachines: readonly IMachineChoice[];
+  /** The same machines as the start of a new chat weighs them. */
+  startCandidates: readonly IStartCandidate[];
   /** The projects and the favorites are the person's, kept by the cluster. */
   personSidebar: boolean;
   /** The machines about to fail their work, the open one first, for the notification centre. */
@@ -454,6 +469,8 @@ export function useShellModel(): IShellModel {
   const linkDown = connection?.k === 'stale' || connection?.k === 'offline';
   const down = useDownMachines();
 
+  // the new chats that wait in the hub for their machine stand first.
+  const queued = useQueuedChats();
   const chats = useMemo<readonly ISidebarChat[] | null>(() => {
     if (!convs) return null;
     const away = new Set(down);
@@ -468,7 +485,8 @@ export function useShellModel(): IShellModel {
       if (projectIndex) return chatProjectOf(projectIndex, c.machineId, c.projectId);
       return c.machineId === here ? c.projectId : null;
     };
-    return convs.map((c) => {
+    const waitingRows = queuedRows(queued ?? [], (m) => (several ? nameOf(m) : null));
+    const machineRows = convs.map((c) => {
       const features = views.get(c.machineId)?.features ?? [];
       const canStop = features.includes('terminal-stop');
       const canFork = features.includes('fork');
@@ -507,7 +525,8 @@ export function useShellModel(): IShellModel {
         canMoveVm: moveOn.has(c.machineId) && c.lastTurn !== null,
       };
     });
-  }, [convs, here, linkDown, down, machines, central.names, moveOn, projectIndex]);
+    return [...waitingRows, ...machineRows];
+  }, [convs, here, linkDown, down, machines, central.names, moveOn, projectIndex, queued]);
   const machineFavorites = useFavorites(here);
   const favorites = shared ? shared.favorites : machineFavorites;
   const listedProjects = useProjects(here);
@@ -533,13 +552,26 @@ export function useShellModel(): IShellModel {
     () => (unified ? [] : (machines ?? []).filter((v) => v.machine.id !== here).map(choiceOf)),
     [unified, machines, here],
   );
-  const startMachines = useMemo(
-    () =>
-      [
-        ...(machines ?? []).filter((v) => v.machine.id === here),
-        ...(machines ?? []).filter((v) => v.machine.id !== here),
-      ].map(choiceOf),
+  const startViews = useMemo(
+    () => [
+      ...(machines ?? []).filter((v) => v.machine.id === here),
+      ...(machines ?? []).filter((v) => v.machine.id !== here),
+    ],
     [machines, here],
+  );
+  const startMachines = useMemo(() => startViews.map(choiceOf), [startViews]);
+  // which of them answers now, for the machine a new chat starts on.
+  const liveMachines = useLiveMachines();
+  const startCandidates = useMemo(
+    () =>
+      startViews.map((v, i) => {
+        const id = v.machine.id;
+        let link: Link = LINK.unknown;
+        if (liveMachines.includes(id)) link = LINK.live;
+        else if (down.includes(id)) link = LINK.down;
+        return startCandidateOf(v, link, startMachines[i].off);
+      }),
+    [startViews, startMachines, liveMachines, down],
   );
   const machineNotices = useMemo(
     () =>
@@ -606,7 +638,11 @@ export function useShellModel(): IShellModel {
           sharedOn && projectId !== null ? await machineProjectOf(projectId, machine) : projectId;
         await settled(moveConversation(machine, chat(id), target));
       },
-      onDelete: (id) => settled(deleteConversation(machineOfChat(id), id as Conversation['id'])),
+      onDelete: async (id) => {
+        const waiting = queuedItemOf(id);
+        if (waiting === null) return settled(deleteConversation(machineOfChat(id), id as Conversation['id']));
+        if (!(await cancelQueuedChat(waiting))) throw new Error(t('next.queuedChat.cancelFailed'));
+      },
       // The person confirmed in the menu, which says that work going on stops too.
       onStopTerminal: (id) => settled(stopTerminal(machineOfChat(id), id as Conversation['id'], true)),
       onCopyLink: (id) => copyText(chatUrl(id)),
@@ -642,6 +678,7 @@ export function useShellModel(): IShellModel {
     machine,
     otherMachines,
     startMachines,
+    startCandidates,
     personSidebar: sharedOn,
     machineNotices,
     actions,

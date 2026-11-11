@@ -71,3 +71,26 @@ func TestDecide(t *testing.T) {
 		t.Error("an empty person passed as the creator of a machine without one")
 	}
 }
+
+// Under the owner's rule only the creator and what the creator listed pass: no role, no empty list.
+func TestDecideOwnWork(t *testing.T) {
+	m := store.Machine{ID: "m", CreatedBy: "alice"}
+	own := func(s machaccess.Subject) machaccess.Subject { s.OwnWork = true; return s }
+	for _, c := range []struct {
+		name    string
+		entries []store.MachineAccessEntry
+		who     machaccess.Subject
+		want    bool
+	}{
+		{"empty list: the creator", nil, own(machaccess.Subject{UserID: "alice"}), true},
+		{"empty list: a member", nil, own(machaccess.Subject{UserID: "bob"}), false},
+		{"empty list: an instance admin", nil, own(machaccess.Subject{UserID: "root", Admin: true}), false},
+		{"owner mode: a manager", []store.MachineAccessEntry{user("alice")}, own(machaccess.Subject{UserID: "carol", Manager: true}), false},
+		{"pick: a listed admin", []store.MachineAccessEntry{user("root")}, own(machaccess.Subject{UserID: "root", Admin: true}), true},
+		{"team mode: a manager in the team", []store.MachineAccessEntry{team("t1")}, own(machaccess.Subject{UserID: "carol", Manager: true, Teams: []string{"t1"}}), true},
+	} {
+		if got := machaccess.Decide(m, c.entries, c.who); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}

@@ -218,6 +218,7 @@ func (i *Instance) run() {
 		i.closing = true
 		i.mu.Unlock()
 		i.tasks.Wait()
+		i.dropLogins()
 		close(flush)
 		<-workers
 		i.setState("down", nil)

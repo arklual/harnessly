@@ -1,0 +1,21 @@
+{
+  "v": 3,
+  "title": "Acme Brand",
+  "namespace": "AcmeBrand",
+  "libraries": [],
+  "kit": { "id": "acme-brand", "version": "1.0.0", "source": "library", "extends": "acme-ui@^1.0.0", "cssLayer": "kit-acme-brand" },
+  "sections": { "foundation": { "title": "Foundation" }, "components": { "title": "Components" } },
+  "groups": [
+    { "id": "actions", "title": "Actions",
+      "components": [
+        { "id": "Button", "name": "Button", "description": "The main way to act on a page, in the brand's rounded shape.",
+          "props": [
+            { "name": "variant", "type": "enum", "values": ["primary", "secondary", "ghost"], "description": "visual weight; primary once per area" },
+            { "name": "disabled", "type": "boolean", "description": "greys it out and ignores clicks" },
+            { "name": "tone", "type": "enum", "values": ["calm", "bold"], "description": "how loud the brand colour is" },
+            { "name": "children", "type": "node", "required": true, "description": "the label" } ],
+          "sample": { "variant": "primary", "children": "Save" },
+          "code": { "import": "@acme/brand", "export": "Button" } }
+      ] }
+  ]
+}

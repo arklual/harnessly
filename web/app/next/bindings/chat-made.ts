@@ -11,6 +11,7 @@ import {
   aboutOf,
   cachedMade,
   dedupeMade,
+  fromOf,
   iconOf,
   kindWord,
   madeKey,
@@ -176,8 +177,9 @@ export const useChatMade = (conv: Conversation, on: boolean): IChatMade => {
     items === null || entries === null
       ? null
       : [
+          // Merge requests have their block under a finished task, not a card here.
           ...items
-            .filter((x) => x.kind !== 'task')
+            .filter((x) => x.kind !== 'task' && x.kind !== 'mr')
             .map((x) => {
               const name = titleOf(x);
               return {
@@ -188,7 +190,8 @@ export const useChatMade = (conv: Conversation, on: boolean): IChatMade => {
                   title: name.title,
                   pending: name.pending,
                   // Two pages with no name between them are told apart by where they live.
-                  about: name.known ? aboutOf(x) : whereOf(x),
+                  // What a subchat or a subagent made says so: the chat inherits it.
+                  about: [name.known ? aboutOf(x) : whereOf(x), fromOf(x)].filter(Boolean).join(' · '),
                 } satisfies IMadeCard,
               };
             }),

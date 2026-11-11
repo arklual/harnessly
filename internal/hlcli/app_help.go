@@ -53,7 +53,10 @@ Uninstalls an app from this machine.
 `,
 	"enable": `harnessly app enable ID
 
-Turns an app on in the chat this tab runs; the agent gets it when it starts next. "app disable ID" turns it off.
+Turns an app on in the chat this tab runs. A running Claude Code agent has the app's tools at once and its
+instructions with its next turn; an app that needs what only a launch gives (rules for the agent's tools, its own MCP
+servers, slash commands), and any other agent, gets it when the agent starts next. The command says which.
+"app disable ID" turns it off.
 `,
 	"disable": `harnessly app disable ID
 
@@ -142,7 +145,7 @@ Serves an MCP server from a fixture file, the way an eval mocks the app's own se
 }
 
 // appSubNames lists every subcommand of `harnessly app`, for the usage line of a mistyped one.
-const appSubNames = "docs, catalog, sdk, new, validate (check), install (a folder or a .hlapp), pack, key, dev, list, remove, enable, disable, connect, explain, logs, check (--open), " +
+const appSubNames = "docs, catalog, sdk, new, validate (check), install (a folder or a .hlapp), pack, key, dev, list, remove, enable, disable, settings, secret, compat, run, connect, explain, logs, check (--open), " +
 	"publish, promote, rollback, channels, update, share, shares, unshare, team, public, eval or mock-mcp"
 
 // appHelpAliases are the names that print another subcommand's help.

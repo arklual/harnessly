@@ -5,6 +5,8 @@
 // in the field; a press on one opens its row again, a press on its chip in the field brings its words into view. The
 // words are kept by their turn and their place in its text (feed-anchor.ts): the feed draws only the turns near the
 // screen and redraws a turn as it grows. A finger has no mouseup, so on touch the button waits until the handles stop.
+// Where the chat has a side chat, «Ask aside» stands beside «Annotate»: the words go to the side chat's field as a quote
+// (stores/side-ask.ts), the agent of the chat is not disturbed.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createStore, useStore } from '@/next/core/store';
 import { anchorOf, rangeOf, stillHolds, type IFeedAnchor } from '@/next/features/chat/feed-anchor';
@@ -20,6 +22,7 @@ import {
   useQuotes,
 } from '@/next/stores/quotes';
 import { revealMessage } from '@/next/stores/reveal';
+import { askBeside } from '@/next/stores/side-ask';
 import AnnotatePill from '@/next/ui/notes/pill';
 import type { INoteChip } from '@/next/ui/notes/note-chips';
 import {
@@ -176,9 +179,11 @@ export const FeedNotesBar = ({
 
 interface ISelBarProps {
   conv: ConvId;
+  /** The chat has a side chat (a Claude chat): the picked words can be asked about there. */
+  aside?: boolean;
 }
 
-const SelBar = ({ conv }: ISelBarProps) => {
+const SelBar = ({ conv, aside = false }: ISelBarProps) => {
   const quotes = useQuotes(conv);
   const [picked, setPicked] = useState<IPicked | null>(null);
   const [fresh, setFresh] = useState<IFeedMark | null>(null);
@@ -342,6 +347,12 @@ const SelBar = ({ conv }: ISelBarProps) => {
     setPicked(null);
     window.getSelection()?.removeAllRanges();
   }, [picked]);
+  const pressAside = useCallback(() => {
+    if (!picked) return;
+    askBeside(conv, picked.quote);
+    setPicked(null);
+    window.getSelection()?.removeAllRanges();
+  }, [picked, conv]);
   const dismiss = useCallback(() => setPicked(null), []);
 
   const commit = (mark: IFeedMark, comment: string) => {
@@ -363,7 +374,14 @@ const SelBar = ({ conv }: ISelBarProps) => {
 
   return (
     <>
-      <AnnotatePill target={picked} preferBelow={coarse()} onPress={press} onDismiss={dismiss} />
+      <AnnotatePill
+        target={picked}
+        preferBelow={coarse()}
+        onPress={press}
+        onAside={aside ? pressAside : undefined}
+        keys
+        onDismiss={dismiss}
+      />
       {shown.length > 0 && (
         <div className="hx-fnotes">
           {shown.map(({ item, leaving }) => {

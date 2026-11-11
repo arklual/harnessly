@@ -488,6 +488,9 @@ func packErr(format string, a ...any) error { return &PackError{Msg: fmt.Sprintf
 type PackImportOptions struct {
 	// DryRun checks and reports; nothing is written.
 	DryRun bool
+	// Person is who imports (a page session's address; "" is the runtime's own): an imported project is theirs, as one
+	// they made, since the pack carries no .owner.json.
+	Person string
 }
 
 type limitedReader struct {
@@ -909,6 +912,7 @@ func (l *Library) PackImport(src io.Reader, opt PackImportOptions) (PackImportRe
 			return res, packErr("the project %s could not be placed as %s: %v", pl.pr.ID, pl.as, err)
 		}
 		origins[pl.pr.SHA256] = pl.as
+		l.AnnounceNewBy(pl.as, opt.Person)
 		res.Projects[i].As = pl.as
 	}
 	if err := l.savePackOrigins(origins); err != nil {

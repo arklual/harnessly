@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
@@ -324,7 +325,8 @@ func (m *Manager) transitionFromScreen(tabID string, e *Entry, decision string) 
 			x := m.now() - at
 			d = &x
 		}
-		go m.mismatch(Mismatch{Kind: "stuck-settled", Shown: e.CliState, Actual: decision, Provider: e.AgentProviderID.Value(), DurationMs: d, Unhooked: e.HooksMissing})
+		mis := Mismatch{Kind: "stuck-settled", Shown: e.CliState, Actual: decision, Provider: e.AgentProviderID.Value(), DurationMs: d, Unhooked: e.HooksMissing}
+		safego.Go("status mismatch", func() { m.mismatch(mis) })
 	}
 	e.StuckBackoffMs = 0
 	m.applyCliState(tabID, e, decision, applyOpts{silent: true})
@@ -433,7 +435,8 @@ func (m *Manager) healInactive(tabID string, e *Entry, p Provider) bool {
 	m.d.Log("info", "agent found running in an inactive tab", "tabId", tabID, "next", next)
 	if gone != nil {
 		d := now - *gone
-		go m.mismatch(Mismatch{Kind: "gone-while-running", Shown: Inactive, Actual: next, Provider: p.ID(), DurationMs: &d})
+		mis := Mismatch{Kind: "gone-while-running", Shown: Inactive, Actual: next, Provider: p.ID(), DurationMs: &d}
+		safego.Go("status mismatch", func() { m.mismatch(mis) })
 	}
 	if next == Busy {
 		session := e.TmuxSession

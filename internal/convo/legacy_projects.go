@@ -38,11 +38,13 @@ func (r *Runtime) ImportProjects(projects []LegacyProject, assign map[string]str
 		if placed[id] {
 			continue
 		}
-		var cwd string
-		live := false
-		if r.call(context.Background(), id, func(c *conv, _ time.Time) { cwd, live = c.rec.Cwd, c.deletedAt == 0 }) != nil || !live {
+		// The record the conversation last left says where it runs: asking its actor would count as a use of every
+		// conversation the organizer names, at every pass of the take-over.
+		v := r.view(id)
+		if v == nil || v.deleted {
 			continue
 		}
+		cwd := v.rec.Cwd
 		byProject[pid] = append(byProject[pid], id)
 		if cwds[pid] == nil {
 			cwds[pid] = map[string]int{}
@@ -66,6 +68,11 @@ func (r *Runtime) ImportProjects(projects []LegacyProject, assign map[string]str
 			p, _ = r.addProject(wire.Project{ID: lp.ID, Path: path, Name: lp.Name})
 		}
 		for _, id := range ids {
+			if v := r.view(id); v != nil && v.rec.ProjectID != nil {
+				placed[id] = true // in a project already: nothing to write, and a parked conversation stays parked
+				n++
+				continue
+			}
 			_ = r.call(context.Background(), id, func(c *conv, now time.Time) {
 				if c.rec.ProjectID == nil {
 					pid := p.ID

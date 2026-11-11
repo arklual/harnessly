@@ -11,9 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/machaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Messages between agents of different machines (docs/hub/peers.md). A machine proves itself with its own key; the hub
@@ -35,28 +38,50 @@ const (
 
 // peerSender is who the hub says a machine's message comes from. The person the machine names is believed as the site
 // session believes it (siteSession): they registered the machine, or opened it through the hub lately, and are still
-// members of its space. Otherwise it is the person who registered the machine; with none, the machine cannot send.
-func (h *Hub) peerSender(ctx context.Context, m store.Machine, claimed string) (hubproto.PeerSender, bool) {
+// members of its space. Otherwise it is the person who registered the machine, while they are a member of its space and
+// their account works; with none, the machine cannot send.
+func (h *Hub) peerSender(ctx context.Context, m store.Machine, claimed string) (hubproto.PeerSender, string, bool) {
 	s := hubproto.PeerSender{Machine: hubproto.PeerRefPrefix + m.ID, MachineName: m.Name}
-	person := func(u store.User) hubproto.PeerSender {
+	person := func(u store.User) (hubproto.PeerSender, string, bool) {
 		s.Person, s.PersonName = u.Email, u.Name
-		return s
+		return s, u.ID, true
 	}
 	if email := strings.ToLower(strings.TrimSpace(claimed)); email != "" {
-		if u, err := h.db.S().UserByEmail(ctx, email); err == nil && (u.ID == m.CreatedBy || h.Tickets.OpenedRecently(u.ID, m.ID)) {
+		if u, err := h.db.S().UserByEmail(ctx, email); err == nil && u.DisabledAt == nil && (u.ID == m.CreatedBy || h.Tickets.OpenedRecently(u.ID, m.ID)) {
 			if role, err := h.db.S().Role(ctx, m.SpaceID, u.ID); err == nil && role != "" {
-				return person(u), true
+				return person(u)
 			}
 		}
 	}
 	if m.CreatedBy == "" {
-		return s, false
+		return s, "", false
 	}
 	u, err := h.db.S().UserByID(ctx, m.CreatedBy)
-	if err != nil || u.Email == "" {
-		return s, false
+	if err != nil || u.Email == "" || u.DisabledAt != nil {
+		return s, "", false
 	}
-	return person(u), true
+	if role, err := h.db.S().Role(ctx, m.SpaceID, u.ID); err != nil || role == "" {
+		return s, "", false
+	}
+	return person(u)
+}
+
+// peerMayOpen says whether the person a message comes from may open the machine it goes to, by the rule the site
+// applies: a place in the machine's space (or managing it from above), then the machine's access list. It is asked
+// under HUB_ACCESS_ENFORCE like every other use of the list: off asks nothing, warn logs what on would refuse.
+func (h *Hub) peerMayOpen(ctx context.Context, userID string, to store.Machine) bool {
+	acc := &machaccess.Checker{Config: h.cfg, DB: h.db, Authz: h.Spaces.Authz, IsAdmin: h.Auth.IsInstanceAdmin, Log: h.log}
+	if !acc.Enforcing() {
+		return true
+	}
+	if _, err := h.Spaces.Access(ctx, userID, to.SpaceID); err != nil {
+		if h.cfg.Machines.AccessEnforce == config.AccessWarn {
+			h.log.Warn("peer message would be refused: the sender is not in the machine's space", "machine", to.ID, "user", userID)
+			return true
+		}
+		return false
+	}
+	return acc.Reach(ctx, userID, to) == nil
 }
 
 // peerSpaces is the spaces a machine of space may reach: its own, and the other spaces of its organization.
@@ -132,7 +157,7 @@ func (h *Hub) peersSend(w http.ResponseWriter, r *http.Request) error {
 	if ok, _ := h.limiter.Allow("peers:"+from.ID, peersPerMinute, time.Minute); !ok {
 		return answer(hubproto.PeerRefusal(msg.ID, hubproto.PeerRateLimited, ""))
 	}
-	sender, ok := h.peerSender(r.Context(), from, body.Person)
+	sender, senderID, ok := h.peerSender(r.Context(), from, body.Person)
 	if !ok {
 		return answer(hubproto.PeerRefusal(msg.ID, hubproto.PeerUnverified, "the machine has no person the hub can vouch for"))
 	}
@@ -142,6 +167,9 @@ func (h *Hub) peersSend(w http.ResponseWriter, r *http.Request) error {
 	}
 	// An unknown machine, one out of reach and one switched off answer alike: the sender learns nothing of which exist.
 	to, ok := h.peerTarget(r.Context(), from, machineID)
+	if ok && !h.peerMayOpen(r.Context(), senderID, to) {
+		ok = false
+	}
 	if !ok {
 		return answer(hubproto.PeerRefusal(msg.ID, hubproto.PeerUnreachable, ""))
 	}
@@ -188,7 +216,7 @@ func (h *Hub) peersDirectory(w http.ResponseWriter, r *http.Request) error {
 		return httpx.RateLimited(int(retry / time.Second))
 	}
 	out := hubproto.PeerChats{Chats: []hubproto.PeerChat{}}
-	sender, ok := h.peerSender(r.Context(), from, body.Person)
+	sender, senderID, ok := h.peerSender(r.Context(), from, body.Person)
 	if !ok {
 		httpx.WriteJSON(w, http.StatusOK, out)
 		return nil
@@ -204,7 +232,8 @@ func (h *Hub) peersDirectory(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		for _, m := range ms {
-			if m.ID != from.ID && m.RevokedAt == nil && m.DisabledAt == nil && h.Registry.Get(m.ID) != nil && len(targets) < peersMaxMachines {
+			if m.ID != from.ID && m.RevokedAt == nil && m.DisabledAt == nil && h.Registry.Get(m.ID) != nil && len(targets) < peersMaxMachines &&
+				h.peerMayOpen(r.Context(), senderID, m) {
 				targets = append(targets, m)
 			}
 		}
@@ -213,7 +242,7 @@ func (h *Hub) peersDirectory(w http.ResponseWriter, r *http.Request) error {
 	var wg sync.WaitGroup
 	for _, m := range targets {
 		wg.Add(1)
-		go func() {
+		safego.Go("api peersDirectory", func() {
 			defer wg.Done()
 			l := h.Registry.Get(m.ID)
 			if l == nil {
@@ -232,7 +261,7 @@ func (h *Hub) peersDirectory(w http.ResponseWriter, r *http.Request) error {
 					out.Chats = append(out.Chats, peerChat(c, m))
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	sort.Slice(out.Chats, func(i, j int) bool {

@@ -55,6 +55,10 @@ type ColorToken struct {
 	Name   string            `json:"name"`
 	Values map[string]string `json:"values"`
 	Usage  string            `json:"usage,omitempty"`
+	// Var is the CSS variable the token is published as, when tokens.json says (token.var).
+	Var string `json:"var,omitempty"`
+	// From is the kit this token is inherited from («id@version»), "" for the kit's own.
+	From string `json:"from,omitempty"`
 }
 
 // TypeStyle is a text style of the foundation.
@@ -82,6 +86,8 @@ type PlainToken struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 	Usage string `json:"usage,omitempty"`
+	Var   string `json:"var,omitempty"`
+	From  string `json:"from,omitempty"`
 }
 
 // Prop is a property of a component.
@@ -119,6 +125,30 @@ type Component struct {
 	Part string `json:"part,omitempty"`
 	// Keywords are the words people look for it by besides its name and description (synonyms, tasks).
 	Keywords []string `json:"keywords,omitempty"`
+	// Code is the module a consuming project imports it from, Preset what it is a fixed-props copy of, Status its
+	// life (stable, new, deprecated) and ReplacedBy what replaces a deprecated one; all optional (see "Optional fields").
+	Code       *Code   `json:"code,omitempty"`
+	Preset     *Preset `json:"preset,omitempty"`
+	Status     string  `json:"status,omitempty"`
+	ReplacedBy string  `json:"replacedBy,omitempty"`
+	// From is the base kit the component is inherited from («id@version»), "" for the kit's own; Overrides the base
+	// one this component replaces. Ns is the namespace to call an inherited component by when it is not the kit's own.
+	From      string `json:"from,omitempty"`
+	Overrides string `json:"overrides,omitempty"`
+	Ns        string `json:"ns,omitempty"`
+	src       *fileSrc
+}
+
+// Code says where a component is imported from in a consuming project.
+type Code struct {
+	Import string `json:"import"`
+	Export string `json:"export"`
+}
+
+// Preset: the component is another component (Of) with fixed props.
+type Preset struct {
+	Of    string         `json:"of"`
+	Props map[string]any `json:"props,omitempty"`
 }
 
 // PartProvider marks a component that only provides context (a theme, a store) and draws nothing.
@@ -191,6 +221,7 @@ type TemplateLayout struct {
 	Cell int `json:"cell"`
 	// Address is how a deck takes the layout (`<kit>/<theme>/<layout>`), "" when the theme does not ship its board.
 	Address string `json:"address,omitempty"`
+	src     *fileSrc
 }
 
 // TemplateSection is a section of a template.
@@ -217,6 +248,8 @@ type Template struct {
 	Description string            `json:"description,omitempty"`
 	Sections    []TemplateSection `json:"sections"`
 	Atlas       *Atlas            `json:"atlas,omitempty"`
+	// From is the base kit the template is inherited from, "" for the kit's own.
+	From string `json:"from,omitempty"`
 }
 
 // Canvas is a theme of an installed kit version as the kit screen draws it.
@@ -230,6 +263,12 @@ type Canvas struct {
 	Namespace string        `json:"namespace"`
 	// Root is the provider component every board on the kit wraps its content in (the kit record's root), "" for none.
 	Root string `json:"root,omitempty"`
+	// TokenPrefix is the kit record's prefix of the tokens' CSS variables (--acme-), "" when none.
+	TokenPrefix string `json:"tokenPrefix,omitempty"`
+	// Package is the npm package the kit stands for (kit.package), Strict whether projects on it are checked in strict
+	// mode (kit.strict).
+	Package string `json:"package,omitempty"`
+	Strict  bool   `json:"strict,omitempty"`
 	// Base is the theme's folder in the version (slash path, "" for a kit that is one theme).
 	Base       string           `json:"base"`
 	Sections   []CanvasSection  `json:"sections"`
@@ -243,6 +282,12 @@ type Canvas struct {
 	Templates  []Template       `json:"templates"`
 	Index      []IndexEntry     `json:"index"`
 	PreparedAt int64            `json:"preparedAt"`
+	// Extends is the kit's link to its base (extends.go): the spec, the version it resolved to or why it did not.
+	Extends *ExtendsInfo `json:"extends,omitempty"`
+	// Bases are the kits this one is built on, the outermost first; their files load before the kit's own.
+	Bases []Base `json:"bases,omitempty"`
+	// RootNs is the namespace of Root when it is inherited from another namespace.
+	RootNs string `json:"rootNs,omitempty"`
 }
 
 // kitTheme is a theme as kit.json names it.
@@ -277,6 +322,10 @@ type rawManifest struct {
 			Thumb       string          `json:"thumb"`
 			Part        json.RawMessage `json:"part"`
 			Keywords    []string        `json:"keywords"`
+			Code        *Code           `json:"code"`
+			Preset      *Preset         `json:"preset"`
+			Status      string          `json:"status"`
+			ReplacedBy  string          `json:"replacedBy"`
 		} `json:"components"`
 	} `json:"groups"`
 	AssetGroups map[string]struct {
@@ -362,6 +411,10 @@ func (m *rawManifest) hasCanvas() bool {
 // ReadCanvas reads a theme of an installed version ("" is its first theme) as the kit screen draws it, without the
 // prepared atlases (Prepare adds them).
 func ReadCanvas(dir, id, version, theme string) (*Canvas, error) {
+	return readCanvas(dir, id, version, theme, nil)
+}
+
+func readCanvas(dir, id, version, theme string, stack []string) (*Canvas, error) {
 	themes := Themes(dir, id, version)
 	if len(themes) == 0 {
 		return nil, ErrNoCanvas
@@ -407,12 +460,15 @@ func ReadCanvas(dir, id, version, theme string) (*Canvas, error) {
 		c.Themes = append(c.Themes, CanvasTheme{ID: t.ID, Title: firstNonEmpty(title, t.ID)})
 	}
 	c.Root = kitRoot(raw)
+	c.TokenPrefix = kitTokenPrefix(raw)
+	c.Package, c.Strict = kitPackageStrict(raw)
 	if tokens, err := readThemeFile(dir, id, version, th.Folder, "tokens.json"); err == nil {
 		readFoundation(c, tokens)
 	}
 	readComponents(c, &m)
 	readAssets(c, &m)
 	readTemplates(c, &m, dir, id, version)
+	inherit(dir, c, raw, stack)
 	readSections(c, &m)
 	c.Index = buildIndex(c)
 	return c, nil
@@ -454,6 +510,7 @@ type tokensFile struct {
 			Name  string          `json:"name"`
 			Value json.RawMessage `json:"value"`
 			Usage string          `json:"usage"`
+			Var   string          `json:"var"`
 		} `json:"tokens"`
 	} `json:"color"`
 	Type struct {
@@ -510,7 +567,7 @@ func readFoundation(c *Canvas, raw []byte) {
 		if tok.Name == "" || len(values) == 0 {
 			continue
 		}
-		c.Colors = append(c.Colors, ColorToken{ID: "color:" + tok.Name, Name: tok.Name, Values: values, Usage: tok.Usage})
+		c.Colors = append(c.Colors, ColorToken{ID: "color:" + tok.Name, Name: tok.Name, Values: values, Usage: tok.Usage, Var: tok.Var})
 	}
 	for _, f := range t.Type.Fonts {
 		if file := cleanRel(f.File); f.Family != "" && file != "" {
@@ -545,6 +602,7 @@ func readFoundation(c *Canvas, raw []byte) {
 				Name  string          `json:"name"`
 				Value json.RawMessage `json:"value"`
 				Usage string          `json:"usage"`
+				Var   string          `json:"var"`
 			} `json:"tokens"`
 		}
 		if json.Unmarshal(all[kind], &list) != nil {
@@ -552,7 +610,7 @@ func readFoundation(c *Canvas, raw []byte) {
 		}
 		for _, tok := range list.Tokens {
 			if v := rawString(tok.Value); tok.Name != "" && v != "" {
-				c.Tokens = append(c.Tokens, PlainToken{ID: "token:" + tok.Name, Kind: kind, Name: tok.Name, Value: v, Usage: tok.Usage})
+				c.Tokens = append(c.Tokens, PlainToken{ID: "token:" + tok.Name, Kind: kind, Name: tok.Name, Value: v, Usage: tok.Usage, Var: tok.Var})
 			}
 		}
 	}
@@ -579,7 +637,7 @@ func readComponents(c *Canvas, m *rawManifest) {
 			}
 			comp := Component{ID: id, NodeID: "component:" + id, Name: firstNonEmpty(k.Name, id), Description: k.Description,
 				Props: k.Props, Variants: k.Variants, Sample: k.Sample, Preview: cleanRel(k.Preview), Thumb: cleanRel(k.Thumb),
-				Cell: -1, Part: partOf(k.Part), Keywords: k.Keywords}
+				Cell: -1, Part: partOf(k.Part), Keywords: k.Keywords, Code: k.Code, Preset: k.Preset, Status: k.Status, ReplacedBy: k.ReplacedBy}
 			if comp.Props == nil {
 				comp.Props = []Prop{}
 			}
@@ -731,6 +789,56 @@ func kitRoot(manifest []byte) string {
 		return root
 	}
 	return ""
+}
+
+// kitTokenPrefix is the kit record's tokenPrefix (the same member kitRoot reads), "" without one.
+func kitTokenPrefix(manifest []byte) string {
+	var all map[string]json.RawMessage
+	if json.Unmarshal(manifest, &all) != nil {
+		return ""
+	}
+	names := make([]string, 0, len(all))
+	for name := range all {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		var own struct {
+			ID          string `json:"id"`
+			Version     string `json:"version"`
+			TokenPrefix string `json:"tokenPrefix"`
+		}
+		if json.Unmarshal(all[name], &own) == nil && own.ID != "" && own.Version != "" {
+			return own.TokenPrefix
+		}
+	}
+	return ""
+}
+
+// kitPackageStrict are the kit record's package and strict (the same member kitRoot reads).
+func kitPackageStrict(manifest []byte) (string, bool) {
+	var all map[string]json.RawMessage
+	if json.Unmarshal(manifest, &all) != nil {
+		return "", false
+	}
+	names := make([]string, 0, len(all))
+	for name := range all {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		var own struct {
+			ID      string `json:"id"`
+			Version string `json:"version"`
+			Package string `json:"package"`
+			Strict  any    `json:"strict"`
+		}
+		if json.Unmarshal(all[name], &own) == nil && own.ID != "" && own.Version != "" {
+			strict, _ := own.Strict.(bool)
+			return own.Package, strict
+		}
+	}
+	return "", false
 }
 
 // partOf reads a component's part: "provider", a parent's id, or {"of": "<id>"}; "" when it is a component of its own.

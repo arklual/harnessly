@@ -374,11 +374,11 @@ func (s *Service) run(j *job, r Request) {
 	if s.Env != nil {
 		cmd.Env = s.Env()
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		fail(err.Error())
-		return
-	}
+	// What Codex prints is read through a pipe of our own: Wait then returns only after every line was handed to the
+	// reader, so the last thing Codex said is not lost when it exits at once.
+	stdout, stdin := io.Pipe()
+	cmd.Stdout = stdin
+	cmd.WaitDelay = 5 * time.Second
 	var stderr tailBuffer
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
@@ -387,7 +387,12 @@ func (s *Service) run(j *job, r Request) {
 	}
 	threads := make(chan string, 1)
 	var said lastSaid
-	go readEvents(stdout, threads, &said)
+	read := make(chan struct{})
+	go func() {
+		defer close(read)
+		readEvents(stdout, threads, &said)
+		_, _ = io.Copy(io.Discard, stdout)
+	}()
 
 	var thread string
 	seen := map[string]bool{}
@@ -423,7 +428,12 @@ func (s *Service) run(j *job, r Request) {
 		}
 	}
 	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
+	go func() {
+		err := cmd.Wait()
+		stdin.Close()
+		<-read
+		exited <- err
+	}()
 	tick := time.NewTicker(watchEvery)
 	defer tick.Stop()
 	for {

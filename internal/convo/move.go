@@ -135,9 +135,20 @@ func (r *Runtime) MoveOpen(in MoveOpen) (string, wire.RefuseCode) {
 
 // MoveDelete removes a conversation a move made and then undid; it is idempotent and takes nothing else.
 func (r *Runtime) MoveDelete(id string) {
-	if r.actor(id) == nil {
+	if !r.Has(id) {
 		return
 	}
 	force := true
 	r.Do(context.Background(), "", wire.ConversationDeleteCmd{OpID: "move-discard-" + id, ID: id, Force: &force})
+}
+
+// MoveIDs are the conversations of the runtime, read without waking any (the resume snapshots look at them).
+func (r *Runtime) MoveIDs() []string {
+	var out []string
+	for _, v := range r.views() {
+		if !v.deleted {
+			out = append(out, v.rec.ID)
+		}
+	}
+	return out
 }

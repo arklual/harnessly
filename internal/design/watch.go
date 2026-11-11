@@ -400,3 +400,22 @@ func (c *listingCache) refs(watching bool, compute func() []string) []string {
 	c.mu.Unlock()
 	return refs
 }
+
+// ListingGen is a number that moves whenever the watcher sees anything change under a project's folder (or cannot tell
+// where): what was read from the folder at one number is still so at the same number. ok is false while the folder is
+// not watched, and then nothing read from it may be kept. Ask for it before reading, so a change during the read is
+// not lost.
+func (l *Library) ListingGen(ref string) (gen uint64, ok bool) {
+	if !l.watching() {
+		return 0, false
+	}
+	c := &l.listing
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.init()
+	return c.genOf(ref), true
+}
+
+// Refresh drops what the listing remembers of the folder: files were put in or taken out of it by someone other than the
+// library (the hub bringing a project up to a new revision), and the watcher may not have said so yet.
+func (l *Library) Refresh() { l.listing.invalidateAll() }

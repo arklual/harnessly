@@ -86,3 +86,62 @@ func TestDoctorPreviewNXDOMAIN(t *testing.T) {
 		}
 	}
 }
+
+func runDoctorUpdate(t *testing.T, answer string, args ...string) (string, int) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/cli/update" || r.Header.Get("x-cli-token") != "tok" {
+			w.WriteHeader(404)
+			return
+		}
+		_, _ = w.Write([]byte(answer))
+	}))
+	t.Cleanup(srv.Close)
+	env := map[string]string{"HARNESSLY_URL": srv.URL, "HARNESSLY_CLI_TOKEN": "tok"}
+	var out bytes.Buffer
+	code := Run(append([]string{"doctor", "update"}, args...), Env{Getenv: func(k string) string { return env[k] }, Stdout: &out, Stderr: &out, Home: t.TempDir()})
+	return out.String(), code
+}
+
+// doctor update shows the channel and what it offers, and the reason when the stable channel has nothing to offer.
+func TestDoctorUpdateShowsTheChannel(t *testing.T) {
+	for name, tc := range map[string]struct {
+		answer string
+		want   []string
+	}{
+		"stable with a newer release": {
+			`{"current":"0.16.100","latest":"0.16.180","url":"https://example.org/v0.16.180","updateAvailable":true,"channel":"stable","checking":true,"source":"releases"}`,
+			[]string{"version: 0.16.100", "channel stable (RUNTIME_UPDATE_CHANNEL)", "newer on this channel: 0.16.180  https://example.org/v0.16.180"}},
+		"latest, nothing newer": {
+			`{"current":"0.16.200","latest":"0.16.200","updateAvailable":false,"channel":"latest","checking":true,"source":"releases"}`,
+			[]string{"channel latest", "this channel is at 0.16.200: nothing newer"}},
+		"stable without a pointer": {
+			`{"current":"0.16.100","updateAvailable":false,"channel":"stable","note":"No stable release is named at https://example.org/stable.json yet","checking":true,"source":"releases"}`,
+			[]string{"channel stable", "[warn] No stable release is named at https://example.org/stable.json yet"}},
+		"a machine of a hub": {
+			`{"current":"0.16.100","updateAvailable":false,"checking":false,"source":"hub","machine":{"mode":"auto","checked":true,"upToDate":true,"version":"0.16.100"}}`,
+			[]string{"the programs this machine's hub serves", "machine programs: auto mode, up to date (0.16.100)"}},
+		"a fleet machine": {
+			`{"current":"0.16.100","updateAvailable":false,"checking":false,"source":"fleet","machine":{"mode":"fleet","checked":true,"upToDate":true}}`,
+			[]string{"a rollout brings whole releases", "machine programs: fleet mode, up to date"}},
+		"a build from source": {
+			`{"current":"dev","updateAvailable":false,"checking":false,"source":"none"}`,
+			[]string{"this runtime looks for none"}},
+	} {
+		out, code := runDoctorUpdate(t, tc.answer)
+		if code != 0 {
+			t.Fatalf("%s: exit %d\n%s", name, code, out)
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: no %q in\n%s", name, want, out)
+			}
+		}
+		if (name == "a machine of a hub" || name == "a fleet machine") && strings.Contains(out, "channel stable") {
+			t.Errorf("%s: a channel is shown:\n%s", name, out)
+		}
+	}
+	if out, code := runDoctorUpdate(t, `{}`, "--verbose"); code == 0 {
+		t.Fatalf("an unknown flag was taken:\n%s", out)
+	}
+}

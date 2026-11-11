@@ -103,7 +103,8 @@ func (s *Service) gitlabExtras(ctx context.Context, view *jsvalue.Object, item a
 	}
 	var jobs, threads any
 	var w sync.WaitGroup
-	w.Add(2)
+	w.Add(3)
+	go func() { defer w.Done(); s.gitlabReview(ctx, view, item, a, project, ref) }()
 	go func() {
 		defer w.Done()
 		if pid := opt(pipeline, "id"); truthy(pid) {

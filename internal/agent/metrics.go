@@ -78,7 +78,7 @@ func (h *hub) emitSubscribed(event, key string, value any) bool {
 	sent := false
 	for _, l := range h.hubLinks() {
 		if l.subscribed(event) {
-			l.sendText(frame)
+			l.sendEvent(event, frame)
 			sent = true
 		}
 	}

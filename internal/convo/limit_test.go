@@ -498,9 +498,12 @@ func TestRestartOfAnIdleChatPokesNothing(t *testing.T) {
 	}
 }
 
-// A lost terminal the startup's resume does not bring back is resumed by the chat itself, after RestartResumeAfter.
+// With the sessions left to the tabs' keepers (Deps.LegacyLife), a lost terminal the startup's resume does not bring
+// back is resumed by the chat itself, after RestartResumeAfter.
 func TestRestartLostTerminalResumesItself(t *testing.T) {
 	r := newRig(t)
+	r.deps = func(d *Deps) { d.LegacyLife = true }
+	r.rt = r.runtime()
 	r.rt.Import([]ImportTab{{ID: r.id, Session: "s1", Title: "work", Provider: wire.ProviderClaude, Cwd: "/w",
 		TranscriptPath: r.path, AgentSessionID: "sess-1"}}, nil)
 	r.settle(wire.StateReady)

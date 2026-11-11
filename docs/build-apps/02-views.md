@@ -150,7 +150,7 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 
 | Call | Permission | What it does |
 | --- | --- | --- |
-| `hl.context` | none | `app`, `target`, `view`, `theme`, `locale`, `chat` (null when the app is off in the chat), `readOnly`, `data` (a card's). `user` is always `null` |
+| `hl.context` | none | `app`, `target`, `view`, `theme`, `locale`, `chat` (null when the app is off in the chat), `readOnly`, `data` (a card's). `user` is `{name, role}`: the person's name (else e-mail) and their role where the view stands — `edit` or `view` in a document, `member` elsewhere; `null` while nobody is known. It is shown, not proven: a check that matters is the host's |
 | `hl.host` | none | `{name, version}` |
 | `hl.on(event, fn)` | none | Working events: `context`, `theme`, `storage` (`{scope, key}`: a key was written or deleted), `visibility` (`{visible}`: the view was hidden or shown), `agents` (`{agents}`: the list of conversations or the status of one changed; only with `agents.read`), and `selection` in Sinopia. `tool-input` and `tool-result` are not sent yet |
 | `hl.chat.send(text)` | `chat.prompt` | A message to the agent, up to 20 000 characters, shown with the app's name on one line |
@@ -165,6 +165,10 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 | `hl.files.list(folder)`, `hl.files.search(text, {glob})` | `files.read:<mask>` | A folder's entries and the lines that hold a text, within the masks |
 | `hl.files.watch(fn)` | `files.watch` | Which files under the masks changed (names only); gives the function that stops it |
 | `hl.files.pick({accept})` | none | The person picks a file in the host's dialog: `{path, text}` once, or `null` |
+| `hl.files.choose({accept, multiple})` | none | Asks the person for files from their computer (call it from a click): the `File`s, `[]` when they cancel |
+| `hl.files.dropZone(el, onFiles)` | none | Lets the person drop files on an element; `data-drop="over"` while files hover it. Gives the function that stops it |
+| `hl.files.upload(file, path)` | `files.write:<mask>` | Puts a file the person gave (from `choose`, a drop or your own `<input type=file>`) into the chat's folder at `path` (default `uploads/<name>`): `{path, size}`. Up to 4 MB, any bytes |
+| `hl.workflow.get()`, `hl.workflow.move(to, {version, hash, note})` | none | The status of the view's document by the manifest's `workflow`. See [Statuses](04-sinopia.md#statuses-of-a-document) |
 | `hl.git.status()`, `hl.git.diff({path, staged, ref})`, `hl.git.log({limit})` | `git.read` | git of the chat's folder, read only, secrets left out |
 | `hl.events.on(kind, fn)` | `events:<kind>` | `turn`, `tool`, `message` of the chat |
 | `hl.terminal.run(command, {cwd, timeout})` | `terminal.run`, `terminal.run:<mask>` | A command in the agent's sandbox: `{code, output, cut, timedOut, ms}`. See [Commands and processes](#commands-and-processes) |

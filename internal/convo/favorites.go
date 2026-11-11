@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,17 +15,33 @@ import (
 // are laid out: the groups, their order and the order of the chats in them (wire.Favorites). Every change publishes
 // the whole layout as favorites_upsert, and the answer names that event's seq.
 
-// pinnedIDs are the pinned conversations, the newest first, as each actor holds them now (the list a snapshot is made of).
+// pinnedIDs are the pinned conversations as each actor holds them now (the list a snapshot is made of), in the order
+// the page draws the ones the layout does not name: the newest created first, then by id. Not by activity: the layout
+// written after a change keeps them where they stood, and an agent's reply never moves a favorite.
 func (r *Runtime) pinnedIDs() []string {
 	snap, err := r.Conversations(context.Background())
 	if err != nil {
 		return nil
 	}
-	ids := []string{}
-	for _, c := range snap.Conversations {
+	return pinnedByCreation(snap.Conversations)
+}
+
+func pinnedByCreation(convs []wire.Conversation) []string {
+	pinned := []wire.Conversation{}
+	for _, c := range convs {
 		if c.Pinned {
-			ids = append(ids, c.ID)
+			pinned = append(pinned, c)
 		}
+	}
+	sort.Slice(pinned, func(i, j int) bool {
+		if pinned[i].CreatedAt != pinned[j].CreatedAt {
+			return pinned[i].CreatedAt > pinned[j].CreatedAt
+		}
+		return pinned[i].ID < pinned[j].ID
+	})
+	ids := make([]string, len(pinned))
+	for i, c := range pinned {
+		ids[i] = c.ID
 	}
 	return ids
 }
@@ -96,7 +113,7 @@ func (r *Runtime) favGroup(cmd wire.Command) wire.CmdResult {
 // favPlace pins the conversation when it is not pinned (the actor does, as conversation.pin does) and puts it in its
 // place in the layout. When the second step cannot go (the group is gone) the conversation stays pinned, ungrouped.
 func (r *Runtime) favPlace(m wire.FavPlaceCmd) wire.CmdResult {
-	if r.actor(m.ID) == nil {
+	if !r.Has(m.ID) {
 		return wire.Refused(wire.RefuseNotFound)
 	}
 	if m.GroupID != nil {

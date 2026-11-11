@@ -1002,6 +1002,10 @@ func parseCodexLines(lines []string, s *codexState, offsets []int64, shift int64
 	var r codexLinesResult
 	r.entries = []*jsvalue.Object{}
 	for i, raw := range lines {
+		if len(raw) > MaxLineBytes {
+			r.errorCount++
+			continue
+		}
 		if jscompat.Trim(raw) == "" {
 			continue
 		}

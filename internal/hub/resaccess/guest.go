@@ -48,14 +48,14 @@ func newToken() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-const linkCols = `l.link_id, l.kind, l.id, l.title, l.rights, l.pinned_version, l.created_by, l.created_at, l.expires_at, l.revoked_at, l.opens, l.last_opened_at,
+const linkCols = `l.link_id, l.kind, l.id, COALESCE(l.space_id, ''), l.title, l.rights, l.pinned_version, l.created_by, l.created_at, l.expires_at, l.revoked_at, l.opens, l.last_opened_at,
 	(SELECT COUNT(*) FROM resource_guest_comments c WHERE c.link_id = l.link_id)`
 
 func scanLink(row interface{ Scan(...any) error }) (link, error) {
 	var l link
 	var created int64
 	var exp, rev, opened sql.NullInt64
-	if err := row.Scan(&l.ID, &l.Kind, &l.Ref.ID, &l.Title, &l.Rights, &l.Pinned, &l.CreatedBy, &created, &exp, &rev, &l.Opens, &opened, &l.Comments); err != nil {
+	if err := row.Scan(&l.ID, &l.Kind, &l.Ref.ID, &l.Space, &l.Title, &l.Rights, &l.Pinned, &l.CreatedBy, &created, &exp, &rev, &l.Opens, &opened, &l.Comments); err != nil {
 		return link{}, err
 	}
 	l.CreatedAt = fromMs(created)
@@ -72,7 +72,7 @@ func scanLink(row interface{ Scan(...any) error }) (link, error) {
 }
 
 func (t *txn) links(ref Ref) ([]link, error) {
-	rows, err := t.q.Query(t.ctx, `SELECT `+linkCols+` FROM resource_guest_links l WHERE l.kind = ? AND l.id = ? ORDER BY l.created_at DESC, l.link_id`, ref.Kind, ref.ID)
+	rows, err := t.q.Query(t.ctx, `SELECT `+linkCols+` FROM resource_guest_links l WHERE l.kind = ? AND l.id = ? AND COALESCE(l.space_id, '') = ? ORDER BY l.created_at DESC, l.link_id`, ref.Kind, ref.ID, ref.Space)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (t *txn) links(ref Ref) ([]link, error) {
 }
 
 func (t *txn) oneLink(ref Ref, id string) (link, error) {
-	l, err := scanLink(t.q.QueryRow(t.ctx, `SELECT `+linkCols+` FROM resource_guest_links l WHERE l.link_id = ? AND l.kind = ? AND l.id = ?`, id, ref.Kind, ref.ID))
+	l, err := scanLink(t.q.QueryRow(t.ctx, `SELECT `+linkCols+` FROM resource_guest_links l WHERE l.link_id = ? AND l.kind = ? AND l.id = ? AND COALESCE(l.space_id, '') = ?`, id, ref.Kind, ref.ID, ref.Space))
 	if errors.Is(err, sql.ErrNoRows) {
 		return l, fail("not_found", "Ссылка не найдена")
 	}
@@ -110,15 +110,15 @@ func (t *txn) createLink(ref Ref, actor string, in linkInput) (link, string, err
 		return link{}, "", err
 	}
 	var live int
-	if err := t.q.QueryRow(t.ctx, `SELECT COUNT(*) FROM resource_guest_links WHERE kind = ? AND id = ? AND revoked_at IS NULL`, ref.Kind, ref.ID).Scan(&live); err != nil {
+	if err := t.q.QueryRow(t.ctx, `SELECT COUNT(*) FROM resource_guest_links WHERE kind = ? AND id = ? AND COALESCE(space_id, '') = ? AND revoked_at IS NULL`, ref.Kind, ref.ID, ref.Space).Scan(&live); err != nil {
 		return link{}, "", err
 	}
 	if live >= maxLinks {
 		return link{}, "", fail("conflict", "Слишком много действующих ссылок: отключите ненужные")
 	}
 	token, id := newToken(), newID()
-	if _, err := t.q.Exec(t.ctx, `INSERT INTO resource_guest_links (link_id, kind, id, token_hash, rights, pinned_version, title, created_by, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, ref.Kind, ref.ID, hashToken(token), in.Rights, in.Pinned, clip(in.Title, maxTitle), actor, ms(t.now), nullTime(exp)); err != nil {
+	if _, err := t.q.Exec(t.ctx, `INSERT INTO resource_guest_links (link_id, kind, id, space_id, token_hash, rights, pinned_version, title, created_by, created_at, expires_at)
+		VALUES (?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?)`, id, ref.Kind, ref.ID, ref.Space, hashToken(token), in.Rights, in.Pinned, clip(in.Title, maxTitle), actor, ms(t.now), nullTime(exp)); err != nil {
 		return link{}, "", err
 	}
 	if err := t.log(ref, actor, "link_create", id, map[string]any{"rights": in.Rights}); err != nil {
@@ -151,7 +151,7 @@ func (t *txn) updateLink(ref Ref, actor, id string, title *string, rights string
 			return l, err
 		}
 	}
-	if _, err := t.q.Exec(t.ctx, `UPDATE resource_guest_links SET title = ?, rights = ?, expires_at = ? WHERE link_id = ?`, l.Title, l.Rights, nullTime(l.Expires), id); err != nil {
+	if _, err := t.q.Exec(t.ctx, `UPDATE resource_guest_links SET title = ?, rights = ?, expires_at = ? WHERE link_id = ? AND COALESCE(space_id, '') = ?`, l.Title, l.Rights, nullTime(l.Expires), id, ref.Space); err != nil {
 		return l, err
 	}
 	return l, t.log(ref, actor, "link_update", id, nil)
@@ -165,14 +165,14 @@ func (t *txn) revokeLink(ref Ref, actor, id string) error {
 	if l.Revoked != nil {
 		return nil
 	}
-	if _, err := t.q.Exec(t.ctx, `UPDATE resource_guest_links SET revoked_at = ? WHERE link_id = ?`, ms(t.now), id); err != nil {
+	if _, err := t.q.Exec(t.ctx, `UPDATE resource_guest_links SET revoked_at = ? WHERE link_id = ? AND COALESCE(space_id, '') = ?`, ms(t.now), id, ref.Space); err != nil {
 		return err
 	}
 	return t.log(ref, actor, "link_revoke", id, nil)
 }
 
 func (t *txn) revokeAllLinks(ref Ref, actor string) (int64, error) {
-	res, err := t.q.Exec(t.ctx, `UPDATE resource_guest_links SET revoked_at = ? WHERE kind = ? AND id = ? AND revoked_at IS NULL`, ms(t.now), ref.Kind, ref.ID)
+	res, err := t.q.Exec(t.ctx, `UPDATE resource_guest_links SET revoked_at = ? WHERE kind = ? AND id = ? AND COALESCE(space_id, '') = ? AND revoked_at IS NULL`, ms(t.now), ref.Kind, ref.ID, ref.Space)
 	if err != nil {
 		return 0, err
 	}
@@ -190,7 +190,8 @@ type Guest struct {
 	Expires *time.Time
 }
 
-// Resolve finds the link a token opens. A token nobody made is not_found; one switched off or run out is gone.
+// Resolve finds the link a token opens, and with it the space of the resource: the token is the one key that names a
+// link without its space. A token nobody made is not_found; one switched off or run out is gone.
 func (s *Service) Resolve(ctx context.Context, token string) (*Guest, error) {
 	if len(token) < 20 || len(token) > 128 {
 		return nil, fail("not_found", "Ссылка не найдена")
@@ -206,7 +207,7 @@ func (s *Service) Resolve(ctx context.Context, token string) (*Guest, error) {
 	if l.Revoked != nil || (l.Expires != nil && !l.Expires.After(t.now)) {
 		return nil, fail("gone", "Ссылка отключена или её срок вышел")
 	}
-	return &Guest{LinkID: l.ID, Title: l.Title, Rights: l.Rights, Pinned: l.Pinned, Ref: Ref{Kind: l.Kind, ID: l.Ref.ID}, Expires: l.Expires}, nil
+	return &Guest{LinkID: l.ID, Title: l.Title, Rights: l.Rights, Pinned: l.Pinned, Ref: l.Ref, Expires: l.Expires}, nil
 }
 
 // RecordOpen counts one opening of a link.
@@ -239,7 +240,7 @@ func (t *txn) guestComments(ref Ref) ([]map[string]any, error) {
 		FROM resource_guest_comments g
 		JOIN resource_guest_links l ON l.link_id = g.link_id
 		JOIN doc_comments c ON c.id = (SELECT id FROM doc_comments WHERE thread_id = g.thread_id ORDER BY created_at, id LIMIT 1)
-		WHERE l.kind = ? AND l.id = ? ORDER BY g.created_at DESC LIMIT 200`, ref.Kind, ref.ID)
+		WHERE l.kind = ? AND l.id = ? AND COALESCE(l.space_id, '') = ? ORDER BY g.created_at DESC LIMIT 200`, ref.Kind, ref.ID, ref.Space)
 	if err != nil {
 		return nil, err
 	}

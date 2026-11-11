@@ -7,5 +7,12 @@ import { parsePage, type MachineId } from '@/next/protocol/v2';
 /** The machine reads two services one after another, each within its own term: the page waits for the slowest. */
 const APPS_TIMEOUT_MS = 20_000;
 
-export const loadApps = (m: MachineId) =>
-  getPage(machineApi(m).http('/apps'), parsePage.apps, APPS_TIMEOUT_MS);
+/** `only`: the apps to read (the review start reads GitLab alone, without waiting for the tracker); none: all. */
+export const loadApps = (m: MachineId, only: readonly string[] = []) =>
+  getPage(
+    machineApi(m).http(
+      only.length ? `/apps?${only.map((id) => `app=${encodeURIComponent(id)}`).join('&')}` : '/apps',
+    ),
+    parsePage.apps,
+    APPS_TIMEOUT_MS,
+  );

@@ -9,6 +9,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 )
 
 // tailBytes is how much of a transcript a cold read takes: one line can be megabytes long, the start is history.
@@ -17,6 +20,10 @@ const tailBytes = 6 << 20
 type cursor struct {
 	progress
 	reading sync.Mutex
+	// sub is the cursor's place in the transcript index, nil without one; fresh says the index handed over lines the
+	// cursor's lists do not count yet. Both under reading.
+	sub   *transcriptindex.Sub
+	fresh bool
 }
 
 // progress is how far a cursor has read its transcript and what it found. A transcript that is gone starts it over;
@@ -39,6 +46,10 @@ type Reader struct {
 	TempDir string
 	UID     int
 	Now     func() float64 // epoch milliseconds
+	// Index, when set, reads what a transcript gains for the reader and for the transcript's other readers at once:
+	// the reader reads a transcript's tail itself and takes the lines after it from the index. nil has it read every
+	// transcript itself.
+	Index *transcriptindex.Index
 
 	mu      sync.Mutex
 	cursors map[string]*cursor
@@ -69,14 +80,91 @@ func (r *Reader) Read(path string) []Task {
 // subagents did, not only the ones still running.
 func (r *Reader) ReadAll(path string) ([]Task, []Ended) {
 	c := r.cursorOf(path)
+	if r.Index != nil {
+		return r.indexed(path, c)
+	}
 	c.reading.Lock()
 	defer c.reading.Unlock()
 	return r.advance(path, c)
 }
 
+// indexed is ReadAll with the index: the lines the transcript gained come from the index's one read of them, folded
+// into the cursor's scan as they are read (take). Where the index does not serve the cursor — it is new, the file
+// was replaced, cut or is gone — the cursor reads the file itself, as without an index, and takes its place again.
+func (r *Reader) indexed(path string, c *cursor) ([]Task, []Ended) {
+	c.reading.Lock()
+	if c.sub == nil {
+		c.sub = r.Index.Subscribe(path, "background", transcriptindex.SinkFunc(func(b *transcriptindex.Batch) bool { return r.take(c, b) }))
+	}
+	sub := c.sub
+	c.reading.Unlock()
+	// The look hands the lines to take, which locks the cursor: the cursor is not held over it.
+	st, _ := sub.Sync(false)
+	c.reading.Lock()
+	if st != transcriptindex.Fresh {
+		tasks, ended := r.advance(path, c)
+		c.fresh = false
+		read, offset, ino := c.scan != nil, c.offset, c.ino
+		if !read && c.sub == sub {
+			c.sub = nil // the transcript is gone and the cursor with it
+		}
+		c.reading.Unlock()
+		// The index is told with the cursor let go: its looks hold the file and then take the cursor (take).
+		if read {
+			sub.Seat(offset, ino)
+		} else {
+			sub.Close()
+		}
+		return tasks, ended
+	}
+	defer c.reading.Unlock()
+	now := r.now()
+	if !c.fresh {
+		out := []Task{}
+		for _, t := range c.tasks {
+			if pending(t, now) {
+				out = append(out, t)
+			}
+		}
+		return out, c.ended
+	}
+	c.fresh = false
+	c.tasks = r.aliveOnly(c.scan.tasks(now), path)
+	c.ended = c.scan.endedAgents()
+	c.team = c.scan.team.list()
+	return c.tasks, c.ended
+}
+
+// take folds the lines the index read into the cursor's scan.
+func (r *Reader) take(c *cursor, b *transcriptindex.Batch) bool {
+	c.reading.Lock()
+	defer c.reading.Unlock()
+	if c.scan == nil || b.From != c.offset {
+		return false // not where the cursor stands: it reads for itself
+	}
+	now := r.now()
+	b.Each(func(l *transcriptindex.Line) {
+		var decoded *lineEntry
+		if f := l.Fields(); f != nil {
+			decoded = &lineEntry{Type: f.Type, IsSidechain: f.IsSidechain, Timestamp: f.Timestamp}
+			decoded.Message.Content = f.Message.Content
+		}
+		c.scan.line(l.Text(), decoded, now)
+	})
+	// The file's time and size are not the cursor's any more: a read of its own starts with the file as it is.
+	c.offset, c.mtime, c.size, c.fresh = b.To, time.Time{}, 0, true
+	return true
+}
+
 // Teammates are the named teammates the transcript started, the latest first, in the state its lead last saw them.
 func (r *Reader) Teammates(path string) []Teammate {
 	c := r.cursorOf(path)
+	if r.Index != nil {
+		r.indexed(path, c)
+		c.reading.Lock()
+		defer c.reading.Unlock()
+		return c.team
+	}
 	c.reading.Lock()
 	defer c.reading.Unlock()
 	r.advance(path, c)
@@ -100,15 +188,29 @@ func (r *Reader) cursorOf(path string) *cursor {
 // Forget drops the cursor of a transcript no tab shows any more.
 func (r *Reader) Forget(path string) {
 	r.mu.Lock()
+	c := r.cursors[path]
 	delete(r.cursors, path)
 	r.mu.Unlock()
+	if c == nil {
+		return
+	}
+	c.reading.Lock()
+	sub := c.sub
+	c.sub = nil
+	c.reading.Unlock()
+	if sub != nil {
+		sub.Close()
+	}
 }
 
 func (r *Reader) advance(path string, c *cursor) ([]Task, []Ended) {
 	now := r.now()
 	st, err := os.Stat(path)
+	tally.Stat()
 	if err != nil {
-		r.Forget(path)
+		r.mu.Lock()
+		delete(r.cursors, path)
+		r.mu.Unlock()
 		c.progress = progress{}
 		return []Task{}, nil
 	}
@@ -134,14 +236,21 @@ func (r *Reader) advance(path string, c *cursor) ([]Task, []Ended) {
 		start = bytes.IndexByte(chunk, '\n') + 1 // the tail starts inside a line
 	}
 	complete := bytes.LastIndexByte(chunk, '\n') + 1
-	if complete > start {
-		var lines []string
-		for _, l := range strings.Split(strings.ToValidUTF8(string(chunk[start:complete]), "�"), "\n") {
-			if l != "" {
-				lines = append(lines, l)
-			}
+	// One line at a time: the chunk is megabytes, and a copy of it as text, another made valid and a slice of its
+	// lines were three more of them held at once for every transcript read cold.
+	one := make([]string, 1)
+	for rest := chunk[start:max(start, complete)]; len(rest) > 0; {
+		line := rest
+		if i := bytes.IndexByte(rest, '\n'); i >= 0 {
+			line, rest = rest[:i], rest[i+1:]
+		} else {
+			rest = nil
 		}
-		c.scan.lines(lines, now)
+		if len(line) == 0 {
+			continue
+		}
+		one[0] = strings.ToValidUTF8(string(line), "�")
+		c.scan.lines(one, now)
 	}
 	c.offset += int64(complete)
 	c.mtime, c.size = st.ModTime(), st.Size()
@@ -153,12 +262,14 @@ func (r *Reader) advance(path string, c *cursor) ([]Task, []Ended) {
 
 func readChunk(path string, from, to int64) []byte {
 	f, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return nil
 	}
 	defer f.Close()
 	buf := make([]byte, to-from)
 	n, _ := f.ReadAt(buf, from)
+	tally.Read(n)
 	return buf[:n]
 }
 

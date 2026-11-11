@@ -76,6 +76,8 @@ type Store struct {
 	Namespace string
 	// TmpTag marks the files a rewind stages beside the ones it replaces (<file>.<tag>-<hex>.tmp).
 	TmpTag string
+	// Pool shares one object store between the repositories of a working folder (pool.go).
+	Pool   bool
 	Limits *Limits
 	// Now is the clock in milliseconds; nil for the real one.
 	Now func() int64
@@ -291,6 +293,9 @@ func (sc *Scope) ensureRepo(now int64) error {
 		}
 	}
 	sc.pruneStaleRepos(now)
+	if sc.store.Pool {
+		return sc.attachPool(now)
+	}
 	return nil
 }
 
@@ -509,6 +514,9 @@ func (sc *Scope) Take(now int64) (Checkpoint, string) {
 	c, reason := sc.createLocked(KindTurn, now)
 	if reason == "" {
 		_ = sc.trimOldest()
+		if sc.store.Pool {
+			sc.pool(now)
+		}
 	}
 	return c, reason
 }

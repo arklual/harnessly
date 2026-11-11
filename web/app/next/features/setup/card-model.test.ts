@@ -135,5 +135,19 @@ describe('the setup card', () => {
       expect(v!.items.map((it) => it.name)).toEqual(['git']);
       expect(v!.done).toBe(true);
     });
+
+    it('keeps a missing optional tool off the first screen and shows it once it is in place', () => {
+      const missing = withBase(
+        null,
+        base([b('libreoffice', 'missing', { optional: true }), b('git', 'ok')], { done: true }),
+      );
+      expect(missing!.items.map((it) => it.name)).toEqual(['git']);
+      expect(missing!.done).toBe(true);
+      const there = withBase(
+        null,
+        base([b('libreoffice', 'ok', { optional: true }), b('git', 'ok')], { done: true }),
+      );
+      expect(there!.items.map((it) => it.name)).toEqual(['libreoffice', 'git']);
+    });
   });
 });

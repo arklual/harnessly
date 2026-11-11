@@ -162,6 +162,11 @@ type Deps struct {
 	Queue     Queue
 	History   *history.Store
 	Push      Pusher
+	// ChatSession says the tab's tmux session is a chat's, which follows its agent's transcript itself (convo): the
+	// poll reads no transcript and no process tree for such a tab once it knows it, and the keeper neither watches its
+	// transcript nor pushes nor snapshots its folder at a turn's end: the chat's actor does (convo.Notice). nil: no
+	// tab is.
+	ChatSession func(session string) bool
 	// TurnEnd snapshots the session folder for rewinding once a turn ended.
 	TurnEnd func(tabID, cwd string)
 	// AskFolderTrust leaves an agent's folder trust dialog to the person; by default the keeper answers yes for the

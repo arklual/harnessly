@@ -175,6 +175,8 @@ type MemoryBus struct {
 	rings  map[string]*orgRing
 	subs   map[string]map[*OrgSub]struct{}
 	closed bool
+	// out, when set, gets what this process published, for the other replicas (Relay).
+	out func(relayMsg)
 }
 
 // NewMemoryBus starts a bus whose ids begin at the current time in milliseconds.
@@ -198,10 +200,18 @@ func (b *MemoryBus) Publish(orgID, kind string, data any) {
 	if err != nil {
 		return
 	}
+	if out := b.publish(orgID, kind, raw, aud); out != nil {
+		out(relayMsg{Bus: relayOrg, Key: orgID, Name: kind, Data: raw, Aud: &aud})
+	}
+}
+
+// publish gives an event to this process's streams and ring, under an id of this process, and returns where the
+// other replicas are told of it.
+func (b *MemoryBus) publish(orgID, kind string, raw json.RawMessage, aud Audience) func(relayMsg) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.closed {
-		return
+		return nil
 	}
 	b.next++
 	e := OrgEvent{ID: b.next, Kind: kind, Data: raw, Aud: aud}
@@ -225,6 +235,7 @@ func (b *MemoryBus) Publish(orgID, kind string, data any) {
 			s.markLost()
 		}
 	}
+	return b.out
 }
 
 // Subscribe implements OrgBus. It is nil once the bus is closed.
@@ -315,6 +326,12 @@ func (b *MemoryBus) Count(orgID string) int {
 
 // Kick implements OrgBus.
 func (b *MemoryBus) Kick(orgID, userID string) {
+	if out := b.kick(orgID, userID); out != nil {
+		out(relayMsg{Bus: relayOrgKick, Key: orgID, User: userID})
+	}
+}
+
+func (b *MemoryBus) kick(orgID, userID string) func(relayMsg) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for s := range b.subs[orgID] {
@@ -323,6 +340,7 @@ func (b *MemoryBus) Kick(orgID, userID string) {
 			s.close()
 		}
 	}
+	return b.out
 }
 
 // Close implements OrgBus.

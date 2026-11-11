@@ -23,6 +23,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/filestore"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Room is a space's design collection as the hub reads it.
@@ -48,6 +49,12 @@ type Options struct {
 	MaxBytes int64
 	// Poll is how often a waiting reader looks for a new revision (default 2 s).
 	Poll time.Duration
+	// Live is how many projects keep their folder and library between revisions (default 12; negative: none, every
+	// revision is laid out on its own as before HRN-1004).
+	Live int
+	// BusyWait is how long a new revision waits for slow readers of a live folder (default 1.5 s) before reads go by the
+	// revision's own folder.
+	BusyWait time.Duration
 }
 
 // View answers the reads of design projects from the store.
@@ -58,6 +65,11 @@ type View struct {
 	snaps map[string]*snap
 	order []string // oldest first
 	edits map[string]*workspace
+	lives map[string]*live
+	// liveOrder is the keys of lives, least recently used first.
+	liveOrder []string
+	// listing is the library's items by space and project (library.go).
+	listing map[string]listedProject
 }
 
 type snap struct {
@@ -71,6 +83,7 @@ const (
 	defaultKeep  = 48
 	defaultBytes = 512 << 20
 	maxFiles     = 20000
+	defaultLive  = 12
 )
 
 // New makes a View; nil without a store.
@@ -87,14 +100,19 @@ func New(o Options) *View {
 	if o.Poll <= 0 {
 		o.Poll = 2 * time.Second
 	}
+	if o.Live == 0 {
+		o.Live = defaultLive
+	}
 	if o.Log == nil {
 		o.Log = slog.Default()
 	}
 	// The folders of a previous run are not this run's: they go, and with them the contents nothing links.
 	_ = os.RemoveAll(filepath.Join(o.Dir, "rev"))
 	_ = os.RemoveAll(filepath.Join(o.Dir, "edit"))
-	v := &View{o: o, snaps: map[string]*snap{}}
-	go v.pruneBlobs()
+	_ = os.RemoveAll(filepath.Join(o.Dir, "live"))
+	_ = os.RemoveAll(filepath.Join(o.Dir, "list"))
+	v := &View{o: o, snaps: map[string]*snap{}, lives: map[string]*live{}}
+	safego.Go("designview pruneBlobs", func() { v.pruneBlobs() })
 	return v
 }
 
@@ -135,6 +153,15 @@ func (v *View) Wait(ctx context.Context, spaceID, project string, since int64) (
 // under the project (none for its board list), pages limits the boards (nil: all), pinned says the version on the
 // answer as a pinned read does.
 func (v *View) Serve(w http.ResponseWriter, r *http.Request, spaceID, project string, at int64, segs, pages []string, pinned bool) error {
+	// The head of a project (a read that does not name its version) is answered from the project's own folder and
+	// library, which a new revision only brings up to date; a read of one version is answered from that version's.
+	if !pinned && v.o.Live > 0 {
+		if l := v.liveAt(r.Context(), spaceID, project, at); l != nil {
+			defer l.mu.RUnlock()
+			l.api.ServeSnapshot(w, r, project, segs, "", pages)
+			return nil
+		}
+	}
 	s, err := v.snapshot(r.Context(), spaceID, project, at)
 	if err != nil {
 		return err
@@ -161,7 +188,7 @@ func (v *View) snapshot(ctx context.Context, spaceID, project string, at int64) 
 		s = &snap{ready: make(chan struct{}), base: filepath.Join(v.o.Dir, "rev", spaceID, fmt.Sprint(at))}
 		v.snaps[key] = s
 		v.order = append(v.order, key)
-		go v.fill(s, spaceID, project, at)
+		safego.Go("designview fill", func() { v.fill(s, spaceID, project, at) })
 		v.evictLocked()
 	}
 	v.mu.Unlock()
@@ -188,7 +215,7 @@ func (v *View) fill(s *snap, spaceID, project string, at int64) {
 	defer cancel()
 	target := filepath.Join(s.base, project)
 	if _, err := os.Stat(target); err != nil {
-		if s.err = v.extract(ctx, spaceID, project, at, s.base); s.err != nil {
+		if _, s.err = v.extract(ctx, spaceID, project, at, s.base); s.err != nil {
 			v.o.Log.Warn("design view: a revision not read from the store", "space", spaceID, "project", project, "rev", at, "error", s.err)
 			return
 		}
@@ -203,57 +230,61 @@ func (v *View) fill(s *snap, spaceID, project string, at int64) {
 	s.api = &design.API{L: lib, GuestApp: v.o.GuestApp, PlatformAPI: "/api/platform"}
 }
 
-func (v *View) extract(ctx context.Context, spaceID, project string, at int64, base string) error {
+func (v *View) extract(ctx context.Context, spaceID, project string, at int64, base string) (map[string]string, error) {
 	room, err := v.o.Rooms(ctx, spaceID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	snapshot, err := room.Snapshot(ctx, project+"/", at)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(snapshot.Entries) == 0 {
-		return ErrMissing
+		return nil, ErrMissing
 	}
 	if len(snapshot.Entries) > maxFiles {
-		return fmt.Errorf("designview: %d files in one project", len(snapshot.Entries))
+		return nil, fmt.Errorf("designview: %d files in one project", len(snapshot.Entries))
 	}
 	if err := os.MkdirAll(base, 0o700); err != nil {
-		return err
+		return nil, err
 	}
 	tmp, err := os.MkdirTemp(base, ".fill-")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer os.RemoveAll(tmp)
+	pruneMu.RLock()
+	defer pruneMu.RUnlock()
 	var total int64
+	files := map[string]string{}
 	for _, e := range snapshot.Entries {
 		rel, ok := strings.CutPrefix(e.Path, project+"/")
 		if !ok || rel == "" || path.Clean(rel) != rel || strings.HasPrefix(rel, "../") || !filestore.ValidSha(e.Sha) {
 			continue
 		}
 		if total += e.Size; total > v.o.MaxBytes {
-			return fmt.Errorf("designview: the project is over %d bytes", v.o.MaxBytes)
+			return nil, fmt.Errorf("designview: the project is over %d bytes", v.o.MaxBytes)
 		}
+		files[rel] = e.Sha
 		blob, err := v.blob(ctx, room, spaceID, e.Sha)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		file := filepath.Join(tmp, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-			return err
+			return nil, err
 		}
 		// A link to the kept contents: one copy on disk for every revision that has it, never written through.
 		if err := os.Link(blob, file); err != nil {
 			if err := copyFile(blob, file); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 	if err := os.Rename(tmp, filepath.Join(base, project)); err != nil && !errors.Is(err, os.ErrExist) {
-		return err
+		return nil, err
 	}
-	return nil
+	return files, nil
 }
 
 // blob is the kept file of a blob, read from the store once.
@@ -325,18 +356,21 @@ func (v *View) evictLocked() {
 			continue
 		}
 		parts := strings.SplitN(old, "/", 3)
-		go func(s *snap, project string) {
+		project := parts[2]
+		safego.Go("designview prune", func() {
 			<-s.ready
 			_ = os.RemoveAll(filepath.Join(s.base, project))
 			if entries, err := os.ReadDir(s.base); err == nil && len(entries) == 0 {
 				_ = os.Remove(s.base)
 			}
 			v.pruneBlobs()
-		}(s, parts[2])
+		})
 	}
 }
 
-var pruneMu sync.Mutex
+// pruneMu keeps pruneBlobs off the kept contents while a fill links them: a blob fetched for a fill has
+// a link count of one until the fill links it, and pruning in between would take it away.
+var pruneMu sync.RWMutex
 
 // pruneBlobs removes the kept contents that no revision folder links (a link count of one).
 func (v *View) pruneBlobs() {

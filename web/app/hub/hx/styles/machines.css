@@ -191,3 +191,16 @@
 .hb .mo-empty .hx-btn {
   margin-top: 12px;
 }
+
+/* A server and the seats of its people (machine.seats) */
+.hb .mt-chev {
+  flex: none;
+  color: var(--hx-fg-3);
+  transition: transform 0.25s var(--hx-ease-out);
+}
+.hb .mt-row[aria-expanded='true'] .mt-chev {
+  transform: rotate(90deg);
+}
+.hb .mt-row[data-seat='1'] .mt-name {
+  padding-left: 22px;
+}

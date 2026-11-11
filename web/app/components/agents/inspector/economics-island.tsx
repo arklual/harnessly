@@ -222,9 +222,10 @@ const SwitchToSonnet = ({ sessionName }: { sessionName: string }) => {
 export const Island = ({ tab, expanded }: IInspectorIslandProps) => {
   const provider = economicsProvider(tab);
   const sessionName = tab?.sessionName ?? null;
-  const activity = useTimelineSnapshotStore((s) =>
-    sessionName ? s.bySession[sessionName]?.entries.length : undefined,
-  );
+  const activity = useTimelineSnapshotStore((s) => {
+    const snapshot = sessionName ? s.bySession[sessionName] : undefined;
+    return snapshot?.activity ?? snapshot?.entries.length;
+  });
   const { data, error } = useConversationEconomics(provider ? (tab?.id ?? null) : null, undefined, activity);
   if (!provider || !tab) return null;
 

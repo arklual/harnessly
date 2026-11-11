@@ -48,6 +48,7 @@ const ICON_OF: Record<MadeItem['kind'], string> = {
   board: 'layout-dashboard',
   design: 'palette',
   task: 'square-check-big',
+  mr: 'git-pull-request',
 };
 
 export const iconOf = (item: MadeItem): string => {
@@ -136,6 +137,7 @@ export const kindWord = (item: MadeItem): string => {
   if (item.kind === 'doc') return t('next.made.doc');
   if (item.kind === 'board') return t('next.made.board');
   if (item.kind === 'task') return isEpic(item) ? t('next.made.epic') : t('next.made.task');
+  if (item.kind === 'mr') return t('next.made.mr');
   return t('next.made.design');
 };
 
@@ -153,6 +155,13 @@ const pathOf = (ref: string): string => {
   } catch {
     return '';
   }
+};
+
+/** Who made a thing the chat inherits, in words: «подчат «…»», «сабагент «…»»; empty for the chat's own. */
+export const fromOf = (item: MadeItem): string => {
+  if (!item.from) return '';
+  const word = item.from.kind === 'subchat' ? t('next.made.fromSubchat') : t('next.made.fromSubagent');
+  return item.from.title ? `${word} «${item.from.title}»` : word;
 };
 
 /** Under a card's name: the host of a link, the kind of a design. */

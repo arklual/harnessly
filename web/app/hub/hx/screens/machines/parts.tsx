@@ -1,5 +1,5 @@
 // The pieces both lists share: the tiles, the search, the link to ML Core, the row of a machine and the group head.
-import type { CSSProperties, ReactNode } from 'react';
+import { type CSSProperties, Fragment, type ReactNode, useState } from 'react';
 
 import type { MachineGroup, OrgMachine } from '../../../org/api/machines';
 import { Bars } from '../../charts/bars';
@@ -21,6 +21,8 @@ import {
   rowStLabel,
   rowSub,
   type RowMode,
+  type ServerRow,
+  serverRows,
   type Tile,
   verText,
   weekText,
@@ -244,11 +246,14 @@ export const MachineRow = ({
   mode,
   now,
   onOpen,
+  seat,
 }: {
   m: OrgMachine;
   mode: RowMode;
   now: number;
   onOpen: (id: string) => void;
+  /** A person's seat under its server: the server's load is told once, in the server's row. */
+  seat?: boolean;
 }) => {
   const st = rowSt(m);
   const off = st === 'off';
@@ -260,6 +265,7 @@ export const MachineRow = ({
       tabIndex={0}
       className="mt-row"
       data-st={st}
+      data-seat={seat ? '1' : undefined}
       onClick={() => onOpen(m.id)}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
@@ -279,9 +285,19 @@ export const MachineRow = ({
         {rowStLabel(m, now)}
       </span>
       <span className="mt-num">{chatsText(m)}</span>
-      <Meter pct={liveLoad(m, m.cpu)} off={off} />
-      <Meter pct={liveLoad(m, m.ram)} off={off} />
-      <Meter pct={m.disk} off={off} />
+      {seat ? (
+        <>
+          <span />
+          <span />
+          <span />
+        </>
+      ) : (
+        <>
+          <Meter pct={liveLoad(m, m.cpu)} off={off} />
+          <Meter pct={liveLoad(m, m.ram)} off={off} />
+          <Meter pct={m.disk} off={off} />
+        </>
+      )}
       <span className="mt-ver" data-old={m.runnerOutdated ? '1' : '0'}>
         {verText(m)}
       </span>
@@ -302,6 +318,108 @@ export const MachineRow = ({
         </button>
       )}
     </div>
+  );
+};
+
+/** A server several people work on: one row with its load, the people's seats unfold under it. */
+const ServerLine = ({
+  s,
+  now,
+  open,
+  onToggle,
+}: {
+  s: ServerRow;
+  now: number;
+  open: boolean;
+  onToggle: () => void;
+}) => {
+  const m = s.server;
+  const st = rowSt(m);
+  const off = st === 'off';
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className="mt-row"
+      data-st={st}
+      data-server="1"
+      aria-expanded={open}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+    >
+      <span className="mt-name">
+        <span className="mo-dot" data-st={st} />
+        <span className="mt-name__t">
+          <b>{m.name}</b>
+          <small>{m.purpose}</small>
+        </span>
+        <Icon i="chevron-right" size="sm" className="mt-chev" />
+      </span>
+      <span className="mt-st" data-st={st}>
+        {rowStLabel(m, now)}
+      </span>
+      <span className="mt-num">{chatsText(m)}</span>
+      <Meter pct={liveLoad(m, m.cpu)} off={off} />
+      <Meter pct={liveLoad(m, m.ram)} off={off} />
+      <Meter pct={m.disk} off={off} />
+      <span className="mt-ver" data-old={m.runnerOutdated ? '1' : '0'}>
+        {verText(m)}
+      </span>
+      <span className="mt-week">{weekText(m)}</span>
+    </div>
+  );
+};
+
+/** The rows of a table. With `seats` the machines of one server fold into the server's row (machine.seats). */
+export const MachineRows = ({
+  machines,
+  mode,
+  now,
+  onOpen,
+  seats,
+}: {
+  machines: readonly OrgMachine[];
+  mode: RowMode;
+  now: number;
+  onOpen: (id: string) => void;
+  seats: boolean;
+}) => {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  if (!seats) {
+    return (
+      <>
+        {machines.map((m) => (
+          <MachineRow key={m.id} m={m} mode={mode} now={now} onOpen={onOpen} />
+        ))}
+      </>
+    );
+  }
+  return (
+    <>
+      {serverRows(machines).map((r) =>
+        r.kind === 'machine' ? (
+          <MachineRow key={r.m.id} m={r.m} mode={mode} now={now} onOpen={onOpen} />
+        ) : (
+          <Fragment key={r.s.key}>
+            <ServerLine
+              s={r.s}
+              now={now}
+              open={!!open[r.s.key]}
+              onToggle={() => setOpen((o) => ({ ...o, [r.s.key]: !o[r.s.key] }))}
+            />
+            {open[r.s.key] &&
+              r.s.seats.map((m) => (
+                <MachineRow key={m.id} m={m} mode={mode} now={now} onOpen={onOpen} seat />
+              ))}
+          </Fragment>
+        ),
+      )}
+    </>
   );
 };
 

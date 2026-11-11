@@ -9,10 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 )
 
 // failure is a refusal in the shape the web core reads: {error: words for the person, code}.
@@ -93,11 +96,27 @@ func (s *Service) guard(fn func(w http.ResponseWriter, r *http.Request, p *auth.
 	})
 }
 
+// Handler answers the documents' routes alone, for the workspace (/agents/api/…) to hand them over; nil when the hub
+// keeps no documents (HUB_DOCS off). Prefix is where those routes live.
+func (s *Service) Handler() http.Handler {
+	if !s.cfg.Docs {
+		return nil
+	}
+	mux := http.NewServeMux()
+	s.Mount(mux)
+	return mux
+}
+
+// Prefix is the documents' own path: <platform api>/docs.
+func (s *Service) Prefix() string { return strings.TrimSuffix(s.prefix, "/docs") }
+
 // Mount adds the routes under the platform API prefix.
 func (s *Service) Mount(mux *http.ServeMux) {
 	p := s.prefix
 	mux.Handle("GET "+p+"/_status", http.HandlerFunc(s.status))
 	mux.Handle("GET "+p, s.guard(s.list))
+	mux.Handle("POST "+p+"/_adopt", s.guard(s.adoptRoute))
+	mux.Handle("POST "+p+"/_rights", http.HandlerFunc(s.rights))
 	mux.Handle("GET "+p+"/people", s.guard(s.peopleRoute))
 	mux.Handle("GET "+p+"/{slug}", s.guard(s.detail))
 	mux.Handle("POST "+p+"/{slug}/threads", s.guard(s.newThread))
@@ -158,12 +177,15 @@ type summary struct {
 	OpenThreads    int     `json:"openThreads"`
 	Unread         int     `json:"unread"`
 	LastActivityAt string  `json:"lastActivityAt"`
+	// author is who the documents or boards service says made it; it places a document the hub has no record of.
+	author string
 }
 
 type board struct {
 	Slug      string `json:"slug"`
 	Title     string `json:"title"`
 	URL       string `json:"url"`
+	Author    string `json:"author"`
 	UpdatedAt any    `json:"updatedAt"`
 }
 
@@ -199,7 +221,7 @@ func (s *Service) contentPath(slug string) string {
 
 func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string) ([]summary, error) {
 	type item struct {
-		slug, kind, title, url, updated string
+		slug, kind, title, url, updated, author string
 	}
 	var items []item
 	arts, err := s.art.list(ctx)
@@ -208,7 +230,7 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 	}
 	for _, a := range arts {
 		if only == "" || only == a.Slug {
-			items = append(items, item{a.Slug, "artifact", a.Title, s.contentPath(a.Slug), a.UpdatedAt})
+			items = append(items, item{a.Slug, "artifact", a.Title, s.contentPath(a.Slug), a.UpdatedAt, a.Author})
 		}
 	}
 	if bs, err := s.boards(ctx); err != nil {
@@ -216,7 +238,7 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 	} else {
 		for _, b := range bs {
 			if only == "" || only == b.Slug {
-				items = append(items, item{b.Slug, "board", b.Title, b.URL, timeOf(b.UpdatedAt)})
+				items = append(items, item{b.Slug, "board", b.Title, b.URL, timeOf(b.UpdatedAt), b.Author})
 			}
 		}
 	}
@@ -224,7 +246,7 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 	for i, it := range items {
 		slugs[i] = it.slug
 	}
-	metas, err := s.metas(ctx, slugs)
+	metas, elsewhere, err := s.metas(ctx, slugs, s.reachOf(ctx, p))
 	if err != nil {
 		return nil, err
 	}
@@ -233,15 +255,19 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 		return nil, err
 	}
 	out := []summary{}
+	c := s.circleOf(p)
 	for _, it := range items {
+		if elsewhere[it.slug] {
+			continue
+		}
 		var mp *meta
 		if m, ok := metas[it.slug]; ok {
 			mp = &m
 		}
-		if s.rank(ctx, mp, p) < levelRank[levelView] {
+		if s.rank(ctx, it.slug, mp, it.author, p, c) < levelRank[levelView] {
 			continue
 		}
-		sm := summary{Slug: it.slug, Kind: it.kind, Title: it.title, URL: it.url, OpenThreads: open[it.slug], Unread: unread[it.slug], LastActivityAt: it.updated}
+		sm := summary{author: it.author, Slug: it.slug, Kind: it.kind, Title: it.title, URL: it.url, OpenThreads: open[it.slug], Unread: unread[it.slug], LastActivityAt: it.updated}
 		if mp != nil {
 			sm.Bound = mp.MachineID != ""
 			sm.Owner = &author{Kind: "person", Email: mp.OwnerEmail, Name: firstNonEmpty(mp.OwnerName, mp.OwnerEmail)}
@@ -288,15 +314,36 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request, p *auth.Principal
 // open finds a document and the person's rank on it.
 func (s *Service) open(r *http.Request, p *auth.Principal, need int) (summary, *meta, error) {
 	slug := r.PathValue("slug")
-	m, err := s.meta(r.Context(), slug)
+	m, elsewhere, err := s.meta(r.Context(), slug, s.reachOf(r.Context(), p))
 	if err != nil {
 		return summary{}, nil, err
 	}
-	if s.rank(r.Context(), m, p) < need {
-		if s.rank(r.Context(), m, p) < levelRank[levelView] {
+	if elsewhere {
+		return summary{}, nil, errNoAccess
+	}
+	if m == nil {
+		// Who may read a document the hub has no record of depends on its author, whom only the list names; the list
+		// leaves out what the person may not read, so a closed document and a missing one look the same.
+		list, err := s.summaries(r.Context(), p, slug)
+		if err != nil {
+			return summary{}, nil, err
+		}
+		if len(list) == 0 {
+			return summary{}, nil, errNoDoc
+		}
+		if s.rank(r.Context(), slug, nil, list[0].author, p, nil) < need {
+			return summary{}, nil, errNoComment
+		}
+		return list[0], nil, nil
+	}
+	if rank := s.rank(r.Context(), slug, m, "", p, nil); rank < need {
+		if rank < levelRank[levelView] {
 			return summary{}, nil, errNoAccess
 		}
 		return summary{}, nil, errNoComment
+	}
+	if err := s.noteOperator(r.Context(), p, slug, m); err != nil {
+		return summary{}, nil, err
 	}
 	list, err := s.summaries(r.Context(), p, slug)
 	if err != nil {
@@ -321,8 +368,13 @@ func (s *Service) detail(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	return nil
 }
 
-func (s *Service) peopleRoute(w http.ResponseWriter, r *http.Request, _ *auth.Principal) error {
-	ppl, err := s.people(r.Context(), r.URL.Query().Get("q"))
+// peopleRoute finds the people a person may name in a comment: those they share a space with.
+func (s *Service) peopleRoute(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	if ok, retry := s.lim.Allow("docs-people:"+p.User.ID, peoplePerMinute, time.Minute); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(ratelimit.RetrySeconds(retry)))
+		return fail(http.StatusTooManyRequests, "rate_limited", "Слишком много запросов: попробуйте через минуту")
+	}
+	ppl, err := s.people(r.Context(), p, r.URL.Query().Get("q"))
 	if err != nil {
 		return err
 	}
@@ -460,7 +512,7 @@ func (s *Service) content(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
-	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-popups")
+	frameable(h)
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(withFrame(page))
@@ -593,7 +645,7 @@ func (s *Service) source(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	if err != nil {
 		return err
 	}
-	can := s.rank(r.Context(), m, p) >= levelRank[levelEdit]
+	can := s.rank(r.Context(), doc.Slug, m, doc.author, p, nil) >= levelRank[levelEdit]
 	if doc.Kind == "board" {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"mode": nil, "markdown": nil, "version": 0, "canEdit": false})
 		return nil
@@ -611,7 +663,7 @@ func (s *Service) source(w http.ResponseWriter, r *http.Request, p *auth.Princip
 }
 
 func (s *Service) saveSource(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	doc, _, err := s.open(r, p, levelRank[levelEdit])
+	doc, m, err := s.open(r, p, levelRank[levelEdit])
 	if err != nil {
 		return err
 	}
@@ -630,13 +682,15 @@ func (s *Service) saveSource(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	if err != nil {
 		return err
 	}
-	s.touch(r.Context(), doc.Slug)
+	if m != nil {
+		s.touch(r.Context(), m)
+	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"version": out.Version.N})
 	return nil
 }
 
-func (s *Service) touch(ctx context.Context, slug string) {
-	if _, err := s.db.S().Q().Exec(ctx, `UPDATE doc_meta SET updated_at = ? WHERE slug = ?`, s.now().UnixMilli(), slug); err != nil {
+func (s *Service) touch(ctx context.Context, m *meta) {
+	if _, err := s.db.S().Q().Exec(ctx, `UPDATE doc_meta SET updated_at = ? WHERE slug = ? AND COALESCE(space_id, '') = ?`, s.now().UnixMilli(), m.Slug, m.SpaceID); err != nil {
 		s.log.Warn("doc_meta touch failed", "error", err)
 	}
 }

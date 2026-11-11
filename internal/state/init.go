@@ -12,7 +12,8 @@ import (
 
 // Init prepares the stores at start and after a tmux reset: the workspace list (migrated from the oldest single-layout
 // files when there is none), a default layout for a workspace without one, and each layout checked against tmux:
-// a missing agent tab's session is started again and a session of the workspace that no tab names becomes a tab.
+// the missing session of an agent tab whose agent was up is started again and a session of the workspace that no tab
+// names becomes a tab.
 func (s *Store) Init() error {
 	if err := s.InitLayouts(); err != nil {
 		return err
@@ -45,8 +46,8 @@ func (s *Store) InitLayouts() error {
 	return nil
 }
 
-// RestoreSessions is Init's second half: each layout checked against tmux. After a reboot it starts every agent tab's
-// session again, which takes seconds for a hundred tabs; the runtime's start does the rest of its work first.
+// RestoreSessions is Init's second half: each layout checked against tmux. After a reboot it starts again the sessions
+// of the agent tabs whose agents were up (see agentWasUp); the runtime's start does the rest of its work first.
 func (s *Store) RestoreSessions() error {
 	s.wsLock.Lock()
 	data := s.readWorkspaces()
@@ -72,6 +73,18 @@ func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 func isAgentPanel(t *jsvalue.Object) bool {
 	p, _ := t.Get("panelType")
 	return p == "claude-code" || p == "codex-cli"
+}
+
+// agentWasUp: the tab's agent worked or waited for the person when its state was last written, so the tab is owed a
+// terminal to be judged and resumed in. A tab whose agent had exited ("inactive") or never started is a chat without a
+// session: whoever needs one makes it (the resume on its next message, the restart of the tab, a terminal opened on
+// it). A shell started for each of them at every start is memory nobody uses.
+func agentWasUp(t *jsvalue.Object) bool {
+	switch t.String("cliState") {
+	case "", "inactive":
+		return false
+	}
+	return true
 }
 
 func (s *Store) checkWorkspace(ws *jsvalue.Object, sessions []string) error {
@@ -125,7 +138,10 @@ func (s *Store) checkWorkspace(ws *jsvalue.Object, sessions []string) error {
 		if p, _ := t.Get("panelType"); p == webBrowser {
 			continue
 		}
-		if !present[t.String("sessionName")] && isAgentPanel(t) {
+		if s.cfg.SessionOwned != nil && s.cfg.SessionOwned(t.String("sessionName")) {
+			continue
+		}
+		if !present[t.String("sessionName")] && isAgentPanel(t) && agentWasUp(t) {
 			cwd := t.String("cwd")
 			if cwd == "" {
 				cwd = firstDir
@@ -133,8 +149,8 @@ func (s *Store) checkWorkspace(ws *jsvalue.Object, sessions []string) error {
 			gone = append(gone, missing{t.String("sessionName"), cwd})
 		}
 	}
-	// After a reboot every tab's session is gone: a hundred of them one by one held the start for seconds. The first
-	// starts the server, the rest go sessionWorkers at a time.
+	// After a reboot every tab's session is gone: many of them one by one held the start for seconds. The first starts
+	// the server, the rest go sessionWorkers at a time.
 	restarted := len(gone) > 0
 	if restarted {
 		if err := s.cfg.Tmux.CreateSession(gone[0].name, cols, rows, gone[0].cwd); err != nil {

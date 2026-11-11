@@ -50,6 +50,7 @@ func TestAppGuardHook(t *testing.T) {
 		{"confirm", `{"tool_name":"Edit","tool_input":{"file_path":"/w/a.go"}}`, "ask"},
 		{"no rule", `{"tool_name":"Bash","tool_input":{"command":"git status"}}`, ""},
 		{"turning an app off from inside", `{"tool_name":"Bash","tool_input":{"command":"harnessly app disable acme.review"}}`, "deny"},
+		{"a secret of an app from inside", `{"tool_name":"Bash","tool_input":{"command":"echo x | harnessly app secret set acme.review TOKEN"}}`, "deny"},
 		{"editing a package", `{"tool_name":"Write","tool_input":{"file_path":"/data/apps/packages/x/app.json"}}`, "deny"},
 		{"an unreadable call", `not json`, "deny"},
 	} {

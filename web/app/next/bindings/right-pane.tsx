@@ -22,6 +22,7 @@ import { ConsentAsks } from '@/next/features/app-consent/consent-ask';
 import { heldTools, quietTools, toolOfRequest } from '@/next/features/pane/tools-order';
 import { useChatMade } from '@/next/bindings/chat-made';
 import BrowserTab from '@/next/bindings/browser-tab';
+import { isChatPlace, type IPlace } from '@/next/features/pane/place';
 import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
 import { crumbsOf } from '@/next/features/pane/crumbs';
 import { downloadHref, saveFrom } from '@/next/features/pane/download';
@@ -31,6 +32,7 @@ import SideChat from '@/next/features/pane/side-chat';
 import { SideFloat } from '@/next/features/pane/side-float';
 import { onOpenSubagent, openSubagent } from '@/next/features/subagents/open';
 import AppTab from '@/next/features/app-views/app-tab';
+import PinnedAppTab, { PINNED_APP_TAB, usePinnedApp } from '@/next/features/app-views/pinned-tab';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { onOpenAddressTab, onOpenAppTab, openAppTab } from '@/next/features/app-views/open';
 import { workflowsOf } from '@/next/features/workflows/run';
@@ -61,6 +63,7 @@ import Modal from '@/next/features/shell/modal';
 import { Button } from '@/next/ui/button';
 import type { IDraft } from '@/next/features/pane/editor/file-editor';
 import { useSideChat } from '@/next/bindings/side-chat';
+import { onSideAsk } from '@/next/stores/side-ask';
 import Icon from '@/next/ui/icon';
 import LazyView from '@/next/ui/lazy-view';
 import { CLIENT_ID } from '@/next/bindings/agent-terminal';
@@ -87,7 +90,6 @@ import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } fro
 import { MACHINE, browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
 import { requestOf, requestsOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
-import { foldRailForDesign } from '@/next/bindings/rail';
 import { usePhone } from '@/next/ui/use-media';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeys } from '@/next/features/keys/use-keys';
@@ -106,10 +108,10 @@ const SubagentView = later(() => import('@/next/features/pane/subagent-view'));
 const MachineTab = later(() => import('@/next/bindings/machine-tab'));
 const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
 
-/** A design opened beside the chat, full screen: Sinopia Design with this chat; a document of an app's type, its own page. */
-const openDesignFull = async (machine: MachineId, design: string, chat: ConvId) => {
+/** A design opened beside the chat, full screen: Sinopia Design with this chat; a document of an app's type, its own page.
+ *  Without a chat (the start page's pane) the design opens on its own. */
+export const openDesignFull = async (machine: MachineId, design: string, chat?: ConvId) => {
   const docs = await loadKindDocs(machine).catch(() => []);
-  foldRailForDesign();
   goTo(
     docs.some((d) => d.document === design)
       ? { kind: ROUTE.appDoc, id: design, chat }
@@ -298,7 +300,7 @@ interface IShownFile {
 
 /** The chat's folder: the place on screen is the tab's, so the crumbs survive a switch of tabs. A file opens in the
  *  editor; leaving it with unsaved text asks first. */
-const FilesTab = ({
+export const FilesTab = ({
   conv,
   tab,
   edits,
@@ -307,7 +309,8 @@ const FilesTab = ({
   onOpenBeside,
   tools,
 }: {
-  conv: Conversation;
+  /** The chat, or the machine's own place on the start page (features/pane/place.ts). */
+  conv: IPlace;
   tab: Extract<TTab, { kind: 'files' }>;
   edits: IFileEdits;
   guard: (tabs: readonly string[], run: () => void) => void;
@@ -461,10 +464,14 @@ const FilesTab = ({
         compare={shownCompare}
         onCloseCompare={() => onChange({ ...tab, against: undefined })}
         at={tab.at ?? null}
-        onAsk={(quote, note) => {
-          addQuote(conv.id, quote, note);
-          toast(t('next.editor.asked'), { tone: 'success' });
-        }}
+        onAsk={
+          isChatPlace(conv)
+            ? (quote, note) => {
+                addQuote(conv.id, quote, note);
+                toast(t('next.editor.asked'), { tone: 'success' });
+              }
+            : undefined
+        }
       />
     ) : null;
   if (delivered)
@@ -560,6 +567,8 @@ interface IPaneBodyProps {
   onOpenMade: (item: Pick<MadeItem, 'kind' | 'ref'>) => void;
   /** The pane stands beside an open design: its Designly tab and tool are left out (the design is the screen). */
   besideDesign: boolean;
+  /** The design the pane stands beside: a document of an app's type made of a site shows that app's pinned tab. */
+  design: string | null;
 }
 
 const PaneBody = (props: IPaneBodyProps) => {
@@ -578,8 +587,18 @@ const PaneBody = (props: IPaneBodyProps) => {
   const legacyTab = isLegacyTab(active) ? legacy.tabs.find((x) => x.id === active) : undefined;
   // Neither is open: the tools, the permanent first tab (it is not among the pane's own).
   const tab = legacyTab ? undefined : tabs.find((x) => x.id === active);
+  // Beside a document of an app's type made of a site, that app's tab comes first and is never closed.
+  const pinned = usePinnedApp(conv.machineId, props.design);
+  const onPinned = pinned !== null && !legacyTab && !tab && active === PINNED_APP_TAB;
+  // The pinned tab is what the pane shows first beside such a document, once for each document it stands beside.
+  const pinnedShown = useRef<string | null>(null);
+  useEffect(() => {
+    if (pinned === null || pinnedShown.current === pinned.document) return;
+    pinnedShown.current = pinned.document;
+    if (active === '' || active === TOOLS_TAB) setActive(PINNED_APP_TAB);
+  }, [pinned, active, setActive]);
   // A kept Legacy tab in front waits for Legacy's pane to come, rather than the tools showing for a moment.
-  const launcher = !legacyTab && !tab && !(isLegacyTab(active) && !legacy.on);
+  const launcher = !legacyTab && !tab && !onPinned && !(isLegacyTab(active) && !legacy.on);
 
   const made = useChatMade(conv, launcher);
 
@@ -950,6 +969,16 @@ const PaneBody = (props: IPaneBodyProps) => {
   return (
     <ToolPane
       tabs={[
+        ...(pinned
+          ? [
+              {
+                id: PINNED_APP_TAB,
+                icon: 'app-window',
+                name: pinned.view.title ?? pinned.app.name,
+                pinned: true,
+              },
+            ]
+          : []),
         ...tabs.map((x) => ({
           ...tabInfo(
             x,
@@ -962,7 +991,7 @@ const PaneBody = (props: IPaneBodyProps) => {
         })),
         ...legacy.tabs,
       ]}
-      tab={legacyTab?.id ?? tab?.id ?? TOOLS_TAB}
+      tab={legacyTab?.id ?? tab?.id ?? (onPinned ? PINNED_APP_TAB : TOOLS_TAB)}
       ownBar={tab?.kind === 'browser' || tab?.kind === 'agent-browser' || tab?.kind === 'designly'}
       maxed={props.maxed}
       onPick={(id) => {
@@ -988,6 +1017,7 @@ const PaneBody = (props: IPaneBodyProps) => {
       strip={props.strip}
     >
       {legacyTab && legacy.render(legacyTab.id)}
+      {onPinned && <PinnedAppTab machine={conv.machineId} conversation={conv.id} pinned={pinned} />}
       {launcher && (
         <ToolsLauncher
           tools={marked}
@@ -1021,6 +1051,8 @@ const PaneBody = (props: IPaneBodyProps) => {
           onAsk={(q) => side.ask(q)}
           onStop={side.stop}
           onRetry={side.retry}
+          quote={side.quote}
+          onQuoted={side.takeQuote}
         />
       )}
       {tab?.kind === 'plan' && <PlanTab key={tab.id} conv={conv} />}
@@ -1107,6 +1139,8 @@ export const useRightPane = (
   strip: ReactNode = null,
   /** The pane stands beside an open design, not a chat. */
   besideDesign = false,
+  /** The design it stands beside: its app's pinned tab. */
+  design: string | null = null,
 ) => {
   useMachines();
   const side = useSideChat(conv?.machineId ?? null, conv?.id ?? null);
@@ -1302,6 +1336,18 @@ export const useRightPane = (
       leaveFloat();
     } else openFloat();
   };
+  // Words of the chat asked about aside (the pill over picked words): the side chat comes forward. Its open window takes
+  // them where it is; otherwise it opens as the pane's tab, whose field takes them (the quote waits in the store).
+  const asideConv = conv?.provider === 'claude' ? conv.id : null;
+  useEffect(
+    () =>
+      onSideAsk((ask) => {
+        if (ask.conv === asideConv && float !== 'open') dockSide();
+      }),
+    // dockSide is made anew each render; what it does depends on nothing else here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [asideConv, float],
+  );
   // The pane's shortcuts (features/keys): the pane itself, and the side chat of a Claude chat.
   useKeys(
     KEY_SCOPE.global,
@@ -1608,6 +1654,7 @@ export const useRightPane = (
         onUsed={(ids) => setState((s) => ({ ...s, used: markUsed(s.used, ids, Date.now()) }))}
         onOpenMade={openMade}
         besideDesign={besideDesign}
+        design={besideDesign ? design : null}
       />
       {legacy.extras}
     </PaneDrawer>
@@ -1667,6 +1714,8 @@ export const useRightPane = (
       onAsk={(q) => side.ask(q)}
       onStop={side.stop}
       onRetry={side.retry}
+      quote={side.quote}
+      onQuoted={side.takeQuote}
       onClear={side.clear}
       onDock={dockSide}
       onClose={() => {

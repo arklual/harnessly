@@ -10,6 +10,7 @@ import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { downloadHref, saveFrom } from '@/next/features/pane/download';
 import { previewUrl } from '@/next/features/pane/delivered';
 import { addQuote } from '@/next/stores/quotes';
+import { isChatPlace } from '@/next/features/pane/place';
 
 /** What opens as a page of its own in a new tab of the browser: the runtime's viewer shows these as they are. */
 const IN_TAB = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp|ico|pdf|html?|mp4|m4v|webm|mov|mp3|wav|m4a|ogg|flac)$/i;
@@ -98,10 +99,13 @@ const FileMenu = ({
           </Menu.Item>
         )}
         <Menu.Separator className="hx-cmenu__sep" />
-        <Menu.Item className="hx-cmenu__item" onClick={ask}>
-          <Icon name="message-square-text" size="sm" />
-          <span className="hx-cmenu__txt">{t('next.fileMenu.ask')}</span>
-        </Menu.Item>
+        {/* The start page's files have no chat to ask: the item is there only beside one. */}
+        {isChatPlace({ id: conv }) && (
+          <Menu.Item className="hx-cmenu__item" onClick={ask}>
+            <Icon name="message-square-text" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.fileMenu.ask')}</span>
+          </Menu.Item>
+        )}
         <Menu.Item className="hx-cmenu__item" onClick={copy}>
           <Icon name="copy" size="sm" />
           <span className="hx-cmenu__txt">{t('next.fileMenu.copyPath')}</span>

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // MaxPayload bounds one frame: a page's own socket message (a long paste into the terminal) travels whole inside one
@@ -34,6 +36,28 @@ type link struct {
 	hub bool
 	// events is the set a link.subscribe named; nil means every event.
 	events atomic.Pointer[map[string]struct{}]
+	// repl is the batches the hub started on this link (repl.go); nil: the kinds go as their old events.
+	repl atomic.Pointer[replOut]
+}
+
+// sendEvent sends an event frame: as the batch of its kind when the hub started batches for it, else as it is.
+func (l *link) sendEvent(name string, frame []byte) {
+	if o := l.repl.Load(); o.has(name) {
+		o.queue(name, frame)
+		return
+	}
+	l.sendText(frame)
+}
+
+// startRepl is the hub's repl.start: the kinds it names go as batches from now on, numbered from 1.
+func (l *link) startRepl(start hubproto.ReplStart) {
+	o := newReplOut(l.sendText, l.done, start)
+	if old := l.repl.Swap(o); old != nil {
+		old.close()
+	}
+	if l.closed() {
+		o.close()
+	}
 }
 
 // subscribe limits the link to the named events from now on.
@@ -124,6 +148,9 @@ func (l *link) sendBinary(b []byte) bool {
 func (l *link) close(code websocket.StatusCode, reason string) {
 	l.once.Do(func() {
 		close(l.done)
+		if o := l.repl.Load(); o != nil {
+			o.close()
+		}
 		// The close handshake waits for the peer; nobody who closes a link should wait with it.
 		go func() { _ = l.conn.Close(code, reason) }()
 	})

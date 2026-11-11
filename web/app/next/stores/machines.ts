@@ -6,6 +6,9 @@ import type { Feature, Limits, Machine, MachineId } from '@/next/protocol/v2';
 
 export interface MachineView {
   machine: Machine;
+  /** the hub listed the machine as on with a runtime that did not answer a moment ago; gone with its own
+   *  welcome. */
+  hangs?: true;
   /** v2: the runtime speaks proto 2; outdated: /api/v2/hello is missing or older; unknown: not asked yet. */
   runtime: 'unknown' | 'v2' | 'outdated';
   epoch: string | null;
@@ -36,15 +39,68 @@ export const activeMachineStore = createStore<MachineId | null>(null);
  */
 export const homeMachineStore = createStore<MachineId | null>(null);
 
-export function putMachines(list: Machine[]): void {
-  for (const m of list) {
-    machinesStore.patch(m.id, (prev) =>
-      prev
-        ? { ...prev, machine: m }
-        : { machine: m, runtime: 'unknown', epoch: null, features: [], limits: null },
-    );
-  }
+/**
+ * A machine of the fleet's list. From a hub its agents are what the machine last said of them, whatever it
+ * does now, with its features and its agents' limits (`usage`, the platform's …/machines `limits`); `hangs`: it is on
+ * but its runtime did not answer a moment ago.
+ */
+export type FleetMachine = Machine & { hangs?: boolean; features?: Feature[]; usage?: unknown };
+
+function putMachine({ hangs, features, usage: _usage, ...m }: FleetMachine): void {
+  machinesStore.patch(m.id, (prev) => {
+    const { hangs: _was, ...view }: MachineView = prev
+      ? { ...prev, machine: m }
+      : { machine: m, runtime: 'unknown', epoch: null, features: features ?? [], limits: null };
+    // A machine that has said welcome on this page answers for itself.
+    return hangs && view.epoch === null ? { ...view, hangs: true } : view;
+  });
+}
+
+export function putMachines(list: FleetMachine[]): void {
+  for (const m of list) putMachine(m);
   machineOrderStore.set(list.map((m) => m.id));
+}
+
+/**
+ * A later reading of the fleet's list, on a page that is already open. A machine the page did not know is put as at
+ * the start. One it knows keeps what its own socket said (runtime, agents, health, load, welcome) and takes what only
+ * the list knows: its name and host, whose it is, and its reach while no socket of the page is live to say it (`live`).
+ * A machine the list no longer has leaves the order; its record is the caller's to drop, with its socket.
+ */
+export function mergeMachines(list: FleetMachine[], live: (m: MachineId) => boolean = () => false): void {
+  const fresh: FleetMachine[] = [];
+  for (const m of list) {
+    const prev = machinesStore.get(m.id);
+    if (!prev) {
+      fresh.push(m);
+      continue;
+    }
+    const was = prev.machine;
+    const reach = live(m.id)
+      ? { reach: was.reach, lastSeenAt: was.lastSeenAt }
+      : { reach: m.reach, lastSeenAt: m.lastSeenAt };
+    const next: Machine = {
+      ...was,
+      name: m.name,
+      host: m.host,
+      ...reach,
+      ...(m.orgName === undefined ? {} : { orgName: m.orgName }),
+      ...(m.mine === undefined ? {} : { mine: m.mine }),
+    };
+    const same =
+      next.name === was.name &&
+      next.host === was.host &&
+      next.reach === was.reach &&
+      next.lastSeenAt === was.lastSeenAt &&
+      next.orgName === was.orgName &&
+      next.mine === was.mine;
+    if (!same) machinesStore.set(m.id, { ...prev, machine: next });
+  }
+  for (const m of fresh) putMachine(m);
+  const order = list.map((m) => m.id);
+  const had = machineOrderStore.get();
+  if (!had || had.length !== order.length || had.some((id, i) => id !== order[i]))
+    machineOrderStore.set(order);
 }
 
 export const limitsOf = (m: MachineId): Limits => machinesStore.get(m)?.limits ?? DEFAULT_LIMITS;

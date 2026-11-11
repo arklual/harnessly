@@ -26,14 +26,48 @@ var Undefined = undefinedValue{}
 type undefinedValue struct{}
 
 // Object is a JavaScript object with string keys.
+//
+// The keys and values are two parallel slices; a small object (nearly every transcript entry) is searched linearly,
+// which costs a fraction of the memory a map per object does, and only a wide one gets an index.
 type Object struct {
 	keys []string
-	vals map[string]any
+	vals []any
+	idx  map[string]int // key -> position, built once the object has more than indexAt keys
+}
+
+const indexAt = 16
+
+// find is the position of k, or -1.
+func (o *Object) find(k string) int {
+	if o.idx != nil {
+		if i, ok := o.idx[k]; ok {
+			return i
+		}
+		return -1
+	}
+	for i, key := range o.keys {
+		if key == k {
+			return i
+		}
+	}
+	return -1
+}
+
+// reindex rebuilds (or drops) the index after keys moved.
+func (o *Object) reindex() {
+	if len(o.keys) <= indexAt {
+		o.idx = nil
+		return
+	}
+	o.idx = make(map[string]int, len(o.keys))
+	for i, k := range o.keys {
+		o.idx[k] = i
+	}
 }
 
 // NewObject is an empty object; pairs are set in order (key, value, key, value…).
 func NewObject(pairs ...any) *Object {
-	o := &Object{vals: map[string]any{}}
+	o := &Object{}
 	for i := 0; i+1 < len(pairs); i += 2 {
 		o.Set(pairs[i].(string), pairs[i+1])
 	}
@@ -46,13 +80,18 @@ func (o *Object) Set(k string, v any) {
 		o.Delete(k)
 		return
 	}
-	if o.vals == nil {
-		o.vals = map[string]any{}
+	v = normalize(v)
+	if i := o.find(k); i >= 0 {
+		o.vals[i] = v
+		return
 	}
-	if _, ok := o.vals[k]; !ok {
-		o.keys = append(o.keys, k)
+	o.keys = append(o.keys, k)
+	o.vals = append(o.vals, v)
+	if o.idx != nil {
+		o.idx[k] = len(o.keys) - 1
+	} else if len(o.keys) > indexAt {
+		o.reindex()
 	}
-	o.vals[k] = normalize(v)
 }
 
 // normalize turns the Go numbers callers pass into float64, the only number there is.
@@ -79,8 +118,10 @@ func (o *Object) Get(k string) (any, bool) {
 	if o == nil {
 		return nil, false
 	}
-	v, ok := o.vals[k]
-	return v, ok
+	if i := o.find(k); i >= 0 {
+		return o.vals[i], true
+	}
+	return nil, false
 }
 
 // Has says whether the key is present.
@@ -91,16 +132,13 @@ func (o *Object) Delete(k string) {
 	if o == nil {
 		return
 	}
-	if _, ok := o.vals[k]; !ok {
+	i := o.find(k)
+	if i < 0 {
 		return
 	}
-	delete(o.vals, k)
-	for i, key := range o.keys {
-		if key == k {
-			o.keys = append(o.keys[:i:i], o.keys[i+1:]...)
-			break
-		}
-	}
+	o.keys = append(o.keys[:i:i], o.keys[i+1:]...)
+	o.vals = append(o.vals[:i:i], o.vals[i+1:]...)
+	o.reindex()
 }
 
 // Len is the number of keys.
@@ -151,8 +189,7 @@ func isArrayIndex(k string) bool {
 
 // Clear removes every key.
 func (o *Object) Clear() {
-	o.keys = nil
-	o.vals = map[string]any{}
+	o.keys, o.vals, o.idx = nil, nil, nil
 }
 
 // Assign copies every key of src onto o, as Object.assign.
@@ -209,10 +246,12 @@ func Clone(v any) any {
 	switch x := v.(type) {
 	case *Object:
 		c := NewObject()
-		for _, k := range x.keys {
-			c.keys = append(c.keys, k)
-			c.vals[k] = Clone(x.vals[k])
+		c.keys = append([]string(nil), x.keys...)
+		c.vals = make([]any, len(x.vals))
+		for i, e := range x.vals {
+			c.vals[i] = Clone(e)
 		}
+		c.reindex()
 		return c
 	case []any:
 		out := make([]any, len(x))
@@ -235,9 +274,9 @@ func SameValue(a, b any) bool {
 		if !ok || x.Len() != y.Len() {
 			return false
 		}
-		for _, k := range x.keys {
+		for i, k := range x.keys {
 			yv, ok := y.Get(k)
-			if !ok || !SameValue(x.vals[k], yv) {
+			if !ok || !SameValue(x.vals[i], yv) {
 				return false
 			}
 		}
@@ -408,7 +447,8 @@ func write(b *bytes.Buffer, v any, indent, cur string) {
 			if indent != "" {
 				b.WriteByte(' ')
 			}
-			write(b, x.vals[k], indent, inner)
+			xv, _ := x.Get(k)
+			write(b, xv, indent, inner)
 		}
 		if indent != "" {
 			b.WriteString("\n" + cur)

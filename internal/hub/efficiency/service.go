@@ -4,38 +4,40 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
-	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 const maxSpan = 92 * 24 * time.Hour
 
 // Service serves the figures of the screen. Everything is behind the organization flag features.Efficiency.
 type Service struct {
-	DB       *store.DB
-	Gate     func(orgs.Handler) httpx.Handler
+	DB *store.DB
+	// Gate is the guard of an organization's route (orgs.Service.OrgGate).
+	OrgGate  func(tenant.Handler) httpx.Handler
 	Features features.Gate
+	// Switches decides per person whether the overview and the personal tab come from the hub (SwitchOverview).
+	Switches switches.Gate
 	Cost     CostFn
 	Now      func() time.Time
 }
 
 // Mount registers the endpoints.
 func (s *Service) Mount(mux *http.ServeMux) {
-	mux.Handle("GET /api/orgs/{org}/efficiency/summary", s.Gate(s.summary))
-	mux.Handle("GET /api/orgs/{org}/efficiency/pulse", s.Gate(s.pulseGet))
-	mux.Handle("POST /api/orgs/{org}/efficiency/pulse", s.Gate(s.pulsePut))
+	mux.Handle("GET /api/orgs/{org}/efficiency/summary", s.OrgGate(s.summary))
+	mux.Handle("GET /api/orgs/{org}/efficiency/pulse", s.OrgGate(s.pulseGet))
+	mux.Handle("POST /api/orgs/{org}/efficiency/pulse", s.OrgGate(s.pulsePut))
+	s.mountOverview(mux)
 }
 
-func (s *Service) summary(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) summary(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	ctx := r.Context()
 	st := s.DB.S()
-	o, err := orgs.Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *t.Org
+	var err error
 	if s.Features == nil || !s.Features.On(ctx, o.ID, features.Efficiency) {
 		return httpx.ErrNotFound
 	}

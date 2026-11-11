@@ -56,26 +56,168 @@
 
 /* harnessly — аннотации: карточка с комментарием и свойствами элемента, пометки в документе, плашка «N аннотаций» в поле ввода */
 
-/* ── Карточка ── */
+/* ── Карточка: стеклянная, поле крупное, свойства раскрываются вставкой, внизу «Отменить», 🗑, 🎤 и ↑ ── */
 .hx-note.hx-ann {
-  width: 320px;
+  width: 344px;
   padding: 0;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 10%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--hx-bg-raised) 94%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+  box-shadow:
+    0 28px 64px -16px rgba(8, 10, 24, 0.42),
+    0 4px 14px rgba(8, 10, 24, 0.14),
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
   text-align: left;
 }
-/* The card is the shared row of a comment (ui/notes/notes.tsx), standing where the card stands. */
-.hx-ann > .hx-note__row {
-  position: static;
-  width: 100%;
-  animation: none;
-  translate: none;
+.hx-ann__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px 4px 10px;
+}
+.hx-ann__tune {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 240ms var(--hx-ease-out);
+}
+.hx-ann__tune:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 11%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-ann__tune:active {
+  transform: scale(0.94);
 }
 .hx-ann__tune[aria-pressed='true'] {
   background: var(--hx-accent-soft);
   color: var(--hx-accent);
+}
+.hx-ann__row > .hx-ann__n {
+  flex: none;
+  margin: 4px 4px 0 2px;
+}
+.hx-ann__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  max-height: 132px;
+  padding: 7px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 15px;
+  line-height: 20px;
+}
+.hx-ann__input::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-ann__foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 10px;
+}
+.hx-ann__cancel {
+  height: 34px;
+  padding: 0 15px;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 12%, transparent);
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.hx-ann__cancel:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 6%, transparent);
+}
+.hx-ann__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-ann__icon:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-ann__del:hover {
+  color: var(--hx-danger);
+}
+.hx-ann__ok {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-app);
+  cursor: pointer;
+  transition:
+    transform 200ms var(--hx-ease-out),
+    opacity 160ms ease;
+}
+.hx-ann__ok:hover {
+  opacity: 0.88;
+}
+.hx-ann__ok:active {
+  transform: scale(0.92);
+}
+.hx-ann__ok[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-ann__ok[aria-busy='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+/* The card is moved by its own ground: the line of the field and the foot between the buttons. */
+.hx-site > .hx-note.hx-ann :is(.hx-ann__row, .hx-ann__foot, .hx-ann__foot > .hx-spacer) {
+  cursor: grab;
+}
+.hx-site
+  > .hx-note.hx-ann[data-dragging='true']
+  :is(.hx-ann__row, .hx-ann__foot, .hx-ann__foot > .hx-spacer) {
+  cursor: grabbing;
+}
+.hx-ann__tag {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 /* Свойства: раскрываются по высоте, без прыжка */
@@ -94,7 +236,8 @@
 .hx-ann__props-in {
   min-height: 0;
   overflow: hidden;
-  border-radius: 10px;
+  margin: 0 8px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--hx-fg-1) 4%, transparent);
 }
 .hx-ann[data-tune='true'] .hx-ann__props-in {
@@ -818,7 +961,7 @@
 /* Телефон: карточка во всю ширину, свойства — колонкой покороче */
 @media (max-width: 600px) {
   .hx-note.hx-ann {
-    width: min(320px, calc(100vw - 24px));
+    width: min(344px, calc(100vw - 24px));
   }
   .hx-ann__prop {
     grid-template-columns: 100px minmax(0, 1fr);

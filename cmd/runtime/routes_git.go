@@ -119,7 +119,12 @@ func gitRoutes(d deps) []gate.JSONRoute {
 				if !d.SessionOK(r) { // a cli-token alone is not a person
 					return nodejson.Answer(r, http.StatusForbidden, map[string]string{"error": "Forbidden"}, nil)
 				}
-				status, v := gitread.CommitChanges(oldQuery(r))
+				q := oldQuery(r)
+				read := gitread.CommitChanges
+				if _, one := q["path"]; one || q.Has("oldPath") {
+					read = gitread.FileSides // one file's two versions for the review's diff
+				}
+				status, v := read(q)
 				return nodejson.Answer(r, status, v, http.Header{"Cache-Control": {"no-store"}})
 			},
 		},

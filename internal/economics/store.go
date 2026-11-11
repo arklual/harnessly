@@ -13,6 +13,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 )
 
 const (
@@ -26,6 +28,9 @@ type Store struct {
 	Dir string
 	// ChunkBytes is the most read at once (4 MB when 0).
 	ChunkBytes int
+	// Lines, when set, gives what a transcript a conversation is live on gained, read once for all its readers, so
+	// such a transcript is not opened for its counters; nil reads every transcript from the file.
+	Lines *transcriptindex.Follower
 
 	mu       sync.Mutex
 	states   map[string]*State
@@ -107,13 +112,28 @@ func (s *Store) advance(st *State) (*State, error) {
 		cur = NewState(st.Path, st.Provider)
 		cur.Dev, cur.Ino = dev, ino
 	}
-	if fi.Size() == cur.Offset {
+	if cur.Carry == "" {
+		// The cursor stands at the start of a line: the whole lines after it may come from the shared read.
+		if data, _, ok := s.Lines.Take(cur.Path, cur.Offset); ok && len(data) > 0 {
+			if cur == st {
+				cur = st.clone()
+			}
+			dec := jscompat.UTF8Decoder{StripBOM: true}
+			cur.Offset += int64(len(data))
+			cur.consume(dec.Decode(data, true))
+		}
+	}
+	if fi.Size() <= cur.Offset {
+		if cur != st && cur.Carry == "" {
+			s.Lines.Seat(cur.Path, cur.Offset)
+		}
 		return cur, nil
 	}
 	if cur == st {
 		cur = st.clone()
 	}
 	f, err := os.Open(cur.Path)
+	tally.Open()
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +156,9 @@ func (s *Store) advance(st *State) (*State, error) {
 		}
 		cur.Offset += int64(n)
 		cur.consume(dec.Decode(buf[:n], true))
+	}
+	if cur.Carry == "" {
+		s.Lines.Seat(cur.Path, cur.Offset)
 	}
 	return cur, nil
 }

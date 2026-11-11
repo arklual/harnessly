@@ -174,7 +174,12 @@ export const readMachineLimits = (doc: unknown, machine: string): MachineLimits 
   const list = rec(doc)?.machines;
   if (!Array.isArray(list)) throw new Error('no machines in the answer');
   const mine = list.find((m) => rec(m)?.id === machine) ?? (list.length === 1 ? list[0] : undefined);
-  const limits = rec(rec(mine)?.limits);
+  return readLimitsOf(rec(mine)?.limits);
+};
+
+/** One machine's `limits` of that answer (the hub keeps it as the machine last gave it); null when none. */
+export const readLimitsOf = (doc: unknown): MachineLimits | null => {
+  const limits = rec(doc);
   if (!limits) return null;
   return {
     claude: readProvider(limits.claude),

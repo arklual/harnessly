@@ -37,6 +37,8 @@ export type CatalogSource = {
   repo?: string; // the item id of a `repo` of the list
   repoUrl?: string;
   path?: string;
+  // app: the organization turned the app off for everybody; it stays installed, without its menu item and tools
+  off?: boolean;
   run?: string;
   rerun?: 'once' | 'check';
   check?: string;

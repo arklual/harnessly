@@ -40,7 +40,8 @@ A source holds the text or the address of the item and **nothing secret**. Whate
 | `doc` | `url` (http or https), `text` (≤ 48 KiB) |
 | `plugin` | `marketplace` (GitHub `owner/repo` or an https git address), `plugin` (`name@marketplace`) — see «Recommended» |
 | `claude-settings` | `always`, `ifAbsent` (objects of Claude Code's settings), `claudeMd` (≤ 8 KiB) — see «Recommended» |
-| `app` | `from` (`repo`), `repo` (the item id of a `repo` of the list) or `repoUrl` (https) + `branch`, `path` (the app's folder in the repository, relative, no `..`) — see «Apps» |
+| `app` | `from` (`repo`), `repo` (the item id of a `repo` of the list) or `repoUrl` (https) + `branch`, `path` (the app's folder in the repository, relative, no `..`), `off` (boolean: off for the whole organization) — see «Apps» |
+| `pack` | as `app`: `repo` or `repoUrl` + `branch`, `path` (the pack's folder with `harnessly/pack.json`) — see [packs.md](packs.md); org admins only, flag `env.packs` |
 
 The whole source is at most 64 KiB. Names are up to 80 characters, hints up to 200, without control characters.
 
@@ -314,6 +315,12 @@ version from the same files is «уже стоит». A trusted app is never ins
   are taken off, the copy with them. Each hub link takes off only its own.
 - A new version in the repository comes with the next setup. Boards already made from the app's templates are not
   changed; a strict template keeps them locked as before.
+- **Off for the organization**: `source.off: true` (the item's form, «В организации» → «Выключено у всех») turns the
+  app off for everybody, pinned or not. The machines get the change with the list, at once and without a setup run;
+  the app stays installed with its settings and data, and is not listed: no item in «Приложения», no tools for the
+  agent, no views. Turned on again, it is back as it was. The service's own data and links to it are not touched.
+- **In the menu**: an app of the environment whose manifest targets `app` stands in the sidebar's «Приложения» for
+  everybody, without turning it on in a chat; a person who turned it off for themselves does not see it there.
 
 ## Calls of the tools
 

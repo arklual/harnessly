@@ -194,6 +194,8 @@ func serviceRoutes(d deps) []gate.JSONRoute {
 		)
 	}
 	out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/change-view"), Compute: viaMemory(d, h.ChangeView)})
+	// The review picker answers a state of its own without a GitLab (not-configured), so the pane says why.
+	out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/gitlab-pick"), Compute: viaMemory(d, h.GitLabPick)})
 	// Link previews and task cards also answer once the person connected a tracker or a wiki of their own, whatever the
 	// deployment names.
 	conns := connectionsFor(d)

@@ -173,6 +173,9 @@ type Event struct {
 	// runtime). A Claude run from the tab's terminal (a script, or the agent itself calling `claude -p`) inherits the
 	// tab's tmux session and hooks: only this tells its hooks from those of the tab's agent.
 	AgentSession string `json:"-"`
+	// PromptHash of a prompt-submit names the prompt the agent took (screen.MessageHash), "" when the hook did not say
+	// (Codex, a Claude started before its hook carried it).
+	PromptHash string `json:"-"`
 }
 
 // NotificationNeedsInput: only a notification asking for permission (or one without a type) needs the person; the

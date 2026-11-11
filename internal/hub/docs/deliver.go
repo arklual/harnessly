@@ -12,7 +12,9 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
+	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // A person's comment on a document goes to the conversation the document was published from (docs.bound) by the op
@@ -58,15 +60,15 @@ func (f *inflight) done(id string) {
 
 // bind records the conversation a document of this machine was published from. A board's binding is not the hub's:
 // boards stay with their own service.
-func (s *Service) bind(ctx context.Context, machineID string, b hubproto.DocBinding) error {
+func (s *Service) bind(ctx context.Context, mc store.Machine, b hubproto.DocBinding) error {
 	if b.Slug == "" || (b.Kind != "" && b.Kind != "artifact") {
 		return nil
 	}
 	_, err := s.db.S().Q().Exec(ctx, `UPDATE doc_meta SET tab_id = ?, session_name = ?, agent_session_id = ?, provider = ?, cwd = ?,
 			bound_at = ?, source_path = COALESCE(?, source_path)
-		WHERE slug = ? AND machine_id = ?`,
+		WHERE slug = ? AND machine_id = ? AND (space_id IS NULL OR space_id = ?)`,
 		ptr(b.TabID), ptr(b.SessionName), ptr(b.AgentSessionID), nullIf(b.Provider), ptr(b.Cwd), s.now().UnixMilli(), ptr(b.SourcePath),
-		b.Slug, machineID)
+		b.Slug, mc.ID, mc.SpaceID)
 	return err
 }
 
@@ -208,15 +210,17 @@ func (s *Service) Deliver(commentID string) {
 	if s.links == nil {
 		return
 	}
-	go func() {
+	safego.Go("docs Deliver", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), deliverTimeout+10*time.Second)
 		defer cancel()
 		s.deliver(ctx, commentID, false)
-	}()
+	})
 }
 
-// Run tries the comments not yet handed over again every minute until ctx ends, and gives up on those older than a day.
+// Run probes the documents and boards services (health.go) and tries the comments not yet handed over again every minute until ctx ends, and gives up on those older than a day.
 func (s *Service) Run(ctx context.Context) {
+	safego.Go("docs services health", func() { s.runHealth(ctx) })
+	s.reportLoose(ctx)
 	if s.links == nil {
 		return
 	}

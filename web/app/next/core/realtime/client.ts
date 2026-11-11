@@ -2,7 +2,9 @@
 // with seq per channel; events at or below the snapshot's seq are dropped, a gap re-subscribes with the cursor.
 // A reconnect resumes by epoch + afterSeq and afterEntryId, so the feed is never reloaded whole.
 //
-// Pulse: a ping every 15 s; 20 s without a frame is stale, 35 s closes the socket and opens it again. Backoff
+// Pulse: a ping every 15 s; 20 s without a frame is stale, 35 s closes the socket and opens it again. A runtime that
+// beats by itself (a pong nobody asked for) is answered with a ping at once: a hidden tab, whose timers the browser
+// stretches to a minute, keeps its socket by the runtime's clock. Backoff
 // 3 → 6 → 12 → 20 s with ±20 % jitter, reset by welcome; online and visible reconnect at once. The connection is
 // an explicit union with the moment of the next try, for the banner «Нет связи · через N с · Сейчас».
 
@@ -22,6 +24,8 @@ import {
 } from '@/next/protocol/v2';
 
 export const PING_MS = 15000;
+/** The `t` of a pong the runtime sends unasked (its own beat); a ping of the page carries its clock, never 0. */
+export const SERVER_BEAT_T = 0;
 export const STALE_MS = 20000;
 export const DEAD_MS = 35000;
 export const CONNECT_MS = 10000;
@@ -170,11 +174,15 @@ export class RealtimeClient {
   }
 
   stop(): void {
+    if (this.stopped) return;
     this.stopped = true;
     for (const u of this.unlisten) u();
     this.unlisten = [];
     this.clearTimers();
     this.drop();
+    // The socket is closed on purpose and nothing opens it until start(): the page must not count the machine as
+    // on the line.
+    this.setConn({ k: 'offline', retryAt: Number.POSITIVE_INFINITY, cause: 'paused' });
     this.settleWaiters(() => true, 'gone');
   }
 
@@ -212,6 +220,15 @@ export class RealtimeClient {
 
   isSubscribed(ch: Channel): boolean {
     return this.subs.has(ch);
+  }
+
+  /** Asks for a held channel's snapshot again, whole (its state is doubted, not its events). */
+  resnapshot(ch: Channel): void {
+    const sub = this.subs.get(ch);
+    if (!sub || (this.conn.k !== 'live' && this.conn.k !== 'stale')) return;
+    sub.cursor = null;
+    sub.resyncing = false;
+    this.sendSub(ch);
   }
 
   /** Resolves once the channel has shown seq (the effect of a command), or when it cannot any more. */
@@ -293,6 +310,8 @@ export class RealtimeClient {
         this.onEvent(frame);
         return;
       case 'pong':
+        // t 0 is no ping of this page: the runtime beats by itself and hears the answer as the page's sign of life.
+        if (frame.t === SERVER_BEAT_T) this.ping();
         return;
       case 'error':
         if (frame.ch) {

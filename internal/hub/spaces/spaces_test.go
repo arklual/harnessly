@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -18,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
+	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
@@ -254,7 +259,7 @@ func TestCreateSpaceAndSlugs(t *testing.T) {
 func TestOwnedSpaceCap(t *testing.T) {
 	e := newEnv(t)
 	a := e.signIn("a@example.com")
-	for i := 0; i < maxOwnedSpaces; i++ {
+	for i := 0; i < config.DefaultMaxSpaces; i++ {
 		a.newSpace("Команда")
 	}
 	r := a.do("POST", "/api/spaces", map[string]string{"name": "Ещё"})
@@ -705,6 +710,61 @@ func TestMemberCanLeaveAndOwnerCanRemove(t *testing.T) {
 	}
 }
 
+func TestRemovedMemberKeepsNothingOfTheSpace(t *testing.T) {
+	e := newEnv(t, "HUB_ORGS", "on")
+	ctx := context.Background()
+	owner, a := e.signIn("owner@example.com"), e.signIn("a@example.com")
+	sp := owner.newSpace("Команда")
+	join(t, e, owner, a, sp.ID)
+	st := e.db.S()
+	team := &store.Team{SpaceID: sp.ID, Slug: "core", Name: "Core"}
+	if err := st.CreateTeam(ctx, team); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddTeamMember(ctx, team.ID, a.id, true, e.clock()); err != nil {
+		t.Fatal(err)
+	}
+	admin := store.RoleGrant{UserID: a.id, ScopeKind: store.ScopeTenant, ScopeID: sp.ID, Role: store.RoleAdmin}
+	lead := store.RoleGrant{UserID: a.id, ScopeKind: store.ScopeTeam, ScopeID: team.ID, Role: store.RoleLead}
+	for _, g := range []store.RoleGrant{admin, lead} {
+		if _, err := st.Grant(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := e.svc.Owner(ctx, a.id, sp.ID); err != nil {
+		t.Fatalf("a tenant admin who is a member manages the space: %v", err)
+	}
+
+	if r := owner.do("DELETE", "/api/spaces/"+sp.ID+"/members/"+a.id, nil); r.Code != 204 {
+		t.Fatalf("remove: %d %s", r.Code, r.Body)
+	}
+	if left, err := st.GrantsOfUser(ctx, a.id); err != nil || len(left) != 0 {
+		t.Errorf("grants left after the removal: %+v %v", left, err)
+	}
+	if left, err := st.TeamsOfUser(ctx, a.id); err != nil || len(left) != 0 {
+		t.Errorf("team places left after the removal: %+v %v", left, err)
+	}
+	// A grant that outlives the membership all the same (written by an older build, or by hand) gives nothing: neither
+	// the space's management nor Access, which is what the machines' proxy asks before it opens a machine.
+	for _, g := range []store.RoleGrant{admin, lead} {
+		if _, err := st.Grant(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if role, err := e.svc.Access(ctx, a.id, sp.ID); !errors.Is(err, httpx.ErrForbidden) {
+		t.Errorf("access with a grant and no membership: %q %v", role, err)
+	}
+	if err := e.svc.Owner(ctx, a.id, sp.ID); err == nil {
+		t.Error("a grant without membership manages the space")
+	}
+	if r := a.do("PATCH", "/api/spaces/"+sp.ID, map[string]string{"name": "Чужое"}); r.Code != 403 {
+		t.Errorf("patch with a grant and no membership: %d", r.Code)
+	}
+	if r := a.do("GET", "/api/spaces/"+sp.ID+"/members", nil); r.Code != 403 {
+		t.Errorf("members with a grant and no membership: %d", r.Code)
+	}
+}
+
 // join puts guest into a space by a link invitation.
 func join(t *testing.T, e *env, owner, guest *person, spaceID string) {
 	t.Helper()
@@ -952,4 +1012,68 @@ func inTeam(t *testing.T, e *env, teamID, userID string) bool {
 		}
 	}
 	return false
+}
+
+// Every change of who is in a space, or in what role, has its line in the journal of changes, written with the change;
+// a change that was refused has none.
+func TestMembershipChangesAreInTheJournal(t *testing.T) {
+	e := newEnv(t)
+	owner, guest := e.signIn("owner@example.com"), e.signIn("guest@example.com")
+	sp := owner.newSpace("Команда")
+	join(t, e, owner, guest, sp.ID)
+	members := "/api/spaces/" + sp.ID + "/members/"
+	if r := owner.do("PATCH", members+owner.id, map[string]string{"role": "member"}); r.Code != 409 {
+		t.Fatalf("the last owner steps down: %d %s", r.Code, r.Body)
+	}
+	if r := owner.do("PATCH", members+guest.id, map[string]string{"role": "owner"}); r.Code != 200 {
+		t.Fatalf("a second owner: %d %s", r.Code, r.Body)
+	}
+	// the same role again changes nothing and is not written
+	if r := owner.do("PATCH", members+guest.id, map[string]string{"role": "owner"}); r.Code != 200 {
+		t.Fatalf("the same role again: %d %s", r.Code, r.Body)
+	}
+	if r := guest.do("PATCH", members+owner.id, map[string]string{"role": "member"}); r.Code != 200 {
+		t.Fatalf("the first owner becomes a member: %d %s", r.Code, r.Body)
+	}
+	if r := owner.do("DELETE", members+owner.id, nil); r.Code != 204 {
+		t.Fatalf("a member leaves: %d %s", r.Code, r.Body)
+	}
+	if r := guest.do("DELETE", members+guest.id, nil); r.Code != 409 {
+		t.Fatalf("the last owner leaves: %d %s", r.Code, r.Body)
+	}
+	events, err := e.db.S().Audit(context.Background(), store.AuditFilter{SpaceID: sp.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, ev := range events {
+		if ev.ScopeKind != store.ScopeTenant || ev.ScopeID != sp.ID || ev.TargetKind != "user" {
+			t.Errorf("an event of another kind: %+v", ev)
+		}
+		got = append(got, fmt.Sprintf("%s by=%s on=%s %s>%s self=%v", ev.Action, ev.ActorID, ev.TargetID, ev.Before, ev.After, ev.Self))
+	}
+	role := func(r string) string { return `{"tenantRole":"` + r + `"}` }
+	want := []string{
+		fmt.Sprintf("member.add by=%s on=%s >%s self=true", owner.id, owner.id, role("owner")),
+		fmt.Sprintf("member.add by=%s on=%s >%s self=false", owner.id, guest.id, role("member")),
+		fmt.Sprintf("member.role by=%s on=%s %s>%s self=false", owner.id, guest.id, role("member"), role("owner")),
+		fmt.Sprintf("member.role by=%s on=%s %s>%s self=false", guest.id, owner.id, role("owner"), role("member")),
+		fmt.Sprintf("member.remove by=%s on=%s %s> self=true", owner.id, owner.id, role("member")),
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("the journal:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// The number of spaces a person may own is the hub's setting.
+func TestOwnedSpaceCapIsConfigured(t *testing.T) {
+	e := newEnv(t, "HUB_MAX_SPACES_PER_PERSON", "2")
+	a := e.signIn("a@example.com")
+	a.newSpace("Первое")
+	a.newSpace("Второе")
+	if r := a.do("POST", "/api/spaces", map[string]string{"name": "Третье"}); r.Code != 409 || r.reason() != "space_limit" {
+		t.Errorf("over the configured cap: %d %s", r.Code, r.Body)
+	}
 }

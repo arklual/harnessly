@@ -32,9 +32,9 @@ const isFloat = (v: unknown): v is IFloat => {
   return isNumber(f.x) && isNumber(f.y) && isNumber(f.w) && isNumber(f.h);
 };
 
-/** The kept layout, or the column when nothing usable was kept (an older shape, a hand edit). */
-export const parseLayout = (raw: string | null): IAppLayout => {
-  const fallback: IAppLayout = { placement: PLACEMENT.left, float: null };
+/** The kept layout, or `first` (the column) when nothing usable was kept (an older shape, a hand edit). */
+export const parseLayout = (raw: string | null, first: TPlacement = PLACEMENT.left): IAppLayout => {
+  const fallback: IAppLayout = { placement: first, float: null };
   if (raw === null) return fallback;
   try {
     const v: unknown = JSON.parse(raw);
@@ -48,17 +48,18 @@ export const parseLayout = (raw: string | null): IAppLayout => {
   }
 };
 
-export const readLayout = (): IAppLayout => {
+/** The layout kept under `key` (the apps' own by default); `first` where none is kept. */
+export const readLayout = (key: string = KEY, first: TPlacement = PLACEMENT.left): IAppLayout => {
   try {
-    return parseLayout(localStorage.getItem(KEY));
+    return parseLayout(localStorage.getItem(key), first);
   } catch {
-    return parseLayout(null);
+    return parseLayout(null, first);
   }
 };
 
-export const keepLayout = (layout: IAppLayout): void => {
+export const keepLayout = (layout: IAppLayout, key: string = KEY): void => {
   try {
-    localStorage.setItem(KEY, JSON.stringify(layout));
+    localStorage.setItem(key, JSON.stringify(layout));
   } catch {
     // Blocked or full storage: the choice holds while the page is open.
   }

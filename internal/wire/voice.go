@@ -62,12 +62,12 @@ func (s *Server) voice(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), VoiceBudget)
 	defer cancel()
 	body := &countingReader{r: http.MaxBytesReader(w, r.Body, VoiceBodyMax)}
-	text, err := s.Voice(ctx, body, lang, s.voiceEngine())
+	text, err := s.Voice(ctx, body, lang, s.voiceEngine(r))
 	switch {
 	case err == nil && body.n == 0:
 		refuse(w, RefuseBadRequest)
 	case err == nil:
-		s.writeChecked(w, r, Transcript{Text: s.inPersonsWords(text)})
+		s.writeChecked(w, r, Transcript{Text: s.inPersonsWords(r, text)})
 	case errors.Is(err, ErrVoiceUnavailable):
 		refuse(w, RefuseUnsupported)
 	case errors.Is(err, context.DeadlineExceeded):
@@ -97,29 +97,23 @@ func (c *countingReader) Read(p []byte) (int, error) {
 
 // voiceEngine is the recognition model the person picked for dictation (Settings → Voice): a recording sent whole is
 // recognized by the same one as the live dictation, "" (the machine's own) without settings to read.
-func (s *Server) voiceEngine() string {
-	if s.Me == nil {
+func (s *Server) voiceEngine(r *http.Request) string {
+	p, ok := s.personOf(r)
+	if !ok {
 		return ""
 	}
-	me, err := s.Me.Me()
-	if err != nil {
-		return ""
-	}
-	return me.Settings.Voice.Engine
+	return p.Voice.Engine
 }
 
 // inPersonsWords puts the person's own words (Settings → Voice) over what was recognized, as the live dictation does.
 // Without settings to read, or without words, the text stays as heard.
-func (s *Server) inPersonsWords(text string) string {
-	if s.Me == nil || text == "" {
+func (s *Server) inPersonsWords(r *http.Request, text string) string {
+	p, ok := s.personOf(r)
+	if !ok || text == "" || len(p.Voice.Words) == 0 {
 		return text
 	}
-	me, err := s.Me.Me()
-	if err != nil || len(me.Settings.Voice.Words) == 0 {
-		return text
-	}
-	words := make([]dict.Entry, 0, len(me.Settings.Voice.Words))
-	for _, w := range me.Settings.Voice.Words {
+	words := make([]dict.Entry, 0, len(p.Voice.Words))
+	for _, w := range p.Voice.Words {
 		words = append(words, dict.Entry{Word: w.Word, Heard: w.Heard})
 	}
 	return dict.Apply(text, dict.Clean(words))

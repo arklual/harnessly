@@ -2,6 +2,8 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"sort"
@@ -11,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // FeatureGate says whether an organization has a feature on (features.Gate).
@@ -52,29 +55,29 @@ func (s *Service) fleetOn(ctx context.Context, sp store.Space) bool {
 	return s.gate != nil && s.gate.On(ctx, store.OrgKey(sp), features.RuntimeFleet)
 }
 
-// fleet is every machine the person may open now, across the organizations, oldest first within a tenant. onHub keeps
-// only the machines that may answer on the hub's own origin (the workspace, workspace.go), in either mode.
-func (s *Service) fleet(ctx context.Context, userID string, onHub bool) ([]FleetMachine, error) {
+// fleetSpaces is every space the person may see machines of: the ones they are a member of and, for a person who
+// manages an organization from above, its tenants they reach without being a member. With them, the organizations'
+// names by id.
+func (s *Service) fleetSpaces(ctx context.Context, userID string) (map[string]store.Space, map[string]string, error) {
 	st := s.db.S()
 	byID := map[string]store.Space{}
 	mine, err := st.SpacesByUser(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, x := range mine {
 		byID[x.ID] = x.Space
 	}
 	orgs, err := st.OrgsForUser(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	orgName := map[string]string{}
 	for _, o := range orgs {
 		orgName[o.ID] = o.Name
-		// A person who manages an organization from above reaches its tenants without being a member of them.
 		sps, err := st.SpacesByOrg(ctx, o.ID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, sp := range sps {
 			if _, seen := byID[sp.ID]; seen {
@@ -84,6 +87,67 @@ func (s *Service) fleet(ctx context.Context, userID string, onHub bool) ([]Fleet
 				byID[sp.ID] = sp
 			}
 		}
+	}
+	return byID, orgName, nil
+}
+
+// fleetEvents is the workspace page's live channel (GET /api/v2/machines/events, events.FleetBus): it says when the
+// answer of GET /api/v2/machines may have changed, and nothing else. Without the flag for any of the person's spaces
+// there is no fleet and no stream, as with the list.
+func (s *Service) fleetEvents(w http.ResponseWriter, r *http.Request, u store.User) {
+	watched := func(ctx context.Context) ([]string, error) {
+		byID, _, err := s.fleetSpaces(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]string, 0, len(byID))
+		for id := range byID {
+			ids = append(ids, id)
+		}
+		return ids, nil
+	}
+	if s.fleetBus == nil {
+		httpx.WriteError(w, r, httpx.ErrNotFound)
+		return
+	}
+	byID, _, err := s.fleetSpaces(r.Context(), u.ID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	on := false
+	ids := make([]string, 0, len(byID))
+	for id, sp := range byID {
+		ids = append(ids, id)
+		on = on || s.fleetOn(r.Context(), sp)
+	}
+	if !on {
+		httpx.WriteError(w, r, errFleetOff)
+		return
+	}
+	sub := s.fleetBus.Subscribe(u.ID, ids)
+	if sub == nil {
+		httpx.WriteError(w, r, httpx.New(http.StatusServiceUnavailable, "unavailable", "Сервер перезапускается"))
+		return
+	}
+	s.fleetBus.Serve(w, r, sub, watched)
+}
+
+// denied is a refusal (no access, an untrusted machine), as against a failure to find out (the database did not
+// answer): a machine is left out of the list only for a refusal. Leaving it out for a failure made it vanish from the
+// person's list until the next ask, and its chats and favorites with it.
+func denied(err error) bool {
+	var he *httpx.Error
+	return errors.As(err, &he)
+}
+
+// fleet is every machine the person may open now, across the organizations, oldest first within a tenant. onHub keeps
+// only the machines that may answer on the hub's own origin (the workspace, workspace.go), in either mode.
+func (s *Service) fleet(ctx context.Context, userID string, onHub bool) ([]FleetMachine, error) {
+	st := s.db.S()
+	byID, orgName, err := s.fleetSpaces(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
 	spaces := make([]store.Space, 0, len(byID))
 	for _, sp := range byID {
@@ -111,10 +175,18 @@ func (s *Service) fleet(ctx context.Context, userID string, onHub bool) ([]Fleet
 				continue
 			}
 			if _, err := s.admit(ctx, userID, m.ID); err != nil {
-				continue // no access, an untrusted machine: it is not there for this person
+				if denied(err) {
+					continue // no access, an untrusted machine: it is not there for this person
+				}
+				return nil, err
 			}
-			if onHub && s.trustedOnHub(ctx, m) != nil {
-				continue
+			if onHub {
+				if err := s.trustedOnHub(ctx, m); err != nil {
+					if denied(err) {
+						continue
+					}
+					return nil, err
+				}
 			}
 			f := FleetMachine{
 				ID: m.ID, Name: m.Name, Host: m.Hostname, OrgID: sp.OrgID, OrgName: orgName[sp.OrgID],
@@ -153,24 +225,37 @@ func (s *Service) meMachines(w http.ResponseWriter, r *http.Request, p *auth.Pri
 	return nil
 }
 
-// v2Machine is the runtime's Machine (web/app/next/protocol/v2.ts) plus where the machine belongs. The runtime fills
-// in what only the machine knows (its runtime and agents) from its own welcome.
+// v2Machine is the runtime's Machine (web/app/next/protocol/v2.ts) plus where the machine belongs. HRN-1036: its agents
+// are what the machine last said of them (machine_cards), whatever it does now; features and usage too, and hangs says
+// that it is on but its runtime did not answer a moment ago. The runtime takes the machine's own welcome over them.
 type v2Machine struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Host       string   `json:"host"`
-	Reach      string   `json:"reach"`
-	LastSeenAt *int64   `json:"lastSeenAt"`
-	Runtime    any      `json:"runtime"`
-	Agents     []string `json:"agents"`
-	OrgID      string   `json:"orgId"`
-	OrgName    string   `json:"orgName"`
-	Tenant     string   `json:"tenant"`
-	Mine       bool     `json:"mine"`
+	ID         string          `json:"id"`
+	Name       string          `json:"name"`
+	Host       string          `json:"host"`
+	Reach      string          `json:"reach"`
+	LastSeenAt *int64          `json:"lastSeenAt"`
+	Runtime    any             `json:"runtime"`
+	Agents     json.RawMessage `json:"agents"`
+	Features   []wire.Feature  `json:"features,omitempty"`
+	Usage      json.RawMessage `json:"usage,omitempty"`
+	Hangs      bool            `json:"hangs,omitempty"`
+	OrgID      string          `json:"orgId"`
+	OrgName    string          `json:"orgName"`
+	Tenant     string          `json:"tenant"`
+	Mine       bool            `json:"mine"`
 }
 
-func (s *Service) v2List(w http.ResponseWriter, r *http.Request, userID string, onHub bool) {
-	list, err := s.fleet(r.Context(), userID, onHub)
+func (s *Service) v2List(w http.ResponseWriter, r *http.Request, u store.User, onHub bool) {
+	list, err := s.fleet(r.Context(), u.ID, onHub)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	ids := make([]string, len(list))
+	for i, f := range list {
+		ids[i] = f.ID
+	}
+	cards, err := s.cards(r.Context(), ids)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -184,9 +269,16 @@ func (s *Service) v2List(w http.ResponseWriter, r *http.Request, userID string, 
 		case "offline":
 			reach = "unreachable"
 		}
-		out = append(out, v2Machine{ID: f.ID, Name: f.Name, Host: f.Host, Reach: reach, LastSeenAt: f.LastSeenAt, Agents: []string{},
+		c := cards[f.ID]
+		agents := c.agents
+		if agents == nil {
+			agents = json.RawMessage("[]")
+		}
+		out = append(out, v2Machine{ID: f.ID, Name: f.Name, Host: f.Host, Reach: reach, LastSeenAt: f.LastSeenAt, Agents: agents,
+			Features: c.features(), Usage: c.usage, Hangs: f.Online && s.hangs(f.ID),
 			OrgID: f.OrgID, OrgName: f.OrgName, Tenant: f.Tenant, Mine: f.Mine})
 	}
+	s.refreshCards(r.Host, u, list)
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
@@ -250,12 +342,14 @@ func personal(list []FleetMachine) []FleetMachine {
 	return out
 }
 
-// hangs: the machine did not give its page settings when last asked, a moment ago (machineSettings).
+// hangs: the machine did not give its page settings when last asked, a moment ago (machineSettings), or its card when
+// last asked (askCard).
 func (s *Service) hangs(id string) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	c, ok := s.pages[id]
-	return ok && c.missed && s.now().Before(c.until)
+	settings := ok && c.missed && s.now().Before(c.until)
+	s.mu.Unlock()
+	return settings || s.cardHangs(id)
 }
 
 // serveFleet answers /api/v2/…: the list of machines itself, anything else for the machine named by ?machine=.
@@ -297,12 +391,20 @@ func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User
 	}
 	q := r.URL.Query()
 	id := q.Get("machine")
+	if r.URL.Path == "/api/v2/machines/events" && id == "" {
+		if r.Method != http.MethodGet {
+			httpx.WriteError(w, r, httpx.ErrNotFound)
+			return
+		}
+		s.fleetEvents(w, r, u)
+		return
+	}
 	if r.URL.Path == "/api/v2/machines" && id == "" {
 		if r.Method != http.MethodGet {
 			httpx.WriteError(w, r, httpx.ErrNotFound)
 			return
 		}
-		s.v2List(w, r, u.ID, onHub)
+		s.v2List(w, r, u, onHub)
 		return
 	}
 	if id == "" && clusterPath(r.URL.Path) {

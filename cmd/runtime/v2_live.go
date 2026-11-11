@@ -22,6 +22,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/catalog"
+	"github.com/ly-solutions/harnessly/internal/chatmove"
+	"github.com/ly-solutions/harnessly/internal/chatwork"
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/design"
@@ -35,6 +37,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/prompts"
 	"github.com/ly-solutions/harnessly/internal/providers"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/sessionmeta"
 	"github.com/ly-solutions/harnessly/internal/shots"
 	"github.com/ly-solutions/harnessly/internal/sources"
@@ -70,15 +73,24 @@ type v2Live struct {
 	designly   *v2Designly  // nil when the core cannot start agents
 	// delegation is the agents' delegation of chats to other agents (v2_delegate.go).
 	delegation *delegation.Service
+	// resume is the move service when the chats' resume snapshots are on (chat_resume.go), else nil.
+	resume *chatmove.Service
 	// profiles keeps the keys of the backend profiles (Kimi, GLM, Grok) in <DataDir>/providers.
 	profiles *providers.Store
+	// work registers the chats' work in git (chat_work.go).
+	work *chatwork.Observer
 
 	ready    atomic.Bool
+	settled  atomic.Bool // the first take-over of the tabs and projects is done (chats_ready.go)
 	kick     chan struct{}
 	cancel   context.CancelFunc
 	wg       sync.WaitGroup
 	attached map[string]attachedAs // only the sync loop touches it
-	heads    launch.Headlines      // the transcripts' titles, as Legacy reads them
+	// ses finds an agent's session by its id; finding are the conversations whose session is being looked up now
+	// (v2_transcript.go).
+	ses     *v2Sessions
+	finding sync.Map
+	heads   launch.Headlines // the transcripts' titles, as Legacy reads them
 }
 
 type attachedAs struct{ transcript, agentSession string }
@@ -151,12 +163,14 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.starter = &v2Launcher{v: v}
 	uploads := &wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads"), Limits: wire.DefaultLimits}
 	ses := newV2Sessions(d.Home, func() map[string]string { return v.rt.AttachedSessions() })
+	v.ses = ses
 	publisher := autoOpenPublisher{hub: v.hub, watch: v.newPaneWatcher()}
 	if d.BrowserTools != nil {
 		publisher.browser = d.BrowserTools.Access
 	}
 	// The terminals are stopped by tmux and /proc; without tmux there is nothing to stop.
 	runtimeSettings := &wire.FileRuntimeSettings{Path: filepath.Join(d.DataDir, "v2", "runtime-settings.json")}
+	idleFloor, pressureFloor := sleepFloors(c.cfg.Hooks.Sleep)
 	var terminals convo.Terminals
 	if c.cfg.Tmux != nil {
 		terminals = newV2Stopper(v, c.cfg.Tmux)
@@ -174,10 +188,14 @@ func newV2Live(d deps, c *core) *v2Live {
 	}
 	moveStore := openMoveStore(d)
 	titler := newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"), agentEnvDir(d.DataDir))
-	v.rt = convo.New(convo.Deps{Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Handoffs: handoffs,
-		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: newV2Summarizer(titler, filepath.Join(d.DataDir, "v2", "turn-summaries")).Summarize, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
+	var noticesRT atomic.Pointer[convo.Runtime]
+	notices := newChatNotices(c, &noticesRT)
+	v.rt = convo.New(convo.Deps{Notify: notices.notice, Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Input: codexInputOf(c), Handoffs: handoffs,
+		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{Index: c.transcripts}, Transcripts: c.transcripts, Shots: &shots.Reader{Index: c.transcripts}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: newV2Summarizer(titler, filepath.Join(d.DataDir, "v2", "turn-summaries")).Summarize, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
+		IdleFloor: idleFloor, MemoryShort: memoryShort, PressureStop: pressureFloor, LegacyLife: !sessionOwnerOn(os.Getenv),
 		TerminalOff: chatGuard.Off,
+		PaneLinks:   paneLinks(os.Getenv),
 		AppsOK:      appsOK(apps.Open(d.DataDir)),
 		AppsLive:    liveAppsOf.changeIsLive,
 		AlwaysApps:  alwaysApps(apps.Open(d.DataDir)),
@@ -191,9 +209,15 @@ func newV2Live(d deps, c *core) *v2Live {
 		LimitReset: func(p wire.Provider, now time.Time) wire.Ms {
 			return wire.Ms(limits.ExhaustedReset(c.limits.Read()[string(p)], float64(now.Unix())) * 1000)
 		}})
+	noticesRT.Store(v.rt)
+	if c.agents != nil && c.agents.codexInput != nil {
+		c.agents.codexInput.rt.Store(v.rt)
+	}
 	v.delegation = newDelegation(v, runtimeSettings)
 	v.srv = v2Server(d, v.hub, v.rt, v.machine, features, false)
 	v.srv.Uploads = uploads
+	v.work = newChatWork(v)
+	v.srv.Work = v.work.Reg
 	if terminals != nil {
 		v.srv.RuntimeSettings = runtimeSettings
 	}
@@ -208,11 +232,16 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.SideChat = sc.Serve
 	if c.launcher != nil && c.agents != nil {
 		if svc := newV2Move(d, v.rt, v.machine, moveStore); svc != nil {
+			if svc.Resume = newChatResume(d); svc.Resume != nil {
+				v.resume = svc
+			}
 			v.srv.Move = svc.Handler()
 		}
 	}
 	v.srv.HandoffDraft = (&v2Handoff{rt: v.rt, runtimeFile: os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")}).Draft
-	v2f := &v2Files{record: v.rt.Record, touched: v.rt.Touched, delivered: v.rt.Delivered, access: workspaceAccess(d)}
+	// The start page's pane browses the machine's own place without a chat (wire.HomeConv).
+	place := homeRecord(homePlace(d), v.rt.Record)
+	v2f := &v2Files{record: place, touched: v.rt.Touched, delivered: v.rt.Delivered, access: workspaceAccess(d)}
 	v.srv.Files = v2f
 	v.srv.Download = v2f.ServeDownload
 	v.srv.GitSide = v2f.ServeGitSide
@@ -236,7 +265,13 @@ func newV2Live(d deps, c *core) *v2Live {
 			return nil
 		}
 		return madeLibrary{d: v.designly, person: v.designly.personOf(ctx)}
-	}, task: madeTaskOf(handlers.S)}.Made
+	}, task: madeTaskOf(handlers.S), chats: func(ctx context.Context) []wire.Conversation {
+		snap, err := v.rt.Conversations(ctx)
+		if err != nil {
+			return nil
+		}
+		return snap.Conversations
+	}}.Made
 	checker := newMRChecker(handlers.S)
 	targets := panelTargets()
 	targets.Resolve = linkResolver(connectionsFor(d), docsProviderOf(), targets)
@@ -259,7 +294,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		v.srv.Logins = v2Logins(d.Home, cachedPath(c.agents.checker.ShellPath), func(wire.Provider) {
 			// The account changed: the next look at the CLIs is a fresh one, and the page hears it.
 			c.agents.checker.Invalidate()
-			go v.machine.refresh()
+			safego.Go("machine refresh", func() { v.machine.refresh() })
 		})
 	}
 	v.srv.Context = v.rt.Context
@@ -303,7 +338,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		v.srv.Designly = v.designly
 	}
 	if slices.Contains(features, wire.FeatureTerminal) {
-		v.terms = &v2Terminals{rt: v.rt, tmux: c.cfg.Tmux, term: c.cfg.Term}
+		v.terms = &v2Terminals{rt: v.rt, record: homeRecord(homePlace(d), v.rt.Record), tmux: c.cfg.Tmux, term: c.cfg.Term}
 		v.srv.Terminals = v.terms
 	}
 	return v
@@ -403,22 +438,31 @@ func (v *v2Live) start(ctx context.Context) {
 	}
 	v.ready.Store(true)
 	v.wg.Add(2)
-	go func() { defer v.wg.Done(); v.machine.run(ctx) }()
-	go func() {
+	safego.Go("machine run", func() { defer v.wg.Done(); v.machine.run(ctx) })
+	safego.Go("v2 sync loop", func() {
 		defer v.wg.Done()
 		if n := v.importTabs(); n > 0 {
 			agent.Log("info", "v2: Legacy tabs became conversations", agent.F{K: "count", V: n})
 		}
 		v.importProjects()
+		v.settled.Store(true)
 		v.syncLoop(ctx)
-	}()
+	})
 	if v.designly != nil {
 		v.wg.Add(1)
-		go func() { defer v.wg.Done(); v.designly.backfill(ctx) }()
+		safego.Go("designly backfill", func() { defer v.wg.Done(); v.designly.backfill(ctx) })
 	}
-	v.wg.Add(2)
-	go func() { defer v.wg.Done(); v.serveDelegation(ctx.Done()) }()
-	go func() { defer v.wg.Done(); v.serveAppTools(ctx.Done()) }()
+	if v.resume != nil {
+		v.wg.Add(1)
+		safego.Go("chat resume", func() { defer v.wg.Done(); runChatResume(ctx, v.resume, v.rt.MoveIDs, v.d.DataDir) })
+	}
+	v.wg.Add(3)
+	safego.Go("chat work", func() { defer v.wg.Done(); v.serveWork(ctx.Done()) })
+	safego.Go("delegation", func() { defer v.wg.Done(); v.serveDelegation(ctx.Done()) })
+	safego.Go("app tools", func() { defer v.wg.Done(); v.serveAppTools(ctx.Done()) })
+	if !sessionOwnerOn(os.Getenv) {
+		agent.Log("info", "v2: the chats' sessions are left to the agent tabs' keepers ("+sessionOwnerEnv+"=0)")
+	}
 	agent.Log("info", "v2 started")
 }
 
@@ -465,12 +509,12 @@ func (v *v2Live) layoutTabs() []convo.ImportTab {
 		}
 		titled.Add(1)
 		slots <- struct{}{}
-		go func() {
+		safego.Go("session titles", func() {
 			defer func() { <-slots; titled.Done() }()
 			if h := v.heads.Read(it.TranscriptPath); h.Title != nil && *h.Title != "" {
 				it.Title = *h.Title
 			}
-		}()
+		})
 	}
 	titled.Wait()
 	return out
@@ -559,25 +603,38 @@ func legacyTabOf(record func(string) (wire.Conversation, bool), parse func(strin
 
 // --- the keeper's view, kept in step ---
 
-// syncLoop attaches each conversation to the transcript and agent session the keeper found for its tab, and takes
-// over tabs that appeared in the Legacy pages. Its own goroutine: the keeper's lock is held by the Legacy side for as
+// syncEvery is how often the keeper's view is gone through with nothing that asked for it. A chat learns its
+// transcript from its own hooks (follow), and a hook of a session no chat holds asks for a pass at once (asked); the
+// pass by the clock only catches what the keeper found by itself (its own poll is 30–60 s apart).
+const syncEvery = 30 * time.Second
+
+// syncSettle lets a burst of hooks that asked for a pass settle into one.
+const syncSettle = 300 * time.Millisecond
+
+// syncLoop attaches each conversation whose session is still the tabs' keeper's (LegacyLife) to the transcript and
+// agent session the keeper found for its tab, and takes over tabs that appeared in the Legacy pages. Its own goroutine: the keeper's lock is held by the Legacy side for as
 // long as that side wants.
 func (v *v2Live) syncLoop(ctx context.Context) {
-	t := time.NewTicker(2 * time.Second)
+	syncPasses(ctx, v.kick, syncEvery, syncSettle, v.syncOnce)
+}
+
+// syncPasses runs pass when kick asks for it (after settle) and every `every` otherwise, until ctx ends.
+func syncPasses(ctx context.Context, kick <-chan struct{}, every, settle time.Duration, pass func()) {
+	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-		case <-v.kick:
-			select { // let a burst of hooks settle
-			case <-time.After(300 * time.Millisecond):
+		case <-kick:
+			select {
+			case <-time.After(settle):
 			case <-ctx.Done():
 				return
 			}
 		}
-		v.syncOnce()
+		pass()
 	}
 }
 
@@ -594,6 +651,11 @@ func (v *v2Live) syncOnce() {
 		id := v.rt.ConvOfSession(s.TmuxSession)
 		if id == "" {
 			unknown = true
+			continue
+		}
+		if v.rt.OwnsSession(s.TmuxSession) {
+			// A chat that owns its session follows its agent's transcript off the hooks itself (follow), and the
+			// keeper finds none for it any more.
 			continue
 		}
 		now := attachedAs{s.Transcript, s.AgentSessionID}
@@ -638,7 +700,8 @@ func (v *v2Live) hook(session string, ev agents.Event) {
 		v.asked()
 		return
 	}
-	_ = v.rt.Hook(id, convo.Hook{Kind: string(ev.Kind), Notification: ev.NotificationType})
+	v.follow(id, session, ev.AgentSession, "")
+	_ = v.rt.Hook(id, convo.Hook{Kind: string(ev.Kind), Notification: ev.NotificationType, PromptHash: ev.PromptHash})
 }
 
 // permissionRequest holds a Claude PermissionRequest for the conversation of a tmux session, and answers with the hook's
@@ -748,6 +811,10 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 	if err := agents.CheckLaunch(chosen); err != nil {
 		return err
 	}
+	if c.agents.codexInput != nil && req.Provider == wire.ProviderCodex && req.ResumeSessionID == "" && !req.Fork {
+		// A new Codex chat may start beside its app-server; whether it does is the launch line's to decide.
+		chosen.Input = req.ID
+	}
 	if len(req.Apps) > 0 {
 		if chosen == nil {
 			chosen = &agents.Launch{}
@@ -764,10 +831,10 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 		return errors.New(reason)
 	}
 	l.starting.Add(1)
-	go func() {
+	safego.Go("agent launch", func() {
 		defer l.starting.Add(-1)
 		l.start(req, chosen, files)
-	}()
+	})
 	return nil
 }
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/cliversion"
 )
 
 // The keeper of the self-test: when the tests run, what the machine is told, and the Claude Code gate.
@@ -39,15 +40,18 @@ const (
 )
 
 type keeper struct {
-	d       deps
-	run     sync.Mutex // one test at a time: they share the machine with people
-	mu      sync.Mutex
-	state   string // pending | pass | fail
-	checks  []machineCheck
-	judged  map[string]bool // Claude versions this runtime gave a verdict on
-	current string          // the current Claude's version as last tried
-	lastAt  time.Time       // the current Claude's last try
-	alerted map[string]time.Time
+	d   deps
+	run sync.Mutex // one test at a time: they share the machine with people
+	// agentRun is held by the agent's scenario from before it waits for run: a second one does not start over it.
+	agentRun    sync.Mutex
+	cancelAgent context.CancelFunc // cuts the running scenario short (the runtime stops)
+	mu          sync.Mutex
+	state       string // pending | pass | fail
+	checks      []machineCheck
+	judged      map[string]bool // Claude versions this runtime gave a verdict on
+	current     string          // the current Claude's version as last tried
+	lastAt      time.Time       // the current Claude's last try
+	alerted     map[string]time.Time
 	// updater's places; empty: no managed Claude on this machine, no gate
 	statePath, requests string
 	store               string // the folder of the installed copies, claude-<version>
@@ -57,6 +61,8 @@ type keeper struct {
 	// runTerminal runs the terminal's self-test once, sleep waits before it is tried again; nil: the real ones.
 	runTerminal func() []machineCheck
 	sleep       func(time.Duration)
+	// readScreens reads the reference screens and returns the misread ones; nil: the typist's.
+	readScreens func() []string
 }
 
 var selfKeeper = &keeper{state: "pending", judged: map[string]bool{}, alerted: map[string]time.Time{}}
@@ -99,13 +105,21 @@ func (k *keeper) alert(key, text string) {
 // terminalOnce runs the terminal's self-test once.
 func (k *keeper) terminalOnce() []machineCheck {
 	if k.runTerminal != nil {
-		return k.runTerminal()
+		return k.screens(k.runTerminal())
 	}
 	k.run.Lock()
 	defer k.run.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	return newSelftest(k.d.Tmux).run(ctx)
+	return k.screens(newSelftest(k.d.Tmux).run(ctx))
+}
+
+// screens adds the screen's part of the self-test to the terminal's.
+func (k *keeper) screens(checks []machineCheck) []machineCheck {
+	if k.readScreens != nil {
+		return append(checks, screenChecks(k.readScreens(), cliversion.Seen())...)
+	}
+	return withScreenChecks(checks)
 }
 
 func (k *keeper) terminal() {
@@ -140,11 +154,8 @@ func (k *keeper) agentOn(binary string) []machineCheck {
 	if err != nil {
 		return []machineCheck{{ID: "agent_question", Detail: err.Error()}}
 	}
-	k.run.Lock()
-	defer k.run.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
-	defer cancel()
-	return a.run(ctx)
+	checks, _ := k.agentOnce(context.Background(), true, a.run)
+	return checks
 }
 
 // updaterState is what the keeper reads of claude-update.py's state file.
@@ -292,6 +303,7 @@ func versionLess(a, b string) bool {
 
 // startKeeper starts the self-test's loops; the Claude gate only where claude-update.py keeps its state.
 func startKeeper(d deps) {
+	watchCLIVersions(d)
 	if d.Tmux == nil {
 		return
 	}
@@ -301,6 +313,8 @@ func startKeeper(d deps) {
 	k.statePath = env("CLAUDE_UPDATE_STATE", "/var/lib/harnessly/claude-update/state.json")
 	k.requests = env("CLAUDE_UPDATE_REQUESTS", "/run/harnessly-claude-update")
 	k.store = env("CLAUDE_UPDATE_STORE", "/opt/harnessly-profile/bin")
+	// Before any test of this run: what a runtime stopped in the middle of one left behind.
+	k.sweep("start")
 	go func() {
 		time.Sleep(selftestAfterBoot)
 		for {

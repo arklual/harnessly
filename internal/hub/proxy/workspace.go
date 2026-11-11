@@ -18,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
+	"github.com/ly-solutions/harnessly/internal/webstatic"
 )
 
 // The workspace is the runtime's own page served by the hub at /agents/ (flag runtime.fleet): one interface for every
@@ -144,8 +145,15 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 		v.Serve(w, r, vaultsvc.Person{ID: p.User.ID, Email: p.User.Email}, vaultPath.ReplaceAllString(rest, ""))
 		return
 	}
+	if s.serveDocs(w, r, rest) {
+		return
+	}
 	if outboxPath.MatchString(rest) {
 		s.serveOutbox(w, r, p)
+		return
+	}
+	if outboxChatsPath.MatchString(rest) {
+		s.serveOutboxChats(w, r, p)
 		return
 	}
 	if s.voiceTakes && voiceTakesPath.MatchString(rest) {
@@ -202,6 +210,14 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 	u := url.URL{Path: workspaceBase + rest, RawQuery: q.Encode()}
 	clone.URL = &u
 	clone.RequestURI = ""
+	if r.Method == http.MethodGet && platformMachines.MatchString(rest) {
+		// what is left of the agents' subscriptions is kept as it passes, for the page to draw before any
+		// machine answers.
+		tee := &usageTee{ResponseWriter: w}
+		s.forward(tee, clone, p.User, m)
+		s.keepUsage(r.Context(), m.ID, tee)
+		return
+	}
 	s.forward(w, clone, p.User, m)
 }
 
@@ -221,13 +237,7 @@ func (s *Service) workspacePage(w http.ResponseWriter, r *http.Request, u store.
 	frameHeaders(h)
 	name := strings.TrimPrefix(path.Clean("/"+rest), "/")
 	if name != "" && name != "index.html" {
-		if st, err := fs.Stat(s.web, name); err == nil && st.Mode().IsRegular() {
-			if strings.HasPrefix(name, "assets/") {
-				h.Set("Cache-Control", "public, max-age=31536000, immutable")
-			} else {
-				h.Set("Cache-Control", "no-cache")
-			}
-			http.ServeFileFS(w, r, s.web, name)
+		if s.static.Serve(w, r, s.web, name) {
 			return
 		}
 		// An app's page carries its id, and ids are dotted (harnessly.cashback): not a file.
@@ -243,10 +253,7 @@ func (s *Service) workspacePage(w http.ResponseWriter, r *http.Request, u store.
 	}
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-cache")
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		_, _ = w.Write(raw)
-	}
+	webstatic.WriteBody(w, r, raw, nil)
 }
 
 // workspaceIndex is index.html with the hub's base, the workspace's API prefix and the home machine's settings.

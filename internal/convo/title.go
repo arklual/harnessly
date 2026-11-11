@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -99,10 +100,10 @@ func (c *conv) retitle(finish func(wire.CmdResult), now time.Time) {
 	c.titling = true
 	titler, provider := c.d.Titler, c.rec.Provider
 	made := make(chan retitleDone, 1)
-	go func() {
+	safego.Go("convo title", func() {
 		t, err := titler(provider, first, answer)
 		made <- retitleDone{t, err}
-	}()
+	})
 	apply := func(r retitleDone) bool {
 		c.titling = false
 		if r.err != nil || strings.TrimSpace(r.title) == "" {

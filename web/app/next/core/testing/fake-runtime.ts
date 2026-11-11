@@ -312,7 +312,17 @@ export class FakeRuntime {
     if (e.type === 'question_asked') data.questions = [...data.questions, e.question];
     if (e.type === 'permission_requested' || e.type === 'plan_proposed')
       data.permissions = [...data.permissions.filter((p) => p.id !== e.permission.id), e.permission];
-    if (e.type === 'queue_changed') data.queue = e.queue;
+    if (e.type === 'queue_changed') {
+      data.queue = e.queue;
+      if (e.pane) {
+        const have = e.pane.reset ? undefined : data.pane;
+        data.pane = {
+          count: e.pane.count,
+          links: e.pane.links ?? have?.links ?? [],
+          items: [...(have?.items ?? []), ...(e.pane.items ?? [])],
+        };
+      }
+    }
     if (e.type === 'now') {
       const { type: _type, ...now } = e;
       data.now = now;

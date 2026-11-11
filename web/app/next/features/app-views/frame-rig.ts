@@ -16,7 +16,7 @@ const SDK_SRC = readFileSync(new URL('app-sdk.js', sdkDir), 'utf8');
 
 /** The SDK as the view server serves it to a view: a classic script that publishes window.harnessly (views.go classicSDK). */
 export const classicSdk = (): string =>
-  `(function () {\n${SDK_SRC.replaceAll('export async function', 'async function').replaceAll('export class', 'class')}\nglobalThis.harnessly = { connect: connect, HarnesslyError: HarnesslyError };\n})();\n`;
+  `(function () {\n${SDK_SRC.replaceAll('export async function', 'async function').replaceAll('export function', 'function').replaceAll('export class', 'class')}\nglobalThis.harnessly = { connect: connect, HarnesslyError: HarnesslyError, state: state, action: action, screen: screen };\n})();\n`;
 
 /** What the view server does to a page: the nonce's meta and the shim's script first in <head> (views.go injectNonce). */
 export const servePage = (html: string, nonce: string | null): string => {

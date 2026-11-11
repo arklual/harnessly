@@ -157,11 +157,13 @@ func (c *core) resumeConfig() launch.ResumeConfig {
 		}
 		return r.Claude.Installed, r.Claude.BinaryPath != nil
 	}
-	return newResumeConfig(c.cfg.Home, c.cfg.Tmux, installed, sleep.ReadConfig(os.Getenv, c.cfg.Hooks.Sleep), time.Now)
+	rc := newResumeConfig(c.cfg.Home, c.cfg.Tmux, installed, sleep.ReadConfig(os.Getenv, c.cfg.Hooks.Sleep), time.Now)
+	rc.Owned = c.chatOwns
+	return rc
 }
 
 func newResumeConfig(home string, tm launch.ResumeTmux, installed func(string) (bool, bool), rules sleep.Config, now func() time.Time) launch.ResumeConfig {
-	activity := &claude.ActivityReader{}
+	activity := &claude.ActivityReader{Lines: transcriptLines("resume-activity")}
 	claudeDet, codexDet := claude.NewDetector(home), codex.NewDetector(home)
 	return launch.ResumeConfig{
 		Tmux:      tm,
@@ -182,6 +184,12 @@ func newResumeConfig(home string, tm launch.ResumeTmux, installed func(string) (
 			path := claudeDet.FindTranscript(sid)
 			if path == "" {
 				return nil
+			}
+			if st, err := os.Stat(path); err == nil && rules.ResumeRecentMs > 0 {
+				// No line of a transcript is newer than its file: one not written within the window is not read.
+				if ms := float64(st.ModTime().UnixNano()) / 1e6; float64(time.Now().UnixMilli())-ms >= rules.ResumeRecentMs {
+					return &ms
+				}
 			}
 			return activity.At(path)
 		},
@@ -220,7 +228,7 @@ func (c *core) launchRoutes(f *gate.Gate, d deps, isMachineAgent func(*http.Requ
 		deps.Agents = nil
 	}
 	l := &layoutapi.Launch{
-		Starter: c.launcher, Inbox: c.inbox, Headlines: &launch.Headlines{}, MachineAgent: isMachineAgent,
+		Starter: c.launcher, Inbox: c.inbox, Headlines: &launch.Headlines{File: filepath.Join(c.cfg.DataDir, "headlines.json"), Lines: c.transcripts.Follower("headlines", 0)}, MachineAgent: isMachineAgent,
 		SessionCreated: func(s string) int64 { return c.cfg.Tmux.PaneDetail(s).SessionCreated },
 		CodexArgs: func(ws, resume string, l *agents.Launch) (codex.Start, error) {
 			if c.agents == nil {
@@ -228,6 +236,7 @@ func (c *core) launchRoutes(f *gate.Gate, d deps, isMachineAgent func(*http.Requ
 			}
 			return c.agents.CodexArgs(ws, resume, l)
 		},
+		CodexInput: c.agents != nil && c.agents.codexInput != nil,
 		CodexForkArgs: func(ws, session string, l *agents.Launch) (codex.Start, error) {
 			if c.agents == nil {
 				return codex.Start{}, errCoreOff

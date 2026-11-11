@@ -14,7 +14,9 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/hookspool"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/status"
 )
 
@@ -138,6 +140,9 @@ type Config struct {
 	MirrorVisibility func(deviceID string, visible bool)
 	Timings          Timings
 	Log              func(level, msg string, kv ...any)
+	// Spool is the file Claude's status hook leaves its events in before it calls (hookspool); nil applies every event
+	// as it comes. Its Apply is ApplyClaudeHook.
+	Spool *hookspool.Queue
 }
 
 func (c *Config) log(level, msg string, kv ...any) {
@@ -229,7 +234,7 @@ func (c *Config) hook(r *http.Request, body any) (int, any, http.Header) {
 	} else if ok && p == "claude-permission" {
 		return c.permissionHook(r, body)
 	}
-	return c.claudeHook(body)
+	return c.claudeHook(r, body)
 }
 
 // permissionHook holds Claude's PermissionRequest until the person decided; no content leaves it to Claude's dialog.
@@ -245,27 +250,40 @@ func (c *Config) permissionHook(r *http.Request, body any) (int, any, http.Heade
 	return http.StatusOK, answer, nil
 }
 
-func (c *Config) claudeHook(body any) (int, any, http.Header) {
+func (c *Config) claudeHook(r *http.Request, body any) (int, any, http.Header) {
 	f := fields(body)
+	// An event with an id is in the spool too: what the spool holds from before goes first, and the event once.
+	if id, _ := f["id"].(string); id != "" && c.Spool != nil {
+		if !c.Spool.Deliver(id, f) {
+			return answer(r, http.StatusServiceUnavailable, errorBody("hook events are not taken yet"), nil)
+		}
+		return http.StatusNoContent, nil, nil
+	}
+	c.ApplyClaudeHook(f)
+	return http.StatusNoContent, nil, nil
+}
+
+// ApplyClaudeHook is one event of Claude's status hook, as the request or the spool carried it.
+func (c *Config) ApplyClaudeHook(f map[string]any) {
 	event, isEvent := f["event"].(string)
 	session, _ := f["session"].(string)
 	if !isEvent || event == "poll" || session == "" {
-		go c.Keeper.Poll()
-		return http.StatusNoContent, nil, nil
+		safego.Go("hook poll", c.Keeper.Poll)
+		return
 	}
 	nt, _ := f["notificationType"].(string)
 	ev, ok := claude.TranslateHook(event, nt)
 	if !ok {
 		c.log("debug", "unknown claude hook event, ignoring", "event", event, "session", session)
-		return http.StatusNoContent, nil, nil
+		return
 	}
 	var firedAt *float64
 	if at, isNum := f["at"].(float64); isNum && !math.IsInf(at, 0) && !math.IsNaN(at) {
 		firedAt = &at
 	}
 	ev.AgentSession, _ = f["agentSessionId"].(string)
+	ev.PromptHash, _ = f["promptHash"].(string)
 	c.Keeper.HandleProviderEvent(claude.ProviderID, session, ev, firedAt)
-	return http.StatusNoContent, nil, nil
 }
 
 func optPtr(p *string) *status.Opt[string] {

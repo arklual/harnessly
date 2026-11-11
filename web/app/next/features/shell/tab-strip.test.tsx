@@ -75,12 +75,14 @@ const press = (id: string, x: number, pointerType = 'mouse') =>
   act(
     () => void tab(id).dispatchEvent(pointer('pointerdown', x, { pointerType, button: 0, isPrimary: true })),
   );
-// A move is drawn on the next frame.
-const moveTo = (x: number, pointerType = 'mouse') =>
+// A move with the button held is drawn on the next frame.
+const moveTo = (x: number, pointerType = 'mouse', init: PointerEventInit = {}) =>
   act(() => {
-    window.dispatchEvent(pointer('pointermove', x, { pointerType, isPrimary: true }));
+    window.dispatchEvent(pointer('pointermove', x, { pointerType, isPrimary: true, buttons: 1, ...init }));
     vi.advanceTimersByTime(16);
   });
+/** A move with no button held: the release before it was not heard. */
+const hoverTo = (x: number) => moveTo(x, 'mouse', { buttons: 0 });
 /** The let-go tab eases into its place (or back to its own) before anything else happens. */
 const settle = () => act(() => void vi.advanceTimersByTime(200));
 /** A drop the owner did not follow with a new order: the tab goes back and the strip is free again. */
@@ -330,6 +332,107 @@ describe('TabStrip: carrying a tab', () => {
     settle();
     expect(stuck()).toBeFalsy();
     release(275);
+
+    expect(on.onMove).not.toHaveBeenCalled();
+  });
+
+  it('ends the drag on the release: the tab does not follow the pointer after it', () => {
+    const on = mount();
+    layOut();
+    press('a', 50);
+    moveTo(80);
+    moveTo(275);
+    release(275);
+    settle();
+    expect(on.onMove).toHaveBeenCalledTimes(1);
+    expect(list().hasAttribute('data-dragging')).toBe(false);
+    giveUp();
+    // The pointer goes on, with the button held or not: nothing is carried any more.
+    moveTo(390);
+    hoverTo(10);
+    expect(list().hasAttribute('data-dragging')).toBe(false);
+    expect(document.querySelector('[data-dragging]')).toBeNull();
+    expect(tab('a').style.transform).toBe('');
+    expect(on.onMove).toHaveBeenCalledTimes(1);
+  });
+
+  it('puts the tab down on the first move without a button when the release was not heard', () => {
+    const on = mount();
+    layOut();
+    press('a', 50);
+    moveTo(80);
+    moveTo(275);
+    // Let go over the window's frame: no pointerup; the next move comes with no button held.
+    hoverTo(390);
+    expect(list().hasAttribute('data-dragging')).toBe(false);
+    settle();
+    // Put down where it was last carried to, not where the free pointer is now.
+    expect(on.onMove).toHaveBeenLastCalledWith('a', 2);
+    giveUp();
+    hoverTo(10);
+    expect(document.querySelector('[data-dragging]')).toBeNull();
+    expect(tab('a').style.transform).toBe('');
+  });
+
+  it('picks nothing up when the release of a press was not heard before the pointer moved on', () => {
+    const on = mount();
+    layOut();
+    press('b', 150);
+    hoverTo(300);
+    hoverTo(20);
+    expect(list().hasAttribute('data-dragging')).toBe(false);
+    expect(tab('b').style.transform).toBe('');
+    // The next press works as one.
+    press('c', 250);
+    release(250);
+    expect(on.onActivate).toHaveBeenLastCalledWith('c');
+    expect(on.onMove).not.toHaveBeenCalled();
+  });
+
+  it('switches on a click without a move and carries nothing', () => {
+    const on = mount();
+    layOut();
+    press('c', 250);
+    moveTo(252);
+    release(252);
+    fireEvent.click(tab('c'));
+    expect(on.onActivate).toHaveBeenCalledWith('c');
+    expect(on.onMove).not.toHaveBeenCalled();
+    expect(list().hasAttribute('data-dragging')).toBe(false);
+    expect(tab('c').style.transform).toBe('');
+  });
+
+  it('ends the drag when the pointer leaves the window or the list loses it', () => {
+    const on = mount();
+    layOut();
+    const stuck = () =>
+      list().hasAttribute('data-dragging') || document.querySelector('[data-dragging], [data-drop-over]');
+
+    press('a', 50);
+    moveTo(80);
+    moveTo(275);
+    moveTo(275, 'mouse', { clientY: -200 });
+    settle();
+    expect(stuck()).toBeFalsy();
+    expect(tab('a').style.transform).toBe('');
+    release(275);
+
+    press('a', 50);
+    moveTo(80);
+    moveTo(275);
+    act(() => void list().dispatchEvent(pointer('lostpointercapture', 275, { pointerType: 'mouse' })));
+    settle();
+    expect(stuck()).toBeFalsy();
+    moveTo(300);
+    expect(stuck()).toBeFalsy();
+    release(300);
+
+    // Out of the window before the pickup: nothing is picked up.
+    press('b', 150);
+    act(() => void document.documentElement.dispatchEvent(new MouseEvent('mouseleave')));
+    moveTo(300);
+    expect(stuck()).toBeFalsy();
+    release(300);
 
     expect(on.onMove).not.toHaveBeenCalled();
   });

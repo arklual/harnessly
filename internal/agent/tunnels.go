@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,10 +16,18 @@ import (
 // the cluster link. The gateway speaks HTTP and WebSocket through it; the runtime checks the session cookie as usual.
 // Opening is a JSON request on the link; the bytes travel as binary frames: one byte of kind, sixteen of tunnel id,
 // then the payload.
+//
+// A side that opens a tunnel with a window is sent no more than the window until it grants more (FrameWindow): its
+// slow reader holds this tunnel's socket back instead of piling the bytes up at the other end. Without a window the
+// socket is read as fast as the link takes it.
 
 const (
 	FrameData  byte = 1
 	FrameClose byte = 2
+	// FrameWindow grants a tunnel opened with a window more bytes to send: the payload is their number, four bytes.
+	FrameWindow byte = 3
+	// maxWindow bounds what a tunnel is allowed to send ahead, whatever it is granted.
+	maxWindow = 64 << 20
 
 	tunnelIDBytes = 16
 	maxTunnels    = 512
@@ -34,6 +43,16 @@ var tunnelIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 type TunnelOpen struct {
 	TunnelID string `json:"tunnelId"`
 	Target   string `json:"target"`
+	// Window is how many bytes may be sent before the opener grants more; 0: it does not count them.
+	Window int `json:"window,omitempty"`
+}
+
+// tunnelOpened is the answer to an opening: flow tells the opener its window is kept to.
+func tunnelOpened(spec TunnelOpen) map[string]bool {
+	if spec.Window > 0 {
+		return map[string]bool{"opened": true, "flow": true}
+	}
+	return map[string]bool{"opened": true}
 }
 
 func EncodeFrame(kind byte, tunnelID string, payload []byte) []byte {
@@ -45,7 +64,7 @@ func EncodeFrame(kind byte, tunnelID string, payload []byte) []byte {
 }
 
 func DecodeFrame(frame []byte) (kind byte, tunnelID string, payload []byte, ok bool) {
-	if len(frame) < 1+tunnelIDBytes || (frame[0] != FrameData && frame[0] != FrameClose) {
+	if len(frame) < 1+tunnelIDBytes || frame[0] < FrameData || frame[0] > FrameWindow {
 		return 0, "", nil, false
 	}
 	return frame[0], hex.EncodeToString(frame[1 : 1+tunnelIDBytes]), frame[1+tunnelIDBytes:], true
@@ -57,6 +76,44 @@ type tunnel struct {
 	writes chan []byte // nil payload: the cluster ended the connection
 	done   chan struct{}
 	once   sync.Once
+
+	// flow: the tunnel was opened with a window. credit is how many bytes may still be sent; more wakes the reader
+	// waiting for some.
+	flow   bool
+	mu     sync.Mutex
+	credit int
+	more   chan struct{}
+}
+
+// grant adds to what the tunnel may send.
+func (tn *tunnel) grant(n int) {
+	tn.mu.Lock()
+	tn.credit = min(tn.credit+n, maxWindow)
+	tn.mu.Unlock()
+	select {
+	case tn.more <- struct{}{}:
+	default:
+	}
+}
+
+// spend waits until the tunnel may send and takes up to limit bytes of it; 0: the tunnel or its link ended.
+func (tn *tunnel) spend(limit int) int {
+	for {
+		tn.mu.Lock()
+		n := min(tn.credit, limit)
+		tn.credit -= n
+		tn.mu.Unlock()
+		if n > 0 {
+			return n
+		}
+		select {
+		case <-tn.more:
+		case <-tn.done:
+			return 0
+		case <-tn.link.done:
+			return 0
+		}
+	}
 }
 
 func (tn *tunnel) close() {
@@ -117,6 +174,9 @@ func (t *tunnels) OpenAt(l *link, spec TunnelOpen, at int) (start func(), err er
 	conn := c.(*net.TCPConn)
 	_ = conn.SetNoDelay(true)
 	tn := &tunnel{link: l, conn: conn, writes: make(chan []byte, tunnelWrites), done: make(chan struct{})}
+	if spec.Window > 0 {
+		tn.flow, tn.credit, tn.more = true, min(spec.Window, maxWindow), make(chan struct{}, 1)
+	}
 	t.mu.Lock()
 	if _, raced := t.open[spec.TunnelID]; raced || l.closed() {
 		t.mu.Unlock()
@@ -132,7 +192,16 @@ func (t *tunnels) OpenAt(l *link, spec TunnelOpen, at int) (start func(), err er
 func (t *tunnels) reader(id string, tn *tunnel) {
 	buf := make([]byte, tunnelRead)
 	for {
-		n, err := tn.conn.Read(buf)
+		limit := len(buf)
+		if tn.flow {
+			if limit = tn.spend(len(buf)); limit == 0 {
+				break
+			}
+		}
+		n, err := tn.conn.Read(buf[:limit])
+		if tn.flow && n < limit {
+			tn.grant(limit - n)
+		}
 		if n > 0 && !tn.link.sendBinary(EncodeFrame(FrameData, id, buf[:n])) {
 			break
 		}
@@ -183,6 +252,12 @@ func (t *tunnels) Frame(raw []byte) {
 	}
 	t.mu.Unlock()
 	if tn == nil {
+		return
+	}
+	if kind == FrameWindow {
+		if tn.flow && len(payload) == 4 {
+			tn.grant(int(min(binary.BigEndian.Uint32(payload), maxWindow)))
+		}
 		return
 	}
 	if kind == FrameData {

@@ -9,10 +9,12 @@ import Shell, { type IShellProps } from '@/next/bindings/shell';
 import { bootNext, shutdownNext } from '@/next/boot';
 
 const NextEntry = (props: IShellProps) => {
+  // Booted once per mount: the owner may arrive after the first draw (a home machine slow to give the start data), and
+  // the boot finds who is signed in by itself (me), so a late owner is no other person.
   useEffect(() => {
     void bootNext();
     return () => void shutdownNext();
-  }, [props.owner]);
+  }, []);
   return <Shell {...props} />;
 };
 

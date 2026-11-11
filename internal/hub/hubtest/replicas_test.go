@@ -2,9 +2,13 @@ package hubtest_test
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -73,21 +77,55 @@ func TestAnotherReplicaReachesTheMachineThroughTheOwner(t *testing.T) {
 	}
 }
 
-func TestTheHopWantsTheSecret(t *testing.T) {
+// hop sends a call to a replica's hop the way another replica does, signed with secret ("" for no signature at all).
+func hop(t *testing.T, base, secret string, at time.Time) int {
+	t.Helper()
+	const path, body = "/internal/replica/v1/call", `{"machine":"x","op":"ping"}`
+	req, _ := http.NewRequest("POST", base+path, strings.NewReader(body))
+	if secret != "" {
+		stamp := strconv.FormatInt(at.Unix(), 10)
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte("POST\n" + path + "\n" + stamp + "\n" + body))
+		req.Header.Set("X-Replica-Time", stamp)
+		req.Header.Set("X-Replica-Signature", hex.EncodeToString(mac.Sum(nil)))
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	return res.StatusCode
+}
+
+func TestTheHopWantsASignature(t *testing.T) {
 	a, _ := replicas(t)
-	for _, secret := range []string{"", "wrong-secret-0123456789"} {
-		req, _ := http.NewRequest("POST", a.URL+"/internal/replica/v1/call", strings.NewReader(`{"machine":"x","op":"ping"}`))
-		if secret != "" {
-			req.Header.Set("X-Replica-Secret", secret)
+	now := time.Now()
+	if got := hop(t, a.ReplicaURL, replicaSecret, now); got != http.StatusOK {
+		t.Fatalf("a signed call: status %d", got)
+	}
+	for name, got := range map[string]int{
+		"no signature": hop(t, a.ReplicaURL, "", now),
+		"wrong secret": hop(t, a.ReplicaURL, "wrong-secret-0123456789", now),
+		"an old one":   hop(t, a.ReplicaURL, replicaSecret, now.Add(-10*time.Minute)),
+	} {
+		if got != http.StatusForbidden {
+			t.Errorf("%s: status %d", name, got)
 		}
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = res.Body.Close()
-		if res.StatusCode != http.StatusForbidden {
-			t.Errorf("secret %q: status %d", secret, res.StatusCode)
-		}
+	}
+}
+
+func TestThePublicListenerDoesNotServeTheHop(t *testing.T) {
+	a, _ := replicas(t)
+	if got := hop(t, a.URL, replicaSecret, time.Now()); got != http.StatusNotFound {
+		t.Errorf("a signed call on the public listener: status %d, want 404", got)
+	}
+	res, err := http.Get(a.URL + "/internal/replica/v1/tunnel?machine=x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("the tunnel on the public listener: status %d, want 404", res.StatusCode)
 	}
 }
 
@@ -180,8 +218,11 @@ func TestWithoutTheFlagNothingChanges(t *testing.T) {
 	if _, ok := ownerOf(t, s, ag.MachineID); ok {
 		t.Error("the directory must stay empty without the flag")
 	}
-	if r := s.Browser().Do("POST", "/internal/replica/v1/call", nil); r.Code == http.StatusForbidden {
-		t.Error("the hop must not be mounted without the flag")
+	if s.Hub.Internal != nil {
+		t.Error("the hop must not be served without the flag")
+	}
+	if r := s.Browser().Do("POST", "/internal/replica/v1/call", nil); r.Code != http.StatusNotFound {
+		t.Errorf("the hop on the public listener without the flag: status %d, want 404", r.Code)
 	}
 }
 

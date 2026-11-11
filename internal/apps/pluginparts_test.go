@@ -69,7 +69,6 @@ func TestFieldsTheHostDoesNotRunAreRefused(t *testing.T) {
 	}
 	for _, tc := range []struct{ name, extra, path string }{
 		{"icon", `"icon":"x.svg",`, "icon"},
-		{"when", `"when":"a",`, "when"},
 		{"storage", `"storage":{},`, "storage"},
 		{"backend", `"backend":{"url":"https://x.y"},`, "backend"},
 		{"template", `"activation":{"on":["manual"],"template":"t"},`, "activation.template"},
@@ -79,6 +78,10 @@ func TestFieldsTheHostDoesNotRunAreRefused(t *testing.T) {
 		if p := problemAt(ps, tc.path); p == nil || !strings.Contains(p.Message, "not supported yet") {
 			t.Errorf("%s: %v", tc.name, ps)
 		}
+	}
+	// The top-level `when` is refused with the way to a condition: rules by the document's status.
+	if _, ps := ParseManifest([]byte(base(`"when":"a",`))); problemAt(ps, "when") == nil || !strings.Contains(problemAt(ps, "when").Message, "agent.tools.when") {
+		t.Errorf("when: %v", ps)
 	}
 	for _, perm := range []string{"users.read", "sinopia.export"} {
 		_, ps := ParseManifest([]byte(strings.Replace(base(""), `"permissions":[]`, `"permissions":["`+perm+`"]`, 1)))

@@ -180,6 +180,14 @@ A machine's access list is `access: [{ kind: 'user' | 'team', id }]` (set by `PA
 Who passes: an instance administrator, a manager of the tenant (owner or administrator grant), the person who connected
 the machine, anyone on an empty list, a person listed by `user`, and a member of a listed `team`.
 
+**The owner's rule** (rollout switch `own-work`, keyed by the person who opens and the machine; see
+[Own work](own-work.md)). Opening a machine is reading its owner's work, so with the switch on for a person only the
+person who connected the machine and the people and teams it lists let them in: an administrator's or a manager's role
+and an empty list no longer do. The role still *sees* and manages the machine (lists, detail, live events, operations);
+the refusal of opening is 403 `own_work` when a role or an empty list would have let the person in before, and
+`machine_access` otherwise. Peer messages ([Peers](peers.md)) follow the rule without the switch: the receiving runtime
+asks its owner itself.
+
 With `on` the list also decides who *sees* the machine: a person it does not let in gets the machine in no list (the
 tenant's machines, the organization's inventory, the fleet), `GET /api/machines/{id}` answers 404 as for a machine that
 does not exist, and the live events of the machine (`machine`, `machine.op`, `job`, `login`) are checked per person at

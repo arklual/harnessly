@@ -39,6 +39,12 @@ func previewPath(path, id string) bool {
 
 // servePreview forwards a slot by path to the machine without a person: the runtime decides by the key.
 func (s *Service) servePreview(w http.ResponseWriter, r *http.Request, id string) {
+	s.servePreviewOn(w, r, id, false)
+}
+
+// servePreviewOn is servePreview; own says the slot is shown on an origin of its own (slothost.go): there the page needs
+// no sandbox and the answers carry the slot host's headers instead.
+func (s *Service) servePreviewOn(w http.ResponseWriter, r *http.Request, id string, own bool) {
 	m, err := s.db.S().MachineByID(r.Context(), id)
 	if errors.Is(err, store.ErrNotFound) || err == nil && (m.RevokedAt != nil || m.SpaceID == "") {
 		s.previewRefused(w, r, id, httpx.ErrNotFound, func() { httpx.WriteError(w, r, httpx.ErrNotFound) })
@@ -92,7 +98,11 @@ func (s *Service) servePreview(w http.ResponseWriter, r *http.Request, id string
 					res.Header.Add("Set-Cookie", line)
 				}
 			}
-			previewHeaders(res.Header)
+			if own {
+				slotHeaders(res.Header, s.slotFrameOrigins())
+			} else {
+				previewHeaders(res.Header)
+			}
 			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
@@ -235,13 +245,18 @@ var frameRefusalCSP = func() string {
 }()
 
 func serveFrameRefusal(w http.ResponseWriter, r *http.Request, he *httpx.Error) {
+	serveFrameRefusalFor(w, r, he, "'self'")
+}
+
+// serveFrameRefusalFor is serveFrameRefusal for a page that may be framed by ancestors (a CSP source list).
+func serveFrameRefusalFor(w http.ResponseWriter, r *http.Request, he *httpx.Error, ancestors string) {
 	reason := "хаб не пропустил окно к машине: " + he.Message
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-store")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Content-Security-Policy", frameRefusalCSP)
+	h.Set("Content-Security-Policy", strings.Replace(frameRefusalCSP, "frame-ancestors 'self'", "frame-ancestors "+ancestors, 1))
 	w.WriteHeader(he.Status)
 	if r.Method == http.MethodHead {
 		return

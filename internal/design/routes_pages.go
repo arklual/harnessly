@@ -66,6 +66,22 @@ func (a *API) CLIPages(r *http.Request) Answer {
 	}
 	cli := a.L.cfg.Texts.CLI
 	switch Field(body, "action") {
+	case "build":
+		return JSON(r, 200, struct {
+			OK      bool        `json:"ok"`
+			Project string      `json:"project"`
+			Pages   []PageBuild `json:"pages"`
+		}{true, project, a.L.BuildPages(project, page)}, h)
+	case "check":
+		problems := a.L.PageSourceProblems(project)
+		if problems == nil {
+			problems = []PageSourceProblem{}
+		}
+		return JSON(r, 200, struct {
+			OK       bool                `json:"ok"`
+			Project  string              `json:"project"`
+			Problems []PageSourceProblem `json:"problems"`
+		}{len(problems) == 0, project, problems}, h)
 	case "create":
 		title, _ := strField(body, "title")
 		file, _ := strField(body, "file")
@@ -79,5 +95,5 @@ func (a *API) CLIPages(r *http.Request) Answer {
 	case "remove":
 		return answer(a.L.RemovePage(project, page))
 	}
-	return JSON(r, 400, errorBody(locale.Pick("Unknown action: create, rename or remove ("+cli+" design page help)", "Неизвестное действие: create, rename или remove ("+cli+" design page help)")), h)
+	return JSON(r, 400, errorBody(locale.Pick("Unknown action: create, rename, remove, build or check ("+cli+" design page help)", "Неизвестное действие: create, rename, remove, build или check ("+cli+" design page help)")), h)
 }

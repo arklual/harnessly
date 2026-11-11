@@ -120,6 +120,15 @@ describe("the design's current chat", () => {
     expect(goTo).toHaveBeenCalledWith({ kind: 'site', id: 'abc', edit: true }, { replace: true });
   });
 
+  it('takes ?chat= off the screen it names: an app opened as the main thing stays on its object', () => {
+    putList([conv('tab-from', 20)]);
+    goTo.mockClear();
+    const address = { kind: 'app', id: 'harnessly.docs', object: 'plan-x1' } as const;
+    const { result } = renderHook(() => useDesignConv(M, 'app:harnessly.docs/plan-x1', 'tab-from', address));
+    act(() => result.current.pick(null));
+    expect(goTo).toHaveBeenCalledWith(address, { replace: true });
+  });
+
   it('leaves the address alone when it names no chat', () => {
     putList([conv('tab-b', 10)]);
     goTo.mockClear();
@@ -180,5 +189,28 @@ describe("the design's first message", () => {
     expect(creatingStore.has(KEY)).toBe(false);
     expect(designBindingStore.has(KEY)).toBe(false);
     expect(record).not.toHaveBeenCalled();
+  });
+
+  it("records no app object's chat in the library, and hands the chat to the app", async () => {
+    const finish = pendingCreate();
+    const onCreated = vi.fn();
+    record.mockClear();
+    const key = designKey(M, 'app:harnessly.docs');
+    startDesignConv({
+      machine: M,
+      design: 'app:harnessly.docs',
+      key,
+      dir: DIR,
+      choice: null,
+      text: 'hi',
+      attachments: [],
+      onRefused: vi.fn(),
+      unlisted: true,
+      onCreated,
+    });
+    await act(async () => finish('tab-app'));
+    expect(onCreated).toHaveBeenCalledWith('tab-app');
+    expect(record).not.toHaveBeenCalled();
+    expect(designBindingStore.get(key)).toEqual({ id: 'tab-app', fresh: true });
   });
 });

@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/storehub"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // the apps installed for a space open at the hub for its members with every machine off
@@ -42,13 +42,9 @@ func (h *Hub) appsMember(v storehub.AppsViewer) http.HandlerFunc {
 	}
 }
 
-func (h *Hub) spaceApps(v storehub.AppsViewer) func(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	return func(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-		spaceID := r.PathValue("spaceId")
-		if _, err := h.Spaces.Access(r.Context(), p.User.ID, spaceID); err != nil {
-			return err
-		}
-		list, err := v.SpaceApps(r.Context(), spaceID)
+func (h *Hub) spaceApps(v storehub.AppsViewer) tenant.Handler {
+	return func(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+		list, err := v.SpaceApps(r.Context(), t.SpaceID)
 		if err != nil {
 			return err
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/machines"
 	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -26,6 +27,14 @@ import (
 // the machine channel's record. None of it is on the actors' path: the actors ask for it off their goroutines, and
 // the machine channel answers from what it holds.
 
+func init() {
+	// A writer that held a pane past its term lost it: the journal says which pane, for the hang behind it is a fault.
+	typist.OnExpired = func(pane string, held time.Duration) {
+		agent.Log("warn", "v2: a pane's lock was let go for a writer that held it too long", agent.F{K: "session", V: pane},
+			agent.F{K: "heldMs", V: held.Milliseconds()})
+	}
+}
+
 // v2Pane is an agent pane in tmux, typed into the way the Legacy queue types.
 type v2Pane struct {
 	tm      *tmux.Tmux
@@ -33,14 +42,32 @@ type v2Pane struct {
 	// term and tall read a cut dialog with the page's terminal attached; nil term never does.
 	term tmux.Terminal
 	tall *tallCaptures
+	// held is the hold of the pane's lock the keys are bound to (Bind); nil types with no hold.
+	held context.Context
+}
+
+// Bind is the pane for one writer's hold: its keys end with the hold (typist.Binder).
+func (p v2Pane) Bind(held context.Context) typist.Pane {
+	p.held = held
+	return p
+}
+
+func (p v2Pane) keys() tmux.Keys {
+	if p.held == nil {
+		return p.tm.With(context.Background())
+	}
+	return p.tm.With(p.held)
 }
 
 func (p v2Pane) CaptureStyled() (string, bool) { return p.tm.CaptureStyled(p.session) }
 func (p v2Pane) Capture() (string, bool)       { return p.tm.Capture(p.session) }
-func (p v2Pane) Paste(text string) error       { return p.tm.SendBracketedPasteOnly(p.session, text) }
-func (p v2Pane) TypeLine(text string) error    { return p.tm.SendLiteralThenEnter(p.session, text) }
-func (p v2Pane) TypeOnly(text string) error    { return p.tm.SendLiteral(p.session, text) }
-func (p v2Pane) Keys(keys ...string) error     { return p.tm.SendKeySequence(p.session, keys...) }
+func (p v2Pane) Paste(text string) error       { return p.keys().SendBracketedPasteOnly(p.session, text) }
+func (p v2Pane) TypeLine(text string) error    { return p.keys().SendLiteralThenEnter(p.session, text) }
+func (p v2Pane) TypeOnly(text string) error    { return p.keys().SendLiteral(p.session, text) }
+func (p v2Pane) Keys(keys ...string) error     { return p.keys().SendKeySequence(p.session, keys...) }
+
+// Responsive is asked by the typist before the first key of a try (typist.Prober).
+func (p v2Pane) Responsive() error { return p.tm.Responsive(p.session) }
 
 // A permission dialog that does not fit its window gets this much: at 197 columns of command, about 50 lines of it.
 const (
@@ -115,6 +142,14 @@ type v2Tmux struct {
 type doubt struct {
 	noSession, shell bool
 	gen              uint64
+	// sure: the shell was confirmed by a listing of its own, see freshPanes.
+	sure bool
+}
+
+// freshPanes is a tmux whose ReadAllPanes may answer from what its servers' events last said; ReadAllPanesNow lists
+// the panes at this moment, and is false when there is nothing newer to say.
+type freshPanes interface {
+	ReadAllPanesNow() (map[string]tmux.PaneInfo, bool)
 }
 
 // probeTmux is what a look asks tmux.
@@ -161,6 +196,24 @@ func (m *v2Tmux) Pane(session string) typist.Pane {
 	return chatguard.Guarded(v2Pane{tm: m.tm, session: session, term: m.term, tall: &m.tall}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
 }
 
+var _ convo.SessionForgetter = (*v2Tmux)(nil)
+
+// ForgetSession drops what the looks kept of a session nobody looks at any more: its last probe and its last tall
+// capture. The next look of it, if one ever comes, starts as a first look does.
+func (m *v2Tmux) ForgetSession(session string) {
+	m.mu.Lock()
+	delete(m.doubt, session)
+	m.mu.Unlock()
+	m.ForgetScreen(session)
+}
+
+// ForgetScreen drops the tall capture kept of a session whose terminal ended.
+func (m *v2Tmux) ForgetScreen(session string) {
+	m.tall.mu.Lock()
+	delete(m.tall.last, session)
+	m.tall.mu.Unlock()
+}
+
 // Probe: what runs in the session. A look that says "no session" or "a shell" is reported only when the previous look
 // said so too; the first is reported as the agent still running. Looks that read one snapshot are one look: a pane that
 // was a shell a moment ago (the launch line is not typed yet) must not be read twice from the same snapshot and taken
@@ -189,8 +242,20 @@ func (m *v2Tmux) Probe(session string) convo.Probe {
 		// The same snapshot again is the same look: the first sight of the shell is not confirmed by it.
 		return convo.Probe{Session: true, Foreground: true}
 	}
+	if shell && prev.shell && !prev.sure {
+		// Two looks of servers followed by events may be one listing read twice: before the agent is taken for
+		// exited, the panes are listed once more.
+		if f, can := m.prober().(freshPanes); can {
+			if now, listed := f.ReadAllPanesNow(); listed && !tmux.SafeShells[now[session].Command] {
+				m.mu.Lock()
+				m.doubt[session] = doubt{gen: gen}
+				m.mu.Unlock()
+				return convo.Probe{Session: true, Foreground: true}
+			}
+		}
+	}
 	m.mu.Lock()
-	m.doubt[session] = doubt{noSession: !has, shell: shell, gen: gen}
+	m.doubt[session] = doubt{noSession: !has, shell: shell, gen: gen, sure: shell && prev.shell}
 	m.mu.Unlock()
 	switch {
 	case !has && !prev.noSession:
@@ -306,7 +371,7 @@ func (m *liveMachine) Subscribe(load bool, fn func(wire.Event)) (cancel func()) 
 	m.mu.Unlock()
 	stop := make(chan struct{})
 	if load {
-		go func() {
+		safego.Go("machine load", func() {
 			t := time.NewTicker(2 * time.Second)
 			defer t.Stop()
 			for {
@@ -317,7 +382,7 @@ func (m *liveMachine) Subscribe(load bool, fn func(wire.Event)) (cancel func()) 
 					fn(wire.MachineLoadEv{Load: m.readLoad()})
 				}
 			}
-		}()
+		})
 	}
 	var once sync.Once
 	return func() {
@@ -473,7 +538,7 @@ func (m *liveMachine) modelsOf(p wire.Provider) []wire.AgentModel {
 func (m *liveMachine) run(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func() {
+	safego.Go("machine health", func() {
 		defer wg.Done()
 		m.judgeHealth()
 		t := time.NewTicker(machines.HealthEvery)
@@ -486,7 +551,7 @@ func (m *liveMachine) run(ctx context.Context) {
 				m.judgeHealth()
 			}
 		}
-	}()
+	})
 	defer wg.Wait()
 	m.refresh()
 	t := time.NewTicker(30 * time.Second)

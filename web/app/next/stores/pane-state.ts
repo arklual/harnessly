@@ -68,7 +68,7 @@ const isAddress = (v: unknown): boolean => {
 
 const SIMPLE_KINDS: ReadonlySet<string> = new Set(['side', 'plan', 'machine', 'agent-browser']);
 
-const isPaneTab = (v: unknown): v is TTab => {
+export const isPaneTab = (v: unknown): v is TTab => {
   if (!isRecord(v) || !isString(v.id) || !isString(v.kind)) return false;
   if (SIMPLE_KINDS.has(v.kind)) return true;
   switch (v.kind) {

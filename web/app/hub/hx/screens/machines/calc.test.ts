@@ -5,6 +5,7 @@ import {
   applyOverlay,
   canOpen,
   cleanName,
+  countByServers,
   cardSub,
   chatsText,
   deltaOf,
@@ -12,6 +13,7 @@ import {
   filterOptions,
   filterTenants,
   flatRows,
+  foldGroups,
   groupLimit,
   groupSt,
   groupWeek,
@@ -28,6 +30,7 @@ import {
   rowSub,
   rubOf,
   searchGroups,
+  serverRows,
   statusOf,
   sizeText,
   snapStop,
@@ -479,5 +482,88 @@ describe('rename and open', () => {
   it('does not open a machine the hub only watches', () => {
     expect(canOpen(machine({ state: 'online', opensRuntime: false }))).toBe(false);
     expect(canOpen(machine({ state: 'online', opensRuntime: true }))).toBe(true);
+  });
+});
+
+describe('a server and its seats', () => {
+  const anya = machine({ id: 'a', name: 'dev-anya', host: 'dev.example.com', chats: 2, cpu: 40, disk: 91 });
+  const boris = machine({
+    id: 'b',
+    name: 'dev-boris',
+    ownerName: 'Борис',
+    host: 'dev.example.com',
+    state: 'offline',
+    since: hoursAgo(3),
+    chats: null,
+    cpu: null,
+    ram: null,
+    disk: null,
+    weekCostUsd: 14,
+    weekChats: 9,
+    runnerVersion: '1.1.0',
+    runnerOutdated: true,
+  });
+  const alone = machine({ id: 'c', name: 'build-01', host: 'build.example.com' });
+  const noHost = machine({ id: 'd', name: 'old-01' });
+  const elsewhere = machine({ id: 'e', name: 'dev-other', host: 'dev.example.com', tenantId: 't2' });
+
+  it('folds the seats of one hostname in a tenant and leaves the rest as machines', () => {
+    const rows = serverRows([anya, alone, boris, noHost, elsewhere]);
+    expect(
+      rows.map((r) => (r.kind === 'server' ? `server:${r.s.seats.map((m) => m.id).join('+')}` : r.m.id)),
+    ).toEqual(['server:a+b', 'c', 'd', 'e']);
+  });
+
+  it('tells the load once and adds up the chats and the money', () => {
+    const [row] = serverRows([anya, boris]);
+    if (row?.kind !== 'server') throw new Error('want a server');
+    expect(row.s.server).toMatchObject({
+      name: 'dev',
+      state: 'online',
+      chats: 2,
+      cpu: 40,
+      disk: 91,
+      weekCostUsd: 100,
+      weekChats: 50,
+      runnerVersion: 'разные',
+      runnerOutdated: true,
+      purpose: '2 места: Аня, Борис',
+    });
+  });
+
+  it('is off only when every seat is', () => {
+    const off = { state: 'offline' as const, since: hoursAgo(5) };
+    const [row] = serverRows([{ ...anya, ...off }, boris]);
+    expect(row?.kind === 'server' && row.s.server.state).toBe('offline');
+    expect(row?.kind === 'server' && row.s.server.since).toBe(hoursAgo(3));
+    const [gone] = serverRows([
+      { ...anya, state: 'disabled' },
+      { ...boris, state: 'disabled' },
+    ]);
+    expect(gone?.kind === 'server' && gone.s.server.state).toBe('disabled');
+  });
+
+  it('counts servers in the tiles and the heads of the groups', () => {
+    const list: MachinesList = {
+      summary: summary({ total: 3, online: 2, idleWeek: 0, offline: 1, outdatedRunners: 1 }),
+      groups: [group({ total: 3, online: 2, offline: 1 }, [anya, boris, alone])],
+      tenants: [],
+      mlCoreUrl: null,
+    };
+    const next = countByServers(list);
+    expect(next.summary).toMatchObject({ total: 2, online: 2, offline: 0, outdatedRunners: 1 });
+    expect(next.groups[0]).toMatchObject({ total: 2, online: 2, offline: 0 });
+    expect(next.groups[0]?.machines).toHaveLength(3);
+    expect(foldGroups(list.groups)[0]?.machines.map((m) => m.name)).toEqual(['dev', 'build-01']);
+  });
+
+  it('returns the same list when every machine has a server of its own', () => {
+    const list: MachinesList = {
+      summary: summary(),
+      groups: [group({}, [alone, noHost])],
+      tenants: [],
+      mlCoreUrl: null,
+    };
+    expect(countByServers(list)).toBe(list);
   });
 });

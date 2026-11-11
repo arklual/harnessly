@@ -131,6 +131,9 @@ const claudeMsg = "Плагины и настройки Claude подключа�
 // appMsg: an app works in every chat of the people it reaches, with the rights it asks.
 const appMsg = "Приложения в окружение ставит админ организации"
 
+// packMsg: a pack brings hooks that run with every tool call and tools on the PATH of every chat.
+const packMsg = "Пакеты окружения ставит админ организации"
+
 // CheckConsent refuses the items only an organization admin may write: an access, and a script that takes secrets from
 // the safe. It is asked for every item a team or a tenant owns.
 func CheckConsent(kind string, src json.RawMessage) error {
@@ -141,6 +144,8 @@ func CheckConsent(kind string, src json.RawMessage) error {
 		return httpx.Invalid("kind", claudeMsg)
 	case store.CatalogApp:
 		return httpx.Invalid("kind", appMsg)
+	case store.CatalogPack:
+		return httpx.Invalid("kind", packMsg)
 	case store.CatalogScript:
 		var s struct {
 			Secrets []string `json:"secrets"`
@@ -240,6 +245,11 @@ func (s *Service) addCatalog(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		}
 		if !ValidKind(in.Kind) {
 			return httpx.Invalid("kind", kindsRu)
+		}
+		if in.Kind == store.CatalogPack {
+			if err := s.feature(r.Context(), q.w.org.ID, FeaturePacks); err != nil {
+				return err
+			}
 		}
 		name, err := CleanText("name", deref(in.Name), maxNameRunes, true)
 		if err != nil {
@@ -344,6 +354,11 @@ func (s *Service) patchCatalog(w http.ResponseWriter, r *http.Request, p *auth.P
 			}
 		}
 		if in.Source != nil {
+			if c.Kind == store.CatalogPack {
+				if err := s.feature(r.Context(), q.w.org.ID, FeaturePacks); err != nil {
+					return err
+				}
+			}
 			src, err := CleanSource(c.Kind, in.Source)
 			if err != nil {
 				return err

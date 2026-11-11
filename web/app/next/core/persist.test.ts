@@ -1,8 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { idbKV, memoryKV, startPersistence, type Persistence } from '@/next/core/persist';
+import {
+  FEED_KEPT_MS,
+  FEEDS_DELAY_MS,
+  FEEDS_KEPT_MAX,
+  feedsToDrop,
+  feedsToRestore,
+  idbKV,
+  memoryKV,
+  startPersistence,
+  type KV,
+  type Persistence,
+} from '@/next/core/persist';
 import { hub } from '@/next/core/realtime/hub';
 import { batch } from '@/next/core/store';
-import { FakeRuntime, type FakeSocket } from '@/next/core/testing/fake-runtime';
+import { fixture, FakeRuntime, type FakeSocket } from '@/next/core/testing/fake-runtime';
 import { bootFake, settle, useFakeTime } from '@/next/core/testing/setup';
 import { resetCore } from '@/next/core/testing/reset';
 import { setFetch } from '@/next/core/net/http';
@@ -12,7 +23,7 @@ import { MEMORY_CHATS, recentConversations, touchConversation } from '@/next/sto
 import { applyStep, ensureFeed, entryStore, feedStore, key } from '@/next/stores/conversation';
 import { draftsStore, setDraft } from '@/next/stores/drafts';
 import { applyMessage, messagesStore } from '@/next/stores/messages';
-import type { ClientFrame, ConvId } from '@/next/protocol/v2';
+import type { ClientFrame, ConvEvent, ConvId, Entry } from '@/next/protocol/v2';
 
 const CONV = 'tab-k3Jx9QmZ' as ConvId;
 const CH = `conv:${CONV}` as const;
@@ -164,6 +175,117 @@ describe('F5', () => {
     await vi.advanceTimersByTimeAsync(100);
     await settle();
     expect(kv.dump().drafts.get(CONV)).toEqual({ text: 'ab', attachments: [] });
+  });
+});
+
+describe('what the cache writes, and when', () => {
+  /** A new step of the live turn: the feed changes as it does while the agent answers. */
+  const step = (n: number): ConvEvent => {
+    const e = fixture<{ e: Extract<ConvEvent, { type: 'step' }> }>('ev.step').e;
+    return { ...e, entry: { ...e.entry, id: `x:${40000 + n}#0`, at: e.entry.at + n } as Entry, counts: null };
+  };
+  /** A store that tells which cached chats were written. */
+  const watched = () => {
+    const kv = memoryKV();
+    const feeds: string[] = [];
+    const convs: string[] = [];
+    const spy: KV = {
+      ...kv,
+      set: async (area, k, v) => {
+        if (area === 'feeds') feeds.push(k);
+        if (area === 'convs') convs.push(k);
+        await kv.set(area, k, v);
+      },
+    };
+    return { kv, spy, feeds, convs };
+  };
+
+  it('while the agent answers, the chat is written once in five seconds, and only that chat', async () => {
+    const { spy, feeds } = watched();
+    const rt = new FakeRuntime();
+    const { m } = await bootFake({ rt });
+    persistence = startPersistence(spy);
+    await persistence.ready;
+    const release = hub.openConversation(m, CONV);
+    await settle();
+    await persistence.flushNow();
+    feeds.length = 0;
+    for (let i = 1; i <= 20; i++) {
+      rt.emit(CH, step(i));
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    // Ten seconds of an answer: two writes, both of the chat that changed.
+    expect(feeds).toEqual([CONV, CONV]);
+    expect(FEEDS_DELAY_MS).toBeGreaterThanOrEqual(5000);
+    // Leaving the page writes what waits at once.
+    rt.emit(CH, step(21));
+    await persistence.flushNow();
+    expect(feeds).toEqual([CONV, CONV, CONV]);
+    release();
+  });
+
+  it('leaves alone what another window keeps, and lets go only what is old', async () => {
+    const { kv, spy } = watched();
+    const { m } = await bootFake();
+    persistence = startPersistence(spy);
+    await persistence.ready;
+    // Another window of the same browser keeps a chat this page never opened; a third one was kept long ago.
+    await kv.set('feeds', 'tab-elsewhere', { convId: 'tab-elsewhere', rank: 0, at: Date.now() });
+    await kv.set('feeds', 'tab-forgotten', {
+      convId: 'tab-forgotten',
+      rank: 1,
+      at: Date.now() - FEED_KEPT_MS - 1,
+    });
+    const release = hub.openConversation(m, CONV);
+    await settle();
+    await persistence.flushNow();
+    expect([...kv.dump().feeds.keys()].sort()).toEqual([CONV, 'tab-elsewhere'].sort());
+    release();
+  });
+
+  it('only the list of the machine something changed on is written', async () => {
+    const { conversationsStore } = await import('@/next/stores/conversations');
+    const { spy, convs } = watched();
+    const { m } = await bootFake();
+    persistence = startPersistence(spy);
+    await persistence.ready;
+    await persistence.flushNow();
+    convs.length = 0;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(convs).toEqual([]);
+    const c = conversationsStore.get(CONV)!;
+    for (let i = 1; i <= 8; i++) {
+      conversationsStore.set(CONV, { ...c, title: `title ${i}` });
+      await vi.advanceTimersByTimeAsync(1000);
+    }
+    expect(convs).toEqual([`list:${m}`]);
+  });
+
+  it('lets go by age and by count, never by «not in my list»', () => {
+    const now = 1_000_000_000_000;
+    const fresh = (k: string, ago: number) => [k, { at: now - ago }] as const;
+    expect(feedsToDrop([fresh('a', 1000), fresh('b', FEED_KEPT_MS + 1)], [], now)).toEqual(['b']);
+    const many = Array.from({ length: FEEDS_KEPT_MAX + 2 }, (_, i) => fresh(`c${i}`, i * 1000));
+    expect(feedsToDrop(many, [], now)).toEqual([`c${FEEDS_KEPT_MAX}`, `c${FEEDS_KEPT_MAX + 1}`]);
+    // What an older page kept has no time: it stays only while this page keeps that chat itself.
+    const legacy = [
+      ['mine', {}],
+      ['theirs', {}],
+    ] as const;
+    expect(feedsToDrop(legacy, ['mine'], now)).toEqual(['theirs']);
+  });
+
+  it('takes back the six written last, the most recent one last', () => {
+    const kept = Array.from({ length: 9 }, (_, i) => ({ convId: `c${i}`, rank: 0, at: 100 + i }));
+    const legacy = { convId: 'old', rank: 0 };
+    const back = feedsToRestore([legacy, ...kept] as never);
+    expect(back.map((f) => f.convId)).toEqual(['c3', 'c4', 'c5', 'c6', 'c7', 'c8']);
+    expect(
+      feedsToRestore([
+        { convId: 'r1', rank: 1 },
+        { convId: 'r0', rank: 0 },
+      ] as never).map((f) => f.convId),
+    ).toEqual(['r1', 'r0']);
   });
 });
 

@@ -150,7 +150,7 @@ type EnvSetupState struct {
 
 // IsSetupKind says whether the machine (the runtime) does something with an item of this kind besides the chats.
 func IsSetupKind(kind string) bool {
-	return kind == EnvKindScript || kind == EnvKindAccess || kind == EnvKindRepo || IsClaudeKind(kind) || kind == EnvKindApp
+	return kind == EnvKindScript || kind == EnvKindAccess || kind == EnvKindRepo || IsClaudeKind(kind) || kind == EnvKindApp || kind == EnvKindPack
 }
 
 // IsClaudeKind says whether the kind changes the person's Claude Code (FeatureEnvClaude).

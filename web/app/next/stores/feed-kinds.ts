@@ -1,10 +1,11 @@
 // «Что показывать в ленте» (Settings → General): which things a turn made get a card under its answer. This browser's,
 // as the theme and the pane's own switch are. The plain files are off unless the person turns them on (what
-// the agent made matters, not that it wrote a file).
+// the agent made matters, not that it wrote a file). `mrDone` is the block of the chat's merge requests under a
+// finished task.
 import { useSyncExternalStore } from 'react';
 import { OUTPUT_KINDS } from '@/next/protocol/v2';
 
-export const FEED_KINDS = [...OUTPUT_KINDS, 'file'] as const;
+export const FEED_KINDS = [...OUTPUT_KINDS, 'file', 'mrDone'] as const;
 export type FeedKind = (typeof FEED_KINDS)[number];
 export type FeedKinds = Readonly<Record<FeedKind, boolean>>;
 
@@ -18,6 +19,7 @@ export const DEFAULT_FEED_KINDS: FeedKinds = {
   stand: true,
   delivery: true,
   file: false,
+  mrDone: true,
 } as const satisfies Record<FeedKind, boolean>;
 
 const listeners = new Set<() => void>();

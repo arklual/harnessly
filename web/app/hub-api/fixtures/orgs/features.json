@@ -44,6 +44,21 @@
       "name": "efficiency",
       "enabled": false,
       "forced": false
+    },
+    {
+      "name": "chat.resume",
+      "enabled": false,
+      "forced": false
+    },
+    {
+      "name": "machine.seats",
+      "enabled": false,
+      "forced": false
+    },
+    {
+      "name": "env.packs",
+      "enabled": false,
+      "forced": false
     }
   ]
 }

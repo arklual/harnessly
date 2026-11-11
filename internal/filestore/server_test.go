@@ -222,3 +222,55 @@ func TestLeasesOverTheWire(t *testing.T) {
 		}
 	})
 }
+
+func TestMissingBlobsAnswersABatchLikeALookAtEach(t *testing.T) {
+	eachCombo(t, func(t *testing.T, r *rig) {
+		srv := wireServer(t, r)
+		const body = "\x89PNG picture"
+		have, lack := sum([]byte(body)), sum([]byte("never uploaded"))
+		if c := do(t, "PUT", srv.URL+uploadsAPI+"/blobs/"+have, strings.NewReader(body)).StatusCode; c != 204 {
+			t.Fatalf("put: %d", c)
+		}
+		ask := func(api string, shas ...string) (*http.Response, []string) {
+			b, _ := json.Marshal(MissingBlobsRequest{Shas: shas})
+			resp := do(t, "POST", srv.URL+api+"/blobs/missing", bytes.NewReader(b))
+			var out MissingBlobsResponse
+			_ = json.NewDecoder(resp.Body).Decode(&out)
+			return resp, out.Missing
+		}
+		resp, missing := ask(uploadsAPI, have, lack, lack)
+		if resp.StatusCode != 200 || len(missing) != 1 || missing[0] != lack {
+			t.Fatalf("missing: %d %v, want only %s", resp.StatusCode, missing, lack)
+		}
+		if resp, missing := ask(uploadsAPI); resp.StatusCode != 200 || len(missing) != 0 {
+			t.Fatalf("nothing asked: %d %v", resp.StatusCode, missing)
+		}
+		// Another collection is another room: it does not hold the upload, as a look at the one blob says too.
+		if resp, missing := ask(designAPI, have); resp.StatusCode != 200 || len(missing) != 1 {
+			t.Fatalf("design must not see an upload: %d %v", resp.StatusCode, missing)
+		}
+		if resp, _ := ask(uploadsAPI, "not-a-hash"); resp.StatusCode != 400 {
+			t.Fatalf("a name that is no hash: %d", resp.StatusCode)
+		}
+		many := make([]string, MaxBlobCheck+1)
+		for i := range many {
+			many[i] = have
+		}
+		if resp, _ := ask(uploadsAPI, many...); resp.StatusCode != 400 {
+			t.Fatalf("more than the limit: %d", resp.StatusCode)
+		}
+		// The caller is judged as for one blob: a collection it may not open, and a caller nobody knows.
+		if resp, _ := ask("/v1/collections/"+KindFiles, have); resp.StatusCode != 403 {
+			t.Fatalf("a collection the caller may not open: %d", resp.StatusCode)
+		}
+		b, _ := json.Marshal(MissingBlobsRequest{Shas: []string{have}})
+		anon, err := http.Post(srv.URL+uploadsAPI+"/blobs/missing", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatal(err)
+		}
+		anon.Body.Close()
+		if anon.StatusCode != 401 {
+			t.Fatalf("an unknown caller: %d", anon.StatusCode)
+		}
+	})
+}

@@ -141,7 +141,7 @@ func (s *Service) machineListMemo(w *world, spaceID string, m store.Machine, mem
 	if len(w.groups) > 0 {
 		owner = m.CreatedBy // with groups the list depends on the owner's choices
 	}
-	key := fmt.Sprintf("%s/%s/%s/%t/%t/%t/%t/%t", spaceID, m.TeamID, owner, setup, known, ex.Claude, ex.Apps, ex.AppsConsent)
+	key := fmt.Sprintf("%s/%s/%s/%t/%t/%t/%t/%t/%t", spaceID, m.TeamID, owner, setup, known, ex.Claude, ex.Apps, ex.Packs, ex.AppsConsent)
 	if v, ok := memo[key]; ok {
 		return v
 	}

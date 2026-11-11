@@ -115,11 +115,13 @@ All of these are optional; a kit without them passes `kit check` as before. Each
 | --- | --- | --- |
 | component | `code` | `{import, export}`: the module a consuming project imports from and the export name. Gives the component readiness level 0. |
 | component | `preset` | `{of, props}`: this component is another component with fixed props (`of` is its id, `props` are values it declares). A preset needs only a description; it takes its target's card, sample and readiness. |
+| component | `todo` | what an imported draft still lacks (a list of sentences); `kit check` warns while it is not empty. See "Other formats". |
 | component | `status` | `stable`, `new` or `deprecated`. |
 | component | `replacedBy` | the component that replaces a `deprecated` one. |
 | `kit` | `kind` | `app`, `site`, `slides` or `video`. |
 | `kit` | `extends` | `<id>@<range>`: the kit this one builds on, e.g. `base-kit@^1.2.0` (`^`, `~`, `>=`, `<`, exact). |
 | `kit` | `omitted` | what the kit leaves out on purpose: `tokens`, `examples`, `docs`, `patterns`, `templates`. An omitted part counts as done in the readiness. |
+| `kit` | `strict` | `true`: every project on the kit is checked in strict mode (see «Strict mode»). |
 | token | `var` | the CSS custom property the token is published as, `--like-this`. |
 
 ```json
@@ -211,7 +213,8 @@ The kit screen's live preview (`/kitv/<id>/<version>/<theme>/_play.dc.html?c=<Co
 
 A compound component's sample is where its parts get their picture: Dialog's sample opens it with `DialogHeader`,
 `DialogBody`, `DialogFooter` inside. A component that cannot draw outside an application (it needs a router, a
-network, a real chart engine's config) gets no sample; the check warns, and the README says why.
+network, a real chart engine's config) gets no sample; the check warns, the README says why, and the render (`kit render`,
+`check --render`) passes over a component with neither a sample nor variants.
 
 ### `assetGroups`: icons, logos, pictures
 
@@ -354,8 +357,58 @@ import { Button } from '@acme/ui';                                   ← library
 - The example is board markup, as a board writes it.
 - A part's card names its parent; the parent's card shows the whole compound.
 
+Optional sections, each its own `##` heading, are read by `kit show`, `kit_component` and the screen's panel; the check
+does not require them (the rules below stay as they are): `Examples` (several examples, as `Example`), `Content` (what
+the text in it should say), `Accessibility`, `States`, `Status` (a note on maturity). **Used with** is not written: it
+is computed from the kit's samples and the layouts' boards. A preset has no card of its own; it reads its target's.
+The sections, the answers of the `kit_*` tools and the order an agent reads in are in
+[design-kit-mcp.md](design-kit-mcp.md).
+
 The kit's `README.md` ends with **Consuming**: the namespace, the files a board loads in order, the root, and the
 **index** — one line per component, `Name — description`, by group, parts indented under their parent.
+
+## A kit on a kit
+
+`kit.extends` (`"acme-ui@^1.0.0"`: a kit id and a version range) makes a kit the **child** of a base kit. The child holds
+only its differences; the rest is the base's, read from the newest installed version the range allows. One brand can
+then serve slides and application pages: foundation → brand → a kit for the kind of work. A child can be as small as three
+files — `design-system.json` (with `extends`), `README.md`, `tokens.json` with the tokens it changes.
+
+```json
+{ "kit": { "id": "acme-brand", "version": "1.0.0", "source": "library", "extends": "acme-ui@^1.0.0" } }
+```
+
+What the child gets:
+
+| Part | Rule |
+| --- | --- |
+| Tokens | the base's, a token of the child replacing the base's of the same name; new ones are added. `tokenPrefix` and `root` are the base's unless the child sets its own |
+| Components | the base's, a component of the child replacing the base's of its id (a preset too); new ones are added to the group of the same id, else to a group of their own |
+| Templates | the base's, a template of the child replacing the base's of its id |
+| Not inherited yet | assets (icons, logos, pictures) and the pictures of inherited components and layouts: the kit screen draws inherited components live |
+
+**Files.** A page loads the kits of the chain in order, the outermost base first, the child last: each one's `tokens.css`,
+`fonts.css`, `components/bundle.css`, then each one's `components/bundle.js`. So the child's variables and styles overrule
+the base's by the cascade, and its bundle runs after the base's. A component the child **replaces** is assigned by its
+bundle into the base's namespace (`window.Acme.Button = Button`), so a board written on the base draws the replacement
+too; a component the child **adds** lives in its own namespace (`window.AcmeBrand`). The assembled kit tells each
+component's namespace (`ns`), and `call` and `sampleJsx` use it.
+
+**Source.** In `kit show`, search and the `kit_*` tools every inherited token and component says where it comes from
+(`from`: `acme-ui@1.0.0`), a replacing one says what it replaces (`overrides`); the index marks inherited components
+`←acme-ui`. A card of an inherited component is read from the base.
+
+**Which base.** The version is chosen when the child's version is installed or published (or the first time it is read) and
+kept in `<kits>/<id>/.<version>.base.json`: a published child shows the same after the base gets a newer release, and
+needs that base version installed (`extends.missing` otherwise). A new child version takes the newest base that fits.
+`kit export` and `design pack` list the base as a requirement and carry it. A project is pinned to the child; its boards
+find the base's files under `ds/<base theme>/`. A draft kit follows the newest base.
+
+**Check.** `kit check` (and `kit_check`) needs the kits folder to find the base (`--dir`, the runtime's by default). It
+checks the child as assembled: a preset, part or sample element may name an inherited component. A component that
+replaces the base's must keep its contract, so a board written on the base still draws: every prop of the base stays with
+its type, an enum keeps all its values, what the child adds is optional (`extends.override`). The chain is at most three
+bases deep and has no loop. `kit render` draws the child with its bases when they are installed.
 
 ## Bundle rules
 
@@ -372,17 +425,37 @@ The kit's `README.md` ends with **Consuming**: the namespace, the files a board 
 
 ### A library kit
 
-1. **Inventory** the package: exports, families, the CSS that defines its tokens, fonts, icons. Everything ends up in
-   the kit or in the README's «not in the kit» with a reason.
-2. `harnessly design kit init <folder> --source library`, then a build script in the package's repository
-   (`npm run build:kit`) that writes the folder: the bundle, `tokens.json` + `tokens.css`, `design-system.json` from
-   the TypeScript types (react-docgen-typescript or the compiler API) and hand-written samples, cards from the
-   package's docs.
-3. Compound components: the parent's sample holds its parts as elements; each part says `"part": "<Parent>"`.
-   Providers say `"part": "provider"`.
-4. Templates: four to six whole pages as boards.
-5. `harnessly design kit check <folder> --render` until clean, then `harnessly design kit render <folder> --shots` as
-   the build's last step. The package's CI runs the build on a release tag, so a kit version equals a package version.
+One command makes the kit from the package, the same command (or `kit update`) brings it to a new version:
+
+```sh
+harnessly design kit add npm:@acme/ui@1.4.0 ./acme-ui [--root ThemeProvider] [--css @acme/ui/theme.css] [--registry URL]
+harnessly design kit add shadcn:ui ./shadcn-ui                 # shadcn/ui; shadcn:<folder or address> for another registry
+harnessly design kit update ./acme-ui --version 1.5.0          # the newest when --version is not given
+```
+
+| Step | What `kit add` does |
+| --- | --- |
+| Install | `npm install` of the package (plus React 18.3.1 and TypeScript for reading the types) into a build folder in the user cache, with the registry and token of the `.npmrc` in the folder the command runs in (or `--registry`); `--from DIR` takes a folder that already has `node_modules` and installs nothing. A peer dependency npm left out is installed when the bundle needs it. A shadcn registry: every `registry:ui` item and what it names, from the address or a folder (a mirror in a closed network) |
+| Bundle | esbuild: every export into `window.<Namespace>`, `react`, `react-dom`, `react/jsx-runtime` and React 19's compiler runtime mapped to the page's React 18; the package's stylesheets (its `style` field and the `.css` of its `exports`, or `--css`) with fonts and pictures inlined, in `@layer kit-<id>`. A shadcn kit: Tailwind compiles the classes the components use, with the registry's style, into `bundle.css`; the kit gets a `Root` (light and dark) |
+| Props | TypeScript reads each exported component's props: enums from string unions, booleans, nodes, functions, the doc comments as descriptions. The attributes React's own types add (`className`, `onClick`, `aria-*`) are left out; `children` stays where the component takes it |
+| Parts | a `…Provider` is a provider; in a file declaring several components, the ones named after another (`CardHeader` after `Card`) are its parts |
+| Tokens | the CSS variables of the package's stylesheets (shadcn: of the registry's colours) under `:root`, `[data-theme]`, `.dark`: `tokens.json` + `tokens.css` (see «Other formats», CSS) |
+| Index and cards | `kit.version` = the package's version, `kit.package`, `code` `{import, export}` for every component, a first sample (a value for every required prop; a parent holds its parts), variants from a `variant` prop, a card each (description, Props, Example, In code), `todo` with what a person writes, README.md with «Not in the kit» and Consuming |
+| Draw | every component in headless Chrome (`--no-render` skips it): one that throws or draws nothing alone loses its sample, says why in its `todo`, and is listed in the README under «Not in the kit»; the check and `--render` then pass over it |
+
+The run ends with the report: components, parts, providers, tokens; on an update what changed (`+` a component, `-` a
+component, `~` its props: `+size, -tone, ~variant: enum(a|b) → enum(a|b|c)`); **what it could not read** (no types, no
+stylesheet, no variables, items a registry lacks) and what a person writes; then the check.
+
+**What a later run keeps.** The bundle, `tokens.css`, the kit record, every component's `props` and `code`, the cards'
+`Props` and `In code` sections and the README from «Not in the kit» on are rebuilt each time. Everything else is the
+person's and stays: descriptions and prop descriptions, keywords, samples and variants (a prop that is gone is taken out
+of them, a new required one gets a value — both reported), status, presets, the rest of each card, the README above
+«Not in the kit», a token's usage. A component gone from the package leaves the index; its card stays and is reported.
+The same version twice writes the same files. `_harnessly/kit-source.json` records the source `kit update` builds from.
+
+After the command: write what each component's `todo` says (what it is for, «When to use», «When not to use»), better
+samples, `keywords`; four to six templates; `harnessly design kit render <folder> --shots`; `check --render` until clean.
 
 ### A draft kit
 
@@ -402,7 +475,7 @@ harnessly design kit render <folder> [--only Button,Card] [--shots] [--json]
 ```
 
 `check` reads the folder the way the kit screen and install do. `--render` (and `render`) draws every component that is
-not a part or a provider, and every layout, through the kit screen's own pages, and reports script errors, failed
+not a part or a provider and has a sample or variants, and every layout, through the kit screen's own pages, and reports script errors, failed
 requests and pictures with nothing visible. Errors exit 1: do not pack. Each problem names its rule:
 
 | Rule | Level | What it wants |
@@ -422,6 +495,12 @@ requests and pictures with nothing visible. Errors exit 1: do not pack. Each pro
 | `identity.source` | warning | source is library or draft |
 | `identity.kind` | error | the kit record's kind, when set, is app, site, slides or video |
 | `identity.extends` | error | extends, when set, is <id>@<range> with a valid id and version range |
+| `extends.missing` | error | the base kit named by extends is installed |
+| `extends.version` | error | an installed version of the base kit satisfies the range |
+| `extends.cycle` | error | the chain of bases does not lead back to the kit |
+| `extends.depth` | error | the chain of bases is at most three kits long |
+| `extends.override` | error | a component that replaces the base's keeps its props: it may add optional props and enum values, not drop, retype or require |
+| `identity.strict` | error | the kit record's strict, when set, is true or false |
 | `identity.omitted` | error | omitted, when set, lists only tokens, examples, docs, patterns, templates |
 | `code.shape` | error | a component's code, when set, is {import, export} with plain strings |
 | `preset.shape` | error | a component's preset, when set, is {of, props} |
@@ -440,6 +519,7 @@ requests and pictures with nothing visible. Errors exit 1: do not pack. Each pro
 | `component.description` | error | every component has a description: what it is for |
 | `component.description-short` | warning | a description has five words or more |
 | `component.description-same` | warning | no two components share a description |
+| `component.todo` | warning | a component imported as a draft lists what a person still writes in todo; the list is empty when it is done |
 | `component.thumb` | error | a component's thumb is a file of the kit |
 | `component.preview` | error | a component's preview, when set, is a file of the kit |
 | `component.dotted` | warning | a component drawn live has a one-word id (a dotted one is a part) |
@@ -501,6 +581,60 @@ requests and pictures with nothing visible. Errors exit 1: do not pack. Each pro
 | `render.error` | error | a component or a layout draws without an exception, a console error or a failed request (--render) |
 | `render.blank` | error | a component or a layout draws something visible (--render; a provider or a part is marked as one) |
 
+## Other formats
+
+The kit's own format is the only one inside: `design-system.json` v3, `tokens.json` as lists, the cards. Other people's
+formats exist at the border, in one command, and nothing else reads them. `tokens.json` stays lists (the check refuses
+DTCG there); DTCG is only what `convert` writes and reads.
+
+```sh
+harnessly design kit convert <folder> --to dtcg|css|tailwind|tailwind4|design-md [--out FILE]
+harnessly design kit convert <folder> --from dtcg|css|design-md|figma <file> [--mode ID] [--css] [--dry-run]
+harnessly design kit convert <folder> --from storybook <build folder | index.json | stories.json> [--dry-run]
+```
+
+`<folder>` is a theme folder (the one with `design-system.json`). Without `--out` an export goes to standard output and
+its report to standard error. An import merges into the kit by name: a new token is added, one with the same name is
+replaced, nothing is deleted; components already in the kit are left as they are. `tokens.css` is rewritten only with
+`--css` (components read it; the report reminds you when it is stale). `--dry-run` writes nothing.
+
+**Every run ends with what it did not carry** (`not carried`), and an import with what a person still writes (`to write`)
+and the result of `kit check`. Nothing is dropped without a line.
+
+| Format | Direction | Carried | Not carried |
+| --- | --- | --- | --- |
+| DTCG (W3C Design Tokens) | out and in | colours with `$type`, `$description` = usage, `{a.b}` aliases, a mode other than the first in `$extensions.mode.<mode>`, dimensions (spacing, radius), shadows as `$type: shadow` objects, font families, text styles as `typography`. Kit-only members (`var`, font files, unknown token fields, the colour themes) go to `$extensions.harnessly`, so "ours → DTCG → ours" is lossless | components, cards, templates, assets. Dimensions are strings (`"8px"`), not `{value, unit}`. On import: tokens of types the kit has no family for (`duration`, `number`, `cubicBezier`, `border`, `gradient`), `$ref` pointers, group-level `$extends` |
+| CSS variables | out and in | every token as `--<prefix><name>` (its `var` when set); the first mode under `:root`, others under `[data-theme="<mode>"]`; alias `{a}` ⇄ `var(--a)`; usage ⇄ a comment next to the declaration. Import: `:root`, `html`, `@theme`, `[data-theme]`, `.dark`, `@media (prefers-color-scheme: dark)`; every token gets `var` | text styles, font files, components. Import: properties that are not a colour, a length, a shadow or a font family (z-index, durations, `calc()`, `color-mix()`), rules under component selectors; named colours become values only for `white`, `black`, `transparent` |
+| Tailwind | out | v3: a preset with `theme.extend` (`colors`, `spacing`, `borderRadius`, `boxShadow`, `fontFamily`, `fontSize`) whose values are `var(--…)`, `darkMode` for the second mode. v4: `@custom-variant`, the variables, and `@theme inline` pointing at them | values per mode (they live in the variables, one class works in every mode); opacity modifiers on colours in v3; components |
+| DESIGN.md | out and in | out: one file for an agent that has nothing else: front matter (`name`, `colors`, `typography`, `rounded`, `spacing`), prose (Overview, Colors with every mode, Typography, Layout, Elevation, Shapes) and the kit's components (name, purpose, props, when to use and not). In: the front matter's tokens; usage and other modes from a table with a `Token` column and a `Use` column, or from `**Name (#hex):** text` bullets; the prose that has no field kept in `_harnessly/design-notes.md` | out: shadows in the front matter (the format has no key), samples, variants, the bundle, templates, assets. In: components (front-matter recipes are style recipes without props or code, listed in the notes, never made into kit components; prose is never read for components), `omitted`, tokens from prose alone (no front matter is an error) |
+| Storybook build | in | from `index.json` (v5/v4) or `stories.json` (v3): every title is a component (`Group/Name`), stories are variants and the first one is the sample; `argTypes` become props (type, enum values, required, description); from the component manifest (`components.json`): description, props (react-docgen), `import` → `code {import, export}`. A card is written for each | MDX and autodocs text, play functions, decorators, parameters; the stories' code and the components' code (the bundle is built from the package, not from a Storybook); `part`/`provider` marks; «when not to use»; a description when the build has none; props when it has neither `argTypes` nor a manifest |
+| Figma variables | in | the JSON of `GET /v1/files/:key/variables/local` (its `meta.variables` is how it is recognised; the file is read from disk, nothing calls Figma): COLOR → colour with a value per Figma mode (the default mode first), aliases between colours, FLOAT named like spacing or radius → `px`, STRING named like a font → font family, `description` → usage | BOOLEAN and other FLOAT/STRING variables, modes of non-colour variables (the first is kept), scopes, code syntax, remote variables, text styles and effects (not variables). A DTCG export made by a Figma plugin goes through `--from dtcg` |
+
+### A Storybook import is a draft
+
+Storybook knows what a component is called, what its stories are and, with `argTypes` or the manifest, its props. It
+does not know what the component is for. So the import writes a **draft**: the record in `design-system.json`, a card
+(title, description if there is one, props, an example, the story names) and a `todo` list on the component:
+
+```jsonc
+{ "id": "TextField", "name": "TextField", "description": "",
+  "todo": ["description: what it is for and when to take it (Storybook has no text for it)",
+           "sample: no story carries args for declared props, so there is no sample or variants",
+           "code: {import, export} (the component manifest has the import statement; this build has none)",
+           "card: «When to use» and «When not to use» (names what to take instead)"] }
+```
+
+`kit check` reports each draft with a `todo` as a warning (`component.todo`); an empty description stays the error it
+always was (`component.description`), so a draft is not fit to pack until a person has written it. Write what the list
+says, delete the `todo` field, check again. To get props and a sample, give the import a build that has them:
+`storybook extract` writes `stories.json` with `args` and `argTypes`; a plain `index.json` only names the stories.
+
+### Modes from two files
+
+A light file and a dark file of the same tokens (what several Figma plugins write) are imported one after the other:
+`--from dtcg light.json`, then `--from dtcg dark.json --mode dark`. The second sets the dark value of the tokens that
+have the same name and adds the new ones.
+
 ## Installing, using, finding
 
 ```sh
@@ -508,10 +642,13 @@ tar -czf acme-ui-1.4.0.tar.gz -C <folder> .
 harnessly design kit install acme-ui 1.4.0 acme-ui-1.4.0.tar.gz    # or an https address, --header for a login
 harnessly design kit list
 harnessly design kit search acme-ui confirm deletion               # the kit screen's search
-harnessly design kit show acme-ui component:ConfirmDialog          # description, props, variants, how to call it
+harnessly design kit show acme-ui component:ConfirmDialog          # description, props, variants, card, how to call it (what kit_component answers)
 ```
 
-A version is installed once and never changes; a fix is a new version. A board loads it from
+A version is installed once and never changes; a fix is a new version. Every install ends with `kit.sealed.json` in the
+version's folder: the list of its files with sizes and sha256. A version counts as installed only with that seal and
+all its files in place, and a file the seal does not list is not part of the version (see docs/design-pack.md, "The seal
+of a version"). The seal is not part of the kit you pack and has no rule: do not write it by hand. A board loads it from
 `/kit/<id>/<version>/<file>`; a layout taken by its address copies its theme folder into the project as `ds/<theme>/`.
 
 The search (the screen's ⌘K and `kit search`) reads a component's name, description, keywords, prop names and prop
@@ -520,10 +657,86 @@ Russian and English endings off (`удаления` finds `удаление`, `b
 half of the words match, and ranks by how many matched, the title first. A word the kit never uses finds nothing — put
 it in `keywords`.
 
+## A page as a module
+
+A board can also be written as `pages/<name>.tsx`: a React module that imports the kit's components by `kit.package` (and
+the subpaths its components' `code.import` name), takes its data from `pages/<name>.fixtures.ts` and exports the page as
+default. The library builds `<name>.dc.html` from it (`harnessly design page build <project>`), a board that is closed to
+direct edits; the same `.tsx` is what goes into the product. The rules (what may be imported, fixtures, the check, going
+back) are in [design-pages.md](../design-pages.md#pages-written-as-modules-hrn-1012). A component an agent wants on a
+page must have `code` in the kit's index, or the page cannot import it.
+
+A board written in the old format becomes such a page with `harnessly design migrate --to tsx <project>`: rules, no
+model, and only when the page draws the board's picture pixel for pixel; `--to board` takes it back byte for byte
+([migrations/0002-boards-to-tsx.md](../migrations/0002-boards-to-tsx.md)). A migrated page imports nothing from a kit
+yet: its `<x-import>`s become `<Global __global="Kit.Button">` (the component found on `window`, as the board found it).
+
+## Into the product's code
+
+`harnessly design code <project> --to <repository>` turns a strict project's page modules into the application's code,
+by rules over files and without a model: a kit import is written from the components' `code`, a preset becomes its
+target with the preset's props, a token's semantic variable (`var(--acme-accent)`) becomes the library's own (its
+`var`, `var(--acme-color-accent)`), and the page's fixtures become the view's props. A kit whose tokens name a `var`
+keeps the semantic names as aliases in its `tokens.css` (`--acme-accent: var(--acme-color-accent)`), so the mockup draws
+them; the application loads only the package's CSS. The repository's `sinopia.export.json`, the checks and what is
+never touched are in [design-pages.md](../design-pages.md#into-the-products-code-hrn-1015).
+
+## Strict mode
+
+A mockup on a kit is meant to become the product's code one to one, so it must be made of the kit and nothing else.
+The strict check says where it is not:
+
+```sh
+harnessly design check <project> --strict [--board home] [--json]   # local: no runtime, no browser; exit 1 on a finding
+```
+
+It is on without the flag when the project says so (`meta/project.json` `"strict": true`) or its kit does (`kit.strict`);
+then `harnessly design check <project>` runs it before drawing the boards. Agents have it as `kit_check {kit, project}`
+(see [design-kit-mcp.md](design-kit-mcp.md)). It reads the project's files under `project/`:
+
+| File | Read as |
+| --- | --- |
+| `pages/<name>.tsx` | a page: only the kit's components (imported from `kit.package` and the subpaths in `code.import`), React's own (`Fragment`) and local components imported from the project's files |
+| any other `.tsx`, `.jsx` | a local component: a block of the project's own. Plain HTML is allowed in it; its values are still tokens and the kit's components in it are still checked |
+| `*.dc.html` written by hand | a board: `<x-import component-from-global-scope="<Namespace>.<Component>">` of the kit or a local component file (`from="components/…"`); `<style>`, `style=""` and the strings of `renderVals()` for values. A board built from a page module is checked through its source |
+| `*.fixtures.*` | data, not read |
+
+Each finding is one line an agent can act on: `file:line:col rule — what is wrong. Fix: what to put instead` (the
+component and its import, the token with the same value, the props the component declares, the closest name):
+
+```text
+pages/home.tsx:6:15 strict.prop — Button has no prop "size". Fix: Button declares: variant, children
+pages/home.tsx:9:31 strict.value — the colour #2563eb is not a token. Fix: use var(--acme-accent) (token accent)
+```
+
+| Rule | Level | What it wants |
+| --- | --- | --- |
+| `strict.element` | error | every element is a component of the kit, or a local component of the project in a file of its own |
+| `strict.value` | error | colours, lengths and CSS variables are the kit's tokens, and a token prop gets a token |
+| `strict.prop` | error | a component gets only the props it declares, an enum prop only one of its values |
+| `strict.deprecated` | error | no component the kit marks deprecated |
+
+What counts:
+
+- **Element.** Plain HTML (`<div>`), a component of another package, one the kit does not export, or one written inside
+  the page are not the kit's. A block the kit lacks is a local component in its own file (`components/<Name>.tsx`),
+  imported by the page: it goes into the product as a file of its own.
+- **Value.** A colour (hex, `rgb()`, `hsl()`, `oklch()`…), a length other than 0 (`12px`, `1rem`, a number given to a
+  size property of a `style` object), or `var(--x)` of a variable that is not a token. A prop of type `color` or `token`
+  takes a token's name (or its variable).
+- **Prop.** Any attribute the component does not declare (`style` and `className` included), except `key`, `ref`,
+  `children`, `aria-*` and `data-*`; an enum prop set to a value it does not list. A preset takes its target's props.
+- **Deprecated.** A component with `status: "deprecated"`; the fix names `replacedBy` and its import.
+
+The check is rules over text, without a model. It reads JSX the way TSX does (an element where an expression starts)
+and does not run the code, so props built at run time (a spread `{...props}`, values computed in `renderVals()`) are not
+checked.
+
 ## Not done yet
 
 - Projects do not yet record their kits (`meta.kits` is kept but not read): a board names the kit's files itself
  .
-- No command draws a project's board on a kit outside Sinopia, and none turns a package's CSS into `tokens.json`: a
-  library kit's build does it.
-- No `harnessly design code` (board → TSX) yet.
+- No command draws a project's board on a kit outside Sinopia.
+- `kit add` reads token values as the stylesheet writes them: a variable defined by `calc()` or `color-mix()` of others
+  is left out, not resolved in a browser. Packages styled by CSS-in-JS have no variables to read (their theme object is
+  not read yet), and Angular packages are not built.

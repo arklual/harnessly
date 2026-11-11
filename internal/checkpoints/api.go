@@ -131,6 +131,9 @@ func (s *Store) SnapshotTurnEnd(tabID, cwd string) {
 	if cwd == "" {
 		return
 	}
+	if s.Pool {
+		s.sweepOnce()
+	}
 	sc, err := s.Scope(tabID, cwd)
 	if err != nil {
 		agent.Log("warn", "checkpoint failed", agent.F{K: "tabId", V: tabID}, agent.F{K: "err", V: err.Error()})

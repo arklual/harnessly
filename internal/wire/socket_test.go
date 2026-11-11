@@ -285,6 +285,47 @@ func TestSocketWantsHelloFirstAndClosesWhenIdle(t *testing.T) {
 	}
 }
 
+// A page whose timers the browser stretched (a hidden tab) sends nothing by itself: the runtime beats, and the page's
+// answer to each beat is what keeps the socket past the idle limit.
+func TestTheRuntimeBeatsAndAnAnsweredBeatKeepsTheSocket(t *testing.T) {
+	g := newRig(t, time.Hour)
+	defer wire.SetSocketBeat(60 * time.Millisecond)()
+	defer wire.SetSocketIdle(400 * time.Millisecond)()
+	s := g.dial()
+	s.hello()
+	start := time.Now()
+	beats := 0
+	for time.Since(start) < 1200*time.Millisecond {
+		p, ok := s.read().(wire.PongFrame)
+		if !ok {
+			t.Fatalf("a quiet socket hears %#v", p)
+		}
+		if p.T != wire.BeatT {
+			continue // the answer to this page's own ping
+		}
+		beats++
+		s.send(wire.PingFrame{T: time.Now().UnixMilli()})
+	}
+	if beats < 3 {
+		t.Fatalf("%d beats in %v", beats, time.Since(start))
+	}
+}
+
+// A page that pings on time is answered and gets no beat on top.
+func TestAPageThatPingsGetsNoBeat(t *testing.T) {
+	g := newRig(t, time.Hour)
+	defer wire.SetSocketBeat(200 * time.Millisecond)()
+	s := g.dial()
+	s.hello()
+	for i := range 12 {
+		s.send(wire.PingFrame{T: int64(i + 1)})
+		if p, ok := s.read().(wire.PongFrame); !ok || p.T != int64(i+1) {
+			t.Fatalf("ping %d is answered with %#v", i+1, p)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // A message to an idle agent: queued, typed, accepted, its turn, done — every state on the socket, seqs without
 // gaps, the command's seq among them.
 func TestSendPlaysTheWholeWay(t *testing.T) {
@@ -1488,6 +1529,14 @@ func TestAppsPage(t *testing.T) {
 			}
 		}
 	}
+	// One app alone: the review start reads GitLab without waiting for the tracker; an unknown app is refused.
+	var one wire.AppsFeed
+	if code := g.do("GET", "/api/v2/apps?app=gitlab", nil, &one); code != 200 || len(one.Apps) != 1 || one.Apps[0].ID != wire.AppGitLab {
+		t.Fatalf("apps of gitlab: %d %+v", code, one)
+	}
+	if code := g.do("GET", "/api/v2/apps?app=nope", nil, nil); code == 200 {
+		t.Fatalf("an unknown app: %d", code)
+	}
 	if code := g.do("POST", "/api/v2/apps", nil, nil); code != http.StatusMethodNotAllowed {
 		t.Fatalf("POST apps: %d", code)
 	}
@@ -1568,5 +1617,47 @@ func TestAgentSettingsPages(t *testing.T) {
 		if code := g.do("PATCH", "/api/v2/agent-settings/"+bad.provider, bad.body, nil); code != http.StatusBadRequest {
 			t.Errorf("%s: %d", name, code)
 		}
+	}
+}
+
+// The library's list carries its fingerprint: asked again with it, an unchanged list is a 304 with no body, and a list
+// that changed is sent whole with a new fingerprint.
+func TestDesignlyLibraryIsRevalidated(t *testing.T) {
+	g := newRig(t, time.Hour)
+	ask := func(etag string) (*http.Response, []byte) {
+		t.Helper()
+		req, _ := http.NewRequest("GET", g.http.URL+"/api/v2/designly/library", nil)
+		req.Header.Set(wire.DeviceHeader, "dev-test")
+		if etag != "" {
+			req.Header.Set("If-None-Match", etag)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		raw, _ := io.ReadAll(res.Body)
+		return res, raw
+	}
+	first, body := ask("")
+	etag := first.Header.Get("ETag")
+	if first.StatusCode != 200 || etag == "" || len(body) == 0 || first.Header.Get("Cache-Control") != "private, no-cache" {
+		t.Fatalf("first: %d etag %q cache %q", first.StatusCode, etag, first.Header.Get("Cache-Control"))
+	}
+	again, body := ask(etag)
+	if again.StatusCode != http.StatusNotModified || len(body) != 0 || again.Header.Get("ETag") != etag {
+		t.Fatalf("unchanged: %d, %d bytes, etag %q", again.StatusCode, len(body), again.Header.Get("ETag"))
+	}
+	if weak, _ := ask("W/" + etag); weak.StatusCode != http.StatusNotModified {
+		t.Fatalf("a weak tag of the same answer: %d", weak.StatusCode)
+	}
+
+	create := wire.DesignlyCreate{Title: "Сайт для пекарни", Brief: "Главная и меню", Kind: wire.DesignSite, Provider: wire.ProviderClaude}
+	if code := g.do("POST", "/api/v2/designly/create", create, nil); code != 200 {
+		t.Fatalf("create: %d", code)
+	}
+	changed, body := ask(etag)
+	if changed.StatusCode != 200 || len(body) == 0 || changed.Header.Get("ETag") == etag {
+		t.Fatalf("changed: %d, %d bytes, etag %q", changed.StatusCode, len(body), changed.Header.Get("ETag"))
 	}
 }

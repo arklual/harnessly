@@ -310,6 +310,9 @@ func (a *Agent) automationReport(w http.ResponseWriter, r *http.Request) {
 	ev.BugIssueID, _ = field[string](obj, "bugIssueId")
 	ev.MrURL, _ = field[string](obj, "mrUrl")
 	a.broadcast(ev)
+	if a.hub != nil {
+		a.hub.emitAutomationResult(ev)
+	}
 	Log("info", "automation report relayed", F{"runId", runID})
 	reply(w, 200, map[string]bool{"ok": true})
 }

@@ -80,6 +80,7 @@ import QuestionCard from '@/next/features/questions/question-card';
 import type { ConvId, MachineId, PromoteTo } from '@/next/protocol/v2';
 import { reconnectNow, useConnection } from '@/next/stores/connection';
 import { openGates, useFedClients, useGates, useQueue } from '@/next/stores/conversation';
+import { useAgentState } from '@/next/stores/chat-state';
 import { useConversation } from '@/next/stores/conversations';
 import {
   addDraftRef,
@@ -122,6 +123,7 @@ const rowOf = (m: MessageView): QueueRow => ({
   steer: m.mode === 'steer',
   ahead: m.mode === 'now',
   handed: isHanded(m),
+  cancelling: m.cancelling === true,
 });
 
 /**
@@ -214,9 +216,10 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const carried = useCarriedNotes(conv);
   const open = useMemo(() => openGates(gates), [gates]);
   const question = open.questions[0] ?? null;
-  const working = record?.state.k === 'working';
+  const chatState = useAgentState(conv);
+  const working = chatState?.k === 'working';
   const waitingAgents = useWaitingAgents(conv);
-  const stopped = record?.state.k === 'stopped' && record.state.resumable;
+  const stopped = chatState?.k === 'stopped' && chatState.resumable;
   let mode: ComposerMode = 'idle';
   if (question) mode = 'answer';
   else if (working) mode = 'working';
@@ -274,7 +277,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       ? limitPlaceholder(limitHold ?? { resetsAt: null }, machineNow(machine))
       : undefined;
 
-  const agentState = record?.state.k;
+  const agentState = chatState?.k;
   // The rows stand in the order of the machine's line; a runtime that cannot put them in another order has no grips.
   const line = queue?.items;
   const rows = useMemo(
@@ -295,8 +298,8 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     machine,
     limitsProviderOf(record ? { provider: record.provider, profile: record.model?.profile } : null),
   );
-  const compacting = record?.state.k === 'working' && record.state.compacting;
-  const idle = record?.state.k === 'idle' || record?.state.k === 'ready';
+  const compacting = chatState?.k === 'working' && chatState.compacting;
+  const idle = chatState?.k === 'idle' || chatState?.k === 'ready';
   const compact = useMemo(
     () =>
       idle
@@ -570,7 +573,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       <Queue
         rows={rows}
         paused={queue?.paused?.reason === 'limited' ? null : (queue?.paused ?? null)}
-        launchFailure={record?.state.k === 'launch-failed' ? record.state.reason : null}
+        launchFailure={chatState?.k === 'launch-failed' ? chatState.reason : null}
         waitingLimit={heldOnLimit}
         onRemove={(id) => settled(cancelMessage(id))}
         onEdit={onEdit}

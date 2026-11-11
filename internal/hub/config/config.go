@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -15,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/net/publicsuffix"
 
@@ -23,9 +25,8 @@ import (
 )
 
 const (
-	OrgsOff    = "off"
-	OrgsShadow = "shadow"
-	OrgsOn     = "on"
+	OrgsOff = "off"
+	OrgsOn  = "on"
 
 	EditionSelfHosted = "self-hosted"
 	EditionCloud      = "cloud"
@@ -91,8 +92,23 @@ type Config struct {
 	// Replicas turns on several hub replicas (HUB_REPLICAS=on, docs/hub/replicas.md): machine links get a lease and a
 	// fencing token in the database and a request reaches the replica that holds the link. ReplicaID names this replica
 	// (random when empty), ReplicaAddr is where the other replicas reach it, ReplicaSecret is shared by all of them.
+	// ReplicaListen is the address the replicas' hop is served at (HUB_REPLICA_LISTEN): a listener of its own, which
+	// only the replicas should reach; the hub's public listener does not serve the hop.
 	Replicas                              bool
 	ReplicaID, ReplicaAddr, ReplicaSecret string
+	ReplicaListen                         string
+	// MetricsListen is the address /metrics is served at in the Prometheus text format (HUB_METRICS_LISTEN), a listener
+	// of its own: the numbers are served to whoever reaches it, so it is never the hub's public one. Empty: no metrics.
+	MetricsListen string
+	// ShutdownGrace (HUB_SHUTDOWN_GRACE) is how long a stop may take in all; it must fit the time the process is given
+	// to stop (a pod's terminationGracePeriodSeconds). DrainSettle (HUB_DRAIN_SETTLE) is how long a stopping hub stays
+	// not ready and serving before it touches a link, so the balancer stops sending it requests; DrainLinks
+	// (HUB_DRAIN_LINKS) the window its machines are asked to dial again over, one at a time. Both are 0 for a single
+	// process, which stops at once as there is nowhere to dial; with HUB_REPLICAS=on they default to 5 s and 10 s.
+	ShutdownGrace, DrainSettle, DrainLinks time.Duration
+	// TunnelMemory (HUB_TUNNEL_MEMORY_MB, in bytes here) is how much of the machines' answers the tunnels of this process
+	// hold together for readers that have not taken them yet. With it full no new tunnel is opened.
+	TunnelMemory int64
 
 	Listen string
 	// PublicURL is the address people open the hub at, without a trailing slash. It may carry a path
@@ -168,9 +184,12 @@ type Config struct {
 
 	// Sites (internal/sites): published static sites. SitesDomain is the wildcard domain they live under
 	// (<site>--<space>.<domain>); without it a self-hosted hub serves them under /sites/ on its own origin, sandboxed.
-	SitesOff      bool
-	SitesDomain   string
-	SitesAbuseURL string
+	SitesOff    bool
+	SitesDomain string
+	// PreviewSlotDomain is the wildcard domain a person's preview slots live under (<handle>-<n>.<domain>, one origin
+	// per person and slot, internal/hub/proxy/slothost.go); empty: the slots go by path on the hub's origin, sandboxed.
+	PreviewSlotDomain string
+	SitesAbuseURL     string
 	// SitesDir holds the sites' files when no bucket is set.
 	SitesDir string
 	SitesS3  SitesS3
@@ -211,8 +230,8 @@ type Config struct {
 	// the data folder.
 	SecretKey       string
 	MinAgentVersion string
-	// Orgs (HUB_ORGS) is how far organizations are switched on: OrgsOff (the schema is there, the hub behaves as before),
-	// OrgsShadow (the new endpoints answer instance administrators only: checking and seeding), OrgsOn (everyone).
+	// Orgs (HUB_ORGS) says whether organizations are switched on: OrgsOff (the schema is there, their endpoints answer
+	// nobody) or OrgsOn (everyone, by their rights).
 	Orgs string
 	// MachineTrust (HUB_MACHINE_TRUST=on) lets an owner of a space trust a machine to run on the hub's own origin when
 	// the hub has no HUB_RUNTIME_DOMAIN; off: only machines an instance administrator connected open there.
@@ -231,6 +250,20 @@ type Config struct {
 	Automations        bool
 	AutomationsSecret  string
 	AutomationsPortEnv string
+	// What follows is what a finished run does after its report (docs/hub/automations.md); each part is off while its
+	// address or token is empty. AutomationsNotifyURL (HUB_AUTOMATIONS_NOTIFY_URL) is the address the hub posts a
+	// finished run to so that a messenger bot can show it with the decision buttons, with AutomationsNotifyToken
+	// (HUB_AUTOMATIONS_NOTIFY_TOKEN) as the bearer. AutomationsGitLabURL (HUB_AUTOMATIONS_GITLAB_URL) and
+	// AutomationsGitLabToken (HUB_AUTOMATIONS_GITLAB_TOKEN) let an approval merge, and a rejection close, the run's merge
+	// request, and only in the projects AutomationsMRProjects (HUB_AUTOMATIONS_MR_PROJECTS, path prefixes such as
+	// "team/,tools/") names: a conversation's report is not to point the hub's token at any project.
+	AutomationsNotifyURL   string
+	AutomationsNotifyToken string
+	AutomationsGitLabURL   string
+	AutomationsGitLabToken string
+	AutomationsMRProjects  []string
+	// Quotas are the ceilings on what one person or one space may create.
+	Quotas Quotas
 	// ResourceAccess (HUB_RESOURCE_ACCESS=on) puts access to documents on the shared model of access to a resource
 	// (docs/hub/resource-access.md): people, teams, guest links, requests and a log. Off: doc_meta.team_level as before.
 	ResourceAccess bool
@@ -239,12 +272,26 @@ type Config struct {
 	// first pair, boards need the second; either may be missing and the page then says which one.
 	ArtifactsURL, ArtifactsToken string
 	BoardsURL, BoardsToken       string
+	// ArtifactsPublicURL and BoardsPublicURL (HUB_ARTIFACTS_PUBLIC_URL, HUB_BOARDS_PUBLIC_URL) are the services'
+	// addresses as machines and the person's browser reach them: they go to the apps as ${install:artifactsUrl} and
+	// ${install:boardsUrl}. Empty: the same as ArtifactsURL / BoardsURL, which stay the hub's own way to the services.
+	ArtifactsPublicURL, BoardsPublicURL string
+	// DocsLegacyHosts (HUB_DOCS_LEGACY_HOSTS, comma separated hosts) are the old addresses of documents, /a/<slug>: the hub
+	// answers them with a permanent redirect to the document's page, where the sign-in and the document's access decide.
+	// Empty: none.
+	DocsLegacyHosts []string
+	// ArtifactsAccessToken (HUB_ARTIFACTS_ACCESS_TOKEN) is the documents service's secret for asking the hub what a
+	// person may do with documents (POST <platform api>/docs/_rights); empty: the route is not there.
+	ArtifactsAccessToken string
 	// UsageIngest (HUB_USAGE_INGEST=on) lets the hub pull the machines' spend facts (docs/hub/usage.md); off: it never
 	// asks, and the spend tables stay empty.
 	UsageIngest bool
 	// History (HUB_HISTORY, on by default) keeps the people's chats in the hub (docs/hub/history.md): the machines'
 	// agents send their runtime's chat list and feeds, and the workspace reads them from here while a machine is off.
 	History bool
+	// HistoryDeletedKeep (HUB_HISTORY_DELETED_DAYS, 30 by default) is how long the hub keeps its copy of a chat after
+	// the chat was deleted on its machine; then the copy is removed with its turns. 0 keeps the copies for good.
+	HistoryDeletedKeep time.Duration
 	// VaultKeys (HUB_VAULT_KEYS="v2:<base64 32 bytes>,v1:<base64>", the first one current) turns on the hub's central
 	// password safe (docs/hub/vault.md); empty: the safe is off. VaultSharedMembers and VaultSharedEditors
 	// (HUB_VAULT_SHARED_MEMBERS, HUB_VAULT_SHARED_EDITORS, comma-separated emails) say who sees and who changes the
@@ -274,6 +321,14 @@ type Config struct {
 	MRSourceURL    string
 	MRSourceGroups []string
 	MRSourceToken  string
+	// EfficiencyMarkers (HUB_EFFICIENCY_MARKERS, or the file HUB_EFFICIENCY_MARKERS_FILE) is a JSON array of the dated changes
+	// the «Эффективность» screen draws over its charts: [{key?, at, kind, title, detail?}]. The hub stores them on every
+	// start; a marker with the same key is replaced, never doubled.
+	EfficiencyMarkers string
+	// Switches (HUB_SWITCHES, or the file HUB_SWITCHES_FILE) is a JSON array of rollout switch rows the hub writes on
+	// every start: [{feature, person?, machine?, enabled, note?}], empty person or machine meaning anyone. It lets the
+	// instance's repository turn a feature on pair by pair without an administrator's session.
+	Switches string
 	// LimitsEnforce (HUB_LIMITS_ENFORCE) is what the machines do with the limits (docs/hub/limits.md): off sends them
 	// nothing (the hub still shows the limits), warn makes a stop only a notice, stop stops new chats.
 	LimitsEnforce string
@@ -347,6 +402,8 @@ type StoreConfig struct {
 	// Claude profiles in, bound to the person's user id (never an email: an account may claim one it does not own):
 	// their machines sync those rooms instead of profile-<user id>.
 	ProfileRooms map[string]string
+	// MaxUpload is the biggest file a machine sends in parts (HUB_STORE_MAX_UPLOAD_MB); 0, the default, is no limit.
+	MaxUpload int64
 }
 
 // StorageS3 says the hub keeps its files in an S3-compatible bucket (HUB_STORAGE=s3), not in its data folder.
@@ -446,6 +503,17 @@ func hostName(host string) string {
 	return h
 }
 
+// IsDocsLegacyHost says whether host is one of the old document addresses (HUB_DOCS_LEGACY_HOSTS).
+func (c *Config) IsDocsLegacyHost(host string) bool {
+	h := hostName(host)
+	for _, l := range c.DocsLegacyHosts {
+		if l == h {
+			return true
+		}
+	}
+	return false
+}
+
 // MachineIDFromHost reads the machine id out of a request host of the form <id>.<runtime domain>[:port]; "" when the
 // host is not one. The hub's own host is never one, whatever the runtime domain is.
 func (c *Config) MachineIDFromHost(host string) string {
@@ -463,6 +531,43 @@ func (c *Config) MachineIDFromHost(host string) string {
 	return id
 }
 
+// PreviewSlotHost is the host of a person's preview slot n (1-6): <handle>-<n>.<preview slot domain>, with the hub's
+// port when it has one (development); "" when the slot domain is not set.
+func (c *Config) PreviewSlotHost(handle string, n int) string {
+	if c.PreviewSlotDomain == "" {
+		return ""
+	}
+	h := handle + "-" + strconv.Itoa(n) + "." + c.PreviewSlotDomain
+	if _, port, ok := strings.Cut(c.Host, ":"); ok && port != "" {
+		h += ":" + port
+	}
+	return h
+}
+
+var previewSlotLabel = regexp.MustCompile(`^(p[a-z2-7]{12})-([1-6])$`)
+
+// PreviewSlotFromHost reads the handle and the slot out of a request host of the form <handle>-<n>.<slot domain>[:port];
+// false when the host is not one. The hub's own host is never one.
+func (c *Config) PreviewSlotFromHost(host string) (handle string, n int, ok bool) {
+	if c.PreviewSlotDomain == "" {
+		return "", 0, false
+	}
+	h := hostName(host)
+	if h == hostName(c.Host) || h == hostName(c.AgentHost) {
+		return "", 0, false
+	}
+	label, found := strings.CutSuffix(h, "."+c.PreviewSlotDomain)
+	if !found {
+		return "", 0, false
+	}
+	m := previewSlotLabel.FindStringSubmatch(label)
+	if m == nil {
+		return "", 0, false
+	}
+	n, _ = strconv.Atoi(m[2])
+	return m[1], n, true
+}
+
 // sameSite says that two hosts share a registrable domain (the public suffix list's eTLD+1), which makes their origins
 // the same site: a browser sends a person's cookies from one to the other, and a page of one may set cookies for the
 // other's parent domain. False when either has none (an address, localhost, a public suffix itself).
@@ -477,6 +582,10 @@ func sameSite(a, b string) bool {
 
 var oidcID = regexp.MustCompile(`^[a-z0-9]+$`)
 var domainName = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$|^localhost$`)
+
+// machineBinDays is how many days a machine's runtime keeps a deleted chat restorable (convo.DeletedKept). The hub's
+// copy of a deleted chat must live at least as long, so the two are changed together.
+const machineBinDays = 7
 
 // Load reads the configuration through lookup (os.LookupEnv in the binary) and reports every problem at once.
 func Load(lookup func(string) (string, bool)) (*Config, error) {
@@ -506,23 +615,24 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 
 	c := &Config{
-		Listen:           def("HUB_LISTEN", "0.0.0.0:8040"),
-		DataDir:          def("HUB_DATA_DIR", "/var/lib/harnessly-hub"),
-		Edition:          def("HUB_EDITION", EditionSelfHosted),
-		Signup:           def("HUB_SIGNUP", SignupOpen),
-		SMTPURL:          get("HUB_SMTP_URL"),
-		MailFrom:         get("HUB_MAIL_FROM"),
-		RPID:             get("HUB_RP_ID"),
-		RPName:           def("HUB_RP_NAME", "harnessly"),
-		RuntimeDomain:    strings.ToLower(strings.Trim(get("HUB_RUNTIME_DOMAIN"), ".")),
-		DistDir:          def("HUB_DIST_DIR", "/opt/harnessly/dist"),
-		SitesDomain:      strings.ToLower(strings.Trim(get("HARNESSLY_SITES_DOMAIN"), ".")),
-		SitesAbuseURL:    get("HARNESSLY_SITES_ABUSE_URL"),
-		FleetSitesSecret: get("HARNESSLY_FLEET_SITES_SECRET"),
-		FleetSitesSpace:  get("HARNESSLY_FLEET_SITES_SPACE"),
-		ContainerImage:   get("HUB_CONTAINER_IMAGE"),
-		LocalCodeFile:    get("HUB_LOCAL_CODE_FILE"),
-		LocalCodeGID:     -1,
+		Listen:            def("HUB_LISTEN", "0.0.0.0:8040"),
+		DataDir:           def("HUB_DATA_DIR", "/var/lib/harnessly-hub"),
+		Edition:           def("HUB_EDITION", EditionSelfHosted),
+		Signup:            def("HUB_SIGNUP", SignupOpen),
+		SMTPURL:           get("HUB_SMTP_URL"),
+		MailFrom:          get("HUB_MAIL_FROM"),
+		RPID:              get("HUB_RP_ID"),
+		RPName:            def("HUB_RP_NAME", "harnessly"),
+		RuntimeDomain:     strings.ToLower(strings.Trim(get("HUB_RUNTIME_DOMAIN"), ".")),
+		DistDir:           def("HUB_DIST_DIR", "/opt/harnessly/dist"),
+		SitesDomain:       strings.ToLower(strings.Trim(get("HARNESSLY_SITES_DOMAIN"), ".")),
+		PreviewSlotDomain: strings.ToLower(strings.Trim(get("HUB_PREVIEW_SLOT_DOMAIN"), ".")),
+		SitesAbuseURL:     get("HARNESSLY_SITES_ABUSE_URL"),
+		FleetSitesSecret:  get("HARNESSLY_FLEET_SITES_SECRET"),
+		FleetSitesSpace:   get("HARNESSLY_FLEET_SITES_SPACE"),
+		ContainerImage:    get("HUB_CONTAINER_IMAGE"),
+		LocalCodeFile:     get("HUB_LOCAL_CODE_FILE"),
+		LocalCodeGID:      -1,
 		MinAgentVersion: strings.TrimPrefix(
 			get("HUB_MIN_AGENT_VERSION"), "v"),
 		TermsURL: get("HUB_TERMS_URL"),
@@ -611,18 +721,63 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		bad("HUB_REPLICAS must be on or off")
 	}
 	c.ReplicaID, c.ReplicaAddr, c.ReplicaSecret = def("HUB_REPLICA_ID", ""), strings.TrimRight(def("HUB_REPLICA_ADDR", ""), "/"), def("HUB_REPLICA_SECRET", "")
+	c.ReplicaListen = def("HUB_REPLICA_LISTEN", "0.0.0.0:8041")
 	if c.Replicas {
 		if u, err := url.Parse(c.ReplicaAddr); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			bad("HUB_REPLICAS=on needs HUB_REPLICA_ADDR, the address the other replicas reach this one at (http://<pod ip>:8040)")
+			bad("HUB_REPLICAS=on needs HUB_REPLICA_ADDR, the address the other replicas reach this one's HUB_REPLICA_LISTEN at (http://<pod ip>:8041)")
+		}
+		if c.ReplicaListen == c.Listen {
+			bad("HUB_REPLICA_LISTEN must not be HUB_LISTEN: the replicas talk on a listener of their own, closed to everybody else")
 		}
 		if len(c.ReplicaSecret) < 16 {
 			bad("HUB_REPLICAS=on needs HUB_REPLICA_SECRET of at least 16 characters, the same on every replica")
 		}
 	}
+	span := func(name string, d time.Duration) time.Duration {
+		v := def(name, "")
+		if v == "" {
+			return d
+		}
+		got, err := time.ParseDuration(v)
+		if err != nil || got < 0 {
+			bad("%s must be a duration (5s, 1m)", name)
+			return d
+		}
+		return got
+	}
+	settle, window := time.Duration(0), time.Duration(0)
+	if c.Replicas {
+		settle, window = 5*time.Second, 10*time.Second
+	}
+	c.ShutdownGrace = span("HUB_SHUTDOWN_GRACE", 20*time.Second)
+	c.DrainSettle, c.DrainLinks = span("HUB_DRAIN_SETTLE", settle), span("HUB_DRAIN_LINKS", window)
+	if c.DrainSettle+c.DrainLinks >= c.ShutdownGrace {
+		bad("HUB_DRAIN_SETTLE and HUB_DRAIN_LINKS together must be shorter than HUB_SHUTDOWN_GRACE: the requests under way need the rest")
+	}
+	c.TunnelMemory = 256 << 20
+	if v := def("HUB_TUNNEL_MEMORY_MB", ""); v != "" {
+		mb, err := strconv.Atoi(v)
+		if err != nil || mb < 1 || mb > 1<<20 {
+			bad("HUB_TUNNEL_MEMORY_MB must be a number of megabytes, 1 or more")
+		} else {
+			c.TunnelMemory = int64(mb) << 20
+		}
+	}
+	c.MetricsListen = def("HUB_METRICS_LISTEN", "")
+	if c.MetricsListen != "" {
+		if _, _, err := net.SplitHostPort(c.MetricsListen); err != nil {
+			bad("HUB_METRICS_LISTEN must be host:port (0.0.0.0:8042), or empty for no metrics")
+		}
+		if c.MetricsListen == c.Listen || (c.Replicas && c.MetricsListen == c.ReplicaListen) {
+			bad("HUB_METRICS_LISTEN must be a listener of its own, not HUB_LISTEN or HUB_REPLICA_LISTEN: /metrics is served without sign-in")
+		}
+	}
 	switch c.Orgs = strings.ToLower(def("HUB_ORGS", OrgsOff)); c.Orgs {
-	case OrgsOff, OrgsShadow, OrgsOn:
+	case OrgsOff, OrgsOn:
+	case "shadow":
+		bad("HUB_ORGS=shadow is no longer a value: set on (organizations for everyone) or off")
 	default:
-		bad("HUB_ORGS must be off, shadow or on, got %q", c.Orgs)
+		bad("HUB_ORGS must be off or on, got %q", c.Orgs)
 	}
 	switch strings.ToLower(def("HUB_RESOURCE_ACCESS", "off")) {
 	case "on", "true", "1", "yes":
@@ -646,9 +801,33 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		bad("HUB_AUTOMATIONS must be on or off")
 	}
 	c.AutomationsSecret, c.AutomationsPortEnv = get("HUB_AUTOMATIONS_SECRET"), def("HUB_AUTOMATIONS_PORT_ENV", "AGENT_REPORT_PORT")
+	c.AutomationsNotifyURL, c.AutomationsNotifyToken = strings.TrimRight(get("HUB_AUTOMATIONS_NOTIFY_URL"), "/"), get("HUB_AUTOMATIONS_NOTIFY_TOKEN")
+	c.AutomationsGitLabURL, c.AutomationsGitLabToken = strings.TrimRight(get("HUB_AUTOMATIONS_GITLAB_URL"), "/"), get("HUB_AUTOMATIONS_GITLAB_TOKEN")
+	for _, p := range strings.Split(get("HUB_AUTOMATIONS_MR_PROJECTS"), ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			c.AutomationsMRProjects = append(c.AutomationsMRProjects, p)
+		}
+	}
+	for _, u := range []struct{ name, v string }{{"HUB_AUTOMATIONS_NOTIFY_URL", c.AutomationsNotifyURL}, {"HUB_AUTOMATIONS_GITLAB_URL", c.AutomationsGitLabURL}} {
+		if u.v != "" && !strings.HasPrefix(u.v, "http://") && !strings.HasPrefix(u.v, "https://") {
+			bad("%s must be an http(s) address", u.name)
+		}
+	}
 	c.ArtifactsURL, c.ArtifactsToken = strings.TrimRight(get("HUB_ARTIFACTS_URL"), "/"), get("HUB_ARTIFACTS_TOKEN")
 	c.BoardsURL, c.BoardsToken = strings.TrimRight(get("HUB_BOARDS_URL"), "/"), get("HUB_BOARDS_TOKEN")
-	for _, u := range []struct{ name, v string }{{"HUB_ARTIFACTS_URL", c.ArtifactsURL}, {"HUB_BOARDS_URL", c.BoardsURL}} {
+	c.ArtifactsAccessToken = get("HUB_ARTIFACTS_ACCESS_TOKEN")
+	c.ArtifactsPublicURL = strings.TrimRight(def("HUB_ARTIFACTS_PUBLIC_URL", c.ArtifactsURL), "/")
+	c.BoardsPublicURL = strings.TrimRight(def("HUB_BOARDS_PUBLIC_URL", c.BoardsURL), "/")
+	for _, h := range strings.FieldsFunc(strings.ToLower(get("HUB_DOCS_LEGACY_HOSTS")), func(r rune) bool { return r == ',' || r == ' ' }) {
+		h = strings.Trim(h, ".")
+		if !domainName.MatchString(h) {
+			bad("HUB_DOCS_LEGACY_HOSTS: %q is not a host name", h)
+			continue
+		}
+		c.DocsLegacyHosts = append(c.DocsLegacyHosts, h)
+	}
+	for _, u := range []struct{ name, v string }{{"HUB_ARTIFACTS_URL", c.ArtifactsURL}, {"HUB_BOARDS_URL", c.BoardsURL},
+		{"HUB_ARTIFACTS_PUBLIC_URL", c.ArtifactsPublicURL}, {"HUB_BOARDS_PUBLIC_URL", c.BoardsPublicURL}} {
 		if u.v != "" && !strings.HasPrefix(u.v, "http://") && !strings.HasPrefix(u.v, "https://") {
 			bad("%s must be an http(s) address", u.name)
 		}
@@ -676,6 +855,18 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_HISTORY must be on or off")
+	}
+	c.HistoryDeletedKeep = 30 * 24 * time.Hour
+	if v := def("HUB_HISTORY_DELETED_DAYS", ""); v != "" {
+		days, err := strconv.Atoi(v)
+		switch {
+		case err != nil || days < 0 || days > 36500:
+			bad("HUB_HISTORY_DELETED_DAYS must be a whole number of days, 0 to keep the copies of deleted chats for good")
+		case days > 0 && days < machineBinDays:
+			bad("HUB_HISTORY_DELETED_DAYS must be 0 or at least %d: a machine keeps a deleted chat in its bin for %d days, and a chat restored from the bin must find its copy in the hub", machineBinDays, machineBinDays)
+		default:
+			c.HistoryDeletedKeep = time.Duration(days) * 24 * time.Hour
+		}
 	}
 	switch strings.ToLower(def("HUB_VOICE_TAKES", "off")) {
 	case "on", "true", "1", "yes":
@@ -731,6 +922,18 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 			bad("HUB_DESIGN_PLATFORM_API must look like /api/<name>")
 		}
 		c.DesignPlatformAPI = p
+	}
+	if m := get("HUB_EFFICIENCY_MARKERS"); m != "" {
+		if !json.Valid([]byte(m)) {
+			bad("HUB_EFFICIENCY_MARKERS must be a JSON array")
+		}
+		c.EfficiencyMarkers = m
+	}
+	if m := get("HUB_SWITCHES"); m != "" {
+		if !json.Valid([]byte(m)) || !strings.HasPrefix(strings.TrimSpace(m), "[") {
+			bad("HUB_SWITCHES must be a JSON array")
+		}
+		c.Switches = m
 	}
 	if u := get("HUB_MR_SOURCE_GITLAB_URL"); u != "" {
 		pu, err := url.Parse(u)
@@ -967,6 +1170,42 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		// script, and on the hub's origin it would act with the signed-in person's session.
 		bad("HUB_EDITION=cloud needs HUB_RUNTIME_DOMAIN: machines of strangers must not run on the hub's origin")
 	}
+	for _, q := range []struct {
+		name string
+		to   *int
+		def  int
+	}{
+		{"HUB_MAX_SPACES_PER_PERSON", &c.Quotas.Spaces, DefaultMaxSpaces},
+		{"HUB_MAX_ORGS_PER_PERSON", &c.Quotas.Orgs, DefaultMaxOrgs},
+		{"HUB_MAX_SERVERS_PER_SPACE", &c.Quotas.Servers, DefaultMaxServers},
+	} {
+		*q.to = q.def
+		if v := get(q.name); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				*q.to = n
+			} else {
+				bad("%s must be a whole number above zero, got %q", q.name, v)
+			}
+		}
+	}
+	// The three switches that keep one organization's people, machines and documents from another's.
+	for _, f := range []struct {
+		name string
+		on   bool
+		off  string
+	}{
+		{"HUB_ORGS", c.Orgs == OrgsOn, "roles and organizations are not asked: every member of a space is treated alike"},
+		{"HUB_ACCESS_ENFORCE", c.Machines.AccessEnforce == AccessOn, "a machine's access list is not kept: every member of its space opens it"},
+		{"HUB_RESOURCE_ACCESS", c.ResourceAccess, "documents are not on the shared access model"},
+	} {
+		switch {
+		case f.on:
+		case c.Edition == EditionCloud:
+			bad("HUB_EDITION=cloud needs %s=on: %s", f.name, f.off)
+		default:
+			c.Warnings = append(c.Warnings, f.name+" is not on: "+f.off+" (the cloud edition does not start without it)")
+		}
+	}
 	if g := get("HUB_LOCAL_CODE_GROUP"); g != "" {
 		if gid, err := strconv.Atoi(g); err == nil && gid >= 0 {
 			c.LocalCodeGID = gid
@@ -1121,6 +1360,14 @@ func (c *Config) loadStore(get func(string) string, def func(string, string) str
 		bad("HUB_STORE must be on or off")
 	}
 	c.Store.Dir = def("HUB_STORE_DIR", filepath.Join(c.DataDir, "store"))
+	c.Store.MaxUpload = 0
+	if v := strings.TrimSpace(get("HUB_STORE_MAX_UPLOAD_MB")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 0 && n <= 1<<30 {
+			c.Store.MaxUpload = n << 20
+		} else {
+			bad("HUB_STORE_MAX_UPLOAD_MB must be a whole number of megabytes (0: no limit), got %q", v)
+		}
+	}
 	c.Store.LegacySpace = strings.TrimSpace(get("HUB_STORE_LEGACY_SPACE"))
 	if raw := strings.TrimSpace(get("HUB_STORE_PROFILE_ROOMS")); raw != "" {
 		c.Store.ProfileRooms = map[string]string{}
@@ -1228,6 +1475,9 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 	}
 	if c.FleetSitesSecret != "" && len(c.FleetSitesSecret) < 32 {
 		bad("HARNESSLY_FLEET_SITES_SECRET must be at least 32 characters")
+	}
+	if c.PreviewSlotDomain != "" {
+		c.validatePreviewSlotDomain(bad)
 	}
 	if c.SitesDomain == "" {
 		return
@@ -1341,5 +1591,76 @@ func (c *Config) loadAppToken(get func(string) string, def func(string, string) 
 	}
 	if len(c.AppToken.ExchangeAudiences) == 0 {
 		bad("HUB_APP_TOKEN_EXCHANGE_URL needs HUB_APP_TOKEN_EXCHANGE_AUDIENCES: the audiences apps may get, each with its backend")
+	}
+}
+
+// Quotas are how much may be created: generous enough that people at work never meet them, low enough that a script
+// with one account does not fill the database or the provider's bill.
+type Quotas struct {
+	// Spaces (HUB_MAX_SPACES_PER_PERSON) is how many spaces one person may own.
+	Spaces int
+	// Orgs (HUB_MAX_ORGS_PER_PERSON) is how many organizations one person may have created.
+	Orgs int
+	// Servers (HUB_MAX_SERVERS_PER_SPACE) is how many servers a space may have asked the provider for.
+	Servers int
+}
+
+// The quotas of a hub that sets none.
+const (
+	DefaultMaxSpaces  = 20
+	DefaultMaxOrgs    = 10
+	DefaultMaxServers = 50
+)
+
+// MaxSpaces, MaxOrgs and MaxServers are the quotas in force; a hub built without a configuration has the defaults.
+func (c *Config) MaxSpaces() int {
+	if c == nil || c.Quotas.Spaces <= 0 {
+		return DefaultMaxSpaces
+	}
+	return c.Quotas.Spaces
+}
+
+func (c *Config) MaxOrgs() int {
+	if c == nil || c.Quotas.Orgs <= 0 {
+		return DefaultMaxOrgs
+	}
+	return c.Quotas.Orgs
+}
+
+func (c *Config) MaxServers() int {
+	if c == nil || c.Quotas.Servers <= 0 {
+		return DefaultMaxServers
+	}
+	return c.Quotas.Servers
+}
+
+// validatePreviewSlotDomain: the slots' origins must be sites of their own. A page of a slot is a person's app, and on
+// the hub's registrable domain it could set cookies for the hub or send it requests with a person's cookies.
+func (c *Config) validatePreviewSlotDomain(bad func(format string, args ...any)) {
+	d := c.PreviewSlotDomain
+	if !domainName.MatchString(d) {
+		bad("HUB_PREVIEW_SLOT_DOMAIN must be a domain name like slots.example.com")
+		return
+	}
+	hub := hostName(c.Host)
+	within := func(a, b string) bool { return a == b || strings.HasSuffix(a, "."+b) }
+	switch {
+	case hub == d:
+		bad("HUB_PREVIEW_SLOT_DOMAIN must differ from the hub's own host")
+	case strings.HasSuffix(hub, "."+d):
+		bad("HUB_PREVIEW_SLOT_DOMAIN %s is a parent of the hub's own host %s: use a domain that is not above it", d, hub)
+	case c.RuntimeDomain != "" && (within(d, c.RuntimeDomain) || within(c.RuntimeDomain, d)):
+		bad("HUB_PREVIEW_SLOT_DOMAIN %s and HUB_RUNTIME_DOMAIN %s must not contain one another", d, c.RuntimeDomain)
+	case c.SitesDomain != "" && (within(d, c.SitesDomain) || within(c.SitesDomain, d)):
+		bad("HUB_PREVIEW_SLOT_DOMAIN %s and HARNESSLY_SITES_DOMAIN %s must not contain one another", d, c.SitesDomain)
+	case sameSite(hub, d):
+		msg := fmt.Sprintf("HUB_PREVIEW_SLOT_DOMAIN %s and the hub's host %s are on one registrable domain, so they are one site: "+
+			"a person's app in a slot could set cookies for the whole domain and send the hub requests with a person's cookies. "+
+			"Use a domain of its own for the slots, or get it onto the public suffix list", d, hub)
+		if c.Edition == EditionCloud && !c.AllowSameSiteRuntime {
+			bad("%s (HUB_ALLOW_SAME_SITE_RUNTIME=1 accepts it in the cloud edition)", msg)
+		} else {
+			c.Warnings = append(c.Warnings, msg)
+		}
 	}
 }

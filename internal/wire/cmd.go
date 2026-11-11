@@ -16,6 +16,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // The answers of opIds are kept OpsKeep, at most OpsMax of them (§3, §4.5).
@@ -94,7 +95,7 @@ func (o *OpLog) Run(ctx context.Context, cmd Command, budget time.Duration, run 
 		e = &opEntry{FP: fp, done: make(chan struct{})}
 		o.m[key] = e
 		o.mu.Unlock()
-		go o.finish(key, e, budget, run)
+		safego.Go("wire command", func() { o.finish(key, e, budget, run) })
 	} else {
 		o.mu.Unlock()
 	}

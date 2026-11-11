@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // worktreeDir is where a conversation's worktrees live inside the repository, and worktreeBranch the prefix of their
@@ -42,7 +44,7 @@ func git(dir string, args ...string) (string, error) {
 		return "", err
 	}
 	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	safego.Go("convo worktree wait", func() { done <- cmd.Wait() })
 	select {
 	case err := <-done:
 		if err != nil {

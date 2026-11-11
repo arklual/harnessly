@@ -10,6 +10,9 @@ import (
 // procRoot is where foregroundOf reads processes; tests point it elsewhere.
 var procRoot = "/proc"
 
+// readProc reads one file of /proc; tests count the reads through it.
+var readProc = os.ReadFile
+
 // foregroundOf is the program in the foreground of the pane whose shell is panePID, read from /proc the way tmux reads
 // it (the terminal's foreground process group, the first word of its leader's command line), or "" when /proc does not
 // tell.
@@ -38,7 +41,7 @@ func foregroundOf(panePID int) string {
 			return ""
 		}
 	}
-	cmdline, err := os.ReadFile(procRoot + "/" + strconv.Itoa(fg) + "/cmdline")
+	cmdline, err := readProc(procRoot + "/" + strconv.Itoa(fg) + "/cmdline")
 	if err != nil {
 		return ""
 	}
@@ -53,7 +56,7 @@ type procStat struct {
 }
 
 func readStat(pid int) (procStat, bool) {
-	stat, err := os.ReadFile(procRoot + "/" + strconv.Itoa(pid) + "/stat")
+	stat, err := readProc(procRoot + "/" + strconv.Itoa(pid) + "/stat")
 	if err != nil {
 		return procStat{}, false
 	}

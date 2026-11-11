@@ -1,6 +1,8 @@
 // The side chat: questions about the open chat and their answers as they come; with nothing asked yet, what it is for
 // and a few questions to start. Enter asks, the square stops the answer. The same log and field are a tab of the pane
-// (.hx-sidedock) or the window over everything (side-float.tsx).
+// (.hx-sidedock) or the window over everything (side-float.tsx). Words picked in the chat and sent here («Ask aside»,
+// stores/side-ask.ts) come into the field as a quote from the main chat, after what is typed there, with the caret
+// after them for the question.
 import { useEffect, useRef, useState } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
@@ -22,15 +24,49 @@ export interface ISideChatProps {
   onAsk: (question: string) => void;
   onStop: () => void;
   onRetry: (id: string) => void;
+  /** Words of the main chat for the field, as a quote; taken once (by their nonce). */
+  quote?: { quote: string; nonce: number } | null;
+  /** The field has the quote. */
+  onQuoted?: (nonce: number) => void;
 }
+
+/** The words as a quote of the main chat, a question to write after them. */
+export const quoteBlock = (words: string): string =>
+  `${t('next.side.quoteFrom')}\n${words
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n')}\n\n`;
 
 const SUGGESTIONS = ['done', 'why', 'files', 'cost'] as const;
 
 /** The log and the field, in whatever holds them. */
-export const SideChatBody = ({ messages, busy, onAsk, onStop, onRetry }: ISideChatProps) => {
+export const SideChatBody = ({ messages, busy, onAsk, onStop, onRetry, quote, onQuoted }: ISideChatProps) => {
   const [draft, setDraft] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
   const last = messages[messages.length - 1];
+
+  // A quote sent here goes after what is typed (in the render that brings it), then the store lets it go and the caret
+  // goes after it, for the question.
+  const [taken, setTaken] = useState<number | null>(null);
+  if (quote && quote.nonce !== taken) {
+    setTaken(quote.nonce);
+    const block = quoteBlock(quote.quote);
+    const kept = draft.trimEnd();
+    setDraft(kept === '' ? block : `${kept}\n\n${block}`);
+  }
+  useEffect(() => {
+    if (taken === null) return;
+    onQuoted?.(taken);
+    // After the render that puts the words in.
+    requestAnimationFrame(() => {
+      const field = fieldRef.current;
+      if (!field) return;
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+      field.scrollTop = field.scrollHeight;
+    });
+  }, [taken, onQuoted]);
 
   useEffect(() => {
     const el = bodyRef.current;
@@ -88,6 +124,7 @@ export const SideChatBody = ({ messages, busy, onAsk, onStop, onRetry }: ISideCh
       </div>
       <div className="hx-sidechat__foot">
         <textarea
+          ref={fieldRef}
           className="hx-sidechat__input"
           rows={1}
           autoFocus

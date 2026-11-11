@@ -10,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Reply is what the hub answers an agent's doc.publish or doc.acl: the agent turns it into the tool result.
@@ -23,6 +24,8 @@ type Who struct {
 	MachineID string
 	// OwnerID is the account that connected the machine.
 	OwnerID string
+	// SpaceID is the space the machine is in: what it publishes belongs there.
+	SpaceID string
 }
 
 type publishEvent struct {
@@ -90,7 +93,11 @@ func (s *Service) publish(ctx context.Context, who Who, e publishEvent) Reply {
 	if e.Slug != "" {
 		sl := e.Slug
 		in.Slug = &sl
-		if m, err := s.meta(ctx, e.Slug); err == nil && m != nil && owner.Email != "" && !strings.EqualFold(m.OwnerEmail, owner.Email) {
+		m, elsewhere, err := s.meta(ctx, e.Slug, reachMachine(who.SpaceID))
+		if err != nil {
+			return reply(http.StatusInternalServerError, "internal", "Что-то пошло не так")
+		}
+		if elsewhere || (m != nil && owner.Email != "" && !strings.EqualFold(m.OwnerEmail, owner.Email)) {
 			return reply(http.StatusForbidden, "forbidden", "Этот документ опубликовал другой человек")
 		}
 	} else {
@@ -106,7 +113,7 @@ func (s *Service) publish(ctx context.Context, who Who, e publishEvent) Reply {
 	}
 	slug := out.Artifact.Slug
 	level := levelOf(e.Visibility)
-	if err := s.putMeta(ctx, meta{Slug: slug, OwnerEmail: owner.Email, OwnerName: displayName(owner), MachineID: who.MachineID, SourcePath: e.Source.Path, Title: e.Title, TeamLevel: level}); err != nil {
+	if err := s.putMeta(ctx, meta{Slug: slug, OwnerEmail: owner.Email, OwnerName: displayName(owner), SpaceID: who.SpaceID, MachineID: who.MachineID, SourcePath: e.Source.Path, Title: e.Title, TeamLevel: level}); err != nil {
 		s.log.Error("doc_meta write failed", "slug", slug, "error", err)
 		return reply(http.StatusInternalServerError, "internal", "Не удалось записать документ")
 	}
@@ -134,12 +141,12 @@ func (s *Service) upstream(err error) Reply {
 		return reply(http.StatusBadRequest, "invalid", "Сервис документов не принял документ")
 	}
 	s.log.Warn("documents service failed", "error", err)
-	return reply(http.StatusBadGateway, "docs_unavailable", "Сервис документов не отвечает")
+	return reply(http.StatusBadGateway, "docs_unavailable", "Сервис документов сейчас недоступен, попробуйте позже")
 }
 
 // acl handles the sharing calls of the agent's gateway route. Supported: .../acl/team {level} and .../access {public}.
 func (s *Service) acl(ctx context.Context, who Who, e aclEvent) Reply {
-	m, err := s.meta(ctx, e.Slug)
+	m, _, err := s.meta(ctx, e.Slug, reachMachine(who.SpaceID))
 	if err != nil {
 		return reply(http.StatusInternalServerError, "internal", "Что-то пошло не так")
 	}
@@ -158,7 +165,7 @@ func (s *Service) acl(ctx context.Context, who Who, e aclEvent) Reply {
 		if json.Unmarshal(e.Body, &b) != nil || levelRank[b.Level] == 0 && b.Level != levelNone {
 			return reply(http.StatusBadRequest, "invalid", "Уровень: none, view, comment или edit")
 		}
-		if err := s.setLevel(ctx, e.Slug, b.Level); err != nil {
+		if err := s.setLevel(ctx, m, b.Level); err != nil {
 			return reply(http.StatusInternalServerError, "internal", "Что-то пошло не так")
 		}
 		return Reply{Status: http.StatusOK, Body: map[string]any{"slug": e.Slug, "level": b.Level}}
@@ -186,7 +193,7 @@ func (s *Service) machineEvent(m store.Machine, ev link.Event) {
 	if ev.Name == hubproto.EventDocBound {
 		var e struct{ Binding hubproto.DocBinding }
 		if err = json.Unmarshal(ev.Raw, &e); err == nil {
-			err = s.bind(ctx, m.ID, e.Binding)
+			err = s.bind(ctx, m, e.Binding)
 		}
 	} else {
 		var e hubproto.DocReply
@@ -204,21 +211,21 @@ func (s *Service) machineEvent(m store.Machine, ev link.Event) {
 func (s *Service) Event(l *link.Link, m store.Machine, ev link.Event) {
 	switch ev.Name {
 	case hubproto.EventDocBound, hubproto.EventDocReply:
-		go s.machineEvent(m, ev)
+		safego.Go("docs machineEvent", func() { s.machineEvent(m, ev) })
 		return
 	case hubproto.EventDocPublish, hubproto.EventDocACL:
 	default:
 		return
 	}
-	go func() {
+	safego.Go("docs Event", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 		defer cancel()
-		rid, rep, ok := s.Handle(ctx, Who{MachineID: m.ID, OwnerID: m.CreatedBy}, ev.Name, ev.Raw)
+		rid, rep, ok := s.Handle(ctx, Who{MachineID: m.ID, OwnerID: m.CreatedBy, SpaceID: m.SpaceID}, ev.Name, ev.Raw)
 		if !ok || rid == "" {
 			return
 		}
 		if _, err := l.Call(ctx, "doc.result", map[string]any{"requestId": rid, "status": rep.Status, "body": rep.Body}); err != nil {
 			s.log.Warn("doc.result not delivered", "machine", m.ID, "error", err)
 		}
-	}()
+	})
 }

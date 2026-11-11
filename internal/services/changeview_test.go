@@ -371,3 +371,77 @@ func TestChangeViewServesGitlabWithJobsAndDiscussions(t *testing.T) {
 		t.Error("IsChangeRef")
 	}
 }
+
+func TestChangeViewGivesReviewFieldsAndFileVersions(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.EscapedPath() {
+		case "/api/v4/projects/team%2Fapp":
+			_, _ = w.Write([]byte(`{"path_with_namespace":"team/app"}`))
+		case "/api/v4/projects/team%2Fapp/merge_requests/7":
+			diverged := ""
+			if r.URL.Query().Get("include_diverged_commits_count") == "true" {
+				diverged = `"diverged_commits_count":4,`
+			}
+			_, _ = w.Write([]byte(`{"iid":7,"title":"Review HRN-1","state":"opened","web_url":"https://gitlab.example.com/team/app/-/merge_requests/7",
+				"changes_count":"1","has_conflicts":true,` + diverged + `"reviewers":[{"name":"Eva"},{"name":""}],
+				"diff_refs":{"base_sha":"b1","head_sha":"h2","start_sha":"s0"}}`))
+		case "/api/v4/projects/team%2Fapp/merge_requests/7/diffs":
+			_, _ = w.Write([]byte(`[]`))
+		case "/api/v4/projects/team%2Fapp/merge_requests/7/approvals":
+			_, _ = w.Write([]byte(`{"approvals_left":1,"approved_by":[{"user":{"name":"Fil"}}]}`))
+		case "/api/v4/projects/team%2Fapp/merge_requests/7/commits":
+			_, _ = w.Write([]byte(`[{"id":"c1","title":"feat: one (HRN-2)","author_name":"Eva","created_at":"2026-11-11T01:00:00Z"},{"title":"no id"}]`))
+		case "/api/v4/projects/team%2Fapp/merge_requests/7/discussions":
+			_, _ = w.Write([]byte(`[]`))
+		case "/api/v4/projects/team%2Fapp/repository/files/src%2Fa.go/raw":
+			switch r.URL.Query().Get("ref") {
+			case "b1":
+				_, _ = w.Write([]byte("old\n"))
+			case "h2":
+				_, _ = w.Write([]byte("new\n"))
+			default:
+				http.NotFound(w, r)
+			}
+		case "/api/v4/projects/team%2Fapp/repository/files/bin.png/raw":
+			_, _ = w.Write([]byte("\x89PNG\x00\x01"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer api.Close()
+	t.Setenv("GITLAB_SELF_TOKEN", "self")
+	s := New(Config{GitLabHosts: []string{"gitlab.example.com"}, GitLabAPI: api.URL})
+	link := "https://gitlab.example.com/team/app/-/merge_requests/7"
+	v := view(t, s, link)
+	if opt(v, "conflicts") != true || opt(v, "behind") != float64(4) || opt(v, "approvalsLeft") != float64(1) {
+		t.Errorf("%s", jsvalue.Stringify(v, ""))
+	}
+	if r := opt(v, "reviewers").([]any); len(r) != 1 || r[0] != "Eva" {
+		t.Errorf("reviewers %v", r)
+	}
+	if a := opt(v, "approvedBy").([]any); len(a) != 1 || a[0] != "Fil" {
+		t.Errorf("approvedBy %v", a)
+	}
+	if c := opt(v, "commits").([]any); len(c) != 1 || opt(c[0], "sha") != "c1" || opt(c[0], "author") != "Eva" {
+		t.Errorf("commits %s", jsvalue.Stringify(opt(v, "commits"), ""))
+	}
+	if opt(opt(v, "diffRefs"), "base") != "b1" || opt(opt(v, "diffRefs"), "head") != "h2" {
+		t.Errorf("diffRefs %s", jsvalue.Stringify(opt(v, "diffRefs"), ""))
+	}
+
+	sides, err := s.ChangeFile(context.Background(), link, "src/a.go", "src/a.go")
+	if err != nil || sides == nil || opt(sides, "oldContent") != "old\n" || opt(sides, "newContent") != "new\n" || opt(sides, "binary") != false {
+		t.Errorf("file %v %v", sides, err)
+	}
+	added, _ := s.ChangeFile(context.Background(), link, "", "src/a.go")
+	if added == nil || opt(added, "oldContent") != "" || opt(added, "newContent") != "new\n" {
+		t.Errorf("added %v", added)
+	}
+	bin, _ := s.ChangeFile(context.Background(), link, "bin.png", "bin.png")
+	if bin == nil || opt(bin, "binary") != true || opt(bin, "newContent") != "" {
+		t.Errorf("binary %v", bin)
+	}
+	if none, err := s.ChangeFile(context.Background(), "https://example.com/x", "a", "a"); none != nil || err != nil {
+		t.Errorf("not a change %v %v", none, err)
+	}
+}

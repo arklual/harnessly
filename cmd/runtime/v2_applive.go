@@ -30,6 +30,8 @@ type liveApps struct {
 	mu sync.Mutex
 	// told are the apps each chat's agent was told of by the live hook, by conversation.
 	told map[string][]string
+	// windows are the blocks of the open app windows each chat's agent was told of, by conversation and app.
+	windows map[string]map[string]string
 }
 
 var liveAppsOf = &liveApps{}
@@ -94,9 +96,12 @@ func (l *liveApps) changeIsLive(rec wire.Conversation, ids []string) bool {
 	return true
 }
 
-// notice is the live hook's text for the next turn of a chat's agent: the apps turned on since it was last told (their
-// words), the ones that wait for a new start (why), and the ones turned off. It remembers what it told.
-func (l *liveApps) notice(rec wire.Conversation) string {
+// notice is the live hook's text for a turn of a chat's agent: the apps turned on since it was last
+// told (their words), the ones that wait for a new start (why) and the ones turned off, then, on every turn while apps
+// are on, a short context of them: where their instructions and skills are, their tools and what is open beside the
+// chat. A service turn (a reminder the platform typed, delegation.IsService) gets the same text but spends nothing: what
+// is told once is told again on the person's next turn.
+func (l *liveApps) notice(rec wire.Conversation, service bool) string {
 	launched := l.startedWith(rec.Session)
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -104,41 +109,107 @@ func (l *liveApps) notice(rec wire.Conversation) string {
 		l.told = map[string][]string{}
 	}
 	told := l.told[rec.ID]
-	var on, waiting, off, now []string
+	var on, waiting, off, now, lines []string
 	for _, id := range rec.Apps {
-		if slices.Contains(launched, id) {
-			continue
+		if !slices.Contains(launched, id) {
+			now = append(now, id)
+			why := l.refusal(id, launched)
+			if !slices.Contains(told, id) {
+				if why != "" {
+					waiting = append(waiting, why)
+					continue
+				}
+				a, err := l.reg.Get(id)
+				if err != nil || a.Manifest == nil {
+					continue
+				}
+				brief, err := apps.LiveBrief(a)
+				if err != nil {
+					continue
+				}
+				on = append(on, brief)
+				continue
+			}
+			if why != "" {
+				continue
+			}
 		}
-		now = append(now, id)
-		if slices.Contains(told, id) {
-			continue
+		if a, err := l.reg.Get(id); err == nil && a.Manifest != nil {
+			lines = append(lines, apps.LiveLine(a))
 		}
-		if why := l.refusal(id, launched); why != "" {
-			waiting = append(waiting, why)
-			continue
-		}
-		a, err := l.reg.Get(id)
-		if err != nil || a.Manifest == nil {
-			continue
-		}
-		brief, err := apps.LiveBrief(a)
-		if err != nil {
-			continue
-		}
-		on = append(on, brief)
 	}
 	for _, id := range told {
 		if !slices.Contains(rec.Apps, id) {
 			off = append(off, l.name(id))
 		}
 	}
-	sort.Strings(now)
-	if len(now) == 0 {
-		delete(l.told, rec.ID)
-	} else {
-		l.told[rec.ID] = now
+	if !service {
+		sort.Strings(now)
+		if len(now) == 0 {
+			delete(l.told, rec.ID)
+		} else {
+			l.told[rec.ID] = now
+		}
 	}
-	return apps.LiveNotice(on, waiting, off)
+	var parts []string
+	for _, part := range []string{apps.LiveNotice(on, waiting, off), apps.LiveContext(lines, l.open(rec.ID))} {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+// open are the views of apps mounted beside a chat, in words: "Кэшбэк (acme.cashback): view main in the pane".
+func (l *liveApps) open(conv string) []string {
+	sessions := appViewSessions.Load()
+	if sessions == nil {
+		return nil
+	}
+	var out []string
+	for _, s := range sessions.Mounted(conv) {
+		line := l.name(s.App) + ": view " + s.View + " in the " + s.Target
+		if !slices.Contains(out, line) {
+			out = append(out, line)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// windowNotice is the live hook's text of the chat's open app windows: the block of each window that is new
+// or changed since the agent was last told, and the windows closed since. It remembers what it told, but not on a
+// service turn: what a reminder of the platform was told the person's next turn is told again.
+func (l *liveApps) windowNotice(conv string, briefs []apps.WindowBriefOf, service bool) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.windows == nil {
+		l.windows = map[string]map[string]string{}
+	}
+	told := l.windows[conv]
+	now := map[string]string{}
+	var blocks, closed []string
+	for _, b := range briefs {
+		now[b.App] = b.Text
+		if told[b.App] != b.Text {
+			blocks = append(blocks, b.Text)
+		}
+	}
+	for app := range told {
+		if _, open := now[app]; !open {
+			closed = append(closed, l.name(app))
+		}
+	}
+	sort.Strings(closed)
+	if service {
+		return apps.WindowNotice(blocks, closed)
+	}
+	if len(now) == 0 {
+		delete(l.windows, conv)
+	} else {
+		l.windows[conv] = now
+	}
+	return apps.WindowNotice(blocks, closed)
 }
 
 func (l *liveApps) name(id string) string {
@@ -148,8 +219,28 @@ func (l *liveApps) name(id string) string {
 	return id
 }
 
-// appLiveRoutes: POST /api/cli/apps/live-context {session} is the live hook's question (harnessly hook app-context
-// --live): {"text": …}, empty when the chat's apps did not change since the agent was last told.
+// liveStatus remembers what each chat's agent was last told of its documents' statuses: it is told again only when
+// that changes (a restart of the runtime tells it once more).
+type liveStatus struct {
+	mu   sync.Mutex
+	told map[string]string
+}
+
+var liveStatusOf = &liveStatus{told: map[string]string{}}
+
+// notice is text when it is new for the chat, else "".
+func (l *liveStatus) notice(conv, text string) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.told[conv] == text {
+		return ""
+	}
+	l.told[conv] = text
+	return text
+}
+
+// appLiveRoutes: POST /api/cli/apps/live-context {session, service} is the live hook's question (harnessly hook
+// app-context --live): {"text": …}, empty when no app is on in the chat and no window changed.
 func appLiveRoutes(d deps, reg *apps.Registry, chats appChats) []gate.Route {
 	live := func(w http.ResponseWriter, r *http.Request) {
 		if d.CLI == nil || !d.CLI.OK(r) {
@@ -162,6 +253,8 @@ func appLiveRoutes(d deps, reg *apps.Registry, chats appChats) []gate.Route {
 		}
 		var b struct {
 			Session string `json:"session"`
+			// Service: the turn is one the platform typed (a reminder), not the person's.
+			Service bool `json:"service"`
 		}
 		if !readSecretBody(r, &b) || strings.TrimSpace(b.Session) == "" {
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
@@ -180,7 +273,21 @@ func appLiveRoutes(d deps, reg *apps.Registry, chats appChats) []gate.Route {
 			secretJSON(w, http.StatusOK, map[string]string{"text": ""})
 			return
 		}
-		secretJSON(w, http.StatusOK, map[string]string{"text": liveAppsOf.notice(rec)})
+		// The apps turned on or off since the agent was told, then the open windows of the apps on now.
+		windows := apps.HostTools{Conv: rec.ID, Registry: reg, Pages: appPages, Enabled: func() []string { return rec.Apps }}.WindowBriefs()
+		var parts []string
+		statusText := liveStatusOf.notice(rec.ID, apps.ChatStatusNotice(reg.ChatStatuses(rec.ID), func(id string) *apps.Manifest {
+			if a, err := reg.Get(id); err == nil && slices.Contains(rec.Apps, id) {
+				return a.Manifest
+			}
+			return nil
+		}))
+		for _, text := range []string{liveAppsOf.notice(rec, b.Service), liveAppsOf.windowNotice(rec.ID, windows, b.Service), statusText} {
+			if text != "" {
+				parts = append(parts, text)
+			}
+		}
+		secretJSON(w, http.StatusOK, map[string]string{"text": strings.Join(parts, "\n\n")})
 	}
 	return []gate.Route{{Match: func(r *http.Request) bool { return pathIs(r, "/api/cli/apps/live-context") }, Handler: http.HandlerFunc(live)}}
 }

@@ -12,7 +12,7 @@ import { useMe, personKey, type MeState } from '@/next/stores/me';
 import { LOCAL_PERSON } from '@/next/core/persist';
 import { useLinkRestored } from '@/next/stores/connection';
 import { t } from '@/next/i18n';
-import type { Conversation } from '@/next/protocol/v2';
+import { isChatPlace, type IPlace } from '@/next/features/pane/place';
 import type { TTab } from '@/next/features/pane/pane-tabs';
 import { useFrameBridge } from '@/next/features/pane/use-frame-bridge';
 import { siteUrlOf } from '@/next/features/pane/frame-bridge';
@@ -48,7 +48,8 @@ import type { IFrameAct } from '@/next/features/pane/use-frame-bridge';
 const SEND_FADE_MS = 220;
 
 interface IBrowserTabProps {
-  conv: Conversation;
+  /** The chat, or the machine's own place on the start page: there nothing goes to a chat's field. */
+  conv: IPlace;
   tab: Extract<TTab, { kind: 'browser' }>;
   onChange: (tab: Extract<TTab, { kind: 'browser' }>) => void;
   onNewTab: () => void;
@@ -84,6 +85,7 @@ const tellVault = (outcome: TVaultOutcome, login: string): void => {
 };
 
 const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
+  const chat = isChatPlace(conv);
   const [reloadKey, setReloadKey] = useState(0);
   // A reload asked from outside the tab (the agent published the page again) is one more press of «Обновить».
   const asked = tab.reload ?? 0;
@@ -498,7 +500,7 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
         else setReloadKey((n) => n + 1);
       }}
       onNewTab={onNewTab}
-      picking={slotOrigin !== null && !live ? bridge.picking : null}
+      picking={slotOrigin !== null && !live && chat ? bridge.picking : null}
       onPick={() => {
         if (dom.inspect) dom.setInspect(false);
         bridge.togglePick();
@@ -564,8 +566,16 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
               dom,
               inspect: { on: dom.inspect, disabled: slotOrigin === null, onToggle: toggleInspect },
               onSend: (words) => {
-                toChat(words);
-                toast(t('next.pane.pick.sent'));
+                if (chat) {
+                  toChat(words);
+                  toast(t('next.pane.pick.sent'));
+                  return;
+                }
+                // No chat to tell: the words are copied for the person to take where they want.
+                void navigator.clipboard.writeText(words).then(
+                  () => toast(t('next.fileMenu.copied'), { tone: 'success' }),
+                  () => toast(t('next.fileMenu.copyFailed'), { tone: 'error' }),
+                );
               },
             }
       }

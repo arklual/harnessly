@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -42,6 +43,11 @@ func origin(dialURL string) (string, error) {
 	}
 	return u.Scheme + "://" + u.Host + strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), "/agent/v1"), nil
 }
+
+// ErrNotConnected: the hub refuses this machine a store session (401, 403 or 423): it is not in a space of the hub yet
+// (or was removed or switched off), or its clock is off. It is not a fault to repeat every few seconds: the session asks
+// the hub again with growing pauses, and the loops that wait for the store wait for the connection (Link.Ready).
+var ErrNotConnected = errors.New("the hub gave this machine no store session")
 
 // errNoStore is a hub that answers and has no store: an older hub, or HUB_STORE=off.
 var errNoStore = errors.New("the hub has no store")
@@ -106,7 +112,7 @@ func RequestSession(ctx context.Context, hc *http.Client, m Machine, now time.Ti
 	case http.StatusNotFound:
 		return out, errNoStore
 	case http.StatusUnauthorized, http.StatusForbidden, http.StatusLocked:
-		return out, fmt.Errorf("the hub gave this machine no store session (HTTP %d): check the clock, or the machine is not in this hub", res.StatusCode)
+		return out, fmt.Errorf("%w (HTTP %d): check the clock, or the machine is not in this hub", ErrNotConnected, res.StatusCode)
 	default:
 		return out, fmt.Errorf("the hub gave no store session: HTTP %d", res.StatusCode)
 	}
@@ -121,10 +127,28 @@ type sessions struct {
 	hc      *http.Client
 	machine Machine
 	now     func() time.Time
+	log     *slog.Logger
 
 	mu  sync.Mutex
 	cur hubproto.StoreSession
 	exp time.Time
+	// A refusal (ErrNotConnected) is kept: until denyUntil the hub is not asked again and every caller gets the same
+	// answer, so a machine that is not in a space yet makes one request now and then, not one per loop every few seconds.
+	fails     int
+	denyUntil time.Time
+	denied    error
+}
+
+const (
+	denyFirst = 5 * time.Second
+	denyMax   = 2 * time.Minute
+)
+
+// retryIn is how long until a refused session is asked for again; 0 when it is not refused.
+func (s *sessions) retryIn() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return max(0, s.denyUntil.Sub(s.now()))
 }
 
 func (s *sessions) token(ctx context.Context, refresh bool) (string, error) {
@@ -133,9 +157,26 @@ func (s *sessions) token(ctx context.Context, refresh bool) (string, error) {
 	if !refresh && s.cur.Token != "" && s.now().Add(5*time.Minute).Before(s.exp) {
 		return s.cur.Token, nil
 	}
+	if now := s.now(); now.Before(s.denyUntil) {
+		return "", s.denied
+	}
 	sess, err := RequestSession(ctx, s.hc, s.machine, s.now())
 	if err != nil {
+		if errors.Is(err, ErrNotConnected) {
+			s.fails++
+			wait := min(denyFirst<<min(s.fails-1, 10), denyMax)
+			s.denyUntil, s.denied = s.now().Add(wait), err
+			if s.fails == 1 && s.log != nil {
+				s.log.Warn("store: this machine is not connected to a space of the hub yet, so it keeps its data on its own; it checks again with growing pauses", "err", err)
+			}
+		}
 		return "", err
+	}
+	if s.fails > 0 {
+		s.fails, s.denyUntil, s.denied = 0, time.Time{}, nil
+		if s.log != nil {
+			s.log.Info("store: the hub gave this machine a store session")
+		}
 	}
 	exp, err := time.Parse(time.RFC3339, sess.ExpiresAt)
 	if err != nil {

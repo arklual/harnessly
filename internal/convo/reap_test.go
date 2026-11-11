@@ -496,3 +496,48 @@ func TestAppsChangeLiveKeepsTheAgent(t *testing.T) {
 		t.Fatalf("a change that needs a start must stop the agent at rest: %v", r.terms.stopped)
 	}
 }
+
+// A chat whose agent exited loses its session too (the runtime keeps none for a bare shell): it stays the stopped chat
+// it was, through a restart, and its next message resumes it.
+func TestAStoppedChatWithoutASessionStaysStopped(t *testing.T) {
+	r := newRig(t)
+	r.user("work")
+	r.say("done")
+	r.turnEnd()
+	r.idle()
+	r.open()
+	r.machine.probes["s1"] = Probe{Session: true, Shell: true, Resumable: true}
+	r.tick(time.Second)
+	if st := r.state(); st.K != wire.StateStopped || !st.Resumable {
+		t.Fatalf("the agent exited: %+v", st)
+	}
+
+	r.machine.probes["s1"] = Probe{}
+	for range 3 {
+		r.tick(10 * time.Second)
+	}
+	if st := r.state(); st.K != wire.StateStopped || !st.Resumable {
+		t.Fatalf("without the session: %+v", st)
+	}
+	if q := r.snap().Queue; q.Paused != nil {
+		t.Fatalf("queue paused: %+v", q.Paused)
+	}
+	r.rt.Stop()
+	r.restart()
+	for range 3 {
+		r.tick(10 * time.Second)
+	}
+	if st := r.state(); st.K != wire.StateStopped || !st.Resumable {
+		t.Fatalf("after a restart: %+v", st)
+	}
+
+	if res := r.send("m1", "go on", wire.ModeQueue); res.Code != "" {
+		t.Fatalf("send: %+v", res)
+	}
+	if !slices.Contains(r.launcher.resumed, r.id) {
+		t.Fatalf("resumed %v", r.launcher.resumed)
+	}
+	if k := r.state().K; k != wire.StateStarting {
+		t.Fatalf("after the message: %s", k)
+	}
+}

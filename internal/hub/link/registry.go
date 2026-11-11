@@ -4,9 +4,11 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/coder/websocket"
 
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -16,9 +18,49 @@ type Registry struct {
 	mu      sync.Mutex
 	links   map[string]*Link
 	cluster *Cluster
+	// seen are the machines this process has had a link of: a link of one of them is a reconnect.
+	seen map[string]struct{}
 }
 
-func NewRegistry() *Registry { return &Registry{links: map[string]*Link{}} }
+func NewRegistry() *Registry {
+	return &Registry{links: map[string]*Link{}, seen: map[string]struct{}{}}
+}
+
+// Stats is what the links this process holds carry at one moment.
+type Stats struct {
+	// Links is the live links; Tunnels the open tunnels; Calls the requests to agents waiting for an answer.
+	Links, Tunnels, Calls int
+	// Events and Bulk are the events queued for the hub: the ordinary ones and the frames of the chats' history.
+	Events, Bulk int
+	// OldestEvent and OldestBulk are how long the oldest event of each queue that is not handled yet has waited.
+	OldestEvent, OldestBulk time.Duration
+}
+
+// Stats counts what the local links hold. It is for a scrape of the metrics: it takes every link's lock in turn.
+func (r *Registry) Stats() Stats {
+	r.mu.Lock()
+	links := make([]*Link, 0, len(r.links))
+	for _, l := range r.links {
+		if !l.Closed() {
+			links = append(links, l)
+		}
+	}
+	r.mu.Unlock()
+	st := Stats{Links: len(links)}
+	now := time.Now().UnixNano()
+	age := func(head int64, oldest *time.Duration) {
+		if head != 0 && time.Duration(now-head) > *oldest {
+			*oldest = time.Duration(now - head)
+		}
+	}
+	for _, l := range links {
+		tunnels, calls, events, bulk, eventHead, bulkHead := l.load()
+		st.Tunnels, st.Calls, st.Events, st.Bulk = st.Tunnels+tunnels, st.Calls+calls, st.Events+events, st.Bulk+bulk
+		age(eventHead, &st.OldestEvent)
+		age(bulkHead, &st.OldestBulk)
+	}
+	return st
+}
 
 // Get is the machine's link, or nil when it is not connected.
 func (r *Registry) Get(machineID string) *Link {
@@ -58,10 +100,17 @@ func (r *Registry) Add(l *Link) {
 	if r.cluster != nil {
 		r.cluster.acquire(r, l)
 	}
+	l.registered.Store(true)
 	r.mu.Lock()
 	old := r.links[l.MachineID]
 	r.links[l.MachineID] = l
+	_, again := r.seen[l.MachineID]
+	r.seen[l.MachineID] = struct{}{}
 	r.mu.Unlock()
+	metrics.LinkConnects.Inc()
+	if again {
+		metrics.LinkReconnects.Inc()
+	}
 	if old != nil {
 		old.Close(websocket.StatusCode(hubproto.CloseReplaced), "replaced by a newer link")
 	}

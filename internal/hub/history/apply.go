@@ -8,7 +8,6 @@ package history
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"math"
@@ -110,15 +109,16 @@ func ApplyFrame(ctx context.Context, db *store.DB, o Owner, f hubproto.HistoryEv
 	// Nothing is stored with a secret in it: the gateway's rules, before the transaction (redact.go).
 	f.Events = redactEvents(f.Events)
 	var res FrameResult
-	err := db.Tx(ctx, func(s store.Store) error {
+	// Two links of one machine (the old one ending, the new one started) may bring frames of one channel at once: the
+	// cursor moves only from what this transaction read, and the one that lost runs again from its read.
+	err := db.TxRetry(ctx, func(s store.Store) error {
+		res = FrameResult{}
 		q := s.Q()
-		var epoch string
-		var seq int64
-		err := q.QueryRow(ctx, `SELECT epoch, seq FROM history_cursors WHERE machine_id = ? AND ch = ?`, o.MachineID, f.Ch).Scan(&epoch, &seq)
-		stored := err == nil
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		cur, stored, err := s.HistoryCursorOf(ctx, o.MachineID, f.Ch)
+		if err != nil {
 			return err
 		}
+		epoch, seq := cur.Epoch, cur.Seq
 		last := f.FromSeq + int64(len(f.Events)) - 1
 		continues := stored && epoch == f.Epoch
 		from := f.FromSeq
@@ -140,10 +140,14 @@ func ApplyFrame(ctx context.Context, db *store.DB, o Owner, f hubproto.HistoryEv
 			res.Applied++
 		}
 		if last >= f.FromSeq {
-			if _, err := q.Exec(ctx, `INSERT INTO history_cursors (machine_id, ch, epoch, seq, updated_at) VALUES (?, ?, ?, ?, ?)
-				ON CONFLICT (machine_id, ch) DO UPDATE SET epoch = excluded.epoch, seq = excluded.seq, updated_at = excluded.updated_at`,
-				o.MachineID, f.Ch, f.Epoch, last, store.Ms(now)); err != nil {
-				return err
+			var read *store.HistoryCursor
+			if stored {
+				read = &cur
+			}
+			if to := (store.HistoryCursor{Epoch: f.Epoch, Seq: last}); !stored || to != cur {
+				if err := s.MoveHistoryCursor(ctx, o.MachineID, f.Ch, read, to, now); err != nil {
+					return err
+				}
 			}
 		}
 		res.AckSeq, res.Epoch = last, f.Epoch
@@ -226,9 +230,9 @@ func upsertConversation(ctx context.Context, q store.Q, o Owner, raw json.RawMes
 		return err
 	}
 	_, err := q.Exec(ctx, `UPDATE history_conversations SET record = ?, rev = ?, seq = ?, last_prompt_ms = ?, last_activity_ms = ?,
-		deleted_at = NULL, updated_at = ?
+		parent_id = ?, deleted_at = NULL, updated_at = ?
 		WHERE machine_id = ? AND conv_id = ? AND owner_id = ? AND (record IS NULL OR rev <= ?)`,
-		string(raw), rev, seq, nullNum(c["lastPromptAt"]), nullNum(c["lastActivityAt"]), store.Ms(now),
+		string(raw), rev, seq, nullNum(c["lastPromptAt"]), nullNum(c["lastActivityAt"]), parentOf(raw), store.Ms(now),
 		o.MachineID, id, o.UserID, rev)
 	return err
 }

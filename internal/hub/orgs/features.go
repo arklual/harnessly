@@ -8,6 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // FeatureView is one flag of an organization (docs/hub/api.md, «Feature flags»).
@@ -36,8 +37,8 @@ func (s *Service) view(ctx context.Context, st store.Store, p *auth.Principal, o
 }
 
 func (s *Service) mountFeatures(mux *http.ServeMux) {
-	mux.Handle("GET /api/orgs/{org}/features", s.Gate(s.featuresList))
-	mux.Handle("PUT /api/orgs/{org}/features/{name}", s.Gate(s.featureSet))
+	mux.Handle("GET /api/orgs/{org}/features", s.OrgGate(s.featuresList))
+	mux.Handle("PUT /api/orgs/{org}/features/{name}", s.OrgGate(s.featureSet))
 }
 
 func (s *Service) featureView(ctx context.Context, orgID, name string) FeatureView {
@@ -48,11 +49,8 @@ func (s *Service) featureView(ctx context.Context, orgID, name string) FeatureVi
 }
 
 // featuresList is every flag the hub knows with its state for the organization; any member of it may read.
-func (s *Service) featuresList(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	o, err := Resolve(r.Context(), s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+func (s *Service) featuresList(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	o := *tc.Org
 	out := FeaturesResponse{Features: make([]FeatureView, 0, len(features.Known))}
 	for _, n := range features.Known {
 		out.Features = append(out.Features, s.featureView(r.Context(), o.ID, n))
@@ -63,16 +61,14 @@ func (s *Service) featuresList(w http.ResponseWriter, r *http.Request, p *auth.P
 
 // featureSet switches a flag for the organization. Only an instance administrator may: what is shipped dark is theirs
 // to open. Journal: org.feature.
-func (s *Service) featureSet(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) featureSet(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct{ Enabled *bool }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
 	}
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	if !p.Admin {
 		return httpx.ErrForbidden
 	}

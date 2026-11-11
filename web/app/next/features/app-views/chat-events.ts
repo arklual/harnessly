@@ -3,6 +3,7 @@
 // never what was said or passed: the view reads the chat with chat.read when it holds that right.
 import type { ConvId, Entry } from '@/next/protocol/v2';
 import { entryStore } from '@/next/stores/conversation';
+import { agentStateOf } from '@/next/stores/chat-state';
 import { conversationsStore } from '@/next/stores/conversations';
 import type { TEventKind } from './bridge';
 
@@ -26,9 +27,9 @@ export const eventOfEntry = (e: Entry): { kind: TEventKind; params: Record<strin
 export const watchChatEvents = (conv: ConvId, emit: TEmit, now = Date.now()): (() => void) => {
   const prefix = `${conv} `;
   const told = new Set<string>();
-  let working = conversationsStore.get(conv)?.state.k === 'working';
+  let working = agentStateOf(conv)?.k === 'working';
   const offState = conversationsStore.subscribeKey(conv, () => {
-    const state = conversationsStore.get(conv)?.state;
+    const state = agentStateOf(conv);
     if (!state) return;
     const was = working;
     working = state.k === 'working';

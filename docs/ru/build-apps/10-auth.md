@@ -54,6 +54,11 @@ JWT, подписанный Ed25519-ключом хаба (`alg: EdDSA`, `typ: h
 остаётся в наборе). Машина без хаба подписывает своим ключом и ничего в сеть не публикует: набор лежит в
 `app-token.jwks.json` в папке данных рантайма, администратор бэкенда копирует его к себе.
 
+**Discovery.** Хаб отвечает и на `https://<хаб>/.well-known/openid-configuration` (`issuer`, `jwks_uri`, алгоритм
+`EdDSA`), так что обычная OIDC-библиотека находит ключи по одному издателю: в Go — `oidc.NewProvider(ctx, "https://harnessly.example")`,
+затем `provider.Verifier(&oidc.Config{ClientID: <ваш origin>, SupportedSigningAlgs: []string{oidc.EdDSA}})`. Публично, кэш
+5 минут; при `HUB_APP_TOKEN=off` оба адреса отвечают 404.
+
 **Проверка на бэкенде**: подпись ключом из набора, `iss`, свой `aud` и `exp` — всегда; `typ` — где библиотека позволяет.
 
 Go (`github.com/coreos/go-oidc/v3`):
@@ -136,7 +141,7 @@ export async function whoCalls(req) {
 
 | Переменная | Что значит |
 | --- | --- |
-| `HUB_APP_TOKEN` | `on` (по умолчанию) или `off`: хаб не выдаёт токены и не публикует JWKS |
+| `HUB_APP_TOKEN` | `on` (по умолчанию) или `off`: хаб не выдаёт токены и не публикует ни JWKS, ни discovery |
 | `HUB_APP_TOKEN_KEY_FILE` | Ключ Ed25519, PKCS#8 PEM; создаётся при первом старте (`<HUB_DATA_DIR>/app-token.pem`). Все реплики читают один файл |
 | `HUB_APP_TOKEN_PREVIOUS_KEYS` | Через запятую — публичные ключи (PKIX PEM) прошлых ротаций, ещё публикуются |
 

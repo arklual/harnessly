@@ -1,10 +1,11 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"html"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -15,10 +16,10 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/gate"
-	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/proc"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 // What a runtime carried by a hub (RUNTIME_HUB_URL) answers besides its own page:
@@ -37,6 +38,13 @@ import (
 
 // hubMode says a hub carries this runtime.
 func hubMode() bool { return strings.TrimSpace(os.Getenv("RUNTIME_HUB_URL")) != "" }
+
+// hubAnalytics: the personal statistics come from the hub (RUNTIME_HUB_ANALYTICS=on) and the runtime keeps no usage
+// report of its own. It needs a hub to ask, so it is off on a runtime no hub carries. The machine agent keeps
+// writing the facts the hub pulls.
+func hubAnalytics() bool {
+	return hubMode() && strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_HUB_ANALYTICS")), "on")
+}
 
 // chatGuard is the chat's view of the machine's terminal policy, shared by the prompt service, the conversations and
 // the route the machine agent tells it by. A runtime a hub carries starts with the terminal off, until told otherwise.
@@ -122,7 +130,7 @@ func (c *hubConsole) pagePrefix() string { return c.base + "/console/" }
 
 func (c *hubConsole) matches(r *http.Request) bool {
 	if p := apiPath(r.URL.Path); p != "" {
-		return p == "/api/auth/setup" || p == "/api/agent/terminal-tab" || p == "/api/agent/policy" || p == "/api/agent/load" || p == "/api/agent/restart" || strings.HasPrefix(p, "/api/console/")
+		return p == "/api/auth/setup" || p == "/api/agent/terminal-tab" || p == "/api/agent/console-state" || p == "/api/agent/policy" || p == "/api/agent/load" || p == "/api/agent/restart" || strings.HasPrefix(p, "/api/console/")
 	}
 	return strings.HasPrefix(r.URL.Path, c.pagePrefix())
 }
@@ -134,6 +142,8 @@ func (c *hubConsole) serve(w http.ResponseWriter, r *http.Request) {
 		c.setup(w, r)
 	case p == "/api/agent/terminal-tab":
 		c.open(w, r)
+	case p == "/api/agent/console-state":
+		c.consoleState(w, r)
 	case p == "/api/agent/policy":
 		c.policy(w, r)
 	case p == "/api/agent/load":
@@ -284,7 +294,7 @@ func (c *hubConsole) open(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	time.Sleep(c.ready)
-	if err := c.tm.SendLiteralThenEnter(name, command); err != nil {
+	if err := typist.Write(r.Context(), c.tm, name, func(held context.Context) error { return c.tm.With(held).SendLiteralThenEnter(name, command) }); err != nil {
 		c.tm.KillSession(name)
 		errReply(w, http.StatusInternalServerError, "The command could not be typed.")
 		return
@@ -304,7 +314,7 @@ func (c *hubConsole) sweep() {
 			c.tm.KillSession(name)
 		}
 	}
-	c.holds.drop(func(id string) bool { return c.tm.HasSession(c.sessionName(id)) })
+	c.holds.drop(func(id string) bool { return c.tm.HasSession(c.sessionName(id)) }, c.now())
 }
 
 // api is `/api/console/<id>/screen` (GET), `/api/console/<id>/keys` (POST) and `/api/console/<id>/callback` (POST).
@@ -326,20 +336,22 @@ func (c *hubConsole) api(w http.ResponseWriter, r *http.Request, tail string) {
 	switch {
 	case what == "screen" && r.Method == http.MethodGet:
 		if !c.tm.HasSession(name) {
-			jsonReply(w, http.StatusOK, map[string]any{"alive": false, "screen": ""})
+			jsonReply(w, http.StatusOK, map[string]any{"alive": false, "screen": "", "attempt": c.attempt(id)})
 			return
 		}
 		out, err := c.tm.Command(name, "capture-pane", "-p", "-J", "-t", name)
 		if err != nil {
-			jsonReply(w, http.StatusOK, map[string]any{"alive": false, "screen": ""})
+			jsonReply(w, http.StatusOK, map[string]any{"alive": false, "screen": "", "attempt": c.attempt(id)})
 			return
 		}
 		jsonReply(w, http.StatusOK, map[string]any{"alive": true, "screen": strings.TrimRight(tmux.StripControlChars(out), " \n\t"),
-			"callback": c.callbackState(id, name)})
+			"callback": c.callbackState(id, name), "attempt": c.attempt(id)})
 	case what == "keys" && r.Method == http.MethodPost:
 		c.keys(w, r, name)
 	case what == "callback" && r.Method == http.MethodPost:
 		c.callback(w, r, id, name)
+	case what == "cancel" && r.Method == http.MethodPost:
+		c.cancel(w, r, id, name)
 	default:
 		errReply(w, http.StatusNotFound, "Not found")
 	}
@@ -369,17 +381,34 @@ func (c *hubConsole) keys(w http.ResponseWriter, r *http.Request, name string) {
 		errReply(w, http.StatusGone, "The terminal has ended.")
 		return
 	}
-	if body.Text != "" {
-		if err := c.tm.SendLiteral(name, body.Text); err != nil {
-			errReply(w, http.StatusInternalServerError, "The text could not be typed.")
-			return
+	// The text and its keys go in as one writer of the pane: nothing else types between them.
+	textFailed := false
+	err := typist.Write(r.Context(), c.tm, name, func(held context.Context) error {
+		keys := c.tm.With(held)
+		if body.Text != "" {
+			if err := keys.SendLiteral(name, body.Text); err != nil {
+				textFailed = true
+				return err
+			}
 		}
-	}
-	for _, k := range body.Keys {
-		if err := c.tm.SendRawKeys(name, k); err != nil {
-			errReply(w, http.StatusInternalServerError, "The key could not be pressed.")
-			return
+		for _, k := range body.Keys {
+			if err := keys.SendRawKeys(name, k); err != nil {
+				return err
+			}
 		}
+		return nil
+	})
+	var busy *typist.BusyError
+	switch {
+	case errors.As(err, &busy) || typist.IsSlow(err):
+		errReply(w, http.StatusServiceUnavailable, "The terminal is busy; try again in a moment.")
+		return
+	case err != nil && textFailed:
+		errReply(w, http.StatusInternalServerError, "The text could not be typed.")
+		return
+	case err != nil:
+		errReply(w, http.StatusInternalServerError, "The key could not be pressed.")
+		return
 	}
 	jsonReply(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -406,145 +435,4 @@ func (c *hubConsole) page(w http.ResponseWriter, r *http.Request, id string) {
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'")
 	_, _ = io.WriteString(w, consolePage())
-}
-
-// consoleTexts are the page's words, in the runtime's language.
-func consoleTexts() map[string]string {
-	return map[string]string{
-		"title":   locale.Pick("Machine terminal", "Терминал машины"),
-		"hint":    locale.Pick("Sign in to the agent here. A link in the output opens with a click; type what it asks for below.", "Войдите в агента здесь. Ссылка в выводе открывается кликом, то, что просят ввести, вводите ниже."),
-		"input":   locale.Pick("Type here and press Enter", "Введите здесь и нажмите Enter"),
-		"send":    locale.Pick("Send", "Отправить"),
-		"ended":   locale.Pick("The terminal has ended.", "Сеанс завершён."),
-		"offline": locale.Pick("No connection to the machine…", "Нет связи с машиной…"),
-		"cbHint": locale.Pick("The sign-in waits for the browser on this machine. After you sign in, the browser opens an address that starts with http://localhost and does not load: copy it from the address bar and paste it here.",
-			"Вход ждёт браузер на этой машине. После входа браузер откроет адрес, начинающийся с http://localhost, и он не загрузится: скопируйте его из адресной строки и вставьте сюда."),
-		"cbInput":  locale.Pick("http://localhost:…", "http://localhost:…"),
-		"cbSend":   locale.Pick("Finish sign-in", "Завершить вход"),
-		"cbDone":   locale.Pick("Delivered to the sign-in on the machine. Follow the terminal above.", "Передано входу на машине. Дальше смотрите терминал выше."),
-		"cbFailed": locale.Pick("Not delivered: ", "Не передано: "),
-	}
-}
-
-// consolePage is the console's page. It holds no data of the machine: it asks for the screen and shows it as text, with
-// the links made clickable from the text node by node, never as markup.
-func consolePage() string {
-	t := consoleTexts()
-	raw, _ := json.Marshal(t)
-	texts := strings.ReplaceAll(string(raw), "</", `<\/`)
-	return `<!doctype html>
-<html lang="` + locale.Pick("en", "ru") + `">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>` + html.EscapeString(t["title"]) + `</title>
-<style>
-:root{color-scheme:light dark;--bg:#fff;--fg:#1c1c1e;--mute:#6b6b70;--line:#d9d9de;--panel:#f5f5f7;--accent:#2563eb}
-@media (prefers-color-scheme:dark){:root{--bg:#121214;--fg:#ececf0;--mute:#9a9aa3;--line:#2e2e34;--panel:#1b1b1f;--accent:#7aa2ff}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;display:grid;grid-template-rows:auto 1fr auto;height:100dvh}
-header{padding:12px 16px;border-bottom:1px solid var(--line)}
-h1{margin:0 0 2px;font-size:15px;font-weight:600}
-header p{margin:0;color:var(--mute);font-size:13px}
-#screen{margin:0;padding:12px 16px;overflow:auto;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel)}
-#screen a{color:var(--accent)}
-footer{border-top:1px solid var(--line);padding:10px 16px;display:grid;gap:8px}
-form{display:flex;gap:8px}
-input{flex:1;min-width:0;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
-button{font:inherit;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);cursor:pointer}
-button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.keys{display:flex;flex-wrap:wrap;gap:6px}
-.keys button{padding:5px 10px;font-size:13px}
-#state{color:var(--mute);font-size:13px;min-height:1.2em}
-#cb{display:none;gap:6px}
-#cb p{margin:0;color:var(--mute);font-size:13px}
-</style>
-</head>
-<body>
-<header><h1>` + html.EscapeString(t["title"]) + `</h1><p>` + html.EscapeString(t["hint"]) + `</p></header>
-<pre id="screen" aria-live="polite"></pre>
-<footer>
-<form id="form" autocomplete="off"><input id="text" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="` + html.EscapeString(t["input"]) + `" aria-label="` + html.EscapeString(t["input"]) + `"><button class="primary" type="submit">` + html.EscapeString(t["send"]) + `</button></form>
-<div id="cb"><p>` + html.EscapeString(t["cbHint"]) + `</p><form id="cbform" autocomplete="off"><input id="cburl" type="url" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="` + html.EscapeString(t["cbInput"]) + `" aria-label="` + html.EscapeString(t["cbInput"]) + `"><button type="submit">` + html.EscapeString(t["cbSend"]) + `</button></form><p id="cbstate"></p></div>
-<div class="keys" id="keys"></div>
-<div id="state"></div>
-</footer>
-<script>
-(function () {
-  var T = ` + texts + `;
-  var m = location.pathname.match(/^(.*)\/console\/([0-9a-f]{16})\/?$/);
-  if (!m) return;
-  var api = m[1] + '/api/console/' + m[2];
-  var screen = document.getElementById('screen'), state = document.getElementById('state');
-  var text = document.getElementById('text'), last = null, ended = false;
-  function show(t) {
-    if (t === last) return;
-    last = t;
-    var stick = screen.scrollHeight - screen.scrollTop - screen.clientHeight < 40;
-    screen.textContent = '';
-    var re = /https?:\/\/[^\s]+/g, pos = 0, hit;
-    while ((hit = re.exec(t))) {
-      screen.append(t.slice(pos, hit.index));
-      var a = document.createElement('a');
-      a.href = hit[0]; a.textContent = hit[0]; a.target = '_blank'; a.rel = 'noopener noreferrer';
-      screen.append(a);
-      pos = hit.index + hit[0].length;
-    }
-    screen.append(t.slice(pos));
-    if (stick) screen.scrollTop = screen.scrollHeight;
-  }
-  function poll() {
-    if (ended || document.hidden) return;
-    fetch(api + '/screen', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    }).then(function (d) {
-      show(d.screen || '');
-      callback(d.callback);
-      ended = !d.alive;
-      state.textContent = ended ? T.ended : '';
-    }).catch(function () { state.textContent = T.offline; });
-  }
-  var cb = document.getElementById('cb'), cbstate = document.getElementById('cbstate'), cburl = document.getElementById('cburl'), sent = false;
-  function callback(c) {
-    var open = !!c && !c.used && c.ports && c.ports.length > 0;
-    cb.style.display = open || sent ? 'grid' : 'none';
-  }
-  document.getElementById('cbform').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var u = cburl.value.trim();
-    if (!u || ended) return;
-    fetch(api + '/callback', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u }) })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (x) {
-        if (x.ok) { sent = true; cburl.value = ''; cbstate.textContent = T.cbDone; setTimeout(poll, 300); }
-        else cbstate.textContent = T.cbFailed + ((x.d && x.d.error) || '');
-      }).catch(function () { cbstate.textContent = T.offline; });
-  });
-  function send(body) {
-    if (ended) return;
-    fetch(api + '/keys', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function () { setTimeout(poll, 150); }).catch(function () { state.textContent = T.offline; });
-  }
-  document.getElementById('form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    send({ text: text.value, keys: ['Enter'] });
-    text.value = '';
-  });
-  [['Enter', 'Enter'], ['Esc', 'Escape'], ['Tab', 'Tab'], ['↑', 'Up'], ['↓', 'Down'], ['←', 'Left'], ['→', 'Right'], ['Ctrl+C', 'C-c']].forEach(function (k) {
-    var b = document.createElement('button');
-    b.type = 'button'; b.textContent = k[0];
-    b.addEventListener('click', function () { send({ keys: [k[1]] }); text.focus(); });
-    document.getElementById('keys').append(b);
-  });
-  document.addEventListener('visibilitychange', poll);
-  setInterval(poll, 800);
-  poll();
-  text.focus();
-})();
-</script>
-</body>
-</html>
-`
 }

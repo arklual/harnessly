@@ -64,13 +64,19 @@ type Health struct {
 	Alive func() bool
 	// Selftest is the machine's self-test: pending, pass or fail; nil leaves it out.
 	Selftest func() string
+	// Chats says how far the chats are after a start, for a rollout that restarts one runtime at a time: starting (the
+	// conversations are not loaded, nothing is served yet), restoring (they are served while the start's work still
+	// runs) or ready. Nil, or an empty answer, leaves it out.
+	Chats func() string
+	// Transcripts is what following the agents' transcripts costs the runtime, as numbers; nil, or a nil answer,
+	// leaves it out.
+	Transcripts func() any
 }
 
 type service struct {
 	cfg      Config
 	notices  sync.Mutex
-	release  *Release
-	relOnce  sync.Once
+	release  releaseFile
 	manifest struct {
 		sync.Mutex
 		mtime time.Time
@@ -255,18 +261,57 @@ func (s *service) machineLoad(r *http.Request, _ any) (int, any, http.Header) {
 }
 
 func (s *service) health(r *http.Request, _ any) (int, any, http.Header) {
-	s.relOnce.Do(func() { s.release = ReadRelease(s.cfg.Health.ReleaseFile) })
+	release := s.release.read(s.cfg.Health.ReleaseFile)
 	o := jsvalue.NewObject("app", s.cfg.Health.App, "version", s.cfg.Health.FallbackVersion, "commit", nil)
-	if s.release != nil {
-		o.Set("version", s.release.Version)
-		if s.release.Commit != nil {
-			o.Set("commit", *s.release.Commit)
+	if release != nil {
+		o.Set("version", release.Version)
+		if release.Commit != nil {
+			o.Set("commit", *release.Commit)
 		}
 	}
 	if s.cfg.Health.Selftest != nil {
 		o.Set("selftest", s.cfg.Health.Selftest())
 	}
+	if s.cfg.Health.Chats != nil {
+		if st := s.cfg.Health.Chats(); st != "" {
+			o.Set("chats", st)
+		}
+	}
+	if s.cfg.Health.Transcripts != nil {
+		if t := s.cfg.Health.Transcripts(); t != nil {
+			o.Set("transcripts", t)
+		}
+	}
 	return answer(r, 200, o, nil)
+}
+
+// releaseFile is the release the health reports, read again when the file changes. A rollout that finds this runtime
+// the same as the one it brings leaves it running and points the file (through the symlink of the active release) at
+// the next release: the runtime then has to answer with that release, or the rollout restarts it to be sure.
+type releaseFile struct {
+	sync.Mutex
+	seen os.FileInfo
+	rel  *Release
+}
+
+func (f *releaseFile) read(file string) *Release {
+	if file == "" {
+		return nil
+	}
+	f.Lock()
+	defer f.Unlock()
+	st, err := os.Stat(file)
+	if err != nil {
+		// Between two releases, or not there yet: what was read last stands, and the next request looks again.
+		return f.rel
+	}
+	if f.seen != nil && os.SameFile(f.seen, st) && st.ModTime().Equal(f.seen.ModTime()) && st.Size() == f.seen.Size() {
+		return f.rel
+	}
+	if rel := ReadRelease(file); rel != nil {
+		f.seen, f.rel = st, rel
+	}
+	return f.rel
 }
 
 // manifestBody is the manifest file as JSON.stringify writes it, read again when the file changes; nil without one.

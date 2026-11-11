@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -56,6 +57,20 @@ func List(ctx context.Context, db *store.DB, userID string, machines []string) (
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// ListVersion tells one state of the person's chat list from another without reading a record: how many rows the
+// person has and how many of them are deleted, when the newest of them changed, and the sums of their revisions and
+// sequence numbers (two changes within one millisecond still differ). Every write that changes what List returns
+// moves at least one of them.
+func ListVersion(ctx context.Context, db *store.DB, userID string) (string, error) {
+	var rows, deleted, changed, revs, seqs int64
+	err := db.QueryRow(ctx, `SELECT COUNT(*), COUNT(deleted_at), COALESCE(MAX(updated_at), 0), COALESCE(SUM(rev), 0), COALESCE(SUM(seq), 0)
+		FROM history_conversations WHERE owner_id = ?`, userID).Scan(&rows, &deleted, &changed, &revs, &seqs)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%d.%d.%d.%d.%d", rows, deleted, changed, revs, seqs), nil
 }
 
 // Page is a chat's feed in the shape the machine gives (`conv:<id>` snapshot turns and entries): turns oldest first,

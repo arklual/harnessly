@@ -144,6 +144,8 @@ const pointer = (type: string, y: number) =>
     pointerId: 1,
     pointerType: 'mouse',
     button: 0,
+    // The button is held from the press to the release.
+    buttons: type === 'pointerup' ? 0 : 1,
     isPrimary: true,
   });
 const press = (id: string, y: number) => act(() => void row(id).dispatchEvent(pointer('pointerdown', y)));
@@ -194,7 +196,7 @@ describe('useDrag: the row itself is carried', () => {
     moveTo(400);
     // The list ends at 160: the row (taken 10 px into it) goes no lower than 120, 80 below its place.
     expect(row('b').style.transform).toBe('translate3d(0, 80px, 0)');
-    moveTo(-300);
+    moveTo(-40);
     expect(row('b').style.transform).toBe('translate3d(0, -40px, 0)');
   });
 

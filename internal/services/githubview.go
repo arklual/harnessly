@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/connections"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -72,8 +73,8 @@ func (s *Service) githubAPI() string {
 	return "https://" + s.githubHost() + "/api/v3"
 }
 
-// githubToken is the person's GitHub token, "" without one. gh is asked before the environment, as the person's own
-// login is the one that is current; the answer is kept for a minute so a view does not start a process per request.
+// githubToken is the person's GitHub token, "" without one: their own connection, then gh, then the environment, as
+// the person's own login is the one that is current; the answer is kept for a minute so a view does not start a process per request.
 func (s *Service) githubToken(ctx context.Context) string {
 	g := s.github
 	g.mu.Lock()
@@ -83,7 +84,14 @@ func (s *Service) githubToken(ctx context.Context) string {
 		return t
 	}
 	g.mu.Unlock()
-	token := s.githubTokenFromGh(ctx)
+	token := ""
+	if s.cfg.Connections != nil {
+		// The person's own GitHub connection (Settings → Connections) first: it is the one a review writes with.
+		token = s.cfg.Connections.OwnToken(connections.GitHub, s.githubHost())
+	}
+	if token == "" {
+		token = s.githubTokenFromGh(ctx)
+	}
 	if token == "" {
 		token = s.secret("GITHUB_TOKEN", "github-token")
 	}

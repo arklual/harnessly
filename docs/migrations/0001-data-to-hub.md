@@ -63,13 +63,11 @@ Fix: give the runtime's user read access (`ls -l` the path from `harnessly migra
 
 ### MIG-GONE
 
-The object was in the inventory and is not on the disk any more (an upload cleaned up, a handoff note expired).
+The object was in the inventory and is not on the disk any more (an upload cleaned up, a handoff note expired, a
+handed-over file in a cleaned temp folder). There is nothing to move, so it is skipped by itself with this code, and the
+move does not stop for it. It is moved after all if its file comes back at the same path.
 
-Fix: nothing to move; `harnessly migrate skip KIND/OBJECT`. The next inventory leaves it out by itself.
-
-Before skipping an upload, `ls <path>*`: an upload's bytes are `<id><ext>` (`up_X.png`) beside `<id>.json`. A runtime
-without the fix of HRN-982 looked for a bare `<id>` and called such uploads gone: those are not to be skipped — update
-the runtime and `harnessly migrate retry`. A skipped object is not moved again.
+Fix: none needed.
 
 ### MIG-HASH
 
@@ -80,9 +78,12 @@ and `harnessly migrate skip` it.
 
 ### MIG-TOO-BIG
 
-The object is bigger than the store takes (64 MiB for a file of a chat).
+The object is bigger than the store takes, or the hub refused it for its size. A file over 50 MiB goes in parts to a hub
+that takes them (of any size, unless its `HUB_STORE_MAX_UPLOAD_MB` sets a limit); an older hub takes 50 MiB at most. It is
+skipped by itself with this code: it stays on the machine and opens while the machine is on. It is sent again when its
+size changes, or when the hub takes more than it did when it refused the object (the hub was updated).
 
-Fix: none in the store. It stays on the machine and opens while the machine is on: `harnessly migrate skip` it.
+Fix: none in the store; keep the machine for this file, or download it from the chat while the machine is on.
 
 ### MIG-PUT
 

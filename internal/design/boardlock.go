@@ -269,6 +269,11 @@ func (l *Library) BoardLockReason(project, absPath string) string {
 	if err != nil || strings.HasPrefix(rel, "..") {
 		return ""
 	}
+	if strings.HasPrefix(rel, ProjectDirname+string(filepath.Separator)) {
+		if reason := l.BuiltBoardReason(project, filepath.ToSlash(rel[len(ProjectDirname)+1:])); reason != "" {
+			return reason
+		}
+	}
 	m := l.ReadModel(project)
 	if m == nil {
 		return ""

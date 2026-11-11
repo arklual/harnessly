@@ -98,6 +98,8 @@ export const isBridgeCode = (v: unknown): v is TBridgeCode => typeof v === 'stri
 
 /** A file moves as text, at most as much as the runtime takes (4 MB, internal/apps/files.go). */
 const MAX_FILE_CHARS = 4 << 20;
+/** A file of 4 MB in base64. */
+const MAX_UPLOAD_CHARS = Math.ceil((4 << 20) / 3) * 4;
 
 export type TBridgeMethod = keyof typeof METHOD_PERMISSION;
 
@@ -162,6 +164,25 @@ export interface IViewContext {
   data?: unknown;
 }
 
+export const VIEW_ROLES = { view: 'view', edit: 'edit', member: 'member' } as const;
+export type TViewRole = (typeof VIEW_ROLES)[keyof typeof VIEW_ROLES];
+
+/**
+ * hl.context.user: the person the host shows, by name (their name, else their e-mail; null while nobody is known),
+ * and their role where the view stands: in a document, `edit` or `view` (it may only be read); elsewhere `member`.
+ * Shown, not proven: a check that matters is the host's (the workflow's transitions check the project role).
+ */
+export const viewUser = (
+  me: { name: string | null; email: string | null } | null,
+  inDocument: boolean,
+  readOnly: boolean,
+): { name: string; role: TViewRole } | null => {
+  const name = me?.name?.trim() || me?.email || '';
+  if (name === '') return null;
+  if (!inDocument) return { name, role: VIEW_ROLES.member };
+  return { name, role: readOnly ? VIEW_ROLES.view : VIEW_ROLES.edit };
+};
+
 /**
  * The context as MCP Apps spells it (`theme` is the mode, `styles.variables` the tokens, then locale, displayMode,
  * platform), so a standard view reads it unchanged; the whole of ours rides along under `harnessly` for the SDK.
@@ -191,6 +212,14 @@ export interface IPageTool {
 const PAGE_TOOL_NAME = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
 const MAX_PAGE_TOOLS = 32;
 
+/** A move of the document's status as a view asks it: to a status, of the version it saw, with a note. */
+export interface IWorkflowMove {
+  to: string;
+  version?: number;
+  hash?: string;
+  note?: string;
+}
+
 export interface IBridgeHandlers {
   tool?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
   storage?: (
@@ -203,6 +232,10 @@ export interface IBridgeHandlers {
   ) => Promise<unknown>;
   /** The settings the person saved in the app's form, over the schema's defaults. */
   settings?: () => Promise<unknown>;
+  /** A file the person gave the view, as base64, into the chat's workspace (hl.files.upload). */
+  upload?: (path: string, data: string) => Promise<unknown>;
+  /** The status of the view's document (hl.workflow): read it, or move it; the runtime checks the move and the role. */
+  workflow?: (op: 'get' | 'move', move?: IWorkflowMove) => Promise<unknown>;
   chatSend?: (text: string) => Promise<void>;
   chatRead?: (last: number) => Promise<{ role: string; text: string }[]>;
   chatCard?: (view: string, data: unknown) => Promise<void>;
@@ -210,6 +243,8 @@ export interface IBridgeHandlers {
   /** The person's conversations on this machine: who and in what state, never what was said. */
   agents?: () => Promise<readonly object[]>;
   notify?: (text: string) => Promise<void>;
+  /** The smart notice's open slot (hl.notice): the runtime reads the app and the chat from the view's session. */
+  notice?: (op: 'ask' | 'show' | 'update' | 'close', params: Record<string, unknown>) => Promise<unknown>;
   /** A file of the chat's workspace; the runtime judges the path against the app's masks and answers for it. */
   files?: (op: 'read' | 'write', path: string, text?: string) => Promise<string | undefined>;
   /** The workspace beyond one file: a folder, a search, the start and end of a watch. */
@@ -923,9 +958,38 @@ export class AppBridge {
         return { keys: await this.need('storage')('keys', scope(), '-') };
       case 'harnessly/settings.get':
         return { value: (await this.need('settings')()) ?? {} };
+      case 'harnessly/workflow.get':
+        return this.need('workflow')('get');
+      case 'harnessly/workflow.move': {
+        const version = p.version;
+        if (version !== undefined && (!Number.isSafeInteger(version) || (version as number) < 1))
+          throw new BridgeError(
+            'invalid_params',
+            'version is the number of the version the view saw, 1 or more',
+          );
+        return this.need('workflow')('move', {
+          to: str('to', 32),
+          ...(version === undefined ? {} : { version: version as number }),
+          ...(typeof p.hash === 'string' ? { hash: p.hash.slice(0, 64) } : {}),
+          ...(typeof p.note === 'string' ? { note: p.note.slice(0, 500) } : {}),
+        });
+      }
       case 'harnessly/notify':
         await this.need('notify')(str('text', 2000));
         return {};
+      case 'harnessly/notice.ask':
+        return this.need('notice')('ask', { spec: p });
+      case 'harnessly/notice.show':
+        return this.need('notice')('show', { spec: p });
+      case 'harnessly/notice.update':
+        return this.need('notice')('update', {
+          id: str('id', 64),
+          progress: typeof p.progress === 'number' ? p.progress : undefined,
+          title: typeof p.title === 'string' ? p.title : undefined,
+          text: typeof p.text === 'string' ? p.text : undefined,
+        });
+      case 'harnessly/notice.close':
+        return this.need('notice')('close', { id: str('id', 64) });
       case 'harnessly/files.read':
         return { text: await this.need('files')('read', str('path', 4096)) };
       case 'harnessly/files.write': {
@@ -956,6 +1020,11 @@ export class AppBridge {
       case 'harnessly/files.unwatch':
         await this.need('filesMore')('unwatch', {});
         return {};
+      case 'harnessly/files.upload': {
+        if (typeof p.data !== 'string' || p.data.length > MAX_UPLOAD_CHARS)
+          throw new BridgeError('invalid_params', 'data is the file in base64, up to 4 MB');
+        return this.need('upload')(str('path', 4096), p.data);
+      }
       case 'harnessly/files.pick': {
         const accept = Array.isArray(p.accept)
           ? p.accept.filter((a): a is string => typeof a === 'string').slice(0, 20)

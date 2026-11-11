@@ -25,6 +25,16 @@ type BlobStore interface {
 	// Put stores contents, refusing them (ErrBadRequest) when they do not hash to sha or are bigger than
 	// MaxFileSize.
 	Put(ctx context.Context, room, sha string, r io.Reader) error
+	// UploadBegin starts putting an upload in parts together where its blob will be (blobs_parts.go); the handle
+	// names the assembly to the store.
+	UploadBegin(ctx context.Context, room, upload, sha string) (handle string, err error)
+	// UploadWrite stores part n of an upload: size bytes of r at off of the contents. A part written again replaces
+	// the one before. The tag is what UploadFinish needs of the part.
+	UploadWrite(ctx context.Context, room string, u *Upload, n int, off, size int64, r io.Reader) (tag string, err error)
+	// UploadFinish makes the written parts the room's blob u.Sha, without reading them again.
+	UploadFinish(ctx context.Context, room string, u *Upload) error
+	// UploadAbort removes what an upload wrote; removing what is not there is not an error.
+	UploadAbort(ctx context.Context, room string, u *Upload) error
 	// Delete removes contents; deleting what is not there is not an error.
 	Delete(ctx context.Context, room, sha string) error
 	// List calls fn for every stored blob of the room.

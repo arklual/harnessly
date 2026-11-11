@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page, type Response } from '@playwright/test';
+import { expect, test, type Browser, type Page, type Response, type Route } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { startStack, type Stack } from './stack';
@@ -65,21 +65,20 @@ async function anotherDevice(browser: Browser): Promise<void> {
   await page.goto(`${stack.hub}/api/config`);
 }
 
+const isHubList = (r: Response) =>
+  /\/history\/conversations$/.test(new URL(r.url()).pathname) && r.request().method() === 'GET';
+
 async function hubList(): Promise<{ conversations: { id: string; title?: string }[] }> {
   let list: { conversations: { id: string; title?: string }[] } = { conversations: [] };
-  // A fresh page of the hub with its home machine hung can take a while to start (seen locally: a blank page for
-  // 30 s, the hub's own matter, not the copy's): it is opened again until the list comes.
+  // The page draws from the hub without waiting on its home machine (a hung one is let be after a moment), so one
+  // opening sees the list soon; it is opened again only while the hub has not taken the chat yet.
   await expect(async () => {
-    const answered = page.waitForResponse(
-      (r: Response) =>
-        /\/history\/conversations$/.test(new URL(r.url()).pathname) && r.request().method() === 'GET',
-      { timeout: 30_000 },
-    );
+    const answered = page.waitForResponse(isHubList, { timeout: 15_000 });
     await page.goto(`${stack.hub}/agents/`);
     const res = await answered;
     listUrl = res.url();
     list = (await res.json()) as typeof list;
-  }).toPass({ timeout: 120_000 });
+  }).toPass({ timeout: 90_000 });
   return list;
 }
 
@@ -165,8 +164,20 @@ test('3. the runtime hangs while its agent is on: the chat still opens whole fro
   // The case of a machine under load: its agent keeps the link and the hub calls it online, but the runtime answers
   // nothing. Reading goes through the hub, so the chat opens all the same (spec v10).
   stack.hangRuntime(true);
+  const held: Route[] = [];
   try {
     await anotherDevice(browser);
+    // The page asks the hung machine for twenty things at once (its secrets, apps, panes…), and each waits 10–20 s. The
+    // stand serves the hub over HTTP/1.1, six connections to one origin: those waits took all six, and the chat's read
+    // from the hub queued behind them in the browser until the step ran out. A hub behind HTTPS multiplexes them. So
+    // here they are held by the browser itself, unanswered as the machine leaves them, and hold no connection.
+    const toMachine = (u: URL) =>
+      u.pathname.includes('/api/') &&
+      !u.pathname.includes('/history/') &&
+      (u.searchParams.get('machine') === machineId || u.pathname.includes(`/m/${machineId}/`));
+    await page.route(toMachine, (route) => {
+      held.push(route);
+    });
     // The cluster's gateway calls a machine off only after 45 s without its beats; the hub knows
     // sooner. The list says «online» here as the gateway would in that window: the page must not wait on the machine.
     await page.route(/\/history\/conversations$/, async (route) => {
@@ -176,10 +187,16 @@ test('3. the runtime hangs while its agent is on: the chat still opens whole fro
       await route.fulfill({ response: res, json: body });
     });
     expect(await machineStatus()).toBe('online');
-    const list = await hubList();
-    expect(list.conversations.length).toBeGreaterThan(0);
+    // The list of chats is the hub's: it shows within 3 s of the page loading, however long the home machine keeps
+    // its start data (asked through the hub, which waits on the machine much longer).
+    const answered = page.waitForResponse(isHubList, { timeout: 15_000 });
+    await page.goto(`${stack.hub}/agents/`);
+    const loaded = Date.now();
     const row = page.getByText('hello from the machine').first();
-    await expect(row).toBeVisible({ timeout: 30_000 });
+    await expect(row).toBeVisible({ timeout: 3_000 });
+    expect(Date.now() - loaded).toBeLessThan(3_000);
+    const list = (await (await answered).json()) as { conversations: unknown[] };
+    expect(list.conversations.length).toBeGreaterThan(0);
     await row.click();
     await expect(page.getByText('Fake agent reply: hello from the machine').first()).toBeVisible({
       timeout: 20_000,
@@ -187,6 +204,7 @@ test('3. the runtime hangs while its agent is on: the chat still opens whole fro
     await shot(page, 'hung-chat');
   } finally {
     await page.unrouteAll({ behavior: 'ignoreErrors' });
+    await Promise.all(held.map((r) => r.abort('timedout').catch(() => undefined)));
     stack.hangRuntime(false);
   }
 });

@@ -72,6 +72,18 @@ func usageRoute(d deps, authorized func(*http.Request) bool) *usagereport.Route 
 		Owner: os.Getenv("RUNTIME_USAGE_OWNER"), Machine: host}
 }
 
+// hubAnalyticsUsage answers <platform API>/stats while the hub's analytics are on: the figures are the hub's, so the
+// runtime says so and counts nothing (503 `hub-analytics`).
+func hubAnalyticsUsage(authorized func(*http.Request) bool) func(*http.Request) (int, any, http.Header) {
+	return func(r *http.Request) (int, any, http.Header) {
+		if !authorized(r) {
+			return http.StatusUnauthorized, gate.Raw{ContentType: "application/json", Body: []byte(`{"error":"Unauthorized"}`)}, nil
+		}
+		return http.StatusServiceUnavailable, gate.Raw{ContentType: "application/json", Body: []byte(`{"error":"hub-analytics"}`)},
+			http.Header{"Cache-Control": {"no-store"}}
+	}
+}
+
 // shareRoute is the conversation snapshots and read-only links; nil while the deployment has not named the share
 // headers, token, file prefix and app name (the routes then stay with the previous runtime).
 func (c *core) shareRoute(d deps) *share.Route {
@@ -131,8 +143,12 @@ func (c *core) transcriptRoutes(f *gate.Gate, d deps) []gate.Route {
 	authorized := func(r *http.Request) bool { return token(r) || d.SessionOK(r) }
 	src := &sources.Route{Links: sourceLinks(), Home: d.Home, Authorized: authorized, SessionOK: d.SessionOK,
 		Codex: transcript.CodexOptions{ImageURL: transcript.NewCodexImageURL(c.cfg.Timeline.UploadsDir, c.cfg.Timeline.AppBase)}}
-	counts := &messagecounts.Route{Home: d.Home, Authorized: authorized}
-	usage := usageRoute(d, authorized)
+	counts := &messagecounts.Route{Home: d.Home, Authorized: authorized, Lines: c.transcripts.Follower("message-counts", 0)}
+	// With the hub's analytics on, no collector is built or kept fresh: the report is not served from here.
+	usageAnswer := hubAnalyticsUsage(authorized)
+	if !hubAnalytics() {
+		usageAnswer = usageRoute(d, authorized).Answer
+	}
 	pages := &stats.Route{Home: d.Home, DataDir: d.DataDir, ConfigFile: d.ConfigFile, Authorized: authorized,
 		CwdRewrites: stats.ParseCwdRewrites(os.Getenv("RUNTIME_STATS_CWD_REWRITES")), ShellPath: preflight.New(d.Home).ShellPath}
 	var routes []gate.JSONRoute
@@ -157,7 +173,7 @@ func (c *core) transcriptRoutes(f *gate.Gate, d deps) []gate.Route {
 		gate.JSONRoute{
 			Slice:   "transcripts",
 			Match:   func(r *http.Request) bool { return apiPathIs(r, platformAPI+"/stats") },
-			Compute: usage.Answer,
+			Compute: usageAnswer,
 		},
 	)...)...)
 }

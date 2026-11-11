@@ -77,11 +77,16 @@ type Tmux struct {
 	run runner // reads: cmdTimeout
 	// runWrite runs the commands a person waits on: writeTimeout.
 	runWrite runner
-	sleep    func(time.Duration)
+	// runCtx runs a command that ends with ctx or at timeout, whichever is first: a writer's keys (Keys). Nil leaves
+	// them to run and runWrite.
+	runCtx func(ctx context.Context, timeout time.Duration, dir, program string, args ...string) result
+	sleep  func(time.Duration)
 
 	mu sync.Mutex
 	// legacy remembers which server a legacy-named session was last seen on.
 	legacy map[string]string
+	// applied is the config file as each server last read it (see configStamp).
+	applied map[string]string
 }
 
 // New runs commands on the named servers; sessions it creates start with tmux's defaults and the process environment.
@@ -98,7 +103,7 @@ func NewConfig(cfg Config) *Tmux {
 	if cfg.Home == "" {
 		cfg.Home = "/"
 	}
-	return &Tmux{cfg: cfg, run: timedRunner(cmdTimeout), runWrite: timedRunner(writeTimeout), sleep: time.Sleep, legacy: map[string]string{}}
+	return &Tmux{cfg: cfg, run: timedRunner(cmdTimeout), runWrite: timedRunner(writeTimeout), runCtx: execRunnerCtx, sleep: time.Sleep, legacy: map[string]string{}, applied: map[string]string{}}
 }
 
 // Names are the servers and prefixes this Tmux works with.
@@ -121,11 +126,15 @@ func timedRunner(timeout time.Duration) runner {
 }
 
 func execRunner(timeout time.Duration, dir, program string, args ...string) result {
+	return execRunnerCtx(context.Background(), timeout, dir, program, args...)
+}
+
+func execRunnerCtx(parent context.Context, timeout time.Duration, dir, program string, args ...string) result {
 	if program == "tmux" {
 		program = tmuxBinary()
 	}
 	start := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, program, args...)
 	cmd.Dir = dir
@@ -145,11 +154,6 @@ func (t *Tmux) tmux(socket string, args ...string) result {
 
 // on runs a command for a session on the server it lives on.
 func (t *Tmux) on(name string, args ...string) result { return t.tmux(t.SocketOf(name), args...) }
-
-// onWrite is on for a command a person waits on: it gets writeTimeout.
-func (t *Tmux) onWrite(name string, args ...string) result {
-	return t.runWrite("", "tmux", append([]string{"-u", "-L", t.SocketOf(name)}, args...)...)
-}
 
 // Command runs any other tmux command on the server the session lives on and returns what it printed.
 func (t *Tmux) Command(session string, args ...string) (string, error) {

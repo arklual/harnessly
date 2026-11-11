@@ -193,3 +193,66 @@ func TestPeersRateLimit(t *testing.T) {
 		t.Fatal("40 messages in a minute were never limited")
 	}
 }
+
+// A message reaches a machine only when the person it comes from may open that machine: a machine with an access list
+// that does not name the sender is out of reach, and is not asked for its chats either.
+func TestPeersKeepTheMachineAccessList(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_PEERS", "on"), hubtest.Env("HUB_ORGS", "on"), hubtest.Env("HUB_ACCESS_ENFORCE", "on"))
+	owner, guest := s.SignIn("owner@example.com"), s.SignIn("guest@example.com")
+	id, _ := owner.NewSpace("Acme")
+	owner.Join(id, guest)
+	a := owner.Machine(id, nil)
+	b := owner.Machine(id, nil)
+	ctx := context.Background()
+	// The sending machine is the guest's: its messages come from the guest.
+	if _, err := s.DB.Exec(ctx, `UPDATE machines SET created_by = ? WHERE id = ?`, guest.ID, a.MachineID); err != nil {
+		t.Fatal(err)
+	}
+	b.Handle(hubproto.OpPeersDeliver, deliverer)
+	b.Handle(hubproto.OpPeersDirectory, func(hubtest.Call) (any, error) {
+		return hubproto.PeerChats{Chats: []hubproto.PeerChat{{Ref: "host/c-1", Conv: "c-1", Title: "Deploy", Machine: "host"}}}, nil
+	})
+	to := hubproto.PeerRefPrefix + b.MachineID + "/c"
+	chats := func() int {
+		t.Helper()
+		r := peersPost(t, s, a, "/agent/peers/directory", map[string]string{})
+		if r.Code != http.StatusOK {
+			t.Fatalf("directory: %s", r)
+		}
+		var got hubproto.PeerChats
+		r.JSON(&got)
+		return len(got.Chats)
+	}
+
+	// No list: the machine is open to its space.
+	if res := peerSend(t, s, a, "", to, "x"); res.State != hubproto.PeerDelivered {
+		t.Fatalf("a machine open to the space: %+v", res)
+	}
+	if n := chats(); n != 1 {
+		t.Fatalf("chats of an open machine: %d", n)
+	}
+	delivered := len(b.Calls(hubproto.OpPeersDeliver))
+	asked := len(b.Calls(hubproto.OpPeersDirectory))
+
+	// A list without the sender closes it.
+	if err := s.DB.S().SetMachineAccess(ctx, b.MachineID, []store.MachineAccessEntry{{Kind: store.AccessUser, RefID: owner.ID}}, s.Clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if res := peerSend(t, s, a, "", to, "x"); res.State != hubproto.PeerRefused || res.Reason != hubproto.PeerUnreachable {
+		t.Fatalf("a machine closed to the sender was reached: %+v", res)
+	}
+	if n := chats(); n != 0 {
+		t.Fatalf("chats of a closed machine: %d", n)
+	}
+	if len(b.Calls(hubproto.OpPeersDeliver)) != delivered || len(b.Calls(hubproto.OpPeersDirectory)) != asked {
+		t.Fatal("the hub called a machine the sender may not open")
+	}
+
+	// The sender on the list reaches it again.
+	if err := s.DB.S().SetMachineAccess(ctx, b.MachineID, []store.MachineAccessEntry{{Kind: store.AccessUser, RefID: owner.ID}, {Kind: store.AccessUser, RefID: guest.ID}}, s.Clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if res := peerSend(t, s, a, "", to, "x"); res.State != hubproto.PeerDelivered {
+		t.Fatalf("a sender on the list: %+v", res)
+	}
+}

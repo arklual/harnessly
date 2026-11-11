@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/appmcp"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -56,11 +57,14 @@ type previewSet struct {
 	// appTools are the host's tools for the agent of a chat with apps: their own server, harnessly-app, which the launch
 	// adds to such a chat (?server=harnessly-app on this endpoint); nil before the conversations run.
 	appTools atomic.Pointer[func(*http.Request) mcpserver.Toolset]
-	scanner  *ports.Scanner
-	logs     *devtools.ServerLogs
-	proxy    *preview.Proxy
-	cfg      preview.Config
-	search   ports.Searcher
+	// appMCP are the tools of the remote MCP servers of the apps turned on after the chat's agent started, which the
+	// harnessly-app server proxies (internal/apps appmcp.go).
+	appMCP  atomic.Pointer[func(*http.Request) mcpserver.Toolset]
+	scanner *ports.Scanner
+	logs    *devtools.ServerLogs
+	proxy   *preview.Proxy
+	cfg     preview.Config
+	search  ports.Searcher
 }
 
 var (
@@ -549,15 +553,27 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 				srv.Sets = append(srv.Sets, set)
 			}
 		}
+		if more := s.appMCP.Load(); more != nil {
+			if set := (*more)(r); set != nil {
+				srv.Sets = append(srv.Sets, set)
+			}
+		}
 	} else if more := s.agentTools.Load(); more != nil {
 		if set := (*more)(r); set != nil {
 			srv.Sets = append(srv.Sets, set)
 		}
 	}
 	srv.OnCall = journalToolCall(server)
+	h := previewNoStore()
+	if server == apps.HostServer {
+		// The agent's proxy gives a tool call a key and makes it again when the answer was lost with a restart of the
+		// runtime (internal/appmcp): a window's command is found by the key, nothing else runs twice.
+		r = r.WithContext(apps.WithCallKey(r.Context(), r.Header.Get(appmcp.KeyHeader), r.Header.Get(appmcp.RepeatHeader) != ""))
+		h.Set(appmcp.KeysHeader, "1")
+	}
 	status, body := srv.Handle(r.Context(), payload)
 	if body == nil {
-		return status, nil, previewNoStore()
+		return status, nil, h
 	}
-	return previewBytes(r, status, body, previewNoStore())
+	return previewBytes(r, status, body, h)
 }

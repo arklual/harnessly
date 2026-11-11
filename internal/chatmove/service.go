@@ -79,6 +79,8 @@ type Service struct {
 	Store  *Store
 	// Home is where a move without files gets its folder.
 	Home string
+	// Resume keeps and reads the chats' resume snapshots in the hub's store; nil when it is off.
+	Resume *Resume
 
 	locks sync.Map // opId -> *sync.Mutex
 }
@@ -321,6 +323,10 @@ func (s *Service) Import(ctx context.Context, req ImportRequest) (ImportResponse
 	if err != nil {
 		return ImportResponse{}, refuse(http.StatusBadRequest, CodeBadBundle, "Перенос не прошёл проверку")
 	}
+	plain, err = gunzipBundle(plain)
+	if err != nil {
+		return ImportResponse{}, refuse(http.StatusBadRequest, CodeBadBundle, "Перенос не прошёл проверку")
+	}
 	bundle, err := DecodeBundle(plain)
 	if err != nil {
 		return ImportResponse{}, refuse(http.StatusBadRequest, CodeBadBundle, "Перенос не прошёл проверку")
@@ -559,6 +565,13 @@ func (s *Service) dispatch(ctx context.Context, step string, body []byte) any {
 			return bad
 		}
 		out, ref := s.Import(ctx, q)
+		return orRefusal(out, ref)
+	case "resume":
+		var q ResumeRequest
+		if !decode(body, &q) {
+			return bad
+		}
+		out, ref := s.ResumeFrom(ctx, q)
 		return orRefusal(out, ref)
 	case "hold":
 		var q struct {

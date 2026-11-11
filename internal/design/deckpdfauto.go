@@ -2,7 +2,9 @@ package design
 
 import (
 	"context"
+	"errors"
 	"io/fs"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -48,9 +50,24 @@ type deckPdfDeck struct {
 type deckPdfKeep struct {
 	mu    sync.Mutex
 	decks map[string]*deckPdfDeck
-	// revs is the store's word on each deck for a moment (deckStoreRev), under revMu.
+	// revs is the store's word on each deck (deckStoreRev), under revMu with the rest below.
 	revMu sync.Mutex
 	revs  map[string]deckStoreRevAt
+	// touched is when a file a deck's PDF is made of last changed in this machine's folder, by the deck; touchedAll is
+	// the same for a change that names no deck. The store is asked again until it has answered deckPdfSettle after it.
+	touched    map[string]time.Time
+	touchedAll time.Time
+	// recheck is from when a deck's word is asked for once more: the store itself showed a newer revision of it.
+	recheck    map[string]time.Time
+	recheckAll time.Time
+	// failed is when the store last did not answer about a deck.
+	failed map[string]time.Time
+	// following: the changes of the folder are heard (follow). top is the newest revision of the whole library the
+	// look around saw, topNext when it looks again.
+	following bool
+	top       int64
+	topKnown  bool
+	topNext   time.Time
 }
 
 type deckStoreRevAt struct {
@@ -74,8 +91,20 @@ const deckPdfLeaseKey = "task:pdf/"
 // deckPdfLeaseRefresh is how often a machine building a PDF says it still does (the lease lapses after two minutes).
 const deckPdfLeaseRefresh = 30 * time.Second
 
-// deckPdfStoreFor says how long the store's word on a deck is taken as it is.
-var deckPdfStoreFor = 5 * time.Second
+var (
+	// deckPdfStoreFor says how long the store's word on a deck is taken as it is, whatever happened since.
+	deckPdfStoreFor = 5 * time.Second
+	// deckPdfSettle is how long after a change in the folder the store is still asked: this machine's own edit reaches
+	// the store a moment after it reaches the disk.
+	deckPdfSettle = 20 * time.Second
+	// deckPdfLookEvery is how often the store is asked whether anything changed that the folder's watcher did not
+	// tell: one request for the whole library, spread by up to half of it so the machines of a space do not ask
+	// together. deckPdfBlindEvery is the same while the folder is not watched at all.
+	deckPdfLookEvery  = 3 * time.Minute
+	deckPdfBlindEvery = 15 * time.Second
+	// deckPdfLookMax is how many of the library's newest revisions one look around reads.
+	deckPdfLookMax = 100
+)
 
 // deckPdfStore is the store whose leases decide who builds; nil without one (the runtime named in the mark builds).
 func (l *Library) deckPdfStore() (Revisions, RevisionLeases) {
@@ -90,22 +119,169 @@ func (l *Library) deckPdfStore() (Revisions, RevisionLeases) {
 	return r, ls
 }
 
-// deckStoreRev is the newest store revision of what the PDF is made of — the project folder, the files of meta/ and
-// of meta/pages/, as deckContentRev has it — and when it was made.
-func (l *Library) deckStoreRev(r Revisions, id string) (int64, time.Time, error) {
+// deckPdfPart says which deck a path of the library (or of the store) belongs to when it is one of the files the PDF
+// is made of: anything in the project folder, the files of meta/ and of meta/pages/.
+func deckPdfPart(rel string) (string, bool) {
+	parts := strings.SplitN(filepath.ToSlash(rel), "/", 3)
+	if len(parts) < 2 || parts[0] == "" {
+		return "", false
+	}
+	switch parts[1] {
+	case ProjectDirname:
+		return parts[0], true
+	case MetaDirname:
+		if len(parts) == 2 {
+			return parts[0], true
+		}
+		page, inPages := strings.CutPrefix(parts[2], MetaPagesDirname+"/")
+		if !strings.Contains(parts[2], "/") || inPages && !strings.Contains(page, "/") {
+			return parts[0], true
+		}
+	}
+	return "", false
+}
+
+// follow hears the folder's changes from then on: a change made here or brought by the sync is what tells that the
+// store may have a new revision of a deck, so an unchanged deck asks the store nothing.
+func (k *deckPdfKeep) follow(l *Library) {
+	k.revMu.Lock()
+	was := k.following
+	k.following = true
+	k.revMu.Unlock()
+	if was {
+		return
+	}
+	l.Subscribe(func(rel string) { k.changed(rel, time.Now()) })
+}
+
+// changed notes a change in the folder.
+func (k *deckPdfKeep) changed(rel string, now time.Time) {
+	k.revMu.Lock()
+	defer k.revMu.Unlock()
+	if rel == "." {
+		k.touchedAll = now
+		return
+	}
+	if id, ok := deckPdfPart(rel); ok {
+		if k.touched == nil {
+			k.touched = map[string]time.Time{}
+		}
+		k.touched[id] = now
+	}
+}
+
+// fresh is whether the word the store gave on a deck at checked still stands (under revMu).
+func (k *deckPdfKeep) fresh(id string, checked time.Time) bool {
+	touched := k.touched[id]
+	if k.touchedAll.After(touched) {
+		touched = k.touchedAll
+	}
+	if !touched.IsZero() && checked.Before(touched.Add(deckPdfSettle)) {
+		return false
+	}
+	return !checked.Before(k.recheck[id]) && !checked.Before(k.recheckAll)
+}
+
+// lookAround asks the store, once in a long while, for the newest revisions of the whole library and has the decks
+// they name asked about again: what covers a change the watcher never told (it was not running, or the kernel dropped
+// the event). With nothing new in the store that is one request and nothing more.
+func (l *Library) lookAround(r Revisions, now time.Time) {
 	keep := l.deckPdfs()
 	keep.revMu.Lock()
-	c, ok := keep.revs[id]
+	due := !now.Before(keep.topNext)
 	keep.revMu.Unlock()
-	if ok && time.Since(c.checked) < deckPdfStoreFor {
-		return c.rev, c.at, nil
+	if !due {
+		return
 	}
+	every := deckPdfLookEvery
+	if !l.watching() {
+		every = deckPdfBlindEvery
+	}
+	keep.revMu.Lock()
+	if now.Before(keep.topNext) {
+		keep.revMu.Unlock()
+		return
+	}
+	keep.topNext = now.Add(every + rand.N(every/2+1))
+	top, known := keep.top, keep.topKnown
+	keep.revMu.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	var rev, at int64
+	es, err := r.HistoryUnder(ctx, "", deckPdfLookMax)
+	if err != nil {
+		return
+	}
+	keep.revMu.Lock()
+	defer keep.revMu.Unlock()
+	newest, newer := top, 0
+	for _, e := range es {
+		newest = max(newest, e.Rev)
+		if !known || e.Rev <= top {
+			continue
+		}
+		newer++
+		if id, ok := deckPdfPart(e.Path); ok {
+			if keep.recheck == nil {
+				keep.recheck = map[string]time.Time{}
+			}
+			keep.recheck[id] = now
+		}
+	}
+	if known && newer == len(es) && newer >= deckPdfLookMax {
+		// More changed than one look reads: every deck is asked about.
+		keep.recheckAll = now
+	}
+	keep.top, keep.topKnown = newest, true
+}
+
+// deckStoreRev is the newest store revision of what the PDF is made of — the project folder, the files of meta/ and
+// of meta/pages/, as deckContentRev has it — and when it was made. The store is asked when the deck is first looked
+// at, after a change of its files in this machine's folder and when a look around showed a newer revision; otherwise
+// the word it gave last stands.
+func (l *Library) deckStoreRev(r Revisions, id string) (int64, time.Time, error) {
+	keep := l.deckPdfs()
+	keep.follow(l)
+	started := time.Now()
+	l.lookAround(r, started)
+	keep.revMu.Lock()
+	c, ok := keep.revs[id]
+	if ok && (started.Sub(c.checked) < deckPdfStoreFor || keep.fresh(id, c.checked)) {
+		keep.revMu.Unlock()
+		return c.rev, c.at, nil
+	}
+	if at, bad := keep.failed[id]; bad && started.Sub(at) < deckPdfStoreFor {
+		keep.revMu.Unlock()
+		return 0, time.Time{}, errDeckPdfStoreAway
+	}
+	keep.revMu.Unlock()
+	rev, at, err := deckStoreRevNow(r, id)
+	keep.revMu.Lock()
+	defer keep.revMu.Unlock()
+	if err != nil {
+		if keep.failed == nil {
+			keep.failed = map[string]time.Time{}
+		}
+		keep.failed[id] = started
+		return 0, time.Time{}, err
+	}
+	delete(keep.failed, id)
+	if keep.revs == nil {
+		keep.revs = map[string]deckStoreRevAt{}
+	}
+	keep.revs[id] = deckStoreRevAt{rev: rev, at: time.UnixMilli(at), checked: started}
+	return rev, time.UnixMilli(at), nil
+}
+
+var errDeckPdfStoreAway = errors.New("the store did not answer a moment ago")
+
+// deckStoreRevNow asks the store.
+func deckStoreRevNow(r Revisions, id string) (rev, at int64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	es, err := r.HistoryUnder(ctx, id+"/"+ProjectDirname+"/", 1)
 	if err != nil {
-		return 0, time.Time{}, err
+		return 0, 0, err
 	}
 	if len(es) > 0 {
 		rev, at = es[0].Rev, es[0].At
@@ -113,25 +289,17 @@ func (l *Library) deckStoreRev(r Revisions, id string) (int64, time.Time, error)
 	meta := id + "/" + MetaDirname + "/"
 	es, err = r.HistoryUnder(ctx, meta, 200)
 	if err != nil {
-		return 0, time.Time{}, err
+		return 0, 0, err
 	}
 	for _, e := range es {
-		rel := strings.TrimPrefix(e.Path, meta)
-		page, inPages := strings.CutPrefix(rel, MetaPagesDirname+"/")
-		if !strings.Contains(rel, "/") || inPages && !strings.Contains(page, "/") {
+		if _, part := deckPdfPart(e.Path); part {
 			if e.Rev > rev {
 				rev, at = e.Rev, e.At
 			}
 			break
 		}
 	}
-	keep.revMu.Lock()
-	if keep.revs == nil {
-		keep.revs = map[string]deckStoreRevAt{}
-	}
-	keep.revs[id] = deckStoreRevAt{rev: rev, at: time.UnixMilli(at), checked: time.Now()}
-	keep.revMu.Unlock()
-	return rev, time.UnixMilli(at), nil
+	return rev, at, nil
 }
 
 // deckPdfFromRev is the store revision the published PDF was built from, 0 when there is none.

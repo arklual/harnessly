@@ -93,6 +93,9 @@ func (l *Launcher) Codex(conversation string, ids []string) (agents.CodexApps, e
 		if err := writeGrant(sealDir, ids, conversation); err != nil {
 			return out, fmt.Errorf("the apps' grant: %w", err)
 		}
+		if err := writeChatStatus(sealDir, l.Registry.ChatStatuses(conversation)); err != nil {
+			return out, fmt.Errorf("the documents' status: %w", err)
+		}
 		out.TokenFile = file
 		out.Env = l.agentEnv(file)
 	}

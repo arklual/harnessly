@@ -534,3 +534,66 @@ func TestReplicaWalksTheStepsOfAChatHeldWholeByTheirCursor(t *testing.T) {
 		t.Errorf("marks %q, want %q", marks, want)
 	}
 }
+
+func TestReplicaSendsAgainWhatNoAckCameFor(t *testing.T) {
+	g := newReplicaRig(t)
+	g.r.ackWait = 20 * time.Millisecond
+	g.r.hello("ep-1")
+	g.r.start(true, nil, nil, nil)
+	g.r.event("convs", 1, raw(`{"n":1}`))
+	g.r.event("convs", 2, raw(`{"n":2}`))
+	if events, channels := g.r.lag(); events != 2 || channels != 1 {
+		t.Fatalf("lag %d events in %d channels, want 2 in 1", events, channels)
+	}
+	// No ack comes (the frame was not stored, or its ack was lost): both events go again, from the acknowledged place.
+	g.until(func() bool { return len(g.events()) >= 3 })
+	again := g.events()[2]
+	if again.FromSeq != 1 || len(again.Events) != 2 || again.Epoch != "ep-1" {
+		t.Fatalf("resend %+v", again)
+	}
+	g.r.mu.Lock()
+	wait := g.r.chans["convs"].wait
+	g.r.mu.Unlock()
+	if wait < 40*time.Millisecond {
+		t.Fatalf("the next wait is %s, want it doubled", wait)
+	}
+	// The ack ends it: nothing more is sent, and the wait is the first one again.
+	g.r.ack("convs", "ep-1", 2, false)
+	sent := len(g.events())
+	time.Sleep(150 * time.Millisecond)
+	if len(g.events()) != sent {
+		t.Fatalf("sent again after the ack: %+v", g.events()[sent:])
+	}
+	g.r.mu.Lock()
+	wait = g.r.chans["convs"].wait
+	g.r.mu.Unlock()
+	if events, _ := g.r.lag(); events != 0 || wait != 0 {
+		t.Fatalf("after the ack: lag %d, wait %s", events, wait)
+	}
+}
+
+func TestReplicaDoesNotAnswerARepeatedRefusalAtOnce(t *testing.T) {
+	g := newReplicaRig(t)
+	g.r.ackWait = 300 * time.Millisecond
+	g.r.hello("ep-1")
+	g.r.start(true, nil, nil, nil)
+	g.r.event("convs", 1, raw(`{"n":1}`))
+	// The cluster could not store the frame and says where it stands: the frame goes again at once.
+	g.r.ack("convs", "ep-1", 0, true)
+	if got := g.events(); len(got) != 2 || got[1].FromSeq != 1 {
+		t.Fatalf("resend %+v", got)
+	}
+	// It refuses the same place again: no storm, the frame waits for the timer.
+	g.r.ack("convs", "ep-1", 0, true)
+	if got := g.events(); len(got) != 2 {
+		t.Fatalf("a repeated refusal was answered at once: %+v", got)
+	}
+	g.until(func() bool { return len(g.events()) >= 3 })
+	if got := g.events()[2]; got.FromSeq != 1 || len(got.Events) != 1 {
+		t.Fatalf("resend by the timer %+v", got)
+	}
+	g.r.ack("convs", "ep-1", 1, false)
+	if len(g.r.chans["convs"].events) != 0 {
+		t.Fatal("an acknowledged event is kept")
+	}
+}

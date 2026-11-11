@@ -1,24 +1,25 @@
 /* The mode of a project at the head of its bar (features/designly/mode-button), beside the address. */
 
-/* The switch: «Просмотр» | «Редактирование» side by side, two equal parts on a sunk track; a raised thumb under the
+/* The switch: «Просмотр» | «Редактирование» side by side, two equal parts on a pill track; a raised pill under the
    part of the mode the screen is in slides to the other one. */
 .hx-modeseg {
   position: relative;
   display: inline-grid;
   flex: none;
   grid-template-columns: 1fr 1fr;
-  height: 30px;
-  padding: 2px;
-  border-radius: var(--hx-radius-sm);
-  background: var(--hx-bg-active);
+  height: 32px;
+  margin: 0 2px;
+  padding: 3px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-rail);
 }
 .hx-modeseg__thumb {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-  width: calc(50% - 2px);
-  border-radius: 6px;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: var(--hx-radius-full);
   background: var(--hx-bg-raised);
   box-shadow: var(--hx-shadow-sm);
   transition: transform var(--hx-dur-sm) var(--hx-ease-out);
@@ -33,20 +34,19 @@
   justify-content: center;
   gap: 6px;
   min-width: 0;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--hx-radius-full);
   background: transparent;
-  color: var(--hx-fg-2);
+  color: var(--hx-fg-3);
   font: inherit;
-  font-size: var(--hx-text-sm);
+  font-size: 12.5px;
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--hx-dur-sm) var(--hx-ease-out);
 }
 .hx-modeseg__part[aria-pressed='true'] {
   color: var(--hx-fg-1);
-  font-weight: var(--hx-weight-medium);
   cursor: default;
 }
 .hx-modeseg__part[aria-pressed='false']:hover {
@@ -55,9 +55,6 @@
 .hx-modeseg__part:focus-visible {
   outline: 2px solid var(--hx-focus);
   outline-offset: 1px;
-}
-.hx-modeseg[data-editing='true'] [data-k='mode-edit'] .hx-modeseg__icon {
-  color: var(--hx-accent);
 }
 /* Where the text is there, the hint of a part repeats it: only «Запросить доступ» says something more. */
 .hx-modeseg[data-compact='false'] .hx-modeseg__part:not([data-ask]) > .hx-tip {

@@ -22,6 +22,7 @@ Exit code: `0` nothing failed (warnings do not fail), `1` a check failed, `2` th
 | proxy | `HUB_TRUSTED_PROXIES` against an https address |
 | public address | `GET <HUB_PUBLIC_URL>/healthz` from here, as the proxy passes it |
 | clock | the `Date` of that answer against this machine's time |
+| app services | `GET /readyz` of the documents and boards services (`HUB_ARTIFACTS_URL`, `HUB_BOARDS_URL`) |
 | extensions | the adapters of `HUB_EXTENSIONS_FILE` ([extensions.md](extensions.md)) |
 
 ## HUB-C001
@@ -73,6 +74,13 @@ An OpenID provider's configuration cannot be read. The issuer (`HUB_OIDC_<ID>_IS
 
 ## HUB-E001
 An extension adapter is unreachable or unhealthy; the lines under `extensions` say which ([extensions.md](extensions.md)).
+
+## HUB-E002
+The documents or boards service does not answer `GET <address>/readyz` with 2xx. The hub keeps working: the app shows
+«сейчас не открывается» and opens by itself once the service is back, and the agents' tools answer «сервис
+недоступен». The running hub asks the same every 30 seconds: `/api/platform/docs/_status` has it under `services`,
+the scrape has `harnessly_hub_app_service_up{service}`, and after 5 minutes down the administrators get one mail
+(and one more when it is back). Start the service or fix its address.
 
 ## HUB-M001
 A machine's move of its own data into the store stopped on objects with errors (docs/migrations): the line names the

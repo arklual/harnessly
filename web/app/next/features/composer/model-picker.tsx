@@ -37,6 +37,7 @@ import Tooltip from '@/next/ui/tooltip';
 import { usePresentFlag } from '@/next/ui/presence';
 import type { IMachineChoice } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
+import { useCoverField } from '@/next/stores/field-cover';
 // The trigger's own look (.hx-model) is the composer's: a picker outside the field brings it along.
 import '@/next/styles/composer.css';
 import '@/next/styles/picker.css';
@@ -123,6 +124,7 @@ const ModelPicker = ({
   machine = null,
 }: IModelPickerProps) => {
   const [open, setOpen] = useState(false);
+  useCoverField(open);
   const [view, setView] = useState<TView>(VIEW.effort);
   const [browse, setBrowse] = useState(choiceAgentKey(value));
   const { mounted, state } = usePresentFlag(open, EXIT_MS);

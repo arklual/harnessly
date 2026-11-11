@@ -150,6 +150,8 @@ export interface Fields {
   repoOther: boolean;
   repoUrl: string;
   path: string;
+  /** app: turned off for the whole organization. */
+  appOff: boolean;
   run: string;
   rerun: 'once' | 'check';
   check: string;
@@ -198,6 +200,7 @@ export const blankFields = (k: AddKind, repos: readonly RepoRef[] = []): Fields 
   secret: '',
   repo: repos[0]?.id ?? '',
   repoOther: false,
+  appOff: false,
   repoUrl: '',
   path: '',
   run: '',
@@ -469,6 +472,10 @@ export const viewOf = (d: Draft, repos: readonly RepoRef[] = []): ItemView => {
         ['Репозиторий', rp],
         ['Папка', f.path],
         ['Ветка', f.branch.trim() || 'main'],
+        [
+          'В организации',
+          f.appOff ? 'Выключено у всех: нет в меню, у агента нет его инструментов' : 'Включено',
+        ],
         ['У человека', 'Удалить нельзя; выключить — только если пункт не закреплён'],
       ],
     };
@@ -741,6 +748,7 @@ export const toSource = (d: Draft): CatalogSource => {
   if (d.k === 'access') return { service: f.svc, host: orUndef(f.host) };
   if (d.k === 'app') {
     const out: CatalogSource = { from: 'repo', path: f.path.trim(), branch: orUndef(f.branch) };
+    if (f.appOff) out.off = true;
     if (f.repoOther) out.repoUrl = withScheme(f.repoUrl);
     else out.repo = f.repo;
     return out;
@@ -813,6 +821,7 @@ export const fromItem = (it: CatalogItem): Draft | null => {
     f.repoUrl = noScheme(s.repoUrl ?? '');
     f.branch = s.branch ?? '';
     f.path = s.path ?? '';
+    f.appOff = s.off === true;
   }
   if (it.kind === 'plugin') {
     f.name = it.name;

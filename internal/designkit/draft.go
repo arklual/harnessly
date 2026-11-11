@@ -231,7 +231,7 @@ func walkFiles(root string, skip map[string]bool) (map[string]fs.FileInfo, error
 			}
 			return nil
 		}
-		if d.Type().IsRegular() {
+		if d.Type().IsRegular() && rel != SealFile {
 			info, err := d.Info()
 			if err != nil {
 				return err

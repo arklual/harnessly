@@ -80,6 +80,9 @@ func (s *Service) proxyPrincipal(r *http.Request) (*Principal, error) {
 	if err != nil || u == nil {
 		return nil, err
 	}
+	if u.DisabledAt != nil {
+		return nil, nil
+	}
 	admin, err := s.adminFor(ctx, s.db.S(), *u)
 	if err != nil {
 		return nil, err

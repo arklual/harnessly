@@ -351,3 +351,103 @@ cat "$PLIST"`, map[string]string{"launchctl": "exit 0"})
 		t.Fatalf("plist:\n%s", plist)
 	}
 }
+
+// stableCurl answers the stable pointer's address with the given body (nothing: 404) and the latest release with 0.16.200.
+func stableCurl(pointer string) string {
+	stable := "exit 22"
+	if pointer != "" {
+		stable = "printf '%s' '" + pointer + "'; exit 0"
+	}
+	return `echo "curl $*" >> "$CALLS"
+case "$*" in
+*stable.json*) ` + stable + ` ;;
+*releases/latest*) printf 'https://github.com/ly-solutions/harnessly/releases/tag/v0.16.200'; exit 0 ;;
+*latest.txt*) printf 'v0.16.200\n'; exit 0 ;;
+esac
+exit 22`
+}
+
+const installedStub = `
+mkdir -p "$BIN"
+printf '#!/bin/sh\necho "harnessly %s"\n' "$INSTALLED" > "$BIN/harnessly"
+chmod 755 "$BIN/harnessly"
+`
+
+func TestRootInstallerChannels(t *testing.T) {
+	const pointer = `{"schema": 1, "channel": "stable", "version": "0.16.180", "released_at": "2026-10-20T10:00:00Z"}`
+	for _, tc := range []struct {
+		name, args, installed, pointer string
+		wantVersion, wantChannel       string
+		wantOut, wantCall, noCall      string
+	}{
+		{name: "a new installation takes the stable release", pointer: pointer,
+			wantVersion: "0.16.180", wantChannel: "stable", wantCall: "releases/download/channels/stable.json", noCall: "releases/latest"},
+		{name: "the latest channel takes every release", args: "--channel latest", pointer: pointer,
+			wantVersion: "0.16.200", wantChannel: "latest", wantCall: "releases/latest", noCall: "stable.json"},
+		{name: "an older installation moves up to stable", installed: "0.16.100", pointer: pointer,
+			wantVersion: "0.16.180", wantChannel: "stable"},
+		{name: "an installation ahead of stable stays", installed: "0.16.200", pointer: pointer,
+			wantVersion: "0.16.200", wantChannel: "stable", wantOut: "staying on 0.16.200 until a newer one is stable", noCall: "releases/latest"},
+		{name: "no pointer: what is installed stays, with the reason", installed: "0.16.100",
+			wantVersion: "0.16.100", wantChannel: "stable", wantOut: "no stable release is named yet", noCall: "releases/latest"},
+		{name: "no pointer and nothing installed: the latest release, said aloud",
+			wantVersion: "0.16.200", wantChannel: "stable", wantOut: "installing the latest release instead", wantCall: "releases/latest"},
+		{name: "a mirror keeps its pointer beside latest.txt", args: "--mirror https://mirror.example.org/h", pointer: pointer,
+			wantVersion: "0.16.180", wantChannel: "stable", wantCall: "https://mirror.example.org/h/stable.json", noCall: "latest.txt"},
+		{name: "a version asked for wins", args: "--version 0.16.150", pointer: pointer,
+			wantVersion: "0.16.150", wantChannel: "stable", noCall: "curl"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := "parse_args " + tc.args + "\nOS=linux\nARCH=amd64\n"
+			if tc.installed != "" {
+				body += "INSTALLED=" + tc.installed + installedStub
+			}
+			body += "resolve_version\necho \"version=$VERSION channel=$CHANNEL\""
+			out, calls := installerFunctions(t, body, map[string]string{"curl": stableCurl(tc.pointer)})
+			if want := "version=" + tc.wantVersion + " channel=" + tc.wantChannel; !strings.Contains(out, want) {
+				t.Fatalf("want %s:\n%s", want, out)
+			}
+			if tc.wantOut != "" && !strings.Contains(out, tc.wantOut) {
+				t.Fatalf("no %q in:\n%s", tc.wantOut, out)
+			}
+			if tc.wantCall != "" && !strings.Contains(calls, tc.wantCall) {
+				t.Fatalf("no request for %s:\n%s", tc.wantCall, calls)
+			}
+			if tc.noCall != "" && strings.Contains(calls, tc.noCall) {
+				t.Fatalf("a request for %s:\n%s", tc.noCall, calls)
+			}
+		})
+	}
+}
+
+// The channel is kept in the service's env file: the runtime's notice reads it there, and so does the next run.
+func TestRootInstallerKeepsTheChannel(t *testing.T) {
+	out, _ := installerFunctions(t, `parse_args --channel latest
+OS=linux
+ARCH=amd64
+resolve_version
+write_env_file
+grep -c '^RUNTIME_UPDATE_CHANNEL="latest"$' "$ENV_FILE"
+parse_args
+resolve_version
+echo "again=$CHANNEL"
+parse_args --channel stable
+resolve_version
+write_env_file
+grep '^RUNTIME_UPDATE_CHANNEL=' "$ENV_FILE"`, map[string]string{"curl": stableCurl(`{"schema":1,"channel":"stable","version":"0.16.180"}`)})
+	for _, want := range []string{"1\n", "again=latest", `RUNTIME_UPDATE_CHANNEL="stable"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("no %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, `RUNTIME_UPDATE_CHANNEL="latest"`) {
+		t.Fatalf("the earlier channel is still in the env file:\n%s", out)
+	}
+}
+
+func TestRootInstallerRefusesAnUnknownChannel(t *testing.T) {
+	out, _ := installerFunctions(t, `(parse_args --channel nightly) || echo refused`, nil)
+	if !strings.Contains(out, "--channel is stable or latest, got: nightly") || !strings.Contains(out, "refused") {
+		t.Fatal(out)
+	}
+}

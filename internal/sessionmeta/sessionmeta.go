@@ -16,6 +16,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 )
 
 // tailBytes is how much of a transcript a cold read takes. A goal is restated at every check, so the tail has it; the
@@ -145,9 +148,36 @@ func (s *scan) feed(raw []byte) {
 		return
 	}
 	var l line
+	tally.Decode()
 	if json.Unmarshal(raw, &l) != nil {
 		return
 	}
+	s.take(l)
+}
+
+// lineOf is a line the index decoded as the scan reads it; false where the scan's own decode would refuse the line.
+func lineOf(f *transcriptindex.Fields) (l line, ok bool) {
+	if f == nil {
+		return l, false
+	}
+	switch ts := f.Timestamp.(type) {
+	case nil:
+	case string:
+		l.Timestamp = ts
+	default:
+		return l, false
+	}
+	l.Type, l.Subtype, l.Operation, l.QuerySource = f.Type, f.Subtype, f.Operation, f.QuerySource
+	l.Content, l.AITitle, l.CustomTitle = f.Content, f.AITitle, f.CustomTitle
+	l.Message.Content = f.Message.Content
+	l.Params.OutputConfig.Effort = f.Params.OutputConfig.Effort
+	l.Attachment.Type, l.Attachment.Met = f.Attachment.Type, f.Attachment.Met
+	l.Attachment.Condition, l.Attachment.HookName = f.Attachment.Condition, f.Attachment.HookName
+	return l, true
+}
+
+// take is a decoded line in its order.
+func (s *scan) take(l line) {
 	at := millis(l.Timestamp)
 	switch {
 	case l.Type == "ai-title":
@@ -314,6 +344,8 @@ func (s *scan) goalStatus(text string, met bool, at int64) {
 type cursor struct {
 	progress
 	reading sync.Mutex
+	// sub is the cursor's place in the transcript index, nil without one. Under reading.
+	sub *transcriptindex.Sub
 }
 
 // progress is how far a cursor has read its transcript. A transcript that is gone starts it over; the lock of the read
@@ -328,6 +360,11 @@ type progress struct {
 
 // Reader keeps one cursor per transcript.
 type Reader struct {
+	// Index, when set, reads what a transcript gains for the reader and for the transcript's other readers at once:
+	// the reader reads a transcript's tail itself and takes the lines after it from the index. nil has it read every
+	// transcript itself.
+	Index *transcriptindex.Index
+
 	mu      sync.Mutex
 	cursors map[string]*cursor
 }
@@ -335,8 +372,26 @@ type Reader struct {
 // Forget drops the cursor of a transcript no conversation shows any more.
 func (r *Reader) Forget(path string) {
 	r.mu.Lock()
+	c := r.cursors[path]
 	delete(r.cursors, path)
 	r.mu.Unlock()
+	if c == nil {
+		return
+	}
+	c.reading.Lock()
+	sub := c.sub
+	c.sub = nil
+	c.reading.Unlock()
+	if sub != nil {
+		sub.Close()
+	}
+}
+
+// Cursors is how many transcripts the reader keeps a cursor of.
+func (r *Reader) Cursors() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.cursors)
 }
 
 // Read is what the transcript says now. Reads of one transcript take turns.
@@ -351,9 +406,64 @@ func (r *Reader) Read(path string) Info {
 		r.cursors[path] = c
 	}
 	r.mu.Unlock()
+	if r.Index != nil {
+		return r.indexed(path, c)
+	}
 	c.reading.Lock()
 	defer c.reading.Unlock()
 	return advance(path, c)
+}
+
+// indexed is Read with the index: the lines the transcript gained come from the index's one read of them, folded into
+// the cursor's scan as they are read (take). Where the index does not serve the cursor — it is new, the file was
+// replaced, cut or is gone — the cursor reads the file itself, as without an index, and takes its place again.
+func (r *Reader) indexed(path string, c *cursor) Info {
+	c.reading.Lock()
+	if c.sub == nil {
+		c.sub = r.Index.Subscribe(path, "sessionmeta", transcriptindex.SinkFunc(func(b *transcriptindex.Batch) bool { return take(c, b) }))
+	}
+	sub := c.sub
+	c.reading.Unlock()
+	// The look hands the lines to take, which locks the cursor: the cursor is not held over it.
+	st, _ := sub.Sync(false)
+	c.reading.Lock()
+	if st == transcriptindex.Fresh {
+		defer c.reading.Unlock()
+		if c.scan == nil {
+			return Info{}
+		}
+		return copyOf(c.scan.info)
+	}
+	info := advance(path, c)
+	read, offset, ino := c.scan != nil, c.offset, c.ino
+	c.reading.Unlock()
+	// The index is told with the cursor let go: its looks hold the file and then take the cursor (take).
+	if read {
+		sub.Seat(offset, ino)
+	}
+	return info
+}
+
+// take folds the lines the index read into the cursor's scan.
+func take(c *cursor, b *transcriptindex.Batch) bool {
+	c.reading.Lock()
+	defer c.reading.Unlock()
+	if c.scan == nil || b.From != c.offset {
+		return false // not where the cursor stands: it reads for itself
+	}
+	b.Each(func(l *transcriptindex.Line) {
+		if !interesting(l.Raw) {
+			return
+		}
+		if decoded, ok := lineOf(l.Fields()); ok {
+			c.scan.take(decoded)
+		} else if l.Fields() == nil {
+			c.scan.feed(l.Raw) // the index could not decode it: the scan's narrower read may
+		}
+	})
+	// The file's time and size are not the cursor's any more: a read of its own starts with the file as it is.
+	c.offset, c.mtime, c.size = b.To, time.Time{}, 0
+	return true
 }
 
 func inode(st os.FileInfo) uint64 {
@@ -365,6 +475,7 @@ func inode(st os.FileInfo) uint64 {
 
 func advance(path string, c *cursor) Info {
 	st, err := os.Stat(path)
+	tally.Stat()
 	if err != nil {
 		c.progress = progress{}
 		return Info{}
@@ -420,12 +531,14 @@ func copyOf(i Info) Info {
 
 func readChunk(path string, from, to int64) []byte {
 	f, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return nil
 	}
 	defer f.Close()
 	buf := make([]byte, to-from)
 	n, _ := f.ReadAt(buf, from)
+	tally.Read(n)
 	return buf[:n]
 }
 

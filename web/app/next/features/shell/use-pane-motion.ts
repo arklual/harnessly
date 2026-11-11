@@ -2,6 +2,9 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { PHONE_QUERY } from '@/next/features/shell/gestures';
 import { SIDE_MOTION_EASING, SIDE_MOTION_MS } from '@/next/features/shell/use-side-motion';
 
+/** The content's fade-in while the pane goes to its whole width and back: shorter than the edge's slide. */
+const PANE_FADE_MS = 180;
+
 /** The phone's sheet leaves by its own CSS motion (styles/shell.css), this long. */
 const SHEET_EXIT_MS = 300;
 
@@ -106,23 +109,35 @@ const usePaneMotion = (pane: RefObject<HTMLElement | null>, open: boolean): void
 
 export default usePaneMotion;
 
+/** How far the pane's left edge is clipped now (the running slide's frame): `inset(0 0 0 <x>px …)`. */
+const clipLeft = (el: HTMLElement): number => {
+  const match = /inset\(([^)]*)\)/.exec(getComputedStyle(el).clipPath);
+  const parts = match?.[1]?.split(/\s+/).filter((x) => x.endsWith('px')) ?? [];
+  return px(parts[3] ?? parts[1] ?? parts[0] ?? '0');
+};
+
+/** The pane's visible box: its left `left` px clipped, its corners as the pane's own. */
+const inset = (left: number): string => `inset(0px 0px 0px ${left}px round 16px)`;
+
 /**
- * «Во всю ширину» and back: the pane's width goes from where it was to where it is on the same 240 ms and curve as its
- * opening, and what is in it is laid out once, at the wider of the two widths, behind the pane's edge (a terminal or a
- * page is not asked to refit on every frame). The chat is not touched: its columns follow the pane's own width, which
- * a maximised pane covers rather than narrows, so the reader's place stays. A toggle in the middle starts from the
- * width the pane has then. The phone and reduced motion skip it.
+ * «Во всю ширину» and back. What is in the pane is laid out once, at its new width, and stands where it ends
+ * up from the first frame: the pane keeps the wider of the two boxes for the slide, its content right-aligned in it,
+ * and only its left edge moves, by clip-path on the compositor (no width per frame, no refit of a terminal, a page or
+ * a design on the way). The content comes in with a short fade, as its first frame is the new layout seen through
+ * the old edge. The chat is not touched: a maximised pane covers it rather than narrows it. A toggle in the middle
+ * starts from where the edge is then. The phone and reduced motion skip it.
  */
 export const usePaneMax = (pane: RefObject<HTMLElement | null>, maxed: boolean, mounted: boolean): void => {
   const previous = useRef(maxed);
   const laidOut = useRef(0);
-  const running = useRef<Animation | null>(null);
+  const running = useRef<{ edge: Animation; fade: Animation | null; box: number } | null>(null);
 
   // The width the layout last gave the pane: where a slide starts from, as the layout is already the new one by then.
   useLayoutEffect(() => {
     const el = pane.current;
-    if (!mounted || !el || typeof ResizeObserver === 'undefined') return;
+    if (!mounted || !el) return;
     laidOut.current = el.getBoundingClientRect().width;
+    if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => {
       if (!running.current) laidOut.current = el.getBoundingClientRect().width;
     });
@@ -135,27 +150,40 @@ export const usePaneMax = (pane: RefObject<HTMLElement | null>, maxed: boolean, 
     previous.current = maxed;
     const el = pane.current;
     if (!el) return;
-    const sliding = running.current !== null;
-    // A slide in progress holds the pane at its frame: that is where the next one starts.
-    const from = sliding ? el.getBoundingClientRect().width : laidOut.current;
-    running.current?.cancel();
+    const now = running.current;
+    // A slide in progress: the visible width is the box less what its edge clips now.
+    const from = now ? now.box - clipLeft(el) : laidOut.current;
+    now?.edge.cancel();
+    now?.fade?.cancel();
     running.current = null;
+    el.style.removeProperty('width');
     el.removeAttribute('data-resizing');
     if (phone() || reduced() || from === 0) return;
     const to = el.getBoundingClientRect().width;
     if (Math.abs(from - to) < 1) return;
-    el.style.setProperty('--hx-inner-w', `${Math.max(from, to)}px`);
+    const box = Math.max(from, to);
+    el.style.setProperty('width', `${box}px`);
+    el.style.setProperty('--hx-inner-w', `${to}px`);
     el.setAttribute('data-resizing', 'true');
-    const slide = el.animate([{ width: `${from}px` }, { width: `${to}px` }], {
-      duration: SIDE_MOTION_MS,
-      easing: SIDE_MOTION_EASING,
+    const timing: KeyframeAnimationOptions = { duration: SIDE_MOTION_MS, easing: SIDE_MOTION_EASING };
+    // Held at its end until the box is given back, so no frame shows the wider box unclipped.
+    const edge = el.animate([{ clipPath: inset(box - from) }, { clipPath: inset(box - to) }], {
+      ...timing,
+      fill: 'forwards',
     });
+    const inner = el.querySelector<HTMLElement>(':scope > .hx-browser');
+    const fade =
+      inner?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: PANE_FADE_MS, easing: 'ease-out' }) ??
+      null;
+    const slide = { edge, fade, box };
     running.current = slide;
-    void slide.finished.then(
+    void edge.finished.then(
       () => {
         if (running.current !== slide) return;
         running.current = null;
+        el.style.removeProperty('width');
         el.removeAttribute('data-resizing');
+        edge.cancel();
         laidOut.current = to;
       },
       () => undefined,
@@ -164,7 +192,8 @@ export const usePaneMax = (pane: RefObject<HTMLElement | null>, maxed: boolean, 
 
   useLayoutEffect(
     () => () => {
-      running.current?.cancel();
+      running.current?.edge.cancel();
+      running.current?.fade?.cancel();
       running.current = null;
     },
     [],

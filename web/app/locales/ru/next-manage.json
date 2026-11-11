@@ -57,5 +57,8 @@
   "next.manage.spend.sub.hub": "По всем вашим машинам, как учёл хаб",
   "next.manage.spend.sub.local": "На этой машине, по цене API",
   "next.manage.spend.empty": "За этот период расхода нет.",
-  "next.manage.spend.aria": "Расход по дням"
+  "next.manage.spend.aria": "Расход по дням",
+  "next.manage.hubOnly": "По данным сервера",
+  "next.manage.hubUnavailable": "Данные с сервера недоступны. На этой машине ничего не считается; цифры появятся, когда хаб ответит.",
+  "next.manage.tile.costHub": "Потрачено"
 }

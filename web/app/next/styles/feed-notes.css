@@ -8,7 +8,7 @@
   pointer-events: none;
 }
 .hx-fnotes .hx-note__row {
-  width: min(280px, calc(100vw - 16px));
+  width: min(320px, calc(100vw - 16px));
 }
 ::highlight(hx-feed-note) {
   background-color: var(--hx-accent-soft);

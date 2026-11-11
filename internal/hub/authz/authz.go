@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -136,7 +137,9 @@ func notFound(err error) error {
 }
 
 // level is the index in chain of the highest scope the person manages it from, or -1 when they do not manage it. An
-// admin grant on an org or tenant, a tenant's owner membership, and a lead grant on the team at the bottom count.
+// admin grant on an org or tenant, a tenant's owner membership, and a lead grant on the team at the bottom count. A
+// grant on a tenant or on its team counts only while the person is a member of that tenant: a grant left behind by
+// somebody who is no longer in it gives nothing.
 func (a Authz) level(ctx context.Context, userID string, chain []Scope) (int, error) {
 	if userID == "" {
 		return -1, nil
@@ -152,6 +155,7 @@ func (a Authz) level(ctx context.Context, userID string, chain []Scope) (int, er
 	for _, g := range grants {
 		has[g.ScopeKind+":"+g.ScopeID+":"+g.Role] = true
 	}
+	member := false
 	for i, s := range chain {
 		switch s.Kind {
 		case store.ScopeOrg:
@@ -159,18 +163,16 @@ func (a Authz) level(ctx context.Context, userID string, chain []Scope) (int, er
 				return i, nil
 			}
 		case store.ScopeTenant:
-			if has[s.Key()+":"+store.RoleAdmin] {
-				return i, nil
-			}
 			role, err := a.S.Role(ctx, s.ID, userID)
 			if err != nil {
 				return -1, err
 			}
-			if role == store.RoleOwner {
+			member = role != ""
+			if role == store.RoleOwner || (member && has[s.Key()+":"+store.RoleAdmin]) {
 				return i, nil
 			}
 		case store.ScopeTeam:
-			if has[s.Key()+":"+store.RoleLead] {
+			if member && has[s.Key()+":"+store.RoleLead] {
 				return i, nil
 			}
 		}
@@ -210,6 +212,9 @@ func (a Authz) Can(ctx context.Context, p Principal, c Check) (Decision, error) 
 	}
 	if p.InstanceAdmin && lvl < 0 {
 		lvl = 0 // an instance administrator manages everything from the top; the self rules still hold
+		if err := a.noteOperator(ctx, p.UserID, chain, "operator."+string(c.Action), c.Scope.Kind, c.Scope.ID); err != nil {
+			return Decision{}, err
+		}
 	}
 	self := c.Target != "" && c.Target == p.UserID
 
@@ -396,4 +401,35 @@ func (a Authz) CapabilitiesAt(ctx context.Context, p Principal, s Scope) (Capabi
 		c.Needs.SetLimit = &n
 	}
 	return c, nil
+}
+
+// OperatorWindow is how long the same use of the installation administrator's role stays one line of the journal.
+const OperatorWindow = time.Hour
+
+// NoteOperator writes into the journal of the scope that an administrator of the installation, who holds no place in
+// it, reached it or something in it (target): who, where and what, never the content. Repeats within OperatorWindow
+// are one line.
+func (a Authz) NoteOperator(ctx context.Context, userID string, s Scope, action, targetKind, targetID string) error {
+	chain, err := a.Chain(ctx, s)
+	if err != nil {
+		return err
+	}
+	return a.noteOperator(ctx, userID, chain, action, targetKind, targetID)
+}
+
+func (a Authz) noteOperator(ctx context.Context, userID string, chain []Scope, action, targetKind, targetID string) error {
+	at := chain[len(chain)-1]
+	e := &store.AuditEvent{ActorID: userID, ScopeKind: at.Kind, ScopeID: at.ID, Action: action, TargetKind: targetKind, TargetID: targetID, At: time.Now().UTC()}
+	for _, s := range chain {
+		switch s.Kind {
+		case store.ScopeOrg:
+			e.OrgID = s.ID
+		case store.ScopeTenant:
+			e.SpaceID = s.ID
+		case store.ScopeTeam:
+			e.TeamID = s.ID
+		}
+	}
+	_, err := a.S.AddOperatorRead(ctx, e, e.At.Add(-OperatorWindow))
+	return err
 }

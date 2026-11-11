@@ -4,11 +4,11 @@
 import { useMemo } from 'react';
 import type { BackgroundTask, ConvId } from '@/next/protocol/v2';
 import { useBackground } from '@/next/stores/conversation';
-import { useConversation } from '@/next/stores/conversations';
+import { useAgentState } from '@/next/stores/chat-state';
 
 export const useWaitingAgents = (conv: ConvId): readonly BackgroundTask[] => {
   const tasks = useBackground(conv);
-  const state = useConversation(conv)?.state.k;
+  const state = useAgentState(conv)?.k;
   const answering = state === 'working' || state === 'ready' || state === 'idle';
   return useMemo(
     () =>

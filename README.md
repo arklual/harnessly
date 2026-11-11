@@ -161,7 +161,8 @@ section. Agents can also send plain messages with `harnessly notify send`.
 
 - Web push when a turn ends or an agent asks for input; Telegram bots as above.
 - A standalone runtime built from a release checks the project's GitHub releases at start and every 12 hours and shows
-  a quiet "new version" notice with a link to the notes. The check sends nothing but the standard request headers;
+  a quiet "new version" notice with a link to the notes. It follows the `stable` channel unless
+  `RUNTIME_UPDATE_CHANNEL=latest` ([update channels](docs/self-host/update-channels.md)). The check sends nothing but the standard request headers;
   `RUNTIME_UPDATE_CHECK=0` turns it off. See [Updates](docs/deploy.md#updates).
 
 ### Hub

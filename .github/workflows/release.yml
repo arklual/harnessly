@@ -7,7 +7,8 @@
 #             pre-release.
 #   image     The Dockerfile's runtime target (and with-agents) as a multi-arch image on ghcr.io/ly-solutions/harnessly,
 #             tagged X.Y.Z, X.Y and latest (X.Y.Z-with-agents, X.Y-with-agents and with-agents), signed keyless with cosign,
-#             with a provenance attestation.
+#             with a provenance attestation. The hub and machine targets the same way, as ghcr.io/ly-solutions/harnessly-hub
+#             and ghcr.io/ly-solutions/harnessly-machine (X.Y.Z, X.Y and latest).
 #
 # Nothing is signed with a key kept anywhere: both signatures and attestations use the run's GitHub OIDC identity.
 # Every action is pinned to a commit (the comment names the release); Dependabot bumps them.
@@ -75,13 +76,24 @@ jobs:
       matrix:
         include:
           - target: runtime
+            image: ghcr.io/ly-solutions/harnessly
             suffix: ""
             floating: latest
           - target: with-agents
+            image: ghcr.io/ly-solutions/harnessly
             suffix: -with-agents
             floating: with-agents
+          # The hub and the machine of compose.hub.yaml, so that a hub starts without building anything.
+          - target: hub
+            image: ghcr.io/ly-solutions/harnessly-hub
+            suffix: ""
+            floating: latest
+          - target: machine
+            image: ghcr.io/ly-solutions/harnessly-machine
+            suffix: ""
+            floating: latest
     env:
-      IMAGE: ghcr.io/ly-solutions/harnessly
+      IMAGE: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

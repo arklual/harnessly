@@ -1,13 +1,16 @@
 package proxy_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
 )
@@ -18,6 +21,8 @@ type sendRuntime struct {
 	bodies []string
 	device []string
 	answer string
+	// hold, when set, is called while the machine holds a send unanswered.
+	hold func()
 }
 
 func (m *sendRuntime) handler() http.Handler {
@@ -28,8 +33,11 @@ func (m *sendRuntime) handler() http.Handler {
 		m.mu.Lock()
 		m.bodies = append(m.bodies, string(b))
 		m.device = append(m.device, r.Header.Get("X-Harnessly-Device"))
-		ans := m.answer
+		ans, hold := m.answer, m.hold
 		m.mu.Unlock()
+		if hold != nil {
+			hold()
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, ans)
 	})
@@ -122,7 +130,7 @@ func TestOutboxKeepsMessagesForAMachineThatIsOff(t *testing.T) {
 	if got := listOutbox(t, guest, a.MachineID, "tab-a"); len(got) != 0 {
 		t.Errorf("guest sees %+v", got)
 	}
-	if r := guest.Do("DELETE", base+"&client=c-1", nil); r.Code != 409 {
+	if r := guest.Do("DELETE", base+"&client=c-1", nil); r.Code != 404 {
 		t.Errorf("guest delete: %s", r)
 	}
 	// A pass while the machine is off hands over nothing.
@@ -162,9 +170,73 @@ func TestOutboxKeepsMessagesForAMachineThatIsOff(t *testing.T) {
 	if len(items) != 1 || items[0].State != "delivered" {
 		t.Errorf("after delivery %+v", items)
 	}
-	// What is delivered cannot be taken back.
-	if r := owner.Do("DELETE", base+"&id="+items[0].ID, nil); r.Code != 409 {
-		t.Errorf("delete delivered: %s", r)
+	// What is delivered is not taken back here: the answer says the machine has it, and the row stays.
+	if got := takeBack(t, owner, base+"&id="+items[0].ID); got != "200 delivered" {
+		t.Errorf("delete delivered: %s", got)
+	}
+	if items = listOutbox(t, owner, a.MachineID, "tab-a"); len(items) != 1 || items[0].State != "delivered" {
+		t.Errorf("after the delete of a delivered one %+v", items)
+	}
+}
+
+// takeBack is the answer to a DELETE as "<status> <outcome or code>".
+func takeBack(t *testing.T, p *hubtest.Person, url string) string {
+	t.Helper()
+	r := p.Do("DELETE", url, nil)
+	var out struct{ Outcome, Code string }
+	r.JSON(&out)
+	return strings.TrimSpace(strconv.Itoa(r.Code) + " " + out.Outcome + out.Code)
+}
+
+// A message taken back while it waits in the hub is never handed to the machine; one the hub is handing over just now
+// has no outcome until the machine answered, and then exactly one: delivered.
+func TestOutboxTakingBackHasOneOutcome(t *testing.T) {
+	s := hubtest.New(t, withWorkspace, fleetOn)
+	owner := s.SignIn("owner@example.com")
+	space, _ := owner.NewSpace("Команда")
+	entered, release := make(chan struct{}, 4), make(chan struct{})
+	rt := &sendRuntime{answer: `{"r":"queued","ch":"c","seq":1}`}
+	rt.hold = func() {
+		entered <- struct{}{}
+		<-release
+	}
+	a := owner.Machine(space, rt.handler())
+	a.Close()
+	s.Eventually("the machine to be off", func() bool { return s.Hub.Registry.Get(a.MachineID) == nil })
+
+	base := "/agents/api/platform/offline-prompts?machine=" + a.MachineID
+	for _, c := range []string{"c-1", "c-2"} {
+		if r := owner.Do("POST", base, queueBody(c, "tab-a", "текст "+c)); r.Code != 201 {
+			t.Fatalf("post %s: %s", c, r)
+		}
+	}
+	// Taken back while it waits: cancelled, and the hub no longer keeps it.
+	if got := takeBack(t, owner, base+"&client=c-1"); got != "200 cancelled" {
+		t.Fatalf("delete waiting: %s", got)
+	}
+	if got := takeBack(t, owner, base+"&client=c-1"); got != "404 not-found" {
+		t.Fatalf("delete again: %s", got)
+	}
+
+	a.Connect()
+	s.Eventually("the machine to be on", func() bool { return s.Hub.Registry.Get(a.MachineID) != nil })
+	passed := make(chan int, 1)
+	go func() { passed <- s.Hub.Proxy.DeliverOutbox(context.Background()) }()
+	<-entered
+	// The machine holds the send: neither outcome is true yet.
+	if got := takeBack(t, owner, base+"&client=c-2"); got != "409 sending" {
+		t.Errorf("delete during the hand-over: %s", got)
+	}
+	close(release)
+	if n := <-passed; n != 1 {
+		t.Fatalf("delivered %d", n)
+	}
+	if got := takeBack(t, owner, base+"&client=c-2"); got != "200 delivered" {
+		t.Errorf("delete after the hand-over: %s", got)
+	}
+	got := rt.got()
+	if len(got) != 1 || !strings.Contains(got[0], `"c-2"`) {
+		t.Fatalf("machine got %v", got)
 	}
 }
 
@@ -260,5 +332,55 @@ func TestOutboxAMachineThatStaysOffDoesNotHoldUpAnother(t *testing.T) {
 	}
 	if n := s.Hub.Proxy.DeliverOutbox(t.Context()); n != 1 || len(rtA.got()) != 1 {
 		t.Fatalf("delivered %d, a got %v", n, rtA.got())
+	}
+}
+
+// A machine that is slow to take a message holds up only its own messages: another machine gets its own meanwhile, in
+// the order they were written.
+func TestOutboxASlowMachineDoesNotHoldUpAnother(t *testing.T) {
+	s := hubtest.New(t, withWorkspace, fleetOn)
+	owner := s.SignIn("owner@example.com")
+	space, _ := owner.NewSpace("Команда")
+	holding, release := make(chan struct{}, 1), make(chan struct{})
+	slowRT := &sendRuntime{answer: `{"r":"accepted"}`, hold: func() { holding <- struct{}{}; <-release }}
+	fastRT := &sendRuntime{answer: `{"r":"accepted"}`}
+	slow := owner.Machine(space, slowRT.handler())
+	fast := owner.Machine(space, fastRT.handler())
+	post := func(machine, client, text string) {
+		t.Helper()
+		if r := owner.Do("POST", "/agents/api/platform/offline-prompts?machine="+machine, queueBody(client, "tab-1", text)); r.Code != 201 {
+			t.Fatalf("post %s: %s", client, r)
+		}
+	}
+	post(slow.MachineID, "s-1", "медленной")
+	post(fast.MachineID, "f-1", "первое")
+	post(fast.MachineID, "f-2", "второе")
+
+	passed := make(chan int, 1)
+	go func() { passed <- s.Hub.Proxy.DeliverOutbox(context.Background()) }()
+	select {
+	case <-holding:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the slow machine was not given its message")
+	}
+	// The slow machine still holds its message, and the other one has both of its own.
+	s.Eventually("the fast machine to get both messages", func() bool { return len(fastRT.got()) == 2 })
+	got := fastRT.got()
+	if !strings.Contains(got[0], "первое") || !strings.Contains(got[1], "второе") {
+		t.Errorf("the fast machine's messages out of order: %v", got)
+	}
+	select {
+	case n := <-passed:
+		t.Fatalf("the pass ended with %d while the slow machine held its message", n)
+	default:
+	}
+	close(release)
+	select {
+	case n := <-passed:
+		if n != 3 {
+			t.Errorf("delivered %d, want 3", n)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the pass did not end")
 	}
 }

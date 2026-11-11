@@ -87,6 +87,9 @@ func kitContent(t *testing.T, l *Library, id, version string) map[string]string 
 	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err == nil && d.Type().IsRegular() {
 			rel, _ := filepath.Rel(root, p)
+			if filepath.ToSlash(rel) == designkit.SealFile {
+				return nil
+			}
 			_, sum, _ := hashFile(p)
 			out[filepath.ToSlash(rel)] = sum
 		}
@@ -474,6 +477,21 @@ func TestPackRefusesAProjectWhoseHashIsNotItsFilesAndBadKitNames(t *testing.T) {
 	for _, bad := range []string{"draft", "../x", "Acme DS", "acme-ds@draft", "acme-ds@../1"} {
 		if _, err := a.PackExport(context.Background(), PackExportOptions{Kits: []string{bad}}, io.Discard); err == nil {
 			t.Errorf("kit %q was packed", bad)
+		}
+	}
+}
+
+// A pack carries no .owner.json: the project becomes the importer's, as one they made.
+func TestPackImportRecordsTheImporterAsOwner(t *testing.T) {
+	a, ids := packSource(t)
+	pack := exportPack(t, a, PackExportOptions{Projects: ids})
+	b := emptyLibrary(t)
+	if _, err := b.PackImport(bytes.NewReader(pack), PackImportOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		if _, ok := b.ReadOwner(id); !ok {
+			t.Errorf("%s has no owner after the import", id)
 		}
 	}
 }

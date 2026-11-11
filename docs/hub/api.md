@@ -120,7 +120,7 @@ type Config = {
   profiles: { dir: true; container: boolean; full: true };
   runtimeMode: 'path' | 'subdomain';
   termsUrl: string | null;            // HUB_TERMS_URL; the sign-up line about terms shows only when set
-  orgs: 'off' | 'shadow' | 'on';      // HUB_ORGS: how far organizations are switched on (docs/hub/orgs.md)
+  orgs: 'off' | 'on';                 // HUB_ORGS: whether organizations are switched on (docs/hub/orgs.md)
   features: string[];                 // flags the instance itself has on for every organization (see «Feature flags»)
 };
 ```
@@ -142,6 +142,8 @@ type SignedIn = { user: User; isNew: boolean; next: string }; // next: '/new' (n
 | `GET /api/auth/oauth/{provider}/start?intent=signin\|signup\|link&next=/path` | | 302 to the provider; sets a short cookie bound to the state (`__Host-hl_oauth`, Path=/, on https; `hl_oauth` without https) | 422 `provider_off` (as a redirect to `/signin?error=provider_off`) |
 | `GET /api/auth/oauth/{provider}/callback` | provider's `code`, `state` | 302 to `next` (default `/new` or `/s/<slug>`), session cookie set | 302 to `/signin?error=<code>` with `account_exists`, `expired`, `signup_closed`, `oauth_failed` |
 | `POST /api/auth/logout` | `{}` | 204, cookie cleared | |
+| `POST /api/auth/logout/all` | `{}` | 204, cookie cleared: every session of the person ends, on every device and on the machines they had open | 401 |
+| `PUT /api/admin/users/{userId}/disabled` | `{ disabled: boolean }` | `{ disabled }`: an administrator of the installation switches an account off or back on. A switched-off account loses every session at once and cannot sign in (403 `account_disabled`); its rows stay | 404 for anyone else; 409 `own_account` |
 
 `{provider}` is `github`, `yandex` or `oidc-<id>` for each id in `HUB_OIDC_PROVIDERS`. The callback URL to register
 with a provider is `<HUB_PUBLIC_URL>/api/auth/oauth/<provider>/callback`. `intent=link` requires a session and links the
@@ -179,8 +181,8 @@ pass the provider's signed token in a header and the person needs no hub sign-in
 | `PATCH /api/me` | `{ name }` | 200 `{ user }` |
 | `POST /api/me/passkeys/begin` | `{}` | 200 `{ challengeId, publicKey }` (`PublicKeyCredentialCreationOptions`, resident key required) |
 | `POST /api/me/passkeys/finish` | `{ challengeId, credential, name }` | 200 `{ passkey: Passkey }` |
-| `DELETE /api/me/passkeys/{id}` | | 204; 409 `conflict` (`last_method`) |
-| `DELETE /api/me/identities/{provider}` | | 204; 409 `conflict` (`last_method`) |
+| `DELETE /api/me/passkeys/{id}` | | 204; 409 `conflict` (`last_method`). The person's other sessions end: only the one that removed the passkey stays |
+| `DELETE /api/me/identities/{provider}` | | 204; 409 `conflict` (`last_method`). The person's other sessions end |
 
 `type Passkey = { id: string; name: string; createdAt: string; lastUsedAt: string | null }`
 
@@ -195,10 +197,11 @@ The person's numbers are described in [analytics.md](analytics.md#the-person-api
 | `GET /api/spaces/{spaceId}` | member | | `{ space: Space }` |
 | `GET /api/spaces/by-slug/{slug}` | member | | `{ space: Space }` |
 | `PATCH /api/spaces/{spaceId}` | owner | `{ name?, onboardingStep? }` | `{ space: Space }` |
+| `POST /api/spaces/{spaceId}/delete` | owner, or an instance administrator | `{ confirm: string, withMembers?: boolean }`: `confirm` is the space's name, exactly | 200 `{ deleted: true, removed: { [table]: rows } }`. Deletes the space with everything in it, in one transaction: documents and their comments, access rows and guest links, designs, sites, machines with their history, uploads, usage and sessions, provider accounts, limits, roles, environment settings, teams, invitations, memberships and the space's own journal. The list is `store.SpaceCascade`; a table that is in neither it nor the list of kept tables fails the tests. 400 `invalid` (`confirm`) when the name does not match; 409 `space_has_members` (`details.members`, `details.withoutOtherSpace`) when other people are in the space and `withMembers` is not `true`. With it they lose the space as if each had been removed: their streams end, what they had open on its machines closes, and a person for whom it was the only space stays signed in with no space, like an account that has not joined one. The machines' links are closed and their keys are gone with their rows. The organization stays, with its administrators, also when this was its last space. Servers rented from a provider are not given back. The deletion's line (`tenant.purge`: who, the space's name and slug, the ids of its members, the counts) is kept in the organization's journal, and `space_purged` in the installation's sign-in journal. Content-addressed site blobs and files outside the database (uploads on disk or in object storage) are not removed by this call |
 | `GET /api/spaces/{spaceId}/members` | member | | `{ members: { userId, email, name, role, joinedAt }[] }` |
 | `GET /api/spaces/{spaceId}/apps` | member | | `{ apps: { id, name, version, targets, path? }[] }`: the apps installed for the space, from the store; `path` is the app's page at the hub (`/apps/space/{spaceId}/{appId}/`, a member's session; without one a GET leads to the sign-in), served with every machine off (docs/apps.md) |
-| `PATCH /api/spaces/{spaceId}/members/{userId}` | owner | `{ role }` | `{ member }`; 409 `last_owner` |
-| `DELETE /api/spaces/{spaceId}/members/{userId}` | owner, or self | | 204; 409 `last_owner` |
+| `PATCH /api/spaces/{spaceId}/members/{userId}` | owner | `{ role }` | `{ member }`; 409 `last_owner`. Every change of who is in a space or in what role (a space made, an invitation accepted, a role changed, a person removed or gone) is one transaction that also writes its line into the journal of changes (`member.add`, `member.role`, `member.remove`); two changes asked for at once are decided one after the other, so a space never loses its last owner |
+| `DELETE /api/spaces/{spaceId}/members/{userId}` | owner, or self | | 204; 409 `last_owner`. In one transaction the person loses the membership, their roles on the space and its teams, their places in the teams, their lines in the access lists of its machines, the limits set for them there, their roles and requests in its documents, and the sessions they opened on its machines; the machines they registered in the space are revoked (to keep one, give it to another member first: `POST /api/machines/{machineId}/owner`) |
 | `POST /api/spaces/{spaceId}/invites` | owner | `{ emails: string[], role?: "member" \| "owner", teamId?: string }` (≤ 20; `role` is what the invitee becomes, member by default; `teamId` is a team of this space the invitee joins on accepting, else 400 `invalid_request`; `GET /api/invites/{token}` then also says `teamName`) | 201 `{ invites: Invite[] }` |
 | `POST /api/spaces/{spaceId}/invites/link` | owner | `{ maxUses?: number, days?: 1..7, teamId?: string }` | 201 `{ invite: Invite }`; returns the current active link invite if one exists and the body is empty (a link that names a team is always a new one) |
 | `GET /api/spaces/{spaceId}/invites` | owner | | `{ invites: Invite[] }` (active ones; `url` absent: only hashes are kept) |
@@ -214,6 +217,15 @@ type Invite = {
   maxUses: number | null; uses: number; expiresAt: string; createdAt: string;
 };
 ```
+
+**An instance administrator in a space they are not in.** An administrator of the installation (`HUB_ADMIN_EMAILS`)
+passes the rights checks of every organization, tenant and team. When that role is what let them through, the hub
+writes a line into the journal of the scope they reached: `operator.open` (an organization they have nothing in was
+opened), `operator.view`, `operator.manage`, `operator.money` and the other checked actions (a tenant or a team), and
+`operator.read` with `targetKind: "doc"` (a document of a space they are not a member of was opened). A line says who,
+which scope and what, never the content; the same line is written once an hour however often it repeats. A member of
+the space, or a person who manages it by a role of their own, leaves no such line. The request fails when the line
+cannot be written.
 
 ### Space events (SSE)
 
@@ -247,8 +259,10 @@ off. A choice made by this process is seen at once, one made by another replica 
 | `catalog` | the catalog of tools and skills |
 | `machine.resources` | editing a machine's resources and showing their price |
 | `runtime.fleet` | one runtime for all of a person's machines, «Fleet» below |
+| `chat.resume` | a chat of a machine that is off goes on on another machine of the same person from its snapshot in the hub's store ([resume.md](resume.md)); with `runtime.fleet` |
+| `machine.seats` | the machines screen shows the machines of one server (one hostname within a tenant, a Linux user per person) as one server with the people's seats; the server's load, disk and hardware are shown once. Only the screen changes: the machines, their API and the actions on them stay as they are |
 | `secrets.vault` | the hub's safe: the machines keep their secrets on the hub's Vault-compatible server ([../safe.md](../safe.md#the-hubs-safe)) |
-| `efficiency` | the «Эффективность» figures: `GET /api/orgs/{org}/efficiency/summary` (merged requests per day from the code host, money per merged request from `usage_rollup_hour` at list prices, state of each source; the body also carries `metrics` in the shape of the screen's `IEffSummary`) and the person's own weekly pulse, `GET`/`POST /api/orgs/{org}/efficiency/pulse` (`speed`, `quality`, `friction` 1..5, one row per person and week, read only by the author). The collector reads the merge request source (`HUB_MR_SOURCE_GITLAB_*`) hourly and runs when the instance turns the flag on for everyone (`HUB_FEATURES_DEFAULT=efficiency`) or forces it. Money per request divides by every request the host reports merged, not by those sessions mention |
+| `efficiency` | the «Эффективность» figures: `GET /api/orgs/{org}/efficiency/summary` (merged requests per day from the code host, money per merged request from `usage_rollup_hour` at list prices, state of each source; the body also carries `metrics` in the shape of the screen's `IEffSummary`) the screen's overview, answered only to a person whose rollout switch `hub-efficiency` is on (`/api/admin/switches`, [rollout-switches.md](rollout-switches.md); otherwise 404 and the screen asks the gateway), `GET /api/orgs/{org}/efficiency/overview?scope=team|me&days=30` (IEffOverview: per day the spend and calls of `usage_rollup_hour`, the sessions and the shares from the sessions' `metrics`; a figure no machine measures is `null`; `scope=me` is the caller's own sessions), the markers (dated changes drawn over the charts: model, claude, plugins, memory, rule, eval; facts of the source `marker`, returned in the overview and stored from `HUB_EFFICIENCY_MARKERS` at every start), the personal tab, `GET /api/orgs/{org}/efficiency/me?days=30` (IEffMe: the wait for the person's reply and their newest sessions with spend, context and the share of re-read tokens above 250K) and the person's own weekly pulse, `GET`/`POST /api/orgs/{org}/efficiency/pulse` (`speed`, `quality`, `friction` 1..5, one row per person and week, read only by the author). The collector reads the merge request source (`HUB_MR_SOURCE_GITLAB_*`) hourly and runs when the instance turns the flag on for everyone (`HUB_FEATURES_DEFAULT=efficiency`) or forces it. Money per request divides by every request the host reports merged, not by those sessions mention |
 
 | Method, path | Who | Request | Response |
 | --- | --- | --- | --- |
@@ -290,6 +304,8 @@ organization 404, a person with no part in the tenant 403.
 | `usage.tick` | `{ spendToday: Money, tokensToday, activeNow, chatsNow }` | every 10 seconds, and only while somebody listens to the scope; the organization's numbers to its administrators, a tenant's to its leads on the tenant stream only |
 | `signal.new` | `{ signal: Signal }` | a signal was opened: to the leads of its tenant and administrators, and to the person it is addressed to |
 | `limit.request` | `{ signalId, userId, name, scope: { kind, id } }` | a person asked for a higher limit: to those who may raise it |
+| `members.changed` | `{ spaceId? }` | somebody joined or left a tenant or a team, or a role was given, taken or changed: to every member of the organization, on its stream and on the tenant's |
+| `invites.changed` | `{ spaceId }` | an invitation was made, accepted or revoked: to the same streams |
 | `resync` | `{}` | the stream lost events; refetch |
 
 `spendToday` is the money the organization's accounts paid since midnight of its zone (`Money`, [analytics.md](analytics.md#money-and-periods)),
@@ -318,6 +334,7 @@ these routes answer 404 `not_enabled` (the proxy: 404 `not_found`).
 | --- | --- | --- |
 | `GET /api/me/machines` | signed in | `{machines: [{id, name, host, online, status, lastSeenAt, orgId, orgName, tenantId, tenant}]}` |
 | `GET /api/v2/machines` | signed in | the same list as the runtime's `Machine[]` (`reach`, `lastSeenAt`, `orgName`, `tenant`) |
+| `GET /api/v2/machines/events` | signed in | `text/event-stream`: `event: fleet`, `data: {}` when the answer of `GET /api/v2/machines` may have changed for this person (a machine of a space they see was added, removed, renamed, switched on or off, or went on or off line; they joined or left a space, or their role changed). It carries nothing else: the page reads the list again. A comment line every 20 seconds keeps it open. The bus is one process's: with several replicas a page hears only the changes made on its own replica, and reads the list when its tab comes back into view |
 | `ANY /api/v2/…?machine=<id>` | signed in | the runtime's own `/api/v2/…` on that machine through its agent tunnel; sockets too |
 | `GET /api/v2/me`, `PATCH /api/v2/me/settings` | signed in | the hub's own, never sent to a machine, whatever `?machine=` says (also `/agents/api/v2/me…` and `/m/<id>/api/v2/me…`): the signed-in user's settings, kept by the hub per user with their own revision; `email` and `name` are the account's. A new account has the default settings at revision 1. Answers as a runtime's: `{r: accepted, me}`, `conflict` (409) on a stale `rev`, `bad-request` (400) on a patch that is not settings or a `defaultMachine` the user may not open. A main machine is a preference, not access: it is checked when saved, and every call to a machine is checked again |
 | `GET /api/v2/{search,vault,push}` | signed in | no machine named: the person's first machine that is on answers |
@@ -349,7 +366,8 @@ What a machine answers in the workspace runs on the hub's origin, so in either m
 it (made by an instance admin, or trusted with `HUB_MACHINE_TRUST`); any other is not listed and is refused with 403
 `machine_untrusted`. In subdomain mode `/api/v2/machines` still lists it: there it opens on an origin of its own. The
 preview slots of a machine (`/m/<id>/__pv/…`) are the path mode's: in subdomain mode a preview opens on the machine's
-origin.
+origin. With `HUB_PREVIEW_SLOT_DOMAIN` and the `preview-slot-host` switch a slot also opens on an origin of its own,
+`POST /api/preview/slot-open {machine, path}` (member; answers `{url, host}`): [preview-slots.md](preview-slots.md).
 
 #### Moving a chat between machines (flag `runtime.fleet`)
 
@@ -367,6 +385,14 @@ anything is asked of the source. Flag off: 404 `not_enabled`.
 A refusal is `{error, code}` with the words for the person: 409 `machine_offline`, 403 `no_access`, 400 `same_machine`,
 and the runtime's own (`changed`, `commit_missing`, …). If the old machine cannot be sealed after the import, the
 import is discarded and the chat stays where it was.
+
+With `chat.resume` on for both machines' organizations, a move from a machine that is off between two machines the
+person made goes on from the chat's snapshot instead of answering `machine_offline`: the hub asks only the target, the
+answer adds `fromSnapshot: true`, and the source is not sealed ([resume.md](resume.md)). The web asks for the choices
+first: with the source off and the flag on for its organization (machine made by the person), `status` answers
+`{enabled: true, moved: null, offline: true}` and `targets` answers `source: {ok: true, project: false, dirty: false,
+busy: false, offline: true, fromSnapshot: true}` with only the person's own machines that are up; without the flag or
+for someone else's machine `targets` answers 409 `machine_offline` / 404 as before.
 
 ### Machines
 
@@ -449,7 +475,7 @@ HTML page «Машина не на связи» with status 502.
 | `GET /install` | | `text/x-shellscript`: `deploy/install/install.sh` (from `HUB_DIST_DIR`) with `HARNESSLY_HUB_URL` set to the public URL and, when `HUB_CONTAINER_IMAGE` is set, `HARNESSLY_IMAGE` set to it, on the lines right after the shebang |
 | `GET /dl/manifest.json` | | `{ version, files: { "<name>": { sha256, size } } }`, names `runtime-<os>-<arch>`, `agent-<os>-<arch>` for linux/darwin × amd64/arm64 |
 | `GET /dl/{name}` | | the binary (`application/octet-stream`), from `HUB_DIST_DIR` |
-| `POST /agent/register` | `RegisterRequest` | 201 `RegisterResponse`; 410 `expired`, 400, 429 |
+| `POST /agent/register` | `RegisterRequest` | 201 `RegisterResponse` (200 when the machine kept its id, below); 410 `expired`, 400, 429 |
 | `GET /agent/v1` | WebSocket upgrade with the signed `Authorization` header | 101; 401 bad signature/unknown key/old time/replayed nonce; 403 revoked (`forbidden` with `details.reason: "revoked"`; only this, or the close code 4010, stops the agent dialing: a 403 without it, as a proxy may answer, is retried with the usual backoff); 426 agent older than `HUB_MIN_AGENT_VERSION` |
 | `POST /agent/peers/send`, `POST /agent/peers/directory` | signed like the dial, under `harnessly-agent-peers-v1` | messages between machines, [peers.md](peers.md); 404 unless `HUB_PEERS=on` |
 | `DELETE /agent/v1` | the machine removes itself: an `Authorization` header made like the dial's, signed under the domain `harnessly-agent-unlink-v1` (a dial's signature does not do) | 204 (revoked as `DELETE /api/machines/{id}` does: link closed with 4010, `machineRemoved` event); 401 bad signature/unknown key/old time/replayed nonce; 403 already revoked |
@@ -462,6 +488,12 @@ type RegisterRequest = {
   hostname: string; os: 'linux' | 'darwin'; arch: 'amd64' | 'arm64'; unixUser: string;
   profile: Profile; via: 'command' | 'ssh' | 'local' | 'container';
   agentVersion: string;
+  // A machine that registers again over a registration it holds: its id there, and an Ed25519 signature (base64 std)
+  // by that registration's key of "harnessly/reregister/v1\n<machineId>\n<hex sha256 of code>\n<publicKey>". When the
+  // machine is in the code's space, is neither removed nor switched off, and the signature is by the key the hub
+  // holds for it, the machine keeps its id, name and place and gets the new keys (200, its open link is closed).
+  // Anything else registers a new machine (201), as without the claim.
+  previous?: { machineId: string; proof: string };
 };
 type RegisterResponse = {
   machineId: string;
@@ -889,7 +921,7 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_DB_MIGRATE_URL` | not set | direct `postgres://` URL for the migrations when `HUB_DATABASE_URL` goes through a pooler |
 | `HUB_DB_CHECK` | `warn` | `warn`, `strict` (refuse to start on a database newer than the binary or on schema drift; exit 70/71/72/73) or `off` |
 | `HUB_DATA_DIR` | `/var/lib/harnessly-hub` | SQLite file, the `secret_key` file (unless `HUB_SECRET_KEY` is set) |
-| `HUB_EDITION` | `self-hosted` | or `cloud` (needs `HUB_RUNTIME_DOMAIN`; no SSH to private addresses) |
+| `HUB_EDITION` | `self-hosted` | or `cloud` (needs `HUB_RUNTIME_DOMAIN`, `HUB_ORGS=on`, `HUB_ACCESS_ENFORCE=on` and `HUB_RESOURCE_ACCESS=on`; no SSH to private addresses) |
 | `HUB_SIGNUP` | `open` (Helm chart: `invite`) | or `invite` |
 | `HUB_ADMIN_EMAILS` | | comma-separated; an address counts when its owner proved it; empty = the first account is the admin, if it proved its email |
 | `HUB_TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` (compose: the network's gateway; Helm: none) | CIDRs whose `X-Forwarded-For`/`-Proto` are believed: as exact as the proxy |
@@ -912,11 +944,14 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_SSH` | `on` | `off` hides «по SSH» |
 | `HUB_SSH_ALLOW_PRIVATE` | `off` | `on` lets the SSH way reach private, loopback and link-local addresses (self-hosted only; the cloud edition ignores it) |
 | `HUB_SECRET_KEY` | | at least 32 characters: seals the spaces' SSH keys; empty: a `secret_key` file in `HUB_DATA_DIR` |
-| `HUB_ORGS` | `off` | organizations, tenants and teams ([orgs.md](orgs.md)): `off` — the schema is there, the hub behaves as before; `shadow` — the new endpoints answer instance administrators only (checking, `hub seed`); `on` — everyone |
+| `HUB_ORGS` | `off` | organizations, tenants and teams ([orgs.md](orgs.md)): `off` — the schema is there, the hub behaves as before; `on` — everyone. Any other value, the former `shadow` included, stops the hub at start |
 | `HUB_ENV_FEATURES` | | environment and catalog ([environment.md](environment.md)): `env`, `catalog` (comma separated) or `all`; empty — off, the endpoints answer 404 `not_enabled` and no machine gets a list. Needs `HUB_ORGS` other than `off`; tool numbers need `HUB_USAGE_INGEST=on` |
 | `HUB_HISTORY` | `on` | the people's chats in the hub ([history.md](history.md)): the machines' agents send their chat list and feeds, and the workspace reads them from here while a machine is off; `off`: the hub takes no chat and the workspace asks the home machine |
+| `HUB_HISTORY_DELETED_DAYS` | `30` | how many days the hub keeps its copy of a chat after the chat was deleted on its machine ([history.md](history.md), [data-owners.md](data-owners.md)); then a background sweep removes the copy with its turns, a little at a time. `0`: the copies of deleted chats are kept for good. `harnessly_hub_history_chats_purged_total` and `harnessly_hub_history_rows_purged_total` count what was removed |
 | `HUB_VOICE_TAKES` | `off` | the people's dictation recordings («Записи» of the composer) kept in the hub ([voice-takes.md](voice-takes.md)); off: `voice/takes` answers 404 and the takes stay in the browser |
 | `HUB_USAGE_INGEST` | `off` | `on`: the hub pulls the machines' spend facts ([usage.md](usage.md)) and keeps the price list; `off`: it never asks |
+| `HUB_EFFICIENCY_MARKERS` | | JSON array `[{key?, at, kind, title, detail?}]` of the dated changes the «Эффективность» screen draws over its charts (`kind`: model, claude, plugins, memory, rule, eval). Stored at every start; the same `key` replaces, never doubles. Also readable from a file (`HUB_EFFICIENCY_MARKERS_FILE`) |
+| `HUB_SWITCHES` | | JSON array `[{feature, person?, machine?, enabled, note?}]` of rollout switch rows written at every start, signed `config:HUB_SWITCHES` (empty `person`/`machine` = anyone). The instance's repository turns a feature on pair by pair without an administrator's session; a row changed in `/api/admin/switches` goes back to the configured value on the next start, rows not named are left alone ([rollout-switches.md](rollout-switches.md)) |
 | `HUB_MR_SOURCE_GITLAB_URL` | | GitLab (`https://git.example.com`) whose merged merge requests the hub polls for the KPI «деньги на MR», «время до MR», «MR на человека» ([analytics.md](analytics.md)); empty — nothing is polled. Needs the next two |
 | `HUB_MR_SOURCE_GITLAB_GROUPS` | | comma separated group paths to poll (`team,team/sub`), subgroups included |
 | `HUB_MR_SOURCE_GITLAB_TOKEN` | | token with `read_api` (also `_FILE`); never logged |
@@ -950,6 +985,7 @@ Secrets (`*_SECRET`, `HUB_SMTP_URL`, `HUB_DATABASE_URL`, `HUB_SECRET_KEY`) may a
 | `AGENT_RUNTIME_PEERS` | `<runtime base>/api/peers` | the runtime's inbox and directory of messages between machines ([peers.md](peers.md)) |
 | `AGENT_HUB_PEERS` | | `on` lets an observe link take part in messages between machines |
 | `AGENT_HUB_DESIGN` | | `on` lets an observe link keep the designs' access and open tunnels to their guest read only ([design-access.md](design-access.md)) |
+| `AGENT_HUB_HISTORY` | | `on` lets an observe link hand the machine's chats to the hub, beside the cluster's copy ([history.md](history.md)) |
 
 All v1 variables keep their meaning. In Ed25519 mode `AGENT_CLUSTER_URL` and `AGENT_RUNTIME_ID` are ignored, and the
 agent starts even while the runtime has not written its secret yet (`runtime.session` answers `failed` until then).

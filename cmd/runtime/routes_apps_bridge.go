@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/ly-solutions/harnessly/internal/secrets"
+	"io"
 	"net/http"
 	"path/filepath"
 	"slices"
@@ -17,6 +20,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // The calls of an app's views that reach the machine. The page's bridge (web/app/next/features/apps) takes a view's
@@ -24,6 +28,7 @@ import (
 // page that forgot is not a way round the manifest.
 //
 //	POST <platform>/apps/storage   hl.storage.<scope>.get|set|delete|keys
+//	POST <platform>/apps/workflow  hl.workflow.get|move: the status of the view's document (routes_apps_workflow.go)
 //	POST <platform>/apps/tool      hl.tools.call: a tool of the app's own remote MCP server
 //	POST <platform>/apps/files     hl.files.read|write|list|search|watch|unwatch: the chat's workspace, inside the app's masks
 //	POST <platform>/apps/git       hl.git.status|diff|log: the repository of the chat's folder, read only
@@ -73,6 +78,9 @@ type bridgeBody struct {
 	// Document is the Sinopia document a view of a sinopia target is shown in.
 	Document string `json:"document"`
 }
+
+// uploadBodyMax bounds an upload's body: a file of apps.MaxFileBytes in base64, and its path.
+const uploadBodyMax = apps.MaxFileBytes/3*4 + 8<<10
 
 // bridgeRefused is the answer to a refused call: the status and the code the page and the view read.
 func bridgeRefused(err error) (int, any) {
@@ -165,7 +173,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 
 	// open issues the session of a view the page mounts: the app has to be installed and the view has to be one for the
 	// target. The reply is the address to open on the view server.
-	open := session(func(_ context.Context, b bridgeBody) (int, any) {
+	open := session(func(ctx context.Context, b bridgeBody) (int, any) {
 		// The agent's own widget: no package, the chat's widget names it, and only its files are served.
 		if b.App == apps.WidgetsApp {
 			if b.Target != apps.TargetChat || b.Conversation == "" || views.Widgets == nil {
@@ -214,9 +222,21 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		if b.Conversation != "" && !apps.ValidOwner(b.Conversation) {
 			return refused(apps.ErrStorageArgs)
 		}
-		// An app gets a chat only where the person turned it on there: the server is the check, not the page.
+		// An app gets a chat only where the person turned it on there: the server is the check, not the page. Opening its
+		// window in the pane of the chat is the person turning it on: the same command as the toggle, so the
+		// agent hears of the app the same way. An app that waits for the person's consent is not among the installed (reg.Get).
 		if b.Conversation != "" {
-			if rec, ok := chats.record(b.Conversation); !ok || !slices.Contains(rec.Apps, b.App) {
+			rec, ok := chats.record(b.Conversation)
+			on := ok && slices.Contains(rec.Apps, b.App)
+			// A view of a document of the app's own type in the pane beside it (its pinned tab) is the person working on
+			// that document in this chat: the app turns on there too.
+			ownDoc := apps.IsSinopiaTarget(b.Target) && b.Document != "" && m.PinnedView(strings.TrimPrefix(b.Target, "sinopia.")) != nil
+			if ok && !on && (b.Target == apps.TargetPane || ownDoc) {
+				res := chats.do(ctx, wire.ConversationAppsCmd{OpID: "open-apps-" + strconv.FormatInt(time.Now().UnixNano(), 36),
+					ID: b.Conversation, Apps: append(slices.Clone(rec.Apps), b.App)})
+				on = res.R == wire.ResultAccepted
+			}
+			if !on {
 				return http.StatusForbidden, map[string]string{"error": "not-on", "message": "the app is not turned on in this chat"}
 			}
 		}
@@ -312,6 +332,8 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		}
 		return http.StatusOK, map[string]any{"ok": true}
 	})
+
+	workflow := appWorkflowRoute(d, reg, storage, views)
 
 	tool := session(func(ctx context.Context, b bridgeBody) (int, any) {
 		sess, app, err := live(b)
@@ -437,6 +459,59 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		}
 		return http.StatusOK, map[string]any{"ok": true}
 	})
+
+	// upload: a file the person gave the view (picked or dropped in it, hl.files.upload) put into the chat's workspace,
+	// inside the app's files.write masks. Its bytes come as base64, so the body is let larger than other calls'.
+	upload := func(w http.ResponseWriter, r *http.Request) {
+		if sameorigin.Refuse(w, r) {
+			return
+		}
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		var b struct {
+			Session string `json:"session"`
+			Path    string `json:"path"`
+			Data    string `json:"data"`
+		}
+		raw, err := io.ReadAll(io.LimitReader(r.Body, uploadBodyMax+1))
+		if err != nil || len(raw) > uploadBodyMax {
+			status, out := refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: fmt.Sprintf("a file is at most %d MB", apps.MaxFileBytes>>20)})
+			secretJSON(w, status, out)
+			return
+		}
+		if json.Unmarshal(raw, &b) != nil {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		status, out := func() (int, any) {
+			sess, app, err := live(bridgeBody{Session: b.Session})
+			if err != nil {
+				return refused(err)
+			}
+			if err := app.Manifest.Authorize("harnessly/files.upload", sess.Target, nil); err != nil {
+				return refused(err)
+			}
+			data, err := base64.StdEncoding.DecodeString(b.Data)
+			if err != nil {
+				return refused(&apps.BridgeError{Code: apps.CodeInvalidParams, Message: "data is the file's bytes in base64"})
+			}
+			scope, status, out := workspaceOf(sess, app)
+			if status != 0 {
+				return status, out
+			}
+			if err := scope.Write(b.Path, data); err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"path": b.Path, "size": len(data)}
+		}()
+		secretJSON(w, status, out)
+	}
 
 	// git: the repository of the chat's folder, read only (internal/apps gitread.go).
 	git := session(func(ctx context.Context, b bridgeBody) (int, any) {
@@ -684,6 +759,8 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 	routes = append(routes, appSecretRoutes(d, reg, chats, live)...)
 	return append(routes, []gate.Route{
 		{Match: is(platformAPI + "/apps/files"), Handler: files},
+		{Match: is(platformAPI + "/apps/files/upload"), Handler: http.HandlerFunc(upload)},
+		{Match: is("/agents" + platformAPI + "/apps/files/upload"), Handler: http.HandlerFunc(upload)},
 		{Match: is("/agents" + platformAPI + "/apps/files"), Handler: files},
 		{Match: is(platformAPI + "/apps/git"), Handler: git},
 		{Match: is("/agents" + platformAPI + "/apps/git"), Handler: git},
@@ -698,6 +775,8 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		{Match: is(platformAPI + "/apps/settings"), Handler: settings},
 		{Match: is("/agents" + platformAPI + "/apps/settings"), Handler: settings},
 		{Match: is(platformAPI + "/apps/storage"), Handler: store},
+		{Match: is(platformAPI + "/apps/workflow"), Handler: workflow},
+		{Match: is("/agents" + platformAPI + "/apps/workflow"), Handler: workflow},
 		{Match: is(platformAPI + "/apps/events"), Handler: http.HandlerFunc(events)},
 		{Match: is(platformAPI + "/apps/tool"), Handler: tool},
 		{Match: is("/agents" + platformAPI + "/apps/storage"), Handler: store},
@@ -761,10 +840,41 @@ func callAppToolRaw(ctx context.Context, d deps, reg *apps.Registry, appID, tool
 	if err != nil {
 		return nil, err
 	}
-	if decl := pkg.MCP[server]; decl.Connection != "" {
-		return callConnectionTool(ctx, mcpFor(d), reg.ConnectionGranted(appID, decl.Connection), decl, name, args)
+	return appServerDo(ctx, d, reg, appID, server, toolOp(name, args))
+}
+
+// mcpOp is one request to an app's server once the host signed it: a tools/call, a tools/list.
+type mcpOp func(ctx context.Context, srv apps.MCPServer) (json.RawMessage, error)
+
+func toolOp(tool string, args map[string]any) mcpOp {
+	return func(ctx context.Context, srv apps.MCPServer) (json.RawMessage, error) {
+		return apps.CallTool(ctx, srv, tool, args)
 	}
-	decl := pkg.MCP[server]
+}
+
+func listOp(ctx context.Context, srv apps.MCPServer) (json.RawMessage, error) {
+	tools, err := apps.ListTools(ctx, srv)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(tools)
+}
+
+// appServerDo sends op to a server of an app's package from the machine, signed the way the server asks: through the
+// person's connection with that connection's grant, with the app's secrets the machine fills into its headers, with
+// the person's sign-in to the server, or with the platform's token.
+func appServerDo(ctx context.Context, d deps, reg *apps.Registry, appID, server string, op mcpOp) (json.RawMessage, error) {
+	pkg, err := reg.Package(appID)
+	if err != nil {
+		return nil, err
+	}
+	decl, ok := pkg.MCP[server]
+	if !ok {
+		return nil, &apps.BridgeError{Code: apps.CodePolicyBlocked, Message: "the app has no MCP server " + server}
+	}
+	if decl.Connection != "" {
+		return connectionDo(ctx, mcpFor(d), reg.ConnectionGranted(appID, decl.Connection), decl, op)
+	}
 	srv, missing := decl.Filled(revealApp(safeFor(d).store.Local, appID, decl.Secrets()))
 	if len(missing) > 0 {
 		return nil, &apps.BridgeError{Code: apps.CodeHostUnavailable, Message: apps.ToolRefused, Detail: "the app waits for a secret"}
@@ -773,7 +883,7 @@ func callAppToolRaw(ctx context.Context, d deps, reg *apps.Registry, appID, tool
 		return nil, err
 	}
 	if decl.Auth != nil && decl.Auth.Type == apps.AuthOAuth {
-		return callAppOAuthTool(ctx, mcpFor(d), appID, server, decl, srv, name, args)
+		return appOAuthDo(ctx, mcpFor(d), appID, server, srv, op)
 	}
-	return callWithAppToken(ctx, appTokensOf(d), appID, server, decl, srv, name, args)
+	return withAppTokenDo(ctx, appTokensOf(d), appID, server, decl, srv, op)
 }

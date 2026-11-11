@@ -14,6 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/limits"
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
@@ -21,9 +22,9 @@ import (
 // Limits: the rules of a scope, the effective limit of its people and of oneself (docs/hub/limits.md, «Endpoints»).
 
 func (s *Service) mountLimits(mux *http.ServeMux) {
-	mux.Handle("GET /api/orgs/{org}/limits", s.Gate(s.getLimits))
-	mux.Handle("PUT /api/orgs/{org}/limits", s.Gate(s.putLimit))
-	mux.Handle("DELETE /api/orgs/{org}/limits/{ruleId}", s.Gate(s.deleteLimit))
+	mux.Handle("GET /api/orgs/{org}/limits", s.OrgGate(s.getLimits))
+	mux.Handle("PUT /api/orgs/{org}/limits", s.OrgGate(s.putLimit))
+	mux.Handle("DELETE /api/orgs/{org}/limits/{ruleId}", s.OrgGate(s.deleteLimit))
 	mux.Handle("GET /api/me/limits", s.Gate(s.meLimits))
 }
 
@@ -222,13 +223,11 @@ func scopeParam(o store.Org, v string) (authz.Scope, error) {
 	return authz.Scope{Kind: kind, ID: id}, nil
 }
 
-func (s *Service) getLimits(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) getLimits(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	sc, err := scopeParam(o, r.URL.Query().Get("scope"))
 	if err != nil {
 		return err
@@ -332,7 +331,8 @@ func ruleJournal(r *store.LimitRule) any {
 		"modelPattern": strPtr(r.ModelPattern), "forbid": r.Forbid, "period": r.Period, "unit": r.Unit, "amount": r.Amount, "warnPct": r.WarnPct}
 }
 
-func (s *Service) putLimit(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) putLimit(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct {
 		Scope        ScopeView
 		UserID       *string
@@ -389,10 +389,8 @@ func (s *Service) putLimit(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		rule.Amount = 0
 	}
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
+	var err error
 	rule.OrgKey = o.ID
 	var saved store.LimitRule
 	err = s.db.Tx(ctx, func(st store.Store) error {
@@ -468,13 +466,11 @@ func (s *Service) ruleView(ctx context.Context, o store.Org, id string) (LimitRu
 	return LimitRuleView{}, httpx.ErrNotFound
 }
 
-func (s *Service) deleteLimit(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) deleteLimit(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
-	err = s.db.Tx(ctx, func(st store.Store) error {
+	o := *tc.Org
+	err := s.db.Tx(ctx, func(st store.Store) error {
 		rule, err := st.LimitRuleByID(ctx, r.PathValue("ruleId"))
 		if err != nil {
 			return notFound(err)

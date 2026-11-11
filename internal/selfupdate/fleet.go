@@ -86,6 +86,29 @@ type Fleet struct {
 	InUse func(dir string) bool
 	// Log gets one line per step; may be nil.
 	Log func(msg string)
+	// Services are the services that run from current, when each can be restarted on its own (fleet_stagger.go): they
+	// are restarted one at a time, in this order, by RestartOne, and Restart and Probe are not used.
+	Services []Service
+	// RestartOne restarts the service of that name; nil restarts nothing.
+	RestartOne func(ctx context.Context, name string) error
+	// SettleTimeout bounds the wait for a restarted service's chats before the next one (DefaultSettleTimeout when zero).
+	SettleTimeout time.Duration
+	// MinGap is the machine's window: Activate refuses a release that comes sooner after the last one (ErrTooSoon).
+	// Zero is no window. Force lets one activation through, for a rollout a person asked for.
+	MinGap time.Duration
+	Force  bool
+	// Units is the machine's unit files (fleet_units.go): Activate renders and writes them after current
+	// moves and before the services restart; nil leaves the units alone, as before.
+	Units *UnitsSpec
+	// UnitsErr is why the spec named in the environment could not be read; Activate refuses while it is set.
+	UnitsErr error
+	// UnitDir is the folder of the units (/etc/systemd/system when empty); Host names the machine for the pairs of the
+	// spec; Systemctl replaces the real command in tests.
+	UnitDir   string
+	Host      string
+	Systemctl func(ctx context.Context, args ...string) error
+	// Now is the clock (time.Now when nil).
+	Now func() time.Time
 }
 
 // StageInput says what to stage.
@@ -492,48 +515,83 @@ func (f *Fleet) Activate(ctx context.Context, version, sha string) error {
 	if _, err := os.Stat(filepath.Join(dir, completeMark)); err != nil {
 		return fmt.Errorf("release %s is not staged in %s", version, dir)
 	}
+	if f.UnitsErr != nil {
+		return fmt.Errorf("the units spec is unusable, nothing changed: %w", f.UnitsErr)
+	}
 	previous := f.Active()
 	if previous == dir {
 		// Already the active one: the services are checked, not restarted.
-		if err := f.wait(ctx, version); err != nil {
+		if err := f.check(ctx, version); err != nil {
 			return err
 		}
 		f.say("release %s is already active", version)
 		return nil
 	}
+	if left := f.tooSoon(); left > 0 {
+		return fmt.Errorf("%w: the next one may come in %s", ErrTooSoon, left.Round(time.Second))
+	}
 	if err := f.pointCurrent(dir); err != nil {
 		return err
 	}
-	err = f.restart(ctx)
-	if err == nil {
-		err = f.wait(ctx, version)
-	}
+	changed, err := f.units(ctx, version, dir)
 	if err != nil {
-		f.rollbackTo(ctx, previous)
+		// Nothing was restarted: only current goes back.
+		if previous == "" {
+			_ = os.Remove(f.current())
+		} else {
+			_ = f.pointCurrent(previous)
+		}
+		return fmt.Errorf("release %s: the units were not written, the previous release is back: %w", version, err)
+	}
+	restarted, err := f.cycle(ctx, version, nil, true)
+	if err != nil {
+		f.restoreUnits(ctx, changed)
+		f.rollbackTo(ctx, previous, restarted)
 		return fmt.Errorf("release %s failed its checks and was rolled back: %w", version, err)
 	}
 	rec, _ := json.Marshal(map[string]string{"version": version, "release": dir, "previous": previous,
-		"activatedAt": time.Now().UTC().Format(time.RFC3339)})
+		"activatedAt": f.now().UTC().Format(time.RFC3339)})
 	_ = os.WriteFile(filepath.Join(f.Root, "deployed.json"), append(rec, '\n'), 0o644)
 	f.say("active: %s", version)
 	f.Prune(previous)
 	return nil
 }
 
-func (f *Fleet) rollbackTo(ctx context.Context, previous string) {
+// rollbackTo puts previous back. Of the services restarted one at a time only those in restarted go back: the others
+// never left the previous release.
+func (f *Fleet) rollbackTo(ctx context.Context, previous string, restarted []string) {
 	f.say("rolling back to %s", orNothing(previous))
 	if previous == "" {
 		_ = os.Remove(f.current())
 	} else {
 		_ = f.pointCurrent(previous)
 	}
-	_ = f.restart(ctx)
-	if previous != "" {
-		if r, err := ReadRelease(previous); err == nil {
-			if err := f.wait(ctx, r.Version); err != nil {
-				f.say("after rollback: %v", err)
+	if !f.staggered() {
+		_ = f.restart(ctx)
+		if previous != "" {
+			if r, err := ReadRelease(previous); err == nil {
+				if err := f.wait(ctx, r.Version); err != nil {
+					f.say("after rollback: %v", err)
+				}
 			}
 		}
+		return
+	}
+	if previous == "" {
+		// Nothing to serve: the services are only told that current is gone.
+		for _, name := range restarted {
+			if f.RestartOne != nil {
+				_ = f.RestartOne(ctx, name)
+			}
+		}
+		return
+	}
+	expected := ""
+	if r, err := ReadRelease(previous); err == nil {
+		expected = r.Version
+	}
+	if _, err := f.cycle(ctx, expected, restarted, false); err != nil {
+		f.say("after rollback: %v", err)
 	}
 }
 
@@ -569,11 +627,8 @@ func (f *Fleet) Rollback(ctx context.Context) error {
 	if err := f.pointCurrent(rec.Previous); err != nil {
 		return err
 	}
-	if err := f.restart(ctx); err != nil {
-		return err
-	}
 	r, _ := ReadRelease(rec.Previous)
-	if err := f.wait(ctx, r.Version); err != nil {
+	if _, err := f.cycle(ctx, r.Version, nil, false); err != nil {
 		return err
 	}
 	out, _ := json.Marshal(map[string]string{"version": r.Version, "release": rec.Previous, "previous": rec.Release,

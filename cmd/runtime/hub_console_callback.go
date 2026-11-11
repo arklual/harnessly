@@ -39,6 +39,16 @@ const (
 type consoleHold struct {
 	owner string
 	used  bool
+	// What the machine agent said of the attempt: its provider, the name to show, when it expires (Unix ms) and where
+	// it stands. state is "" until it has said; "connected", "failed", "expired" and "cancelled" end the attempt.
+	provider, label, state string
+	expiresAt              int64
+	ended                  time.Time
+}
+
+// terminalState says the state ends the attempt.
+func terminalState(s string) bool {
+	return s == "connected" || s == "failed" || s == "expired" || s == "cancelled"
 }
 
 type consoleHolds struct {
@@ -58,12 +68,20 @@ func (h *consoleHolds) get(id string) *consoleHold {
 	return c
 }
 
-// drop forgets the consoles that are not running any more.
-func (h *consoleHolds) drop(alive func(id string) bool) {
+// endedKeep is how long the page can still read how an ended attempt ended.
+const endedKeep = 10 * time.Minute
+
+// drop forgets the consoles that are not running any more; one that ended in a state is kept a while for its page.
+func (h *consoleHolds) drop(alive func(id string) bool, now time.Time) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for id := range h.m {
-		if !alive(id) {
+	for id, c := range h.m {
+		switch {
+		case terminalState(c.state):
+			if now.Sub(c.ended) > endedKeep {
+				delete(h.m, id)
+			}
+		case !alive(id):
 			delete(h.m, id)
 		}
 	}

@@ -45,6 +45,10 @@ var ErrNotKept = errors.New("the hub keeps no place for it")
 // transient codes are tried again by themselves; the others wait for a person (retry or skip).
 func transient(code string) bool { return code == CodePut || code == CodeVerify || code == CodeSession }
 
+// settled codes are objects no person can move (the source left the disk, or it is bigger than the hub takes): they
+// are skipped with their reason instead of failing, and moved once the cause is gone.
+func settled(code string) bool { return code == CodeGone || code == CodeTooBig }
+
 // Item is one object of the machine's data.
 type Item struct {
 	Kind   string
@@ -72,6 +76,42 @@ type Target interface {
 	PutBlob(ctx context.Context, kind, sha string, data []byte) error
 }
 
+// LargeTarget is a Target that also takes objects bigger than one request carries (MaxBytes), in parts.
+type LargeTarget interface {
+	// LargeLimit is the biggest object the store takes in parts: math.MaxInt64 when it sets no limit, 0 when it takes
+	// none (an older hub).
+	LargeLimit(ctx context.Context, kind string) (int64, error)
+	// PutLarge uploads size bytes of r, which hash to sha; ErrTooBig when the store refuses them for their size.
+	PutLarge(ctx context.Context, kind, sha string, size int64, r io.ReaderAt) error
+}
+
+// BatchTarget is a Target that answers for many blobs of a kind at once: which of them the store does not hold.
+type BatchTarget interface {
+	MissingBlobs(ctx context.Context, kind string, shas []string) (map[string]bool, error)
+}
+
+// lacking asks the store once per kind which of the named blobs it lacks. ok is false per kind when the target has
+// no batch answer or it failed: those are asked about one by one.
+func (m *Mover) lacking(ctx context.Context, byKind map[string][]string) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	bt, ok := m.o.Target.(BatchTarget)
+	if !ok {
+		return out
+	}
+	for kind, shas := range byKind {
+		if len(shas) < 2 {
+			continue
+		}
+		missing, err := bt.MissingBlobs(ctx, kind, shas)
+		if err != nil {
+			m.o.Log.Warn("move: the batch look at the store failed, each object asks on its own", "kind", kind, "err", err)
+			continue
+		}
+		out[kind] = missing
+	}
+	return out
+}
+
 // Journal is the hub's journal (storelink); ErrNoJournal from a hub that keeps none.
 type Journal interface {
 	Report(ctx context.Context, rep hubproto.MigrationReport) (hubproto.MigrationAnswer, error)
@@ -79,6 +119,9 @@ type Journal interface {
 
 // ErrNoJournal is a hub without the journal (an older one): the move goes on with its own on the disk only.
 var ErrNoJournal = errors.New("the hub keeps no journal of the move")
+
+// ErrTooBig is a store that refused an object for its size (MIG-TOO-BIG).
+var ErrTooBig = errors.New("the store does not take an object this big")
 
 // ErrUnauthorized is a store that refused the machine's session (MIG-SESSION).
 var ErrUnauthorized = errors.New("the store refused this machine")
@@ -92,7 +135,7 @@ type Options struct {
 	Target    Target
 	// Journal nil keeps the journal on the disk only.
 	Journal Journal
-	// MaxBytes is the largest object the store takes (64 MiB).
+	// MaxBytes is the largest object the store takes (64 MiB when unset; the runtime passes the hub's limit).
 	MaxBytes int64
 	// Every is how often a move that is over takes its inventory again (6 h).
 	Every time.Duration
@@ -110,6 +153,10 @@ type Mover struct {
 	hub      string // "", "on", or why the hub's journal is not kept
 	running  bool
 	failWait time.Duration
+	// lacks is, for the pass that runs, what the store said it lacks of the objects named by hash, by kind.
+	lacks map[string]map[string]bool
+	// limits is, for the pass that runs, the biggest object the store takes of each kind (in parts when it can).
+	limits map[string]int64
 }
 
 type record struct {
@@ -125,6 +172,9 @@ type record struct {
 	Code     string `json:"code,omitempty"`
 	Error    string `json:"error,omitempty"`
 	Attempts int    `json:"attempts,omitempty"`
+	// Limit is the biggest object the store took when it refused this one for its size (MIG-TOO-BIG); 0 in a journal
+	// written before it was kept, which was MaxBytes.
+	Limit int64 `json:"limit,omitempty"`
 	// Retry is a person's ask to try a failed object again.
 	Retry bool `json:"retry,omitempty"`
 	// Dirty: changed since the hub last took it.
@@ -208,12 +258,25 @@ func (m *Mover) pass(ctx context.Context) time.Duration {
 	}
 	m.take(items)
 	m.report(ctx)
+	m.limits = m.storeLimits(ctx, items)
+	defer func() { m.limits = nil }()
+	// The objects whose hash is known before they are read are asked about in one request per kind.
+	var due []Item
+	named := map[string][]string{}
 	for _, it := range items {
-		if ctx.Err() != nil {
-			break
-		}
 		if !m.due(it) {
 			continue
+		}
+		due = append(due, it)
+		if it.Deliver == nil && it.Sha256 != "" {
+			named[it.Kind] = append(named[it.Kind], it.Sha256)
+		}
+	}
+	m.lacks = m.lacking(ctx, named)
+	defer func() { m.lacks = nil }()
+	for _, it := range due {
+		if ctx.Err() != nil {
+			break
 		}
 		m.move(ctx, it)
 		if m.dirty() >= 200 {
@@ -298,6 +361,8 @@ func (m *Mover) due(it Item) bool {
 	switch {
 	case r == nil:
 		return false
+	case r.State == hubproto.MigrationSkipped && settled(r.Code):
+		return back(it, r) || r.Code == CodeTooBig && m.limitOf(it.Kind) > m.refusedAt(r)
 	case r.State == hubproto.MigrationSkipped:
 		return it.Deliver != nil && r.Code == CodeNotKept
 	case r.State == hubproto.MigrationVerified && it.Deliver != nil:
@@ -307,9 +372,35 @@ func (m *Mover) due(it Item) bool {
 		fi, err := os.Lstat(r.Path)
 		return err == nil && (fi.Size() != r.Size || fi.ModTime().UnixMilli() != r.MTime) && r.Kind != "files"
 	case r.State == hubproto.MigrationFailed:
-		return r.Retry || transient(r.Code)
+		// A settled code failed before such objects were skipped: one more pass skips it.
+		return r.Retry || transient(r.Code) || settled(r.Code)
 	}
 	return true
+}
+
+// back: the cause a skipped object was skipped for is gone (its file is on the disk again, or its size changed since
+// the store refused it), so it is moved again. A size that did not change is not sent again.
+func back(it Item, r *record) bool {
+	size := int64(len(it.Data))
+	if it.Deliver == nil {
+		fi, err := os.Lstat(it.Path)
+		if err != nil || !fi.Mode().IsRegular() {
+			return false
+		}
+		size = fi.Size()
+	}
+	return r.Code == CodeGone || size != r.Size
+}
+
+// sizeOf is the object's size as it is now; 0 when its file is not there.
+func sizeOf(it Item) int64 {
+	if it.Deliver != nil {
+		return int64(len(it.Data))
+	}
+	if fi, err := os.Lstat(it.Path); err == nil {
+		return fi.Size()
+	}
+	return 0
 }
 
 func (m *Mover) move(ctx context.Context, it Item) {
@@ -321,8 +412,17 @@ func (m *Mover) move(ctx context.Context, it Item) {
 		return
 	}
 	r.Dirty, r.Retry, r.At = true, false, m.o.Now().UnixMilli()
-	if code == CodeNotKept {
+	if code == CodeNotKept || settled(code) {
+		if settled(code) && r.State != hubproto.MigrationSkipped {
+			m.o.Log.Info("move: an object is skipped", "kind", it.Kind, "object", it.Object, "code", code, "err", err)
+		}
 		r.State, r.Code, r.Error = hubproto.MigrationSkipped, code, err.Error()
+		if settled(code) {
+			r.Size = sizeOf(it)
+		}
+		if code == CodeTooBig {
+			r.Limit = m.limitOf(it.Kind)
+		}
 		return
 	}
 	if code != "" {
@@ -349,8 +449,10 @@ func (m *Mover) put(ctx context.Context, it Item) (sha string, size, mtime int64
 	case !fi.Mode().IsRegular():
 		// A link is not followed: what moves is the file the record names, not where a link leads now.
 		return "", 0, 0, CodeRead, fmt.Errorf("%s is not a regular file", it.Path)
+	case fi.Size() > m.limitOf(it.Kind):
+		return "", 0, 0, CodeTooBig, fmt.Errorf("bigger than the store takes (%d MiB)", m.limitOf(it.Kind)>>20)
 	case fi.Size() > m.o.MaxBytes:
-		return "", 0, 0, CodeTooBig, fmt.Errorf("bigger than the store takes (%d MiB)", m.o.MaxBytes>>20)
+		return m.putLarge(ctx, it, fi)
 	}
 	data, err := readSame(it.Path, fi, m.o.MaxBytes)
 	if err != nil {
@@ -362,8 +464,10 @@ func (m *Mover) put(ctx context.Context, it Item) (sha string, size, mtime int64
 		return "", 0, 0, CodeHash, errors.New("the bytes on the disk are not the ones the machine recorded")
 	}
 	size, mtime = int64(len(data)), fi.ModTime().UnixMilli()
-	has, err := m.o.Target.HasBlob(ctx, it.Kind, sha)
-	if err != nil {
+	var has bool
+	if lacks, asked := m.lacks[it.Kind]; asked && it.Sha256 == sha {
+		has = !lacks[sha]
+	} else if has, err = m.o.Target.HasBlob(ctx, it.Kind, sha); err != nil {
 		return "", 0, 0, storeCode(err, CodePut), err
 	}
 	if has {
@@ -378,6 +482,83 @@ func (m *Mover) put(ctx context.Context, it Item) (sha string, size, mtime int64
 	}
 	if !has {
 		return "", 0, 0, CodeVerify, errors.New("the store answered the upload and then did not have the blob")
+	}
+	return sha, size, mtime, "", nil
+}
+
+// storeLimits asks the store once per kind of the files how big an object it takes.
+func (m *Mover) storeLimits(ctx context.Context, items []Item) map[string]int64 {
+	out := map[string]int64{}
+	lt, ok := m.o.Target.(LargeTarget)
+	if !ok {
+		return out
+	}
+	for _, it := range items {
+		if it.Deliver != nil {
+			continue
+		}
+		if _, asked := out[it.Kind]; asked {
+			continue
+		}
+		n, err := lt.LargeLimit(ctx, it.Kind)
+		if err != nil {
+			m.o.Log.Warn("move: the store's limit is unknown, big objects wait", "kind", it.Kind, "err", err)
+			n = 0
+		}
+		out[it.Kind] = n
+	}
+	return out
+}
+
+// limitOf is the biggest object of a kind the store takes in this pass.
+func (m *Mover) limitOf(kind string) int64 {
+	return max(m.o.MaxBytes, m.limits[kind])
+}
+
+// refusedAt is the limit an object was refused under.
+func (m *Mover) refusedAt(r *record) int64 {
+	if r.Limit > 0 {
+		return r.Limit
+	}
+	return m.o.MaxBytes
+}
+
+// putLarge moves a file bigger than one request carries: hashed from the disk, then sent in parts read from it.
+func (m *Mover) putLarge(ctx context.Context, it Item, seen fs.FileInfo) (sha string, size, mtime int64, code string, err error) {
+	lt, ok := m.o.Target.(LargeTarget)
+	if !ok {
+		return "", 0, 0, CodeTooBig, fmt.Errorf("bigger than the store takes (%d MiB)", m.o.MaxBytes>>20)
+	}
+	f, err := openSame(it.Path, seen)
+	if err != nil {
+		return "", 0, 0, CodeRead, err
+	}
+	defer f.Close()
+	size, mtime = seen.Size(), seen.ModTime().UnixMilli()
+	h := sha256.New()
+	if n, err := io.Copy(h, io.NewSectionReader(f, 0, size+1)); err != nil {
+		return "", 0, 0, CodeRead, err
+	} else if n != size {
+		return "", 0, 0, CodeRead, fmt.Errorf("%s changed while it was read", it.Path)
+	}
+	sha = hex.EncodeToString(h.Sum(nil))
+	if it.Sha256 != "" && it.Sha256 != sha {
+		return "", 0, 0, CodeHash, errors.New("the bytes on the disk are not the ones the machine recorded")
+	}
+	has, err := m.o.Target.HasBlob(ctx, it.Kind, sha)
+	if err != nil {
+		return "", 0, 0, storeCode(err, CodePut), err
+	}
+	if !has {
+		if err := lt.PutLarge(ctx, it.Kind, sha, size, f); err != nil {
+			return "", 0, 0, storeCode(err, CodePut), err
+		}
+		if has, err = m.o.Target.HasBlob(ctx, it.Kind, sha); err != nil {
+			return "", 0, 0, storeCode(err, CodeVerify), err
+		}
+		if !has {
+			return "", 0, 0, CodeVerify, errors.New("the store answered the upload and then did not have the blob")
+		}
 	}
 	return sha, size, mtime, "", nil
 }
@@ -404,7 +585,7 @@ func (m *Mover) deliver(ctx context.Context, it Item) (sha string, size, mtime i
 // readSame reads the file Lstat saw, and only it: a file swapped for a link (or another file) between the look and the
 // open is refused.
 func readSame(path string, seen fs.FileInfo, max int64) ([]byte, error) {
-	f, err := os.Open(path)
+	f, err := openSame(path, seen)
 	if err != nil {
 		return nil, err
 	}
@@ -413,15 +594,40 @@ func readSame(path string, seen fs.FileInfo, max int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// One buffer of the file's size, a byte more than may be kept: a file over the limit, or one that grew since the
+	// look, still shows as such. ReadAll would grow its buffer by copying it, several times for megabytes.
+	buf := make([]byte, min(fi.Size(), max)+1)
+	n, err := io.ReadFull(f, buf)
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		err = nil
+	}
+	return buf[:n], err
+}
+
+// openSame opens the file Lstat saw, and only it.
+func openSame(path string, seen fs.FileInfo) (*os.File, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
 	if !os.SameFile(fi, seen) || !fi.Mode().IsRegular() {
+		f.Close()
 		return nil, fmt.Errorf("%s changed while it was opened", path)
 	}
-	return io.ReadAll(io.LimitReader(f, max+1))
+	return f, nil
 }
 
 func storeCode(err error, otherwise string) string {
-	if errors.Is(err, ErrUnauthorized) {
+	switch {
+	case errors.Is(err, ErrUnauthorized):
 		return CodeSession
+	case errors.Is(err, ErrTooBig):
+		return CodeTooBig
 	}
 	return otherwise
 }

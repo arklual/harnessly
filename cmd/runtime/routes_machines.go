@@ -52,7 +52,7 @@ func upstreamAlive(upstream string) func() bool {
 	}
 }
 
-func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, hooks hookConfig) []gate.JSONRoute {
+func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, hooks hookConfig, chats func() string) []gate.JSONRoute {
 	tz, _ := strconv.Atoi(os.Getenv("RUNTIME_USAGE_TZ_OFFSET_MINUTES"))
 	claudeDir := env("CLAUDE_CONFIG_DIR", filepath.Join(d.Home, ".claude"))
 	// Claude Code keeps its .claude.json in the home, or in its folder when the folder is set.
@@ -66,6 +66,7 @@ func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, ho
 		CodexRoot:  filepath.Join(limits.CodexHome(os.Getenv("CODEX_HOME"), d.Home), "sessions"),
 		TZOffset:   float64(tz) * 60,
 		CacheFile:  filepath.Join(d.DataDir, "limits-spend-cache.gob"),
+		Lines:      transcriptLines("usage"),
 	}
 	releaseFile := os.Getenv("RUNTIME_RELEASE_FILE")
 	snapshot := machines.NewSnapshot(machines.SnapshotConfig{
@@ -159,6 +160,8 @@ func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, ho
 			ReleaseFile:     releaseFile,
 			Alive:           alive,
 			Selftest:        selfKeeper.Selftest,
+			Chats:           chats,
+			Transcripts:     transcriptNumbers,
 		},
 		ManifestFile:     releaseStatic("RUNTIME_MANIFEST_FILE", "manifest.json"),
 		MachineAgent:     d.MachineAgent,

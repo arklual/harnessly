@@ -3,6 +3,7 @@ package convo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -170,6 +171,38 @@ func TestAListDoesNotWaitForAStuckActor(t *testing.T) {
 	snap, err := rt.Conversations(context.Background())
 	if took := time.Since(start); err != nil || took > 600*time.Millisecond || len(snap.Conversations) != 2 {
 		t.Fatalf("list: %d conversations, %v, after %v", len(snap.Conversations), err, took)
+	}
+}
+
+// Many busy actors cost a list one wait, not one each: with hundreds of conversations the waits added up
+// to longer than the page waits for the list.
+func TestAListWaitsForItsBusyActorsAtOnce(t *testing.T) {
+	pub := &fakePub{t: t, seqs: map[wire.Channel]int64{}}
+	rt := New(Deps{MachineID: "m1", Publisher: pub, Machine: &fakeMachine{}, Limits: wire.DefaultLimits})
+	if err := rt.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Stop()
+	const n = 12
+	tabs := make([]ImportTab, 0, n)
+	for i := range n {
+		tabs = append(tabs, ImportTab{ID: fmt.Sprintf("tab-%02d", i), Provider: wire.ProviderClaude})
+	}
+	rt.Import(tabs, nil)
+	// Every actor has answered once, so each left a record behind.
+	if snap, err := rt.Conversations(context.Background()); err != nil || len(snap.Conversations) != n {
+		t.Fatalf("first list: %d conversations, %v", len(snap.Conversations), err)
+	}
+	release := make(chan struct{})
+	defer close(release)
+	for _, tab := range tabs {
+		rt.actor(tab.ID).mail <- func() { <-release }
+	}
+	time.Sleep(50 * time.Millisecond)
+	start := time.Now()
+	snap, err := rt.Conversations(context.Background())
+	if took := time.Since(start); err != nil || took > 3*listWait || len(snap.Conversations) != n {
+		t.Fatalf("list: %d conversations, %v, after %v (one wait is %v)", len(snap.Conversations), err, took, listWait)
 	}
 }
 

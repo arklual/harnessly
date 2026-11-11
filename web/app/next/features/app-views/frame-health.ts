@@ -7,6 +7,11 @@
 export const HANDSHAKE_WAIT_MS = 8000;
 /** How long the host waits for the runtime to give a view session or a preview slot. */
 export const SESSION_WAIT_MS = 15000;
+/** After this long without a handshake the skeleton says the view is slower than usual, before any failure. */
+export const SLOW_HINT_MS = 4000;
+/** A view that failed for a reason that may pass (no answer, a file that did not come) is tried again once by itself. */
+export const AUTO_RETRY_MAX = 1;
+export const AUTO_RETRY_MS = 1500;
 
 export const FAIL_REASON = {
   /** The view's own file did not load (a script, a style, a page); `detail` names it. */
@@ -172,3 +177,13 @@ export const failureOfViewError = (m: IViewErrorMessage, appId: string): IFailur
   if (m.kind === 'csp') return { reason: FAIL_REASON.csp, detail: m.text };
   return { reason: FAIL_REASON.script, detail: m.text };
 };
+
+/**
+ * Whether a failure may pass on its own and is worth one more try before the card: the view said nothing, the
+ * machine did not answer, a file did not come (a gateway's hiccup). A refusal, a sign-in, a security rule, a script that
+ * threw or an app that waits would fail the same way again.
+ */
+export const autoRetryable = (failure: IFailure): boolean =>
+  failure.reason === FAIL_REASON.silent ||
+  failure.reason === FAIL_REASON.server ||
+  failure.reason === FAIL_REASON.file;

@@ -24,6 +24,7 @@ import type { ConvId } from '@/next/protocol/v2';
 import { goTo, parseRoute, ROUTE, routePath, useRoute, type TRoute } from '@/next/routes/routes';
 import {
   activeTab,
+  closeKeyClosesWindow,
   OPEN,
   planOpen,
   startTabs,
@@ -57,6 +58,7 @@ const FIXED: Record<
   [ROUTE.invite]: { icon: 'palette', title: () => t('next.tabs.designly') },
   [ROUTE.tasks]: { icon: 'list-checks', title: () => t('next.sidebar.tasks') },
   [ROUTE.apps]: { icon: 'layout-grid', title: () => t('next.sidebar.apps') },
+  [ROUTE.review]: { icon: 'git-pull-request', title: () => t('next.reviewApp.title') },
   [ROUTE.help]: { icon: 'book-open', title: () => t('next.sidebar.help') },
   [ROUTE.learn]: { icon: 'graduation-cap', title: () => t('next.learn.title') },
   [ROUTE.settings]: { icon: 'settings', title: () => t('next.shell.settings') },
@@ -290,7 +292,9 @@ export const useShellTabs = (byId: ReadonlyMap<string, ITabChat>, enabled: boole
   const newTab = useCallback(() => open({ kind: ROUTE.home }, false, 'end'), [open]);
 
   // The browser's shortcuts. In a plain browser tab Chrome keeps ⌘T, ⌘W and Ctrl+Tab for itself; in the installed
-  // app's window they come here.
+  // app's window and the desktop app they come here. ⌘W closes the views one at a time and, once only the start page
+  // is left, is let through so the window closes as it would anywhere else (the desktop app has no menu item for it,
+  // so it is asked to).
   useEffect(() => {
     if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
@@ -306,6 +310,14 @@ export const useShellTabs = (byId: ReadonlyMap<string, ITabChat>, enabled: boole
         event.preventDefault();
         newTab();
       } else if (mod && !event.shiftKey && key === 'w') {
+        if (closeKeyClosesWindow(now)) {
+          const desktop = (window as { electronAPI?: { closeWindow?: () => Promise<void> } }).electronAPI;
+          if (desktop?.closeWindow) {
+            event.preventDefault();
+            void desktop.closeWindow();
+          }
+          return;
+        }
         event.preventDefault();
         close(now.active);
       } else if (mod && !event.shiftKey && /^[1-9]$/.test(key)) {

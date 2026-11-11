@@ -11,5 +11,6 @@
   "next.appdoc.code.view-only": "You can view this document but not change it.",
   "next.appdoc.details": "Details: {reason}",
   "next.appdoc.failed": "The document could not be opened",
-  "next.appdoc.noView": "The app has no view that edits this document"
+  "next.appdoc.noView": "The app has no view that edits this document",
+  "next.appdoc.extendNotAllowed": "The installation's admin has not let this app extend Sinopia's editor"
 }

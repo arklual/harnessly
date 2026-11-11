@@ -4,6 +4,7 @@ package spaces
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -20,13 +21,10 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 const (
-	// maxOwnedSpaces is how many spaces one person may own; a guard against a script filling the database.
-	maxOwnedSpaces = 20
-	// MaxOwned is maxOwnedSpaces for the other ways a space is made (a tenant of an organization).
-	MaxOwned     = maxOwnedSpaces
 	maxNameRunes = 60
 )
 
@@ -45,19 +43,30 @@ type Deps struct {
 	Now func() time.Time
 	// OnMemberGone runs after a person left or was removed from a space: whatever they had open there must end.
 	OnMemberGone func(spaceID, userID string)
+	// OnMachineGone runs for every machine that was revoked because the person who registered it left the space: its
+	// link closes and the space is told.
+	OnMachineGone func(m store.Machine)
+	// OrgEvents is the bus of the organizations' live stream: it hears of every change of members and invitations, and
+	// ends the streams of a person who left or whose role changed. nil: there is none.
+	OrgEvents events.OrgBus
+	// OnPeople runs after a person joined or left a space or their role in it changed: what they may see is different.
+	OnPeople func(userID string)
 }
 
 // Service is the spaces side of the hub.
 type Service struct {
-	cfg    *config.Config
-	db     *store.DB
-	auth   *auth.Service
-	mailer mail.Mailer
-	events *events.Broker
-	lim    *ratelimit.Limiter
-	log    *slog.Logger
-	now    func() time.Time
-	gone   func(spaceID, userID string)
+	cfg         *config.Config
+	db          *store.DB
+	auth        *auth.Service
+	mailer      mail.Mailer
+	events      *events.Broker
+	lim         *ratelimit.Limiter
+	log         *slog.Logger
+	now         func() time.Time
+	gone        func(spaceID, userID string)
+	machineGone func(m store.Machine)
+	orgBus      events.OrgBus
+	people      func(userID string)
 
 	// linkURLs remembers, in memory only, the address of each link invitation this process made, so that the owner
 	// asking again gets the same address. The database keeps hashes only; after a restart the address is gone.
@@ -69,7 +78,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, mailer: d.Mailer, events: d.Events, lim: d.Limiter, log: d.Log, now: d.Now, gone: d.OnMemberGone, linkURLs: map[string]string{}, sub: http.NewServeMux()}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, mailer: d.Mailer, events: d.Events, lim: d.Limiter, log: d.Log, now: d.Now, gone: d.OnMemberGone, machineGone: d.OnMachineGone, orgBus: d.OrgEvents, people: d.OnPeople, linkURLs: map[string]string{}, sub: http.NewServeMux()}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -94,17 +103,19 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/spaces", s.auth.Require(s.create))
 	mux.Handle("/api/spaces/", http.HandlerFunc(s.route))
 
-	s.sub.Handle("GET /api/spaces/{spaceId}", s.auth.Require(s.get))
-	s.sub.Handle("PATCH /api/spaces/{spaceId}", s.auth.Require(s.patch))
-	s.sub.Handle("GET /api/spaces/{spaceId}/members", s.auth.Require(s.members))
-	s.sub.Handle("PATCH /api/spaces/{spaceId}/members/{userId}", s.auth.Require(s.setRole))
-	s.sub.Handle("DELETE /api/spaces/{spaceId}/members/{userId}", s.auth.Require(s.removeMember))
-	s.sub.Handle("GET /api/spaces/{spaceId}/events", s.auth.Require(s.stream))
+	g := tenant.Guard{Auth: s.auth, Spaces: s}
+	s.sub.Handle("GET /api/spaces/{spaceId}", g.Space(tenant.Member, s.get))
+	s.sub.Handle("PATCH /api/spaces/{spaceId}", g.Space(tenant.Owner, s.patch))
+	s.sub.Handle("POST /api/spaces/{spaceId}/delete", s.auth.Require(s.deleteSpace))
+	s.sub.Handle("GET /api/spaces/{spaceId}/members", g.Space(tenant.Member, s.members))
+	s.sub.Handle("PATCH /api/spaces/{spaceId}/members/{userId}", g.Space(tenant.Owner, s.setRole))
+	s.sub.Handle("DELETE /api/spaces/{spaceId}/members/{userId}", g.Space(tenant.Member, s.removeMember))
+	s.sub.Handle("GET /api/spaces/{spaceId}/events", g.Space(tenant.Member, s.stream))
 
-	s.sub.Handle("POST /api/spaces/{spaceId}/invites", s.auth.Require(s.inviteByEmail))
-	s.sub.Handle("POST /api/spaces/{spaceId}/invites/link", s.auth.Require(s.inviteByLink))
-	s.sub.Handle("GET /api/spaces/{spaceId}/invites", s.auth.Require(s.listInvites))
-	s.sub.Handle("DELETE /api/spaces/{spaceId}/invites/{inviteId}", s.auth.Require(s.revokeInvite))
+	s.sub.Handle("POST /api/spaces/{spaceId}/invites", g.Space(tenant.Owner, s.inviteByEmail))
+	s.sub.Handle("POST /api/spaces/{spaceId}/invites/link", g.Space(tenant.Owner, s.inviteByLink))
+	s.sub.Handle("GET /api/spaces/{spaceId}/invites", g.Space(tenant.Owner, s.listInvites))
+	s.sub.Handle("DELETE /api/spaces/{spaceId}/invites/{inviteId}", g.Space(tenant.Owner, s.revokeInvite))
 	mux.Handle("GET /api/invites/{token}", httpx.Handler(s.peekInvite))
 	mux.Handle("POST /api/invites/{token}/accept", s.auth.Require(s.acceptInvite))
 }
@@ -142,7 +153,8 @@ func (s *Service) Authz() authz.Authz {
 
 // Access is the person's role in the space. A person who is not in it, and an id that is not a space at all, both get
 // the same forbidden: ids are not a way to learn which spaces exist. Someone who manages the space from above (an admin
-// of its organization) has the owner's rights in it without being a member.
+// of its organization) has the owner's rights in it without being a member; a role on the space itself or on its
+// teams gives nothing to a person who is not a member (authz).
 func (s *Service) Access(ctx context.Context, userID, spaceID string) (string, error) {
 	role, err := s.db.S().Role(ctx, spaceID, userID)
 	if err != nil {
@@ -228,7 +240,7 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	}
 	if n, err := s.db.S().CountOwnedSpaces(ctx, p.User.ID); err != nil {
 		return err
-	} else if n >= maxOwnedSpaces {
+	} else if n >= s.cfg.MaxSpaces() {
 		return httpx.Conflict("space_limit", "У вас уже много пространств")
 	}
 	sp := store.Space{Name: name, CreatedBy: p.User.ID, CreatedAt: s.now().UTC()}
@@ -237,7 +249,12 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	for n := 1; ; n++ {
 		sp.Slug = slugCandidate(base, n)
 		sp.ID = ""
-		err := s.db.Tx(ctx, func(st store.Store) error { return st.CreateSpace(ctx, &sp) })
+		err := s.db.Tx(ctx, func(st store.Store) error {
+			if err := st.CreateSpace(ctx, &sp); err != nil {
+				return err
+			}
+			return s.journal(ctx, st, sp.ID, p.User.ID, "member.add", p.User.ID, "", store.RoleOwner)
+		})
 		if err == nil {
 			break
 		}
@@ -271,13 +288,9 @@ func (s *Service) spaceBySlug(w http.ResponseWriter, r *http.Request, p *auth.Pr
 	return nil
 }
 
-func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
-	role, err := s.Access(ctx, p.User.ID, r.PathValue("spaceId"))
-	if err != nil {
-		return err
-	}
-	sp, err := s.db.S().SpaceByID(ctx, r.PathValue("spaceId"))
+func (s *Service) get(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	ctx, role := r.Context(), t.Role
+	sp, err := s.db.S().SpaceByID(ctx, t.SpaceID)
 	if err != nil {
 		return err
 	}
@@ -285,7 +298,7 @@ func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 	return nil
 }
 
-func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) patch(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	var req struct {
 		Name           *string
 		OnboardingStep *string
@@ -294,10 +307,7 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		return err
 	}
 	ctx := r.Context()
-	id := r.PathValue("spaceId")
-	if err := s.Owner(ctx, p.User.ID, id); err != nil {
-		return err
-	}
+	id := t.SpaceID
 	st := s.db.S()
 	sp, err := st.SpaceByID(ctx, id)
 	if err != nil {
@@ -336,12 +346,8 @@ func memberView(m store.Member) MemberView {
 	return MemberView{UserID: m.UserID, Email: m.Email, Name: m.Name, Role: m.Role, JoinedAt: httpx.Time(m.JoinedAt)}
 }
 
-func (s *Service) members(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
-	id := r.PathValue("spaceId")
-	if _, err := s.Access(ctx, p.User.ID, id); err != nil {
-		return err
-	}
+func (s *Service) members(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	ctx, id := r.Context(), t.SpaceID
 	ms, err := s.db.S().Members(ctx, id)
 	if err != nil {
 		return err
@@ -354,9 +360,39 @@ func (s *Service) members(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	return nil
 }
 
+// lockMembers makes the transaction the only one deciding who is in the space: the count of owners it reads is the one
+// it changes, whatever else is asked for at the same moment.
+func lockMembers(ctx context.Context, st store.Store, spaceID string) error {
+	ok, err := st.LockSpace(ctx, spaceID)
+	if err == nil && !ok {
+		return httpx.ErrNotFound
+	}
+	return err
+}
+
+// journal writes a change of who is in the space, or in what role, into the journal of changes; it is called in the
+// transaction that makes the change, so there is no change without its line and no line without its change. was and
+// now are the person's role before and after ("" for not a member).
+func (s *Service) journal(ctx context.Context, st store.Store, spaceID, actor, action, userID, was, now string) error {
+	sp, err := st.SpaceByID(ctx, spaceID)
+	if err != nil {
+		return err
+	}
+	role := func(r string) string {
+		if r == "" {
+			return ""
+		}
+		b, _ := json.Marshal(map[string]string{"tenantRole": r})
+		return string(b)
+	}
+	return st.AddAudit(ctx, &store.AuditEvent{OrgID: sp.OrgID, SpaceID: sp.ID, ActorID: actor, ScopeKind: store.ScopeTenant, ScopeID: sp.ID,
+		Action: action, TargetKind: "user", TargetID: userID, Before: role(was), After: role(now), Self: actor == userID, At: s.now().UTC()})
+}
+
 var errLastOwner = httpx.Conflict("last_owner", "В пространстве должен остаться хотя бы один владелец")
 
-func (s *Service) setRole(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) setRole(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct{ Role string }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -365,12 +401,12 @@ func (s *Service) setRole(w http.ResponseWriter, r *http.Request, p *auth.Princi
 		return httpx.Invalid("role", "Роль — владелец или участник")
 	}
 	ctx := r.Context()
-	spaceID, userID := r.PathValue("spaceId"), r.PathValue("userId")
-	if err := s.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	spaceID, userID := t.SpaceID, r.PathValue("userId")
 	var m store.Member
 	err := s.db.Tx(ctx, func(st store.Store) error {
+		if err := lockMembers(ctx, st, spaceID); err != nil {
+			return err
+		}
 		cur, err := st.MemberByUser(ctx, spaceID, userID)
 		if errors.Is(err, store.ErrNotFound) {
 			return httpx.ErrNotFound
@@ -388,9 +424,13 @@ func (s *Service) setRole(w http.ResponseWriter, r *http.Request, p *auth.Princi
 		if err := st.SetRole(ctx, spaceID, userID, req.Role); err != nil {
 			return err
 		}
+		was := cur.Role
 		cur.Role = req.Role
 		m = cur
-		return nil
+		if was == req.Role {
+			return nil
+		}
+		return s.journal(ctx, st, spaceID, p.User.ID, "member.role", userID, was, req.Role)
 	})
 	if err != nil {
 		return err
@@ -399,21 +439,22 @@ func (s *Service) setRole(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	// The person's open streams were opened with the old role: they reconnect and are given what the new one allows.
 	s.events.Kick(spaceID, userID)
 	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
+	s.peopleChanged(ctx, spaceID, events.KindMembers, userID, true)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"member": memberView(m)})
 	return nil
 }
 
-func (s *Service) removeMember(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
-	spaceID, userID := r.PathValue("spaceId"), r.PathValue("userId")
-	role, err := s.Access(ctx, p.User.ID, spaceID)
-	if err != nil {
-		return err
-	}
-	if userID != p.User.ID && role != store.RoleOwner {
+func (s *Service) removeMember(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	ctx, p := r.Context(), t.Person
+	spaceID, userID := t.SpaceID, r.PathValue("userId")
+	if userID != p.User.ID && t.Role != store.RoleOwner {
 		return httpx.New(http.StatusForbidden, "forbidden", "Это может только владелец пространства")
 	}
-	err = s.db.Tx(ctx, func(st store.Store) error {
+	var machines []store.Machine
+	err := s.db.Tx(ctx, func(st store.Store) error {
+		if err := lockMembers(ctx, st, spaceID); err != nil {
+			return err
+		}
 		cur, err := st.MemberByUser(ctx, spaceID, userID)
 		if errors.Is(err, store.ErrNotFound) {
 			return httpx.ErrNotFound
@@ -428,7 +469,15 @@ func (s *Service) removeMember(w http.ResponseWriter, r *http.Request, p *auth.P
 				return errLastOwner
 			}
 		}
-		return st.RemoveMember(ctx, spaceID, userID)
+		if err := st.RemoveMember(ctx, spaceID, userID); err != nil {
+			return err
+		}
+		// The machines the person registered are theirs: they leave with the person. A machine the space wants to
+		// keep is given to another member first (the machine's owner is changed), and is then not among these.
+		if machines, err = st.RevokeMachinesOf(ctx, spaceID, userID, s.now().UTC()); err != nil {
+			return err
+		}
+		return s.journal(ctx, st, spaceID, p.User.ID, "member.remove", userID, cur.Role, "")
 	})
 	if err != nil {
 		return err
@@ -438,19 +487,20 @@ func (s *Service) removeMember(w http.ResponseWriter, r *http.Request, p *auth.P
 	if s.gone != nil {
 		s.gone(spaceID, userID)
 	}
+	for _, m := range machines {
+		s.auth.Audit(ctx, p.User.ID, "machine_revoked", r, m.ID+" member_removed")
+		if s.machineGone != nil {
+			s.machineGone(m)
+		}
+	}
 	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
+	s.peopleChanged(ctx, spaceID, events.KindMembers, userID, true)
 	httpx.NoContent(w)
 	return nil
 }
 
-func (s *Service) stream(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
-	id := r.PathValue("spaceId")
-	role, err := s.Access(ctx, p.User.ID, id)
-	if err != nil {
-		return err
-	}
-	sub := s.events.Subscribe(id, p.User.ID, role == store.RoleOwner)
+func (s *Service) stream(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	sub := s.events.Subscribe(t.SpaceID, t.Person.User.ID, t.Role == store.RoleOwner)
 	if sub == nil {
 		return httpx.New(http.StatusServiceUnavailable, "unavailable", "Сервер перезапускается")
 	}

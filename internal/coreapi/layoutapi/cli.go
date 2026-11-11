@@ -1,6 +1,7 @@
 package layoutapi
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/paneintents"
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/vault"
 )
 
@@ -468,7 +470,7 @@ func (a *api) cliTabSend(c *call) {
 		return
 	}
 	if !isStr {
-		must(a.d.Tmux.SendKeySequence(session, keys...))
+		must(typist.Write(context.Background(), a.d.Tmux, session, func(context.Context) error { return a.d.Tmux.SendKeySequence(session, keys...) }))
 		c.reply(200, jsvalue.NewObject("status", "sent"))
 		return
 	}
@@ -479,17 +481,21 @@ func (a *api) cliTabSend(c *call) {
 		if safe, _ := a.d.Tmux.CheckTerminalProcess(session); safe {
 			line, err := a.d.Agents.LaunchLine(provider, ws, launchOf(a.d.Store.TabLaunch(found.tab)))
 			must(err)
-			must(a.d.Tmux.SendBracketedPaste(session, agents.AppendArgs(line, args)))
+			must(typist.Write(context.Background(), a.d.Tmux, session, func(context.Context) error {
+				return a.d.Tmux.SendBracketedPaste(session, agents.AppendArgs(line, args))
+			}))
 			a.markLaunch(found.tab.String("id"), true)
 			agent.Log("info", "tab send of a bare agent command started it the platform way", agent.F{K: "tabId", V: found.tab.String("id")})
 			c.reply(200, jsvalue.NewObject("status", "sent", "launched", "platform"))
 			return
 		}
 	}
-	must(a.d.Tmux.SendBracketedPaste(session, content))
-	if keys != nil {
-		must(a.d.Tmux.SendKeySequence(session, keys...))
-	}
+	must(typist.Write(context.Background(), a.d.Tmux, session, func(context.Context) error {
+		if err := a.d.Tmux.SendBracketedPaste(session, content); err != nil || keys == nil {
+			return err
+		}
+		return a.d.Tmux.SendKeySequence(session, keys...)
+	}))
 	c.reply(200, jsvalue.NewObject("status", "sent"))
 }
 

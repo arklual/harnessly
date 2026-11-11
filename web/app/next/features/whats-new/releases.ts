@@ -13,6 +13,125 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-11zd',
+    items: [{ key: 'inherit', icon: 'git-branch' }],
+  },
+  {
+    id: '2026-11-11zc',
+    items: [{ key: 'mrDone', icon: 'git-pull-request' }],
+  },
+  {
+    id: '2026-11-11zb',
+    items: [{ key: 'reviewOwnGitlab', icon: 'plug' }],
+  },
+  {
+    id: '2026-11-11za',
+    items: [{ key: 'reviewFaster', icon: 'zap' }],
+  },
+  {
+    id: '2026-11-11z',
+    items: [{ key: 'reviewInPane', icon: 'git-compare' }],
+  },
+  {
+    id: '2026-11-11y',
+    items: [
+      { key: 'reviewGithub', icon: 'git-pull-request' },
+      { key: 'reviewGithubLists', icon: 'search' },
+    ],
+  },
+  {
+    id: '2026-11-11v',
+    items: [
+      { key: 'reviewApp', icon: 'git-pull-request' },
+      { key: 'reviewNotes', icon: 'message-square' },
+      { key: 'reviewMr', icon: 'git-pull-request' },
+      { key: 'reviewAgent', icon: 'sparkles' },
+      { key: 'reviewAnalyze', icon: 'message-square' },
+      { key: 'kitFromPackage', icon: 'component' },
+      { key: 'kitStrict', icon: 'shield-check' },
+      { key: 'kitToCode', icon: 'file-code' },
+      { key: 'boardsToPages', icon: 'file-code' },
+    ],
+  },
+  {
+    id: '2026-11-11u',
+    items: [
+      { key: 'libraryOffline', icon: 'server' },
+      { key: 'noticesCalm', icon: 'bell' },
+      { key: 'readEverywhere', icon: 'eye' },
+      { key: 'sidebarStill', icon: 'panel-left' },
+      { key: 'tabsDrag', icon: 'grip-vertical' },
+      { key: 'sideAsk', icon: 'message-square' },
+      { key: 'homeTools', icon: 'layout-grid' },
+    ],
+  },
+  {
+    id: '2026-11-11t',
+    items: [
+      { key: 'reviewScreen', icon: 'git-compare' },
+      { key: 'chatWork', icon: 'git-branch' },
+      { key: 'homePane', icon: 'layers' },
+      { key: 'noWaitMachine', icon: 'server' },
+      { key: 'favoritesStill', icon: 'pin' },
+    ],
+  },
+  {
+    id: '2026-11-11s',
+    items: [
+      { key: 'noteCard', icon: 'square-dashed-mouse-pointer' },
+      { key: 'modePill', icon: 'pencil' },
+    ],
+  },
+  {
+    id: '2026-11-11',
+    items: [
+      { key: 'modelPicker', icon: 'square-mouse-pointer' },
+      { key: 'idleChatsFree', icon: 'server' },
+      { key: 'kitsPortable', icon: 'layers' },
+    ],
+  },
+  {
+    id: '2026-11-10s',
+    items: [
+      { key: 'resumeAtOnce', icon: 'play' },
+      { key: 'lighterChats', icon: 'history' },
+      { key: 'bigAnswers', icon: 'server' },
+      { key: 'leaveSpace', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-10r',
+    items: [
+      { key: 'deliverySure', icon: 'send' },
+      { key: 'oneStatus', icon: 'message-square-text' },
+      { key: 'docsInSpace', icon: 'shield-check' },
+      { key: 'quietChats', icon: 'server' },
+    ],
+  },
+  {
+    id: '2026-11-10q',
+    items: [
+      { key: 'messagesInOrder', icon: 'message-square' },
+      { key: 'fleetLive', icon: 'layers' },
+      { key: 'lighterMachine', icon: 'history' },
+    ],
+  },
+  {
+    id: '2026-11-10p',
+    items: [
+      { key: 'slidesInstant', icon: 'presentation' },
+      { key: 'kitsEverywhere', icon: 'layers' },
+    ],
+  },
+  {
+    id: '2026-11-10n',
+    items: [
+      { key: 'onePerSwipe', icon: 'layers' },
+      { key: 'closeAll', icon: 'bell' },
+      { key: 'clickOpens', icon: 'square-mouse-pointer' },
+    ],
+  },
+  {
     id: '2026-11-10a',
     items: [{ key: 'stackGlide', icon: 'layers' }],
   },

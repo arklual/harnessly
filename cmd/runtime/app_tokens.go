@@ -177,17 +177,21 @@ func withAppToken(ctx context.Context, tokens *appTokenSource, app, server strin
 // callWithAppToken runs a tool of a server with auth platform or oidc: once with the cached token, and once more with
 // a fresh one when the backend takes the cached one no more.
 func callWithAppToken(ctx context.Context, tokens *appTokenSource, app, server string, decl, srv apps.MCPServer, tool string, args map[string]any) (json.RawMessage, error) {
+	return withAppTokenDo(ctx, tokens, app, server, decl, srv, toolOp(tool, args))
+}
+
+func withAppTokenDo(ctx context.Context, tokens *appTokenSource, app, server string, decl, srv apps.MCPServer, op mcpOp) (json.RawMessage, error) {
 	signed, err := withAppToken(ctx, tokens, app, server, decl, srv, false)
 	if err != nil {
 		return nil, err
 	}
-	out, err := apps.CallTool(ctx, signed, tool, args)
+	out, err := op(ctx, signed)
 	var be *apps.BridgeError
 	if errors.As(err, &be) && be.Code == apps.CodeAuthExpired {
 		if signed, err = withAppToken(ctx, tokens, app, server, decl, srv, true); err != nil {
 			return nil, err
 		}
-		out, err = apps.CallTool(ctx, signed, tool, args)
+		out, err = op(ctx, signed)
 	}
 	return out, err
 }

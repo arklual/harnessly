@@ -190,6 +190,19 @@ func (s Store) UpdateMachineHello(ctx context.Context, m Machine) error {
 	return err
 }
 
+// RekeyMachine gives a machine that registered again its new keys and what it said of itself, under the id it had;
+// false when the machine is removed or switched off.
+func (s Store) RekeyMachine(ctx context.Context, m Machine) (bool, error) {
+	res, err := s.q.Exec(ctx, `UPDATE machines SET hostname = ?, os = ?, arch = ?, unix_user = ?, profile = ?, via = ?, key_pub = ?, enc_pub = ?, agent_version = ?
+		WHERE id = ? AND revoked_at IS NULL AND disabled_at IS NULL`,
+		m.Hostname, m.OS, m.Arch, m.UnixUser, m.Profile, m.Via, m.KeyPub, m.EncPub, m.AgentVersion, m.ID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 func (s Store) UpdateMachineInfo(ctx context.Context, id, info string) error {
 	_, err := s.q.Exec(ctx, `UPDATE machines SET info = ? WHERE id = ?`, info, id)
 	return err
@@ -211,6 +224,27 @@ func (s Store) RevokeMachine(ctx context.Context, id string, at time.Time) (bool
 		return false, nil
 	}
 	return true, s.DeleteMachineSessions(ctx, id)
+}
+
+// RevokeMachinesOf revokes the machines of a space that the person registered: the machine is theirs, and a space they
+// are no longer in sends it nothing and takes nothing from it. It returns the machines it revoked, as they were. Call
+// it in a transaction.
+func (s Store) RevokeMachinesOf(ctx context.Context, spaceID, userID string, at time.Time) ([]Machine, error) {
+	ms, err := s.MachinesByUser(ctx, spaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := ms[:0]
+	for _, m := range ms {
+		ok, err := s.RevokeMachine(ctx, m.ID, at)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			out = append(out, m)
+		}
+	}
+	return out, nil
 }
 
 // RegCode is a one-time machine registration code (only its hash is kept).

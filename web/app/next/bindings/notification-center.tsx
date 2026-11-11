@@ -18,6 +18,8 @@ import { t } from '@/next/i18n';
 import type { Conversation } from '@/next/protocol/v2';
 import { openGates, useGates } from '@/next/stores/conversation';
 import { convsLoadedStore, useConversationList } from '@/next/stores/conversations';
+import { SOURCE, originOf } from '@/next/stores/conversation-merge';
+import { readUpToOf } from '@/next/bindings/read-while-visible';
 import { addHistory, dropHistory, useHistory } from '@/next/stores/notice-history';
 import { NOTICE_KIND } from '@/next/stores/notices';
 import {
@@ -68,6 +70,19 @@ export const logEventOf = (conv: Conversation): Omit<ILogEntry, 'read'> | null =
     at,
   };
 };
+
+/**
+ * What a record may tell the log. A new event is logged only from the machine's own list and what follows it: the list
+ * the browser kept is not what happened. That the chat moved on (read on another tab or device, answered) is taken from
+ * the hub's copy too, so a row goes read with its chat while the machine is still being asked or does not answer.
+ */
+export const logSourceOf = (
+  conv: Conversation,
+  machineListed: boolean,
+): { logs: boolean; reads: boolean } => ({
+  logs: machineListed,
+  reads: machineListed || originOf(conv).src !== SOURCE.cache,
+});
 
 interface IWaitBindingProps {
   conv: Conversation;
@@ -182,11 +197,10 @@ export const useNotificationCenter = ({
     const events: Omit<ILogEntry, 'read'>[] = [];
     const current = new Map<string, string | null>();
     for (const conv of convs) {
-      // The list the browser kept is not what happened: only the machine's own snapshot and what follows it are.
-      if (!shown.has(conv.id) || !convsLoadedStore.has(conv.machineId)) continue;
-      const event = noticeEventOf(conv, true);
-      current.set(conv.id, event?.key ?? null);
-      const logged = logEventOf(conv);
+      if (!shown.has(conv.id)) continue;
+      const fresh = logSourceOf(conv, convsLoadedStore.has(conv.machineId));
+      if (fresh.reads) current.set(conv.id, noticeEventOf(conv, true)?.key ?? null);
+      const logged = fresh.logs ? logEventOf(conv) : null;
       if (logged) events.push(logged);
     }
     syncLog(events, current);
@@ -243,7 +257,9 @@ export const useNotificationCenter = ({
       const chatsToSee = new Set(list.filter((i) => i.unread && i.chatId).map((i) => i.chatId as string));
       for (const id of chatsToSee) {
         const conv = byId.get(id);
-        if (conv) void markSeen(conv.machineId, conv.id, Date.now());
+        // Up to its last turn by the machine's clock: the browser's may be ahead and read the next answer before it comes.
+        const upTo = conv ? readUpToOf(conv) : null;
+        if (conv && upTo !== null) void markSeen(conv.machineId, conv.id, upTo);
       }
     },
     [byId],

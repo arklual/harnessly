@@ -7,6 +7,7 @@
 // A hub or runtime without the gateway's queue answers 404: the page's own outbox (IndexedDB) is then all there is,
 // as before.
 
+import { pageClock } from '@/next/core/clock';
 import { getPage, sendBody, sendPage } from '@/next/core/net/http';
 import { gatewayPath } from '@/next/core/net/machine';
 import { isMachineOff, keepsHistory } from '@/next/stores/central';
@@ -92,13 +93,19 @@ const readList = (v: unknown): ParkedItem[] => {
 /** Machines whose gateway has no queue (a hub, a runtime alone): asked once per page. */
 const noQueue = new Set<MachineId>();
 const parked = new Set<ClientId>();
-const parking = new Set<ClientId>();
+/** The parks on their way, and each machine's last one: a machine's messages are handed over one after another. */
+const parking = new Map<ClientId, Promise<boolean>>();
+const lines = new Map<MachineId, Promise<unknown>>();
+const unparking = new Map<ClientId, Promise<Unparked>>();
+/** Grows when the page forgets what it parked (tests): a retry of before that stops. */
+let epoch = 0;
 
 const parkable = (m: MessageView | undefined): m is MessageView & { conversationId: ConvId } =>
   !!m &&
   !!m.conversationId &&
   m.rev === 0 &&
   m.state.k === 'submitting' &&
+  !m.cancelling &&
   m.attachments.length === 0 &&
   !noQueue.has(m.machineId) &&
   keepsHistory(m.machineId) &&
@@ -106,43 +113,115 @@ const parkable = (m: MessageView | undefined): m is MessageView & { conversation
 
 /**
  * Hands a message to the cluster's queue when its machine is off. The page keeps its own copy and keeps sending it
- * too: the gateway's copy is what outlives this tab and shows on another device.
+ * too: the gateway's copy is what outlives this tab and shows on another device. The cluster keeps a machine's messages
+ * in the order they came to it, so they are handed over one at a time, in the order of the calls.
  */
-export async function parkInCluster(clientId: ClientId): Promise<boolean> {
+export function parkInCluster(clientId: ClientId): Promise<boolean> {
+  const going = parking.get(clientId);
+  if (going) return going;
   const m = messagesStore.get(clientId);
-  if (parked.has(clientId) || parking.has(clientId) || !parkable(m)) return parked.has(clientId);
-  parking.add(clientId);
-  try {
-    const send = sendOf(m);
-    const res = await sendBody(
-      'POST',
-      queuePath(m.machineId, ''),
-      { tabId: send.conversationId, text: send.text, send },
-      readAdded,
-      TIMEOUT_MS,
-    );
-    if ('ok' in res) {
-      parked.add(clientId);
-      return true;
-    }
-    if (res.r === 'failed' && res.code === 'http' && (res.status === 404 || res.status === 405))
-      noQueue.add(m.machineId);
-    return false;
-  } finally {
-    parking.delete(clientId);
-  }
+  if (parked.has(clientId) || !parkable(m)) return Promise.resolve(parked.has(clientId));
+  const before = lines.get(m.machineId) ?? Promise.resolve();
+  const run = before
+    .then(() => park(clientId))
+    .catch(() => false)
+    .finally(() => parking.delete(clientId));
+  parking.set(clientId, run);
+  lines.set(m.machineId, run);
+  return run;
 }
 
-/** The person took the message back: the cluster's copy goes too, unless it is already on its way to the machine. */
-export async function unparkInCluster(m: MessageView): Promise<void> {
-  if (!parked.has(m.clientId)) return;
-  parked.delete(m.clientId);
-  await sendPage(
-    'DELETE',
-    queuePath(m.machineId, `&client=${encodeURIComponent(m.clientId)}`),
-    () => null,
+async function park(clientId: ClientId): Promise<boolean> {
+  // Taken back, or shown by the runtime, while the one before it was handed over: nothing to keep.
+  const m = messagesStore.get(clientId);
+  if (parked.has(clientId) || !parkable(m)) return parked.has(clientId);
+  const send = sendOf(m);
+  const res = await sendBody(
+    'POST',
+    queuePath(m.machineId, ''),
+    { tabId: send.conversationId, text: send.text, send },
+    readAdded,
     TIMEOUT_MS,
   );
+  if ('ok' in res) {
+    parked.add(clientId);
+    return true;
+  }
+  if (res.r === 'failed' && res.code === 'http' && (res.status === 404 || res.status === 405))
+    noQueue.add(m.machineId);
+  return false;
+}
+
+/**
+ * What became of the cluster's copy of a message the person took back: none — the cluster keeps no copy; cancelled —
+ * it waited there and is gone, the cluster will not deliver it; delivered — the cluster gave it to the machine, which
+ * is now the one to cancel it; unknown — the cluster did not say (it cannot be asked, or an older one that only says
+ * «not now»), so the copy may still be there.
+ */
+export type Unparked = 'none' | 'cancelled' | 'delivered' | 'unknown';
+
+/** How long the page waits before it asks the cluster again to drop a copy: 1 s, 2 s … then every 30 s. */
+export const UNPARK_STEPS_MS = [1000, 2000, 4000, 8000, 15000, 30000] as const;
+/** An older cluster answers 409 for a copy it will never drop (delivered, or not there): asked this many times. */
+export const UNPARK_CONFLICTS = 10;
+
+const readRemoved = (v: unknown): Unparked =>
+  (v as { outcome?: unknown } | null)?.outcome === 'delivered' ? 'delivered' : 'cancelled';
+
+/**
+ * The person took the message back: the cluster's copy goes too. A park still on its way is waited for first — its copy
+ * would otherwise outlive the cancel — and the delete is asked again until the cluster answers for it: done (2xx), or
+ * no such copy (404). While the cluster is handing the copy to the machine it answers 409, and is asked again.
+ *
+ * `ask`: the page does not know whether the cluster keeps a copy (the message is not of this page's making), so it
+ * asks all the same.
+ */
+export function unparkInCluster(m: MessageView, ask = false): Promise<Unparked> {
+  const going = unparking.get(m.clientId);
+  if (going) return going;
+  const run = unpark(m, ask)
+    .catch((): Unparked => 'unknown')
+    .finally(() => unparking.delete(m.clientId));
+  unparking.set(m.clientId, run);
+  return run;
+}
+
+async function unpark(m: MessageView, ask: boolean): Promise<Unparked> {
+  const born = epoch;
+  await parking.get(m.clientId);
+  if (!parked.has(m.clientId) && !(ask && !noQueue.has(m.machineId) && keepsHistory(m.machineId)))
+    return 'none';
+  let conflicts = 0;
+  for (let n = 0; ; n += 1) {
+    const res = await sendPage(
+      'DELETE',
+      queuePath(m.machineId, `&client=${encodeURIComponent(m.clientId)}`),
+      readRemoved,
+      TIMEOUT_MS,
+    );
+    if (born !== epoch) return 'unknown';
+    if ('ok' in res) {
+      parked.delete(m.clientId);
+      return res.value;
+    }
+    if (res.r !== 'failed') return 'unknown';
+    if (res.code === 'http') {
+      if (res.status === 404) {
+        parked.delete(m.clientId);
+        return 'none';
+      }
+      if (res.status === 409) {
+        conflicts += 1;
+        if (conflicts >= UNPARK_CONFLICTS) return 'unknown';
+      } else if (res.status < 500 && res.status !== 408 && res.status !== 429) {
+        // No rights, or a request the cluster does not take: the same question gets the same answer.
+        return 'unknown';
+      }
+    }
+    const wait = UNPARK_STEPS_MS[Math.min(n, UNPARK_STEPS_MS.length - 1)];
+    await new Promise<void>((resolve) => pageClock().setTimeout(resolve, wait));
+    if (born !== epoch) return 'unknown';
+  }
 }
 
 /**
@@ -177,7 +256,10 @@ export async function adoptParked(
 
 /** For tests: the page forgets what it parked. */
 export function resetClusterQueue(): void {
+  epoch += 1;
   noQueue.clear();
   parked.clear();
   parking.clear();
+  lines.clear();
+  unparking.clear();
 }

@@ -17,6 +17,7 @@ import { ThemeProvider, useTheme } from '@/platform/theme';
 import { locale } from '@/lib/i18n';
 import { useRouter } from '@/platform/router';
 import { appFetch } from '@/lib/app-path';
+import { loadBootstrap } from '@/lib/boot-start';
 import { appConfig } from '@/platform/config';
 import { auth } from '@/runtime/endpoints';
 import useWorkspaceStore, { type IWorkspaceInitialData } from '@/hooks/use-workspace-store';
@@ -67,38 +68,45 @@ const toHubSignIn = (hubUrl: string): boolean => {
   return true;
 };
 
-/** Signs in when the runtime asks for it, then loads the page's start data (it answers 503 while the core starts). */
+/**
+ * Signs in when the runtime asks for it, then loads the page's start data (it answers 503 while the core starts). A
+ * home machine that is slow to answer does not hold the page: it draws with what the hub knows and takes the start
+ * data when it comes (lib/boot-start.ts).
+ */
 const useBootstrap = (): [TPhase, () => void] => {
   const [phase, setPhase] = useState<TPhase>({ kind: 'checking' });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let alive = true;
-    let retry: number | undefined;
-    const load = async () => {
-      const res = await appFetch('/api/platform/bootstrap').catch(() => null);
-      if (!alive) return;
-      // The hub answers a request without its session with a redirect to its sign-in page.
-      const hubUrl = appConfig().hubUrl;
-      if (hubUrl && (res?.redirected || res?.status === 401) && toHubSignIn(hubUrl)) return;
-      if (res?.status === 401) {
-        const state = await auth.state().catch(() => ({ needsSetup: false, requiresAuth: false }));
-        if (alive)
-          setPhase({ kind: 'signed-out', needsSetup: state.needsSetup, requiresAuth: state.requiresAuth });
-        return;
-      }
-      if (!res || res.status === 503) {
-        retry = window.setTimeout(() => void load(), 1000);
-        return;
-      }
-      const body = res.ok ? ((await res.json()) as TBootstrap) : {};
-      useWorkspaceStore.getState().hydrate(body.initialWorkspace as IWorkspaceInitialData | undefined);
-      useConfigStore.getState().hydrate(body.initialConfig as IConfigInitialData | undefined);
-      if (alive) setPhase({ kind: 'ready', boot: body });
-    };
-    void load();
+    const stop = loadBootstrap((signal) => appFetch('/api/platform/bootstrap', { signal }), {
+      onData: (body, meanwhile) => {
+        if (!meanwhile) {
+          useWorkspaceStore.getState().hydrate(body.initialWorkspace as IWorkspaceInitialData | undefined);
+          useConfigStore.getState().hydrate(body.initialConfig as IConfigInitialData | undefined);
+        }
+        setPhase({ kind: 'ready', boot: body });
+      },
+      onSignedOut: (res) => {
+        // The hub answers a request without its session with a redirect to its sign-in page.
+        const hubUrl = appConfig().hubUrl;
+        if (hubUrl && toHubSignIn(hubUrl)) return;
+        if (res.status !== 401) return;
+        void auth
+          .state()
+          .catch(() => ({ needsSetup: false, requiresAuth: false }))
+          .then((state) => {
+            if (alive)
+              setPhase({
+                kind: 'signed-out',
+                needsSetup: state.needsSetup,
+                requiresAuth: state.requiresAuth,
+              });
+          });
+      },
+    });
     return () => {
       alive = false;
-      window.clearTimeout(retry);
+      stop();
     };
   }, [attempt]);
   return [phase, () => setAttempt((n) => n + 1)];

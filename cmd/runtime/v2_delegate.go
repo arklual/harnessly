@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/ly-solutions/harnessly/internal/journal"
+	"github.com/ly-solutions/harnessly/internal/noticeslot"
 	"net"
 	"net/http"
 	"net/netip"
@@ -138,9 +139,13 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 			place.Cwd = rec.Cwd
 		}
 		browse := browseract.Tools{Hub: v.browser, Chat: id, Why: why}
+		notices := noticeslot.Tools{S: noticeSlot, Chat: id, Why: why}
+		if rec, ok := v.rt.Record(id); ok {
+			notices.Name = rec.Title
+		}
 		// The agent of a chat with apps stays in its wall: a chat it started or wrote to would run outside.
 		if _, walled := v.d.CLI.AgentOf(r); walled {
-			return toolsets{hand, pics, place, browse}
+			return toolsets{hand, pics, place, browse, notices}
 		}
 		// Only a chat that works in a video project carries the video's tools.
 		video := design.VideoTools{L: designAPI(v.d).L}
@@ -151,7 +156,7 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		if rec, ok := v.rt.Record(id); ok {
 			browser.Cwd = rec.Cwd
 		}
-		return toolsets{t, hand, pics, video, place, browser, browse}
+		return toolsets{t, hand, pics, video, design.KitTools{L: video.L}, place, browser, browse, notices}
 	}
 	set := previewOf(v.d)
 	set.agentTools.Store(&tools)

@@ -12,6 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const (
@@ -20,6 +21,10 @@ const (
 	callTimeout      = 15 * time.Second
 	// statusTimeout is what the machine may take to look at its agents: each is probed for up to 25 s, in parallel.
 	statusTimeout = 35 * time.Second
+	// probeValid is how long the answers of a fresh link's probes (preflight.run, agents.status) stand: a link that
+	// comes back inside it, with the same agent, is not probed again. The probes start the machine's CLIs, and a link
+	// that flickers, or a hub that restarts, would otherwise run them on every machine each time.
+	probeValid = 10 * time.Minute
 	// maxInfoPiece bounds one stored report. A report is a few kilobytes; a machine that sends more is not a
 	// well-behaved one, and the database should not hold what it makes up.
 	maxInfoPiece = 256 << 10
@@ -31,7 +36,50 @@ var subscribed = []string{hubproto.EventJob, hubproto.EventLogin, hubproto.Event
 
 // Hooks are what the hub does when an agent connects, reports and goes away. Give them to link.Dialer.
 func (s *Service) Hooks() link.Hooks {
-	return link.Hooks{Connected: s.connected, Event: s.onEvent, Disconnected: s.disconnected, Unlink: s.unlinked}
+	return link.Hooks{Connected: s.connected, Event: s.onEvent, Disconnected: s.disconnected, Unlink: s.unlinked,
+		Bulk: bulkEvent, BulkLost: s.bulkLost}
+}
+
+// bulkEvent: the frames of a machine's chats come in floods (a backfill, a busy chat) and each is a transaction, so
+// they wait apart from the other events and may be dropped when the hub is behind. A dropped frame of live events
+// shows as a gap in the next one of its channel and a dropped page of a walk does not move the chat's cursor; what
+// neither covers (the last frame of a channel, the first of an epoch) is sent again after bulkLost.
+func bulkEvent(name string) bool {
+	return name == hubproto.EventHistoryEvents || name == hubproto.EventHistoryBackfill || name == hubproto.EventReplBatch
+}
+
+// workSink keeps the chats' work a machine's agent sends (hubproto.ChatWork); a history sink may.
+type workSink interface {
+	Work(ctx context.Context, m store.Machine, raw json.RawMessage)
+}
+
+// bulkLost runs after frames of the chats were dropped: the agent is told again where the copy stands.
+func (s *Service) bulkLost(l *link.Link, m store.Machine) {
+	if s.sendsBatches(l) {
+		// The batches past the hole are not stored and are sent again from it when their ack does not come.
+		return
+	}
+	if r, ok := s.history.(interface{ Resync(store.Machine) }); ok && !l.Closed() {
+		s.log.Info("history frames were dropped, telling the agent where the copy stands", "machine", m.ID)
+		r.Resync(m)
+	}
+}
+
+// probed is the mark of the probes of a fresh link: when they were answered (the hub's clock) and by which agent.
+type probed struct {
+	At           int64  `json:"at"`
+	AgentVersion string `json:"agentVersion"`
+}
+
+// probesFresh says whether what is remembered of the machine (m as it was read when the link came up) holds the
+// answers of probes still valid for an agent of this version.
+func probesFresh(m store.Machine, agentVersion string, now time.Time) bool {
+	var in info
+	if json.Unmarshal([]byte(m.Info), &in) != nil || in.Probed == nil || len(in.Preflight) == 0 || len(in.Agents) == 0 {
+		return false
+	}
+	age := now.Sub(time.UnixMilli(in.Probed.At))
+	return in.Probed.AgentVersion == agentVersion && age >= 0 && age < probeValid
 }
 
 func clamp(v string, n int) string {
@@ -128,9 +176,20 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	if s.history != nil && slices.Contains(hello.Features, hubproto.FeatureHistory) {
 		events = append(slices.Clone(events), hubproto.EventHistoryEvents, hubproto.EventHistoryBackfill)
 	}
+	if s.automations != nil {
+		events = append(slices.Clone(events), hubproto.EventAutomationResult)
+	}
+	if s.replHandlers(l, m, hello.Features) != nil {
+		events = append(slices.Clone(events), hubproto.EventReplBatch)
+	}
+	if _, ok := s.history.(workSink); ok && s.history != nil {
+		events = append(slices.Clone(events), hubproto.EventChatWork)
+	}
 	if _, err := s.reg.Do(ctx, m.ID, hubproto.OpLinkSubscribe, map[string]any{"events": events}, callTimeout); err != nil {
 		s.log.Warn("events not subscribed", "machine", m.ID, "error", err)
 	}
+	// Before anything of the kinds is asked for (history.start, env.set, design.access): from here on they come as batches.
+	s.startRepl(ctx, l, m, hello.Features)
 	if s.usage != nil {
 		s.usage.Connected(m.ID, hello.Features)
 	}
@@ -146,11 +205,19 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	if s.history != nil {
 		s.history.Connected(m, hello.Features)
 	}
-	if _, err := s.RunPreflight(ctx, m); err != nil {
-		s.log.Info("first preflight failed", "machine", m.ID, "error", err)
-	}
-	if _, err := s.RefreshAgents(ctx, m); err != nil {
-		s.log.Info("first agents status failed", "machine", m.ID, "error", err)
+	if !probesFresh(m, m.AgentVersion, s.now()) {
+		_, perr := s.RunPreflight(ctx, m)
+		if perr != nil {
+			s.log.Info("first preflight failed", "machine", m.ID, "error", perr)
+		}
+		_, aerr := s.RefreshAgents(ctx, m)
+		if aerr != nil {
+			s.log.Info("first agents status failed", "machine", m.ID, "error", aerr)
+		}
+		if perr == nil && aerr == nil {
+			mark := &probed{At: s.now().UnixMilli(), AgentVersion: m.AgentVersion}
+			s.update(ctx, m, func(in *info) { in.Probed = mark })
+		}
 	}
 	var proxy hubproto.ProxySummary
 	if err := s.reg.DoInto(ctx, m.ID, hubproto.OpProxyGet, nil, &proxy, callTimeout); err == nil {
@@ -182,6 +249,11 @@ func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 	if l.Fence() != 0 && !s.db.S().LinkHeld(ctx, m.ID, l.Owner(), l.Fence(), s.now().UTC()) {
 		return // a stale owner records nothing
 	}
+	s.dispatch(ctx, l, m, ev)
+}
+
+// dispatch hands an event of the agent to the part of the hub that takes it: as it came, or out of its batch.
+func (s *Service) dispatch(ctx context.Context, l *link.Link, m store.Machine, ev link.Event) {
 	switch ev.Name {
 	case hubproto.EventJob:
 		var e struct{ Job hubproto.Job }
@@ -235,7 +307,7 @@ func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 	case hubproto.EventDesign:
 		var e struct{ Design hubproto.DesignEvent }
 		if s.design != nil && json.Unmarshal(ev.Raw, &e) == nil {
-			go s.design.Event(m, e.Design)
+			safego.Go("machines Event", func() { s.design.Event(m, e.Design) })
 		}
 	case hubproto.EventDocPublish, hubproto.EventDocACL, hubproto.EventDocBound, hubproto.EventDocReply:
 		if s.docs != nil {
@@ -252,6 +324,12 @@ func (s *Service) onEvent(l *link.Link, m store.Machine, ev link.Event) {
 	case hubproto.EventHistoryBackfill:
 		if s.history != nil {
 			s.history.Backfill(ctx, m, ev.Raw)
+		}
+	case hubproto.EventReplBatch:
+		s.replBatch(ctx, l, ev)
+	case hubproto.EventChatWork:
+		if w, ok := s.history.(workSink); ok && s.history != nil {
+			w.Work(ctx, m, ev.Raw)
 		}
 	case hubproto.EventUsageAvailable:
 		if s.usage != nil {

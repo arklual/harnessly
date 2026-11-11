@@ -286,6 +286,8 @@ func (p *Package) checkFiles() Problems {
 		add("", "the package weighs %d MB, at most %d MB", total>>20, MaxPackageBytes>>20)
 	}
 
+	p.checkDataFiles(&ps)
+
 	if ag := m.Agent; ag != nil {
 		if ag.Instructions != "" {
 			if info, err := p.stat("agent.instructions", ag.Instructions, &ps); err == nil {
@@ -356,7 +358,7 @@ func (p *Package) checkFiles() Problems {
 				for _, why := range connectionProblems(s) {
 					add(path, "%s", why)
 				}
-			case s.Command == "" && !strings.HasPrefix(s.URL, "https://"):
+			case s.Command == "" && !strings.HasPrefix(s.URL, "https://") && !installAt(s.URL, false):
 				add(path, "a remote server has an https:// url")
 			}
 			for _, why := range authProblems(s) {
@@ -378,7 +380,7 @@ func (p *Package) checkFiles() Problems {
 	}
 
 	for i, v := range m.Views {
-		if v.Entry == "" || strings.HasPrefix(v.Entry, "https://") {
+		if v.Entry == "" || strings.HasPrefix(v.Entry, "https://") || installAt(v.Entry, false) {
 			continue
 		}
 		field := fmt.Sprintf("views[%d].entry", i)

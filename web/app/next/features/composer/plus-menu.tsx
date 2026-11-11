@@ -20,6 +20,7 @@ import Icon from '@/next/ui/icon';
 import Popover from '@/next/ui/popover';
 import Sheet from '@/next/ui/sheet';
 import { usePhone } from '@/next/ui/use-media';
+import { useCoverField } from '@/next/stores/field-cover';
 import { t } from '@/next/i18n';
 
 export type TFileKind = 'photo' | 'file' | 'camera';
@@ -109,6 +110,7 @@ const PlusMenu = ({
 }: IPlusMenuProps) => {
   const phone = usePhone();
   const [open, setOpen] = useState(false);
+  useCoverField(open);
   // The picker shown in the panel in place of the menu; null: the menu.
   const [view, setView] = useState<TAttachKind | null>(null);
   // The list of stashed drafts, shown in the panel in the same place.

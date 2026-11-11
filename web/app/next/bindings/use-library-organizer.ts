@@ -37,8 +37,11 @@ export const useLibraryOrganizer = (
   reload: () => Promise<void>,
   /** The projects that went to the trash leave the cards at once. */
   forget: (ids: string[]) => void,
+  /** The shelves of the hub's copy: shown until the machine gives its own; null on the machine's library. */
+  storeLayout: ILibraryLayout | null = null,
 ): { layout: ILibraryLayout; organizer: ILibraryOrganizer; readLayout: () => Promise<void> } => {
-  const [layout, setLayout] = useState<ILibraryLayout>(NO_LAYOUT);
+  const [machineLayout, setLayout] = useState<ILibraryLayout | null>(null);
+  const layout = machineLayout ?? storeLayout ?? NO_LAYOUT;
   const [trash, setTrash] = useState<ITrashItem[] | null>(null);
   const restored = useLinkRestored(machine);
   const reloadNow = useStableFn(reload);

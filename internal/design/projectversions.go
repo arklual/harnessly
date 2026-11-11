@@ -2,6 +2,7 @@ package design
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -365,4 +366,18 @@ func (l *Library) RestoreProjectVersion(project, rev, who string) (string, error
 		return "", err
 	}
 	return snap, nil
+}
+
+// VersionLink is the address (from the runtime's root) of a project's point of history opened read only, on its first
+// page, as the "Версии" panel opens it; "" for a project with no page.
+func (l *Library) VersionLink(project, rev string) string {
+	a := l.ReadArtifact(project)
+	if a == nil || len(a.Boards) == 0 || rev == "" {
+		return ""
+	}
+	parts := strings.Split(pageFileOf(a.Boards[0].Path), "/")
+	for i, p := range parts {
+		parts[i] = url.PathEscape(p)
+	}
+	return "/a/" + url.PathEscape(project) + "/r/" + url.PathEscape(rev) + "/" + strings.Join(parts, "/")
 }

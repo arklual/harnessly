@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"github.com/ly-solutions/harnessly/internal/apptoken"
 	"github.com/ly-solutions/harnessly/internal/filestore"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
@@ -37,6 +39,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hub/migration"
 	"github.com/ly-solutions/harnessly/internal/hub/mrsource"
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
@@ -45,15 +48,18 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
 	"github.com/ly-solutions/harnessly/internal/hub/relay"
+	"github.com/ly-solutions/harnessly/internal/hub/repl"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/sshinstall"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/storehub"
 	"github.com/ly-solutions/harnessly/internal/hub/switches"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/secrets"
 	"github.com/ly-solutions/harnessly/internal/secrets/vaultkv"
 	"github.com/ly-solutions/harnessly/internal/sites"
@@ -106,6 +112,12 @@ type Options struct {
 // Hub is the assembled hub.
 type Hub struct {
 	Handler http.Handler
+	// Internal serves what the hub's replicas say to one another (HUB_REPLICAS); nil without them. It gets a listener
+	// of its own (HUB_REPLICA_LISTEN) and is never mounted on Handler.
+	Internal http.Handler
+	// Metrics serves the hub's numbers at /metrics in the Prometheus text format, unauthenticated. It gets a listener
+	// of its own (HUB_METRICS_LISTEN) and is never mounted on Handler.
+	Metrics http.Handler
 
 	Auth      *auth.Service
 	Spaces    *spaces.Service
@@ -122,6 +134,8 @@ type Hub struct {
 	Ingest *ingest.Service
 	// History keeps the people's chats (HUB_HISTORY); nil when it is off.
 	History *history.Service
+	// historySweep removes the copies of chats deleted on their machines after their term; nil: nothing is removed.
+	historySweep *history.Sweeper
 	// Limits sends the machines their limit lists; nil while HUB_LIMITS_ENFORCE=off.
 	Limits *limits.Pusher
 	// EnvPush sends the machines their environment lists; nil without a feature on.
@@ -143,7 +157,9 @@ type Hub struct {
 	Events   *events.Broker
 	// OrgEvents is the bus of the organizations' live stream (GET /api/orgs/{org}/events).
 	OrgEvents *events.MemoryBus
-	Tickets   *ticket.Store
+	// Fleet is the bus of the workspace page's live channel (GET /api/v2/machines/events).
+	Fleet   *events.FleetBus
+	Tickets *ticket.Store
 	// Sites is the published-sites module; nil when HARNESSLY_SITES is off.
 	Sites *sites.Service
 	// Ext is the registry of the extension adapters (docs/hub/extensions.md); nil unless HUB_EXTENSIONS=on.
@@ -162,6 +178,11 @@ type Hub struct {
 	db      *store.DB
 	log     *slog.Logger
 	limiter *ratelimit.Limiter
+
+	// relay passes this replica's events to the other replicas' streams; nil for a single process.
+	relay *events.Relay
+	// draining is set once the hub is being stopped: it answers that it is not ready while it still serves.
+	draining atomic.Bool
 }
 
 // AppsView serves the apps from the store (appsview.Hub): guest links, and a space's apps to its members with every
@@ -191,22 +212,52 @@ func New(o Options) (*Hub, error) {
 		return nil, err
 	}
 
-	h := &Hub{cfg: cfg, db: db, log: log, limiter: o.Limiter, Registry: link.NewRegistry(), Events: events.NewBroker(), Tickets: ticket.New(o.Now)}
+	if cfg.TunnelMemory > 0 {
+		link.SetTunnelMemory(cfg.TunnelMemory)
+	}
+	h := &Hub{cfg: cfg, db: db, log: log, limiter: o.Limiter, Registry: link.NewRegistry(), Events: events.NewBroker(), Tickets: ticket.NewShared(db, o.Now)}
 	if cfg.Replicas {
 		id := cfg.ReplicaID
 		if id == "" {
 			id = link.NewID()
 		}
-		h.Registry.SetCluster(&link.Cluster{DB: db, ID: id, Addr: cfg.ReplicaAddr, Secret: cfg.ReplicaSecret, Log: log})
+		c := &link.Cluster{DB: db, ID: id, Addr: cfg.ReplicaAddr, Secret: cfg.ReplicaSecret, Log: log}
+		h.Registry.SetCluster(c)
+		h.Internal = recoverer(log, c.Handler())
 	}
 	h.Auth, err = auth.New(auth.Deps{Config: cfg, DB: db, Mailer: o.Mailer, Limiter: o.Limiter, Log: log, Now: o.Now, HTTPClient: o.HTTPClient, Endpoints: o.Endpoints})
 	if err != nil {
 		return nil, err
 	}
 	var px *proxy.Service
+	orgBus := events.NewMemoryBus(o.Now)
+	h.OrgEvents = orgBus
+	h.Fleet = events.NewFleetBus()
+	if c := h.Registry.Cluster(); c != nil {
+		// What one replica tells its event streams reaches the streams open on the others.
+		if db.CanListen() {
+			h.relay = events.NewRelay(c.ID, db, h.Events, h.Fleet, orgBus, log)
+		} else {
+			log.Warn("HUB_REPLICAS=on without a database connection that can LISTEN (a pooler in transaction mode needs HUB_DB_MIGRATE_URL): a person's event stream hears only the replica it is open on")
+		}
+	}
+	// The workspace page follows the machines of the spaces its person may see: every event of a machine in a space
+	// tells the pages that watch the space to read their list again.
+	h.Events.SetTap(func(spaceID string, e events.Event) {
+		if e.Name == "machine" || e.Name == "machineRemoved" {
+			h.Fleet.TouchSpace(spaceID)
+		}
+	})
 	h.Spaces = spaces.New(spaces.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Mailer: o.Mailer, Events: h.Events, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnMemberGone: func(spaceID, userID string) { px.Kick(spaceID, userID) },
+		OnMachineGone: func(m store.Machine) {
+			if h.Machines != nil {
+				h.Machines.Revoked(m)
+			}
+		},
+		OrgEvents: h.OrgEvents,
+		OnPeople:  h.Fleet.TouchUser,
 	})
 	var budgetSink machines.BudgetSink
 	limitsChanged := func() {}
@@ -237,8 +288,7 @@ func New(o Options) (*Hub, error) {
 	if h.appTokens != nil && o.Now != nil {
 		h.appTokens.signer.SetClock(o.Now)
 	}
-	h.OrgEvents = events.NewMemoryBus(o.Now)
-	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents,
+	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents, PeopleChanged: h.Fleet.TouchUser,
 		EnvChanged: func() {
 			if h.EnvPush != nil {
 				h.EnvPush.Kick()
@@ -251,7 +301,8 @@ func New(o Options) (*Hub, error) {
 	if envFeatures == nil {
 		envFeatures = anyGate{env.StaticFeatures(cfg.EnvFeatures), h.Features}
 	}
-	h.Env = env.New(env.Deps{DB: db, Gate: h.Orgs.Gate, Features: envFeatures, Recommended: cfg.EnvRecommended, Publisher: orgEvents{db: db, broker: h.Events}, Reg: h.Registry, Log: log, Now: o.Now,
+	installValues := env.InstallValues(cfg.BoardsPublicURL, cfg.ArtifactsPublicURL)
+	h.Env = env.New(env.Deps{DB: db, Gate: h.Orgs.Gate, Features: envFeatures, Recommended: cfg.EnvRecommended, Install: installValues, Publisher: orgEvents{db: db, broker: h.Events}, Reg: h.Registry, Log: log, Now: o.Now,
 		Changed: func() {
 			if h.EnvPush != nil {
 				h.EnvPush.Kick()
@@ -271,7 +322,7 @@ func New(o Options) (*Hub, error) {
 		}
 		// Calls that came before their model had a price get it now; in the background, so a long backlog does not hold
 		// the start.
-		go func() {
+		safego.Go("price stored calls", func() {
 			pctx, pcancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer pcancel()
 			if n, err := usage.PriceUnpriced(pctx, db.S()); err != nil {
@@ -279,14 +330,14 @@ func New(o Options) (*Hub, error) {
 			} else if n > 0 {
 				log.Info("stored calls priced", "calls", n)
 			}
-		}()
+		})
 		h.Ingest = ingest.New(ingest.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
 		usageSink = h.Ingest
 	}
 	var envSink machines.EnvSink
 	// An organization may switch the environment on at any time, so the pusher is always there; it pushes nothing to the
 	// machines of an organization whose feature is off.
-	h.EnvPush = env.NewPusher(env.PushDeps{DB: db, Reg: h.Registry, Features: envFeatures, Recommended: cfg.EnvRecommended, Publisher: orgEvents{db: db, broker: h.Events}, Log: log, Now: o.Now})
+	h.EnvPush = env.NewPusher(env.PushDeps{DB: db, Reg: h.Registry, Features: envFeatures, Recommended: cfg.EnvRecommended, Install: installValues, Publisher: orgEvents{db: db, broker: h.Events}, Log: log, Now: o.Now})
 	h.Env.UsePusher(h.EnvPush)
 	envSink = h.EnvPush
 	machineFeatures := o.Features
@@ -318,6 +369,12 @@ func New(o Options) (*Hub, error) {
 		log.Warn("design access: no hub key, guest link addresses are not kept", "error", err)
 		linkKey = nil
 	}
+	// The key the preview slot hosts sign their cookies with; none without the hub key, and then they stay shut.
+	var slotKey []byte
+	if linkKey != nil {
+		sum := sha256.Sum256(append([]byte("harnessly-hub/preview-slot/v1\x00"), linkKey...))
+		slotKey = sum[:]
+	}
 	var notice designaccess.Notice
 	if n, ok := o.Mailer.(mail.Noticer); ok {
 		notice = func(ctx context.Context, to, subject, body, link string) error {
@@ -328,9 +385,9 @@ func New(o Options) (*Hub, error) {
 	h.Design = designaccess.New(designaccess.Deps{
 		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL,
 		PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
-		LinkKey: linkKey, Notice: notice, Shared: !cfg.Store.Off,
+		LinkKey: linkKey, Notice: notice, Shared: !cfg.Store.Off, Kits: kitAccess(cfg, db, o),
 	})
-	h.Efficiency = &efficiency.Service{DB: db, Gate: h.Orgs.Gate, Features: h.Features, Now: o.Now}
+	h.Efficiency = &efficiency.Service{DB: db, OrgGate: h.Orgs.OrgGate, Features: h.Features, Switches: h.Switches, Now: o.Now}
 	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Notice: func(ctx context.Context, to, subject, body, link string) error {
 		if n, ok := o.Mailer.(mail.Noticer); ok {
 			_, err := n.SendNotice(ctx, to, subject, body, link)
@@ -343,18 +400,36 @@ func New(o Options) (*Hub, error) {
 	if cfg.History {
 		h.History = history.New(history.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
 		historySink = h.History
+		if cfg.HistoryDeletedKeep > 0 {
+			h.historySweep = history.NewSweeper(history.SweepDeps{DB: db, Log: log, Now: o.Now, Keep: cfg.HistoryDeletedKeep})
+		}
 	}
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
 		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Docs: h.Docs, Automations: h.Automations,
-		History: historySink,
+		History: historySink, Switches: h.Switches,
 	})
 	h.Analytics.UseMachines(h.Machines)
 	h.Analytics.UseEvents(h.OrgEvents)
 	h.Analytics.UseFeatures(h.Features)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
-	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features, Workspace: o.Workspace, History: cfg.History, VoiceTakes: cfg.VoiceTakes})
+	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: h.Design, Features: h.Features, Workspace: o.Workspace, History: cfg.History, VoiceTakes: cfg.VoiceTakes, Fleet: h.Fleet, Switches: h.Switches, SlotKey: slotKey})
+	// A person whose sessions were all ended at once holds nothing open: neither the live streams of their spaces nor
+	// what they had open on the machines.
+	h.Auth.OnSessionsEnded(func(userID string) {
+		spaces, err := db.S().SpacesByUser(context.Background(), userID)
+		if err != nil {
+			log.Warn("open streams not ended", "user", userID, "error", err)
+			return
+		}
+		for _, sp := range spaces {
+			h.Events.Kick(sp.ID, userID)
+			px.Kick(sp.ID, userID)
+		}
+	})
+	// The workspace's documents are the hub's own: no machine has to be up to open one.
+	px.UseDocs(h.Docs.Handler(), h.Docs.Prefix())
 	h.Proxy = px
 	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
 	if cfg.SSH {
@@ -424,11 +499,16 @@ func New(o Options) (*Hub, error) {
 		})
 	}
 
+	if u, ok := page.(*ui); ok && h.extUIOn() {
+		u.frames = h.Ext.FrameOrigins()
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", h.healthz)
 	mux.HandleFunc("GET /readyz", h.readyz)
 	mux.Handle("GET /api/config", httpx.Handler(h.config))
 	mux.Handle("GET /api/capabilities", httpx.Handler(h.capabilities))
+	mux.Handle("GET /api/ext/ui", httpx.Handler(h.extUI))
 	h.Auth.Mount(mux)
 	h.Spaces.Mount(mux)
 	h.Orgs.Mount(mux)
@@ -469,13 +549,13 @@ func New(o Options) (*Hub, error) {
 		h.Store.Mount(mux)
 		h.Migration.Mount(mux)
 	}
-	if c := h.Registry.Cluster(); c != nil {
-		mux.Handle("/internal/replica/v1/", c.Handler())
-	}
+	// Nothing under /internal/ is for the outside: the replicas' hop has a listener of its own (Internal).
+	mux.Handle("/internal/", http.NotFoundHandler())
 	mux.Handle("GET /agent/v1", h.Dialer)
 	mux.Handle("POST "+hubproto.SecretsPath, httpx.Handler(h.agentSecrets))
 	mux.Handle("POST "+hubproto.AppTokenPath, httpx.Handler(h.agentAppToken))
 	mux.HandleFunc("GET "+apptoken.JWKSPath, h.jwks)
+	mux.HandleFunc("GET "+apptoken.DiscoveryPath, h.discovery)
 	mux.HandleFunc("DELETE /agent/v1", h.Dialer.ServeUnlink)
 	// Messages between agents of different machines (docs/hub/peers.md): off unless HUB_PEERS=on, and then the paths
 	// fall through to the 404 below, which the agent reads as "this hub does not carry them".
@@ -492,7 +572,7 @@ func New(o Options) (*Hub, error) {
 	if appsView != nil {
 		mux.Handle("/apps/guest/", appsView)                   // apps.GuestPrefix
 		mux.HandleFunc("/apps/space/", h.appsMember(appsView)) // apps.MemberPrefix
-		h.Spaces.Sub().Handle("GET /api/spaces/{spaceId}/apps", h.Auth.Require(h.spaceApps(appsView)))
+		h.Spaces.Sub().Handle("GET /api/spaces/{spaceId}/apps", tenant.Guard{Auth: h.Auth, Spaces: h.Spaces}.Space(tenant.Member, h.spaceApps(appsView)))
 	}
 	mux.Handle("/api/", notFound)
 	mux.Handle("/agent/", notFound)
@@ -507,6 +587,7 @@ func New(o Options) (*Hub, error) {
 	}
 	isGuestHost := func(host string) bool { return guestHost != "" && strings.EqualFold(host, guestHost) }
 	shares := h.Design.Public()
+	legacyDocs := docs.LegacyRedirect(cfg.PublicURL)
 	routed := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case isGuestHost(r.Host):
@@ -528,6 +609,12 @@ func New(o Options) (*Hub, error) {
 			// A machine's preview by path reloaded past its slot's prefix (its path is the target's, off /m/): the pane
 			// opens it again. A frame of a machine's own page from elsewhere stays refused below.
 			proxy.ServeReload(w, r)
+		case h.Proxy.IsSlotHost(r.Host):
+			// A preview slot runs on an origin of its own: its page and nothing of the hub, let in by its own cookie.
+			h.Proxy.ServeSlotHost(w, r)
+		case cfg.IsDocsLegacyHost(r.Host):
+			// The old document addresses: a redirect to the document's page, which decides who may read it.
+			legacyDocs.ServeHTTP(w, r)
 		case cfg.MachineIDFromHost(r.Host) != "":
 			// A machine's own origin runs the machine and nothing of the hub: no API, no page, no sign-in.
 			h.Proxy.ServeHTTP(w, r)
@@ -539,7 +626,7 @@ func New(o Options) (*Hub, error) {
 	})
 	secured := securityHeaders(cfg.Secure, routed)
 	guarded := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) || isGuestHost(r.Host) {
+		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) || isGuestHost(r.Host) || h.Proxy.IsSlotHost(r.Host) {
 			// A published page sets its own headers; the hub's (frame ban, referrer policy) are for the hub's pages.
 			routed.ServeHTTP(w, r)
 			return
@@ -547,7 +634,80 @@ func New(o Options) (*Hub, error) {
 		secured.ServeHTTP(w, r)
 	})
 	h.Handler = underBase(cfg.BasePath, recoverer(log, accessLog(log, h.Auth.ClientIP, guarded)))
+	h.Metrics = recoverer(log, metrics.Handler(h.collectMetrics))
 	return h, nil
+}
+
+// collectMetrics writes the gauges read from the hub's state at the moment of a scrape.
+func (h *Hub) collectMetrics(w *metrics.Writer) {
+	st := h.Registry.Stats()
+	w.Gauge("links", "Agent links this hub process holds.", float64(st.Links))
+	w.Gauge("tunnels_open", "Tunnels to machines open over the links.", float64(st.Tunnels))
+	w.Gauge("machine_calls_pending", "Requests to agents waiting for an answer.", float64(st.Calls))
+	tm := link.TunnelMemory()
+	w.Gauge("tunnel_memory_bytes", "Bytes of machines' answers the tunnels hold or have promised to take, for readers that have not read them yet.", float64(tm.Used))
+	w.Gauge("tunnel_memory_limit_bytes", "The most the tunnels may hold together (HUB_TUNNEL_MEMORY_MB).", float64(tm.Limit))
+	w.Counter("tunnels_refused_total", "Tunnels not opened because the memory for tunnels was full.", float64(tm.Refused))
+	w.Counter("tunnels_cut_total", "Tunnels ended because their reader fell too far behind or the machine sent past its window.", float64(tm.Cut))
+	const queueHelp = "Events of machines read and not handled yet, by queue (bulk: frames of the chats' history)."
+	w.Gauge("link_event_queue_length", queueHelp, float64(st.Events), "queue", "events")
+	w.Gauge("link_event_queue_length", queueHelp, float64(st.Bulk), "queue", "bulk")
+	const oldestHelp = "Age of the oldest event of machines read and not handled yet, by queue, in seconds."
+	w.Gauge("link_event_queue_oldest_seconds", oldestHelp, st.OldestEvent.Seconds(), "queue", "events")
+	w.Gauge("link_event_queue_oldest_seconds", oldestHelp, st.OldestBulk.Seconds(), "queue", "bulk")
+	// The frames of the chats' history are the bulk queue: its oldest frame is how far the hub's copy is behind what
+	// it was sent.
+	w.Gauge("history_lag_seconds", "Age of the oldest history frame the hub has read and not stored yet, in seconds.", st.OldestBulk.Seconds())
+	var usageLag time.Duration
+	var usageWaiting int
+	if h.Ingest != nil {
+		usageLag, usageWaiting = h.Ingest.Lag()
+	}
+	w.Gauge("usage_lag_seconds", "Longest wait of a machine's spend the hub was told of and has not stored yet, in seconds.", usageLag.Seconds())
+	w.Gauge("usage_machines_waiting", "Machines whose spend the hub was told of and has not stored yet.", float64(usageWaiting))
+	// One measure of how far the hub's copy of each kind of a machine's data is behind: the batches' own, the old
+	// history frames' queue and the spend's pull.
+	if h.Machines != nil {
+		h.Machines.Repl().Write(w, time.Now(), repl.Measured(), map[string]time.Duration{
+			"usage": usageLag, hubproto.ReplHistoryEvents: st.OldestBulk, hubproto.ReplHistoryBackfill: st.OldestBulk})
+	}
+	// The hub's own queues, read from the database at the scrape: how much waits and for how long.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	now := time.Now()
+	queue := func(name, rowsHelp, ageHelp string, read func(context.Context) (store.QueueStat, error)) {
+		st, err := read(ctx)
+		if err != nil {
+			return
+		}
+		var age float64
+		if st.OldestMs > 0 {
+			age = max(0, now.Sub(time.UnixMilli(st.OldestMs)).Seconds())
+		}
+		w.Gauge(name+"_rows", rowsHelp, float64(st.Rows))
+		w.Gauge(name+"_oldest_seconds", ageHelp, age)
+	}
+	q := h.db.S()
+	queue("usage_quarantine", "Records of machines' spend set aside because the hub could not read or store them.",
+		"Age of the oldest record of spend set aside, in seconds.", q.UsageQuarantineStat)
+	queue("offline_prompts_waiting", "Messages written to machines that were off and not handed over yet.",
+		"Age of the oldest message that waits for its machine, in seconds.", q.OfflinePromptsStat)
+	queue("automation_runs_queued", "Automation runs that wait to be started on a machine.",
+		"Age of the oldest automation run that waits to be started, in seconds.", q.AutomationRunsStat)
+	w.Counter("background_panics_total", "Panics of background work held since the hub started.", float64(safego.Panics()))
+	services := h.Docs.Services()
+	names := make([]string, 0, len(services))
+	for name := range services {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		up := 0.0
+		if services[name].Up {
+			up = 1
+		}
+		w.Gauge("app_service_up", "Whether the documents or boards service answered its last /readyz (1) or not (0).", up, "service", name)
+	}
 }
 
 func (h *Hub) healthz(w http.ResponseWriter, r *http.Request) {
@@ -555,6 +715,10 @@ func (h *Hub) healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) readyz(w http.ResponseWriter, r *http.Request) {
+	if h.draining.Load() {
+		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "draining": true})
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 	if err := h.db.Ping(ctx); err != nil {
@@ -567,28 +731,57 @@ func (h *Hub) readyz(w http.ResponseWriter, r *http.Request) {
 // Run does the hub's background work until ctx ends: the local machine's registration code, and the sweeping of what
 // expired (sessions, challenges, tickets, remembered nonces).
 func (h *Hub) Run(ctx context.Context) {
-	go h.Machines.RunLocalCode(ctx)
+	safego.Go("local machine code", func() { h.Machines.RunLocalCode(ctx) })
 	if h.Machines.Enabled() {
-		go h.runMachineOps(ctx)
+		safego.Go("machine operations", func() { h.runMachineOps(ctx) })
 	}
-	go h.Analytics.RunLive(ctx, h.OrgEvents.Active)
-	go h.Design.Run(ctx)
-	go h.Proxy.RunOutbox(ctx) // messages written to a machine that was off, handed over once it is back
-	go h.Docs.Run(ctx)        // comments not yet handed to their conversations
-	go h.Automations.Run(ctx) // queued automation runs, started on their owners' machines (HUB_AUTOMATIONS)
+	if h.relay != nil {
+		safego.Go("events relay", func() { h.relay.Run(ctx) })
+	}
+	safego.Go("live analytics", func() { h.Analytics.RunLive(ctx, h.OrgEvents.Active) })
+	safego.Go("design", func() { h.Design.Run(ctx) })
+	// messages written to a machine that was off, handed over once it is back
+	safego.Go("outbox", func() { h.Proxy.RunOutbox(ctx) })
+	// new chats started while no machine answered, made once their machine is back
+	safego.Go("outbox chats", func() { h.Proxy.RunOutboxChats(ctx) })
+	// comments not yet handed to their conversations
+	safego.Go("docs", func() { h.Docs.Run(ctx) })
+	if h.historySweep != nil {
+		// the copies of chats deleted on their machines, removed after their term (HUB_HISTORY_DELETED_DAYS)
+		safego.Go("history sweep", func() { h.historySweep.Run(ctx) })
+	}
+	// queued automation runs, started on their owners' machines (HUB_AUTOMATIONS)
+	safego.Go("automations", func() { h.Automations.Run(ctx) })
 	if h.Ext != nil {
-		go h.Ext.Run(ctx, ext.CheckEvery)
+		safego.Go("extensions", func() { h.Ext.Run(ctx, ext.CheckEvery) })
 	}
 	if h.Sites != nil {
-		go h.Sites.Run(ctx)
+		safego.Go("sites", func() { h.Sites.Run(ctx) })
+	}
+	if raw := h.cfg.Switches; raw != "" {
+		if rows, err := switches.ParseSeeds(raw); err != nil {
+			h.log.Error("switches from HUB_SWITCHES", "err", err)
+		} else if n, err := h.Switches.Apply(ctx, rows); err != nil {
+			h.log.Error("switches from HUB_SWITCHES", "err", err)
+		} else {
+			h.log.Info("switches from HUB_SWITCHES", "stored", n)
+		}
+	}
+	if raw := h.cfg.EfficiencyMarkers; raw != "" {
+		if n, err := efficiency.ImportMarkers(ctx, h.db.S(), raw, time.Now()); err != nil {
+			h.log.Error("efficiency markers", "err", err)
+		} else {
+			h.log.Info("efficiency markers", "stored", n)
+		}
 	}
 	if c := h.efficiencyCollector(); c != nil {
-		go c.Run(ctx)
+		safego.Go("efficiency collector", func() { c.Run(ctx) })
 	}
 	if p := mrsource.New(h.cfg.MRSourceURL, h.cfg.MRSourceGroups, h.cfg.MRSourceToken, h.db.S(), h.log); p != nil {
-		go p.Run(ctx)
+		safego.Go("merge request source", func() { p.Run(ctx) })
 	}
-	go func() { _, _ = h.Dist.Manifest() }() // warm the sums of the binaries before the first machine asks
+	// warm the sums of the binaries before the first machine asks
+	safego.Go("dist manifest", func() { _, _ = h.Dist.Manifest() })
 	tick := time.NewTicker(10 * time.Minute)
 	defer tick.Stop()
 	for {
@@ -597,6 +790,8 @@ func (h *Hub) Run(ctx context.Context) {
 		}
 		h.Tickets.Sweep()
 		h.Dialer.Sweep()
+		// uploads in parts nobody finished (the store throttles this to once an hour)
+		h.Store.SweepUploads(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -640,11 +835,28 @@ func newProvider(cfg *config.Config) (provider.Provider, error) {
 	return p, nil
 }
 
+// BeginDrain takes the hub out of rotation without stopping it: /readyz answers 503 (and /healthz stays 200, so the
+// process is not restarted), and a machine that dials is turned away to dial again. Requests and the links already
+// taken go on.
+func (h *Hub) BeginDrain() {
+	h.draining.Store(true)
+	if h.Dialer != nil {
+		h.Dialer.Refuse()
+	}
+}
+
+// DrainLinks asks the machines linked to this process to dial again, one at a time over window, and returns how many
+// it asked.
+func (h *Hub) DrainLinks(ctx context.Context, window time.Duration) int {
+	return h.Registry.Drain(ctx, window)
+}
+
 // Shutdown ends the open event streams, agent links and SSH installs, which would otherwise hold the server from stopping.
 func (h *Hub) Shutdown() {
 	defer h.Store.Close()
 	h.Events.Close()
 	h.OrgEvents.Close()
+	h.Fleet.Close()
 	// Before the services the links' routines call (usage, environment): the dialer ends the links and waits for them.
 	if h.Dialer != nil {
 		h.Dialer.Close()

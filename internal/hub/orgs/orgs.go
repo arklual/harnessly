@@ -22,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 const (
@@ -49,6 +50,8 @@ type Deps struct {
 	Events events.OrgBus
 	// EnvChanged runs after a setting the machines' environment lists carry changed (the rule for apps); nil: nothing.
 	EnvChanged func()
+	// PeopleChanged runs after a person's team or role changed: what they may see is different; nil: nothing.
+	PeopleChanged func(userID string)
 }
 
 // Service is the organizations side of the hub.
@@ -62,6 +65,7 @@ type Service struct {
 
 	onLimits func()
 	onEnv    func()
+	onPeople func(userID string)
 	rates    *rates.Book
 	features *features.Store
 	bus      events.OrgBus
@@ -69,7 +73,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, onEnv: d.EnvChanged, rates: d.Rates, features: d.Features, bus: d.Events}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, onEnv: d.EnvChanged, onPeople: d.PeopleChanged, rates: d.Rates, features: d.Features, bus: d.Events}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -85,31 +89,46 @@ func New(d Deps) *Service {
 // Handler is an endpoint of the organizations: it runs for a signed-in person the flag lets in.
 type Handler func(w http.ResponseWriter, r *http.Request, p *auth.Principal) error
 
-// Gate wraps an endpoint in the session check and HUB_ORGS: off or (shadow and not an instance administrator) is 404.
+// Gate wraps an endpoint in the session check and HUB_ORGS: off is 404.
 func (s *Service) Gate(h Handler) httpx.Handler {
 	return s.auth.Require(func(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-		switch s.cfg.Orgs {
-		case config.OrgsOn:
-		case config.OrgsShadow:
-			if !p.Admin {
-				return httpx.ErrNotFound
-			}
-		default:
+		if s.cfg.Orgs != config.OrgsOn {
 			return httpx.ErrNotFound
 		}
 		return h(w, r, p)
 	})
 }
 
+// OrgGate wraps an endpoint of one organization: the session, HUB_ORGS (off is 404) and the organization of the path,
+// which the handler gets in the tenant context. What the person may do in it the handler decides with the rights module.
+func (s *Service) OrgGate(h tenant.Handler) httpx.Handler {
+	return tenant.Guard{Auth: s.auth, Orgs: Resolver{DB: s.db}, Ready: s.ready}.Org(h)
+}
+
+func (s *Service) ready() error {
+	if s.cfg.Orgs != config.OrgsOn {
+		return httpx.ErrNotFound
+	}
+	return nil
+}
+
+// Resolver is Resolve over the database, for tenant.Guard.
+type Resolver struct{ DB *store.DB }
+
+// Resolve is the organization of ref for the person (see the function Resolve).
+func (r Resolver) Resolve(ctx context.Context, p *auth.Principal, ref string) (store.Org, error) {
+	return Resolve(ctx, r.DB.S(), p, ref)
+}
+
 // Mount registers the endpoints.
 func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs", s.Gate(s.list))
 	mux.Handle("POST /api/orgs", s.Gate(s.create))
-	mux.Handle("GET /api/orgs/{org}", s.Gate(s.get))
-	mux.Handle("PATCH /api/orgs/{org}", s.Gate(s.patch))
-	mux.Handle("POST /api/orgs/{org}/tenants", s.Gate(s.createTenant))
-	mux.Handle("POST /api/orgs/{org}/tenants/move", s.Gate(s.move))
-	mux.Handle("DELETE /api/orgs/{org}/tenants/{spaceId}", s.Gate(s.deleteTenant))
+	mux.Handle("GET /api/orgs/{org}", s.OrgGate(s.get))
+	mux.Handle("PATCH /api/orgs/{org}", s.OrgGate(s.patch))
+	mux.Handle("POST /api/orgs/{org}/tenants", s.OrgGate(s.createTenant))
+	mux.Handle("POST /api/orgs/{org}/tenants/move", s.OrgGate(s.move))
+	mux.Handle("DELETE /api/orgs/{org}/tenants/{spaceId}", s.OrgGate(s.deleteTenant))
 	s.mountTeams(mux)
 	s.mountLimits(mux)
 	s.mountFeatures(mux)
@@ -134,9 +153,6 @@ func Resolve(ctx context.Context, st store.Store, p *auth.Principal, ref string)
 	if err != nil {
 		return store.Org{}, err
 	}
-	if p.Admin {
-		return o, nil
-	}
 	mine, err := st.OrgsForUser(ctx, p.User.ID)
 	if err != nil {
 		return store.Org{}, err
@@ -145,6 +161,13 @@ func Resolve(ctx context.Context, st store.Store, p *auth.Principal, ref string)
 		if m.ID == o.ID {
 			return o, nil
 		}
+	}
+	if p.Admin {
+		// An administrator of the installation with nothing in the organization: the entry is written into its journal.
+		if err := authz.New(st).NoteOperator(ctx, p.User.ID, authz.Scope{Kind: store.ScopeOrg, ID: o.ID}, "operator.open", store.ScopeOrg, o.ID); err != nil {
+			return store.Org{}, err
+		}
+		return o, nil
 	}
 	return store.Org{}, httpx.ErrNotFound
 }
@@ -182,13 +205,7 @@ type spaceRef struct {
 func (s *Service) list(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
 	ctx := r.Context()
 	st := s.db.S()
-	var all []store.Org
-	var err error
-	if p.Admin && s.cfg.Orgs == config.OrgsShadow {
-		all, err = st.AllOrgs(ctx)
-	} else {
-		all, err = st.OrgsForUser(ctx, p.User.ID)
-	}
+	all, err := st.OrgsForUser(ctx, p.User.ID)
 	if err != nil {
 		return err
 	}
@@ -255,6 +272,11 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	ctx := r.Context()
 	if ok, retry := s.lim.Allow("org:"+p.User.ID, 10, time.Hour); !ok {
 		return httpx.RateLimited(ratelimit.RetrySeconds(retry))
+	}
+	if n, err := s.db.S().CountOrgsBy(ctx, p.User.ID); err != nil {
+		return err
+	} else if n >= s.cfg.MaxOrgs() {
+		return httpx.Conflict("org_limit", "У вас уже много организаций")
 	}
 	now := s.now().UTC()
 	var o store.Org
@@ -336,13 +358,11 @@ func (s *Service) createIn(ctx context.Context, st store.Store, p *auth.Principa
 	return nil
 }
 
-func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) get(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	v, err := s.view(ctx, st, p, o)
 	if err != nil {
 		return err
@@ -351,7 +371,8 @@ func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 	return nil
 }
 
-func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct {
 		Name     *string
 		Timezone *string
@@ -364,10 +385,8 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		return err
 	}
 	ctx := r.Context()
-	o, err := Resolve(ctx, s.db.S(), p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
+	var err error
 	if _, err := authz.New(s.db.S()).Can(ctx, Principal(p), authz.Check{Action: authz.Manage, Scope: authz.Scope{Kind: store.ScopeOrg, ID: o.ID}}); err != nil {
 		return err
 	}
@@ -428,7 +447,8 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, p *auth.Principa
 
 // move brings a space into the organization: the mover manages the organization, and owns the space when it has none,
 // or is an admin of the organization it is in (a tenant moves only between organizations one administers both of).
-func (s *Service) move(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) move(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	var req struct{ SpaceID string }
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -438,10 +458,7 @@ func (s *Service) move(w http.ResponseWriter, r *http.Request, p *auth.Principal
 	}
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	az := authz.New(st)
 	pr := Principal(p)
 	if _, err := az.Can(ctx, pr, authz.Check{Action: authz.Manage, Scope: authz.Scope{Kind: store.ScopeOrg, ID: o.ID}}); err != nil {

@@ -29,6 +29,18 @@ describe('the notice of a removed key', () => {
   });
 });
 
+describe('the notice of an agent that is signed out', () => {
+  it('says to sign in at once and opens the page where the sign-in is', async () => {
+    const onOpen = vi.fn();
+    render(<DockBar notice={{ kind: 'signIn', onOpen }} />);
+    expect(screen.getByText('Sign in to an agent to start a chat')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    });
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('the notice of a recording that was not recognized (HRN-674)', () => {
   const base = { kind: 'voice' as const, ms: 159_000, more: 0, waiting: false, onDrop: async () => {} };
 

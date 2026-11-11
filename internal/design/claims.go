@@ -315,6 +315,14 @@ type ClaimResult struct {
 // ClaimBoard takes a board for a chat: its own claim is refreshed (since stays), one held by another live chat is
 // refused with the holder, a stale or unreadable file is cleared away first.
 func (l *Library) ClaimBoard(project, board string, owner ClaimOwner, now int64) (ClaimResult, error) {
+	res, err := l.claimBoard(project, board, owner, now)
+	if err == nil && res.Held == nil {
+		l.bg.claimTaken()
+	}
+	return res, err
+}
+
+func (l *Library) claimBoard(project, board string, owner ClaimOwner, now int64) (ClaimResult, error) {
 	if c := l.center(); c != nil {
 		turn := "working"
 		if strings.HasPrefix(owner.TabID, leaseUIPrefix) {
@@ -520,6 +528,10 @@ var claimReleasing = map[string]bool{"idle": true, "ready-for-review": true, "in
 type SweepResult struct {
 	Released           []Claim
 	Refreshed, Cleared int
+	// Own counts the claims of this runtime's chats that the pass left held.
+	Own int
+	// Offline: the center did not answer, so nothing is known about the claims.
+	Offline bool
 }
 
 // SweepClaims is the owning runtime's pass over the claims: let go of those whose chat ended its turn or was closed,
@@ -541,6 +553,7 @@ func (l *Library) SweepClaims(now int64, runtime string, chat func(tabID string)
 			}
 			continue
 		}
+		res.Own++
 		view, ok := chat(c.Owner.TabID)
 		title := ""
 		if ok {
@@ -577,5 +590,6 @@ func (l *Library) SweepClaims(now int64, runtime string, chat func(tabID string)
 			delete(missing, k)
 		}
 	}
+	res.Own -= len(res.Released)
 	return res
 }

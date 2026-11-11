@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agentstate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/outbox"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/terminalfailure"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -36,6 +38,11 @@ type Runtime struct {
 
 	mu     sync.Mutex
 	actors map[string]*actor
+	// parked are the conversations at rest whose actors were let go (unload.go): the record each left, which is what
+	// the lists answer with. Asked for by its id, a parked conversation gets an actor again; reviveMu makes that one
+	// actor.
+	parked   map[string]*recView
+	reviveMu sync.Mutex
 	// bySession is the conversation of each tmux session: a hook names its session, not its conversation.
 	bySession map[string]string
 	// projects are the machine's folders made projects.
@@ -86,6 +93,12 @@ type actor struct {
 	// last is the record as the actor left it after its latest turn: what a list answers with when the actor is too
 	// busy to be asked (a read that stalls on a loaded disk), so a sidebar never waits behind one conversation.
 	last atomic.Pointer[recView]
+	// told: the actor took its first message; kept here so a loop that starts again after a panic goes on looking.
+	told bool
+	// used is when the conversation was last asked for by its id (a page, a hook, a message), in unix nanoseconds; the
+	// lists and the sweeps do not count. gone: the actor parked itself in this turn, and its loop ends.
+	used atomic.Int64
+	gone bool
 }
 
 type recView struct {
@@ -114,7 +127,9 @@ func New(d Deps) *Runtime {
 	if d.Log == nil {
 		d.Log = nopLog{}
 	}
-	return &Runtime{d: d, epoch: newID(), actors: map[string]*actor{}, bySession: map[string]string{}, ops: map[string]opRecord{}, drafts: draftBook{},
+	d.epoch = newID()
+	d.startResumes = make(chan struct{}, startResumes)
+	return &Runtime{d: d, epoch: d.epoch, actors: map[string]*actor{}, parked: map[string]*recView{}, bySession: map[string]string{}, ops: map[string]opRecord{}, drafts: draftBook{},
 		inflight: map[string]chan struct{}{}, stop: make(chan struct{}), restartLoads: make(chan struct{}, restartLoads)}
 }
 
@@ -156,6 +171,9 @@ func (r *Runtime) Start(ctx context.Context) error {
 		for _, f := range files {
 			r.restore(f)
 		}
+		if n := s.sweepTemps(time.Now()); n > 0 {
+			r.d.Log.Info("temporary files of unfinished writes removed", "files", n)
+		}
 		ops, err := s.loadOps()
 		errs = append(errs, err)
 		now := r.d.Clock.Now()
@@ -176,14 +194,14 @@ func (r *Runtime) Start(ctx context.Context) error {
 	}
 	if !r.inline {
 		if s := r.d.Store; s != nil {
-			s.Async(func(path string, err error) { r.d.Log.Warn("conversation not saved", "path", path, "err", err) })
+			s.Async(r.saveResult)
 		}
 		r.wg.Add(2)
-		go r.opsSaver()
-		go r.reaper()
+		r.keep("convo ops saver", r.opsSaver)
+		r.keep("convo reaper", r.reaper)
 		if r.d.Index != nil {
 			r.wg.Add(1)
-			go r.indexer()
+			r.keep("convo indexer", r.indexer)
 		}
 	}
 	return errors.Join(errs...)
@@ -191,7 +209,12 @@ func (r *Runtime) Start(ctx context.Context) error {
 
 // Stop ends the actors after each wrote its last state.
 func (r *Runtime) Stop() {
+	// The stop is said before the actors are listed, under the lock an actor parks itself under: none parks (and
+	// closes its own stop) after it is on the list.
 	r.mu.Lock()
+	if !r.inline && !r.stopping() {
+		close(r.stop)
+	}
 	actors := make([]*actor, 0, len(r.actors))
 	for _, a := range r.actors {
 		actors = append(actors, a)
@@ -205,23 +228,36 @@ func (r *Runtime) Stop() {
 		r.saveDrafts()
 		return
 	}
-	select {
-	case <-r.stop:
-	default:
-		close(r.stop)
-	}
 	for _, a := range actors {
 		close(a.stop)
 	}
 	r.wg.Wait()
-	r.saveOps()
-	r.saveDrafts()
-	if r.d.Store != nil {
-		r.d.Store.Close()
+	// The last writes have a term of their own: a file system that hangs must not hold the runtime's stop for good.
+	ctx, cancel := context.WithTimeout(context.Background(), FlushWait)
+	defer cancel()
+	saved := make(chan struct{})
+	safego.Go("convo last writes", func() {
+		defer close(saved)
+		r.saveOps()
+		r.saveDrafts()
+		if r.d.Store != nil {
+			if err := r.d.Store.CloseWithin(ctx); err != nil {
+				r.d.Log.Warn("conversations not all written at the stop", "err", err)
+			}
+		}
+	})
+	select {
+	case <-saved:
+	case <-ctx.Done():
+		r.d.Log.Warn("the stop did not wait for the last writes", "waited", FlushWait.String())
 	}
 }
 
-func (r *Runtime) restore(f convFile) {
+func (r *Runtime) restore(f convFile) { r.wake(f, false) }
+
+// wake gives a written conversation its actor: at a start of the runtime, or (parked) when a conversation whose
+// actor was let go is asked for again.
+func (r *Runtime) wake(f convFile, parked bool) *actor {
 	rec := f.Conv
 	rec.Session, rec.TranscriptPath, rec.AgentSessionID = f.Session, f.TranscriptPath, f.AgentSessionID
 	rec.BgAgents = 0 // the agent's tasks are read again after a start
@@ -243,15 +279,31 @@ func (r *Runtime) restore(f convFile) {
 		p := f.Permissions[i]
 		c.addGate(&gate{p: &p})
 	}
+	atRest := c.wakeAtRest(f.Rest)
+	if s, ok := r.d.Publisher.(SeqTeller); ok && parked {
+		// The runtime did not stop: the conversation's channel goes on from where it is.
+		c.seq = s.Seq(wire.ConvChannel(rec.ID))
+	}
 	a := r.add(c)
 	_ = r.on(a, func(c *conv, now time.Time) { // a fresh mailbox is not full
-		// Every conversation reads its transcript's tail at a start: a few at a time, and each lets go of it after, so
-		// a machine of hundreds of chats does not hold them all at once (10 GB at a start, 3 GB after).
+		if atRest && parked {
+			// The runtime did not stop meanwhile and the transcript is the one the conversation was written over: it
+			// stands as it was parked, and nothing is looked up again.
+			return
+		}
+		if atRest {
+			// A stopped conversation whose transcript did not change reads nothing: it holds no place of the few.
+			c.restarted(now)
+			return
+		}
+		// Any other conversation reads its transcript's tail at a start: a few at a time, and each lets go of it after,
+		// so a machine of hundreds of chats does not hold them all at once (10 GB at a start, 3 GB after).
 		r.restartLoads <- struct{}{}
 		defer func() { <-r.restartLoads }()
 		c.restarted(now)
 		c.fd.Release()
 	})
+	return a
 }
 
 // restarted: the actor's first turn after a start.
@@ -272,10 +324,13 @@ func (c *conv) restarted(now time.Time) {
 		c.input(agentstate.Input{K: agentstate.Restart}, now)
 	}
 	c.cutAtRestart(was, now)
-	c.feedUpdate(c.fd.Load(), false, now) // bounded with the others by r.restartLoads around restarted (HRN-901)
-	for _, m := range c.box.Messages(now) {
-		if m.State.EntryID != nil {
-			c.fd.SetClientID(*m.State.EntryID, m.ClientID)
+	if !c.unread {
+		// A conversation that came back at rest (wakeAtRest) has its feed where it stood, with the client ids it held.
+		c.feedUpdate(c.fd.Load(), false, now) // bounded with the others by r.restartLoads around restarted (HRN-901)
+		for _, m := range c.box.Messages(now) {
+			if m.State.EntryID != nil {
+				c.fd.SetClientID(*m.State.EntryID, m.ClientID)
+			}
 		}
 	}
 	var look *typist.Screen
@@ -293,53 +348,125 @@ func (c *conv) restarted(now time.Time) {
 
 func (r *Runtime) add(c *conv) *actor {
 	a := &actor{c: c, mail: make(chan func(), 64), stop: make(chan struct{})}
+	a.used.Store(r.d.Clock.Now().UnixNano())
 	a.publish()
 	if r.inline {
-		c.spawn = func(work func() any, done func(any)) { r.pending = append(r.pending, job{work, done}) }
+		c.spawn = func(work func() any, done func(any)) {
+			c.jobs++
+			r.pending = append(r.pending, job{work, func(res any) { c.jobs--; done(res) }})
+		}
 	} else {
 		c.spawn = func(work func() any, done func(any)) {
-			go func() {
-				res := work()
+			id := c.rec.ID
+			c.jobs++
+			back := func(res any) { c.jobs--; done(res) }
+			safego.Go("conversation "+id+" work", func() {
+				var res any
+				if p := safego.Try("conversation "+id+" work", func() { res = work() }); p != nil {
+					// The work is lost, not the chat: its end is still told, with nothing read, so what waits on it goes on.
+					r.d.Log.Warn("conversation work panicked", "conv", id, "panic", fmt.Sprint(p.Value), "stack", string(p.Stack))
+					res = nil
+				}
 				select {
-				case a.mail <- func() { done(res) }:
+				case a.mail <- func() { back(res) }:
 				case <-a.stop:
 				}
-			}()
+			})
 		}
 	}
 	r.mu.Lock()
 	r.actors[c.rec.ID] = a
+	delete(r.parked, c.rec.ID)
 	if c.rec.Session != "" {
 		r.bySession[c.rec.Session] = c.rec.ID
 	}
 	r.mu.Unlock()
 	if !r.inline {
 		r.wg.Add(1)
-		go r.loop(a)
+		safego.Go("conversation "+c.rec.ID, func() { r.supervise(a) })
 	}
 	return a
 }
 
+// keep runs one of the runtime's loops, which ends with wg.Done; a loop that panicked starts again after a pause that
+// grows, so one bad turn of it does not end the saving or the sweeping for good.
+func (r *Runtime) keep(name string, loop func()) {
+	safego.Go(name, func() {
+		for pause := time.Second; !safego.Run(name, loop); pause = min(2*pause, time.Minute) {
+			select {
+			case <-r.stop:
+				return
+			case <-time.After(pause):
+			}
+			r.wg.Add(1)
+		}
+	})
+}
+
+// ActorRestartAfter is how long an actor that panicked waits before it runs again; the wait doubles with every panic
+// in a row, up to ActorRestartMax.
+var (
+	ActorRestartAfter = 5 * time.Second
+	ActorRestartMax   = 5 * time.Minute
+)
+
+// supervise runs the actor's loop and holds its panics: a line of a transcript or a screen the code did not expect
+// stops one conversation for a while, never the runtime with every conversation of the profile. The conversation
+// goes unknown, as after a restart of the runtime — the page shows that, and the first look of the actor's next run
+// finds what its agent really does.
+func (r *Runtime) supervise(a *actor) {
+	defer r.wg.Done()
+	c := a.c
+	pause, last := ActorRestartAfter, time.Time{}
+	for {
+		name := "conversation " + c.rec.ID
+		p := safego.Try(name, func() { r.loop(a) })
+		if p == nil {
+			return
+		}
+		if time.Since(last) > 2*ActorRestartMax {
+			pause = ActorRestartAfter // the panics before were long ago: not a row of them
+		}
+		last = time.Now()
+		r.d.Log.Warn("conversation actor panicked; it starts again after a pause", "conv", c.rec.ID, "pause", pause.String(),
+			"panic", fmt.Sprint(p.Value), "stack", string(p.Stack))
+		safego.Run(name, func() {
+			now := r.d.Clock.Now()
+			c.input(agentstate.Input{K: agentstate.Restart}, now)
+			c.flush(now, true)
+			a.publish()
+		})
+		select {
+		case <-r.d.Clock.After(pause):
+		case <-a.stop:
+			safego.Run(name, func() { c.save(r.d.Clock.Now(), true) })
+			return
+		}
+		pause = min(2*pause, ActorRestartMax)
+	}
+}
+
 // loop is one actor: its mail in order, its clock, a look and a read every LookEvery.
 func (r *Runtime) loop(a *actor) {
-	defer r.wg.Done()
 	c := a.c
 	next := r.d.Clock.Now()
 	// The actor looks only after its first message, the one its maker sends: that one reads the transcript as history,
 	// and a look before it would take the history for news (a turn a resumed session left open would be running).
-	told := false
 	looked := next // when the clock last looked
 	spun := false  // the last turn left its clock due: said once in the log, not at every slowed turn
 	for {
 		now := r.d.Clock.Now()
 		wake := c.wake(now)
-		if told && next.Before(wake) {
+		if a.told && next.Before(wake) {
 			wake = next
 		}
 		select {
 		case f := <-a.mail:
 			f()
-			told = true
+			if a.gone {
+				return
+			}
+			a.told = true
 			a.publish()
 			// The message may have changed the pace (a launch or resume makes the agent starting): the next look is
 			// due by the new one, not one the state before set (10 s for a stopped chat).
@@ -348,7 +475,7 @@ func (r *Runtime) loop(a *actor) {
 			}
 		case <-r.d.Clock.After(wake.Sub(now)):
 			now = r.d.Clock.Now()
-			if told && !now.Before(next) {
+			if a.told && !now.Before(next) {
 				c.read(now)
 				c.observe(now)
 				looked, next = now, now.Add(c.lookEvery())
@@ -389,6 +516,7 @@ func (r *Runtime) on(a *actor, f func(c *conv, now time.Time)) error {
 		defer r.mu.Unlock()
 		f(a.c, r.d.Clock.Now())
 		r.drain()
+		a.publish() // what the loop does after every turn
 		return nil
 	}
 	t := time.NewTimer(MailWait)
@@ -421,7 +549,12 @@ func (r *Runtime) drain() {
 
 // call runs f on the conversation's actor and waits for it within ctx.
 func (r *Runtime) call(ctx context.Context, id string, f func(c *conv, now time.Time)) error {
-	a := r.actor(id)
+	return r.callOn(ctx, r.actor(id), f)
+}
+
+// callOn is call on an actor already in hand: what a list or a sweep uses, which must not count as someone asking
+// for the conversation. nil, or an actor that ended meanwhile, is ErrNotFound.
+func (r *Runtime) callOn(ctx context.Context, a *actor, f func(c *conv, now time.Time)) error {
 	if a == nil {
 		return ErrNotFound
 	}
@@ -429,8 +562,17 @@ func (r *Runtime) call(ctx context.Context, id string, f func(c *conv, now time.
 		return r.on(a, f)
 	}
 	done := make(chan struct{})
+	// taken: the actor began the turn (1), or the caller gave the message up before it did (2).
+	var taken atomic.Int32
+	turn := func() {
+		if !taken.CompareAndSwap(0, 1) {
+			return
+		}
+		f(a.c, r.d.Clock.Now())
+		close(done)
+	}
 	select {
-	case a.mail <- func() { f(a.c, r.d.Clock.Now()); close(done) }:
+	case a.mail <- turn:
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-a.stop:
@@ -441,13 +583,73 @@ func (r *Runtime) call(ctx context.Context, id string, f func(c *conv, now time.
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-a.stop:
+		// The actor ends (the runtime stops, or the conversation was parked). A turn it has begun is waited for, as
+		// before; one still in the mail is taken back, so it never runs beside the caller that was told it did not.
+		if taken.CompareAndSwap(0, 2) {
+			return ErrNotFound
+		}
+		<-done
+		return nil
 	}
 }
 
+// actor is the conversation's actor for someone who asks for the conversation by its id: it counts as a use, and a
+// parked conversation gets its actor back. nil for a conversation the runtime does not have.
 func (r *Runtime) actor(id string) *actor {
+	r.mu.Lock()
+	a := r.actors[id]
+	_, parked := r.parked[id]
+	if a != nil {
+		a.used.Store(r.d.Clock.Now().UnixNano())
+	}
+	r.mu.Unlock()
+	if a == nil && parked {
+		return r.revive(id)
+	}
+	return a
+}
+
+// loaded is the conversation's actor when it has one now; it wakes nothing and counts as no use.
+func (r *Runtime) loaded(id string) *actor {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.actors[id]
+}
+
+// view is the record the conversation last left, with or without an actor; nil for one the runtime does not have.
+func (r *Runtime) view(id string) *recView {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if a := r.actors[id]; a != nil {
+		return a.last.Load()
+	}
+	return r.parked[id]
+}
+
+// views are the records of every conversation, the parked ones too, read without asking an actor anything.
+func (r *Runtime) views() []*recView {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]*recView, 0, len(r.actors)+len(r.parked))
+	for _, a := range r.actors {
+		if v := a.last.Load(); v != nil {
+			out = append(out, v)
+		}
+	}
+	for _, v := range r.parked {
+		out = append(out, v)
+	}
+	return out
+}
+
+func (r *Runtime) stopping() bool {
+	select {
+	case <-r.stop:
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *Runtime) all() []*actor {
@@ -503,6 +705,8 @@ type Hook struct {
 	Notification string
 	// Failure is what a stop-failure says went wrong.
 	Failure wire.TurnFailureCode
+	// PromptHash of a prompt-submit names the prompt the agent took, "" when the hook did not say.
+	PromptHash string
 }
 
 // Hook feeds a hook to its conversation: the transcript is read first, so the entry the hook is about is there.
@@ -519,7 +723,13 @@ func (r *Runtime) Hook(id string, h Hook) error {
 			in.K = agentstate.SessionStart
 		case "prompt-submit":
 			in.K = agentstate.PromptSubmit
+			c.promptHash = h.PromptHash
+			defer func() { c.promptHash = "" }()
 		case "stop":
+			if c.inputTurns {
+				// The structured channel tells this conversation's turn ends, each once.
+				return
+			}
 			in = c.stopInput("")
 		case "stop-failure":
 			in.K, in.TurnFailure = agentstate.StopFailure, h.Failure
@@ -550,6 +760,35 @@ func (r *Runtime) Hook(id string, h Hook) error {
 	})
 }
 
+// InputTurnEnded is the end of a turn as the conversation's structured channel tells it: failed says the turn ended on
+// an error, detail what the agent said of it.
+func (r *Runtime) InputTurnEnded(id string, failed bool, detail string) error {
+	a := r.actor(id)
+	if a == nil {
+		return ErrNotFound
+	}
+	return r.on(a, func(c *conv, now time.Time) {
+		if !c.inputTurns {
+			return
+		}
+		c.read(now)
+		in := c.stopInput("")
+		if failed {
+			in = agentstate.Input{K: agentstate.StopFailure, TurnFailure: wire.TurnFailedUnknown, TurnDetail: detail}
+		}
+		c.input(in, now)
+		c.observe(now)
+	})
+}
+
+// InputLost: the conversation's structured channel ended. The turn ends are the hooks' to tell again; the next message
+// tries the channel anew.
+func (r *Runtime) InputLost(id string) {
+	if a := r.loaded(id); a != nil {
+		_ = r.on(a, func(c *conv, _ time.Time) { c.inputTurns = false })
+	}
+}
+
 // LaunchStep, LaunchReady and LaunchFailed are what the launcher reports of a conversation it starts.
 func (r *Runtime) LaunchStep(id string, step wire.LaunchStep) {
 	r.feedInput(id, agentstate.Input{K: agentstate.LaunchStep, Step: step})
@@ -570,7 +809,7 @@ func (r *Runtime) feedInput(id string, in agentstate.Input) {
 }
 
 // Has tells whether the runtime holds a conversation (a deleted one too, until it is purged).
-func (r *Runtime) Has(id string) bool { return r.actor(id) != nil }
+func (r *Runtime) Has(id string) bool { return r.view(id) != nil }
 
 // Busy is how many conversations have an agent at work, from what each actor left after its last turn.
 func (r *Runtime) Busy() int {
@@ -586,11 +825,7 @@ func (r *Runtime) Busy() int {
 // Record is a conversation as its actor last left it, with its tmux session and folder; false for one the runtime does
 // not have or that is deleted.
 func (r *Runtime) Record(id string) (wire.Conversation, bool) {
-	a := r.actor(id)
-	if a == nil {
-		return wire.Conversation{}, false
-	}
-	v := a.last.Load()
+	v := r.view(id)
 	if v == nil || v.deleted {
 		return wire.Conversation{}, false
 	}
@@ -661,10 +896,12 @@ func (r *Runtime) Attach(id, session, transcriptPath, agentSessionID string) err
 // --- persistence ---
 
 func (c *conv) file() convFile {
-	return convFile{Conv: c.rec, Session: c.rec.Session, TranscriptPath: c.rec.TranscriptPath,
+	rec := c.rec
+	rec.NotSavedSince = 0 // says what the disk does now, never what it did before a restart
+	return convFile{Conv: rec, Session: c.rec.Session, TranscriptPath: c.rec.TranscriptPath,
 		AgentSessionID: c.rec.AgentSessionID, HandoffArtifact: c.handoffArtifact,
 		HandoffArtifactClientID: c.handoffArtifactClientID, Outbox: c.box.State(), Questions: c.questions(), Permissions: c.permissions(),
-		DeletedAt: c.deletedAt, Rewinds: c.rewinds, Left: c.left}
+		DeletedAt: c.deletedAt, Rewinds: c.rewinds, Left: c.left, Rest: c.rest()}
 }
 
 // save writes the conversation when it changed, at most every SaveEvery; a conversation deleted longer than
@@ -674,11 +911,53 @@ func (c *conv) save(now time.Time, force bool) {
 	if s == nil || !c.dirty || !force && now.Sub(c.savedAt) < SaveEvery {
 		return
 	}
-	if err := s.saveConv(c.file()); err != nil {
-		c.d.Log.Warn("conversation not saved", "conv", c.rec.ID, "err", err)
+	if !force && now.Before(c.saveRetryAt) {
 		return
 	}
-	c.dirty, c.savedAt = false, now
+	if err := s.saveConv(c.file()); err != nil {
+		// The state stays dirty and is written again after a pause that grows with the failures.
+		c.saveRetryAt = now.Add(retryPause(c.saveFails + 1))
+		c.saveResult(c.saveFails+1, err, now)
+		return
+	}
+	c.dirty, c.savedAt, c.saveRetryAt = false, now, time.Time{}
+	if !s.isAsync() {
+		c.saveResult(0, nil, now)
+	}
+}
+
+// NotSavedAfter is how many writes of a conversation must fail in a row before its record says it is not saved.
+var NotSavedAfter = 3
+
+// saveResult takes how a write of the conversation ended: fails failures in a row with err, or (0, nil) for a write
+// that reached the disk. From NotSavedAfter failures the record says so, and the first good write takes it back.
+func (c *conv) saveResult(fails int, err error, now time.Time) {
+	if fails > 0 {
+		c.d.Log.Warn("conversation not saved", "conv", c.rec.ID, "failsInARow", fails, "err", err)
+	}
+	c.saveFails = fails
+	switch {
+	case fails >= NotSavedAfter && c.rec.NotSavedSince == 0:
+		c.rec.NotSavedSince = ms(now)
+	case fails == 0 && c.rec.NotSavedSince != 0:
+		c.d.Log.Info("conversation saved again", "conv", c.rec.ID, "notSavedFor", now.Sub(time.UnixMilli(c.rec.NotSavedSince)).Round(time.Second).String())
+		c.rec.NotSavedSince = 0
+	default:
+		return
+	}
+	c.touch()
+	c.flush(now, true)
+}
+
+// saveResult is the store's word on a write of its writer: it goes to the conversation's actor, when it has one.
+func (r *Runtime) saveResult(path string, fails int, err error) {
+	id := r.d.Store.convOfPath(path)
+	a := r.loaded(id)
+	if a == nil {
+		r.d.Log.Warn("conversation not saved", "path", path, "failsInARow", fails, "err", err)
+		return
+	}
+	_ = r.on(a, func(c *conv, now time.Time) { c.saveResult(fails, err, now) })
 }
 
 func (r *Runtime) opsSaver() {
@@ -715,23 +994,58 @@ func (r *Runtime) saveOps() {
 
 func (r *Runtime) Conversations(ctx context.Context) (wire.ConvsSnapshot, error) {
 	out := []wire.Conversation{}
-	for _, a := range r.all() {
-		wait, cancel := context.WithTimeout(ctx, listWait)
-		v, err := live(r, wait, a.c.rec.ID, func(c *conv, now time.Time) (recView, error) { return recView{rec: c.rec}, nil })
-		cancel()
-		switch {
-		case errors.Is(err, ErrNotFound):
-			continue // deleted
-		case err != nil && ctx.Err() != nil:
-			return wire.ConvsSnapshot{}, ctx.Err()
-		case err != nil:
-			last := a.last.Load()
-			if last.deleted {
-				continue
-			}
-			v = *last
+	// The parked conversations are listed from the records they left, and before the actors are asked: one that parks
+	// while the list is made is then found among them again below.
+	r.mu.Lock()
+	actors := make([]*actor, 0, len(r.actors))
+	for _, a := range r.actors {
+		actors = append(actors, a)
+	}
+	for _, v := range r.parked {
+		if !v.deleted {
+			out = append(out, v.rec)
 		}
-		out = append(out, v.rec)
+	}
+	r.mu.Unlock()
+	// Every actor is asked at once and the whole list waits listWait, not each actor in turn: with hundreds of
+	// conversations a few dozen busy ones (reading a long transcript) made the list take as many quarters of a second,
+	// longer than the page waits for it. A busy one is listed by the record it published last.
+	views := make([]*recView, len(actors))
+	wait, cancel := context.WithTimeout(ctx, listWait)
+	ask := func(i int, a *actor) {
+		v, err := liveOn(r, wait, a, func(c *conv, now time.Time) (recView, error) { return recView{rec: c.rec}, nil })
+		if err == nil {
+			views[i] = &v
+			return
+		}
+		// Deleted, parked a moment ago, or busy: the record it left is the answer.
+		if last := a.last.Load(); last != nil && !last.deleted {
+			views[i] = last
+		}
+	}
+	if r.inline {
+		for i, a := range actors {
+			ask(i, a)
+		}
+	} else {
+		var wg sync.WaitGroup
+		for i, a := range actors {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ask(i, a)
+			}()
+		}
+		wg.Wait()
+	}
+	cancel()
+	if err := ctx.Err(); err != nil {
+		return wire.ConvsSnapshot{}, err
+	}
+	for _, v := range views {
+		if v != nil {
+			out = append(out, v.rec)
+		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Pinned != out[j].Pinned {
@@ -762,8 +1076,13 @@ type result[T any] struct {
 
 // live runs f on the live conversation's actor and waits for its answer within ctx.
 func live[T any](r *Runtime, ctx context.Context, id string, f func(c *conv, now time.Time) (T, error)) (T, error) {
+	return liveOn(r, ctx, r.actor(id), f)
+}
+
+// liveOn is live on an actor already in hand (see callOn).
+func liveOn[T any](r *Runtime, ctx context.Context, a *actor, f func(c *conv, now time.Time) (T, error)) (T, error) {
 	res := make(chan result[T], 1)
-	err := r.call(ctx, id, func(c *conv, now time.Time) {
+	err := r.callOn(ctx, a, func(c *conv, now time.Time) {
 		if c.deletedAt != 0 {
 			res <- result[T]{err: ErrNotFound}
 			return
@@ -870,6 +1189,19 @@ func (r *Runtime) Context(ctx context.Context, id string) (wire.ConvContext, err
 	})
 }
 
+// sendLost: a send was answered «I have it», and the conversation knows nothing of that message now — not waiting, not
+// ended, not let go: its record was lost after the answer was kept (the runtime stopped between the two writes). The
+// same send is then done again instead of being answered from memory, so the person's Повторить with the same clientId
+// brings the message back; a message the conversation knows is never queued twice.
+func (r *Runtime) sendLost(ctx context.Context, cmd wire.Command, res wire.CmdResult) bool {
+	m, ok := cmd.(wire.SendCmd)
+	if !ok || res.R == wire.ResultRefused {
+		return false
+	}
+	st, err := r.MessageStatus(ctx, m.ConversationID, []string{m.ClientID})
+	return err == nil && len(st.Messages) == 1 && st.Messages[0].K == wire.StatusUnknown
+}
+
 // MessageStatus is the conversation's word on its messages by their client ids, one per id in order: known (the record
 // and where a typed message went), unknown, or expired (its record let go long ago).
 func (r *Runtime) MessageStatus(ctx context.Context, id string, ids []string) (wire.MessageStatuses, error) {
@@ -952,6 +1284,15 @@ func (r *Runtime) Do(ctx context.Context, device string, cmd wire.Command) wire.
 			if op.Hash != hash {
 				return wire.Refused(wire.RefuseConflict)
 			}
+			if r.sendLost(ctx, cmd, op.Result) {
+				r.opsMu.Lock()
+				if cur, ok := r.ops[key]; ok && cur.At == op.At {
+					delete(r.ops, key)
+					r.opsDirty = true
+				}
+				r.opsMu.Unlock()
+				continue
+			}
 			return op.Result
 		}
 		wait, running := r.inflight[key]
@@ -991,7 +1332,7 @@ func (r *Runtime) Do(ctx context.Context, device string, cmd wire.Command) wire.
 	if r.inline {
 		run()
 	} else {
-		go run()
+		safego.Go("convo command", func() { run() })
 	}
 	select {
 	case res := <-result:
@@ -1181,17 +1522,35 @@ func convOf(cmd wire.Command) string {
 
 func (r *Runtime) seenAll(m wire.SeenCmd) wire.CmdResult {
 	res := wire.Accepted(wire.ChannelConvs, 0)
-	for _, a := range r.all() {
-		// A conversation removed since all() has nothing to mark seen.
-		_ = r.call(context.Background(), a.c.rec.ID, func(c *conv, now time.Time) {
-			if c.deletedAt != 0 {
-				return
-			}
-			got := c.seen(m.UpTo, now)
-			if res.Seq == 0 || got.Seq > 0 && got.Seq < res.Seq {
-				res.Seq = got.Seq
-			}
-		})
+	mark := func(c *conv, now time.Time) {
+		if c.deletedAt != 0 {
+			return
+		}
+		got := c.seen(m.UpTo, now)
+		if res.Seq == 0 || got.Seq > 0 && got.Seq < res.Seq {
+			res.Seq = got.Seq
+		}
+	}
+	// Marking everything read is no use of each conversation: the actors are asked as a list asks them.
+	r.mu.Lock()
+	actors := make([]*actor, 0, len(r.actors))
+	for _, a := range r.actors {
+		actors = append(actors, a)
+	}
+	var unread []string
+	for id, v := range r.parked {
+		// A parked conversation is woken only when it has something unread to mark.
+		if t := v.rec.LastTurn; !v.deleted && t != nil && t.EndedAt != nil && *t.EndedAt > v.rec.SeenAt && m.UpTo > v.rec.SeenAt {
+			unread = append(unread, id)
+		}
+	}
+	r.mu.Unlock()
+	for _, a := range actors {
+		// A conversation removed since has nothing to mark seen.
+		_ = r.callOn(context.Background(), a, mark)
+	}
+	for _, id := range unread {
+		_ = r.call(context.Background(), id, mark)
 	}
 	return res
 }
@@ -1494,8 +1853,8 @@ func (r *Runtime) openConv(rec wire.Conversation, req LaunchRequest, first *wire
 // actor anything, so a reader beside the runtime (the design links' backfill) never wakes or holds one.
 func (r *Runtime) Transcripts() []string {
 	var out []string
-	for _, a := range r.all() {
-		if v := a.last.Load(); v != nil && !v.deleted && v.rec.TranscriptPath != "" {
+	for _, v := range r.views() {
+		if !v.deleted && v.rec.TranscriptPath != "" {
 			out = append(out, v.rec.TranscriptPath)
 		}
 	}
@@ -1505,9 +1864,8 @@ func (r *Runtime) Transcripts() []string {
 // AttachedSessions are the agent sessions the conversations hold, by the agent's own session id.
 func (r *Runtime) AttachedSessions() map[string]string {
 	out := map[string]string{}
-	for _, a := range r.all() {
-		v := a.last.Load()
-		if v == nil || v.deleted {
+	for _, v := range r.views() {
+		if v.deleted {
 			continue
 		}
 		if v.rec.AgentSessionID != "" {

@@ -6,7 +6,7 @@ import { createKeyedStore, useKey } from '@/next/core/store';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useDayStartHour } from '@/next/stores/me';
 import { loadMachineLimits } from '@/next/features/limits/api';
-import type { LimitsView, MachineLimits } from '@/next/features/limits/model';
+import { readLimitsOf, type LimitsView, type MachineLimits } from '@/next/features/limits/model';
 import type { MachineId, Provider } from '@/next/protocol/v2';
 
 export const LIMITS_POLL_MS = 60_000;
@@ -25,6 +25,13 @@ const ask = async (machine: MachineId): Promise<void> => {
   } catch {
     entries.patch(machine, (prev) => ({ limits: prev?.limits ?? null, failed: true }));
   }
+};
+
+/** what the hub remembers of the machine's limits (the fleet's list), drawn until the machine answers. A
+ *  machine that has answered on this page keeps its own word. */
+export const seedLimits = (machine: MachineId, usage: unknown): void => {
+  const limits = readLimitsOf(usage);
+  if (limits) entries.patch(machine, (prev) => prev ?? { limits, failed: false });
 };
 
 /** Null while the first answer has not come: the chip is not drawn before it knows what to say. */

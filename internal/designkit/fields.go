@@ -6,9 +6,10 @@ package designkit
 //	component.preset   {of, props}       a name that expands to another component with fixed props
 //	component.status   stable | new | deprecated;  component.replacedBy: the component that takes its place
 //	kit.kind           app | site | slides | video
-//	kit.extends        "<id>@<range>"    the parent kit (read and checked for its shape; tokens are not merged yet)
+//	kit.extends        "<id>@<range>"    the base kit (extends.go: the child is assembled with it)
 //	kit.omitted        sections left out on purpose (tokens, examples, docs, patterns, templates)
 //	token.var          the library's CSS variable a token's name stands for
+//	kit.strict         true: projects on the kit are checked in strict mode (strict.go)
 
 import (
 	"encoding/json"
@@ -32,6 +33,7 @@ type kitFields struct {
 	Kind    json.RawMessage `json:"kind"`
 	Extends json.RawMessage `json:"extends"`
 	Omitted json.RawMessage `json:"omitted"`
+	Strict  json.RawMessage `json:"strict"`
 }
 
 // recordFields checks kind, extends and omitted of a kit record and returns the sections it leaves out.
@@ -52,6 +54,9 @@ func (k *checker) recordFields(mf, name string, own kitFields) map[string]bool {
 				k.add("identity.extends", mf, "%s.extends %q: %v", name, s, err)
 			}
 		}
+	}
+	if own.Strict != nil && string(own.Strict) != "null" && string(own.Strict) != "true" && string(own.Strict) != "false" {
+		k.add("identity.strict", mf, "%s.strict %s: true or false", name, string(own.Strict))
 	}
 	omitted := map[string]bool{}
 	if own.Omitted != nil && string(own.Omitted) != "null" {
@@ -196,5 +201,54 @@ func (k *checker) tokenVar(tf, family, name string, raw json.RawMessage) {
 	}
 	if s, ok := jsonString(raw); !ok || !cssVarRe.MatchString(s) {
 		k.add("token.var", tf, "%s: %s var %s must be a CSS custom property name, --acme-color-accent", family, name, string(raw))
+	}
+}
+
+// extendsLink resolves the base of the theme being checked and reads what it inherits: k.inherited, for the checks that
+// name other components. A base that cannot be used is reported by rule (extends.missing, extends.version,
+// extends.cycle, extends.depth); without a kits folder the link is not followed.
+func (k *checker) extendsLink(mf string, raw []byte) {
+	k.inherited, k.extending = nil, false
+	ex, ok := ExtendsOf(raw)
+	if !ok {
+		return
+	}
+	k.extending = true
+	if k.dir == "" {
+		return
+	}
+	var self struct{ ID, Version string }
+	if id, version, err := Identity(k.root); err == nil {
+		self.ID, self.Version = id, version
+	}
+	version, info := ResolveBase(k.dir, self.ID, "", ex, []string{self.ID})
+	switch info.Rule {
+	case "extends.missing":
+		k.add("extends.missing", mf, "%s", info.Error)
+	case "extends.version":
+		k.add("extends.version", mf, "%s", info.Error)
+	case "extends.cycle":
+		k.add("extends.cycle", mf, "%s", info.Error)
+	case "extends.depth":
+		k.add("extends.depth", mf, "%s", info.Error)
+	}
+	if info.Error != "" {
+		return
+	}
+	b, err := readCanvas(k.dir, ex.Kit, version, "", []string{self.ID})
+	if err != nil {
+		k.add("extends.missing", mf, "the base kit %s %s cannot be read: %v", ex.Kit, version, err)
+		return
+	}
+	if b.Extends != nil && b.Extends.Error != "" {
+		k.add(b.Extends.Rule, mf, "the base %s: %s", ex.Kit, b.Extends.Error)
+	}
+	k.inherited = map[string]*Component{}
+	for _, g := range b.Groups {
+		for i := range g.Components {
+			c := g.Components[i]
+			c.From = firstNonEmpty(c.From, ex.Kit+"@"+version)
+			k.inherited[c.ID] = &c
+		}
 	}
 }

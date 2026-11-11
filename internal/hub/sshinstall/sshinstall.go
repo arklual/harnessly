@@ -44,7 +44,9 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const (
@@ -196,21 +198,18 @@ func (s *Service) Close() {
 
 // Mount registers the endpoints on the router of the paths under a space.
 func (s *Service) Mount(sub *http.ServeMux) {
-	sub.Handle("GET /api/spaces/{spaceId}/machines/ssh", s.auth.Require(s.showKey))
-	sub.Handle("POST /api/spaces/{spaceId}/machines/ssh", s.auth.Require(s.start))
+	g := tenant.Guard{Auth: s.auth, Spaces: s.spaces}
+	sub.Handle("GET /api/spaces/{spaceId}/machines/ssh", g.Space(tenant.Owner, s.showKey))
+	sub.Handle("POST /api/spaces/{spaceId}/machines/ssh", g.Space(tenant.Owner, s.start))
 }
 
 // showKey answers the owners of a space with the public key to add to a server's authorized_keys: the space's own, which
 // nobody else is shown.
-func (s *Service) showKey(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
-	if err := s.spaces.Owner(ctx, p.User.ID, r.PathValue("spaceId")); err != nil {
-		return err
-	}
+func (s *Service) showKey(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	if !s.Available() {
 		return httpx.ErrProviderOff
 	}
-	_, pub, err := s.signerFor(ctx, r.PathValue("spaceId"))
+	_, pub, err := s.signerFor(r.Context(), t.SpaceID)
 	if err != nil {
 		return err
 	}
@@ -265,16 +264,13 @@ func (s *Service) check(req startRequest) (target, error) {
 	return t, nil
 }
 
-func (s *Service) start(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) start(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
 	var req startRequest
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
 	}
 	ctx := r.Context()
-	spaceID := r.PathValue("spaceId")
-	if err := s.spaces.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	p, spaceID := tc.Person, tc.SpaceID
 	if !s.Available() {
 		return httpx.ErrProviderOff
 	}
@@ -318,11 +314,11 @@ func (s *Service) start(w http.ResponseWriter, r *http.Request, p *auth.Principa
 
 	j := newJob(store.RandomHex(16))
 	s.wg.Add(1)
-	go func() {
+	safego.Go("sshinstall start", func() {
 		defer s.wg.Done()
 		defer func() { <-s.slots }()
 		(&run{s: s, j: j, t: t, spaceID: spaceID, userID: p.User.ID, signer: signer, code: code, codeHash: rc.CodeHash}).do()
-	}()
+	})
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]string{"jobId": j.ID})
 	return nil
 }
@@ -649,7 +645,7 @@ func execute(ctx context.Context, client *ssh.Client, cmd string, limit time.Dur
 	ctx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- sess.Run(cmd) }()
+	safego.Go("sshinstall execute", func() { done <- sess.Run(cmd) })
 	select {
 	case err := <-done:
 		var exit *ssh.ExitError

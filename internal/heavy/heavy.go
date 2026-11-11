@@ -62,6 +62,8 @@ type Env struct {
 	Now func() time.Time
 	// Exec replaces the process with the tool for a light call; nil is syscall.Exec.
 	Exec func(path string, argv, env []string) error
+	// Getwd is the folder the call runs in; nil is os.Getwd.
+	Getwd func() (string, error)
 }
 
 // OSEnv is the process's own environment.
@@ -93,6 +95,9 @@ func (e *Env) fill() {
 	}
 	if e.Exec == nil {
 		e.Exec = syscall.Exec
+	}
+	if e.Getwd == nil {
+		e.Getwd = os.Getwd
 	}
 }
 
@@ -171,6 +176,12 @@ func isOff(v string) bool {
 
 func runHeavy(tool, real string, argv, base []string, env Env) int {
 	dir := Dir(env.Getenv)
+	if dest := strings.TrimSpace(env.Getenv(envRemote)); dest != "" {
+		if code, started := runRemote(dest, argv, base, env); started {
+			record(dir, env.Now(), tool, "remote", 0)
+			return code
+		}
+	}
 	n := Slots(env.CPUs)
 	if v, err := strconv.Atoi(strings.TrimSpace(env.Getenv(envSlots))); err == nil && v > 0 {
 		n = v
@@ -341,7 +352,7 @@ func watching(args []string) bool {
 
 // heavyScripts are the package scripts that take a slot under npm and pnpm: test, test:unit, lint, build:web…
 var heavyScripts = map[string]bool{"test": true, "vitest": true, "playwright": true, "tsc": true, "eslint": true,
-	"lint": true, "build": true, "check": true}
+	"lint": true, "build": true, "check": true, "typecheck": true}
 
 func heavyScript(name string) bool {
 	base, _, _ := strings.Cut(name, ":")
@@ -663,7 +674,7 @@ func isLauncher(p string) bool {
 	return strings.HasPrefix(string(head[:n]), "#!") && strings.Contains(string(head[:n]), Marker)
 }
 
-// record appends one heavy call to <dir>/events: unix time, tool, ran|waited|refused, milliseconds waited. The file is
+// record appends one heavy call to <dir>/events: unix time, tool, ran|waited|refused|remote, milliseconds waited. The file is
 // started over past 1 MiB by its owner.
 func record(dir string, now time.Time, tool, outcome string, waited time.Duration) {
 	root, err := openDir(dir)
@@ -695,8 +706,17 @@ When it says the machine is busy (exit 75), do not run the command again: go on 
 the full run to CI. Check in one batch at the end of a task, and only the package or test you changed.
 
 Usage:
-  harnessly heavy stats [--since 24h] [--json]   how many heavy calls ran, waited for a slot, were refused
+  harnessly heavy stats [--since 24h] [--json]   how many heavy calls ran, waited for a slot, were refused, ran remotely
 
 Settings (environment): HARNESSLY_HEAVY=off runs everything at once; HARNESSLY_HEAVY_SLOTS, HARNESSLY_HEAVY_WAIT
 (default 15m), HARNESSLY_HEAVY_DIR (default /var/lib/harnessly-heavy when it exists, else /tmp/harnessly-heavy).
+HARNESSLY_HEAVY_REMOTE=<ssh destination> runs go test, go vet, a go build whose result go drops, the node checks
+(tsc --noEmit, vitest run, eslint, npx/npm exec of those, a package script made only of them) and the node builds
+(tsc that emits, vite build, next build, a script of them such as pnpm build) on that machine: the git working tree
+is copied there with rsync (without .git and node_modules, under HARNESSLY_HEAVY_REMOTE_ROOT, default
+~/.cache/harnessly-remote), node_modules is installed there from the tree's pnpm-lock.yaml or package-lock.json once
+per lockfile, the output and exit code come back, and so do the files a node build wrote (a file changed here
+meanwhile stays). Calls that write elsewhere or change sources (go test -c, -o, profiles, -fuzz, -args, a test's own
+flag such as -update, go build -o, eslint --fix, vitest -u or --coverage) and playwright stay here; when the copy,
+the connection or the install fails, the call runs here after one line saying so.
 `

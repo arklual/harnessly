@@ -35,6 +35,7 @@ const WHY = {
   'machine-unreachable': 'next.connection.machineAway',
   unauthorized: 'next.connection.unauthorized',
   proto: 'next.connection.proto',
+  paused: 'next.connection.network',
 } as const;
 
 interface IPill {

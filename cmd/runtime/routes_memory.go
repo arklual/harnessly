@@ -27,6 +27,8 @@ type memoryService struct {
 	syncer   *memsync.Syncer
 	projects string
 	report   string
+	// localFolders: a folder without a git remote syncs under its path (RUNTIME_MEMORY_LOCAL_FOLDERS=on).
+	localFolders bool
 }
 
 // memorySync is the service when memory sync is on; the launcher reads it before each start.
@@ -43,6 +45,8 @@ func newMemoryService(d deps) *memoryService {
 		syncer:   &memsync.Syncer{Client: &memsync.HTTPClient{URL: u, Secret: d.Secret}},
 		projects: filepath.Join(env("CLAUDE_CONFIG_DIR", filepath.Join(d.Home, ".claude")), "projects"),
 		report:   filepath.Join(d.DataDir, "v2", "memory-sync.json"),
+
+		localFolders: env("RUNTIME_MEMORY_LOCAL_FOLDERS", "") == "on",
 	}
 }
 
@@ -72,7 +76,7 @@ func (m *memoryService) sync(ctx context.Context, cwd string) memsync.Report {
 	var projects []memsync.Project
 	if cwd == "" {
 		projects = memsync.Known(m.projects)
-	} else if id := memsync.ProjectID(ctx, cwd); id != "" {
+	} else if id := memsync.FolderID(ctx, cwd, m.localFolders); id != "" {
 		projects = []memsync.Project{{ID: id, Dir: memsync.MemoryDir(m.projects, cwd)}}
 	}
 	rep := m.syncer.Sync(ctx, projects)

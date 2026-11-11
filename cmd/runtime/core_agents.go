@@ -39,6 +39,8 @@ type coreAgents struct {
 	// launcherScript writes the launcher when it is missing; nil leaves it to the old runtime.
 	launcherScript *codex.LauncherScriptConfig
 	codexArgs      codex.LaunchConfig
+	// codexInput is the structured input channel of new Codex chats; nil when it is off.
+	codexInput *codexInput
 	// profiles keeps the keys of the backend profiles and gives a launch on one what it needs (providers).
 	profiles *providers.Store
 	// gpt is the switch of the gpt profile and the proxy it keeps; nil while the runtime's port is unknown.
@@ -88,6 +90,9 @@ type coreAgentsConfig struct {
 	PassServiceEnv  bool
 	// CodexContainerSandbox: RUNTIME_CODEX_SANDBOX=container, Codex runs without its own sandbox (the container is one).
 	CodexContainerSandbox bool
+	// CodexAppServer is RUNTIME_CODEX_APPSERVER: "1" starts new Codex chats beside an app-server and sends their
+	// messages over it.
+	CodexAppServer string
 	// SafePrompt: every agent's prompt gets the safe's block (internal/secrets). The runtime turns it on; the launches
 	// the previous runtime's goldens recorded had no such block.
 	SafePrompt bool
@@ -143,10 +148,16 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	// The person's MCP servers (Settings → Connections) go to every agent that starts, through the runtime's proxy.
 	mcpEnabled := mcpEnabledOf(c.DataDir)
 	// One launcher gives the apps to both agents: the same registry, wall and rules.
-	appLauncher := &apps.Launcher{Registry: apps.Open(c.DataDir), CLIHeader: firstOf(c.TokenHeaders), GuardCommand: appGuardCommand(), GuardProbe: probeAppGuard, MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
+	appLauncher := &apps.Launcher{Registry: apps.Open(c.DataDir), CLIHeader: firstOf(c.TokenHeaders), GuardCommand: appGuardCommand(), CLIBin: appMCPBin(os.Getenv), GuardProbe: probeAppGuard, MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
 		Boundary: appBoundary(), RequireWall: os.Getenv("RUNTIME_APPS_REQUIRE_WALL") == "1", AgentToken: (&gate.CLIToken{DataDir: c.DataDir}).IssueAgent,
 		Secrets: storeFor(c.DataDir, c.Home), Connections: appConnections{ms: mcpconn.New(c.DataDir, nil, nil)}}
+	input := newCodexInput(c.DataDir, c.CodexAppServer)
+	var inputSocket func(conversation string) string
+	if input != nil {
+		inputSocket = input.socket
+	}
 	return &coreAgents{
+		codexInput: input,
 		profiles:   profiles,
 		alwaysApps: alwaysApps(apps.Open(c.DataDir)),
 		gpt:        gpt,
@@ -186,6 +197,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			ShellEnvExclude:  []string{c.MCP.TokenEnv},
 			Profiles:         launcher,
 			Apps:             appLauncher,
+			InputSocket:      inputSocket,
 		},
 	}
 }
@@ -209,15 +221,23 @@ func pluginDirOnce(dir string) func() string {
 // Only folders the agent has written a plugin into count, looked at on every launch: a list that came after the
 // runtime started reaches the next chat.
 func hubEnvPluginDirs(dataDir, observeFile string) func() []string {
-	var dirs []string
+	var dirs, links []string
 	for _, l := range hubLinkDirs(dataDir, observeFile) {
 		dirs = append(dirs, filepath.Join(l, hubproto.EnvPluginDir))
+		links = append(links, l)
 	}
 	return func() []string {
 		var out []string
 		for _, d := range dirs {
 			if _, err := os.Stat(filepath.Join(d, ".claude-plugin", "plugin.json")); err == nil {
 				out = append(out, d)
+			}
+		}
+		// The environment packs (docs/hub/packs.md): each is a plugin of its own under <link>/environment/packs.
+		for _, l := range links {
+			packs, _ := filepath.Glob(filepath.Join(l, filepath.FromSlash(hubproto.PacksDir), "*", ".claude-plugin", "plugin.json"))
+			for _, f := range packs {
+				out = append(out, filepath.Dir(filepath.Dir(f)))
 			}
 		}
 		return out
@@ -459,7 +479,8 @@ func (a *coreAgents) codexLauncherConfig(launch *agents.Launch) (codex.LaunchCon
 	if err != nil {
 		return codex.LaunchConfig{}, err
 	}
-	return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content, Profiles: a.codexArgs.Profiles}, nil
+	return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content, Profiles: a.codexArgs.Profiles,
+		InputSocket: a.codexArgs.InputSocket}, nil
 }
 
 // codexLauncherContent is the Codex launcher script as the pane runs it.

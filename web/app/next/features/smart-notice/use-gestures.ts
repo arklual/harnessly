@@ -16,6 +16,7 @@ import {
   type RefObject,
 } from 'react';
 import { StackPager, isWheelNotch } from './pager';
+import { NOTICE_INPUT, gestureEvent, noteInput } from './metrics';
 
 export const GESTURE = {
   hide: 'hide',
@@ -54,12 +55,16 @@ const PAGE_PX = 28;
 const FLICK = 0.45;
 const LONG_PRESS_MS = 500;
 const WHEEL_IDLE_MS = 120;
+/** Wheel events closer than this are one gesture (a trackpad's momentum included). */
+const WHEEL_SEQ_MS = 220;
+/** A mouse wheel's clicks closer than this are one turn: it pages one plate. */
+const NOTCH_TURN_MS = 260;
 const PINCH_PX = 24;
 /** The longest and the shortest a thrown plate takes to leave, ms. */
 const FLING_MAX_MS = 380;
 const FLING_MIN_MS = 160;
 /** How long the plate takes to rise from the stack into the front (hx-sn-rise in styles/smart-notice.css). */
-export const RISE_MS = 620;
+export const RISE_MS = 260;
 
 /** What a gesture comes to when it is let go. */
 export const settleGesture = (g: IGestureEnd): TGesture => {
@@ -208,6 +213,7 @@ const stackOf = (
   ref.current ??= new StackPager({
     host: () => host.current,
     onStep: (dir) => latest.current.onStep(dir),
+    onFrames: gestureEvent,
   });
   return ref.current;
 };
@@ -215,6 +221,42 @@ const stackOf = (
 /** Where a press does not start a gesture: text to type into or select. */
 const isField = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('input, textarea, pre, .hx-otp, .hx-sn__reply') !== null;
+
+/** Whether `node` (or one of its parents up to `stop`) scrolls itself by `dy`/`dx` from where it is. */
+const canScroll = (node: Element | null, stop: Element | null, dx: number, dy: number): boolean => {
+  for (let el = node; el && el !== stop; el = el.parentElement) {
+    const style = getComputedStyle(el);
+    if (dy !== 0 && /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) {
+      const top = el.scrollTop;
+      if ((dy < 0 && top > 0) || (dy > 0 && top + el.clientHeight < el.scrollHeight - 1)) return true;
+    }
+    if (dx !== 0 && /(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth) {
+      const left = el.scrollLeft;
+      if ((dx < 0 && left > 0) || (dx > 0 && left + el.clientWidth < el.scrollWidth - 1)) return true;
+    }
+  }
+  return false;
+};
+
+/** The nearest of `from` and its parents that scrolls by `dy`. */
+const scrollerOf = (from: Element | null, dy: number): Element | null => {
+  for (let el = from; el; el = el.parentElement) {
+    if (canScroll(el, el.parentElement, 0, dy)) return el;
+  }
+  return null;
+};
+
+/** What scrolls under the plate by `dy` (the chat's feed): under the pointer, or just past the plate's edge when it
+ *  stands over a header; it gets the wheel the plate stands on. */
+const scrollerUnder = (host: Element, x: number, y: number, dy: number): Element | null => {
+  const below = (px: number, py: number) =>
+    document.elementsFromPoint(px, py).find((n) => !host.contains(n)) ?? null;
+  const shape = host.querySelector('.hx-sn__body:not([data-ghost])')?.getBoundingClientRect();
+  return (
+    scrollerOf(below(x, y), dy) ??
+    (shape ? (scrollerOf(below(x, shape.bottom + 24), dy) ?? scrollerOf(below(x, shape.top - 24), dy)) : null)
+  );
+};
 
 /** The speed, smoothed: a finger lifted after a pause throws nothing. */
 const SMOOTH = 0.6;
@@ -245,6 +287,9 @@ const useGestures = ({ host, present, frontKey, ...options }: IGestureOptions) =
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    noteInput(
+      event.pointerType === 'touch' || event.pointerType === 'pen' ? NOTICE_INPUT.touch : NOTICE_INPUT.mouse,
+    );
     if (latest.current.off || event.button !== 0 || isField(event.target)) return;
     if (host.current?.dataset.fling !== undefined) return;
     swallow.current = false;
@@ -373,6 +418,30 @@ const useGestures = ({ host, present, frontKey, ...options }: IGestureOptions) =
     let paging = false;
     let pv = 0;
     let pt = 0;
+    /** The last mouse wheel click: the clicks of one turn page one plate. */
+    let notchAt = -Infinity;
+    /** Where the gesture now running began: over the plate, or over the page (then the page keeps it). */
+    let seqAt = -Infinity;
+    let seqOver = false;
+    /** Where a gesture begun over the page was: what it scrolls there keeps scrolling where it passes over the plate. */
+    let seqFrom: Element | null = null;
+    const watch = (event: WheelEvent) => {
+      if (event.timeStamp - seqAt > WHEEL_SEQ_MS) {
+        seqOver = event.target instanceof Node && el.contains(event.target);
+        seqFrom = !seqOver && event.target instanceof Element ? event.target : null;
+      }
+      seqAt = event.timeStamp;
+    };
+    /** The wheel the plate stands on goes to what scrolls under it: the feed never loses its scroll to the plate. */
+    const pass = (event: WheelEvent) => {
+      if (canScroll(event.target as Element, el, event.deltaX, event.deltaY)) return;
+      const scroller =
+        scrollerOf(seqFrom, event.deltaY) ?? scrollerUnder(el, event.clientX, event.clientY, event.deltaY);
+      if (!scroller) return;
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroller.clientHeight : 1;
+      scroller.scrollBy({ top: event.deltaY * unit, left: 0, behavior: 'instant' });
+    };
     const endPaging = () => {
       idle = null;
       paging = false;
@@ -382,6 +451,11 @@ const useGestures = ({ host, present, frontKey, ...options }: IGestureOptions) =
     };
     const wheel = (event: WheelEvent) => {
       const now = latest.current;
+      if (!seqOver) {
+        // Begun over the feed, the gesture is the feed's, even where it passes over the plate.
+        pass(event);
+        return;
+      }
       if (now.off || el.dataset.fling !== undefined) return;
       if (event.ctrlKey) {
         // A pinch: out opens, in folds.
@@ -400,6 +474,7 @@ const useGestures = ({ host, present, frontKey, ...options }: IGestureOptions) =
         // Two fingers sideways: the front plate goes with them, one to one, and is thrown or springs back when they
         // stop (the trackpad's own momentum keeps sending deltas a while, so the speed is real).
         event.preventDefault();
+        noteInput(NOTICE_INPUT.trackpad);
         const dt = Math.max(1, event.timeStamp - lastT);
         lastT = event.timeStamp;
         vx = vx * 0.4 + (-event.deltaX / dt) * 0.6;
@@ -416,26 +491,39 @@ const useGestures = ({ host, present, frontKey, ...options }: IGestureOptions) =
         }, WHEEL_IDLE_MS);
         return;
       }
-      if (now.open || !now.stacked) return;
+      if (now.open || !now.stacked) {
+        // Nothing to page: the scroll is the feed's (or the open card's own list's).
+        pass(event);
+        return;
+      }
       event.preventDefault();
       // What it scrolls goes as the fingers do (natural scrolling): a delta of +y moves it up the screen.
       const dy = -event.deltaY;
       if (isWheelNotch(event)) {
-        // A mouse wheel clicks: one plate per click, by the spring.
-        stackOf(pagerRef, host, latest).click(dy);
+        // A mouse wheel clicks: one plate per turn, by the spring; the clicks that follow within a moment are the same
+        // turn.
+        noteInput(NOTICE_INPUT.mouse);
+        const fresh = event.timeStamp - notchAt > NOTCH_TURN_MS;
+        notchAt = event.timeStamp;
+        if (fresh) stackOf(pagerRef, host, latest).click(dy);
         return;
       }
-      // A trackpad: the stack follows the deltas one to one; the end of the gesture is a pause in them.
+      // A trackpad: the stack follows the deltas one to one, one plate at most (momentum included); the end of the
+      // gesture is a pause in them.
+      noteInput(NOTICE_INPUT.trackpad);
       const dt = Math.max(1, event.timeStamp - pt);
       pt = event.timeStamp;
       pv = paging ? pv * 0.5 + (dy / dt) * 0.5 : 0;
+      if (!paging) stackOf(pagerRef, host, latest).begin();
       paging = true;
       stackOf(pagerRef, host, latest).nudge(dy);
       if (idle !== null) window.clearTimeout(idle);
       idle = window.setTimeout(endPaging, WHEEL_IDLE_MS);
     };
+    window.addEventListener('wheel', watch, { capture: true, passive: true });
     el.addEventListener('wheel', wheel, { passive: false });
     return () => {
+      window.removeEventListener('wheel', watch, { capture: true });
       el.removeEventListener('wheel', wheel);
       if (idle !== null) window.clearTimeout(idle);
     };

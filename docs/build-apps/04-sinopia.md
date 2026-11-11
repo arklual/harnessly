@@ -127,3 +127,82 @@ flowchart LR
 - `guest` is refused at validate: not supported yet.
 
 Copy [`moodboard`](../apps/moodboard).
+
+## A document type made of a Sinopia site
+
+A type may be a Sinopia site with the app's additions instead of an editor of its own: `"extends": "site"` on the type.
+
+```json
+"permissions": ["sinopia.kind", "app.extend"],
+"sinopia": { "kinds": [{ "id": "acme.proto", "title": "Прототип", "extends": "site", "schemaVersion": 1 }] }
+```
+
+- Its documents are site projects: they open in Sinopia's own editor, with the chat's right pane, and the library lists them
+  with the type's name as their label (on the card and on the editor's bar). «Новый документ» of the type makes one.
+- The address of an app's document (`/designly/doc/<id>`) opens such a document in Sinopia's editor, so a link from anywhere
+  lands in its place.
+- The app is on in every document of its type (no `activation.on` needed), and only there: its panels, checks and
+  selection items name `sinopia.acme.proto`, so they never show in Sinopia's other sites, and no other app's site
+  additions show in its documents.
+- `editor` is optional. It needs the permission `app.extend`, and the deployment's admin lists the apps that may do it:
+  `HARNESSLY_APPS_EXTEND=acme.proto,acme.other` (or `*`) in the runtime's environment. An app not listed offers no such
+  type, and its documents say that the admin has not allowed it.
+- A view with `"pinned": true` and the target `sinopia.<type>` is the app's tab in the chat's right pane beside every
+  document of the type: the pane's first tab, shown when the document opens, never closed, and in no other document.
+  It is bound to the document and the chat, like a panel (`hl.context.document`, `hl.workflow`). One per app.
+
+```json
+"views": [{ "id": "status", "title": "Статус", "entry": "views/status.html", "targets": ["sinopia.acme.proto"], "pinned": true }]
+```
+
+## Statuses of a document
+
+An app whose documents go through stages (a prototype of a mobile screen: draft → on review → approved → in development →
+test → released → stopped) names them in the manifest's `workflow`. The host keeps every document's status and its
+journal, and checks who makes each move: the app only draws them.
+
+```json
+"workflow": {
+  "statuses": [
+    { "id": "draft", "title": "Черновик", "edit": true },
+    { "id": "review", "title": "На ревью", "tone": "info" },
+    { "id": "approved", "title": "Согласован", "tone": "success" },
+    { "id": "dev", "title": "В разработке" }
+  ],
+  "transitions": [
+    { "from": "draft", "to": "review", "title": "Отправить на ревью" },
+    { "from": "review", "to": "approved", "title": "Согласовать", "role": "manage" },
+    { "from": "review", "to": "draft", "title": "Вернуть на доработку", "role": "manage" },
+    { "from": "approved", "to": "dev", "title": "Взять в разработку" }
+  ]
+},
+"agent": {
+  "tools": {
+    "when": [{ "status": ["review", "approved"], "deny": ["Edit", "Write"] }]
+  }
+}
+```
+
+- The app needs a `sinopia.<kind>` target. Up to 16 statuses and 64 moves; an id is `a-z0-9-`; `tone` is `neutral`,
+  `info`, `warning`, `success` or `danger`.
+- `role` is the least project role that makes the move: `view`, `comment`, `edit` (the default), `manage`, `owner`.
+- **Versions.** A status belongs to a version of the document: its number and a hash of its content (its pages and what the
+  app keeps in `hl.storage.doc`). The first status starts every version and must have `edit: true`. While the current
+  status has `edit`, the version follows the changes. A change to a version whose status has no `edit` does not touch it:
+  the next version starts, in the first status, and the earlier one keeps its status in `versions`.
+- **The view.** `hl.workflow.get()` answers `{version, hash, status, statuses, moves, role, journal, versions}`; each move
+  says whether this person's role makes it (`allowed`). `hl.workflow.move(to, {version, hash, note})` makes one: name the
+  version the person saw, and a document changed since is refused as `conflict` (read again). A move the role does not
+  allow is `permission_denied`. Draw one action from `moves`, and keep the button busy while it runs.
+- **The decision and its version.** Every move keeps the project as it was decided on as a named version of Sinopia's
+  history («v2 · На ревью», in the editor's «Версии»): the move's journal entry carries it as `rev`, and `link` opens it
+  read only. One version of the document keeps one point, and only a person who may edit the project adds it. Who may
+  make a move is the transition's `role`, checked by the host.
+- **Notifications.** When a person of the project other than the machine's owner makes a move, the owner's devices get a
+  push («Анна: «Черновик» → «На ревью», v2») that opens the document.
+- **The agent.** The chat the view is in works on that document: its agent is told the status and version at its next
+  turn, and `agent.tools.when` adds rules that hold only in those statuses (with no document known, none of them holds).
+  A chat that works on several documents of the app keeps each one's status, and the strictest word among them decides.
+  The guard reads the status from the launch's own folder, which the agent cannot write. Claude's built-in rules never
+  carry them: they are the guard's.
+- Under a hub the status lives with the document's storage, in the hub: the same on every machine of the space.

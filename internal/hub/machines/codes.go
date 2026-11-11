@@ -14,12 +14,13 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const (
@@ -49,7 +50,8 @@ func (s *Service) InstallCommand(code, profile string) string {
 	return "curl -fsSL " + s.cfg.AgentURL + "/install | " + shell + " -s -- --token " + code + " --profile " + profile
 }
 
-func (s *Service) createCode(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) createCode(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct {
 		Profile     string
 		ConfirmFull bool
@@ -58,10 +60,7 @@ func (s *Service) createCode(w http.ResponseWriter, r *http.Request, p *auth.Pri
 		return err
 	}
 	ctx := r.Context()
-	spaceID := r.PathValue("spaceId")
-	if err := s.spaces.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	spaceID := t.SpaceID
 	if err := s.CheckProfile(req.Profile, req.ConfirmFull); err != nil {
 		return err
 	}
@@ -208,12 +207,29 @@ func (s *Service) register(w http.ResponseWriter, r *http.Request) error {
 	} else if m.Via == string(hubproto.ViaLocal) {
 		m.Via = string(hubproto.ViaCommand)
 	}
+	// A machine that proves it holds the key of its registration in this space keeps that registration's id, name and
+	// place; only what it says of itself and its keys are new.
+	prev, again := s.heldBefore(ctx, req, code)
+	if again {
+		prev.Hostname, prev.OS, prev.Arch, prev.UnixUser, prev.AgentVersion = m.Hostname, m.OS, m.Arch, m.UnixUser, m.AgentVersion
+		prev.Profile, prev.Via, prev.KeyPub, prev.EncPub = m.Profile, m.Via, m.KeyPub, m.EncPub
+		m = prev
+	}
 	var replaced []string
 	err = s.db.Tx(ctx, func(st store.Store) error {
 		if ok, err := st.ConsumeRegCode(ctx, hash, m.ID, now); err != nil {
 			return err
 		} else if !ok {
 			return errBadCode
+		}
+		if again {
+			if ok, err := st.RekeyMachine(ctx, m); err != nil {
+				return err
+			} else if !ok {
+				// Removed or switched off between the check and here: the code is not spent, the next try registers anew.
+				return httpx.Conflict("machine_gone", "Машину убрали или выключили в harnessly: повторите регистрацию")
+			}
+			return nil
 		}
 		if code.Local {
 			var err error
@@ -235,7 +251,13 @@ func (s *Service) register(w http.ResponseWriter, r *http.Request) error {
 			s.revoked(id)
 		}
 	}
-	s.auth.Audit(ctx, code.CreatedBy, "machine_registered", r, m.ID+" "+m.Profile+" "+m.Via)
+	action, status := "machine_registered", http.StatusCreated
+	if again {
+		// The link the machine may still hold was opened with the key that no longer is its own.
+		s.reg.Revoke(m.ID)
+		action, status = "machine_reregistered", http.StatusOK
+	}
+	s.auth.Audit(ctx, code.CreatedBy, action, r, m.ID+" "+m.Profile+" "+m.Via)
 
 	res := hubproto.RegisterResponse{MachineID: m.ID, DialURL: DialURL(s.cfg.AgentURL), RuntimeBasePath: "/m/" + m.ID, HubURL: s.cfg.AgentURL}
 	if m.SpaceID != "" {
@@ -247,24 +269,43 @@ func (s *Service) register(w http.ResponseWriter, r *http.Request) error {
 		s.Publish(ctx, m)
 	}
 	if code.Local {
-		go func() {
+		safego.Go("machines register", func() {
 			bg, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 			if err := s.renewLocal(bg); err != nil {
 				s.log.Warn("local registration code not renewed", "error", err)
 			}
-		}()
+		})
 	}
-	httpx.WriteJSON(w, http.StatusCreated, res)
+	httpx.WriteJSON(w, status, res)
 	return nil
 }
 
-func (s *Service) claimLocal(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
-	spaceID := r.PathValue("spaceId")
-	if err := s.spaces.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
+// heldBefore is the machine a registration claims to be (RegisterRequest.Previous), when the claim holds: the machine
+// is in the space the code is for, is neither removed nor switched off, and the claim is signed with the key the hub
+// holds for it. Anything else, a wrong signature included, is not an error: the registration makes a new machine, as
+// it does without a claim, so knowing a machine's id never gets anybody that machine.
+func (s *Service) heldBefore(ctx context.Context, req hubproto.RegisterRequest, code store.RegCode) (store.Machine, bool) {
+	c := req.Previous
+	if c == nil || code.Local || code.SpaceID == "" || c.MachineID == "" || len(c.MachineID) > 64 {
+		return store.Machine{}, false
 	}
+	m, err := s.db.S().MachineByID(ctx, c.MachineID)
+	if err != nil || m.SpaceID != code.SpaceID || m.RevokedAt != nil || m.DisabledAt != nil {
+		return store.Machine{}, false
+	}
+	held, err := base64.StdEncoding.DecodeString(m.KeyPub)
+	if err != nil || !hubproto.VerifyReregister(ed25519.PublicKey(held), c, strings.TrimSpace(req.Code), req.PublicKey) {
+		s.log.Warn("a registration claimed a machine's id without its key", "machine", m.ID)
+		return store.Machine{}, false
+	}
+	return m, true
+}
+
+func (s *Service) claimLocal(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
+	ctx := r.Context()
+	spaceID := t.SpaceID
 	if !p.Admin {
 		return httpx.New(http.StatusForbidden, "forbidden", "Подключить эту машину может только администратор установки")
 	}

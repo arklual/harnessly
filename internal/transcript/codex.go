@@ -38,6 +38,16 @@ func (p *CodexParser) Path() string { return p.path }
 // Offset is where the next incremental read starts.
 func (p *CodexParser) Offset() int64 { return p.lastOffset }
 
+// AtRest says the parser holds nothing the lines after its offset depend on: no line half written, no call still
+// running.
+func (p *CodexParser) AtRest() bool { return p.pending == "" && len(p.state.inFlight) == 0 }
+
+// Seat makes the next incremental read start at offset with nothing held, as a parser that was at rest there.
+func (p *CodexParser) Seat(offset int64) {
+	p.Reset()
+	p.lastOffset = offset
+}
+
 func (p *CodexParser) Reset() {
 	p.lastOffset = 0
 	p.pending = ""
@@ -333,6 +343,28 @@ func (p *CodexParser) ParseIncremental() (out Incremental) {
 	p.lastOffset = size
 	p.pending = newPending
 	return Incremental{NewEntries: r.entries, NewOffset: size, PendingBuffer: newPending}
+}
+
+// Holding says the parser holds the start of a line the next read must finish: it has no place at a line's start.
+func (p *CodexParser) Holding() bool { return p.pending != "" }
+
+// ParseAppended is ParseIncremental of whole lines read by the caller (a transcript index): buf starts at byte from
+// of the file and ends with a newline. false leaves the read to ParseIncremental: the parser holds the start of a
+// line, or buf does not start where the parser stands.
+func (p *CodexParser) ParseAppended(buf []byte, from int64) (out Incremental, ok bool) {
+	if p.pending != "" || from != p.lastOffset {
+		return Incremental{}, false
+	}
+	stay := Incremental{NewEntries: []*jsvalue.Object{}, NewOffset: p.lastOffset}
+	if len(buf) == 0 {
+		return stay, true
+	}
+	// Lines that cannot be read leave the parser where it is, as ParseIncremental does.
+	defer recoverCodex(func() { out, ok = stay, true })
+	segments := strings.Split(decodeUTF8(buf), "\n")
+	r := parseCodexLines(segments, p.state, codexLineOffsets(segments, textAt{start: from, firstLine: -1}), 0)
+	p.lastOffset = from + int64(len(buf))
+	return Incremental{NewEntries: r.entries, NewOffset: p.lastOffset}, true
 }
 
 // ParseCodexContent is the entries of Codex transcript text (parseCodexContent); nil where the previous runtime threw.

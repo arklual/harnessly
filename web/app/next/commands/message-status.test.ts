@@ -120,14 +120,41 @@ describe('the page asks the runtime where a late message is', () => {
     expect(waitsInQueue(msg(id), 'idle')).toBe(true);
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     expect(rt.commands.filter((c) => c.op === 'send')).toHaveLength(1);
-    // The runtime's memory of the opId would answer the same id again: the words go as a new message, the old one goes.
+    // What became of the message is not known for certain, so Повторить sends it under the same clientId first: the
+    // runtime takes one clientId once, however often it comes.
+    retryMessage(id);
+    await settle();
+    expect(msg(id)).toMatchObject({ rev: 0, state: { k: 'submitting' }, attempts: 1 });
+    expect(rt.commands.filter((c) => c.op === 'send').map((c) => c.body.opId)).toEqual([id, id]);
+    // This runtime answers from its memory of the opId and still has no message; its status says so again. Only then do
+    // the words go as a new message, and the old one goes.
+    await vi.advanceTimersByTimeAsync(STATUS_EVERY_MS + 2000);
+    expect(msg(id).state).toMatchObject({ k: 'failed', code: 'unconfirmed' });
     rt.handlers.set('send', (cmd, r) => r.defaultSend(cmd as Extract<typeof cmd, { op: 'send' }>));
     retryMessage(id);
     await settle();
     expect(msg(id).state.k).toBe('cancelled');
     const again = [...messagesStore.values()].find((v) => v.clientId !== id && v.text === 'как дела')!;
     expect(again).toMatchObject({ rev: 1, held: true, state: { k: 'queued' } });
-    expect(rt.commands.filter((c) => c.op === 'send').map((c) => c.body.opId)).toEqual([id, again.clientId]);
+    expect(rt.commands.filter((c) => c.op === 'send').map((c) => c.body.opId)).toEqual([
+      id,
+      id,
+      again.clientId,
+    ]);
+  });
+
+  it('a message that waits for an earlier one of its chat to be answered was not sent yet: nobody asks where it is', async () => {
+    const { rt, m } = await openChat();
+    rt.gatewayErrors = 999;
+    const first = sendMessage(m, { conversationId: CONV, text: 'первое' });
+    const second = sendMessage(m, { conversationId: CONV, text: 'второе' });
+    await vi.advanceTimersByTimeAsync(STATUS_EVERY_MS + 5000);
+    // The first got no answer for 30 s and was asked about. The second waited behind it all that time: it was not
+    // asked about, and its own 30 s count from its turn — it is not «unconfirmed» the moment its first try fails.
+    expect(rt.statusAsks.flat()).toContain(first);
+    expect(rt.statusAsks.flat()).not.toContain(second);
+    expect(msg(first).state).toMatchObject({ k: 'failed', code: 'unconfirmed' });
+    expect(msg(second).state.k).toBe('submitting');
   });
 
   it('expired: the runtime delivered it long ago and let it go; the copy goes', async () => {

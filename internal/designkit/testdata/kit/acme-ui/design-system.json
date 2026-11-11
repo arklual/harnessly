@@ -1,0 +1,52 @@
+{
+  "v": 3,
+  "title": "Acme UI",
+  "namespace": "Acme",
+  "libraries": [],
+  "kit": { "id": "acme-ui", "version": "1.0.0", "source": "library", "package": "@acme/ui", "root": "Root", "cssLayer": "kit-acme-ui", "tokenPrefix": "--acme-" },
+  "sections": { "foundation": { "title": "Foundation" }, "components": { "title": "Components" }, "templates": { "title": "Page templates" } },
+  "groups": [
+    { "id": "layout", "title": "Layout",
+      "components": [
+        { "id": "Root", "name": "Root", "part": "provider", "description": "Sets the theme of everything below it; wrap the page once.",
+          "props": [ { "name": "theme", "type": "enum", "values": ["light", "dark"], "description": "the colour mode" } ] },
+        { "id": "Card", "name": "Card", "description": "A raised block that groups a record's header and body on a page.",
+          "keywords": ["panel", "box"],
+          "props": [ { "name": "children", "type": "node", "required": true, "description": "its header and body" } ],
+          "sample": { "children": [ { "$c": "CardHeader", "children": "Spring concert" }, { "$c": "CardBody", "children": "412 tickets sold" } ] },
+          "code": { "import": "@acme/ui", "export": "Card" }, "status": "stable" },
+        { "id": "CardHeader", "name": "CardHeader", "part": "Card", "description": "The title row of a Card, above its body.",
+          "props": [ { "name": "children", "type": "node", "required": true, "description": "the title" } ] },
+        { "id": "CardBody", "name": "CardBody", "part": "Card", "description": "The content area of a Card under its header.",
+          "props": [ { "name": "children", "type": "node", "required": true, "description": "the content" } ] }
+      ] },
+    { "id": "actions", "title": "Actions",
+      "components": [
+        { "id": "Button", "name": "Button", "description": "The main way to act on a page: submits a form or starts a flow.",
+          "keywords": ["submit", "cta"],
+          "props": [
+            { "name": "variant", "type": "enum", "values": ["primary", "secondary"], "description": "visual weight; primary once per area" },
+            { "name": "disabled", "type": "boolean", "description": "greys it out and ignores clicks" },
+            { "name": "children", "type": "node", "required": true, "description": "the label" } ],
+          "variants": [ { "id": "secondary", "name": "Secondary", "props": { "variant": "secondary", "children": "Cancel" } } ],
+          "sample": { "variant": "primary", "children": "Save" },
+          "code": { "import": "@acme/ui", "export": "Button" }, "status": "stable" },
+        { "id": "PrimaryButton", "name": "PrimaryButton", "description": "The page's one main call to action, a Button in its primary weight.",
+          "preset": { "of": "Button", "props": { "variant": "primary" } }, "code": { "import": "@acme/ui", "export": "Button" } }
+      ] },
+    { "id": "display", "title": "Display",
+      "components": [
+        { "id": "Tag", "name": "Tag", "description": "A small label that names a status or a category of a record.",
+          "props": [ { "name": "children", "type": "node", "required": true, "description": "the label" } ],
+          "sample": { "children": "Draft" }, "status": "deprecated", "replacedBy": "Card" }
+      ] }
+  ],
+  "assetGroups": {},
+  "templates": [
+    { "id": "pages", "title": "Pages", "kind": "page", "aspect": [16, 10], "description": "Starting points for admin pages; copy one and fill it.",
+      "sections": [ { "id": "lists", "title": "Lists",
+        "layouts": [ { "id": "record-page", "name": "Record page", "purpose": "A page for one record: a card with its title and its main action.",
+                       "board": "_harnessly/layouts/record-page.dc.html",
+                       "slots": [ { "key": "title", "kind": "text", "sample": "Spring concert" } ] } ] } ] }
+  ]
+}

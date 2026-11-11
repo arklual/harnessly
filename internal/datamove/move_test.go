@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -390,5 +391,126 @@ func TestAnUploadWithAnExtensionMoves(t *testing.T) {
 		if !found {
 			t.Fatalf("the store has no %q", body)
 		}
+	}
+}
+
+// batchStore is a store that also answers for many blobs at once, and counts both kinds of look.
+type batchStore struct {
+	fakeStore
+	looks, batches int
+}
+
+func (s *batchStore) HasBlob(ctx context.Context, kind, sha string) (bool, error) {
+	s.mu.Lock()
+	s.looks++
+	s.mu.Unlock()
+	return s.fakeStore.HasBlob(ctx, kind, sha)
+}
+
+func (s *batchStore) MissingBlobs(_ context.Context, kind string, shas []string) (map[string]bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.batches++
+	missing := map[string]bool{}
+	for _, sha := range shas {
+		if _, ok := s.blobs[kind+"/"+sha]; !ok {
+			missing[sha] = true
+		}
+	}
+	return missing, nil
+}
+
+func TestVerifyAsksTheStoreOncePerKind(t *testing.T) {
+	data, transcripts := oldInstall(t)
+	st := &batchStore{fakeStore: fakeStore{blobs: map[string][]byte{}}}
+	m := newMover(data, transcripts, &st.fakeStore, nil)
+	m.o.Target = st
+	m.pass(context.Background())
+	if !m.Status().MigrationDone() {
+		t.Fatalf("the move: %+v", m.Status())
+	}
+	delete(st.blobs, "uploads/"+shaOf("png-1"))
+	st.looks, st.batches = 0, 0
+	v, err := m.Verify(context.Background())
+	if err != nil || v.Checked != 4 || len(v.Missing) != 1 || v.Missing[0].Object != "up_1" {
+		t.Fatalf("verify = %+v, %v", v, err)
+	}
+	// The two uploads are one request; a kind with one object is asked about as before.
+	if st.batches != 1 || st.looks != 2 {
+		t.Fatalf("%d batch looks and %d single ones; want 1 and 2", st.batches, st.looks)
+	}
+	m.pass(context.Background())
+	if _, ok := st.blobs["uploads/"+shaOf("png-1")]; !ok || !m.Status().MigrationDone() {
+		t.Fatalf("up_1 was not moved again: %+v", m.Status())
+	}
+}
+
+// An object no person can move does not stop the move: a file that left the disk and one bigger than the hub takes
+// are skipped with their reason, and the big one is not sent again until its size changes.
+func TestAGoneOrTooBigObjectIsSkippedWithItsReason(t *testing.T) {
+	data, transcripts := oldInstall(t)
+	if err := os.Remove(filepath.Join(data, "work", "report.pdf")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(data, "v2", "uploads", "up_2"), "png-2, grown bigger than the hub takes")
+	st := &fakeStore{blobs: map[string][]byte{}}
+	j := &fakeJournal{}
+	m := newMover(data, transcripts, st, j)
+	m.o.MaxBytes = 25
+	m.pass(context.Background())
+	s := m.Status()
+	if s.Failed != 0 || s.Skipped != 2 || s.Verified != 2 || !s.MigrationDone() {
+		t.Fatalf("status = %+v, want two skipped and the move done", s)
+	}
+	if o := j.last("files", shaOf("pdf-bytes")); o == nil || o.State != hubproto.MigrationSkipped || o.Code != CodeGone {
+		t.Fatalf("the hub was told %+v of the gone file", o)
+	}
+	if o := j.last("uploads", "up_2"); o == nil || o.State != hubproto.MigrationSkipped || o.Code != CodeTooBig {
+		t.Fatalf("the hub was told %+v of the big upload", o)
+	}
+
+	// The cause gone, both move.
+	write(t, filepath.Join(data, "work", "report.pdf"), "pdf-bytes")
+	write(t, filepath.Join(data, "v2", "uploads", "up_2"), "png-2")
+	m.pass(context.Background())
+	if s := m.Status(); s.Verified != 4 || s.Skipped != 0 {
+		t.Fatalf("status = %+v after the causes went", s)
+	}
+}
+
+// A store that refuses an object for its size is not sent it again pass after pass.
+func TestAnObjectTheStoreRefusesForItsSizeIsNotSentAgain(t *testing.T) {
+	data, transcripts := oldInstall(t)
+	st := &fakeStore{blobs: map[string][]byte{}, fail: fmt.Errorf("%w: 400 file bigger than 52428800 bytes", ErrTooBig)}
+	m := newMover(data, transcripts, st, &fakeJournal{})
+	m.pass(context.Background())
+	s := m.Status()
+	if s.Failed != 0 || s.Skipped != 1 || !s.MigrationDone() {
+		t.Fatalf("status = %+v, want one skipped", s)
+	}
+	puts := st.puts
+	m.pass(context.Background())
+	if st.puts != puts || m.Status().Skipped != 1 {
+		t.Fatalf("the refused object was sent again: %d puts", st.puts-puts)
+	}
+}
+
+// A journal from a runtime that failed such objects skips them on its next pass.
+func TestAnOlderJournalsGoneFailureIsSkipped(t *testing.T) {
+	data, transcripts := oldInstall(t)
+	st := &fakeStore{blobs: map[string][]byte{}}
+	m := newMover(data, transcripts, st, &fakeJournal{})
+	m.pass(context.Background())
+	if err := os.Remove(filepath.Join(data, "v2", "uploads", "up_1")); err != nil {
+		t.Fatal(err)
+	}
+	k := key(KindUploads, "up_1")
+	m.mu.Lock()
+	r := m.st.Records[k]
+	r.State, r.Code, r.Error, r.Attempts = hubproto.MigrationFailed, CodeGone, "gone", 12
+	m.mu.Unlock()
+	m.pass(context.Background())
+	if s := m.Status(); s.Failed != 0 || s.Skipped != 1 || !s.MigrationDone() {
+		t.Fatalf("status = %+v, want the old failure skipped", s)
 	}
 }

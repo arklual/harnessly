@@ -25,7 +25,7 @@ type FavGroup struct {
 
 // Favorites is how the pinned conversations are laid out: the groups in their order, then the conversations that
 // belong to none (Loose) in theirs. Whether a conversation is a favorite is its own `pinned`; this is only where it
-// stands. A pinned conversation the layout does not name shows first among the loose, newest first, and an id the
+// stands. A pinned conversation the layout does not name shows first among the loose, the newest created first, and an id the
 // layout names for a conversation that is not pinned (or gone) is ignored: both ways the pin of an older page stays
 // right without the layout being told.
 type Favorites struct {
@@ -57,7 +57,7 @@ func (f Favorites) Clone() Favorites {
 	return out
 }
 
-// Normalized keeps only the conversations of pinned (newest first), once each, where the layout had them, and puts the
+// Normalized keeps only the conversations of pinned (the newest created first), once each, where the layout had them, and puts the
 // pinned ones it did not name at the front of the loose.
 func (f Favorites) Normalized(pinned []string) Favorites {
 	out := f.Clone()

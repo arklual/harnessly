@@ -2,11 +2,19 @@
   "id": "example-corp.workspace",
   "name": "Example Corp workspace",
   "description": "A settings page, a first-run step, a button at a machine and the product's name: no React, no fork",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "harnessly": ">=0.17",
   "trust": "sandboxed",
-  "targets": ["settings", "onboarding", "object-action", "branding"],
-  "permissions": ["storage"],
+  "targets": [
+    "settings",
+    "onboarding",
+    "object-action",
+    "branding"
+  ],
+  "permissions": [
+    "storage",
+    "secrets:api-token"
+  ],
   "branding": {
     "name": "Example Corp Agents",
     "accent": "#2f6fed",
@@ -17,5 +25,37 @@
     { "id": "settings", "title": "Example Corp", "label": "Example Corp", "icon": "plug", "entry": "ui/settings.html", "targets": ["settings"] },
     { "id": "welcome", "title": "Connect your Example Corp account", "label": "Account", "order": 10, "entry": "ui/onboarding.html", "targets": ["onboarding"] },
     { "id": "open-ticket", "title": "Open in Example Corp", "label": "Open in Example Corp", "icon": "external-link", "objects": ["machine"], "entry": "ui/action.html", "targets": ["object-action"] }
-  ]
+  ],
+  "kind": "ui",
+  "secrets": [
+    {
+      "name": "api-token",
+      "description": "Token of the Example Corp API",
+      "optional": true
+    }
+  ],
+  "settings": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string",
+        "title": "Workspace",
+        "maxLength": 60
+      },
+      "notify": {
+        "type": "boolean",
+        "title": "Notify about new tickets",
+        "default": true
+      }
+    },
+    "required": [
+      "workspace"
+    ]
+  },
+  "data": {
+    "version": 2,
+    "migrations": {
+      "1": "migrations/1-to-2.json"
+    }
+  }
 }

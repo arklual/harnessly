@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -142,6 +143,11 @@ func TestCLIConsoleLogin(t *testing.T) {
 		c, _ := FindCLI(path, provider)
 		return CLIStatus(ctx, b.rig.Checker, b.rig.EnvDir, c)
 	}
+	var notes syncBuffer
+	b.mgr.cfg.ConsoleNote = func(_ context.Context, url, provider, state string, _ int64) bool {
+		fmt.Fprintln(&notes, provider+" "+state)
+		return false
+	}
 	// The console runs the line the way the runtime's terminal does, and its output is what the person reads.
 	var screen syncBuffer
 	b.mgr.cfg.Console = func(ctx context.Context, provider, line string) (string, error) {
@@ -209,6 +215,11 @@ func TestCLIConsoleLogin(t *testing.T) {
 		}
 	}
 
+	// The page was told the attempt waited, and that it connected (after the status check), nothing else.
+	if n := notes.String(); !strings.HasPrefix(n, "example-cli waiting\n") || !strings.HasSuffix(n, "example-cli connected\n") || strings.Contains(n, "secret") {
+		t.Errorf("notes: %q", n)
+	}
+
 	b.mu.Lock()
 	cmds, logins := b.console, b.logins
 	b.mu.Unlock()
@@ -241,4 +252,27 @@ func (s *syncBuffer) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.b.String()
+}
+
+// TestCLIConsoleCancelledOnThePage: the person cancels on the console page; the next note tells the manager, which ends
+// the login as cancelled without a status ever saying logged in.
+func TestCLIConsoleCancelledOnThePage(t *testing.T) {
+	b := newBench(t, Timing{})
+	path := filepath.Join(b.rig.Home, CLIsFile)
+	if err := os.WriteFile(path, []byte(`[{"id":"example-cli","label":"Example CLI","login":["example-cli","login"],"status":["example-cli","status"]}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b.mgr.cfg.CLI = func(id string) (CLI, bool) { return FindCLI(path, id) }
+	b.mgr.cfg.Status = func(context.Context, string) hubproto.AgentStatus {
+		return hubproto.AgentStatus{Login: hubproto.LoggedOut}
+	}
+	b.mgr.cfg.Console = func(context.Context, string, string) (string, error) { return b.consoleURL, nil }
+	var n atomic.Int32
+	b.mgr.cfg.ConsoleNote = func(_ context.Context, _, _, state string, _ int64) bool {
+		return n.Add(1) > 1 && state == "waiting"
+	}
+	if _, err := b.mgr.Start("k9", "example-cli", "console"); err != nil {
+		t.Fatal(err)
+	}
+	b.waitFor("cancelled")
 }

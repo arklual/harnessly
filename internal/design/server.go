@@ -101,6 +101,7 @@ func (l *Library) EnsureServer() (int, error) {
 	go func() { _ = s.srv.Serve(ln) }()
 	_ = l.EnsureGuide()
 	go l.WatchModes()
+	go l.WatchPages()
 	l.bgStarts.Add(1)
 	go func() {
 		defer l.bgStarts.Done()
@@ -293,7 +294,11 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 	}
 	switch pathname {
 	case "/favicon.ico":
-		w.WriteHeader(204)
+		// 200 with an empty body, not 204: the page enters its slot by a frame of this address and waits for the frame's
+		// load, and a browser never fires load for a 204 (the navigation is dropped), so every design stayed a skeleton.
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(200)
 		return
 	case scriptPath:
 		serveLibScript(w, r, l.clientScript(), immutable, "public, max-age=300", head)

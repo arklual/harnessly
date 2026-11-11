@@ -52,6 +52,8 @@ export interface ITeamData {
   unavailable: string[];
   collecting: { machine: string; done: number; total: number }[];
   latestDay: string;
+  /** Blocks of the page the report says it has no facts for (the hub's report). */
+  missing: Set<string>;
 }
 
 const addDay = (into: IUsageDay, day: IUsageDay) => {
@@ -87,6 +89,7 @@ export const mergeTeam = (team: ITeamUsage): ITeamData => {
   const unavailable: string[] = [];
   const collecting: ITeamData['collecting'] = [];
   const people = new Set<string>();
+  const missing = new Set<string>();
   let latestDay = '';
   for (const runtime of team.runtimes) {
     const report = runtime.report;
@@ -95,6 +98,7 @@ export const mergeTeam = (team: ITeamUsage): ITeamData => {
       continue;
     }
     people.add(runtime.person);
+    for (const block of report.hubMissing ?? []) missing.add(block);
     if (report.collecting)
       collecting.push({
         machine: `${personName(runtime.person)} · ${runtime.machineName}`,
@@ -141,7 +145,17 @@ export const mergeTeam = (team: ITeamUsage): ITeamData => {
   const ordered = [...people].sort(
     (a, b) => personColorIndex(a, 9) - personColorIndex(b, 9) || a.localeCompare(b),
   );
-  return { viewer: team.viewer, people: ordered, days, facts, sessions, unavailable, collecting, latestDay };
+  return {
+    viewer: team.viewer,
+    people: ordered,
+    days,
+    facts,
+    sessions,
+    unavailable,
+    collecting,
+    latestDay,
+    missing,
+  };
 };
 
 // --- dates (report days are Moscow calendar days) ---

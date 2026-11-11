@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,15 +28,17 @@ import (
 // history. A subfolder holding a .git of its own is left out of what is saved and looked at.
 
 const (
-	historyQuiet     = 15 * time.Second
-	historyRetry     = 5 * time.Second
-	historyPoll      = 20 * time.Second
-	historyRetries   = 12
-	historyStaleLock = 10 * time.Minute
-	historyGitTime   = 10 * time.Minute
-	embeddedBudget   = 50_000
-	maxSubjectBoards = 3
-	maxEditors       = 5
+	historyQuiet = 15 * time.Second
+	historyRetry = 5 * time.Second
+	historyPoll  = 20 * time.Second
+	// historyPollWatched is the look at the tree while the watcher runs: only what the watcher missed is left to it.
+	historyPollWatched = 3 * time.Minute
+	historyRetries     = 12
+	historyStaleLock   = 10 * time.Minute
+	historyGitTime     = 10 * time.Minute
+	embeddedBudget     = 50_000
+	maxSubjectBoards   = 3
+	maxEditors         = 5
 )
 
 const historyRepoConfig = "[core]\n\trepositoryformatversion = 0\n\tfilemode = false\n\tbare = false\n\tlogallrefupdates = true\n[gc]\n\tautoDetach = false\n"
@@ -773,7 +776,6 @@ type historyState struct {
 	started    bool
 	stopSub    func()
 	timer      *time.Timer
-	pollTicker *time.Ticker
 	pollStop   chan struct{}
 	retries    int
 	running    bool
@@ -979,24 +981,34 @@ func (l *Library) startHistoryWith(runtime string, onFailure func(string), quiet
 	})
 	h.mu.Lock()
 	h.stopSub = stop
-	h.pollTicker = time.NewTicker(poll)
-	ticker := h.pollTicker
 	l.arm(0)
 	h.work.Add(1)
 	h.mu.Unlock()
 	go func() {
 		defer h.work.Done()
+		t := time.NewTimer(historyPollDelay(l.watching(), poll))
+		defer t.Stop()
 		for {
 			select {
 			case <-stopCh:
 				return
-			case <-ticker.C:
+			case <-t.C:
 				// A watcher that broke is started again; the look at the tree covers what happened meanwhile.
-				l.watching()
+				watched := l.watching()
 				l.pollHistory()
+				t.Reset(historyPollDelay(watched, poll))
 			}
 		}
 	}()
+}
+
+// historyPollDelay is the wait before the next look at the tree: the short one while nothing watches the folder, a
+// long spread one while the watcher tells of every change.
+func historyPollDelay(watched bool, poll time.Duration) time.Duration {
+	if !watched || poll >= historyPollWatched {
+		return poll
+	}
+	return historyPollWatched + rand.N(historyPollWatched/2+1)
 }
 
 // stopHistory stops the history and returns once the snapshot or the look at the tree in flight has finished.
@@ -1016,9 +1028,6 @@ func (l *Library) stopHistory() {
 	if h.timer != nil {
 		h.timer.Stop()
 		h.timer = nil
-	}
-	if h.pollTicker != nil {
-		h.pollTicker.Stop()
 	}
 	close(h.pollStop)
 }

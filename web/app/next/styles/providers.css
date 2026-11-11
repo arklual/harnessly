@@ -157,6 +157,15 @@
 .hx-preset__link:hover {
   text-decoration: underline;
 }
+.hx-preset__code-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.hx-preset__code-row .hx-preset__code {
+  align-self: auto;
+}
 .hx-preset__code {
   align-self: flex-start;
   padding: 8px 14px;

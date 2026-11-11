@@ -63,6 +63,8 @@ type Status struct {
 	Command string `json:"command"`
 	// Fleet is the state of the releases on this machine, in fleet mode only (fleet.go).
 	Fleet *FleetStatus `json:"fleet,omitempty"`
+	// NextAuto is when the machine may next update by itself, while its window holds an update back (window.go).
+	NextAuto string `json:"nextAuto,omitempty"`
 }
 
 // Updater checks and applies. Set HubURL, Files, GOOS and GOARCH.
@@ -86,6 +88,11 @@ type Updater struct {
 	// Fleet switches to fleet mode (fleet.go): releases are rolled out to this machine from outside, so it neither
 	// compares its programs with the hub's nor replaces them by itself. Nil keeps the behaviour above.
 	Fleet *Fleet
+	// MinGap is the shortest time between an update and the next one Run applies by itself (window.go); zero is no
+	// window. StateFile remembers the last update across the restart it causes; Now is the clock (time.Now when nil).
+	MinGap    time.Duration
+	StateFile string
+	Now       func() time.Time
 
 	mu       sync.Mutex
 	st       Status
@@ -150,6 +157,9 @@ func (u *Updater) Status() Status {
 	s := u.st
 	s.Applying = u.applying
 	s.Command = u.Command()
+	if until := u.heldUntil(); !until.IsZero() {
+		s.NextAuto = until.UTC().Format(time.RFC3339)
+	}
 	if s.Mode == "" || u.Fleet != nil {
 		s.Mode = u.mode()
 	}
@@ -332,6 +342,7 @@ func (u *Updater) Apply(ctx context.Context) error {
 		names = append(names, s.Name)
 	}
 	u.record(version, true, nil)
+	u.markApplied()
 	if u.Applied != nil {
 		u.Applied(names)
 	}
@@ -392,14 +403,17 @@ func (u *Updater) Run(ctx context.Context) {
 		case <-time.After(wait):
 		}
 		wait = every
-		var err error
-		if u.Auto && u.Writable() {
-			err = u.Apply(ctx)
-		} else {
-			_, err = u.Check(ctx)
-		}
-		if err != nil && ctx.Err() == nil && u.Log != nil {
+		if err := u.tick(ctx); err != nil && ctx.Err() == nil && u.Log != nil {
 			u.Log("self-update failed", err)
 		}
 	}
+}
+
+// tick is one turn of Run: an update where the machine may take one by itself now, a check otherwise.
+func (u *Updater) tick(ctx context.Context) error {
+	if u.Auto && u.Writable() && u.heldUntil().IsZero() {
+		return u.Apply(ctx)
+	}
+	_, err := u.Check(ctx)
+	return err
 }

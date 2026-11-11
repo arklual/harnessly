@@ -44,7 +44,9 @@ type Message struct {
 type Outcome string
 
 const (
-	// Sent: the text left the input box (or the screen could not be read to say otherwise) — not yet accepted.
+	// Sent: the text left the input box (or the screen could not be read to say otherwise) — not yet accepted. An
+	// empty box is not delivery: the agent's prompt-submit hook or the message's entry in the transcript is, and the
+	// caller waits for one of them.
 	Sent Outcome = "sent"
 	// Wait: no input line or a working agent; nothing was typed.
 	Wait Outcome = "wait"
@@ -72,7 +74,12 @@ type Result struct {
 	AsPath bool
 	// Wiped: the box held text not of ours, and the person's word cleared it (Message.Wipe).
 	Wiped bool
-	Err   error
+	// Slow: the terminal did not answer in ProbeLimit, and the try ended before its first key (Wait).
+	Slow bool
+	// Lost: the try's hold of the pane ended under it (TypeHeld): it stopped where it was, and whatever it typed is
+	// not a delivery.
+	Lost bool
+	Err  error
 }
 
 const (
@@ -182,6 +189,13 @@ func Decide(m Message, s Screen, provider wire.Provider) Plan {
 // the person's answer in words, decides whether it may type now, and types what the box does not hold yet. The caller
 // holds the pane's lock.
 func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
+	if pr, ok := p.(Prober); ok {
+		if err := pr.Responsive(); err != nil {
+			// The terminal answers too slowly for the waits between the keys to mean anything: nothing is typed, and
+			// the message stays where it was for a later try.
+			return Result{Outcome: Wait, Slow: true, Err: &SlowError{Cause: err}}
+		}
+	}
 	view := Look(p, provider)
 	res := Result{Before: view}
 	if m.ClearOnly {

@@ -40,6 +40,7 @@ func (s *Service) open(r *http.Request, st store.Store, p *auth.Principal, featu
 	if err != nil {
 		return nil, err
 	}
+	w.install = s.install
 	return &req{ctx: ctx, st: st, p: p, w: w, rt: newRights(ctx, st, p), s: s}, nil
 }
 

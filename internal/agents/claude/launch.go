@@ -370,11 +370,16 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 		if err := agents.CheckLaunch(launch); err != nil {
 			return "", "", err
 		}
+		launch = agents.WithLaunchableApps(launch, c.Apps)
+	}
+	if launch != nil && len(launch.Apps) > 0 {
 		var err error
 		if apps, err = c.Apps.ClaudeFor(launch.Conversation, launch.Apps, settingsFile); err != nil {
-			return "", "", err
+			// The chat does not wait on its apps: it starts without them, and the reason is in the apps' logs.
+			launch, apps = agents.WithoutApps(launch, c.Apps, err), agents.ClaudeApps{}
+		} else {
+			settings = agents.ShellQuote(apps.Settings)
 		}
-		settings = agents.ShellQuote(apps.Settings)
 	}
 	mcp := c.MCPConfigPath
 	if apps.RuntimeMCPConfig != "" {

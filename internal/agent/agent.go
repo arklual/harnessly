@@ -65,8 +65,11 @@ type Agent struct {
 
 	// the chats of the runtime, forwarded to the cluster.
 	replica     *replica
-	replicaMu   sync.Mutex
-	replicaConn *websocket.Conn
+	replicaSock replicaSock
+	// hubReplica is the chats an observe link hands its hub (AGENT_HUB_HISTORY=on): a replica and a socket of
+	// their own, apart from the cluster's above.
+	hubReplica *replica
+	hubSock    replicaSock
 
 	localToken string
 }
@@ -112,6 +115,9 @@ func New(cfg Config) (*Agent, error) {
 		a.hub = newHub(a, cfg.ObserveMachine, filepath.Dir(cfg.ObserveMachineFile), true)
 	}
 	a.replica = newReplica(a)
+	if a.hub != nil && a.hub.observe {
+		a.hubReplica = newHubReplica(a.hub)
+	}
 	return a, nil
 }
 
@@ -279,6 +285,36 @@ func field[T any](req map[string]json.RawMessage, name string) (T, bool) {
 }
 
 // body is the request without its op and id: what a relayed operation hands the runtime.
+// startConversation is conversations.start: the runtime starts a conversation; a run of an automation (runId,
+// resultToken) gets the port to report to and its token is kept for that one report.
+func (a *Agent) startConversation(req map[string]json.RawMessage) (json.RawMessage, error) {
+	runID, _ := field[string](req, "runId")
+	resultToken, _ := field[string](req, "resultToken")
+	b := body(req, "runId", "resultToken")
+	if runID != "" {
+		// The conversation reports back to this process over loopback, so the port is the agent's own.
+		env, _ := field[map[string]json.RawMessage](req, "env")
+		if env == nil {
+			env = map[string]json.RawMessage{}
+		}
+		port, _ := json.Marshal(strconv.Itoa(a.cfg.Port))
+		env[a.cfg.ReportPortEnv] = port
+		raw, _ := json.Marshal(env)
+		b["env"] = raw
+	}
+	started, err := a.callRuntime(a.cfg.RuntimeAPI+"/automations/start", b)
+	if err != nil {
+		return nil, err
+	}
+	// Kept in memory only, never written or logged: the one thing that authorizes this run's report.
+	if runID != "" && resultToken != "" {
+		a.mu.Lock()
+		a.automationTokens[runID] = resultToken
+		a.mu.Unlock()
+	}
+	return started, nil
+}
+
 func body(req map[string]json.RawMessage, drop ...string) map[string]json.RawMessage {
 	out := make(map[string]json.RawMessage, len(req))
 	for k, v := range req {
@@ -302,7 +338,7 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 		if err != nil {
 			return nil, nil, err
 		}
-		return map[string]bool{"opened": true}, start, nil
+		return tunnelOpened(spec), start, nil
 	case "hello":
 		return a.hello, nil, nil
 	case "transcripts.list":
@@ -365,31 +401,8 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 			return frame(id, chunk, data)
 		}), nil, nil
 	case "conversations.start":
-		runID, _ := field[string](req, "runId")
-		resultToken, _ := field[string](req, "resultToken")
-		b := body(req, "runId", "resultToken")
-		if runID != "" {
-			// The conversation reports back to this process over loopback, so the port is the agent's own.
-			env, _ := field[map[string]json.RawMessage](req, "env")
-			if env == nil {
-				env = map[string]json.RawMessage{}
-			}
-			port, _ := json.Marshal(strconv.Itoa(a.cfg.Port))
-			env[a.cfg.ReportPortEnv] = port
-			raw, _ := json.Marshal(env)
-			b["env"] = raw
-		}
-		started, err := a.callRuntime(route("automations/start"), b)
-		if err != nil {
-			return nil, nil, err
-		}
-		// Kept in memory only, never written or logged: the one thing that authorizes this run's report.
-		if runID != "" && resultToken != "" {
-			a.mu.Lock()
-			a.automationTokens[runID] = resultToken
-			a.mu.Unlock()
-		}
-		return started, nil, nil
+		started, err := a.startConversation(req)
+		return started, nil, err
 	case "docs.deliver":
 		res, err := a.callRuntime(route("docs/deliver"), body(req))
 		return res, nil, err
@@ -620,6 +633,11 @@ func (a *Agent) Run(ctx context.Context) error {
 			Log("warn", "the observe link to the hub did not start", F{"error", err.Error()})
 		} else {
 			defer a.hub.stop()
+			if a.cfg.RuntimePort != 0 && historyOptedIn() {
+				// the hub gets the chats beside the cluster, on a replica and a socket of its own; nothing is
+				// sent before the hub's history.start.
+				a.startHubReplica(ctx)
+			}
 			dialed := make(chan struct{})
 			go func() {
 				defer close(dialed)

@@ -126,7 +126,7 @@ const site: ITourTrack = {
     },
     {
       id: 'note',
-      target: ['.hx-ann .hx-note__input', NOTE_CARD],
+      target: ['.hx-ann .hx-ann__input', NOTE_CARD],
       note: 'Сделай заголовок короче и ярче',
       done: (env) => env.signals.has('site:note') || env.find(NOTE_PIN) !== null,
       needs: { test: found(NOTE_CARD, NOTE_PIN), back: 'pick' },

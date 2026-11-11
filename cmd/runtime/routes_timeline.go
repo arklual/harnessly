@@ -35,7 +35,7 @@ func (c *core) timelineRoutes(f *gate.Gate, d deps) []gate.Route {
 	stats := &history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}
 	sink := &statusline.Sink{Authorized: authorized, TokenOK: token, Home: d.Home, ClaudeDir: claudeDir, Limits: c.limits, Stats: stats,
 		Ultracode: c.ultracodeSession, Broadcast: c.broadcastSessionStats, Script: filepath.Join(d.DataDir, hooksetup.StatuslineFile)}
-	econ := &economics.Route{Store: &economics.Store{Dir: filepath.Join(d.DataDir, "economics")}, Stats: stats, Authorized: authorized,
+	econ := &economics.Route{Store: &economics.Store{Dir: filepath.Join(d.DataDir, "economics"), Lines: c.transcripts.Follower("economics", 0)}, Stats: stats, Authorized: authorized,
 		SessionOK: d.SessionOK, FindTab: c.layoutTabByID, Limits: func(p string) any { return providerLimits(p) }}
 	subs := &subagents.Route{Lister: &subagents.Lister{}, Authorized: authorized, SessionOK: d.SessionOK,
 		Paths: subagents.Paths{ClaudeProjects: filepath.Join(claudeDir, "projects"), CodexSessions: filepath.Join(codexDir, "sessions")}}

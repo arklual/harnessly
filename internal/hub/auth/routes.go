@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -25,6 +26,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/auth/oauth/{provider}/start", s.direct(http.HandlerFunc(s.oauthStart)))
 	mux.Handle("GET /api/auth/oauth/{provider}/callback", s.direct(http.HandlerFunc(s.oauthCallback)))
 	mux.Handle("POST /api/auth/logout", s.direct(httpx.Handler(s.logout)))
+	mux.Handle("POST /api/auth/logout/all", s.direct(s.Require(s.logoutAll)))
 
 	mux.Handle("GET /api/me", s.Require(s.me))
 	mux.Handle("PATCH /api/me", s.Require(s.patchMe))
@@ -32,6 +34,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/me/passkeys/finish", s.Require(s.passkeyRegisterFinish))
 	mux.Handle("DELETE /api/me/passkeys/{id}", s.Require(s.deletePasskey))
 	mux.Handle("DELETE /api/me/identities/{provider}", s.Require(s.deleteIdentity))
+	mux.Handle("PUT /api/admin/users/{userId}/disabled", s.Require(s.setDisabled))
 }
 
 // emailOn answers 404 on the code sign-in when the hub has it off (HUB_AUTH_EMAIL=off).
@@ -69,6 +72,66 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) error {
 	}
 	s.clearCookie(w)
 	httpx.NoContent(w)
+	return nil
+}
+
+// logoutAll ends every session of the person, this one too: on every device, and on the machines they had open.
+func (s *Service) logoutAll(w http.ResponseWriter, r *http.Request, p *Principal) error {
+	ctx := r.Context()
+	if err := s.db.S().DeleteUserSessions(ctx, p.User.ID, ""); err != nil {
+		return err
+	}
+	s.Audit(ctx, p.User.ID, "logout_all", r, "")
+	s.sessionsEnded(p.User.ID)
+	s.clearCookie(w)
+	httpx.NoContent(w)
+	return nil
+}
+
+// setDisabled switches an account off or back on; only an administrator of the installation may, and not their own.
+// Switching off ends every session of the account in the same transaction.
+func (s *Service) setDisabled(w http.ResponseWriter, r *http.Request, p *Principal) error {
+	if !p.Admin {
+		return httpx.ErrNotFound
+	}
+	var req struct{ Disabled *bool }
+	if err := httpx.Decode(r, &req); err != nil {
+		return err
+	}
+	if req.Disabled == nil {
+		return httpx.Invalid("disabled", "true or false")
+	}
+	userID := r.PathValue("userId")
+	if userID == p.User.ID {
+		return httpx.Conflict("own_account", "Свой аккаунт отключить нельзя")
+	}
+	ctx := r.Context()
+	changed := false
+	err := s.db.Tx(ctx, func(st store.Store) error {
+		if _, err := st.UserByID(ctx, userID); err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return httpx.ErrNotFound
+			}
+			return err
+		}
+		var err error
+		if *req.Disabled {
+			changed, err = st.DisableUser(ctx, userID, s.now().UTC())
+		} else {
+			changed, err = st.EnableUser(ctx, userID)
+		}
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	if changed && *req.Disabled {
+		s.Audit(ctx, p.User.ID, "account_disabled", r, userID)
+		s.sessionsEnded(userID)
+	} else if changed {
+		s.Audit(ctx, p.User.ID, "account_enabled", r, userID)
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"disabled": *req.Disabled})
 	return nil
 }
 
@@ -153,8 +216,11 @@ func (s *Service) deletePasskey(w http.ResponseWriter, r *http.Request, p *Princ
 		if n <= 1 {
 			return errLastMethod
 		}
-		_, err = st.DeletePasskey(ctx, p.User.ID, r.PathValue("id"))
-		return err
+		if _, err = st.DeletePasskey(ctx, p.User.ID, r.PathValue("id")); err != nil {
+			return err
+		}
+		// Whoever signed in with the removed way is signed out; the session that removed it stays.
+		return st.DeleteOtherSessions(ctx, p.User.ID, p.Session.TokenHash)
 	})
 	if err != nil {
 		return err
@@ -188,8 +254,10 @@ func (s *Service) deleteIdentity(w http.ResponseWriter, r *http.Request, p *Prin
 		if n <= 1 {
 			return errLastMethod
 		}
-		_, err = st.DeleteIdentity(ctx, p.User.ID, provider)
-		return err
+		if _, err = st.DeleteIdentity(ctx, p.User.ID, provider); err != nil {
+			return err
+		}
+		return st.DeleteOtherSessions(ctx, p.User.ID, p.Session.TokenHash)
 	})
 	if err != nil {
 		return err

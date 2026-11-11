@@ -117,6 +117,12 @@ With `HUB_PROVIDER_PROTOCOL` other than `v0` the Hub mounts, for the owner of a 
   machine's id at the provider;
 - `GET /api/machines/{machineId}/provider`, `POST …/provider/power` `{ action }`, `GET …/provider/ops/{opId}`.
 
+The Hub records the server it asked for with the space that asked (`provider_servers`) and the operations it started
+(`provider_ops`). A machine is attached only to a server of its own space (anything else answers 404
+`server_not_found`, and the adapter is not called), a server to one machine (409 `server_attached`), and an operation is
+read only by the space that started it, or through the machine it was started on. A server the Hub did not make is taken
+over by an administrator of the installation: their attach records it for the space of the machine.
+
 On v0 these answer 404 as before.
 
 ## The example adapter and the update scenario

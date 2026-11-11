@@ -1,4 +1,15 @@
-# Documents on: the artifacts service runs in the release, boards are left to a service of their own.
+# Documents and boards on, both run in the release on volumes, routed on the hub's Ingress.
 publicUrl: https://hub.example.com
+adminEmails: [admin@example.com]
+ingress:
+  enabled: true
 docs:
   enabled: true
+  url: https://docs.example.com
+  storage:
+    type: fs
+boards:
+  enabled: true
+  url: https://boards.example.com
+  storage:
+    type: fs

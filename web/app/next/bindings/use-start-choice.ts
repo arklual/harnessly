@@ -1,7 +1,12 @@
 // The model a new chat starts on, with the pill to change it (features/composer/start-choice.ts says the order): the
 // start page's field and a design's first message take it the same way.
 import { useEffect, useState } from 'react';
-import { pickerAgents, type IModelChoice, type IPickerAgent } from '@/next/features/composer/agents';
+import {
+  pickerAgents,
+  signInNeeded,
+  type IModelChoice,
+  type IPickerAgent,
+} from '@/next/features/composer/agents';
 import { useTourStep } from '@/next/features/tour/use-tour-step';
 import { tourFact } from '@/next/stores/tour';
 import { readLastChoice, rememberChoice, startChoice } from '@/next/features/composer/start-choice';
@@ -63,5 +68,5 @@ export const useStartChoice = (machine: MachineId | null, plainOnly = false) => 
     setPicked(next);
     rememberChoice(next);
   };
-  return { choice: lesson ?? choice, agents, onPick };
+  return { choice: lesson ?? choice, agents, onPick, signIn: known && signInNeeded(agents) };
 };

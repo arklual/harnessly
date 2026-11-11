@@ -275,7 +275,7 @@ const TurnView = ({ item, open, machineName, handlers }: ITurnViewProps) => {
   };
   const ends = (
     <>
-      {live && (
+      {live && !item.settled && (
         <NowBlock
           now={item.now}
           startedAt={turn.startedAt}

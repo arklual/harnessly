@@ -1,6 +1,6 @@
 #!/bin/sh
-# harnessly installer for one machine: the latest release into ~/.local/bin, started as a service of this account,
-# listening on 127.0.0.1 only.
+# harnessly installer for one machine: the release of its update channel (stable unless asked otherwise) into
+# ~/.local/bin, started as a service of this account, listening on 127.0.0.1 only.
 #
 #   curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh -s -- --port 8030
@@ -28,7 +28,9 @@ harnessly installer
 
   curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh -s -- [options]
 
-  --version X.Y.Z   install this release (default: the latest)
+  --version X.Y.Z   install this release (default: the one of the channel)
+  --channel NAME    stable (the default: the release the project named stable) or latest (every release); kept for
+                    the next runs and for the "new version" notice (or HARNESSLY_CHANNEL; docs/update-channels.md)
   --port N          the page's port on 127.0.0.1 (default 8022)
   --prefix DIR      where bin/ goes (default ~/.local)
   --no-service      install the programs only, do not start anything
@@ -39,7 +41,8 @@ harnessly installer
   --ca-file FILE    PEM file with your company's CA certificates (downloads and every component trust it)
   --proxy URL       HTTP(S) proxy for downloads and for every component
   --no-proxy LIST   hosts that skip the proxy (127.0.0.1 and localhost are always there)
-  --mirror URL      release files from here instead of github.com (same layout: URL/vX.Y.Z/<file>, URL/latest.txt)
+  --mirror URL      release files from here instead of github.com (same layout: URL/vX.Y.Z/<file>, URL/latest.txt,
+                    URL/stable.json for the stable channel)
   --npm-registry URL, --pip-index URL
                     package mirrors the agents' own installs and tools use
   --offline DIR     install from a bundle folder (scripts/make-offline-bundle.sh); no network is used
@@ -74,6 +77,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 parse_args() {
 	VERSION=
+	CHANNEL=${HARNESSLY_CHANNEL:-}
 	PORT=8022
 	PREFIX=${HOME}/.local
 	SERVICE=1
@@ -100,7 +104,7 @@ parse_args() {
 			set -- "$_k" "$_v" "$@"
 			continue
 			;;
-		--version | --port | --prefix | --archive | --ca-file | --proxy | --no-proxy | --mirror | --npm-registry | --pip-index | --offline | --log)
+		--version | --channel | --port | --prefix | --archive | --ca-file | --proxy | --no-proxy | --mirror | --npm-registry | --pip-index | --offline | --log)
 			[ $# -ge 2 ] || die "$1 needs a value"
 			case $1 in
 			--ca-file) CA_FILE=$2 ;;
@@ -112,6 +116,7 @@ parse_args() {
 			--offline) OFFLINE=$2 ;;
 			--log) LOG=$2 ;;
 			--version) VERSION=${2#v} ;;
+			--channel) CHANNEL=$2 ;;
 			--port) PORT=$2 ;;
 			--prefix) PREFIX=$2 ;;
 			--archive) LOCAL_ARCHIVE=$2 ;;
@@ -135,6 +140,7 @@ parse_args() {
 		shift
 	done
 	case $PORT in '' | *[!0-9]*) die "--port must be a number, got: $PORT" ;; esac
+	case $CHANNEL in '' | stable | latest) ;; *) die "--channel is stable or latest, got: $CHANNEL" ;; esac
 	BIN=$PREFIX/bin
 	URL=http://127.0.0.1:$PORT
 }
@@ -514,15 +520,43 @@ stop_browser_hosts() {
 	done
 }
 
-resolve_version() {
-	if [ -n "$LOCAL_ARCHIVE" ]; then VERSION=${VERSION:-local}; return 0; fi
-	[ -z "$VERSION" ] || return 0
-	if [ -n "$OFFLINE" ]; then
-		# shellcheck disable=SC2012 # the names are ours
-		VERSION=$(ls "$OFFLINE"/harnessly_*_"${OS}_${ARCH}".tar.gz 2>/dev/null | sed -n 's|.*/harnessly_\(.*\)_'"${OS}_${ARCH}"'\.tar\.gz|\1|p' | sort -V | tail -n 1)
-		[ -n "$VERSION" ] || die "no harnessly_*_${OS}_${ARCH}.tar.gz in $OFFLINE"
-		return 0
+# resolve_channel settles the update channel: --channel or HARNESSLY_CHANNEL, else RUNTIME_UPDATE_CHANNEL given to this
+# run, else what an earlier run kept in the env file, else stable.
+resolve_channel() {
+	[ -n "$CHANNEL" ] || CHANNEL=${RUNTIME_UPDATE_CHANNEL:-}
+	if [ -z "$CHANNEL" ] && [ -f "$ENV_FILE" ]; then
+		CHANNEL=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}RUNTIME_UPDATE_CHANNEL="\{0,1\}\([a-z]*\)"\{0,1\}[[:space:]]*$/\2/p' "$ENV_FILE" | tail -n 1)
 	fi
+	case $CHANNEL in
+	latest) ;;
+	*) CHANNEL=stable ;;
+	esac
+}
+
+# installed_version prints X.Y.Z of the harnessly already in $BIN, or nothing (none there, or a build from source).
+installed_version() {
+	[ -x "$BIN/harnessly" ] || return 0
+	_v=$("$BIN/harnessly" version 2>/dev/null | sed -n 's/^harnessly v\{0,1\}\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p') || true
+	printf '%s' "$_v"
+}
+
+# version_newer says whether $1 is a newer X.Y.Z than $2.
+version_newer() {
+	[ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)" = "$1" ]
+}
+
+# stable_version reads the stable pointer (stable.json: {"version": "X.Y.Z", ...}) and prints its version, or nothing
+# when the source of releases has no pointer or it holds no version.
+stable_version() {
+	_url=https://github.com/$REPO/releases/download/channels/stable.json
+	[ -z "$MIRROR" ] || _url=$MIRROR/stable.json
+	_body=$(curl -fsSL "$_url" 2>/dev/null) || return 0
+	_v=$(printf '%s' "$_body" | tr -d '\r\n' | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"v\{0,1\}\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p')
+	printf '%s' "$_v"
+}
+
+# latest_version puts the newest published release into VERSION.
+latest_version() {
 	if [ -n "$MIRROR" ]; then
 		VERSION=$(curl -fsSL "$MIRROR/latest.txt" | tr -d 'v \r\n') || die "could not read $MIRROR/latest.txt; give --version"
 		case $VERSION in '' | *[!0-9.]*) die "$MIRROR/latest.txt has no version in it" ;; esac
@@ -533,6 +567,42 @@ resolve_version() {
 		die "could not reach github.com"
 	VERSION=${tag_url##*/v}
 	case $VERSION in '' | *[!0-9.]*) die "could not read the latest version from $tag_url" ;; esac
+}
+
+resolve_version() {
+	resolve_channel
+	if [ -n "$LOCAL_ARCHIVE" ]; then VERSION=${VERSION:-local}; return 0; fi
+	[ -z "$VERSION" ] || return 0
+	if [ -n "$OFFLINE" ]; then
+		# shellcheck disable=SC2012 # the names are ours
+		VERSION=$(ls "$OFFLINE"/harnessly_*_"${OS}_${ARCH}".tar.gz 2>/dev/null | sed -n 's|.*/harnessly_\(.*\)_'"${OS}_${ARCH}"'\.tar\.gz|\1|p' | sort -V | tail -n 1)
+		[ -n "$VERSION" ] || die "no harnessly_*_${OS}_${ARCH}.tar.gz in $OFFLINE"
+		return 0
+	fi
+	if [ "$CHANNEL" = latest ]; then
+		latest_version
+		return 0
+	fi
+	# The stable channel never takes the latest release in silence and never goes back: without a stable release to
+	# take, what is installed stays, and the reason is said.
+	have_now=$(installed_version)
+	stable=$(stable_version)
+	if [ -z "$stable" ]; then
+		if [ -n "$have_now" ]; then
+			warn "no stable release is named yet (no stable.json where the releases are): staying on harnessly $have_now. --channel latest follows every release."
+			VERSION=$have_now
+			return 0
+		fi
+		warn "no stable release is named yet (no stable.json where the releases are): installing the latest release instead. The stable channel is kept, so later updates wait for a stable release."
+		latest_version
+		return 0
+	fi
+	if [ -n "$have_now" ] && version_newer "$have_now" "$stable"; then
+		say "harnessly $have_now is installed and the stable release is $stable: staying on $have_now until a newer one is stable."
+		VERSION=$have_now
+		return 0
+	fi
+	VERSION=$stable
 }
 
 sha256_of() {
@@ -630,6 +700,9 @@ EOF
 	given_runtime_env | while IFS= read -r line; do
 		set_env_line "${line%%=*}" "${line#*=}"
 	done
+	# The update channel of this installation: the runtime's "new version" notice and the next run of this script
+	# read it here.
+	[ -z "${CHANNEL:-}" ] || set_env_line RUNTIME_UPDATE_CHANNEL "$CHANNEL"
 	umask 022
 }
 

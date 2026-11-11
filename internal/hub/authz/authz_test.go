@@ -304,3 +304,112 @@ func TestMembershipOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestAGrantNeedsMembership(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	s := w.a.S
+	t1, ta := Scope{store.ScopeTenant, w.t1}, Scope{store.ScopeTeam, w.ta}
+	can := func(who string, sc Scope) string {
+		_, err := w.a.Can(ctx, Principal{UserID: w.users[who]}, Check{Action: Manage, Scope: sc})
+		return code(err)
+	}
+	if got := can("ta", t1); got != "ok" {
+		t.Fatalf("a tenant admin who is a member: %s", got)
+	}
+	if got := can("la", ta); got != "ok" {
+		t.Fatalf("a team lead who is a member: %s", got)
+	}
+	// The grants are put back after the removal: a grant that outlived the membership is what must give nothing.
+	for _, who := range []string{"ta", "la"} {
+		if err := s.RemoveMember(ctx, w.t1, w.users[who]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	left, err := s.GrantsOfUser(ctx, w.users["ta"])
+	if err != nil || len(left) != 0 {
+		t.Fatalf("removal leaves the tenant's grants: %+v %v", left, err)
+	}
+	left, err = s.GrantsOfUser(ctx, w.users["la"])
+	if err != nil || len(left) != 0 {
+		t.Fatalf("removal leaves the team's grants: %+v %v", left, err)
+	}
+	if teams, err := s.TeamsOfUser(ctx, w.users["la"]); err != nil || len(teams) != 0 {
+		t.Fatalf("removal leaves the team places: %+v %v", teams, err)
+	}
+	if _, err := s.Grant(ctx, store.RoleGrant{UserID: w.users["ta"], ScopeKind: store.ScopeTenant, ScopeID: w.t1, Role: store.RoleAdmin}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Grant(ctx, store.RoleGrant{UserID: w.users["la"], ScopeKind: store.ScopeTeam, ScopeID: w.ta, Role: store.RoleLead}); err != nil {
+		t.Fatal(err)
+	}
+	if got := can("ta", t1); got != "forbidden_scope/tenant_admin" {
+		t.Errorf("a tenant grant without membership: %s", got)
+	}
+	if got := can("ta", ta); got == "ok" {
+		t.Errorf("a tenant grant without membership manages a team: %s", got)
+	}
+	if got := can("la", ta); got == "ok" {
+		t.Errorf("a team grant without membership: %s", got)
+	}
+	// An administrator of the organization manages its tenants from above, as before.
+	if got := can("oa", t1); got != "ok" {
+		t.Errorf("an organization admin: %s", got)
+	}
+}
+
+// An administrator of the installation who uses that role on a scope they hold nothing in leaves a line in its
+// journal, once per action; a person who manages the scope by a role of their own leaves none.
+func TestOperatorAccessIsInTheJournal(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	tenant := Scope{Kind: store.ScopeTenant, ID: w.x}
+	lines := func() []store.AuditEvent {
+		t.Helper()
+		out, err := w.a.S.Audit(ctx, store.AuditFilter{SpaceID: w.x})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if _, err := w.a.Can(ctx, Principal{UserID: w.users["xo"], InstanceAdmin: true}, Check{Action: View, Scope: tenant}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.a.Can(ctx, Principal{UserID: w.users["inst"]}, Check{Action: View, Scope: tenant}); err == nil {
+		t.Fatal("a stranger views the tenant")
+	}
+	if got := lines(); len(got) != 0 {
+		t.Fatalf("the owner, or a refused stranger, left a line: %+v", got)
+	}
+	inst := Principal{UserID: w.users["inst"], InstanceAdmin: true}
+	for range 3 {
+		if _, err := w.a.Can(ctx, inst, Check{Action: View, Scope: tenant}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := w.a.Can(ctx, inst, Check{Action: Manage, Scope: tenant}); err != nil {
+		t.Fatal(err)
+	}
+	got := lines()
+	if len(got) != 2 {
+		t.Fatalf("lines: %+v", got)
+	}
+	actions := map[string]bool{}
+	for _, e := range got {
+		actions[e.Action] = true
+		if e.ActorID != w.users["inst"] || e.ScopeKind != store.ScopeTenant || e.ScopeID != w.x || e.TargetID != w.x {
+			t.Errorf("line %+v", e)
+		}
+	}
+	if !actions["operator.view"] || !actions["operator.manage"] {
+		t.Errorf("actions %v", actions)
+	}
+	// A team of an organization's tenant: the line names the organization, the tenant and the team.
+	if _, err := w.a.Can(ctx, inst, Check{Action: View, Scope: Scope{Kind: store.ScopeTeam, ID: w.ta}}); err != nil {
+		t.Fatal(err)
+	}
+	team, err := w.a.S.Audit(ctx, store.AuditFilter{TeamID: w.ta})
+	if err != nil || len(team) != 1 || team[0].OrgID != w.o || team[0].SpaceID != w.t1 {
+		t.Fatalf("team line: %+v %v", team, err)
+	}
+}

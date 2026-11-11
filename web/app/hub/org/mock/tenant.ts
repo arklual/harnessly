@@ -91,6 +91,11 @@ export const tenantMock = (_ctx: MockCtx): TenantApi => {
       };
       return later(issued);
     },
+    claimLocalMachine: async () => {
+      const local: SpaceMachine = { id: 'm-local', name: 'Эта машина', status: 'online' };
+      if (!machines.some((m) => m.id === local.id)) machines.push(local);
+      return later({ ...local });
+    },
     tenantInvites: async () => later(invites.map(listed)),
     inviteByEmail: async (_space, email, role) => {
       const made = invite('email', email, role);

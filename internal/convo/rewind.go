@@ -308,6 +308,7 @@ func (c *conv) switchTranscript(path, sessionID string, now time.Time) {
 	ts, es, before := c.fd.Snapshot(snapshotTurns)
 	fit := wire.FitConv(wire.ConvSnapshot{Turns: ts, Entries: es, BeforeTurnID: before})
 	c.emit(wire.FeedResetEv{Turns: fit.Turns, Entries: fit.Entries, BeforeTurnID: fit.BeforeTurnID})
+	c.paneReread()
 	c.lastTurn()
 	c.touch()
 	c.flush(now, true)

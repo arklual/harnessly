@@ -45,3 +45,7 @@ type Carry struct {
 	expandsPrompt bool
 	set           bool
 }
+
+// Open says the read ended inside something the next lines belong to: a read that starts after it from nothing would
+// read those lines differently.
+func (c Carry) Open() bool { return c.set }

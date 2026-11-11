@@ -75,6 +75,22 @@ type RoomMeta interface {
 	ExportState(ctx context.Context) (RoomState, error)
 	ImportState(ctx context.Context, st RoomState) error
 	Counts(ctx context.Context) (RoomCounts, error)
+
+	// Uploads in parts (uploads.go). UploadOpen records u, unless the member has an upload of the same contents under
+	// way: that one is returned (with its parts) and created is false. ErrTooManyUploads past the limits.
+	UploadOpen(ctx context.Context, u Upload, lim OpenLimits, now int64) (out Upload, created bool, err error)
+	// UploadGet is an upload with its parts; nil when there is none (or it expired).
+	UploadGet(ctx context.Context, id string, now int64) (*Upload, error)
+	// UploadBegun records the store's handle of the upload's assembly.
+	UploadBegun(ctx context.Context, id, handle string) error
+	// UploadPart records part p.N with the hash state of the contents up to its end and moves the expiry to expires;
+	// false (and nothing recorded) unless p.N is the next part of an upload still receiving.
+	UploadPart(ctx context.Context, id string, p UploadPart, hash string, expires int64) (bool, error)
+	// UploadSetState moves an upload from one state to another; false when it was not in from.
+	UploadSetState(ctx context.Context, id, from, to, errText string, expires int64) (bool, error)
+	UploadDrop(ctx context.Context, id string) error
+	// UploadsExpired lists the uploads whose term ended.
+	UploadsExpired(ctx context.Context, now int64) ([]Upload, error)
 }
 
 // RoomState is a room's small tables: which revision is current for each path, members, wrapped keys, settings.

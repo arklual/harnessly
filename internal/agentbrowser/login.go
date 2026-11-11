@@ -103,6 +103,32 @@ func (q *LoginRequests) open(conv string, identity ConversationIdentity, target,
 	return x, true, nil
 }
 
+// loginHold is how long a waiting login keeps its browser from the idle stop: the person may sign in and return
+// control minutes later, and a stopped browser would lose the tab the request is bound to.
+const loginHold = 30 * time.Minute
+
+func (x *loginRequest) heldAt(now time.Time) bool {
+	if x == nil {
+		return false
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	return x.answer.Status == "waiting" && now.Sub(time.UnixMilli(x.ask.At)) < loginHold
+}
+
+// dropLogins settles the logins of a browser that went down: its tabs come back under new IDs in a new instance,
+// so a request left waiting could never be answered and would stay on every chat's screen.
+func (i *Instance) dropLogins() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	for _, p := range i.pages {
+		if p.login != nil {
+			p.login.settle("cancelled", i.redactLocked(p.URL))
+			p.login = nil
+		}
+	}
+}
+
 func (q *LoginRequests) find(id string) *loginRequest {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -215,6 +241,13 @@ func (a *ProfileAccess) AnswerLogin(ctx context.Context, id, action string) erro
 	if !valid {
 		x.settle("cancelled", i.loginURL(ask.Tab))
 		return errors.New("The requesting chat has moved or been removed")
+	}
+	if i.ctx.Err() != nil {
+		x.settle("cancelled", "about:blank")
+		if action == "cancel" {
+			return nil
+		}
+		return errors.New("Login request is no longer pending")
 	}
 	if action == "cancel" {
 		return i.CloseTab(ctx, ask.Tab)

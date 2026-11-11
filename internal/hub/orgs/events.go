@@ -12,25 +12,24 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // ErrNotEnabled is an area whose flag is off for the organization: it does not exist for it yet.
 var ErrNotEnabled = httpx.New(http.StatusNotFound, "not_enabled", "Эта возможность не включена для организации")
 
 func (s *Service) mountEvents(mux *http.ServeMux) {
-	mux.Handle("GET /api/orgs/{org}/events", s.Gate(s.orgEvents))
+	mux.Handle("GET /api/orgs/{org}/events", s.OrgGate(s.orgEvents))
 }
 
 // orgEvents is the organization's live stream (docs/hub/api.md, «Organization events»). ?scope= is `all` (the default:
 // the whole organization) or the slug (or `tenant:<id>`) of one tenant. The person sees what their role in that scope
 // lets them: leads and admins everything about it, a member only what is addressed to them or to everyone.
-func (s *Service) orgEvents(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) orgEvents(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	if s.bus == nil || s.features == nil || !s.features.On(ctx, o.ID, features.OrgEvents) {
 		return ErrNotEnabled
 	}
@@ -126,4 +125,21 @@ func (s *Service) streamFilter(ctx context.Context, st store.Store, p *auth.Prin
 		return f, authz.ErrForbiddenScope.With("scope", store.ScopeTenant+":"+tenant.ID)
 	}
 	return f, nil
+}
+
+// peopleChanged tells the organization's open pages that the people of a tenant (spaceID, "" for the organization as a
+// whole) changed, and the workspace pages of the person it happened to that their machines may have. lost says the
+// person's role changed: the organization's streams they hold were opened with the old one and are ended, so the
+// reconnect is given what the new one allows.
+func (s *Service) peopleChanged(orgID, spaceID, userID string, lost bool) {
+	if s.onPeople != nil && userID != "" {
+		s.onPeople(userID)
+	}
+	if s.bus == nil {
+		return
+	}
+	events.PublishPeople(s.bus, orgID, events.KindMembers, spaceID)
+	if lost && userID != "" {
+		s.bus.Kick(orgID, userID)
+	}
 }

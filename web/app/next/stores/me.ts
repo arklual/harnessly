@@ -26,11 +26,17 @@ export interface VoiceSettings {
   words: VoiceWord[];
 }
 
+export const NOTICE_COLORS = ['contrast', 'theme'] as const;
+export type TNoticeColor = (typeof NOTICE_COLORS)[number];
+
 export interface PersonSettings {
   uiVersion: 'legacy' | 'next';
   locale: 'ru' | 'en';
   density: 'compact' | 'full';
   textSize: 's' | 'm' | 'l';
+  /** What pops up (notices, toasts): `contrast` — the other of the theme (dark on light, light on dark); `theme` — the
+   *  theme's own. */
+  noticeColor: TNoticeColor;
   enterSends: boolean;
   defaultMachine: MachineId | null;
   notify: { types: string[]; sound: boolean; dnd: boolean };
@@ -63,6 +69,7 @@ export const DEFAULT_SETTINGS: PersonSettings = {
   locale: 'ru',
   density: 'compact',
   textSize: 'm',
+  noticeColor: 'contrast',
   enterSends: true,
   defaultMachine: null,
   notify: { types: ['turn-finished', 'question', 'permission'], sound: false, dnd: false },

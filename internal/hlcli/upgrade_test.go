@@ -108,3 +108,44 @@ func TestUpgradeFailedCheckRollsBack(t *testing.T) {
 		t.Fatalf("%d %s\n%s", code, errs, r.cli())
 	}
 }
+
+// The apps installed on the machine are checked against the release next to the hub's extensions: an app that
+// is on and does not fit blocks apply, one that is off is shown and does not, and no runtime is no reason to stop.
+func TestUpgradeChecksInstalledApps(t *testing.T) {
+	r := newUpRig(t, "harnessly.machine-provider/v1")
+	var host string
+	rt := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, q *http.Request) {
+		host = q.URL.Query().Get("host")
+		_, _ = w.Write([]byte(`{"host":"2.0.0","ok":false,"apps":[` +
+			`{"id":"example-corp.reports","version":"1.2.0","kind":"hub","harnessly":">=3.0.0","issues":[{"message":"needs harnessly >=3.0.0"}]},` +
+			`{"id":"example-corp.old","version":"0.1.0","kind":"agent-tool","disabled":true,"harnessly":">=3.0.0","issues":[{"message":"needs harnessly >=3.0.0"}]}]}`))
+	}))
+	defer rt.Close()
+	run := func(args ...string) (int, string, string) {
+		var out, errb bytes.Buffer
+		env := map[string]string{"HARNESSLY_URL": rt.URL, "HARNESSLY_CLI_TOKEN": "tok"}
+		code := Run(append([]string{"upgrade"}, args...), Env{Getenv: func(k string) string { return env[k] }, Stdout: &out, Stderr: &errb})
+		return code, out.String(), errb.String()
+	}
+	base := []string{"--hub", r.hub.URL, "--key", r.key, "--dir", r.dir}
+	// Off by default: the runtime is not asked.
+	if code, out, errs := run(append([]string{"plan"}, base...)...); code != 0 || strings.Contains(out, "example-corp") || host != "" {
+		t.Fatalf("flag off: %d\n%s\n%s", code, out, errs)
+	}
+	code, out, _ := run(append([]string{"plan", "--apps"}, base...)...)
+	if code != 1 || host != "2.0.0" || !strings.Contains(out, "BLOCKED: app example-corp.reports") ||
+		!strings.Contains(out, "does not fit (off)") || strings.Contains(out, "BLOCKED: app example-corp.old") {
+		t.Fatalf("plan %d host=%q\n%s", code, host, out)
+	}
+	if code, _, _ := run(append([]string{"apply", "--apps"}, base...)...); code == 0 || !strings.Contains(r.cli(), "1.0.0") {
+		t.Fatalf("apply went through (%d) or changed the program", code)
+	}
+	if code, _, _ := run(append([]string{"apply", "--apps", "--force"}, base...)...); code != 0 || !strings.Contains(r.cli(), "2.0.0") {
+		t.Fatalf("force apply %d", code)
+	}
+	// No runtime to ask: said, not fatal.
+	r2 := newUpRig(t, "harnessly.machine-provider/v1")
+	if code, _, errs := r2.run(append([]string{"plan", "--apps"}, "--hub", r2.hub.URL, "--key", r2.key, "--dir", r2.dir)...); code != 0 || !strings.Contains(errs, "apps were not checked") {
+		t.Fatalf("no runtime: %d %s", code, errs)
+	}
+}

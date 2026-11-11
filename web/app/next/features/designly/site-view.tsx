@@ -323,6 +323,8 @@ export interface ISiteStage {
     text: string,
   ) => void; /** Sends a board's error to the design's chat, opened where it is seen (a board's «Отправить в чат»). */
   report?: (text: string) => void;
+  /** Puts words into the chat's field, opened, for the person to send (an app's view where its chat is not yet on). */
+  fill?: (text: string) => void;
 }
 
 interface IMoreItem {

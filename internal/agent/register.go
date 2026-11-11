@@ -47,10 +47,12 @@ func Reusable(machineFile, hub string, profile hubproto.Profile) (*MachineFile, 
 	if err != nil || m.Profile != profile {
 		return nil, false
 	}
-	same := func(a, b string) bool {
-		return strings.EqualFold(strings.TrimRight(strings.TrimSpace(a), "/"), strings.TrimRight(strings.TrimSpace(b), "/"))
-	}
-	return m, same(m.HubURL, hub)
+	return m, sameHub(m.HubURL, hub)
+}
+
+// sameHub compares two addresses of a hub the way a person would: case and a trailing slash do not matter.
+func sameHub(a, b string) bool {
+	return strings.EqualFold(strings.TrimRight(strings.TrimSpace(a), "/"), strings.TrimRight(strings.TrimSpace(b), "/"))
 }
 
 // hubError is the hub's error body.
@@ -88,13 +90,24 @@ func Register(ctx context.Context, o RegisterOptions) (*MachineFile, error) {
 	if o.MachineFile == "" {
 		return nil, errors.New("no place for machine.json")
 	}
-	if existing, err := LoadMachine(o.MachineFile); err == nil && !o.Force {
+	existing, err := LoadMachine(o.MachineFile)
+	if err == nil && !o.Force {
 		return nil, fmt.Errorf("this machine is already registered as %s with %s; use --force to register it again", existing.MachineID, existing.HubURL)
+	}
+	if err != nil {
+		existing = nil
 	}
 
 	keys, err := newMachineKeys()
 	if err != nil {
 		return nil, err
+	}
+	// A machine that registers again with the hub it is registered with proves it holds the old key: the hub then
+	// keeps its id, and what is filed under the id (its chats in the first place) stays with it. The keys are new
+	// either way.
+	var previous *hubproto.Reregister
+	if existing != nil && sameHub(existing.HubURL, hub) {
+		previous = hubproto.SignReregister(existing.SigningKey(), existing.MachineID, code, keys.publicKey)
 	}
 	host, _ := os.Hostname()
 	if name := strings.TrimSpace(o.Name); name != "" {
@@ -109,7 +122,7 @@ func Register(ctx context.Context, o RegisterOptions) (*MachineFile, error) {
 	}
 	body, err := json.Marshal(hubproto.RegisterRequest{
 		Code: code, PublicKey: keys.publicKey, EncKey: keys.encKey, Hostname: host, OS: runtime.GOOS, Arch: runtime.GOARCH,
-		UnixUser: unixUser, Profile: o.Profile, Via: via, AgentVersion: o.Version,
+		UnixUser: unixUser, Profile: o.Profile, Via: via, AgentVersion: o.Version, Previous: previous,
 	})
 	if err != nil {
 		return nil, err

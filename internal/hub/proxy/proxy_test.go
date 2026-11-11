@@ -859,8 +859,13 @@ func TestSubdomainModeNonMembersAndRemoval(t *testing.T) {
 		t.Fatalf("member: %s", r)
 	}
 	f.owner.Do("DELETE", "/api/spaces/"+f.spaceID+"/members/"+member.ID, nil)
-	if r := o.do(host, "GET", "/m/"+f.id+"/headers"); r.Code != 403 {
+	// The sessions the person opened on the space's machines end with the membership: the cookie is a stranger's now,
+	// and the hub gives them no new ticket.
+	if r := o.do(host, "GET", "/m/"+f.id+"/headers"); r.Code != 302 || !strings.Contains(r.Header.Get("Location"), "/open?redirect=1") {
 		t.Errorf("a removed member's cookie still works: %s", r)
+	}
+	if r := member.Do("GET", "/api/machines/"+f.id+"/open", nil); r.Code != 403 {
+		t.Errorf("a removed member got a ticket: %s", r)
 	}
 	stranger := f.s.SignIn("stranger@example.com")
 	if r := stranger.Do("GET", "/api/machines/"+f.id+"/open", nil); r.Code != 403 {

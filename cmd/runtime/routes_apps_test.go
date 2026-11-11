@@ -124,7 +124,7 @@ func TestAppRoutes(t *testing.T) {
 	}
 
 	// On and off in the chat of the calling tab.
-	if code, body := call("POST", "/api/cli/apps/enable", `{"session":"hs-agent","id":"acme.demo","on":true}`, cli); code != http.StatusOK {
+	if code, body := call("POST", "/api/cli/apps/enable", `{"session":"hs-agent","id":"acme.demo","on":true}`, cli); code != http.StatusOK || !strings.Contains(body, `"live":`) {
 		t.Fatalf("enable: %d %s", code, body)
 	}
 	if len(conv.Apps) != 1 || conv.Apps[0] != "acme.demo" {

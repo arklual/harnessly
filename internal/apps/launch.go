@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/appmcp"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
@@ -48,6 +49,9 @@ type Launcher struct {
 	CLIHeader string
 	// GuardCommand is the hook command line; "" is `harnessly hook app-guard` off the agents' PATH.
 	GuardCommand string
+	// CLIBin is the harnessly CLI the agents can start, by its path; "" when the deployment names none. With it the
+	// harnessly-app server is the CLI's stdio proxy (`harnessly app-mcp`), which outlives the runtime's restarts.
+	CLIBin string
 	// GuardProbe runs the hook command line once at a launch and returns an error when the guard does not answer; nil skips
 	// the check (a test).
 	GuardProbe func(command string) error
@@ -191,6 +195,10 @@ func (l *Launcher) ClaudeFor(conversation string, ids []string, settingsPath str
 		// cannot write it: its folder is a read-only bind in the wall. A new launch writes a new one.
 		if err := writeGrant(sealDir, ids, conversation); err != nil {
 			return out, fmt.Errorf("the apps' grant: %w", err)
+		}
+		// The status of the documents the chat works on, for the rules by status (chatstatus.go).
+		if err := writeChatStatus(sealDir, l.Registry.ChatStatuses(conversation)); err != nil {
+			return out, fmt.Errorf("the documents' status: %w", err)
 		}
 		// The pane's shell names the tab's tmux session before the wall: inside it the tmux server is out of reach
 		// (a window it opened would run outside the wall), and the hooks and the CLI take the session from here.
@@ -361,7 +369,10 @@ func (l *Launcher) hostMCP(dir, token string) (string, error) {
 	return writeByContent(dir, "hmcp", ".json", body)
 }
 
-// hostMCPBody is the config of the harnessly-app server with token in its headers ("" keeps the runtime's own).
+// hostMCPBody is the config of the harnessly-app server with token in its headers ("" keeps the runtime's own). With
+// the CLI known (CLIBin) the server is that CLI's stdio proxy to the runtime's endpoint and not the endpoint itself: a
+// client connected over HTTP loses the server when the runtime restarts at a release, the proxy waits for it (HRN-1050,
+// internal/appmcp). The address and the token go to the proxy in its environment.
 func (l *Launcher) hostMCPBody(token string) ([]byte, error) {
 	raw, err := os.ReadFile(l.MCPConfigPath)
 	if err != nil {
@@ -384,6 +395,18 @@ func (l *Launcher) hostMCPBody(token string) ([]byte, error) {
 		}
 		srv["url"] = url + sep + "server=" + HostServer
 		withToken(srv, token)
+		if l.CLIBin != "" {
+			headers, _ := srv["headers"].(map[string]any)
+			if headers == nil {
+				headers = map[string]any{}
+			}
+			carried, err := json.Marshal(headers)
+			if err != nil {
+				return nil, err
+			}
+			srv = map[string]any{"type": "stdio", "command": l.CLIBin, "args": []string{appmcp.Command},
+				"env": map[string]string{appmcp.EnvURL: srv["url"].(string), appmcp.EnvHeaders: string(carried)}}
+		}
 		return json.MarshalIndent(map[string]any{"mcpServers": map[string]any{HostServer: srv}}, "", "  ")
 	}
 	return nil, fmt.Errorf("%s names no server with an address", l.MCPConfigPath)
@@ -540,4 +563,49 @@ func (l *Launcher) agentEnv(tokenFile string) string {
 		env += " HARNESSLY_CLI_HEADER=" + agents.ShellQuote(l.CLIHeader)
 	}
 	return env + ` HARNESSLY_SESSION="$(tmux display-message -p '#{session_name}' 2>/dev/null)"`
+}
+
+var (
+	_ agents.LaunchableApps = (*Launcher)(nil)
+	_ agents.AppsDropper    = (*Launcher)(nil)
+)
+
+// Launchable splits ids into the apps a chat's agent can be given now and the others with why: an app uninstalled
+// since it was turned on, one that is not for a chat, one whose instructions do not read. The chat starts with the
+// first, so one broken app does not keep it from starting.
+func (l *Launcher) Launchable(ids []string) ([]string, map[string]error) {
+	var ok []string
+	bad := map[string]error{}
+	for _, id := range ids {
+		a, err := l.Registry.Get(id)
+		switch {
+		case err != nil:
+			bad[id] = err
+		case a.Manifest == nil || !a.Manifest.HasTarget(TargetChat):
+			bad[id] = fmt.Errorf("app %s does not work in a chat", id)
+		default:
+			if _, err := instructions(a); err != nil {
+				bad[id] = fmt.Errorf("its instructions: %w", err)
+				continue
+			}
+			ok = append(ok, id)
+		}
+	}
+	return ok, bad
+}
+
+// AppsDropped puts in each app's log, and the machine's, that a chat started without it and why: `harnessly app logs`
+// and the app's card say it, where before the chat did not start at all.
+func (l *Launcher) AppsDropped(conversation string, ids []string, why error) {
+	text := "the chat started without the app: " + why.Error()
+	if conversation != "" {
+		text = "the chat " + conversation + " started without the app: " + why.Error()
+	}
+	for _, id := range ids {
+		if l.Registry != nil {
+			l.Registry.LogEvent(id, "", ViewLogWarn, clip(text, 400))
+		}
+	}
+	jsonlog.Log("warn", "apps: a chat starts without its apps", jsonlog.F{K: "conversation", V: conversation},
+		jsonlog.F{K: "apps", V: strings.Join(ids, ",")}, jsonlog.F{K: "error", V: why.Error()})
 }

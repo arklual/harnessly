@@ -33,6 +33,15 @@ var sdkDTS []byte
 //go:embed sdk/bridge-shim.js
 var shimJS []byte
 
+// loaderJS is the loader of a site that exists already (an admin panel in a frame), and loaderInlineJS the
+// one line its shell carries: outside Harnessly it loads nothing.
+//
+//go:embed sdk/loader.js
+var loaderJS []byte
+
+//go:embed sdk/loader-inline.js
+var loaderInlineJS []byte
+
 //go:embed sdk/widget.css
 var widgetCSS []byte
 
@@ -61,12 +70,26 @@ const (
 	UICSSPath = "/__hl/hl-ui.css"
 	// EChartsPath is the charts library every view may load (window.echarts).
 	EChartsPath = "/__hl/lib/echarts.js"
+	// SDKClassicPath is the classic SDK under a name of its own, the same in the runtime and in a copy a site hosts
+	// (SDKFiles, where app-sdk.js is the module): what the loader loads.
+	SDKClassicPath = "/__hl/app-sdk.classic.js"
+	// LoaderPath is the loader of a site that exists already; LoaderInlinePath is the line its shell carries.
+	LoaderPath       = "/__hl/loader.js"
+	LoaderInlinePath = "/__hl/loader-inline.js"
 )
+
+// SDKMajor is the major version of the SDK's contract with a site that loads it by address. The files are served under
+// /__hl/v<SDKMajor>/ too, and a site's loader line names that folder: a change that would break such a site gets a new
+// number and the old folder keeps what it served.
+const SDKMajor = 1
+
+// SDKVersionedPrefix is the folder of the SDK's files by major version.
+var SDKVersionedPrefix = "/__hl/v" + strconv.Itoa(SDKMajor) + "/"
 
 // classicSDK is the SDK as a classic script: the module without its exports, publishing window.harnessly.
 func classicSDK() []byte {
-	src := strings.NewReplacer("export async function", "async function", "export class", "class").Replace(string(sdkJS))
-	return []byte("(function () {\n" + src + "\nglobalThis.harnessly = { connect: connect, HarnesslyError: HarnesslyError };\n})();\n")
+	src := strings.NewReplacer("export async function", "async function", "export function", "function", "export class", "class").Replace(string(sdkJS))
+	return []byte("(function () {\n" + src + "\nglobalThis.harnessly = { connect: connect, HarnesslyError: HarnesslyError, state: state, action: action, screen: screen };\n})();\n")
 }
 
 // maxViewBytes is the most one file of a view may weigh (a view is at most 10 MB).
@@ -261,9 +284,22 @@ func (s *ViewServer) Handler() http.Handler {
 			refuse(viewRefusal{Status: http.StatusForbidden, Code: "host", Reason: "Адрес не принадлежит серверу видов."})
 			return
 		}
+		// The SDK's files by major version: what a site's loader line names (LoaderInlinePath).
+		if name, versioned := strings.CutPrefix(r.URL.Path, SDKVersionedPrefix); versioned {
+			if body, typ, found := sdkFile(name); found {
+				serveBytes(w, r, typ, body)
+				return
+			}
+		}
 		switch r.URL.Path {
-		case SDKPath:
+		case SDKPath, SDKClassicPath:
 			serveBytes(w, r, "text/javascript; charset=utf-8", classicSDK())
+			return
+		case LoaderPath:
+			serveBytes(w, r, "text/javascript; charset=utf-8", loaderJS)
+			return
+		case LoaderInlinePath:
+			serveBytes(w, r, "text/javascript; charset=utf-8", loaderInlineJS)
 			return
 		case SDKModulePath:
 			serveBytes(w, r, "text/javascript; charset=utf-8", sdkJS)
@@ -447,12 +483,16 @@ func splice(page []byte, at int, insert string) []byte {
 func sdkFile(name string) ([]byte, string, bool) {
 	const js, css = "text/javascript; charset=utf-8", "text/css; charset=utf-8"
 	switch "/__hl/" + name {
-	case SDKPath:
+	case SDKPath, SDKClassicPath:
 		return classicSDK(), js, true
 	case SDKModulePath:
 		return sdkJS, js, true
 	case ShimPath:
 		return shimJS, js, true
+	case LoaderPath:
+		return loaderJS, js, true
+	case LoaderInlinePath:
+		return loaderInlineJS, js, true
 	case WidgetBaseCSSPath:
 		return widgetCSS, css, true
 	case UICSSPath:
@@ -529,10 +569,12 @@ func (m *Manifest) ViewPath(viewID string) (string, error) {
 }
 
 // SDKFiles are the files a view the app's own server hosts serves itself (delivery mode remote): the shim first in its
-// page, then the SDK, by name.
+// page, then the SDK, by name. A site that exists already takes the loader instead: the line of loader-inline.js in its
+// shell, and loader.js, bridge-shim.js and app-sdk.classic.js in the folder the line names.
 func SDKFiles() map[string][]byte {
 	return map[string][]byte{
 		"bridge-shim.js": shimJS, "app-sdk.js": sdkJS, "app-sdk.d.ts": sdkDTS, "hl-ui.css": hlUICSS,
+		"app-sdk.classic.js": classicSDK(), "loader.js": loaderJS, "loader-inline.js": loaderInlineJS,
 	}
 }
 

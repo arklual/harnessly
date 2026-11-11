@@ -30,6 +30,7 @@ import { convMessagesStore, messagesStore } from '@/next/stores/messages';
 import { opsStore } from '@/next/stores/ops';
 import { defaultCwdStore, projectsStore } from '@/next/stores/projects';
 import { resetProfileSidebar } from '@/next/stores/profile-sidebar';
+import { resetCentral } from '@/next/stores/central';
 import { newChatMachineStore } from '@/next/stores/new-chat';
 
 const clear = <K, V>(s: KeyedStore<K, V>) => {
@@ -73,5 +74,6 @@ export function clearPersonData(): void {
   resetLinkGrace();
   resetCache();
   resetProfileSidebar();
+  resetCentral();
   newChatMachineStore.set(null);
 }

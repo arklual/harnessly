@@ -931,12 +931,17 @@ type AgentReport struct {
 	Finished bool         `json:"finished"`
 	Failure  *string      `json:"failure"`
 	Boards   []AgentBoard `json:"boards"`
+	// Sources are the findings about pages written as modules (pages/<name>.tsx): a board that is not current.
+	Sources []PageSourceProblem `json:"sources"`
 }
 
 // ForAgent is a report as an agent reads it: every board and view with its status, problems and screenshot file.
 func (l *Library) ForAgent(r *CheckReport) AgentReport {
 	dir := l.CheckDir(r.Artifact)
-	out := AgentReport{Artifact: r.Artifact, Finished: r.FinishedAt != nil, Failure: r.Failure, Boards: []AgentBoard{}}
+	out := AgentReport{Artifact: r.Artifact, Finished: r.FinishedAt != nil, Failure: r.Failure, Boards: []AgentBoard{}, Sources: []PageSourceProblem{}}
+	if p := l.PageSourceProblems(r.Artifact); p != nil {
+		out.Sources = p
+	}
 	for _, b := range r.Boards {
 		ab := AgentBoard{Title: b.Title, Path: b.Path, Status: b.Status, Shots: []AgentShot{}}
 		for _, sh := range b.Shots {

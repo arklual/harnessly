@@ -47,6 +47,9 @@ type pageConfig struct {
 	// HubLink is where the page's «Хаб» link leads: RUNTIME_HUB_LINK, else the hub carrying this runtime. A machine no hub
 	// carries can link to one without RUNTIME_HUB_URL, which would close the first-run setup and the chat's terminal.
 	HubLink *string `json:"hubLink"`
+	// HubAnalytics (RUNTIME_HUB_ANALYTICS=on with a hub) says the personal statistics screen takes its figures from the
+	// hub and the runtime builds no usage report of its own. Absent while off, so the page config is unchanged.
+	HubAnalytics bool `json:"hubAnalytics,omitempty"`
 }
 
 // pagePin is a page every person finds pinned in the browser tab until they change their pins.
@@ -102,10 +105,11 @@ func pageConfigFromEnv() pageConfig {
 		docsOrigin = "https://" + host
 	}
 	c := pageConfig{
-		ProductName:       env("RUNTIME_APP_NAME", "harnessly"),
-		DesignName:        env("RUNTIME_DESIGN_NAME", "Sinopia Design"),
-		MarkURL:           optional(os.Getenv("RUNTIME_APP_MARK_URL")),
-		Locale:            env("RUNTIME_LOCALE", "en"),
+		ProductName: env("RUNTIME_APP_NAME", "harnessly"),
+		DesignName:  env("RUNTIME_DESIGN_NAME", "Sinopia Design"),
+		MarkURL:     optional(os.Getenv("RUNTIME_APP_MARK_URL")),
+		// Empty while RUNTIME_LOCALE is not set: the page then speaks the person's browser language.
+		Locale:            strings.TrimSpace(os.Getenv("RUNTIME_LOCALE")),
 		ArtifactsURL:      optional(env("RUNTIME_ARTIFACTS_URL", docsOrigin)),
 		BoardsURL:         optional(env("RUNTIME_BOARDS_URL", docsOrigin)),
 		StandDomain:       optional(os.Getenv("RUNTIME_STAND_DOMAIN")),
@@ -125,6 +129,7 @@ func pageConfigFromEnv() pageConfig {
 	c.GithubHost = githubFromEnv().Web
 	c.HubURL = optional(strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_HUB_URL")), "/"))
 	c.HubLink = c.HubURL
+	c.HubAnalytics = hubAnalytics()
 	if link := strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_HUB_LINK")), "/"); link != "" {
 		c.HubLink = &link
 	}

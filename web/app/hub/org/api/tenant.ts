@@ -60,6 +60,8 @@ export interface TenantApi {
   spaceMachines(spaceId: string): Promise<SpaceMachine[]>;
   /** POST …/machines/codes. `full` needs the confirmation, a container may be off on this hub. */
   issueMachineCode(spaceId: string, profile: MachineProfile, confirmFull: boolean): Promise<IssuedCode>;
+  /** POST …/machines/local: takes the machine that runs next to the hub (compose) into the tenant. */
+  claimLocalMachine(spaceId: string): Promise<SpaceMachine>;
   tenantInvites(spaceId: string): Promise<TenantInvite[]>;
   /** Invites one address; the invitee joins with the role given (a member by default). */
   /** Null: the address is in the tenant already, so no letter; the team named, if any, took the person at once. */

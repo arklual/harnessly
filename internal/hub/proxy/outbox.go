@@ -11,12 +11,15 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // The message queue of a machine that is off (docs/hub/offline-prompts.md): what a person writes to it waits in
@@ -25,7 +28,11 @@ import (
 //
 //	POST   <platform api>/offline-prompts?machine=<id>            {tabId, text, send}  → 201 {item}
 //	GET    <platform api>/offline-prompts?machine=<id>&tab=<tab>                       → {items}
-//	DELETE <platform api>/offline-prompts?machine=<id>&client=<clientId> (or &id=<item id>) → {item}
+//	DELETE <platform api>/offline-prompts?machine=<id>&client=<clientId> (or &id=<item id>) → {item, outcome}
+//
+// Taking a message back has one outcome: "cancelled" (it waited here and is gone: the machine never gets it from the
+// hub) or "delivered" (the machine has it; it is the machine's to cancel now). While the hub is handing it over the
+// answer is 409 with code "sending" — ask again; a message the hub does not keep is 404.
 //
 // `send` is the page's own v2 send command; the hub gives the machine exactly that body, so a page that sends it again
 // by itself gets the same answer (one opId).
@@ -53,6 +60,8 @@ const (
 	outboxCall = 30 * time.Second
 	// outboxPassMax bounds one pass; what it did not reach waits for the next.
 	outboxPassMax = 2 * time.Minute
+	// outboxParallel is how many machines are handed their messages at once.
+	outboxParallel = 8
 )
 
 var (
@@ -230,20 +239,34 @@ func (s *Service) serveOutbox(w http.ResponseWriter, r *http.Request, p *auth.Pr
 		if c := q.Get("client"); c != "" {
 			col, val = "client_id", c
 		}
-		item, err := s.outboxRemove(ctx, p.User.ID, m.ID, col, val)
+		item, outcome, err := s.outboxRemove(ctx, p.User.ID, m.ID, col, val)
 		if errors.Is(err, store.ErrNotFound) {
-			outboxError(w, http.StatusConflict, "Сообщение уже уходит или ушло", "")
+			outboxError(w, http.StatusNotFound, "Такого сообщения в очереди нет", "not-found")
+			return
+		}
+		if errors.Is(err, errOutboxSending) {
+			outboxError(w, http.StatusConflict, "Сообщение уходит на машину", "sending")
 			return
 		}
 		if err != nil {
 			s.fail(w, r, err)
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"item": item})
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"item": item, "outcome": outcome})
 	}
 }
 
-var errOutboxFull = errors.New("proxy: the machine's queue is full")
+var (
+	errOutboxFull = errors.New("proxy: the machine's queue is full")
+	// errOutboxSending: the message is being handed to the machine just now; what became of it is known after that.
+	errOutboxSending = errors.New("proxy: the message is being handed over")
+)
+
+// The outcomes of taking a message back.
+const (
+	outboxCancelled = "cancelled"
+	outboxDelivered = "delivered"
+)
 
 func (s *Service) outboxList(ctx context.Context, userID, machine, tab string) ([]outboxItem, error) {
 	rows, err := s.db.Query(ctx, `SELECT `+outboxCols+` FROM offline_prompts
@@ -310,24 +333,36 @@ func (s *Service) outboxAdd(ctx context.Context, userID, machine, tab, text, cli
 	return s.outboxByClient(ctx, userID, machine, client)
 }
 
-// outboxRemove takes back a message still waiting: one being handed over may already be on the machine.
-func (s *Service) outboxRemove(ctx context.Context, userID, machine, col, val string) (outboxItem, error) {
+// outboxRemove takes back a message, with one outcome. A message still waiting (or failed) is deleted: cancelled, the
+// hub never hands it over — the delete and the pass that takes a message into delivery both move the row only from
+// 'queued', so one of them wins. A delivered one stays as it is: delivered. One being handed over has no outcome yet
+// (errOutboxSending): the pass ends it as delivered, or puts it back to wait, and the caller asks again.
+func (s *Service) outboxRemove(ctx context.Context, userID, machine, col, val string) (outboxItem, string, error) {
 	if col != "id" && col != "client_id" {
-		return outboxItem{}, store.ErrNotFound
+		return outboxItem{}, "", store.ErrNotFound
 	}
-	it, err := scanOutbox(s.db.QueryRow(ctx, `SELECT `+outboxCols+` FROM offline_prompts WHERE `+col+` = ? AND user_id = ? AND machine_id = ? AND state IN ('queued', 'failed')`,
-		val, userID, machine))
-	if err != nil {
-		return outboxItem{}, err
+	// The pass may take the message between the look and the delete: then the look is taken again.
+	for range 2 {
+		it, err := scanOutbox(s.db.QueryRow(ctx, `SELECT `+outboxCols+` FROM offline_prompts WHERE `+col+` = ? AND user_id = ? AND machine_id = ?`,
+			val, userID, machine))
+		if err != nil {
+			return outboxItem{}, "", err
+		}
+		switch it.State {
+		case "delivered":
+			return it, outboxDelivered, nil
+		case "sending":
+			return outboxItem{}, "", errOutboxSending
+		}
+		res, err := s.db.Exec(ctx, `DELETE FROM offline_prompts WHERE id = ? AND state IN ('queued', 'failed')`, it.ID)
+		if err != nil {
+			return outboxItem{}, "", err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			return it, outboxCancelled, nil
+		}
 	}
-	res, err := s.db.Exec(ctx, `DELETE FROM offline_prompts WHERE id = ? AND state IN ('queued', 'failed')`, it.ID)
-	if err != nil {
-		return outboxItem{}, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return outboxItem{}, store.ErrNotFound
-	}
-	return it, nil
+	return outboxItem{}, "", errOutboxSending
 }
 
 // ---- delivery ----
@@ -351,8 +386,8 @@ type outboxDue struct {
 	send                  []byte
 }
 
-// DeliverOutbox is one pass: the messages of connected machines, oldest first, one at a time, stopping for a machine
-// that did not take its message so the order of its messages stays. It returns how many were delivered.
+// DeliverOutbox is one pass: the messages of connected machines, every machine's own oldest first and one at a time,
+// the machines side by side. It returns how many were delivered.
 func (s *Service) DeliverOutbox(ctx context.Context) int {
 	now := s.now()
 	if _, err := s.db.Exec(ctx, `UPDATE offline_prompts SET state = 'queued', changed_at = ? WHERE state = 'sending' AND changed_at < ?`,
@@ -377,7 +412,10 @@ func (s *Service) DeliverOutbox(ctx context.Context) int {
 	// A pass is bounded: a machine that takes each message to the last second does not hold up the hub's loop for long.
 	ctx, cancel := context.WithTimeout(ctx, outboxPassMax)
 	defer cancel()
-	var due []outboxDue
+	// Each machine has a line of its own, handed over in order by a routine of its own: a machine that is slow to
+	// take a message holds up only its own line. The routines share outboxParallel slots, so a hub with many machines
+	// back at once does not open a tunnel to all of them together.
+	lines := make([][]outboxDue, 0, len(machines))
 	for _, machine := range machines {
 		rows, err := s.db.Query(ctx, `SELECT id, user_id, machine_id, send FROM offline_prompts WHERE state = 'queued' AND machine_id = ?
 			ORDER BY created_at, id LIMIT ?`, machine, outboxPass)
@@ -387,28 +425,48 @@ func (s *Service) DeliverOutbox(ctx context.Context) int {
 			}
 			return 0
 		}
+		var line []outboxDue
 		for rows.Next() {
 			var d outboxDue
 			var send string
 			if rows.Scan(&d.id, &d.userID, &d.machineID, &send) == nil {
 				d.send = []byte(send)
-				due = append(due, d)
+				line = append(line, d)
 			}
 		}
 		_ = rows.Close()
+		if len(line) > 0 {
+			lines = append(lines, line)
+		}
 	}
-	down := map[string]bool{}
+	var delivered atomic.Int64
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, outboxParallel)
+	for _, line := range lines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case slots <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-slots }()
+			safego.Run("outbox line", func() { delivered.Add(int64(s.deliverLine(ctx, line))) })
+		}()
+	}
+	wg.Wait()
+	return int(delivered.Load())
+}
+
+// deliverLine hands over the messages of one machine, oldest first, one at a time, and stops at the first the machine
+// did not take, so the order of its messages (and with it the order inside each chat) stays. It returns how many were
+// delivered.
+func (s *Service) deliverLine(ctx context.Context, line []outboxDue) int {
 	delivered := 0
-	for _, d := range due {
-		if ctx.Err() != nil {
+	for _, d := range line {
+		if ctx.Err() != nil || s.reg.Get(d.machineID) == nil {
 			break
-		}
-		if down[d.machineID] {
-			continue
-		}
-		if s.reg.Get(d.machineID) == nil {
-			down[d.machineID] = true
-			continue
 		}
 		res, err := s.db.Exec(ctx, `UPDATE offline_prompts SET state = 'sending', changed_at = ? WHERE id = ? AND state = 'queued'`, store.Ms(s.now()), d.id)
 		if err != nil {
@@ -421,9 +479,6 @@ func (s *Service) DeliverOutbox(ctx context.Context) int {
 		if state == "delivered" {
 			delivered++
 		}
-		if state == "queued" {
-			down[d.machineID] = true // the order of a machine's messages stays: the next one waits for the next pass
-		}
 		var errText any
 		if msg != "" {
 			errText = msg
@@ -431,6 +486,9 @@ func (s *Service) DeliverOutbox(ctx context.Context) int {
 		if _, err := s.db.Exec(context.WithoutCancel(ctx), `UPDATE offline_prompts SET state = ?, error = ?, changed_at = ? WHERE id = ?`,
 			state, errText, store.Ms(s.now()), d.id); err != nil {
 			s.log.Warn("offline prompts: the outcome is not kept", "id", d.id, "err", err)
+		}
+		if state == "queued" {
+			break // the next message of this machine waits for the next pass
 		}
 	}
 	return delivered

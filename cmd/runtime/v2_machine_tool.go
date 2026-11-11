@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/machines"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -52,7 +53,7 @@ func (r *machineKitRef) get() *machineKit {
 // newMachineKit looks at the machine from now on: the history is read every few seconds for the life of the process.
 func newMachineKit(d deps, load *machines.LoadMonitor, stopper *machines.Stopper) *machineKit {
 	k := &machineKit{load: load, stopper: stopper, history: machines.NewHistory(machines.HistoryDeps{})}
-	go k.history.Run(context.Background())
+	safego.Go("machine history", func() { k.history.Run(context.Background()) })
 	home := filepath.Clean(d.Home)
 	under := func(rel ...string) []string {
 		out := make([]string, len(rel))

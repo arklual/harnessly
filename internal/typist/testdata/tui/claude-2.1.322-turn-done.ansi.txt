@@ -1,0 +1,40 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.322[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mHaiku 5.5 · Claude Ultra[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/…/4f99430a-3f03-4d69-bb8c-1071d14a5e3f/scratchpad/cap/work[39m
+
+
+[38;5;246m[48;5;237m❯ [38;5;231mThis is an automated self-test of the terminal harness. Call the AskUserQuestion tool exactly once with one question,[39m
+  [38;5;231mheader Selftest, text: Pick one, multiSelect false, and exactly two options labelled Alpha and Bravo. When the [39m
+  [38;5;231manswer comes back, reply with only HS-SELFTEST-PICKED- followed by the label that was chosen, in capitals, and [39m
+  [38;5;231mnothing else. Do not use any other tool.[39m
+
+[38;5;246m[49m● [39mUser answered Claude's questions:
+[38;5;246m  ⎿  · Pick one → Bravo[39m
+
+[38;5;231m●[39m HS-SELFTEST-PICKED-BRAVO
+
+[38;5;246m✻[39m [38;5;246mCrunched for 10s · done 2:09 PM[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                                    [38;5;246m◐ medium · /effort[39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m❯ 
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle)[39m

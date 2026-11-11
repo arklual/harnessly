@@ -13,6 +13,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 )
 
 const (
@@ -29,6 +31,9 @@ type Route struct {
 	Home string
 	// Authorized is the old API's own check: a page session or the cli-token.
 	Authorized func(*http.Request) bool
+	// Lines, when set, gives what a transcript a conversation is live on gained, read once for all its readers, so
+	// such a transcript is not opened to be counted on; nil reads every transcript from the file.
+	Lines *transcriptindex.Follower
 
 	mu    sync.Mutex
 	order []string
@@ -119,7 +124,12 @@ func (rt *Route) Count(path string) Counts {
 		return *f.answer
 	}
 	f.answer = nil
-	c, ok := f.advance(path, st)
+	c, ok := f.follow(rt.Lines, path, st)
+	if !ok {
+		if c, ok = f.advance(path, st); ok {
+			rt.Lines.Seat(path, f.offset)
+		}
+	}
 	if !ok {
 		f.count = nil
 		return Zero()
@@ -139,9 +149,27 @@ func inode(st os.FileInfo) uint64 {
 	return 0
 }
 
+// follow is advance without the file: the count moved on by the whole lines the shared read holds of a transcript a
+// conversation is live on. false leaves the count to a read of the file: the file is not counted yet or is another
+// one, or it ends in a line still being written. The start of a followed file is not compared again: it is the file
+// the conversation writes.
+func (f *file) follow(lines *transcriptindex.Follower, path string, st os.FileInfo) (*counter, bool) {
+	if lines == nil || f.count == nil || f.ino != inode(st) || st.Size() < f.offset {
+		return nil, false
+	}
+	data, partial, ok := lines.Take(path, f.offset)
+	if !ok || partial {
+		return nil, false
+	}
+	f.count.lines(decode(data))
+	f.offset += int64(len(data))
+	return f.count, true
+}
+
 // advance counts what the file gained and returns the count with its unfinished last line taken in too.
 func (f *file) advance(path string, st os.FileInfo) (*counter, bool) {
 	fd, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return nil, false
 	}

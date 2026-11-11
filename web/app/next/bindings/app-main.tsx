@@ -1,42 +1,34 @@
-// An app opened as the main thing, /apps/<id>?chat=<conv>: its `app` view fills the page, the chat it works in stands
-// beside it (a column, a window or its field at the foot — the viewer's choice, kept), and the page's «…» holds the
-// app's rights, the debug section of a dev install and turning the app off in this chat. Without a chat the app stands
-// alone.
-import { useCallback, useEffect, useState } from 'react';
+// An app opened as the main thing, /apps/<id>[?o=<object>][&chat=<conv>]: Sinopia's stage (features/app-main/
+// app-stage.tsx) with the app's `app` view where a design has its page — the app's home, or one of its objects (a
+// document, a board) the view opened with `hl.pane.open('object:<slug>')`. The chat is Sinopia's: bound to the app's
+// home or to the object, docked, in a window or folded into the field, with the right pane of the chat beside it. The
+// first words sent from the field or from the view (`hl.chat.send`) make the chat, with the app on in it. The strip's
+// «…» holds the app's rights, the debug section of a dev install and turning the app off in the chat.
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AppAsks from '@/next/features/app-views/asks';
-import AppFrame from '@/next/features/app-views/app-frame';
+import AppFrame, { fromApp } from '@/next/features/app-views/app-frame';
 import { ConsentStage } from '@/next/features/app-consent/consent-ask';
-import { useInstalledApps } from '@/next/features/app-views/api';
+import { useInstalledApps, type IAppView, type IInstalledApp } from '@/next/features/app-views/api';
 import ConsentBlock from '@/next/features/app-consent/consent-block';
 import AppInspector from '@/next/features/app-views/inspector';
 import { onOpenAppTab } from '@/next/features/app-views/open';
 import { parseAppTarget } from '@/next/features/app-views/target';
-import AppIsland from '@/next/features/app-main/app-island';
-import AppMain, { type IAppMenuItem } from '@/next/features/app-main/app-main';
-import {
-  keepLayout,
-  PLACEMENT,
-  readLayout,
-  withPlacement,
-  type IAppLayout,
-} from '@/next/features/app-main/placement';
-import { lastLineOf } from '@/next/features/designly/last-line';
-import ChatView from '@/next/bindings/chat-view';
-import { useFeedItems } from '@/next/bindings/feed-items';
+import type { IAppMenuItem } from '@/next/features/app-main/app-main';
+import AppStage, { appStageDesign } from '@/next/features/app-main/app-stage';
+import type { TChatOpeners } from '@/next/bindings/chat-view';
+import { startFolder } from '@/next/bindings/home-composer';
+import { useSiteStage } from '@/next/bindings/site-stage';
 import { useChatApps } from '@/next/bindings/use-chat-apps';
-import { createConversation, interrupt, sendMessage, setConversationApps } from '@/next/commands';
+import { setConversationApps } from '@/next/commands';
 import { settled } from '@/next/bindings/outcome';
-import { hub, useConversationChannel } from '@/next/core/realtime/hub';
-import { useCentralFeed } from '@/next/bindings/use-central';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE, routePath } from '@/next/routes/routes';
 import { useConversation, useConversationList, useConvsAnswered } from '@/next/stores/conversations';
-import { ChatSwitch } from '@/next/features/designly/chat-switch';
-import { chatStatusOf } from '@/next/features/sidebar/status';
-import { useConnection } from '@/next/stores/connection';
+import { useDefaultCwd } from '@/next/stores/projects';
 import { useTabTitle } from '@/next/stores/tabs';
 import { toast } from '@/next/ui/toast';
 import { appBasePath } from '@/platform/config';
+import { DOCS_APP, docsReaderPath } from '@/platform/router';
 import { t } from '@/next/i18n';
 import { useAppsDebug } from '@/next/features/app-views/debug-mode';
 
@@ -44,171 +36,119 @@ interface IAppMainPageProps {
   /** The machine of the screen; the chat's own machine wins when the address names a chat. */
   machine: MachineId;
   id: string;
+  /** One of the app's objects open (`?o=`); null: the app's home. */
+  object: string | null;
   chat: string | null;
   onOpenDrawer: () => void;
+  /** Where a link, a file or a card of the chat opens (the pane beside the app). */
+  open?: TChatOpeners;
+  /** The right pane of the chat, as beside a design. */
+  toolPane?: { open: boolean; onToggle: () => void } | null;
 }
 
 const isConvId = (id: string): id is ConvId => id.startsWith('tab-');
 
-/** The field at the foot, wired to the chat: the agent's last line, whether it works, and the words it sends. */
-const ChatIsland = ({
-  machine,
-  conv,
-  onExpand,
-}: {
+interface IAppStagePageProps extends Omit<IAppMainPageProps, 'machine'> {
   machine: MachineId;
-  conv: ConvId;
-  onExpand: () => void;
-}) => {
-  // The chat's own view is not mounted under the folded field: its feed is read from here.
-  useConversationChannel(machine, conv);
-  useCentralFeed(machine, conv);
-  const items = useFeedItems(conv, machine);
-  const state = useConversation(conv)?.state.k;
-  let last: string | null = null;
-  for (let i = (items?.length ?? 0) - 1; i >= 0; i -= 1) {
-    const item = items?.[i];
-    if (item?.kind === 'turn' && item.answer) {
-      last = lastLineOf(item.answer.md);
-      break;
-    }
-  }
-  return (
-    <AppIsland
-      last={last}
-      busy={state === 'starting' || state === 'working'}
-      onSend={(text) => sendMessage(machine, { conversationId: conv, text })}
-      onStop={() =>
-        void settled(interrupt(machine, conv)).catch((e: Error) =>
-          toast(t('next.appmain.stopFailed'), { tone: 'error', description: e.message }),
-        )
-      }
-      onExpand={onExpand}
-    />
-  );
-};
+  app: IInstalledApp;
+  view: IAppView;
+  target: 'app' | 'pane';
+  viewPort: number;
+  agentWalled: boolean;
+}
 
-const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
-  const conv = chat !== null && isConvId(chat) ? chat : null;
-  const record = useConversation(conv);
-  const answered = useConvsAnswered(record?.machineId ?? screen);
-  const machine = record?.machineId ?? screen;
-  const { list, error } = useInstalledApps(machine);
-  const [layout, setLayout] = useState<IAppLayout>(readLayout);
+/** The app in Sinopia's stage, once the app and its view are known. */
+const AppStagePage = ({
+  machine,
+  id,
+  object,
+  chat,
+  app,
+  view,
+  target,
+  viewPort,
+  agentWalled,
+  onOpenDrawer,
+  open,
+  toolPane = null,
+}: IAppStagePageProps) => {
   const [inspector, setInspector] = useState<'closed' | 'about' | 'debug'>('closed');
   const debugMode = useAppsDebug();
   const [reload, setReload] = useState(0);
-  const chatApps = useChatApps(machine, conv);
   const chats = useConversationList(machine);
-  const connection = useConnection(machine);
-  const [making, setMaking] = useState(false);
-
-  const app = list?.apps.find((a) => a.id === id) ?? null;
-  // An app with no screen of its own opens its pane view here, so a press in the sidebar never ends on a blank page.
-  const own = app?.views.find((v) => v.targets.includes('app'));
-  const view = own ?? app?.views.find((v) => v.targets.includes('pane')) ?? null;
-  const target = own ? 'app' : 'pane';
-  useTabTitle(routePath({ kind: ROUTE.app, id, ...(chat ? { chat } : {}) }), app?.name ?? null);
+  const defaultCwd = useDefaultCwd(machine);
+  const fromChat = chat !== null && isConvId(chat) ? chat : null;
+  const record = useConversation(fromChat);
+  // The chats the app is on in are its own, as a design's chats are the design's.
+  const tied = useMemo(
+    () => (chats ?? []).filter((c) => c.apps?.includes(id)).map((c) => c.id as string),
+    [chats, id],
+  );
+  const address = useMemo(
+    () => ({ kind: ROUTE.app, id, ...(object ? { object } : {}) }) as const,
+    [id, object],
+  );
+  const stage = useSiteStage({
+    machine,
+    design: appStageDesign(id, object),
+    fromChat,
+    dir: record?.cwd ?? startFolder(chats, machine, defaultCwd ?? null),
+    tied,
+    title: app.name,
+    pageUrl: '',
+    port: null,
+    onOpenDrawer,
+    open,
+    keep: true,
+    app: {
+      address,
+      onCreated: (made) => void settled(setConversationApps(machine, made, [id])).catch(() => undefined),
+    },
+  });
+  const conv = stage.conv ?? null;
+  const chatApps = useChatApps(machine, conv);
+  useTabTitle(routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) }), object ?? app.name);
 
   // A card's «Открыть в панели» of another app takes this page to that app; this one is already open. The chat goes
   // along only where that app is on.
-  const chatOn = record?.apps;
+  const chatOn = useConversation(conv)?.apps;
   useEffect(
     () =>
-      onOpenAppTab((target) => {
-        const to = parseAppTarget(target);
-        if (to && to.app !== id)
-          goTo({ kind: ROUTE.app, id: to.app, ...(chat && chatOn?.includes(to.app) ? { chat } : {}) });
-      }),
-    [id, chat, chatOn],
-  );
-
-  const place = useCallback((next: IAppLayout) => {
-    setLayout(next);
-    keepLayout(next);
-  }, []);
-
-  if (error) return <p className="hx-appview__error">{error}</p>;
-  // The chat named by the address is not known yet: the page waits for the list rather than showing the app alone and
-  // then pulling a column in.
-  if (list === null || (conv !== null && record === undefined && !answered))
-    return <div className="hx-appview__wait" aria-busy="true" />;
-  if (!app) return <p className="hx-appview__error">{t('next.appmain.gone')}</p>;
-  // An app with a window that waits for consent shows the bar over it (ConsentStage); one with no window says
-  // what it waits for here.
-  if (!view && app.consent) return <ConsentBlock className="hx-consentblock--page" app={app} />;
-  if (!view) return <p className="hx-appview__error">{t('next.appmain.noScreen')}</p>;
-
-  const onChat = record !== undefined && conv !== null;
-  const open = (to: ConvId | null) => goTo({ kind: ROUTE.app, id, ...(to ? { chat: to } : {}) });
-  // The switch lists the chats of this machine the app is on in, and the chat on screen even where it is off.
-  const online = connection === undefined || connection.k === 'live';
-  const rows = (chats ?? [])
-    .filter((c) => c.id === conv || c.apps?.includes(id))
-    .map((c) => ({
-      id: c.id,
-      title: c.title,
-      machine: null,
-      status: chatStatusOf(c, online),
-      at: c.lastActivityAt,
-    }));
-  // A new chat starts where the chat on screen works (or the latest one of the machine), with the app already on in it.
-  const like = record ?? chats?.[0];
-  const newChat = like
-    ? async () => {
-        if (making) return;
-        setMaking(true);
-        try {
-          const made = await createConversation(machine, {
-            where: like.projectId ? { projectId: like.projectId } : { cwd: like.cwd },
-            provider: like.provider,
-            model: like.model,
-          }).conversation;
-          if (made === null) throw new Error(t('next.appmain.newChatFailed'));
-          await settled(setConversationApps(machine, made, [id]));
-          open(made);
-        } catch (e) {
-          toast(t('next.appmain.newChatFailed'), {
-            tone: 'error',
-            description: e instanceof Error ? e.message : undefined,
+      onOpenAppTab((to) => {
+        const next = parseAppTarget(to);
+        if (next && next.app !== id)
+          goTo({
+            kind: ROUTE.app,
+            id: next.app,
+            ...(conv && chatOn?.includes(next.app) ? { chat: conv } : {}),
           });
-        } finally {
-          setMaking(false);
-        }
-      }
-    : null;
-  const chatSwitch = (
-    <ChatSwitch
-      current={onChat ? conv : null}
-      title={onChat ? (record?.title ?? '') : t('next.appmain.noChat')}
-      rows={rows}
-      onPick={(to) => open(to as ConvId | null)}
-      chatsLabel={t('next.appmain.chats')}
-      lead={[
-        ...(newChat
-          ? [
-              {
-                id: 'new',
-                icon: 'square-pen',
-                label: t('next.appmain.newChat'),
-                selected: false,
-                onPick: () => void newChat(),
-              },
-            ]
-          : []),
-        {
-          id: 'none',
-          icon: 'app-window',
-          label: t('next.appmain.noChat'),
-          selected: !onChat,
-          onPick: () => open(null),
-        },
-      ]}
-    />
+      }),
+    [id, conv, chatOn],
   );
+
+  // The chat goes along to the object and back home: it is the one the person works in.
+  const go = useCallback(
+    (to: string | null) =>
+      goTo({ kind: ROUTE.app, id, ...(to ? { object: to } : {}), ...(conv ? { chat: conv } : {}) }),
+    [id, conv],
+  );
+  const { ask, fill } = stage;
+  const on = conv !== null && (chatOn?.includes(id) ?? false);
+  const handlers = useMemo(
+    () => ({
+      // The view's words go to the chat beside it where the app is on. Elsewhere they wait in the chat's field: the
+      // person's own send makes the chat and turns the app on in it, never the view.
+      chatSend: async (text: string) => {
+        if (on) ask?.(fromApp(app.name, text));
+        else fill?.(text);
+      },
+    }),
+    [on, ask, fill, app.name],
+  );
+
   const share = () => {
     // The page's own base (/m/<machine> on the hub) goes into the link, as the chat's «Скопировать ссылку» does.
-    const link = `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.app, id })}`;
+    const link = `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) })}`;
     navigator.clipboard.writeText(link).then(
       () => toast(t('next.appmain.shared'), { description: t('next.appmain.sharedHint') }),
       () => toast(t('next.appmain.shareFailed'), { tone: 'error', description: link }),
@@ -237,7 +177,7 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
           },
         ]
       : []),
-    ...(onChat && chatApps.on.includes(app.id)
+    ...(conv && chatApps.on.includes(app.id)
       ? [
           {
             id: 'off',
@@ -249,7 +189,7 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
         ]
       : []),
     // The app sees this chat only where the person turned it on: the page offers it, it never takes it.
-    ...(onChat && !chatApps.on.includes(app.id)
+    ...(conv && !chatApps.on.includes(app.id)
       ? [
           {
             id: 'on',
@@ -263,49 +203,31 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
 
   return (
     <>
-      <AppMain
+      <AppStage
         title={app.name}
         icon={app.icon || 'layout-grid'}
-        chatTitle={onChat ? (record?.title ?? null) : null}
-        chatSwitch={chatSwitch}
-        onShare={share}
-        placement={layout.placement}
-        float={layout.float}
-        onPlacement={(placement, section) => place(withPlacement(layout, placement, section))}
-        onFloat={(float) => place({ ...layout, float })}
+        object={object ? { title: object } : null}
+        onHome={() => go(null)}
+        stage={stage}
         menu={menu}
-        stage={
+        onShare={share}
+        toolPane={toolPane}
+        onOpenDrawer={onOpenDrawer}
+        frame={
           <ConsentStage machine={machine} app={app}>
             <AppFrame
               machine={machine}
               app={app}
               view={view}
               target={target}
-              viewPort={list.viewPort}
-              conversation={onChat ? conv : null}
+              viewPort={viewPort}
+              conversation={conv}
               reloadToken={reload}
+              data={object ? { object } : undefined}
+              handlers={handlers}
+              onOpenObject={go}
             />
           </ConsentStage>
-        }
-        chat={
-          onChat ? (
-            <ChatView
-              key={conv}
-              conv={conv}
-              machine={machine}
-              onRetryLoad={() => hub.client(machine)?.reconnectNow()}
-              onShowBackground={() => goTo({ kind: ROUTE.chat, id: conv })}
-            />
-          ) : null
-        }
-        island={
-          onChat ? (
-            <ChatIsland
-              machine={machine}
-              conv={conv}
-              onExpand={() => place({ ...layout, placement: PLACEMENT.left })}
-            />
-          ) : null
         }
         inspector={
           inspector === 'closed' ? null : (
@@ -314,16 +236,71 @@ const AppMainPage = ({ machine: screen, id, chat }: IAppMainPageProps) => {
               app={app}
               view={view}
               target={target}
-              conversation={onChat ? conv : null}
+              conversation={conv}
               debug={inspector === 'debug'}
               onReload={() => setReload((n) => n + 1)}
-              agentWalled={list.agentWalled}
+              agentWalled={agentWalled}
             />
           )
         }
       />
-      <AppAsks machine={machine} conversation={onChat ? conv : null} />
+      <AppAsks machine={machine} conversation={conv} />
     </>
+  );
+};
+
+const AppMainPage = ({
+  machine: screen,
+  id,
+  object,
+  chat,
+  onOpenDrawer,
+  open,
+  toolPane,
+}: IAppMainPageProps) => {
+  const conv = chat !== null && isConvId(chat) ? chat : null;
+  const record = useConversation(conv);
+  const answered = useConvsAnswered(record?.machineId ?? screen);
+  const machine = record?.machineId ?? screen;
+  const { list, error } = useInstalledApps(machine);
+
+  const app = list?.apps.find((a) => a.id === id) ?? null;
+  // A document's address came here from the reader (docs-redirect.ts); without the documents app the reader shows it.
+  const toReader = list !== null && !app && id === DOCS_APP && object !== null;
+  useEffect(() => {
+    if (toReader && object !== null) window.location.replace(`${appBasePath()}${docsReaderPath(object)}`);
+  }, [toReader, object]);
+  // An app with no screen of its own opens its pane view here, so a press in the sidebar never ends on a blank page.
+  const own = app?.views.find((v) => v.targets.includes('app'));
+  const view = own ?? app?.views.find((v) => v.targets.includes('pane')) ?? null;
+
+  if (error) return <p className="hx-appview__error">{error}</p>;
+  // The chat named by the address is not known yet: the page waits for the list rather than showing the app alone and
+  // then pulling a column in.
+  if (list === null || (conv !== null && record === undefined && !answered))
+    return <div className="hx-appview__wait" aria-busy="true" />;
+  if (toReader) return <div className="hx-appview__wait" aria-busy="true" />;
+  if (!app) return <p className="hx-appview__error">{t('next.appmain.gone')}</p>;
+  // An app with a window that waits for consent shows the bar over it (ConsentStage); one with no window says
+  // what it waits for here.
+  if (!view && app.consent) return <ConsentBlock className="hx-consentblock--page" app={app} />;
+  if (!view) return <p className="hx-appview__error">{t('next.appmain.noScreen')}</p>;
+
+  return (
+    <AppStagePage
+      machine={machine}
+      id={id}
+      object={object}
+      chat={chat}
+      app={app}
+      view={view}
+      target={own ? 'app' : 'pane'}
+      viewPort={list.viewPort}
+      agentWalled={list.agentWalled}
+      onOpenDrawer={onOpenDrawer}
+      open={open}
+      toolPane={toolPane}
+    />
   );
 };
 

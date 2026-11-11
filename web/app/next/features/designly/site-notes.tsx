@@ -2,9 +2,17 @@
 // with its number stays on the block, the notes ride over the island's field as a strip «N annotations» with a list, or,
 // in «Правки», in the bar «Аннотирование · N» at the foot (.hx-notesbar) that sends them to the agent in one message.
 // The pins, the card and the bar speak the shared language of annotations (ui/notes/notes.tsx).
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import type { INoteChip } from '@/next/ui/notes/note-chips';
-import { NoteBar, NoteDot, NoteRow } from '@/next/ui/notes/notes';
+import { NoteBar, NoteDot } from '@/next/ui/notes/notes';
 import Icon from '@/next/ui/icon';
 import Sheet from '@/next/ui/sheet';
 import { usePhone } from '@/next/ui/use-media';
@@ -189,12 +197,15 @@ const OpacityRange = ({ value, onChange }: { value: number; onChange: (value: nu
 /** The settings of the picked block, as the card of the design has them: what it is, then the fill, the corners and
  *  the opacity; what is changed is dotted, and «Сбросить» gives the block back to the page. */
 const NoteProps = ({
+  picked,
   look,
   edit,
   onEdit,
   open,
   gone,
 }: {
+  /** The block the settings are of: its tag and its name head them. */
+  picked: IPicked;
   look: IPickedLook;
   edit: IStyleEdit;
   onEdit: (edit: IStyleEdit) => void;
@@ -213,7 +224,8 @@ const NoteProps = ({
     <div className="hx-ann__props" aria-hidden={!open} inert={!open}>
       <div className="hx-ann__props-in">
         <div className="hx-ann__el">
-          <span className="hx-ann__target">{t('next.notes.tune')}</span>
+          <code className="hx-ann__tag">{`<${picked.tag}>`}</code>
+          <span className="hx-ann__target">{pickedLabel(picked)}</span>
           <span className="hx-spacer" />
           <button
             type="button"
@@ -379,72 +391,29 @@ export const NotePopover = ({
     return () => window.clearTimeout(timer);
   }, [voiceDone]);
 
-  const lead = look ? (
-    <button
-      type="button"
-      className="hx-note__btn hx-ann__tune hx-tipped"
-      aria-pressed={tune}
-      aria-label={t('next.notes.tune')}
-      onClick={() => setTune((on) => !on)}
-    >
-      <Icon name="sliders-horizontal" size="sm" />
-      <span className="hx-tip" data-pos="below" data-align="start">
-        {t('next.notes.tune')}
-      </span>
-    </button>
-  ) : (
-    <NoteDot
-      n={n}
-      label={t('next.notes.pin', { n, label: pickedLabel(draft.picked) })}
-      empty={!text.trim()}
-    />
-  );
-  const tools = (
-    <>
-      {mic && (
-        <button
-          type="button"
-          className="hx-note__btn hx-ann__mic hx-tipped"
-          data-rec={mic.recording}
-          aria-label={t('next.notes.dictate')}
-          onClick={mic.onToggle}
-        >
-          <Icon name="mic" size="sm" />
-          <span className="hx-tip" data-pos="below" data-align="end">
-            {t('next.notes.dictate')}
-          </span>
-        </button>
-      )}
-      {/* A note being changed can go back to what it was; a new one is dropped by the trash. */}
-      {draft.id !== undefined && (
-        <button
-          type="button"
-          className="hx-note__btn hx-ann__cancel hx-tipped"
-          aria-label={t('next.notes.revert')}
-          onClick={() => leave(onCancel)}
-        >
-          <Icon name="undo-2" size="sm" />
-          <span className="hx-tip" data-pos="below" data-align="end">
-            {t('next.notes.revert')}
-          </span>
-        </button>
-      )}
-    </>
-  );
-  const more =
-    look || (image && !guest && draft.picked.draw) ? (
-      <>
-        {look && <NoteProps look={look} edit={draft.style} onEdit={onStyle} open={tune} gone={gone} />}
-        {image && !guest && draft.picked.draw && (
-          <CardImageGen
-            machine={image.machine}
-            artifact={image.artifact}
-            file={image.file}
-            draw={draft.picked.draw}
-          />
-        )}
-      </>
-    ) : null;
+  // The words grow the field up to a few lines (the CSS caps it).
+  const field = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  // The card is moved by its own ground (not a field or a button); a double press puts it back at its block.
+  const onGround = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget) return;
+    dragNote(event, (at) => {
+      setMoved(at);
+      keepNotePos(at);
+    });
+  };
+  const onGroundDouble = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget) return;
+    setMoved(null);
+    keepNotePos(null);
+  };
+  const okLabel = guest ? t('next.guest.send') : t('next.notes.toMessage');
 
   return (
     <div
@@ -458,35 +427,122 @@ export const NotePopover = ({
       aria-label={t('next.notes.dialog')}
       aria-hidden={hidden}
       inert={hidden}
-    >
-      <NoteRow
-        comment={text}
-        onValue={onText}
-        open
-        label={t('next.notes.dialog')}
-        placeholder={guest ? t('next.guest.placeholder') : t('next.notes.placeholder')}
-        lead={lead}
-        tools={tools}
-        more={more}
-        okLabel={guest ? t('next.guest.send') : t('next.notes.toMessage')}
-        okDisabled={wants}
-        busy={sending}
-        onCommit={ok}
-        onCancel={() => leave(onCancel)}
-        onRemove={guest ? undefined : () => leave(onDelete)}
-        removeLabel={t('next.notes.delete')}
-        // The card is moved by its own ground; a double press puts it back at its block.
-        onGround={(event) =>
-          dragNote(event, (at) => {
-            setMoved(at);
-            keepNotePos(at);
-          })
+      onPointerDown={onGround}
+      onDoubleClick={onGroundDouble}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          leave(onCancel);
         }
-        onGroundDouble={() => {
-          setMoved(null);
-          keepNotePos(null);
-        }}
-      />
+      }}
+    >
+      <div className="hx-ann__row" onPointerDown={onGround} onDoubleClick={onGroundDouble}>
+        {look ? (
+          <button
+            type="button"
+            className="hx-ann__tune hx-tipped"
+            aria-pressed={tune}
+            aria-label={t('next.notes.tune')}
+            onClick={() => setTune((on) => !on)}
+          >
+            <Icon name="sliders-horizontal" />
+            <span className="hx-tip" data-pos="below" data-align="start">
+              {t('next.notes.tune')}
+            </span>
+          </button>
+        ) : (
+          <NoteDot
+            className="hx-ann__n"
+            n={n}
+            label={t('next.notes.pin', { n, label: pickedLabel(draft.picked) })}
+            empty={!text.trim()}
+          />
+        )}
+        <textarea
+          ref={field}
+          className="hx-ann__input"
+          autoFocus
+          rows={1}
+          disabled={sending}
+          placeholder={guest ? t('next.guest.placeholder') : t('next.notes.placeholder')}
+          aria-label={guest ? t('next.guest.placeholder') : t('next.notes.placeholder')}
+          value={text}
+          onChange={(event) => onText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              ok();
+            }
+          }}
+        />
+      </div>
+      {look && (
+        <NoteProps
+          picked={draft.picked}
+          look={look}
+          edit={draft.style}
+          onEdit={onStyle}
+          open={tune}
+          gone={gone}
+        />
+      )}
+      {image && !guest && draft.picked.draw && (
+        <CardImageGen
+          machine={image.machine}
+          artifact={image.artifact}
+          file={image.file}
+          draw={draft.picked.draw}
+        />
+      )}
+      <div className="hx-ann__foot" onPointerDown={onGround} onDoubleClick={onGroundDouble}>
+        {/* Leaves the card: a note being changed goes back to what it was, a new one is not kept. */}
+        <button type="button" className="hx-ann__cancel" onClick={() => leave(onCancel)}>
+          {t('next.notes.revert')}
+        </button>
+        {!guest && (
+          <button
+            type="button"
+            className="hx-ann__icon hx-ann__del hx-tipped"
+            aria-label={t('next.notes.delete')}
+            onClick={() => leave(onDelete)}
+          >
+            <Icon name="trash-2" size="sm" />
+            <span className="hx-tip" data-pos="below">
+              {t('next.notes.delete')}
+            </span>
+          </button>
+        )}
+        <span className="hx-spacer" onPointerDown={onGround} onDoubleClick={onGroundDouble} />
+        {mic && (
+          <button
+            type="button"
+            className="hx-ann__icon hx-ann__mic hx-tipped"
+            data-rec={mic.recording}
+            aria-label={t('next.notes.dictate')}
+            onClick={mic.onToggle}
+          >
+            <Icon name="mic" />
+            <span className="hx-tip" data-pos="below" data-align="end">
+              {t('next.notes.dictate')}
+            </span>
+          </button>
+        )}
+        <button
+          type="button"
+          className="hx-ann__ok hx-tipped"
+          aria-label={okLabel}
+          aria-disabled={wants || sending || undefined}
+          aria-busy={sending || undefined}
+          onClick={ok}
+        >
+          <Icon name="arrow-up" />
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {okLabel}
+            <kbd>↵</kbd>
+          </span>
+        </button>
+      </div>
     </div>
   );
 };

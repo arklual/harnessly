@@ -447,6 +447,134 @@ export const applyOverlay = (
   return { ...list, summary, groups };
 };
 
+// ── One server, several people's seats (machine.seats) ────────────────────────────────────────────────────
+
+/** A server several people work on, each under a Linux user of their own: the hub knows every seat as a machine. */
+export interface ServerRow {
+  key: string;
+  /** The server as one row: the seats' chats and money summed, its load and hardware taken once. */
+  server: OrgMachine;
+  seats: OrgMachine[];
+}
+
+export type ListRow = { kind: 'machine'; m: OrgMachine } | { kind: 'server'; s: ServerRow };
+
+const serverKey = (m: OrgMachine): string | null => (m.host ? `${m.tenantId}\n${m.host}` : null);
+
+const sumOf = (vals: readonly (number | null | undefined)[]): number | null => {
+  const known = vals.filter((v): v is number => v != null);
+  return known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
+};
+
+const maxOf = (vals: readonly (number | null)[]): number | null => {
+  const known = vals.filter((v): v is number => v != null);
+  return known.length > 0 ? Math.max(...known) : null;
+};
+
+const serverState = (seats: readonly OrgMachine[]): OrgMachine['state'] => {
+  if (seats.some((m) => m.state === 'online')) return 'online';
+  if (seats.some((m) => m.state === 'idle')) return 'idle';
+  return seats.every((m) => m.state === 'disabled') ? 'disabled' : 'offline';
+};
+
+/** The server of its seats. Its load is one reading told by every seat, so it is taken once, not added up. */
+export const serverOf = (key: string, seats: readonly OrgMachine[]): OrgMachine => {
+  const first = seats[0]!;
+  const state = serverState(seats);
+  const since = seats
+    .map((m) => m.since)
+    .filter((v): v is string => !!v)
+    .sort();
+  const versions = [...new Set(seats.map((m) => m.runnerVersion).filter(Boolean))];
+  const hw = seats.find((m) => m.hw.cores > 0 || m.hw.ramGb > 0)?.hw ?? first.hw;
+  const people = seats.map(whoOf).filter(Boolean);
+  return {
+    ...first,
+    id: `server:${key}`,
+    name: (first.host ?? first.name).split('.')[0] || first.name,
+    kind: 'shared',
+    ownerName: null,
+    purpose: `${seats.length} ${plural(seats.length, 'место', 'места', 'мест')}${people.length ? `: ${people.join(', ')}` : ''}`,
+    state,
+    since: state === 'online' ? null : (since[since.length - 1] ?? null),
+    disabledBy: null,
+    disabledAt: state === 'disabled' ? first.disabledAt : null,
+    busy: null,
+    chats: sumOf(seats.map((m) => m.chats)),
+    cpu: maxOf(seats.map((m) => m.cpu)),
+    ram: maxOf(seats.map((m) => m.ram)),
+    disk: maxOf(seats.map((m) => m.disk)),
+    hw,
+    runnerVersion: versions.length === 1 ? versions[0]! : versions.length > 1 ? 'разные' : '',
+    runnerOutdated: seats.some((m) => m.runnerOutdated),
+    weekCostUsd: sumOf(seats.map((m) => m.weekCostUsd)),
+    weekChats: sumOf(seats.map((m) => m.weekChats)),
+    mine: seats.some((m) => m.mine),
+    canManage: false,
+    canAdmin: false,
+  };
+};
+
+/** The rows of a list with the seats of one server (one hostname in a tenant) folded into it; the order of the
+ * machines is kept, a server stands where its first seat stood. A machine alone on its server stays a machine. */
+export const serverRows = (machines: readonly OrgMachine[]): ListRow[] => {
+  const seats = new Map<string, OrgMachine[]>();
+  for (const m of machines) {
+    const k = serverKey(m);
+    if (k) seats.set(k, [...(seats.get(k) ?? []), m]);
+  }
+  const done = new Set<string>();
+  const rows: ListRow[] = [];
+  for (const m of machines) {
+    const k = serverKey(m);
+    const own = k ? seats.get(k)! : [];
+    if (!k || own.length < 2) {
+      rows.push({ kind: 'machine', m });
+    } else if (!done.has(k)) {
+      done.add(k);
+      rows.push({ kind: 'server', s: { key: k, server: serverOf(k, own), seats: own } });
+    }
+  }
+  return rows;
+};
+
+/** A row as the machine the counters count: the server for its seats. */
+const unitsOf = (machines: readonly OrgMachine[]): OrgMachine[] =>
+  serverRows(machines).map((r) => (r.kind === 'server' ? r.s.server : r.m));
+
+/** The groups as the tiles read them: a server once, so its full disk is one disk and not one per seat. */
+export const foldGroups = (groups: readonly MachineGroup[]): MachineGroup[] =>
+  groups.map((g) => ({ ...g, machines: unitsOf(g.machines) }));
+
+/** The list with its counters (the tiles, the groups' heads) counting servers, not seats. The machines stay as they
+ * are: the rows fold them with `serverRows`. */
+export const countByServers = (list: MachinesList): MachinesList => {
+  const all = unitsOf(list.groups.flatMap((g) => g.machines));
+  if (all.length === list.groups.reduce((n, g) => n + g.machines.length, 0)) return list;
+  const count = (ms: readonly OrgMachine[], b: 'online' | 'idle' | 'offline') =>
+    ms.filter((m) => bucket(m) === b).length;
+  const groups = list.groups.map((g) => {
+    const units = unitsOf(g.machines);
+    const hidden = g.total - g.machines.length;
+    return {
+      ...g,
+      total: units.length + Math.max(0, hidden),
+      online: count(units, 'online'),
+      idle: count(units, 'idle'),
+      offline: count(units, 'offline'),
+    };
+  });
+  const summary: MachinesSummary = {
+    ...list.summary,
+    total: all.length,
+    online: count(all, 'online'),
+    idleWeek: count(all, 'idle'),
+    offline: count(all, 'offline'),
+    outdatedRunners: all.filter((m) => m.runnerOutdated).length,
+  };
+  return { ...list, summary, groups };
+};
+
 // ── The dialogs of the card ─────────────────────────────────────────────────────────────────────────────────────────
 
 export interface OffItem {

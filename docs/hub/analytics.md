@@ -452,6 +452,7 @@ Every signed-in person, in any organization or none; only their own sessions.
 | `GET /api/me/usage?period=&org=` | | `MeUsageResponse` — their money on organization and personal accounts, by day, model and account; `accountedUntil` is «на сервере учтено до …» |
 | `GET /api/me/sessions?from=&to=&before=&limit=50` | | `MeSessionsResponse` — their sessions with price and result, no text |
 | `GET /api/me/kpis?from=&to=&cmpFrom=&cmpTo=` | | `KpisResponse` with `scope: 'me'` |
+| `GET /api/me/stats` | | `MeStatsResponse` — the person's last 400 days in the shape of a runtime's `/stats` (`{viewer, runtimes:[{…, report}]}`): usage rows by day/provider/model (list price, no project), sessions with tokens and cost (no title, project or task keys), days with turns, agent time, tool calls and MRs counted on the day a session started, `hubMissing` naming the page blocks without facts |
 | `GET /api/me/kpis/{kpi}/series?org=&from=&to=&by=day\|week` | | `KpiSeriesResponse` — the person's own KPI over time, with the changes of `?org=` as markers ([below](#people-and-the-week)) |
 | `GET /api/me/week?org=` | | `MeWeek` — their chats and MRs of the last 7 days |
 | `GET /api/me/limits` | | [limits.md](limits.md) |
@@ -469,8 +470,7 @@ As built:
   `null` until one has been read.
 - `parallelism` takes each session's span from start to end (the working intervals stay on the machine).
 - `/api/me/sessions` pages newest first: `next` is the start of the page's last session, sent back as `before`.
-- The endpoints follow `HUB_ORGS` like the rest of the organizations' API (404 when off, instance admins only in
-  `shadow`).
+- The endpoints follow `HUB_ORGS` like the rest of the organizations' API (404 when off).
 
 As built: the organization's `…/overview`, `…/spend`, `…/kpis`, `…/changes` and `…/waste`, and the rate.
 
@@ -509,7 +509,7 @@ As built (machines):
   `not_implemented` («Перезапуск ВМ пока недоступен») while the organization's `machine.resources` feature is off; with
   it on, `vm` is `machine`: a reboot through the provider (422 `not_supported` without one), and `when: 'drain'` is
   accepted. The answer then also carries `op`, and the restart is a stored operation ([machines-resources.md](machines-resources.md#operations)).
-- All of it follows `HUB_ORGS` (404 when off, instance administrators only in `shadow`).
+- All of it follows `HUB_ORGS` (404 when off).
 
 - **Rate.** The organization's `currency` (default `RUB`) is shown at the Central Bank's rate on the 1st of the period's
   first month, read once from `HUB_RATES_URL` (default `https://www.cbr.ru/scripts/XML_daily.asp`, `off` never fetches)

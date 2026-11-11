@@ -18,6 +18,8 @@ export interface IProjectDownloadsOf {
   board: string | null;
   /** The whole project as a ZIP: set where the person may change it. */
   archives: boolean;
+  /** «Перенести на другой инстанс»: opens the pack export of this project; absent where it is not offered. */
+  transfer?: () => void;
 }
 
 export interface IDownloadItem {
@@ -84,6 +86,14 @@ export const bundleDownload = (of: IProjectDownloadsOf): IDownloadItem => ({
   pick: () => run(of, DECK_EXPORT.bundle),
 });
 
+/** The project with its design system as one pack, to open on another instance. */
+export const transferDownload = (transfer: () => void): IDownloadItem => ({
+  id: 'transfer',
+  icon: 'share',
+  label: t('next.pack.transfer'),
+  pick: transfer,
+});
+
 /** A design's or a video's downloads, in the menu's order: the page on screen, every page, the project. */
 export const projectDownloads = (
   of: IProjectDownloadsOf,
@@ -98,6 +108,7 @@ export const projectDownloads = (
     pick: () => run(of, DECK_EXPORT.pdf),
   });
   if (of.archives) items.push(bundleDownload(of));
+  if (of.archives && of.transfer) items.push(transferDownload(of.transfer));
   return items;
 };
 

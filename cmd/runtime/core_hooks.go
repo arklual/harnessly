@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/coreapi"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/hookspool"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/proc"
@@ -74,7 +76,12 @@ func (k keeperRef) HandleProviderEvent(p, s string, ev agents.Event, at *float64
 
 func (k keeperRef) ApplyHookMeta(p, s string, meta status.HookMeta) (string, string, bool) {
 	if m := k.c.manager(); m != nil {
-		return m.ApplyHookMeta(p, s, meta)
+		tab, state, ok := m.ApplyHookMeta(p, s, meta)
+		// The chat of the session follows the transcript the hook named.
+		if v := k.c.v2.Load(); ok && v != nil && meta.SessionID != nil && meta.JSONLPath != nil {
+			v.followSession(s, meta.SessionID.Value(), meta.JSONLPath.Value())
+		}
+		return tab, state, ok
 	}
 	return "", "", false
 }
@@ -188,6 +195,49 @@ func (c *core) resumeAgents() map[string]coreapi.Agent {
 
 // newHookAPI builds the route configuration over the core; the token check and the API refusal come from main.
 func (c *core) newHookAPI() *coreapi.Config {
+	api := c.hookAPI()
+	api.Spool = &hookspool.Queue{Path: filepath.Join(c.cfg.DataDir, hookspool.File), Apply: api.ApplyClaudeHook, Ready: c.hooksReady}
+	return api
+}
+
+// hooksReady: a hook's event reaches both the keeper and the conversations. Until then the events of the spool wait.
+func (c *core) hooksReady() bool {
+	if c.manager() == nil {
+		return false
+	}
+	if c.v2d == nil || !v2Enabled() {
+		return true
+	}
+	v := c.v2.Load()
+	return v != nil && v.ready.Load()
+}
+
+// hookSpoolEvery is how often the spool is looked at for events whose delivery did not reach the runtime; the first
+// look, at the start, is tried this often until events can be applied.
+const (
+	hookSpoolEvery = 5 * time.Second
+	hookSpoolStart = 250 * time.Millisecond
+)
+
+// runHookSpool applies the events the hooks wrote while the runtime was away, then the ones a delivery lost.
+func (c *core) runHookSpool(ctx context.Context) {
+	wait := hookSpoolStart
+	for {
+		if c.hooksReady() {
+			if n := c.api.Spool.Drain(); n > 0 {
+				agent.Log("info", "core: hook events taken from the spool", agent.F{K: "count", V: n})
+			}
+			wait = hookSpoolEvery
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+	}
+}
+
+func (c *core) hookAPI() *coreapi.Config {
 	return &coreapi.Config{
 		Keeper: keeperRef{c},
 		Access: c.access,
@@ -317,8 +367,19 @@ func writeAnswer(w http.ResponseWriter, status int, v any, h http.Header) {
 	}
 }
 
+// sleepKeeper is what the sleep reads of the tab keeper.
+type sleepKeeper interface {
+	AgentSources() []status.AgentSource
+	Tab(tabID string) (status.TabInfo, bool)
+}
+
 // sleepTabs is the keeper as the idle sleep reads it.
-type sleepTabs struct{ m func() *status.Manager }
+type sleepTabs struct {
+	m func() sleepKeeper
+	// owned: the tab's session is a chat's, which the conversations stop themselves (convo's idle stop): the sleep
+	// never sees it.
+	owned func(session string) bool
+}
 
 func (s sleepTabs) AgentTabs() []sleep.Tab {
 	m := s.m()
@@ -327,6 +388,9 @@ func (s sleepTabs) AgentTabs() []sleep.Tab {
 	}
 	var out []sleep.Tab
 	for _, a := range m.AgentSources() {
+		if s.owned != nil && s.owned(a.TmuxSession) {
+			continue
+		}
 		t := sleep.Tab{TabID: a.TabID, PanelType: a.PanelType, Provider: a.Provider, CliState: a.CliState, TmuxSession: a.TmuxSession,
 			JSONLPath: a.Transcript, AgentSessionID: a.AgentSessionID, LastEventName: a.LastEventName}
 		if a.LastEventAt != nil {
@@ -343,7 +407,7 @@ func (s sleepTabs) Current(tabID string) (sleep.Tab, bool) {
 		return sleep.Tab{}, false
 	}
 	info, ok := m.Tab(tabID)
-	if !ok {
+	if !ok || s.owned != nil && s.owned(info.TmuxSession) {
 		return sleep.Tab{}, false
 	}
 	return sleep.Tab{TabID: tabID, PanelType: info.PanelType, Provider: info.Provider, CliState: info.CliState, TmuxSession: info.TmuxSession,
@@ -353,10 +417,15 @@ func (s sleepTabs) Current(tabID string) (sleep.Tab, bool) {
 // newSleeper is the idle sleep over the keeper m gives once the core runs.
 func (c *core) newSleeper(m func() *status.Manager) *sleep.Sleeper {
 	return &sleep.Sleeper{
-		Tabs:       sleepTabs{m},
+		Tabs: sleepTabs{owned: c.chatOwns, m: func() sleepKeeper {
+			if k := m(); k != nil {
+				return k
+			}
+			return nil
+		}},
 		Panes:      c.cfg.Tmux,
 		Claude:     c.claude,
-		Activity:   &claude.ActivityReader{},
+		Activity:   &claude.ActivityReader{Lines: c.transcripts.Follower("sleep-activity", 0)},
 		Background: c.bg,
 		Getenv:     os.Getenv,
 		Env:        c.cfg.Hooks.Sleep,

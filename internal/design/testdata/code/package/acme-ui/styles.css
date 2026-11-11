@@ -1,0 +1,20 @@
+:root {
+  --acme-color-accent: #2563eb;
+  --acme-color-surface: #ffffff;
+  --acme-color-text: #14161a;
+  --acme-color-muted: #5b6270;
+  --acme-space-2: 8px;
+  --acme-space-4: 16px;
+  --acme-radius-m: 8px;
+}
+@layer kit-acme-ui {
+  .acme-root { box-sizing: border-box; min-height: 100vh; padding: var(--acme-space-4); background: var(--acme-color-surface); color: var(--acme-color-text); font: 15px/22px Arial, Helvetica, sans-serif; }
+  .acme-stack { display: flex; flex-direction: column; align-items: flex-start; }
+  .acme-text-s { font-size: 13px; } .acme-text-m { font-size: 15px; } .acme-text-l { font-size: 22px; font-weight: 700; }
+  .acme-muted { color: var(--acme-color-muted); }
+  .acme-button { border: 0; border-radius: var(--acme-radius-m); padding: var(--acme-space-2) var(--acme-space-4); font: inherit; cursor: pointer; }
+  .acme-button-primary { background: var(--acme-color-accent); color: #ffffff; }
+  .acme-button-secondary { background: #e8ebf0; color: var(--acme-color-text); }
+  .acme-card { width: 320px; box-sizing: border-box; padding: var(--acme-space-4); border-radius: var(--acme-radius-m); border: 1px solid #dfe3ea; }
+  .acme-card-title { margin: 0 0 var(--acme-space-2); font-size: 17px; }
+}

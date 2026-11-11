@@ -210,6 +210,10 @@ type Conversation struct {
 	// TerminalStop says the conversation's terminal was stopped — by the person or for standing idle — while the agent
 	// is not running again; the feed ends with a quiet row about it. Absent otherwise.
 	TerminalStop *TerminalStop `json:"terminalStop,omitempty"`
+	// NotSavedSince is since when the runtime has failed to write the conversation to its disk (a full or read-only
+	// disk), several writes in a row: what the person sends is held in memory only and a restart of the runtime loses
+	// it. The runtime goes on trying; absent while the conversation is saved.
+	NotSavedSince Ms `json:"notSavedSince,omitempty"`
 	// TerminalFailure is a provider-neutral, non-retryable failure of the last turn. NeedsTarget means the runtime
 	// will not retry or move the conversation itself: the person must choose where to continue.
 	TerminalFailure *TerminalFailure `json:"terminalFailure,omitempty"`
@@ -1244,6 +1248,77 @@ type ConvSnapshot struct {
 	// Pictures are the pictures the conversation's messages name, the latest named last (see Picture); absent when none.
 	Pictures []Picture `json:"pictures,omitempty"`
 	Now      *Now      `json:"now"`
+	// Agent is the conversation's agent state as the snapshot was taken; absent from a runtime that does not stamp it.
+	Agent *AgentStamp `json:"agent,omitempty"`
+	// Pane is what the right pane's tools read of the conversation; absent from a runtime that does not send it, and
+	// the page then reads the conversation for its pane by itself.
+	Pane *Pane `json:"pane,omitempty"`
+}
+
+// PaneItemsMax is how many pane items a snapshot carries (the newest), PaneLinksMax how many links.
+const (
+	PaneItemsMax = 128
+	PaneLinksMax = 200
+)
+
+// Pane is what the tools of the page's right pane read of a conversation (its links, the files and pictures it
+// worked with, what it wrote to other agents and heard from them, its subagents), taken from the one read of the
+// transcript that makes the feed. A snapshot carries it whole: the links of what the feed has read, newest first, and
+// the newest items, oldest first. On an event it is what a read added: Items go after the ones the page holds, Links
+// (when the list changed) take the place of the list it holds, and Reset says the transcript was read anew, so both
+// take the place of what the page holds. Count is how many lines of the transcript the read has taken so far: it
+// moves with every read that found something, whatever the items.
+type Pane struct {
+	Count int64      `json:"count"`
+	Reset bool       `json:"reset,omitempty"`
+	Links []PaneLink `json:"links,omitempty"`
+	Items []PaneItem `json:"items,omitempty"`
+}
+
+// PaneLink is a link of the agent's answers: its address as the pane opens it, the words it was given (null without),
+// when it was last named, how many times, and what it leads to (artifact, mr, issue, link and the like; a page
+// draws a kind it does not know as a plain link).
+type PaneLink struct {
+	URL   string  `json:"url"`
+	Label *string `json:"label"`
+	At    Ms      `json:"at"`
+	Count int     `json:"count"`
+	Kind  string  `json:"kind"`
+}
+
+// PaneItem is one line of the transcript as the pane's tools need it, with nothing of it they do not read. K is tool
+// (a tool call: Tool its name, Use its id, Path the file it names, Text its one-line summary, Files what it sent the
+// person, Peer what it wrote to another agent), result (the result of a subagent's call: Use), notice (a background
+// task's notice), user (a message with pictures, Images, or with other agents' words in its Text), answer (an answer
+// that embeds pictures: Text is its Markdown), patch (Files are the files a patch touched) or exec (a command run:
+// Text, in Cwd). A page leaves out a kind it does not know.
+type PaneItem struct {
+	ID     string    `json:"id"`
+	K      string    `json:"k"`
+	At     Ms        `json:"at"`
+	Tool   string    `json:"tool,omitempty"`
+	Use    string    `json:"use,omitempty"`
+	Path   string    `json:"path,omitempty"`
+	Text   string    `json:"text,omitempty"`
+	Cwd    string    `json:"cwd,omitempty"`
+	Files  []string  `json:"files,omitempty"`
+	Images []string  `json:"images,omitempty"`
+	Peer   *PanePeer `json:"peer,omitempty"`
+}
+
+// PanePeer is what a tool call wrote to another agent's session.
+type PanePeer struct {
+	To   string `json:"to"`
+	Text string `json:"text"`
+}
+
+// AgentStamp is a conversation's agent state with its version, as the conversation's own channel carries it. Rev is
+// the record's revision the state stands at, the one the convs channel names for the same change, and Epoch is the
+// runtime's (the welcome's): within an epoch the higher rev is the later state, whichever channel brought it.
+type AgentStamp struct {
+	State AgentState `json:"state"`
+	Rev   int64      `json:"rev"`
+	Epoch string     `json:"epoch"`
 }
 
 // DeviceHeader carries the device id on every HTTP request of the page, as hello does on the socket: the page makes
@@ -1307,6 +1382,10 @@ func (c Channel) Valid() bool {
 	_, conv := c.ConvID()
 	return c == ChannelMachine || c == ChannelConvs || conv
 }
+
+// HomeConv names no conversation but the machine's own place, its projects' folder: the start page's pane browses its
+// files and opens shells there without a chat. No conversation has it (a conversation's id never starts with "_").
+const HomeConv = "tab-_home"
 
 // ValidConvID reports whether id is a conversation id: a runtime tabId, "tab-" and [A-Za-z0-9_-].
 func ValidConvID(id string) bool {
@@ -1542,9 +1621,17 @@ type QuotaExhaustedEv struct {
 	Failure TerminalFailure `json:"failure"`
 }
 
-// QueueChangedEv is the conversation's whole queue.
+// QueueChangedEv is the conversation's whole queue. Agent, when set, is the agent state that changed with it: the
+// conversation's channel has no event of its own for the state, and a page that does not read the field takes the
+// event as the queue it already holds.
+//
+// Pane, when set, is what the right pane's tools read of the conversation, as the read of its transcript that made the
+// events before this one left it (see Pane): it rides here for the same reason, a page that does not read it keeps the
+// queue it holds.
 type QueueChangedEv struct {
-	Queue Queue `json:"queue"`
+	Queue Queue       `json:"queue"`
+	Agent *AgentStamp `json:"agent,omitempty"`
+	Pane  *Pane       `json:"pane,omitempty"`
 }
 
 // PromptStateEv is a message's new state, on every server-side step of it.

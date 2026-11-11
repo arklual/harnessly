@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
@@ -18,6 +19,13 @@ const (
 	tokenEnv = "AUTOMATION_RESULT_TOKEN"
 	startOp  = "conversations.start"
 	startFor = 60 * time.Second
+	// startLease is how long a taken run may stay without its conversation started before it is taken to be
+	// abandoned (the hub that took it stopped) and goes back to the queue: the start's own time and a margin.
+	startLease = startFor + 30*time.Second
+	// maxAttempts is how many times a run is taken before it is given up as failed.
+	maxAttempts = 3
+	// queuedFor is how long a run waits for its machine before it is given up.
+	queuedFor = 24 * time.Hour
 )
 
 // Run starts the queued runs, one at a time, until ctx ends.
@@ -66,11 +74,14 @@ curl -sS -X POST "http://127.0.0.1:$%s/automations/report" \
 `, rule.Name, rule.Trigger.Source, rendered, tokenEnv, port, run.ID, tokenEnv)
 }
 
+// errNoMachine says a rule has no machine to run on just now.
+var errNoMachine = errors.New("no machine")
+
 // machineFor is the machine that runs a rule: the one it names, else the first connected machine its owner registered.
 func (s *Service) machineFor(ctx context.Context, rule Rule) (string, error) {
 	if rule.MachineID != "" {
 		if s.links.Get(rule.MachineID) == nil {
-			return "", fmt.Errorf("machine %s is not connected", rule.MachineID)
+			return "", fmt.Errorf("machine %s is not connected: %w", rule.MachineID, errNoMachine)
 		}
 		return rule.MachineID, nil
 	}
@@ -91,13 +102,16 @@ func (s *Service) machineFor(ctx context.Context, rule Rule) (string, error) {
 	if err := rows.Err(); err != nil {
 		return "", err
 	}
-	return "", errors.New("no connected machine of the owner")
+	return "", fmt.Errorf("no connected machine of the owner: %w", errNoMachine)
 }
 
-// Dispatch is one pass: it claims one queued run and starts its conversation. It returns whether a run was started.
+// Dispatch is one pass: it puts back the runs whose start was abandoned, then takes one queued run whose machine is
+// connected and starts its conversation. It returns whether a run was started.
 func (s *Service) Dispatch(ctx context.Context) bool {
-	// A run waits for a machine in `queued`; look first, claim only when there is somewhere to run it.
-	run, rule, token, err := s.claim(ctx)
+	s.reap(ctx)
+	// A run waits for its machine in `queued`: the machine is looked for first, and the run is taken only when there
+	// is somewhere to run it.
+	run, rule, token, machine, err := s.claim(ctx, s.machineFor)
 	if err != nil {
 		if !errors.Is(err, store.ErrNotFound) && ctx.Err() == nil {
 			s.log.Error("automation run not claimed", "error", err)
@@ -105,18 +119,20 @@ func (s *Service) Dispatch(ctx context.Context) bool {
 		return false
 	}
 	fctx := context.WithoutCancel(ctx)
-	machine, err := s.machineFor(fctx, rule)
-	if err != nil {
-		s.fail(fctx, run.ID, err.Error())
-		s.log.Warn("automation not dispatched", "rule", rule.ID, "run", run.ID, "error", err)
-		return false
-	}
 	raw, err := s.links.Do(ctx, machine, startOp, map[string]any{
 		"workspaceId": nil, "prompt": s.buildPrompt(rule, run), "model": rule.Model, "cwd": nil,
 		"runId": run.ID, "resultToken": token, "env": map[string]string{tokenEnv: token},
 	}, startFor)
 	if err != nil {
-		s.fail(fctx, run.ID, err.Error())
+		if errors.Is(err, httpx.ErrMachineOffline) {
+			// The machine went away between the look and the start, so it was never asked: the run waits for the
+			// next pass.
+			s.release(fctx, run.ID, err.Error())
+		} else {
+			// The machine may have started the conversation and not said so in time: a second start would do the
+			// work twice, so the run is failed and not tried again.
+			s.failStart(fctx, run.ID, err.Error())
+		}
 		s.log.Warn("automation not dispatched", "rule", rule.ID, "run", run.ID, "machine", machine, "error", err)
 		return false
 	}

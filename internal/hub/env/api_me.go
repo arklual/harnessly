@@ -127,6 +127,7 @@ func (s *Service) openMe(r *http.Request, st store.Store, p *auth.Principal, ref
 	if err != nil {
 		return nil, err
 	}
+	w.install = s.install
 	tms, err := st.TeamsOfUser(ctx, p.User.ID)
 	if err != nil {
 		return nil, err

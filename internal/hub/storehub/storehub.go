@@ -63,9 +63,11 @@ const viewCache = 15 * time.Second
 
 // Store is the hub's store.
 type Store struct {
-	srv    *filestore.Server
-	meta   filestore.MetaStore
-	blobs  filestore.BlobStore
+	srv   *filestore.Server
+	meta  filestore.MetaStore
+	blobs filestore.BlobStore
+	// reader opens contents in every mode, also when the driver is lent by a test and blobs is cleared.
+	reader filestore.BlobStore
 	key    []byte
 	db     Machines
 	admit  Admit
@@ -76,6 +78,8 @@ type Store struct {
 	profileRooms map[string]string
 
 	design Design
+	kits   Kits
+	kv     kitViews
 
 	mu       sync.Mutex
 	machines map[string]cachedMachine
@@ -107,6 +111,8 @@ type Options struct {
 	Blobs filestore.BlobStore
 	// Design filters the design collection by the projects' access; nil: every machine of a space sees all of it.
 	Design Design
+	// Kits filters the kits collection by the kits' access; nil: every machine of a space sees all of it.
+	Kits Kits
 }
 
 // Open opens the configured drivers. Nil, nil when the store is off.
@@ -119,7 +125,7 @@ func Open(ctx context.Context, o Options) (*Store, error) {
 		return nil, errors.New("store: no session key")
 	}
 	s := &Store{key: o.Key, db: o.DB, admit: o.Admit, log: o.Log, now: o.Now, machines: map[string]cachedMachine{},
-		design: o.Design, views: map[string]cachedView{}, profileRooms: cfg.Store.ProfileRooms}
+		design: o.Design, kits: o.Kits, views: map[string]cachedView{}, profileRooms: cfg.Store.ProfileRooms}
 	if s.log == nil {
 		s.log = slog.Default()
 	}
@@ -146,6 +152,8 @@ func Open(ctx context.Context, o Options) (*Store, error) {
 		s.legacy = sp.ID
 	}
 	s.srv = filestore.NewServer(s.meta, s.blobs, s.authorize)
+	s.srv.SetMaxUpload(cfg.Store.MaxUpload)
+	s.reader = s.blobs
 	if !owned {
 		s.meta, s.blobs = nil, nil
 	}
@@ -180,6 +188,16 @@ func (s *Store) Close() {
 	}
 	s.meta.Close()
 	s.blobs.Close()
+}
+
+// SweepUploads removes the uploads in parts nobody finished in their term.
+func (s *Store) SweepUploads(ctx context.Context) {
+	if s == nil {
+		return
+	}
+	if n := s.srv.SweepUploads(ctx); n > 0 {
+		s.log.Info("store: expired uploads removed", "count", n)
+	}
 }
 
 // Server is the store's API (the drivers are reached through it).
@@ -331,6 +349,9 @@ func (s *Store) machine(ctx context.Context, id string) (store.Machine, error) {
 
 // authorize is the store's Authorizer: a live session of a machine that is still in the space it names.
 func (s *Store) authorize(r *http.Request, coll string) (filestore.Access, error) {
+	if coll == filestore.KindResume {
+		return s.resumeAccess(r)
+	}
 	m, err := s.sessionMachine(r)
 	if err != nil {
 		return filestore.Access{}, err
@@ -345,6 +366,11 @@ func (s *Store) authorize(r *http.Request, coll string) (filestore.Access, error
 	}
 	if coll == filestore.KindDesign && s.design != nil {
 		if err := s.filter(r.Context(), m, &acc); err != nil {
+			return filestore.Access{}, err
+		}
+	}
+	if coll == filestore.KindKits && s.kits != nil {
+		if err := s.kitsFilter(r.Context(), m, &acc); err != nil {
 			return filestore.Access{}, err
 		}
 	}

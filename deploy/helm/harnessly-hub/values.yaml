@@ -8,6 +8,26 @@
 # without a database both are ignored and the hub runs as one replica, as before.
 replicaCount: 2
 
+strategy:
+  # -- How the Deployment replaces its pods. Empty: RollingUpdate (maxUnavailable 0) with several replicas on a shared
+  # Postgres, Recreate otherwise. RollingUpdate asked for on the SQLite file or with one replica is refused: two pods
+  # must never open one file, and a single replica has nowhere to move its machines.
+  type: ""
+  # -- Pods above replicaCount while rolling.
+  maxSurge: 1
+
+# With several replicas a pod told to stop first answers «not ready» and keeps serving (settleSeconds, so the
+# Service and the ingress stop sending it requests), then asks its machines to dial again one at a time, spread over
+# linksSeconds with a random pause, so they do not reach the other replica as a herd. What is left of
+# terminationGracePeriodSeconds is for the requests under way. A single replica stops at once: there is nowhere to go.
+drain:
+  settleSeconds: 5
+  linksSeconds: 10
+
+# -- A preStop hook of the hub's container, as Kubernetes writes it (for example {sleep: {seconds: 5}} on 1.30+).
+# The hub drains by itself on SIGTERM, so none is needed; the hook's time counts against the grace as well.
+preStop: {}
+
 image:
   # -- Image repository. Build the `hub` target of the Dockerfile; the image carries the binaries machines download.
   repository: ghcr.io/ly-solutions/harnessly-hub
@@ -58,7 +78,7 @@ signup: invite
 # the ingress is on (the chart refuses to render otherwise): empty would make the first account to arrive the
 # administrator, and with the ingress that can be anyone on the internet.
 adminEmails: []
-# -- Organizations (HUB_ORGS: off, shadow or on). On for a new installation: sign in, make an organization with its first
+# -- Organizations (HUB_ORGS: off or on). On for a new installation: sign in, make an organization with its first
 # tenant, invite people, connect a machine.
 orgs: "on"
 # -- Flags that are on for every organization that has not chosen (HUB_FEATURES_DEFAULT): ui.hx is the new interface.
@@ -70,7 +90,8 @@ machineTrust: true
 # through such a provider become the administrator when adminEmails is empty. Only for a provider you run or trust.
 oidcEmailTrusted: false
 # -- self-hosted or cloud (HUB_EDITION). The cloud edition runs no OpenID Connect and no local machine, needs
-# runtimeDomain, and never lets the SSH way reach a private address.
+# runtimeDomain, and never lets the SSH way reach a private address. It does not start unless orgs is "on" and
+# extraEnv sets HUB_ACCESS_ENFORCE=on and HUB_RESOURCE_ACCESS=on.
 edition: self-hosted
 # -- Sign in with a passkey (HUB_PASSKEY). Needs a domain name in publicUrl.
 passkey: true
@@ -178,38 +199,81 @@ database:
       limits:
         memory: 1Gi
 
-# Documents and boards (HUB_DOCS): the hub keeps the comments, threads and rights; the documents themselves live in the
-# artifacts service and the boards in the boards service. OFF by default: it is two more services to run and to keep
-# a token for, and a hub without them is complete (the screens say "not set up", with the reason, instead of failing).
+# Documents and boards are services of their own, each optional (docs/apps/documents.md, docs/apps/boards.md). The hub
+# keeps the comments, threads and rights; the documents live in the artifacts service and the boards in the boards
+# service. Off by default: a hub without them is complete and has no such app. On, the chart refuses to render until
+# the service has an address and, when it runs in this release, a storage.
+#
+# Documents (HUB_DOCS, the artifacts service).
 docs:
   enabled: false
-  artifacts:
-    # -- Run the artifacts service in this release (one replica, files on a volume of its own). Off: set url (and
-    # the token below) to a service you run yourself, with S3 storage, behind several replicas.
-    bundled: true
-    # -- Address of an artifacts service you run (HUB_ARTIFACTS_URL); ignored while bundled is true.
-    url: ""
-    image:
-      repository: ghcr.io/ly-solutions/artifacts
-      tag: latest
-    persistence:
-      size: 5Gi
-      storageClass: ""
-  boards:
-    # -- Run the boards service in this release (files on a volume). There is no published image yet: build it from the
-    # boards repository and set image.repository, or leave this off and the hub offers documents only.
-    bundled: false
-    # -- Address of a boards service you run (HUB_BOARDS_URL); empty with bundled: false means no boards.
-    url: ""
-    image:
-      repository: ""
-      tag: latest
-    persistence:
-      size: 1Gi
-      storageClass: ""
-  # -- A Secret with the key `token`: the bearer both services accept from the hub. Empty: the chart makes one and
-  # keeps it across upgrades. Set it when the services are yours (url set), as the chart cannot know their token.
+  # -- The public address machines and browsers open the service at (HUB_ARTIFACTS_PUBLIC_URL; https for the apps to frame
+  # it), e.g. https://docs.example.com. The hub calls a bundled service inside the cluster and a service of yours here
+  # (HUB_ARTIFACTS_URL). Required when enabled.
+  url: ""
+  # -- Run the service in this release. false: url is a service you run yourself, and existingSecret holds its token.
+  bundled: true
+  image:
+    repository: ghcr.io/ly-solutions/artifacts
+    # -- A released version (X.Y.Z) to pin; latest is the newest release.
+    tag: latest
+  storage:
+    # -- fs: files on a volume of its own (one replica); s3: a bucket, its settings in storage.s3.existingSecret.
+    # Required when the service runs in this release.
+    type: ""
+    size: 5Gi
+    storageClass: ""
+    s3:
+      # -- A Secret with the service's S3 variables (ARTIFACTS_S3_BUCKET, ARTIFACTS_S3_ACCESS_KEY_ID,
+      # ARTIFACTS_S3_SECRET_ACCESS_KEY, and ARTIFACTS_S3_ENDPOINT/REGION as needed), passed to it as its environment.
+      existingSecret: ""
+  # -- How people sign in to the service: token (its own tokens and links) or harnessly (the hub's platform token; the
+  # service asks the hub for each person's rights with the key accessToken of the Secret).
+  auth: token
+  # -- Origins besides the hub that may frame documents, e.g. the machines' https://*.<runtimeDomain> when their pages
+  # embed it. Any page of such an origin can then frame it.
+  frameAncestors: []
+  # -- A Secret with the key `token` (what the hub sends the service) and, with auth: harnessly, `accessToken`. Empty:
+  # the chart makes one and keeps it across upgrades. Required when bundled is false: the chart cannot know the token
+  # of a service it does not run.
   existingSecret: ""
+  # -- Route url's host to the bundled service on the hub's Ingress (ingress.enabled); its TLS goes in ingress.tls.
+  ingress: true
+
+# Boards (HUB_BOARDS_URL, the boards service).
+boards:
+  enabled: false
+  # -- The public address machines and browsers open the service at (HUB_BOARDS_PUBLIC_URL; https for the apps to frame
+  # it), e.g. https://boards.example.com. The hub calls a bundled service inside the cluster and a service of yours here
+  # (HUB_BOARDS_URL). Required when enabled.
+  url: ""
+  # -- Run the service in this release. false: url is a service you run yourself, and existingSecret holds its token.
+  bundled: true
+  image:
+    repository: ghcr.io/ly-solutions/boards
+    # -- A released version (X.Y.Z) to pin; latest is the newest release.
+    tag: latest
+  storage:
+    # -- fs: files on a volume of its own (one replica); s3: a bucket, its settings in storage.s3.existingSecret.
+    # Required when the service runs in this release.
+    type: ""
+    size: 1Gi
+    storageClass: ""
+    s3:
+      # -- A Secret with the service's S3 variables (BOARDS_S3_BUCKET, BOARDS_S3_ACCESS_KEY_ID,
+      # BOARDS_S3_SECRET_ACCESS_KEY, and BOARDS_S3_ENDPOINT/REGION as needed), passed to it as its environment.
+      existingSecret: ""
+  # -- How people sign in to the service: token (its own tokens) or harnessly (the hub's platform token; needs a boards
+  # release that has it).
+  auth: token
+  # -- Origins besides the hub that may frame the editor, e.g. the machines' https://*.<runtimeDomain> when their pages
+  # embed it. Any page of such an origin can then frame it.
+  frameAncestors: []
+  # -- A Secret with the key `token` (what the hub sends the service) and `sessionSecret` (the service's cookies).
+  # Empty: the chart makes one and keeps it across upgrades. Required when bundled is false.
+  existingSecret: ""
+  # -- Route url's host to the bundled service on the hub's Ingress (ingress.enabled); its TLS goes in ingress.tls.
+  ingress: true
 
 persistence:
   # -- The hub's data folder (HUB_DATA_DIR): the SQLite file and, unless HUB_SECRET_KEY is set, the key file that seals
@@ -226,6 +290,22 @@ service:
   type: ClusterIP
   port: 80
   annotations: {}
+
+networkPolicy:
+  # -- With several replicas: a NetworkPolicy that lets only the hub's own pods reach the port the replicas talk on
+  # (8041); the public port stays open as the cluster has it. Needs a network plugin that enforces policies.
+  enabled: true
+
+metrics:
+  # -- Serve the hub's numbers in the Prometheus text format at /metrics, on a port of its own that is on no Service
+  # and no Ingress, and annotate the pods (prometheus.io/scrape, port, path) for a collector that finds pods by
+  # annotation. The numbers are counts only (links, queues, requests by route group), without names or addresses,
+  # and are served without sign-in to whoever reaches the port inside the cluster.
+  enabled: true
+  port: 8042
+  # -- Who may reach the port when the NetworkPolicy above is on: a list of NetworkPolicy peers, for example
+  # [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}]. Empty: any pod of the cluster.
+  from: []
 
 ingress:
   enabled: false
@@ -297,9 +377,20 @@ readinessProbe:
   timeoutSeconds: 4
   failureThreshold: 3
 
-# -- Seconds the pod has to end its streams and agent links on a stop (the hub needs up to 20).
+# -- Seconds the pod has to stop. One replica needs up to 20; several replicas need more than drain.settleSeconds +
+# drain.linksSeconds + 5 (the chart refuses less) and get the rest for the requests under way.
 terminationGracePeriodSeconds: 30
 
 nodeSelector: {}
 tolerations: []
+# -- The pod's affinity, as Kubernetes writes it. When set it replaces the rules of antiAffinity below.
 affinity: {}
+
+antiAffinity:
+  # -- Keep the hub's pods apart from each other (several replicas) and from the pod of the bundled Postgres
+  # (database.postgres.enabled), so losing a node does not take both. Nothing is added for one replica on SQLite.
+  enabled: true
+  # -- false: a preference, so a cluster of one node still schedules. true: a pod that cannot be kept apart stays
+  # Pending.
+  required: false
+  topologyKey: kubernetes.io/hostname

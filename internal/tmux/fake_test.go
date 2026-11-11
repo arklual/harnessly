@@ -42,6 +42,7 @@ var fakeNames = Names{Socket: "main", LegacySocket: "old", Prefix: "nw-", Legacy
 func (f *fakeTmux) tmux(cfg Config) *Tmux {
 	t := NewConfig(cfg)
 	t.run = f.run
+	t.runCtx = nil
 	t.runWrite = func(dir, program string, args ...string) result {
 		r := f.run(dir, program, args...)
 		f.mu.Lock()
@@ -821,5 +822,56 @@ func TestGrowDetached(t *testing.T) {
 	f.display = "0 240 24\n"
 	if !tm.GrowDetached("nw-s", 200, 60) || !slices.Contains(f.calls[1].args, "240") {
 		t.Fatalf("a wide window keeps its width: %+v", f.calls)
+	}
+}
+
+// A server reads the config once per content of the file: the sessions after the first cost one tmux process each.
+func TestCreateSessionReadsAnUnchangedConfigOnce(t *testing.T) {
+	conf := filepath.Join(t.TempDir(), "tmux.conf")
+	if err := os.WriteFile(conf, []byte("set -g mouse on\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f := newFake()
+	tm := f.tmux(Config{Names: fakeNames, ConfigFile: conf, Env: []string{"HOME=/home/u"}})
+	commands := func() string {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		var out []string
+		for _, c := range f.calls {
+			for _, a := range c.args {
+				if a == "new-session" || a == "source-file" || a == "kill-server" {
+					out = append(out, a)
+				}
+			}
+		}
+		f.calls = nil
+		return strings.Join(out, " ")
+	}
+	for _, name := range []string{"nw-a", "nw-b", "nw-c"} {
+		if err := tm.CreateSession(name, 80, 24, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := commands(); got != "new-session source-file new-session new-session" {
+		t.Fatalf("an unchanged config: %q", got)
+	}
+	// A config written anew is read again, once.
+	if err := os.WriteFile(conf, []byte("set -g mouse off\nset -g status off\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = tm.CreateSession("nw-d", 80, 24, "")
+	_ = tm.CreateSession("nw-e", 80, 24, "")
+	if got := commands(); got != "new-session source-file new-session" {
+		t.Fatalf("a changed config: %q", got)
+	}
+	// Asked for by name, it is read whatever the file says; servers that are gone forget what they read.
+	tm.ApplyConfig("main")
+	if got := commands(); got != "source-file" {
+		t.Fatalf("ApplyConfig: %q", got)
+	}
+	tm.KillServer()
+	_ = tm.CreateSession("nw-f", 80, 24, "")
+	if got := commands(); got != "kill-server kill-server new-session source-file" {
+		t.Fatalf("after the servers ended: %q", got)
 	}
 }

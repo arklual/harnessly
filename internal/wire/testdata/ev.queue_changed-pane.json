@@ -1,0 +1,26 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 528,
+  "e": {
+    "type": "queue_changed",
+    "queue": {
+      "conversationId": "tab-k3Jx9QmZ",
+      "items": [],
+      "paused": null,
+      "rev": 11
+    },
+    "pane": {
+      "count": 214,
+      "links": [
+        {"url": "https://docs.example.com/a/report-x1", "label": "The report", "at": 1792656000000, "count": 2, "kind": "artifact"},
+        {"url": "https://example.com/changelog", "label": null, "at": 1792655000000, "count": 1, "kind": "web"}
+      ],
+      "items": [
+        {"id": "t1", "k": "tool", "at": 1792655990000, "tool": "Write", "use": "toolu_01", "path": "/w/report.md", "text": "Create /w/report.md"},
+        {"id": "t2", "k": "tool", "at": 1792655995000, "tool": "SendMessage", "use": "toolu_02", "text": "SendMessage scout", "peer": {"to": "scout", "text": "Check the numbers."}},
+        {"id": "u3", "k": "user", "at": 1792655999000, "text": "look at this", "images": ["/api/v2/shot?id=a1b2c3d4e5f6"]}
+      ]
+    }
+  }
+}

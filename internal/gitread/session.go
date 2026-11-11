@@ -239,20 +239,34 @@ func gitOr(dir, fallback string, args ...string) string {
 }
 
 func sessionCommits(root string, since float64) ([]CommitSummary, bool, error) {
+	shas, err := MadeCommits(root, since)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(shas) == 0 {
+		return []CommitSummary{}, false, nil
+	}
+	args := append([]string{"log", "--no-walk=sorted", "--no-merges", "--numstat", "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%s"}, shas[:min(len(shas), maxSessionCommit)]...)
+	return parseCommitLog(gitOr(root, "", args...)), len(shas) > maxSessionCommit, nil
+}
+
+// MadeCommits are the commits the worktree at root made since `since` (ms) that are still on a branch or HEAD, newest
+// first: from the HEAD reflog, or, without one, the commits of HEAD since then.
+func MadeCommits(root string, since float64) ([]string, error) {
 	iso, ok := jscompat.ISOString(since)
 	if !ok {
-		return nil, false, ErrBadDate
+		return nil, ErrBadDate
 	}
 	reflog := gitOr(root, "", "reflog", "show", "--format=%H%x1f%gs%x1f%gd", "--date=unix", "-n", strconv.Itoa(maxReflog), "HEAD")
 	var shas []string
 	if jscompat.Trim(reflog) != "" {
 		made := parseReflogCommits(reflog, since)
 		if len(made) == 0 {
-			return []CommitSummary{}, false, nil
+			return nil, nil
 		}
 		hourBefore, ok := jscompat.ISOString(since - 3_600_000)
 		if !ok {
-			return nil, false, ErrBadDate
+			return nil, ErrBadDate
 		}
 		reachable := map[string]bool{}
 		for _, l := range strings.Split(gitOr(root, "", "rev-list", "--no-merges", "--since="+hourBefore, "-n", "2000", "--branches", "HEAD"), "\n") {
@@ -266,11 +280,7 @@ func sessionCommits(root string, since float64) ([]CommitSummary, bool, error) {
 	} else {
 		shas = lines(gitOr(root, "", "rev-list", "--no-merges", "--since="+iso, "-n", strconv.Itoa(maxSessionCommit+1), "HEAD"))
 	}
-	if len(shas) == 0 {
-		return []CommitSummary{}, false, nil
-	}
-	args := append([]string{"log", "--no-walk=sorted", "--no-merges", "--numstat", "--format=%x1e%H%x1f%h%x1f%aI%x1f%an%x1f%s"}, shas[:min(len(shas), maxSessionCommit)]...)
-	return parseCommitLog(gitOr(root, "", args...)), len(shas) > maxSessionCommit, nil
+	return shas, nil
 }
 
 // nodeDirname is Node's path.dirname.

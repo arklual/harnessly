@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -253,5 +254,61 @@ func TestAgentBrowserMachineCheck(t *testing.T) {
 	check = checkAgentBrowser(t.Context(), t.TempDir())
 	if check.OK || !strings.Contains(check.Detail, "DOWNLOAD=off") {
 		t.Fatalf("%+v", check)
+	}
+}
+
+// Whoever opened the page is who commits on the machine: with git's identity missing, the check offers to take the
+// name and the email of the sign-in, and only then.
+func TestGitIdentityIsTakenFromTheSignIn(t *testing.T) {
+	p, _ := fakeProbe(t)
+	email := ""
+	var gotName, gotEmail string
+	p.GitEmail = func() string { return email }
+	p.SetGitIdentity = func(name, e string) error { gotName, gotEmail, email = name, e, e; return nil }
+
+	anon := checksByID(p.run(context.Background()))["git_identity"]
+	if anon.OK || anon.Fixable || anon.FixCommand == "" {
+		t.Fatalf("nobody signed in: only the command is offered: %+v", anon)
+	}
+	if err := p.fix(context.Background(), "git_identity"); !errors.Is(err, errNoFix) {
+		t.Fatalf("no email to write: %v", err)
+	}
+
+	ctx := withPerson(context.Background(), "Ada Lovelace", "ada@example.com")
+	if c := checksByID(p.run(ctx))["git_identity"]; c.OK || !c.Fixable {
+		t.Fatalf("the sign-in has an email: %+v", c)
+	}
+	if err := p.fix(ctx, "git_identity"); err != nil {
+		t.Fatal(err)
+	}
+	if gotName != "Ada Lovelace" || gotEmail != "ada@example.com" {
+		t.Fatalf("written: %q %q", gotName, gotEmail)
+	}
+	if c := checksByID(p.run(ctx))["git_identity"]; !c.OK || c.Fixable {
+		t.Fatalf("git knows the person now: %+v", c)
+	}
+	// An identity the person set by hand is never overwritten.
+	gotEmail = ""
+	if err := p.fix(ctx, "git_identity"); !errors.Is(err, errNoFix) || gotEmail != "" {
+		t.Fatalf("existing identity: %v %q", err, gotEmail)
+	}
+}
+
+func TestSetGitIdentityWritesTheGlobalConfig(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
+	if err := setGitIdentity(os.Getenv("PATH"))("Ada Lovelace", "ada@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitEmail(os.Getenv("PATH"))(); got != "ada@example.com" {
+		t.Fatalf("email: %q", got)
+	}
+	raw, _ := os.ReadFile(filepath.Join(home, ".gitconfig"))
+	if !strings.Contains(string(raw), "Ada Lovelace") {
+		t.Fatalf("name: %s", raw)
 	}
 }

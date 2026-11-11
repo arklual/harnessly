@@ -37,13 +37,16 @@ type KitRenderOptions struct {
 	Chrome string
 	// Tabs is how many pages draw at once (4 when 0).
 	Tabs int
+	// KitsDir is the folder of installed kits a kit that extends another finds its base in; "" for none.
+	KitsDir string
 }
 
 // KitRenderItem is how one component or layout rendered.
 type KitRenderItem struct {
 	Theme  string   `json:"theme"`
 	Node   string   `json:"node"`
-	Status string   `json:"status"` // ok, error (a script error or a failed request), blank (draws nothing)
+	ID     string   `json:"id,omitempty"` // the component's or the layout's id
+	Status string   `json:"status"`       // ok, error (a script error or a failed request), blank (draws nothing)
 	Errors []string `json:"errors,omitempty"`
 	Shot   string   `json:"shot,omitempty"` // the picture written, relative to the kit folder
 	Ms     int64    `json:"ms"`
@@ -127,6 +130,16 @@ func RenderKit(folder string, opt KitRenderOptions) ([]KitRenderItem, error) {
 	if err := os.Symlink(abs, filepath.Join(kits, id, version)); err != nil {
 		return nil, err
 	}
+	// The kits it may extend are there too, as they are installed.
+	if opt.KitsDir != "" {
+		if others, err := os.ReadDir(opt.KitsDir); err == nil {
+			for _, e := range others {
+				if e.IsDir() && e.Name() != id && designkit.ValidID(e.Name()) {
+					_ = os.Symlink(filepath.Join(opt.KitsDir, e.Name()), filepath.Join(kits, e.Name()))
+				}
+			}
+		}
+	}
 	l := New(Config{LibraryDir: filepath.Join(work, "library"), DataDir: filepath.Join(work, "data"), KitsDir: kits,
 		Chrome: opt.Chrome, Texts: Texts{Tag: "harnessly-kit", CLI: "harnessly"}})
 	port, err := l.EnsureServer()
@@ -145,8 +158,10 @@ func RenderKit(folder string, opt KitRenderOptions) ([]KitRenderItem, error) {
 		page := base + url.PathEscape(th.ID) + "/"
 		for _, g := range c.Groups {
 			for _, k := range g.Components {
-				// A part draws inside its parent and a provider draws nothing: neither is a picture of its own.
-				if k.Part != "" || (len(opt.Only) > 0 && !opt.Only[k.ID]) {
+				// A part draws inside its parent and a provider draws nothing: neither is a picture of its own. A
+				// component with no sample and no variants is one that draws only inside an application (the check
+				// warns component.no-sample): there is nothing to draw it with.
+				if k.Part != "" || (len(opt.Only) > 0 && !opt.Only[k.ID]) || (k.Sample == nil && len(k.Variants) == 0) {
 					continue
 				}
 				props := map[string]any{}
@@ -247,7 +262,7 @@ func RenderKit(folder string, opt KitRenderOptions) ([]KitRenderItem, error) {
 // renderKitJob opens one page in the tab and judges it.
 func renderKitJob(cdp *cdpPipe, session string, j kitRenderJob, root string, shots bool) KitRenderItem {
 	started := time.Now()
-	item := KitRenderItem{Theme: j.theme, Node: j.node}
+	item := KitRenderItem{Theme: j.theme, Node: j.node, ID: j.id}
 	var mu sync.Mutex
 	var errs []string
 	push := func(s string) {

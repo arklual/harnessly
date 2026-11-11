@@ -124,6 +124,9 @@ func (c *conv) terminalStopped(by wire.TerminalStopBy, idle time.Duration, freed
 		ts.IdleMs = max(idle.Milliseconds(), 1)
 	}
 	c.rec.TerminalStop = ts
+	if f, ok := c.d.Machine.(SessionForgetter); ok {
+		f.ForgetScreen(c.rec.Session)
+	}
 	c.touch()
 	c.flush(now, true)
 	c.save(now, true)
@@ -145,6 +148,9 @@ type reapView struct {
 	provider wire.Provider
 	screen   string
 	since    time.Time
+	// worked is the newest of what the person and the agent did (a prompt, a line of the transcript, a turn's
+	// end): what the floor counts from. Unlike since it does not move when the runtime restarts or the chat is read.
+	worked time.Time
 }
 
 func (c *conv) reapView(now time.Time) reapView {
@@ -159,6 +165,14 @@ func (c *conv) reapView(now time.Time) reapView {
 	}
 	if t := c.rec.LastTurn; t != nil && t.EndedAt != nil && time.UnixMilli(*t.EndedAt).After(v.since) {
 		v.since = time.UnixMilli(*t.EndedAt)
+	}
+	for _, at := range []wire.Ms{c.rec.LastActivityAt, c.rec.LastPromptAt} {
+		if t := time.UnixMilli(at); at != 0 && t.After(v.worked) {
+			v.worked = t
+		}
+	}
+	if t := c.rec.LastTurn; t != nil && t.EndedAt != nil && time.UnixMilli(*t.EndedAt).After(v.worked) {
+		v.worked = time.UnixMilli(*t.EndedAt)
 	}
 	v.reason = c.notIdle(now)
 	return v
@@ -334,11 +348,13 @@ func treeActivity(s PaneSample, provider wire.Provider) treeLook {
 
 // idleTrack is what the sweep remembers of a chat it saw idle: since when, and the sample to compare the next with.
 type idleTrack struct {
-	since  time.Time
-	at     time.Time
-	agent  int
-	cpu    map[int]time.Duration
-	screen uint64
+	since time.Time
+	// unwatched is when the chat was last seen with nobody having it open: the setting's window counts from there.
+	unwatched time.Time
+	at        time.Time
+	agent     int
+	cpu       map[int]time.Duration
+	screen    uint64
 }
 
 func screenKey(s string) uint64 {
@@ -376,20 +392,13 @@ func quietBetween(prev *idleTrack, look treeLook, elapsed time.Duration) bool {
 	return float64(agent) <= agentCPUShare*float64(elapsed) && float64(rest) <= helperCPUShare*float64(elapsed)
 }
 
-func (r *Runtime) idleAfter() time.Duration {
-	if r.d.IdleStop == nil {
-		return 0
-	}
-	return r.d.IdleStop()
-}
-
 // Reap is one sweep: it stops the terminals of the chats that stood idle for the whole window and returns their ids
 // (the stops finish off the sweep's goroutine; the inline runtime of a test has finished them on return).
 func (r *Runtime) Reap() []string {
 	r.reapMu.Lock()
 	defer r.reapMu.Unlock()
-	after := r.idleAfter()
-	if after <= 0 || r.d.Terminals == nil {
+	after, floor := r.idleWindows()
+	if after <= 0 && floor <= 0 || r.d.Terminals == nil {
 		r.idle = nil
 		return nil
 	}
@@ -405,7 +414,7 @@ func (r *Runtime) Reap() []string {
 		}
 		id := last.rec.ID
 		seen[id] = true
-		if r.reapOne(id, after) {
+		if r.reapOne(id, after, floor) {
 			stopped = append(stopped, id)
 		}
 	}
@@ -417,14 +426,24 @@ func (r *Runtime) Reap() []string {
 	return stopped
 }
 
-// reapOne samples one chat and stops its terminal when it has stood idle for after.
-func (r *Runtime) reapOne(id string, after time.Duration) bool {
+// reapOne samples one chat and stops its terminal when it has stood idle for after with nobody having it open, or
+// shows no activity for floor (idleWindows).
+func (r *Runtime) reapOne(id string, after, floor time.Duration) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), reapAsk)
 	var v reapView
-	err := r.call(ctx, id, func(c *conv, now time.Time) { v = c.reapView(now) })
+	// The sweep asks the actor the conversation has: it is no use of the conversation, and wakes none that is parked.
+	a := r.loaded(id)
+	err := r.callOn(ctx, a, func(c *conv, now time.Time) { v = c.reapView(now) })
 	cancel()
 	terms := r.d.Terminals
-	if err != nil || v.reason != "" || !terms.Owned(v.session) || terms.Watched(id, v.session) {
+	if err != nil || v.reason != "" || !terms.Owned(v.session) {
+		delete(r.idle, id)
+		return false
+	}
+	// The floor is the tabs' old sleep, which knew Claude only.
+	floored := floor > 0 && v.provider == wire.ProviderClaude
+	watched := terms.Watched(id, v.session)
+	if (watched || after <= 0) && !floored {
 		delete(r.idle, id)
 		return false
 	}
@@ -441,8 +460,9 @@ func (r *Runtime) reapOne(id string, after time.Duration) bool {
 	now := r.d.Clock.Now()
 	key := screenKey(v.screen)
 	t := r.idle[id]
-	if t == nil {
-		t = &idleTrack{since: now}
+	first := t == nil
+	if first {
+		t = &idleTrack{since: now, unwatched: now}
 		r.idle[id] = t
 	} else if t.agent != look.agent || t.screen != key || !quietBetween(t, look, now.Sub(t.at)) {
 		t.since = now
@@ -450,14 +470,25 @@ func (r *Runtime) reapOne(id string, after time.Duration) bool {
 	if v.since.After(t.since) {
 		t.since = v.since
 	}
+	if watched {
+		t.unwatched = now
+	}
+	if t.unwatched.Before(t.since) {
+		t.unwatched = t.since
+	}
+	quiet := !first && t.since.Before(now) // at rest at two sweeps running
 	t.at, t.agent, t.cpu, t.screen = now, look.agent, look.cpu, key
 	idle := now.Sub(t.since)
-	if idle < after {
-		return false
+	if after <= 0 || watched || now.Sub(t.unwatched) < after {
+		// Not the setting's: the floor counts from the record's last activity, which a restart of the runtime
+		// does not move, and wants the tree at rest at this sweep and the one before.
+		if idle = now.Sub(v.worked); !floored || !quiet || v.worked.IsZero() || idle < floor {
+			return false
+		}
 	}
 	delete(r.idle, id)
 	started := false
-	_ = r.call(context.Background(), id, func(c *conv, now time.Time) {
+	_ = r.callOn(context.Background(), a, func(c *conv, now time.Time) {
 		// The state may have moved since the view: the actor asks again before it stops anything.
 		if c.notIdle(now) != "" {
 			return
@@ -481,6 +512,7 @@ func (r *Runtime) reaper() {
 			return
 		case <-r.d.Clock.After(ReapEvery):
 			r.Reap()
+			r.Unload()
 		}
 	}
 }

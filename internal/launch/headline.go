@@ -8,9 +8,12 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 )
 
 // Headline is a transcript's last AI title and when the person last typed a prompt (epoch ms); nil when not found.
@@ -33,8 +36,80 @@ var aiTitleRe = regexp.MustCompile(`"type":"ai-title","aiTitle":"((?:[^"\\]|\\.)
 
 // Headlines reads transcript headlines, each file's bytes once: a call reads only what was appended since the last.
 type Headlines struct {
-	mu    sync.Mutex
-	cache map[string]headlineScan
+	// File, when set, keeps the headlines over a restart of the runtime: a transcript whose headline is known and
+	// that did not grow is not read again by the first list after a start.
+	File string
+	// Lines, when set, gives what a transcript a conversation is live on gained, read once for all its readers, so
+	// such a transcript is not opened for its headline; nil reads every transcript from the file.
+	Lines *transcriptindex.Follower
+
+	mu      sync.Mutex
+	cache   map[string]headlineScan
+	loaded  bool
+	dirty   bool
+	savedAt time.Time
+}
+
+// headlinesSaveEvery is how often, at most, the headlines are written to File.
+const headlinesSaveEvery = 5 * time.Second
+
+// keptHeadline is a headline as File holds it.
+type keptHeadline struct {
+	Scanned      int64    `json:"scanned"`
+	Title        *string  `json:"title,omitempty"`
+	LastPromptAt *float64 `json:"lastPromptAt,omitempty"`
+}
+
+// load reads File once. Called with the lock held.
+func (h *Headlines) load() {
+	if h.loaded {
+		return
+	}
+	h.loaded = true
+	if h.cache == nil {
+		h.cache = map[string]headlineScan{}
+	}
+	if h.File == "" {
+		return
+	}
+	raw, err := os.ReadFile(h.File)
+	if err != nil {
+		return
+	}
+	var kept map[string]keptHeadline
+	if json.Unmarshal(raw, &kept) != nil {
+		return
+	}
+	for path, k := range kept {
+		h.cache[path] = headlineScan{scanned: k.Scanned, Headline: Headline{Title: k.Title, LastPromptAt: k.LastPromptAt}}
+	}
+}
+
+// save writes File when the headlines changed, at most every headlinesSaveEvery. Called with the lock held.
+func (h *Headlines) save(force bool) {
+	if h.File == "" || !h.dirty || !force && time.Since(h.savedAt) < headlinesSaveEvery {
+		return
+	}
+	kept := make(map[string]keptHeadline, len(h.cache))
+	for path, s := range h.cache {
+		kept[path] = keptHeadline{Scanned: s.scanned, Title: s.Title, LastPromptAt: s.LastPromptAt}
+	}
+	h.dirty, h.savedAt = false, time.Now()
+	raw, err := json.Marshal(kept)
+	if err != nil {
+		return
+	}
+	tmp := h.File + ".tmp"
+	if os.WriteFile(tmp, raw, 0o600) == nil {
+		_ = os.Rename(tmp, h.File)
+	}
+}
+
+// Flush writes the headlines read so far to File.
+func (h *Headlines) Flush() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.save(true)
 }
 
 var harnessNotices = []string{"[Cross-session idle notice]", "[Cross-session delivery notice]", "Another Claude session sent a message:"}
@@ -163,16 +238,18 @@ func or[T any](a, b *T) *T {
 // (Codex writes no titles, so only a prompt is looked for there); the last line, perhaps still being written, waits for
 // the next call.
 func (h *Headlines) Read(path string) Headline {
+	if out, ok := h.readFollowed(path); ok {
+		return out
+	}
 	st, err := os.Stat(path)
 	if err != nil {
 		return Headline{}
 	}
 	size := st.Size()
 	h.mu.Lock()
-	if h.cache == nil {
-		h.cache = map[string]headlineScan{}
-	}
+	h.load()
 	prev := h.cache[path]
+	h.save(false)
 	h.mu.Unlock()
 	if size < prev.scanned {
 		prev = headlineScan{}
@@ -182,6 +259,7 @@ func (h *Headlines) Read(path string) Headline {
 	}
 	floor := max(prev.scanned, size-headlineMaxChunk)
 	f, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return Headline{}
 	}
@@ -229,6 +307,42 @@ func (h *Headlines) Read(path string) Headline {
 	out := Headline{Title: or(newer.Title, prev.Title), LastPromptAt: or(newer.LastPromptAt, prev.LastPromptAt)}
 	h.mu.Lock()
 	h.cache[path] = headlineScan{scanned: max(scannedTo, prev.scanned), Headline: out}
+	h.dirty = true
+	h.save(false)
 	h.mu.Unlock()
+	if scannedTo > floor || floor == prev.scanned {
+		// The headline is read up to the end of a whole line: the lines after it may come from the shared read.
+		h.Lines.Seat(path, max(scannedTo, prev.scanned))
+	}
 	return out
+}
+
+// readFollowed is Read of a transcript whose new lines the shared read holds: the headline known so far, moved on by
+// the whole lines the transcript gained, without the file being opened. false leaves the read to the file.
+func (h *Headlines) readFollowed(path string) (Headline, bool) {
+	if h.Lines == nil {
+		return Headline{}, false
+	}
+	h.mu.Lock()
+	h.load()
+	prev, known := h.cache[path]
+	h.mu.Unlock()
+	if !known || prev.scanned == 0 {
+		return Headline{}, false
+	}
+	data, _, ok := h.Lines.Take(path, prev.scanned)
+	if !ok {
+		return Headline{}, false
+	}
+	out := prev.Headline
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(data) > 0 {
+		newer := scanLines(strings.ToValidUTF8(string(data), "\uFFFD"), Headline{})
+		out = Headline{Title: or(newer.Title, prev.Title), LastPromptAt: or(newer.LastPromptAt, prev.LastPromptAt)}
+		h.cache[path] = headlineScan{scanned: prev.scanned + int64(len(data)), Headline: out}
+		h.dirty = true
+	}
+	h.save(false)
+	return out, true
 }

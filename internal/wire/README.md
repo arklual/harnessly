@@ -204,7 +204,9 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     the repeat gets the stored result (24 h, 5000 ops, kept in `<data>/v2/ops.json`). The same opId with another
     body is `refused{conflict}`. A command past `cmdBudgetMs` is `refused{timeout}` and is not stored, so a retry
     runs again.
-30. **Socket.** `hello` within 10 s or the socket closes; ping every 15 s, a socket silent for 35 s closes; at most
+30. **Socket.** `hello` within 10 s or the socket closes; ping every 15 s, a socket silent for 90 s closes, and the
+    runtime sends a pong of its own (`t` 0) every 15 s to a page it has not heard from, which the page answers with a
+    ping (a hidden tab's timers are stretched by the browser, a frame's handler is not); at most
     64 channels; a client 8 MB behind is closed with 1008. Each channel keeps 2000 events or 5 minutes for resume
     (`RingSize`, `RingAge`); a cursor of another epoch or past the ring gets a snapshot.
 31. **Budgets.** `FitConvs` keeps the convs snapshot within 72 KB per 100 conversations (snippets, then titles,
@@ -771,3 +773,38 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     and extends the agent's wait to 120 s from now; `done` and `failed` end the action with `text`. A chat has one action
     in flight, and at most 120 a minute. Both are same-origin only. A runtime that serves it leaves `PaneAct` set; without
     it the route is a 404.
+69. **A chat that is not saved.** The runtime writes a conversation to its disk after every change. When the write
+    fails several times in a row (a full or read-only disk), the record carries `notSavedSince` (epoch ms) and goes out
+    as a `conversation_upsert` on `convs`: the messages the person sends are held in memory only, and a restart of the
+    runtime would lose them. The runtime goes on trying with a pause that grows; the first write that succeeds takes
+    the field off the record. The field is never written to the disk itself.
+70. **One agent state for both channels.** A conversation's agent state changes in one place of the runtime, and every
+    change takes the record's next `rev`. `convs` names it as before (`conversation_state`, or the record itself).
+    `conv:<id>` carries it too, as `agent: {state, rev, epoch}`: on `queue_changed` at every change (the channel has no
+    event of its own for the state, and a page that does not read the field takes the event as the queue it holds) and
+    on the snapshot. `rev` is the record's revision the state stands at and `epoch` the runtime's, so the two channels
+    count alike: within an epoch the page keeps the state of the higher rev, whichever channel brought it, and a stamp
+    of another epoch than the welcome's is not applied. A stamp never moves the rev the page holds the record at: the
+    record's other fields come only by `convs`. A runtime that sends no `agent` is read as before.
+71. **What the right pane reads of a chat.** The tools of the page's right pane (links and documents, the files and
+    pictures the chat worked with, its words with other agents, its subagents) read `pane`, which the runtime gathers
+    from the same read of the transcript that makes the feed; the page opens no other socket on the conversation for
+    them. A `conv:<id>` snapshot carries `pane: {count, links, items}` whole: the links of the agent's answers in what
+    the feed has read, newest first (at most 200; `{url, label, at, count, kind}`, `kind` as the pane names links:
+    artifact, claude-artifact, mr, issue, gitlab, github, web), and the newest items, oldest first (at most 128, fewer
+    when they weigh more than 48 KiB). An item is a line of the transcript with only what a tool of the pane reads:
+    `{id, k, at}` and, by `k`: `tool` (a call that names a file, runs a shell command, sends files, writes to another
+    agent or starts a subagent: `tool`, `use`, `path`, `text` its one-line summary, `files`, `peer {to, text}`),
+    `result` (the result of a subagent's call: `use`), `notice` (a background task's notice), `user` (a message with
+    pictures, `images`, or other agents' words or uploads in its `text`), `answer` (an answer that embeds pictures:
+    `text` is its Markdown), `patch` (`files`) and `exec` (`text` the command, `cwd`). A text is cut at 16 KiB. A
+    picture the transcript carries whole (`data:`) is not sent. After the snapshot, what a read added rides
+    `queue_changed` as `pane: {count, reset?, links?, items?}` beside the queue as it is (the channel has no event of
+    its own for it, and a page that does not read the field takes the event as the queue it holds, as with `agent`):
+    `items` go after the ones the page holds, `links` (only when the list changed) take the place of its list, and
+    `reset: true` (the transcript was read anew, or one read made more items than a snapshot holds) puts `links` and
+    `items` in the place of everything it holds. `count` is how many lines the read has taken so far and moves with
+    every read that found something: the page takes it as «the chat moved» for what it asks elsewhere. A conversation
+    starts gathering when a page first asks for its snapshot. A runtime that does not gather it (an older one, or
+    `RUNTIME_PANE_FEED=0`) sends no `pane`; only then does the page read the conversation for its pane by itself, over
+    the Legacy timeline socket. No feature names it: a snapshot with `pane` is the sign.

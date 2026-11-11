@@ -10,6 +10,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // The replica socket: GET /api/v2/replica, read by the machine agent next door over loopback, on the page's
@@ -23,12 +24,19 @@ import (
 //	{"k":"hello","epoch":"ep-…"}                      first; the epoch the seqs below belong to
 //	{"k":"ev","ch":"conv:tab-x","seq":12,"e":{…}}     one event, the same as the "ev" frame of the socket
 //	{"k":"convs","conversations":[…]}                 the answer to {"k":"convs"}: every chat's record
+//	{"k":"work","entries":[…]}                        the chats' work (WorkFeed): all of it first, then each change
 //
 // Frames from the agent: {"k":"convs"} asks for the list; {"k":"ping"} is answered with {"k":"pong"}.
 const (
 	replicaQueue = 8192
 	replicaIdle  = 60 * time.Second
 )
+
+// WorkFeed is the work of the chats (internal/chatwork) as frames of the replica socket: all of it, and each change.
+type WorkFeed interface {
+	WorkFrames() [][]byte
+	WatchWork(fn func(frame []byte)) (stop func())
+}
 
 type replicaEv struct {
 	K   string          `json:"k"`
@@ -75,8 +83,16 @@ func (s *Server) Replica(w http.ResponseWriter, r *http.Request) {
 	own(hello)
 	stop := s.Hub.Tap(func(ch Channel, seq int64, frame []byte) { push(item{ch: ch, seq: seq, frame: frame}) }, finish)
 	defer stop()
+	if s.Work != nil {
+		// The work of the chats: every record now, then each one that changes.
+		stopWork := s.Work.WatchWork(own)
+		defer stopWork()
+		for _, f := range s.Work.WorkFrames() {
+			own(f)
+		}
+	}
 
-	go func() {
+	safego.Go("wire replica writer", func() {
 		defer cancel()
 		for {
 			var out []byte
@@ -106,7 +122,7 @@ func (s *Server) Replica(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-	}()
+	})
 
 	for {
 		rctx, rcancel := context.WithTimeout(ctx, replicaIdle)
@@ -128,7 +144,7 @@ func (s *Server) Replica(w http.ResponseWriter, r *http.Request) {
 		case "ping":
 			own([]byte(`{"k":"pong"}`))
 		case "convs":
-			go s.replicaConvs(ctx, own)
+			safego.Go("wire replica convs", func() { s.replicaConvs(ctx, own) })
 		}
 	}
 }

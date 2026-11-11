@@ -1830,8 +1830,8 @@ test('10. a new design opens with its chat; an edit picked on its page goes to t
   await note.locator('.hx-ann__step button[aria-label="More"]').click();
   await note.locator('.hx-ann__range input').fill('50');
   await expect.poll(async () => (await look()).slice(0, 2)).toEqual(['2px', '0.5']);
-  await note.locator('.hx-note__input').fill('Make it bigger');
-  await note.locator('.hx-note__btn[data-primary]').click();
+  await note.locator('.hx-ann__input').fill('Make it bigger');
+  await note.locator('.hx-ann__ok').click();
   await expect(note).toHaveCount(0);
   // It stays on the page while the note is there.
   await expect.poll(async () => (await look()).slice(0, 2)).toEqual(['2px', '0.5']);
@@ -1845,7 +1845,7 @@ test('10. a new design opens with its chat; an edit picked on its page goes to t
   await expect(chip.locator('.hx-pagenote__num')).toHaveText('1');
   await expect(chip.locator('.hx-pagenote__facts')).toContainText('Radius → 2 px, Opacity → 50%');
   await chip.locator('.hx-pagenote__open').click();
-  await expect(page.locator('.hx-note .hx-note__input')).toHaveValue('Make it bigger');
+  await expect(page.locator('.hx-note .hx-ann__input')).toHaveValue('Make it bigger');
   await page.locator('.hx-note .hx-ann__cancel').click();
   await expect(page.locator('.hx-note')).toHaveCount(0);
   await page.locator('.hx-site-modes__item[aria-label="Edits"]').click();

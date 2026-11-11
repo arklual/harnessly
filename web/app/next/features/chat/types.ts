@@ -203,6 +203,8 @@ export interface Message {
   handed?: boolean;
   /** Submitting, and the last try got no answer from the machine (or the machine said it is not there): it waits. */
   waitsMachine?: boolean;
+  /** Taken back, and nobody has confirmed it yet: it may still reach the agent. */
+  cancelling?: boolean;
   /** failed{refused}: the runtime's code (a key of next.refuse.*), for the reason under the bubble. */
   refusal?: string | null;
   /** failed{refused} for a cause that may have passed: the same words can be sent again as a new message. */
@@ -255,6 +257,11 @@ export interface TurnItem {
   answer: SayEntry | null;
   now: Now | null;
   wait: TurnWait;
+  /**
+   * The turn is still live in the feed, but the chat's state says the agent is out of any turn: its live work is not
+   * drawn, the end of the turn is on its way. Absent for any other turn.
+   */
+  settled?: boolean;
   /** What went with a stop or a failure, e.g. «the question was withdrawn». */
   endNote: string | null;
   /** The prompt is a message the runtime sent to go on by itself; absent for any other turn. */

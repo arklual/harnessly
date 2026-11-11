@@ -19,7 +19,8 @@ import (
 // checkpointStore is where the core keeps the snapshots; the deployment names the refs as the previous runtime did.
 func (c *core) checkpointStore() *checkpoints.Store {
 	return &checkpoints.Store{Dir: filepath.Join(c.cfg.DataDir, "checkpoints"), Home: c.cfg.Home,
-		Namespace: env("RUNTIME_CHECKPOINT_NAMESPACE", "harnessly"), TmpTag: env("RUNTIME_CHECKPOINT_TMP_TAG", "hs")}
+		Namespace: env("RUNTIME_CHECKPOINT_NAMESPACE", "harnessly"), TmpTag: env("RUNTIME_CHECKPOINT_TMP_TAG", "hs"),
+		Pool: env("RUNTIME_CHECKPOINT_POOL", "off") == "on"}
 }
 
 // turnEnd snapshots a tab's folder once its agent's turn ended, while the timeline slice runs.

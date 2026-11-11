@@ -162,6 +162,8 @@
   "next.appfail.handoffText": "Приложение «{name}» ({id}) не запустилось: {reason}.",
   "next.appfail.handoffLog": "Журнал окна:",
   "next.appfail.loading": "Запускаем {name}",
+  "next.appfail.retrying": "Переподключаем {name}…",
+  "next.appfail.slow": "Запускаем {name} — дольше обычного…",
   "next.appfail.sessionTimeout": "нет ответа за {s} с",
   "next.appview.badAddressWhy": "Адрес окна приложения не подходит: он должен быть https и на другом сайте.",
   "next.appslist.noneHint": "Поставьте готовое из каталога ниже или напишите своё вместе с агентом.",

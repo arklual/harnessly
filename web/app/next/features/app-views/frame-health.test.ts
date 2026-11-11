@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   FAIL_REASON,
   HANDSHAKE_WAIT_MS,
+  autoRetryable,
   LOADING,
   classifySessionError,
   failureOfViewError,
@@ -12,6 +13,7 @@ import {
   watchHandshake,
   withTimeout,
   type TFrameState,
+  type TFailReason,
 } from '@/next/features/app-views/frame-health';
 
 describe('the frame is up only by the handshake', () => {
@@ -136,5 +138,22 @@ describe('the reasons', () => {
     );
     expect(keepTelling(script, file)).toBe(file);
     expect(keepTelling(file, script)).toBe(file);
+  });
+});
+
+describe('a failure that may pass is tried again once (HRN-991)', () => {
+  it('retries silence, a machine that did not answer and a file that did not come, and nothing else', () => {
+    const f = (reason: TFailReason) => ({ reason, detail: '' });
+    expect(autoRetryable(f(FAIL_REASON.silent))).toBe(true);
+    expect(autoRetryable(f(FAIL_REASON.server))).toBe(true);
+    expect(autoRetryable(f(FAIL_REASON.file))).toBe(true);
+    for (const r of [
+      FAIL_REASON.refused,
+      FAIL_REASON.auth,
+      FAIL_REASON.csp,
+      FAIL_REASON.script,
+      FAIL_REASON.waiting,
+    ])
+      expect(autoRetryable(f(r))).toBe(false);
   });
 });

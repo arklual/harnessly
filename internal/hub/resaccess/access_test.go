@@ -26,6 +26,9 @@ func newService(t *testing.T) *Service {
 var ref = Ref{Kind: KindDoc, ID: "plan"}
 var owner = Actor{Email: "owner@example.com", Name: "Owner"}
 
+// proved is a person who has proved the address they sign in under.
+func proved(email string) Actor { return Actor{Email: email, Verified: []string{email}} }
+
 func call(t *testing.T, s *Service, a Actor, method, path, body string, want int) map[string]any {
 	t.Helper()
 	r := httptest.NewRequest(method, "/x", strings.NewReader(body))
@@ -56,7 +59,7 @@ func role(t *testing.T, s *Service, a Actor) string {
 
 func TestAccessLifecycle(t *testing.T) {
 	s := newService(t)
-	mate, stranger := Actor{Email: "mate@example.com"}, Actor{Email: "stranger@example.com"}
+	mate, stranger := proved("mate@example.com"), proved("stranger@example.com")
 
 	if v := call(t, s, owner, "GET", "", "", 200); v["role"] != "owner" || v["stored"] != false {
 		t.Fatalf("a resource without a row is the owner's: %v", v)

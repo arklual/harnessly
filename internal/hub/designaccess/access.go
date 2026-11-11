@@ -6,12 +6,15 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/hub/resaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // The one access API of a resource, <platform api>/access/{kind}/{id} (and /access/me, /access/directory): what the
@@ -94,6 +97,10 @@ func (s *Service) serveAccess(w http.ResponseWriter, r *http.Request, u store.Us
 			return
 		}
 		parts = append(parts, p)
+	}
+	if len(parts) >= 2 && parts[0] == "kit" {
+		s.serveKit(w, r, u, m, parts[1:])
+		return
 	}
 	res, status, err := s.accessRoute(r, u, m, parts)
 	if err != nil {
@@ -927,13 +934,13 @@ func (s *Service) send(to, subject, body, link string) {
 	if s.notice == nil || to == "" {
 		return
 	}
-	go func() {
+	safego.Go("designaccess send", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), noticeTimeout)
 		defer cancel()
 		if err := s.notice(ctx, to, subject, body, link); err != nil {
 			s.log.Warn("design access notice not sent", "error", err)
 		}
-	}()
+	})
 }
 
 // noticeRequest tells those who run the access that somebody asks for it; never the one who asked.
@@ -985,4 +992,26 @@ func (s *Service) noticeDecision(m store.Machine, project, actor string, rq requ
 		return
 	}
 	s.send(rq.Email, "Отклонён", "Запрос доступа к "+title+" отклонён", "")
+}
+
+var kitIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+
+// serveKit answers the access dialog of a UI kit of the machine's space from the shared model of access to a
+// resource: the same dialog and rules as a design's, with the kit's ceilings (a kit has one maker; a team or the company
+// gets view at most). After a change every machine of the space gets its snapshot again.
+func (s *Service) serveKit(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, parts []string) {
+	if s.kits == nil || m.SpaceID == "" || !kitIDRe.MatchString(parts[0]) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Кит не найден", "code": "not_found"})
+		return
+	}
+	verified, err := s.db.S().VerifiedEmails(r.Context(), u.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Не удалось прочитать доступ", "code": "internal"})
+		return
+	}
+	a := resaccess.Actor{UserID: u.ID, Email: normEmail(u.Email), Name: u.Name, Verified: verified}
+	s.kits.Serve(w, r, a, resaccess.KitRef(m.SpaceID, parts[0]), parts[1:], resaccess.Info{}, func(any) (string, error) { return "", nil })
+	if r.Method != http.MethodGet {
+		s.kickSpace(r.Context(), m)
+	}
 }

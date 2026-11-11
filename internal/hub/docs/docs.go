@@ -17,6 +17,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/resaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
@@ -51,16 +52,21 @@ type Service struct {
 	// access is the shared model of access to a resource (HUB_RESOURCE_ACCESS); nil keeps doc_meta.team_level.
 	access *resaccess.Service
 	notice Notice
+	// lim holds the people search of one person to a pace.
+	lim *ratelimit.Limiter
+	// health is the last answer of the documents and boards services (health.go).
+	health *health
 }
 
 // Notice mails a short notice to a person (a mention); nil keeps the hub silent.
 type Notice func(ctx context.Context, to, subject, body, link string) error
 
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links, notice: d.Notice}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links, notice: d.Notice, health: newHealth()}
 	if s.now == nil {
 		s.now = time.Now
 	}
+	s.lim = ratelimit.New().WithClock(func() time.Time { return s.now() })
 	if d.Config.ResourceAccess {
 		s.access = resaccess.New(d.DB, s.now, d.Config.PublicURL)
 		s.access.Notify = func(ctx context.Context, to, subject, body string) {
@@ -94,6 +100,9 @@ type Status struct {
 	Boards    bool   `json:"boards"`
 	Reason    string `json:"reason,omitempty"`
 	Text      string `json:"text,omitempty"`
+	// Services is whether each configured service answers its /readyz (ServiceDocuments, ServiceBoards); a service not
+	// asked yet is absent, and the page then takes it for up.
+	Services map[string]ServiceHealth `json:"services,omitempty"`
 }
 
 func (s *Service) Status() Status {
@@ -108,6 +117,9 @@ func (s *Service) Status() Status {
 	default:
 		st.Documents = true
 	}
+	if st.Enabled {
+		st.Services = s.Services()
+	}
 	return st
 }
 
@@ -117,19 +129,26 @@ func (s *Service) notConfigured() map[string]any {
 	return map[string]any{"error": st.Text, "code": "docs_not_configured", "reason": st.Reason}
 }
 
-// Who may do what. The owner and the administrators of the installation manage a document; everybody else signed in
-// gets what its team level says. A document the hub never saw (published straight to the documents service) is open
-// to read for every signed-in person.
+// Who may do what. The owner and the administrators of the installation manage a document; the people of the
+// document's organizations (see circle) get what its team level says. A document the hub never saw (a board, or one
+// published straight to the documents service) has no owner; the people of its organizations may read it. author is
+// who the service says made such a document.
 const (
 	rankManage = 4
 )
 
-func (s *Service) rank(ctx context.Context, m *meta, p *auth.Principal) int {
+func (s *Service) rank(ctx context.Context, slug string, m *meta, author string, p *auth.Principal, c *circle) int {
+	if c == nil {
+		c = s.circleOf(p)
+	}
 	if s.access != nil {
-		return s.accessRank(ctx, m, p)
+		return s.accessRank(ctx, slug, m, author, p, c)
 	}
 	if p.Admin || (m != nil && m.OwnerEmail != "" && strings.EqualFold(m.OwnerEmail, p.User.Email)) {
 		return rankManage
+	}
+	if !c.holds(ctx, m, author) {
+		return 0
 	}
 	if m == nil {
 		return levelRank[levelView]

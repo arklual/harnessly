@@ -79,7 +79,7 @@ LABEL org.opencontainers.image.title="harnessly" \
       org.opencontainers.image.source="https://github.com/ly-solutions/harnessly" \
       org.opencontainers.image.licenses="Apache-2.0"
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tmux git bash ca-certificates curl tini procps openssh-client ripgrep less \
+ && apt-get install -y --no-install-recommends tmux git bash ca-certificates curl tini procps openssh-client ripgrep less unzip bubblewrap jq \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --create-home --uid 10001 --user-group --shell /bin/bash agent \
  && mkdir -p /home/agent/work \

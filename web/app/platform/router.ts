@@ -3,6 +3,9 @@
 import { useSyncExternalStore } from 'react';
 
 import { appBasePath } from './config';
+import { docsAppPath, docsReaderPath, DOCS_APP } from './docs-redirect';
+
+export { DOCS_APP, docsReaderPath };
 
 type TQuery = Record<string, string | string[] | undefined>;
 type TListener = (url: string) => void;
@@ -38,6 +41,13 @@ interface ISnapshot {
   pathname: string;
   asPath: string;
   query: TQuery;
+}
+
+// A document's reader address goes to the documents app before anything reads the address (docs-redirect.ts).
+if (typeof window !== 'undefined') {
+  const to = docsAppPath(innerPath(window.location.pathname), window.location.search);
+  if (to !== null)
+    window.history.replaceState(window.history.state, '', `${appBasePath()}${to}${window.location.hash}`);
 }
 
 let snapshot: ISnapshot = read();

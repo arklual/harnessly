@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { IArtifactLink } from '@/lib/hl-artifacts';
 import type { ITaskItem, ITimelineEntry } from '@/types/timeline';
 
 export interface ITimelineSnapshot {
@@ -6,6 +7,10 @@ export interface ITimelineSnapshot {
   jsonlPath: string | null;
   sessionId: string | null;
   tasks?: ITaskItem[];
+  /** The links of the answers, when the runtime found them itself: `entries` then hold no answers to look in. */
+  links?: IArtifactLink[];
+  /** A number that moves whenever the conversation does, when `entries` are not all of its lines. */
+  activity?: number;
 }
 
 interface ITimelineSnapshotStore {

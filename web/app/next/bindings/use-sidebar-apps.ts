@@ -1,11 +1,13 @@
-// «Приложения» of the sidebar: the installed apps that are on in the person's chats, each opening in the chat it was
-// last on in, and the way to the whole list. The installed list is read only once some chat has an app on.
+// «Приложения» of the sidebar: harnessly's own apps (the «Ревью кода»), then the installed apps that are on in the
+// person's chats, each opening in the chat it was last on in, the organization's environment apps with a page of their
+// own, and the way to the whole list.
 import { useMemo } from 'react';
 import { prepareViewSession, useInstalledApps } from '@/next/features/app-views/api';
-import { activeApps } from '@/next/features/app-main/chat-apps';
+import { sidebarApps } from '@/next/features/app-main/chat-apps';
 import type { ISidebarApps } from '@/next/features/sidebar/sidebar';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { ROUTE, type TRoute } from '@/next/routes/routes';
+import { t } from '@/next/i18n';
 
 export const useSidebarApps = (
   machine: MachineId | null,
@@ -13,16 +15,16 @@ export const useSidebarApps = (
   route: TRoute,
   open: (to: TRoute) => void,
 ): ISidebarApps | null => {
-  const anyOn = conversations?.some((c) => (c.apps?.length ?? 0) > 0) ?? false;
-  const installed = useInstalledApps(machine ?? 'local', 0, machine !== null && anyOn).list;
+  // Read always: the environment's apps are in the menu even when no chat has an app on.
+  const installed = useInstalledApps(machine ?? 'local', 0, machine !== null).list;
   const rows = useMemo(
     () =>
       installed === null || conversations === null
         ? []
-        : activeApps(conversations, installed.apps).map(({ app, chat }) => ({
+        : sidebarApps(conversations, installed.apps).map(({ app, chat }) => ({
             id: app.id,
             name: app.name,
-            chat,
+            ...(chat === undefined ? {} : { chat }),
           })),
     [installed, conversations],
   );
@@ -31,10 +33,19 @@ export const useSidebarApps = (
       machine === null
         ? null
         : {
+            builtins: [
+              {
+                id: 'review',
+                name: t('next.reviewApp.title'),
+                icon: 'git-pull-request',
+                current: route.kind === ROUTE.review,
+                onOpen: () => open({ kind: ROUTE.review }),
+              },
+            ],
             rows,
             current: route.kind === ROUTE.app ? route.id : null,
             allCurrent: route.kind === ROUTE.apps,
-            onOpen: (id, chat) => open({ kind: ROUTE.app, id, chat }),
+            onOpen: (id, chat) => open({ kind: ROUTE.app, id, ...(chat === undefined ? {} : { chat }) }),
             onPrepare: (id, chat) => {
               // The same view and target the app's own page picks (app-main): its `app` view, else its pane view.
               const app = installed?.apps.find((a) => a.id === id);
@@ -45,7 +56,7 @@ export const useSidebarApps = (
                 app: id,
                 view: view.id,
                 target: own ? 'app' : 'pane',
-                conversation: chat,
+                conversation: chat ?? null,
               });
             },
             onAll: () => open({ kind: ROUTE.apps }),

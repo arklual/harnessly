@@ -14,7 +14,7 @@ type v2Apps struct{ d deps }
 
 var _ wire.AppsSource = v2Apps{}
 
-func (a v2Apps) Feed(ctx context.Context) (wire.AppsFeed, error) {
+func (a v2Apps) Feed(ctx context.Context, only []wire.AppID) (wire.AppsFeed, error) {
 	h, _ := handlersFor(a.d)
-	return h.S.Apps(ctx), nil
+	return h.S.Apps(ctx, only...), nil
 }

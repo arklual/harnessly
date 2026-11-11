@@ -22,6 +22,7 @@ them with `harnessly docs`. The sections are folders with a `section.json`: [Get
 | [The safe](safe.md) | secrets for the agents without the chat: storage, the ask flow, the threat model |
 | [Connections](connections.md) | the person's Jira, Confluence, YouTrack, Linear, GitLab, GitHub and wikis by a pasted link: detection, storage, routes, the agents' `harnessly issues` |
 | [MCP servers](mcp-connections.md) | remote MCP servers connected in Settings → Connections: probing, OAuth sign-in in a popup, the proxy, how Claude Code and Codex get them |
+| [Documents](apps/documents.md) and [Boards](apps/boards.md) | the two optional services beside the hub: install with compose or Helm, the address, how to check the app is there, what happens without them |
 | [Integrations](integrations.md) | boards and artifacts beside the conversation, the agents' environment, the agent skills |
 | [The hub](hub/deploy.md) | running a hub with sign-in for a team: [deploy](hub/deploy.md) (compose, Caddy, systemd, Helm), [connecting a machine](hub/machine.md), [architecture](hub/architecture.md), [the contract of the hub, the agent link and the UI](hub/api.md) |
 

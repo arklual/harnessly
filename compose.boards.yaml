@@ -1,0 +1,72 @@
+# Boards next to the hub: an overlay for compose.hub.yaml (docs/apps/boards.md).
+#
+#   docker compose -f compose.hub.yaml -f compose.boards.yaml up -d
+#   docker compose -f compose.hub.yaml -f compose.docs.yaml -f compose.boards.yaml up -d     # with documents
+#
+# It starts the boards service (Excalidraw whiteboards) from its published image and gives the hub its address and
+# token. Without this overlay the hub starts as usual and has no boards app.
+#
+# Two addresses: the hub calls the service on the compose network (HUB_BOARDS_URL); machines and browsers open it at
+# the public address, BOARDS_PUBLIC_URL (the hub's HUB_BOARDS_PUBLIC_URL). The try-out public name is boards.localhost: browsers
+# send *.localhost to the host's loopback, where the port is published, and the machine's container is told
+# (extra_hosts) that the name is the service on their network, which listens on the same port inside. The apps frame
+# only https addresses, so on a server put a reverse proxy with TLS in front and set BOARDS_PUBLIC_URL to it.
+#
+# .env: BOARDS_TOKEN (16 characters or more) is the token the hub sends; the default is for a trial on one host only.
+# BOARDS_SESSION_SECRET (32 characters or more) keeps people signed in across restarts. Sign-in to the service:
+# BOARDS_AUTH=token (default) or harnessly (people come with the hub's platform token; needs a boards release that has
+# it). Storage: a volume (fs, one replica); for S3 set BOARDS_STORAGE=s3 and BOARDS_S3_*. BOARDS_IMAGE pins a version
+# (ghcr.io/ly-solutions/boards:X.Y.Z); `latest` is the newest release.
+
+x-boards-url: &boards-url ${BOARDS_PUBLIC_URL:-http://boards.localhost:${BOARDS_PORT:-8081}}
+x-boards-host: &boards-host "boards.localhost:${HUB_NET:-172.29.40}.241"
+
+services:
+  hub:
+    environment:
+      # The hub calls the service on their network; machines and browsers get the public address.
+      HUB_BOARDS_URL: http://boards:${BOARDS_PORT:-8081}
+      HUB_BOARDS_PUBLIC_URL: *boards-url
+      HUB_BOARDS_TOKEN: ${BOARDS_TOKEN:-boards-trial-token-change-me}
+    depends_on:
+      - boards
+
+  machine:
+    extra_hosts:
+      - *boards-host
+
+  boards:
+    image: ${BOARDS_IMAGE:-ghcr.io/ly-solutions/boards:latest}
+    pull_policy: missing
+    environment:
+      PORT: ${BOARDS_PORT:-8081}
+      BOARDS_PUBLIC_URL: *boards-url
+      BOARDS_STORAGE: ${BOARDS_STORAGE:-fs}
+      BOARDS_DATA_DIR: /data
+      BOARDS_S3_ENDPOINT: ${BOARDS_S3_ENDPOINT:-}
+      BOARDS_S3_REGION: ${BOARDS_S3_REGION:-}
+      BOARDS_S3_BUCKET: ${BOARDS_S3_BUCKET:-}
+      BOARDS_S3_ACCESS_KEY_ID: ${BOARDS_S3_ACCESS_KEY_ID:-}
+      BOARDS_S3_SECRET_ACCESS_KEY: ${BOARDS_S3_SECRET_ACCESS_KEY:-}
+      BOARDS_AUTH: ${BOARDS_AUTH:-token}
+      BOARDS_API_TOKENS: ${BOARDS_TOKEN:-boards-trial-token-change-me}
+      BOARDS_SESSION_SECRET: ${BOARDS_SESSION_SECRET:-}
+      BOARDS_HARNESSLY_ISSUER: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
+      # The hub's page and the machines' pages frame the editor; BOARDS_FRAME_EXTRA adds origins (space-separated),
+      # e.g. the machines' https://*.run.example.net with HUB_RUNTIME_DOMAIN.
+      BOARDS_FRAME_ANCESTORS: "'self' ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}} ${BOARDS_FRAME_EXTRA:-}"
+      BOARDS_CORS_ORIGINS: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
+    networks:
+      hub:
+        ipv4_address: ${HUB_NET:-172.29.40}.241
+    # The hub's address, when it is hub.localhost, for the platform token's keys (BOARDS_AUTH=harnessly).
+    extra_hosts:
+      - "hub.localhost:${HUB_NET:-172.29.40}.2"
+    ports:
+      - "127.0.0.1:${BOARDS_PORT:-8081}:${BOARDS_PORT:-8081}"
+    volumes:
+      - boards-data:/data
+    restart: unless-stopped
+
+volumes:
+  boards-data:

@@ -13,6 +13,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Service is what the protocol asks of the conversations: convo.Service, which imports this package, has exactly
@@ -148,21 +149,36 @@ type Server struct {
 	// NotFound and UnknownCursor report whether an error of the Service is convo.ErrNotFound, convo.ErrUnknownCursor.
 	NotFound      func(error) bool
 	UnknownCursor func(error) bool
+
+	// Work is the chats' work the replica socket hands the agent ({"k":"work"}); nil sends none.
+	Work WorkFeed
 }
 
 // The heartbeat (§2): the page pings every 15 s and calls a socket stale after 20 s without a frame; the runtime
 // closes one that sent nothing for SocketIdle, and one that did not say hello within HelloWithin.
+//
+// A browser stretches the timers of a hidden tab to a minute, so the page's own ping cannot be what keeps its socket.
+// The runtime beats by itself: every PingEvery it sends a pong nobody asked for (T is BeatT) to a page it has not
+// heard from lately. A page that knows the beat answers it with a ping at once (a frame's handler is not a timer),
+// which is the frame the idle limit waits for; a page that does not is kept by SocketIdle being longer than the
+// minute between its stretched pings, and the beat is the frame that keeps it from calling the socket dead.
 const (
 	PingEvery   = 15 * time.Second
 	StaleAfter  = 20 * time.Second
-	SocketIdle  = 35 * time.Second
+	SocketIdle  = 90 * time.Second
 	HelloWithin = 10 * time.Second
 )
 
-// socketIdle is SocketIdle; a test makes it shorter.
-var socketIdle atomic.Int64
+// BeatT is the T of the pong the runtime sends by itself; a page's ping carries its clock, never 0.
+const BeatT = 0
 
-func init() { socketIdle.Store(int64(SocketIdle)) }
+// socketIdle is SocketIdle and socketBeat is PingEvery; a test makes them shorter.
+var socketIdle, socketBeat atomic.Int64
+
+func init() {
+	socketIdle.Store(int64(SocketIdle))
+	socketBeat.Store(int64(PingEvery))
+}
 
 // The socket's own limits: subscriptions per socket, the largest frame from the page, how much may wait unsent
 // before the socket is closed (the page comes back with its cursor), how long one frame may take to write, and the
@@ -196,6 +212,8 @@ type client struct {
 	wake   chan struct{}
 	done   chan struct{}
 	once   sync.Once
+	// heard is when the page's last frame came, in unix nanoseconds.
+	heard atomic.Int64
 
 	// subs are the subscribe and unsubscribe frames in the order they came: a snapshot can take its time (a busy
 	// actor, a loaded disk), and the reader that answers pings never waits for one.
@@ -222,7 +240,7 @@ func (c *client) enqueueLocked(frames ...[]byte) {
 	}
 	if c.queued > maxBacklog {
 		c.closed = true
-		go c.kill(closeSlow, "too far behind")
+		safego.Go("wire socket kill", func() { c.kill(closeSlow, "too far behind") })
 		return
 	}
 	select {
@@ -242,6 +260,25 @@ func (c *client) deliver(s *subscription, frame []byte) {
 	c.enqueueLocked(frame)
 }
 
+// beat sends the runtime's own pong every socketBeat while the page is quiet, until the socket is done.
+func (c *client) beat() {
+	every := time.Duration(socketBeat.Load())
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-t.C:
+			// A page that pings on time has just been answered: it needs no other frame.
+			if time.Since(time.Unix(0, c.heard.Load())) < every/2 {
+				continue
+			}
+			c.send(PongFrame{T: BeatT})
+		}
+	}
+}
+
 func (c *client) send(v any) {
 	b, err := Marshal(v)
 	if err != nil {
@@ -258,7 +295,7 @@ func (c *client) kill(code websocket.StatusCode, reason string) {
 		c.closed = true
 		c.mu.Unlock()
 		close(c.done)
-		go func() { _ = c.ws.Close(code, reason) }()
+		safego.Go("wire socket close", func() { _ = c.ws.Close(code, reason) })
 	})
 }
 
@@ -338,10 +375,10 @@ func (s *Server) Socket(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	c := &client{ws: ws, caps: CapsOf(r), subs: map[Channel]*subscription{}, wake: make(chan struct{}, 1), done: make(chan struct{}),
 		ops: make(chan func(), 4*MaxSubs)}
-	go func() {
+	safego.Go("wire socket done", func() {
 		<-c.done
 		cancel()
-	}()
+	})
 	s.Hub.attach(c)
 	defer func() {
 		// The socket is closed first, and its worker is waited for: an operation of the queue that ran after the detach
@@ -352,13 +389,24 @@ func (s *Server) Socket(w http.ResponseWriter, r *http.Request) {
 		}
 		s.Hub.detach(c)
 	}()
-	go c.writer(ctx)
+	// A writer or a worker that died leaves a socket that says nothing: it is closed, and the page connects again.
+	safego.Go("wire socket writer", func() {
+		if !safego.Run("wire socket writer", func() { c.writer(ctx) }) {
+			c.kill(websocket.StatusInternalError, "internal error")
+		}
+	})
 
 	if !s.hello(ctx, c) {
 		return
 	}
 	c.workerDone = make(chan struct{})
-	go c.worker()
+	safego.Go("wire socket worker", func() {
+		if !safego.Run("wire socket worker", c.worker) {
+			c.kill(websocket.StatusInternalError, "internal error")
+		}
+	})
+	c.heard.Store(time.Now().UnixNano())
+	safego.Go("wire socket beat", c.beat)
 	for {
 		rctx, rcancel := context.WithTimeout(ctx, time.Duration(socketIdle.Load()))
 		typ, b, err := ws.Read(rctx)
@@ -366,6 +414,7 @@ func (s *Server) Socket(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
+		c.heard.Store(time.Now().UnixNano())
 		if typ != websocket.MessageText {
 			c.send(ErrorFrame{Code: FrameErrProto})
 			continue

@@ -122,10 +122,8 @@ func (r *Runtime) indexScan() (complete bool) {
 	start := time.Now()
 	complete = true
 	var recs []wire.Conversation
-	for _, a := range r.all() {
-		v := a.last.Load()
+	for _, v := range r.views() {
 		switch {
-		case v == nil:
 		case v.deleted:
 			r.d.Index.Remove(v.rec.ID)
 		case v.rec.TranscriptPath != "":
@@ -180,8 +178,8 @@ func (r *Runtime) Indexing() bool { return r.d.Index != nil && !r.indexed.Load()
 // liveIDs are the conversations that are not deleted.
 func (r *Runtime) liveIDs() map[string]wire.Conversation {
 	out := map[string]wire.Conversation{}
-	for _, a := range r.all() {
-		if v := a.last.Load(); v != nil && !v.deleted {
+	for _, v := range r.views() {
+		if !v.deleted {
 			out[v.rec.ID] = v.rec
 		}
 	}

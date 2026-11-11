@@ -109,10 +109,17 @@ func listVersions(dir, id string) []Version {
 		if !e.IsDir() || !ValidVersion(e.Name()) {
 			continue
 		}
+		ok, seal := installed(dir, id, e.Name(), filepath.Join(dir, id, e.Name()))
+		if !ok {
+			continue // still arriving from another machine: not installed until it is whole and sealed
+		}
 		v := Version{Version: e.Name()}
 		if raw, err := os.ReadFile(metaFile(dir, id, e.Name())); err == nil {
 			_ = json.Unmarshal(raw, &v)
 			v.Version = e.Name()
+		}
+		if seal != nil && v.Files == 0 {
+			v.Files, v.Bytes = seal.files, seal.bytes // a version that came from another machine has no record of its own
 		}
 		out = append(out, v)
 	}
@@ -158,10 +165,21 @@ func Files(dir, id, version string) []string {
 		return nil
 	}
 	var out []string
+	if version != DraftVersion {
+		if _, seal := installed(dir, id, version, root); seal != nil {
+			for rel := range seal.set { // a sealed version is what its seal lists
+				out = append(out, rel)
+			}
+			sort.Strings(out)
+			return out
+		}
+	}
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err == nil && d.Type().IsRegular() {
 			rel, _ := filepath.Rel(root, p)
-			out = append(out, filepath.ToSlash(rel))
+			if rel = filepath.ToSlash(rel); rel != SealFile {
+				out = append(out, rel)
+			}
 		}
 		return nil
 	})
@@ -184,6 +202,15 @@ func Resolve(dir, id, version string, segments []string) string {
 	root, err := filepath.EvalSymlinks(versionDir(dir, id, version))
 	if err != nil {
 		return ""
+	}
+	if version != DraftVersion {
+		ok, seal := installed(dir, id, version, root)
+		if !ok {
+			return ""
+		}
+		if seal != nil && len(segments) > 0 && !seal.set[strings.Join(segments, "/")] {
+			return "" // not a file of the sealed version
+		}
 	}
 	if len(segments) == 0 {
 		return root
@@ -294,10 +321,17 @@ func commit(dir, id, version, root string, res Result, force bool) (Result, erro
 	if err := os.Chmod(target, 0o755); err != nil {
 		return Result{}, err
 	}
+	if version != DraftVersion {
+		if err := WriteSeal(id, version, target); err != nil {
+			return Result{}, err
+		}
+	}
 	meta, _ := json.Marshal(res.Version)
 	if err := os.WriteFile(metaFile(dir, id, version), append(meta, '\n'), 0o644); err != nil {
 		return Result{}, err
 	}
+	// A kit on a kit keeps the base version it was published with (extends.go).
+	PinBase(dir, id, version)
 	return res, nil
 }
 

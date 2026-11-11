@@ -7,7 +7,7 @@ export type Scope = { kind: ScopeKind; id: string };
 export type ScopeKey = `${ScopeKind}:${string}`;
 export type GrantRole = 'admin' | 'lead';
 export type Needs = 'org_admin' | 'tenant_admin' | 'team_lead' | 'instance_admin';
-export type OrgsFlag = 'off' | 'shadow' | 'on';
+export type OrgsFlag = 'off' | 'on';
 
 export type Org = {
   id: string;

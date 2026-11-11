@@ -41,6 +41,7 @@ import {
   turnStore,
   type TurnView,
 } from '@/next/stores/conversation';
+import { agentStateOf, turnRuns } from '@/next/stores/chat-state';
 import { conversationsStore } from '@/next/stores/conversations';
 import {
   convMessagesStore,
@@ -60,6 +61,7 @@ interface ICachedTurn {
   steps: Entry[] | null;
   now: Now | null;
   wait: TurnItem['wait'];
+  settled: boolean;
   auto: AutoMark | undefined;
   cleared: TerminalAside | undefined;
   item: TurnItem;
@@ -164,6 +166,7 @@ const messageOf = (m: MessageView, handed: boolean): Message => ({
   state: m.state,
   handed,
   waitsMachine: m.issue !== null,
+  cancelling: m.cancelling === true,
   refusal: m.refused,
   resendable: m.state.k === 'failed' && isPassingRefusal(m.refused),
 });
@@ -337,7 +340,7 @@ export class ItemsBuilder {
     items.push(...placed);
 
     const kept = new Set<string>();
-    const agent = conversationsStore.get(this.conv)?.state.k;
+    const agent = agentStateOf(this.conv)?.k;
     // A message the feed holds as an entry — a prompt, or steered into a turn — is drawn there, once.
     for (const id of convMessagesStore.get(this.conv) ?? []) {
       const m = messagesStore.get(id);
@@ -494,6 +497,7 @@ export class ItemsBuilder {
     const steps = notLoaded ? null : entries;
     const nowOfTurn = now && now.turnId === id ? now : null;
     const wait = stalled ? 'machine' : null;
+    const settled = turn.status === 'live' && !turnRuns(this.conv, turn);
     const promptId = prompt?.clientId ?? null;
     const promptMessage = promptId === null ? undefined : messagesStore.get(promptId);
     const auto = autoMarkOf(promptId, promptMessage, goes);
@@ -510,6 +514,7 @@ export class ItemsBuilder {
       have.answer === answer &&
       have.now === nowOfTurn &&
       have.wait === wait &&
+      have.settled === settled &&
       have.auto === auto &&
       have.cleared === cleared &&
       sameList(have.steps, steps)
@@ -529,6 +534,7 @@ export class ItemsBuilder {
       now: nowOfTurn,
       wait,
       endNote: null,
+      ...(settled && { settled }),
       ...(partial && { partial }),
       ...(auto && { auto }),
       ...(cleared && { cleared }),
@@ -543,6 +549,7 @@ export class ItemsBuilder {
       steps,
       now: nowOfTurn,
       wait,
+      settled,
       auto,
       cleared,
       item,

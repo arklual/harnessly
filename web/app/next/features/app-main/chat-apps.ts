@@ -1,6 +1,6 @@
 // The apps turned on in chats, as the sidebar and the chat's own row list them. The list a chat keeps is the whole list
 // (the `conversation.apps` command replaces it), so a change is computed here and sent whole.
-import type { IInstalledApp } from '@/next/features/app-views/api';
+import { APP_STATE, type IInstalledApp } from '@/next/features/app-views/api';
 
 /** The chat's apps with one turned on or off; the order of the rest is kept, a new one goes last. */
 export const withApp = (apps: readonly string[], id: string, on: boolean): string[] => {
@@ -30,6 +30,36 @@ export const activeApps = (
       if (app && !seen.has(id)) seen.set(id, { app, chat: chat.id });
     }
   return [...seen.values()];
+};
+
+export interface ISidebarApp {
+  app: IInstalledApp;
+  /** The chat it was last on in; absent for an app of the organization's environment that no chat has on yet. */
+  chat?: string;
+}
+
+/** An app of the organization's environment that has a page of its own and that the person did not turn off. */
+const envAppForMenu = (a: IInstalledApp): boolean =>
+  a.env === true &&
+  a.muted !== true &&
+  a.off !== true &&
+  a.state !== APP_STATE.disabled &&
+  a.targets.includes('app');
+
+/**
+ * «Приложения» of the sidebar: the apps on in some chat (activeApps), then the organization's environment apps with a
+ * page of their own that no chat has on yet. The environment's apps are there for everybody without turning them on.
+ */
+export const sidebarApps = (
+  chats: readonly { id: string; apps?: readonly string[] }[],
+  installed: readonly IInstalledApp[],
+): ISidebarApp[] => {
+  const active: ISidebarApp[] = activeApps(chats, installed);
+  const listed = new Set(active.map((x) => x.app.id));
+  return [
+    ...active,
+    ...installed.filter((a) => envAppForMenu(a) && !listed.has(a.id)).map((app) => ({ app })),
+  ];
 };
 
 /** The apps a chat can turn on or off: the installed ones that work in a chat. */

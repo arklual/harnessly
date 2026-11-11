@@ -1,13 +1,13 @@
 /**
  * The server holds back push notifications for a device it saw looking at the app within the last minute
- * (`VISIBILITY_TTL` in push-subscriptions). The client only has to say when that changes and refresh
+ * (`VisibilityTTL` in internal/push). The client only has to say when that changes and refresh
  * a "still looking" claim before it expires — not echo every focus and blur.
  */
 export const VISIBILITY_REPORT = {
-  /** How often an app in focus re-confirms itself. */
-  pingMs: 30_000,
+  /** How often an app in focus re-confirms itself: once per the server's minute, with room for the request's way. */
+  pingMs: 45_000,
   /** A repeated "visible" is sent only when the previous one is at least this old; the worst gap stays under the server's minute. */
-  refreshAfterMs: 20_000,
+  refreshAfterMs: 40_000,
   /** Focus hops (window → iframe → window) settle before anything is sent. */
   settleMs: 400,
 } as const;

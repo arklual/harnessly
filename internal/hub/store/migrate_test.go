@@ -110,9 +110,29 @@ func TestLoadMigrations(t *testing.T) {
 	}
 }
 
+// snapshotDiffs compares the migrated database with the committed snapshot both ways. The hub's own check at the start
+// only looks for what the snapshot names (a database may hold tables of its own), so a table a migration added and the
+// snapshot lacks went unnoticed: here it is a difference too.
+func snapshotDiffs(t *testing.T, db *DB, driver Driver) ([]string, error) {
+	t.Helper()
+	want, err := ExpectedSchema(driver)
+	if err != nil {
+		return nil, err
+	}
+	have, err := IntrospectSchema(context.Background(), db, driver)
+	if err != nil {
+		return nil, err
+	}
+	diffs := DiffSchema(want, have)
+	for _, d := range DiffSchema(have, want) {
+		diffs = append(diffs, "not in the snapshot: "+d)
+	}
+	return diffs, nil
+}
+
 func TestSchemaSnapshotSQLite(t *testing.T) {
 	db := openTest(t)
-	diffs, err := VerifySchema(context.Background(), db, SQLite)
+	diffs, err := snapshotDiffs(t, db, SQLite)
 	if err != nil || len(diffs) > 0 {
 		t.Fatalf("the committed snapshot is out of date (run `make hub-schema`): %v %v", diffs, err)
 	}
@@ -126,7 +146,7 @@ func TestSchemaSnapshotPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	diffs, err := VerifySchema(context.Background(), db, Postgres)
+	diffs, err := snapshotDiffs(t, db, Postgres)
 	if err != nil || len(diffs) > 0 {
 		t.Fatalf("the committed snapshot is out of date (run `make hub-schema`): %v %v", diffs, err)
 	}

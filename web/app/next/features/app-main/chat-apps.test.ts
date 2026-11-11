@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeApps, offeredApps, withApp } from '@/next/features/app-main/chat-apps';
+import { activeApps, offeredApps, sidebarApps, withApp } from '@/next/features/app-main/chat-apps';
 import type { IInstalledApp } from '@/next/features/app-views/api';
 
 const app = (id: string, targets: string[] = ['chat', 'pane']): IInstalledApp => ({
@@ -43,5 +43,34 @@ describe('offeredApps', () => {
   it('offers the installed apps that work in a chat, the ones on included', () => {
     const installed = [app('a.one'), app('b.two'), app('c.pane', ['pane'])];
     expect(offeredApps(installed).map((a) => a.id)).toEqual(['a.one', 'b.two']);
+  });
+});
+
+describe('sidebarApps', () => {
+  const env = (id: string, extra: Partial<IInstalledApp> = {}): IInstalledApp => ({
+    ...app(id, ['app', 'chat']),
+    env: true,
+    ...extra,
+  });
+
+  it('adds the environment apps with a page of their own after the ones on in chats, without a chat', () => {
+    const installed = [app('a.one'), env('org.boards'), env('org.docs')];
+    const rows = sidebarApps([{ id: 'c1', apps: ['a.one', 'org.docs'] }], installed);
+    expect(rows.map((x) => [x.app.id, x.chat])).toEqual([
+      ['a.one', 'c1'],
+      ['org.docs', 'c1'],
+      ['org.boards', undefined],
+    ]);
+  });
+
+  it('leaves out an environment app the person turned off, one that is disabled, and one without a page', () => {
+    const installed = [
+      env('org.muted', { muted: true }),
+      env('org.off', { off: true }),
+      env('org.safe', { state: 'disabled' }),
+      env('org.plugin', { targets: ['chat'] }),
+      app('own.app', ['app']),
+    ];
+    expect(sidebarApps([], installed)).toEqual([]);
   });
 });

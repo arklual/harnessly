@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 	"github.com/ly-solutions/harnessly/internal/workflows"
 )
 
@@ -89,6 +90,7 @@ type openTasks struct {
 }
 
 func (o *openTasks) set(t Task) {
+	t = ownTask(t)
 	if _, has := o.tasks[t.ID]; !has {
 		o.order = append(o.order, t.ID)
 	}
@@ -106,6 +108,16 @@ func (o *openTasks) del(id string) {
 			break
 		}
 	}
+}
+
+// ownTask copies the strings of t so that none of them pins the transcript text it was cut from.
+func ownTask(t Task) Task {
+	t.ID, t.Label, t.RunID, t.ToolUseID = strings.Clone(t.ID), strings.Clone(t.Label), strings.Clone(t.RunID), strings.Clone(t.ToolUseID)
+	if t.Output != nil {
+		o := strings.Clone(*t.Output)
+		t.Output = &o
+	}
+	return t
 }
 
 // scan is what a transcript has said so far about its background work, fed line by line as it grows.
@@ -178,6 +190,9 @@ func or(a, b any) any {
 
 // finish closes a task the transcript says is over; an agent is remembered with how and when it ended.
 func (s *scan) finish(id, status string, at float64) {
+	// id and status are cut out of a transcript line that can be megabytes; a scan lives as long as its tab, so it
+	// must not keep the line alive through them.
+	id, status = strings.Clone(id), strings.Clone(status)
 	if t, has := s.open.tasks[id]; has && (t.Kind == Agent || t.Kind == Workflow) {
 		s.ended = append(s.ended, Ended{Task: t, Status: status, EndedAt: Ms(at)})
 		if len(s.ended) > endedKeep {
@@ -201,70 +216,87 @@ func lineTime(line string, now float64) float64 {
 	return now
 }
 
+// lineEntry is what the scan reads of a transcript line.
+type lineEntry struct {
+	Type        string `json:"type"`
+	IsSidechain any    `json:"isSidechain"`
+	Timestamp   any    `json:"timestamp"`
+	Message     struct {
+		Content any `json:"content"`
+	} `json:"message"`
+}
+
 func (s *scan) lines(lines []string, now float64) {
 	for _, line := range lines {
-		for _, m := range notification.FindAllStringSubmatch(line, -1) {
-			if doneStatuses[m[2]] {
-				s.finish(m[1], m[2], lineTime(line, now))
+		s.line(line, nil, now)
+	}
+}
+
+// line takes one line of the transcript. decoded is the line as someone already decoded it; nil has the scan decode
+// it.
+func (s *scan) line(line string, decoded *lineEntry, now float64) {
+	for _, m := range notification.FindAllStringSubmatch(line, -1) {
+		if doneStatuses[m[2]] {
+			s.finish(m[1], m[2], lineTime(line, now))
+		}
+	}
+	var entry lineEntry
+	if decoded != nil {
+		entry = *decoded
+	} else {
+		tally.Decode()
+		if json.Unmarshal([]byte(line), &entry) != nil {
+			return
+		}
+	}
+	if jscompat.Truthy(entry.IsSidechain) {
+		return
+	}
+	at := now
+	if jscompat.Truthy(entry.Timestamp) {
+		at = jscompat.DateValue(entry.Timestamp)
+	}
+	lead := leadLine(entry.Type)
+	if lead && entry.Type != "assistant" {
+		s.team.messages(userText(entry.Message.Content), at)
+	}
+	blocks, ok := entry.Message.Content.([]any)
+	if !ok {
+		return
+	}
+	for _, raw := range blocks {
+		block, _ := raw.(map[string]any)
+		typ, _ := block["type"].(string)
+		id, _ := block["id"].(string)
+		name, _ := block["name"].(string)
+		input, _ := block["input"].(map[string]any)
+		if typ == "tool_use" && id != "" && name != "" {
+			s.uses[id] = toolUse{name: name, input: pickInput(input), at: at}
+			stopped := input["task_id"]
+			if stopped == nil {
+				stopped = input["shell_id"]
 			}
-		}
-		var entry struct {
-			Type        string `json:"type"`
-			IsSidechain any    `json:"isSidechain"`
-			Timestamp   any    `json:"timestamp"`
-			Message     struct {
-				Content any `json:"content"`
-			} `json:"message"`
-		}
-		if json.Unmarshal([]byte(line), &entry) != nil || jscompat.Truthy(entry.IsSidechain) {
+			if stopped == nil {
+				stopped = input["bash_id"]
+			}
+			if sid, ok := stopped.(string); ok && (name == "TaskStop" || name == "KillShell" || name == "KillBash") {
+				s.finish(sid, "stopped", at)
+			}
+			if name == "SendMessage" && lead {
+				s.team.poke(teammateTo(input), at)
+			}
 			continue
 		}
-		at := now
-		if jscompat.Truthy(entry.Timestamp) {
-			at = jscompat.DateValue(entry.Timestamp)
+		useID, _ := block["tool_use_id"].(string)
+		if typ != "tool_result" || useID == "" {
+			continue
 		}
-		lead := leadLine(entry.Type)
-		if lead && entry.Type != "assistant" {
-			s.team.messages(userText(entry.Message.Content), at)
-		}
-		blocks, ok := entry.Message.Content.([]any)
+		use, ok := s.uses[useID]
 		if !ok {
 			continue
 		}
-		for _, raw := range blocks {
-			block, _ := raw.(map[string]any)
-			typ, _ := block["type"].(string)
-			id, _ := block["id"].(string)
-			name, _ := block["name"].(string)
-			input, _ := block["input"].(map[string]any)
-			if typ == "tool_use" && id != "" && name != "" {
-				s.uses[id] = toolUse{name: name, input: pickInput(input), at: at}
-				stopped := input["task_id"]
-				if stopped == nil {
-					stopped = input["shell_id"]
-				}
-				if stopped == nil {
-					stopped = input["bash_id"]
-				}
-				if sid, ok := stopped.(string); ok && (name == "TaskStop" || name == "KillShell" || name == "KillBash") {
-					s.finish(sid, "stopped", at)
-				}
-				if name == "SendMessage" && lead {
-					s.team.poke(teammateTo(input), at)
-				}
-				continue
-			}
-			useID, _ := block["tool_use_id"].(string)
-			if typ != "tool_result" || useID == "" {
-				continue
-			}
-			use, ok := s.uses[useID]
-			if !ok {
-				continue
-			}
-			delete(s.uses, useID)
-			s.result(use, useID, textOf(block["content"]))
-		}
+		delete(s.uses, useID)
+		s.result(use, useID, textOf(block["content"]))
 	}
 }
 

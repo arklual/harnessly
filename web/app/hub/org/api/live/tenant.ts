@@ -7,6 +7,7 @@ import { OrgApiError } from '../errors';
 import type { TenantApi, TenantDeletePlan, TenantInvite } from '../tenant';
 import { http, orgPath } from './http';
 
+const LOCAL_GONE = 'Эту машину уже подключили. Обновите список.';
 const CONTAINER_OFF = 'Контейнеры на этом хабе не настроены. Выберите другой доступ.';
 
 const wrap = async <T>(run: () => Promise<T>, text?: (e: ApiError) => string | null): Promise<T> => {
@@ -55,6 +56,14 @@ export const liveTenant = (fetcher?: Fetcher): TenantApi => {
       wrap(
         () => api.machines.issueCode(spaceId, profile, confirmFull),
         (e) => (e.code === 'provider_off' && profile === 'container' ? CONTAINER_OFF : null),
+      ),
+    claimLocalMachine: (spaceId) =>
+      wrap(
+        async () => {
+          const { machine } = await api.machines.claimLocal(spaceId);
+          return { id: machine.id, name: machine.name, status: machine.status };
+        },
+        (e) => (e.code === 'not_found' ? LOCAL_GONE : null),
       ),
     tenantInvites: (spaceId) => wrap(async () => (await api.spaces.invites(spaceId)).invites.map(inviteOf)),
     inviteByEmail: (spaceId, email, role = 'member', teamId) =>

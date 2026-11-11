@@ -1,0 +1,29 @@
+{ "status": 200, "error": false,
+  "meta": {
+    "variableCollections": {
+      "VariableCollectionId:1:1": { "id": "VariableCollectionId:1:1", "name": "Brand", "defaultModeId": "1:0",
+        "modes": [ { "modeId": "1:0", "name": "Light" }, { "modeId": "1:1", "name": "Dark" } ] },
+      "VariableCollectionId:1:2": { "id": "VariableCollectionId:1:2", "name": "Scale", "defaultModeId": "2:0",
+        "modes": [ { "modeId": "2:0", "name": "Default" } ] }
+    },
+    "variables": {
+      "VariableID:1:3": { "id": "VariableID:1:3", "name": "color/surface/page", "resolvedType": "COLOR", "variableCollectionId": "VariableCollectionId:1:1",
+        "description": "Page background behind cards.",
+        "valuesByMode": { "1:0": { "r": 0.9647, "g": 0.9686, "b": 0.9765, "a": 1 }, "1:1": { "r": 0.0588, "g": 0.0667, "b": 0.0824, "a": 1 } } },
+      "VariableID:1:4": { "id": "VariableID:1:4", "name": "color/accent", "resolvedType": "COLOR", "variableCollectionId": "VariableCollectionId:1:1",
+        "valuesByMode": { "1:0": { "r": 0.2314, "g": 0.3569, "b": 0.8588, "a": 1 }, "1:1": { "r": 0.4863, "g": 0.5804, "b": 0.9608, "a": 1 } } },
+      "VariableID:1:5": { "id": "VariableID:1:5", "name": "color/link", "resolvedType": "COLOR", "variableCollectionId": "VariableCollectionId:1:1",
+        "valuesByMode": { "1:0": { "type": "VARIABLE_ALIAS", "id": "VariableID:1:4" }, "1:1": { "type": "VARIABLE_ALIAS", "id": "VariableID:1:4" } } },
+      "VariableID:1:6": { "id": "VariableID:1:6", "name": "color/scrim", "resolvedType": "COLOR", "variableCollectionId": "VariableCollectionId:1:1",
+        "valuesByMode": { "1:0": { "r": 0, "g": 0, "b": 0, "a": 0.5 }, "1:1": { "r": 0, "g": 0, "b": 0, "a": 0.7 } } },
+      "VariableID:2:1": { "id": "VariableID:2:1", "name": "space/4", "resolvedType": "FLOAT", "variableCollectionId": "VariableCollectionId:1:2",
+        "valuesByMode": { "2:0": 16 } },
+      "VariableID:2:2": { "id": "VariableID:2:2", "name": "radius/m", "resolvedType": "FLOAT", "variableCollectionId": "VariableCollectionId:1:2",
+        "valuesByMode": { "2:0": 8 } },
+      "VariableID:2:3": { "id": "VariableID:2:3", "name": "font/sans", "resolvedType": "STRING", "variableCollectionId": "VariableCollectionId:1:2",
+        "valuesByMode": { "2:0": "Inter, system-ui, sans-serif" } },
+      "VariableID:2:4": { "id": "VariableID:2:4", "name": "feature/new-nav", "resolvedType": "BOOLEAN", "variableCollectionId": "VariableCollectionId:1:2",
+        "valuesByMode": { "2:0": true } },
+      "VariableID:2:5": { "id": "VariableID:2:5", "name": "opacity/disabled", "resolvedType": "FLOAT", "variableCollectionId": "VariableCollectionId:1:2",
+        "valuesByMode": { "2:0": 0.4 } }
+    } } }

@@ -27,7 +27,9 @@ export const navOf = (
   teamName: string | null,
   features: readonly string[],
   scope: 'org' | 'tenant' = 'tenant',
+  extViews = false,
 ): HxNavGroup[] => {
+  const ext = extViews && role !== 'member' ? [item('extensions', 'Расширения', 'blocks', 'extensions')] : [];
   const env = features.includes('env') ? [item('env', 'Окружение', 'layers', 'env')] : [];
   const overview = item('overview', 'Обзор', 'chart-column', 'overview');
   const analytics = item('analytics', 'Аналитика', 'activity', 'analytics');
@@ -47,7 +49,7 @@ export const navOf = (
         label: teamName ? `Команда ${teamName}` : 'Команда',
         items: [overview, analytics, ...tools, machines, item('team', 'Моя команда', 'users', 'team')],
       },
-      { label: 'Настройки', items: [...env, accounts] },
+      { label: 'Настройки', items: [...env, accounts, ...ext] },
     ];
   }
   return [
@@ -57,18 +59,29 @@ export const navOf = (
     },
     {
       label: 'Настройки',
-      items: [...env, accounts, item('settings', 'Организация', 'settings-2', 'settings')],
+      items: [...env, accounts, ...ext, item('settings', 'Организация', 'settings-2', 'settings')],
     },
   ];
 };
 
 /** The sections a role may open in the new hub; anything else goes to the overview. */
-export const hxSectionsOf = (role: Role, features: readonly string[]): Section[] => {
+export const hxSectionsOf = (role: Role, features: readonly string[], extViews = false): Section[] => {
   const env: Section[] = features.includes('env') ? ['env'] : [];
   const tools: Section[] = features.includes('ui.hx.live') ? ['efficiency', 'tools'] : [];
   // The organization's own settings are its admin's only.
   const settings: Section[] = role === 'admin' ? ['settings'] : [];
   return role === 'member'
     ? ['overview', 'analytics', 'machines', ...tools, ...env]
-    : ['overview', 'analytics', 'machines', 'teams', 'team', 'accounts', ...tools, ...env, ...settings];
+    : [
+        'overview',
+        'analytics',
+        'machines',
+        'teams',
+        'team',
+        'accounts',
+        ...tools,
+        ...env,
+        ...(extViews ? (['extensions'] as Section[]) : []),
+        ...settings,
+      ];
 };

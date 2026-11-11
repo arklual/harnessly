@@ -264,3 +264,41 @@ func TestAFrameForAChannelThatIsNotAChatIsRefused(t *testing.T) {
 		t.Errorf("no epoch: %v", err)
 	}
 }
+
+func TestListVersionMovesWithEveryChangeOfTheList(t *testing.T) {
+	ctx, db := context.Background(), openDB(t)
+	version := func(user string) string {
+		t.Helper()
+		v, err := ListVersion(ctx, db, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	empty := version("u-sergey")
+	seen := map[string]bool{empty: true}
+	// Every step happens within the same millisecond: the time alone would not tell them apart.
+	steps := []hubproto.HistoryEvents{
+		live("convs", 1, upsert("tab-a", 1, 10)),
+		live("convs", 2, upsert("tab-b", 1, 20)),
+		live("convs", 3, j(map[string]any{"type": "conversation_state", "id": "tab-b", "rev": 2, "state": map[string]any{"k": "running"}})),
+		live("convs", 4, j(map[string]any{"type": "conversation_removed", "id": "tab-a"})),
+		live("convs", 5, upsert("tab-a", 2, 10)),
+	}
+	for i, f := range steps {
+		if _, err := ApplyFrame(ctx, db, mine, f, now); err != nil {
+			t.Fatal(err)
+		}
+		v := version("u-sergey")
+		if seen[v] {
+			t.Errorf("step %d: the version %s was seen before", i, v)
+		}
+		seen[v] = true
+		if again := version("u-sergey"); again != v {
+			t.Errorf("step %d: the version moved without a change: %s, %s", i, v, again)
+		}
+	}
+	if got := version("u-roma"); got != empty {
+		t.Errorf("another person's version moved: %s", got)
+	}
+}

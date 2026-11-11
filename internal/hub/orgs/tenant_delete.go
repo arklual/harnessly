@@ -8,6 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 // Deleting an empty tenant (GitHub issue 28). A tenant goes only when nothing of value is in it: no machine, no other
@@ -30,14 +31,12 @@ type DeletePlan struct {
 	CanDelete bool      `json:"canDelete"`
 }
 
-func (s *Service) deleteTenant(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) deleteTenant(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) error {
+	p := tc.Person
 	ctx := r.Context()
 	dry := r.URL.Query().Get("dry_run") == "true" || r.URL.Query().Get("dry_run") == "1"
 	st := s.db.S()
-	o, err := Resolve(ctx, st, p, r.PathValue("org"))
-	if err != nil {
-		return err
-	}
+	o := *tc.Org
 	sp, err := st.SpaceByID(ctx, r.PathValue("spaceId"))
 	if store.IsNotFound(err) || (err == nil && sp.OrgID != o.ID) {
 		return httpx.ErrNotFound

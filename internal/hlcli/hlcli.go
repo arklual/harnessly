@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/appmcp"
 	"github.com/ly-solutions/harnessly/internal/heavy"
 	"github.com/ly-solutions/harnessly/internal/panel"
 )
@@ -210,6 +211,8 @@ func (c *cli) run(args []string) error {
 		return c.deliver(rest)
 	case "browser":
 		return c.browser(rest)
+	case "preview":
+		return c.preview(rest)
 	case "status":
 		return c.status()
 	case "api-guide":
@@ -232,11 +235,13 @@ func (c *cli) run(args []string) error {
 		return c.selftest(rest)
 	case "ask":
 		return c.ask(rest)
+	case "notice", "notices":
+		return c.notice(rest)
 	case "widget", "widgets":
 		return c.widget(rest)
 	case "peers", "peer":
 		return c.peers(rest)
-	case "memory":
+	case "memory", "mem":
 		return c.memory(rest)
 	case "secret", "secrets":
 		return c.secret(rest)
@@ -266,6 +271,8 @@ func (c *cli) run(args []string) error {
 		return c.docs(rest)
 	case "logs", "log", "journal":
 		return c.logs(rest)
+	case appmcp.Command:
+		return c.appMCP(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }

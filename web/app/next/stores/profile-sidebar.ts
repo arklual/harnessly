@@ -39,6 +39,10 @@ export async function refreshProfileSidebar(): Promise<void> {
     return;
   }
   if (!res.value.enabled) {
+    // Once the person's sidebar stood on this page, a «not kept» answer does not take it away until the next
+    // session: the cluster said so for a moment it could not list the machines, and the page drew a machine's own
+    // favorites for half a minute and then the person's again, so the favorites jumped between two orders.
+    if (profileSidebarStore.get().k === 'ready') return;
     profileSidebarStore.set({ k: 'off' });
     return;
   }

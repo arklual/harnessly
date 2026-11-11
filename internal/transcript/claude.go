@@ -9,6 +9,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -72,6 +73,20 @@ func ParseIncrementalCarry(path string, offset int64, pending string, carry Carr
 	var out Incremental
 	if claudeCatch(func() { out = parseIncremental(path, offset, pending, carry) }) {
 		return Incremental{NewEntries: []*jsvalue.Object{}, NewOffset: offset, PendingBuffer: pending, Carry: carry}
+	}
+	return out
+}
+
+// ParseAppended is ParseIncrementalCarry of bytes already read off the transcript: buf is the whole lines, each with
+// its newline, that start at byte offset of the file. What a read of the same bytes off the file gives, without the
+// file being opened.
+func ParseAppended(buf []byte, offset int64, carry Carry) Incremental {
+	var out Incremental
+	if claudeCatch(func() {
+		r := parseClaude(claudeDecode(buf), textAt{start: offset, firstLine: -1, carry: carry})
+		out = Incremental{NewEntries: r.entries, NewOffset: offset + int64(len(buf)), Carry: r.carry}
+	}) {
+		return Incremental{NewEntries: []*jsvalue.Object{}, NewOffset: offset, Carry: carry}
 	}
 	return out
 }
@@ -389,10 +404,12 @@ func (r claudeResult) window(max int, fromStart bool) Chunk {
 func parseIncremental(path string, offset int64, pending string, carry Carry) Incremental {
 	keep := Incremental{NewEntries: []*jsvalue.Object{}, NewOffset: offset, PendingBuffer: pending, Carry: carry}
 	f, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return keep
 	}
 	st, err := f.Stat()
+	tally.Stat()
 	if err != nil {
 		f.Close()
 		return keep
@@ -413,6 +430,7 @@ func parseIncremental(path string, offset int64, pending string, carry Carry) In
 	}
 	buf := make([]byte, size-offset)
 	_, err = f.ReadAt(buf, offset)
+	tally.Read(len(buf))
 	where := textAt{start: offset, firstLine: -1}
 	if pending != "" {
 		where = pendingAt(f, offset, buf)
@@ -629,6 +647,11 @@ func lineStart(f *os.File, offset int64) int64 {
 }
 
 // parseClaude reads content, which lies in the file as at says.
+// MaxLineBytes is the longest transcript line that is parsed. A line is decoded into a tree several times its size,
+// so one written without bound (a tool's output gone wrong) is counted as an error and left out, as a line that is
+// not JSON is; the largest lines agents write, pictures in a tool's result, are a few megabytes.
+var MaxLineBytes = 64 << 20
+
 func parseClaude(content string, at textAt) claudeResult {
 	var r claudeResult
 	var raws []claudeRaw
@@ -640,9 +663,14 @@ func parseClaude(content string, at textAt) claudeResult {
 		} else {
 			pos += int64(len(line)) + 1
 		}
+		if len(line) > MaxLineBytes {
+			r.errorCount++
+			continue
+		}
 		if jscompat.Trim(line) == "" {
 			continue
 		}
+		tally.Decode()
 		if !r.firstPass(line, offset, &raws) {
 			r.errorCount++
 		}

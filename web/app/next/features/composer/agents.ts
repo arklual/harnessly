@@ -114,6 +114,11 @@ export const LOGIN_COMMANDS = { claude: 'claude auth login', codex: 'codex login
   string
 >;
 
+/** No agent of the machine can start a chat, and at least one is installed but signed out: the person has to sign in
+ *  (a chat started now would wait for an agent that never answers). */
+export const signInNeeded = (agents: readonly IPickerAgent[]): boolean =>
+  !agents.some((a) => a.available) && agents.some((a) => a.status === 'login-required');
+
 /** Why an agent cannot start a chat, in its segment. */
 export const unavailableNote = (agent: IPickerAgent): string =>
   agent.status === 'login-required'

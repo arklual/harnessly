@@ -14,7 +14,12 @@ import DesignlyHome, {
 import {
   createDesign,
   fetchLibrary,
+  fetchStoreLibrary,
   fetchSystems,
+  lastLibraryView,
+  LIBRARY_FROM,
+  readLibrary,
+  storeBoardHref,
   pinDesign,
   restoreDemoDesigns,
   thumbPath,
@@ -26,6 +31,7 @@ import type { ILibraryLayout } from '@/next/features/designly/api';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
 import { bindDesignConv } from '@/next/bindings/design-conv';
+import { startQuietPoll } from '@/next/bindings/quiet-poll';
 import { designKey } from '@/next/features/designly/design-conv';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
@@ -82,6 +88,7 @@ const cardOf = (
     canDelete: design.role === undefined ? design.owner?.me === true : DELETERS.has(design.role),
     folder: layout.placed[design.id] ?? null,
     system: layout.systems[design.id] ?? null,
+    ...(design.appKind ? { appLabel: design.appKind.title } : {}),
   };
 };
 
@@ -111,25 +118,41 @@ const useNow = (ms: number) => {
 
 /** The machine's library as the cards show it: read on open and again when the link returns, kept while an agent draws. */
 const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
-  const [designs, setDesigns] = useState<IDesign[] | null>(null);
+  // The last library shown for this machine is on screen at once; it is read anew behind it.
+  const [designs, setDesigns] = useState<IDesign[] | null>(() => lastLibraryView(machine)?.designs ?? null);
+  // The hub's copy is on screen (the machine did not answer): its shelves; null while the cards are the machine's.
+  const [storeCopy, setStoreCopy] = useState<ILibraryLayout | null>(() => {
+    const view = lastLibraryView(machine);
+    return view?.from === LIBRARY_FROM.store ? view.layout : null;
+  });
   // The documents of the types apps add; an older runtime, or none, lists none (they are an addition, not the library).
   const [appDocs, setAppDocs] = useState<IKindDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const convs = useConversationList(machine);
   const [attempt, setAttempt] = useState(0);
   const now = useNow(60_000);
-  const loaded = useRef(false);
+  const loaded = useRef(lastLibraryView(machine) !== null);
   // The library on screen stays when the link goes; when it returns the library is read again, quietly.
   const restored = useLinkRestored(machine);
 
   const load = useCallback(
     (signal?: AbortSignal) =>
-      fetchLibrary(machine, signal).then(
-        async (library) => {
-          if (withAppDocs) setAppDocs(await loadKindDocs(machine).catch(() => []));
+      // The machine's library when it answers in time, else the hub's copy from its store until it does.
+      readLibrary(
+        machine,
+        { machine: () => fetchLibrary(machine, signal), store: () => fetchStoreLibrary(machine, signal) },
+        (view) => {
+          if (signal?.aborted) return;
           loaded.current = true;
-          setDesigns(library.designs);
+          setDesigns(view.designs);
+          setStoreCopy(view.from === LIBRARY_FROM.store ? view.layout : null);
           setError(null);
+        },
+      ).then(
+        async () => {
+          const docs = withAppDocs ? await loadKindDocs(machine).catch(() => []) : null;
+          if (signal?.aborted) return;
+          if (docs) setAppDocs(docs);
         },
         (failure: Error) => {
           if (signal?.aborted) return;
@@ -151,8 +174,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
   const drawing = designs?.some((d) => isDrawing(d, working)) ?? false;
   useEffect(() => {
     if (!drawing) return;
-    const timer = setInterval(() => void load(), DRAWING_POLL_MS);
-    return () => clearInterval(timer);
+    return startQuietPoll(load, DRAWING_POLL_MS);
   }, [drawing, load]);
 
   const forget = useCallback((ids: string[]) => {
@@ -160,7 +182,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     setDesigns((list) => list?.filter((d) => !gone.has(d.id)) ?? null);
   }, []);
   const reload = useCallback(() => load(), [load]);
-  const { layout, organizer, readLayout } = useLibraryOrganizer(machine, reload, forget);
+  const { layout, organizer, readLayout } = useLibraryOrganizer(machine, reload, forget, storeCopy);
 
   const cards = useMemo(() => {
     if (designs === null) return null;
@@ -198,7 +220,33 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     setAttempt((n) => n + 1);
   };
 
-  return { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds, organizer };
+  // On the hub's copy a project opens read-only from the store: its first board, in a tab of its own.
+  const openCopy = (id: string): boolean => {
+    if (storeCopy === null) return false;
+    const board = designs?.find((d) => d.id === id)?.boards[0];
+    if (!board) {
+      toast(t('next.designly.copyNoBoards'), { tone: 'error' });
+      return true;
+    }
+    window.open(storeBoardHref(machine, id, board.path), '_blank', 'noopener');
+    return true;
+  };
+  const notice = storeCopy !== null ? t('next.designly.storeCopy') : null;
+
+  return {
+    cards,
+    error,
+    now,
+    load,
+    onPin,
+    onDelete,
+    onRestoreDemo,
+    onRetry,
+    appDocIds,
+    organizer,
+    notice,
+    openCopy,
+  };
 };
 
 interface IDesignlyLibraryProps {
@@ -209,10 +257,8 @@ interface IDesignlyLibraryProps {
 /** The library alone, for the right pane: its chat is the field that starts a design, so there is none here. */
 export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
   // The documents of the types apps add are listed here as in the whole library; opening one is the pane's to tell.
-  const { cards, error, now, onPin, onDelete, onRestoreDemo, onRetry, organizer } = useDesignLibrary(
-    machine,
-    true,
-  );
+  const { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, organizer, notice, openCopy } =
+    useDesignLibrary(machine, true);
   return (
     <DesignlyHome
       cards={cards}
@@ -222,8 +268,12 @@ export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
       onDelete={onDelete}
       organizer={organizer}
       onRestoreDemo={onRestoreDemo}
-      onOpen={onOpen}
+      onOpen={(id) => {
+        if (!openCopy(id)) onOpen(id);
+      }}
       onRetry={onRetry}
+      notice={notice}
+      pack={{ machine, onImported: () => void load() }}
       compose={null}
     />
   );
@@ -242,8 +292,20 @@ const START_DRAFT = DESIGN_START_DRAFT;
 const setBrief = (value: string) => setDraftText(START_DRAFT, value);
 
 const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewProps) => {
-  const { cards, error, now, load, onPin, onDelete, onRestoreDemo, onRetry, appDocIds, organizer } =
-    useDesignLibrary(machine, true);
+  const {
+    cards,
+    error,
+    now,
+    load,
+    onPin,
+    onDelete,
+    onRestoreDemo,
+    onRetry,
+    appDocIds,
+    organizer,
+    notice,
+    openCopy,
+  } = useDesignLibrary(machine, true);
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
   const [kitsAdded, setKitsAdded] = useState(0);
   const restored = useLinkRestored(machine);
@@ -300,8 +362,12 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
       toast(t('next.designly.createFailed'), { tone: 'error', description: (failure as Error).message });
       throw failure;
     }
-    // The new document opens at once, in the app's editor.
-    goTo({ kind: ROUTE.appDoc, id: created.document, edit: true });
+    // The new document opens at once: in Sinopia's editor when its type is made of a site, else in the app's editor.
+    goTo(
+      kind.extends
+        ? { kind: ROUTE.site, id: created.document, edit: true }
+        : { kind: ROUTE.appDoc, id: created.document, edit: true },
+    );
   };
 
   const srcOf = useCallback((item: { id: string }) => uploadSrc(machine, item), [machine]);
@@ -351,8 +417,18 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
         onDelete={onDelete}
         organizer={organizer}
         onRestoreDemo={onRestoreDemo}
-        onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
+        onOpen={(id) => {
+          if (!openCopy(id)) goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id });
+        }}
         onRetry={onRetry}
+        notice={notice}
+        pack={{
+          machine,
+          onImported: () => {
+            void load();
+            setKitsAdded((n) => n + 1);
+          },
+        }}
         kits={
           kitCards
             ? {

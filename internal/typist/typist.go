@@ -1,7 +1,8 @@
 // Package typist types into an agent's tmux pane: it reads the screen before any key, decides whether a message may
 // go in now, pastes its pictures and its text, presses Enter and watches the text leave the input box. It owns the
 // pane lock, one per pane for the whole process, that every writer of a pane takes — v2's outbox and Legacy alike —
-// so two of them never type into the same box.
+// so two of them never type into the same box. A hold has a term and a wait for it has one too (panelock.go): Write is
+// the way in for everything that is not a message.
 //
 // The package keeps no state of messages: it answers what one try did, and the caller decides what comes next. It
 // reaches tmux only through Pane, so the tests run on screens from testdata and a fake clock.
@@ -55,39 +56,69 @@ type TallCapturer interface {
 	CaptureTall(short string) (string, bool)
 }
 
+// A pane's lock lives while someone holds it or waits for it: the panes of the sessions that ended leave nothing.
+type paneLock struct {
+	mu sync.Mutex
+	// users are the holder and those waiting, under locksMu.
+	users int
+}
+
 var (
 	locksMu sync.Mutex
-	locks   = map[string]*sync.Mutex{}
+	locks   = map[string]*paneLock{}
 )
 
-func paneLock(pane string) *sync.Mutex {
+func lockOf(pane string) *paneLock {
 	locksMu.Lock()
 	defer locksMu.Unlock()
 	l := locks[pane]
 	if l == nil {
-		l = &sync.Mutex{}
+		l = &paneLock{}
 		locks[pane] = l
 	}
+	l.users++
 	return l
+}
+
+// leave is the end of a use of the pane's lock; the last one takes the lock off the list.
+func leave(pane string, l *paneLock) {
+	locksMu.Lock()
+	defer locksMu.Unlock()
+	if l.users--; l.users == 0 && locks[pane] == l {
+		delete(locks, pane)
+	}
 }
 
 // Lock takes the pane's lock, waiting for the writer that holds it; unlock lets it go and is safe to call twice.
 func Lock(pane string) (unlock func()) {
-	l := paneLock(pane)
-	l.Lock()
-	return onceUnlock(l)
+	l := lockOf(pane)
+	l.mu.Lock()
+	return leased(pane, onceUnlock(pane, l))
 }
 
 // TryLock takes the pane's lock when nobody holds it; ok false otherwise, and nothing is held.
 func TryLock(pane string) (unlock func(), ok bool) {
-	l := paneLock(pane)
-	if !l.TryLock() {
+	l := lockOf(pane)
+	if !l.mu.TryLock() {
+		leave(pane, l)
 		return func() {}, false
 	}
-	return onceUnlock(l), true
+	return leased(pane, onceUnlock(pane, l)), true
 }
 
-func onceUnlock(l *sync.Mutex) func() {
+func onceUnlock(pane string, l *paneLock) func() {
 	var once sync.Once
-	return func() { once.Do(l.Unlock) }
+	return func() {
+		once.Do(func() {
+			l.mu.Unlock()
+			leave(pane, l)
+		})
+	}
+}
+
+// Locks is how many panes have a lock held or waited for now.
+func Locks() int {
+	locksMu.Lock()
+	defer locksMu.Unlock()
+	return len(locks)
 }

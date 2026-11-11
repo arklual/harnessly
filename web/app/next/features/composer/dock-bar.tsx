@@ -55,6 +55,12 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
   } else if (value.kind === 'noMachines') {
     title = t('next.dockBar.noMachines');
     sub = t('next.dockBar.noMachinesSub');
+  } else if (value.kind === 'signIn') {
+    icon = 'key-round';
+    title = t('next.dockBar.signIn');
+    sub = t('next.dockBar.signInSub');
+    const onOpen = value.onOpen;
+    actions = [{ key: 'open', label: t('next.dockBar.signInOpen'), run: async () => onOpen() }];
   } else if (value.kind === 'machine') {
     title = t('next.dockBar.machine', { machine: value.machine });
     sub = t('next.dockBar.machineSub');

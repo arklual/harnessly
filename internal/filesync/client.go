@@ -9,10 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/filestore"
@@ -31,6 +34,8 @@ type Client struct {
 	coll  string
 	token Token
 	http  *http.Client
+	// noBatch: the store has no batch look at the blobs (an older one), so each is asked for on its own.
+	noBatch atomic.Bool
 }
 
 // NewClient makes a client of a collection. hc nil is a plain client with a timeout long enough for a long poll.
@@ -97,6 +102,65 @@ func (c *Client) HasBlob(ctx context.Context, sha string) (bool, error) {
 	return false, failure(resp)
 }
 
+// MissingBlobs tells which of the named contents the collection does not hold: one request for every
+// filestore.MaxBlobCheck of them. A store that does not know the batch look is asked about each on its own, from then
+// on without trying the batch again.
+func (c *Client) MissingBlobs(ctx context.Context, shas []string) (map[string]bool, error) {
+	missing := map[string]bool{}
+	for len(shas) > 0 {
+		part := shas
+		if len(part) > filestore.MaxBlobCheck {
+			part = part[:filestore.MaxBlobCheck]
+		}
+		shas = shas[len(part):]
+		if !c.noBatch.Load() {
+			done, err := c.missingBatch(ctx, part, missing)
+			if err != nil {
+				return nil, err
+			}
+			if done {
+				continue
+			}
+			c.noBatch.Store(true)
+		}
+		for _, sha := range part {
+			ok, err := c.HasBlob(ctx, sha)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				missing[sha] = true
+			}
+		}
+	}
+	return missing, nil
+}
+
+// missingBatch asks about one batch; done is false when the store does not have the route.
+func (c *Client) missingBatch(ctx context.Context, shas []string, missing map[string]bool) (done bool, err error) {
+	body, _ := json.Marshal(filestore.MissingBlobsRequest{Shas: shas})
+	resp, err := c.do(ctx, http.MethodPost, "/blobs/missing", body)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound, http.StatusMethodNotAllowed:
+		return false, nil
+	default:
+		return false, failure(resp)
+	}
+	var out filestore.MissingBlobsResponse
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&out); err != nil {
+		return false, err
+	}
+	for _, sha := range out.Missing {
+		missing[sha] = true
+	}
+	return true, nil
+}
+
 // PutBlob uploads contents under their sha256.
 func (c *Client) PutBlob(ctx context.Context, sha string, data []byte) error {
 	resp, err := c.do(ctx, http.MethodPut, "/blobs/"+sha, data)
@@ -105,9 +169,22 @@ func (c *Client) PutBlob(ctx context.Context, sha string, data []byte) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
-		return failure(resp)
+		err := failure(resp)
+		if tooBig(resp.StatusCode, err) {
+			return fmt.Errorf("%w: %v", ErrTooBig, err)
+		}
+		return err
 	}
 	return nil
+}
+
+// ErrTooBig is contents bigger than the store takes: sending them again does not help.
+var ErrTooBig = errors.New("the store does not take contents this big")
+
+// tooBig: the store refused the contents for their size (413, or the 400 a store answers with its size limit).
+func tooBig(status int, err error) bool {
+	return status == http.StatusRequestEntityTooLarge ||
+		status == http.StatusBadRequest && strings.Contains(err.Error(), "bigger than")
 }
 
 // ErrNoBlob is contents the collection does not hold.
@@ -217,18 +294,62 @@ func (c *Client) Put(ctx context.Context, path string, data []byte, author strin
 			return filestore.Entry{}, err
 		}
 	}
-	var base int64
-	for range 5 {
+	// The write starts from the revision this process last saw of the path, so writing a path again is not first
+	// refused as stale. A conflict names the current revision: the write is tried on top of it after a short spread
+	// wait, and a path that still moves is left to the caller.
+	key := c.base + "\x00" + c.coll + "\x00" + path
+	base := heads.get(key)
+	for attempt := 0; ; attempt++ {
 		resp, err := c.Commit(ctx, filestore.CommitRequest{Path: path, Base: base, Sha: sum, Tag: sum, Size: int64(len(data)), Author: author})
 		if err != nil {
 			return filestore.Entry{}, err
 		}
+		heads.set(key, resp.Entry.Rev)
 		if !resp.Conflict {
 			return *resp.Entry, nil
 		}
+		if attempt >= putRetries {
+			break
+		}
 		base = resp.Entry.Rev
+		if attempt > 0 {
+			if !sleep(ctx, putRetryWait+rand.N(putRetryWait)) {
+				return filestore.Entry{}, ctx.Err()
+			}
+		}
 	}
 	return filestore.Entry{}, fmt.Errorf("store: %s keeps changing under the write", path)
+}
+
+// putRetries is how many times Put writes again on top of the revision a conflict named; the first goes at once (the
+// path was simply not known yet), the next after putRetryWait and as much again at random.
+const putRetries = 2
+
+var putRetryWait = 300 * time.Millisecond
+
+// heads is the newest revision this process saw of the paths it puts whole, by store, collection and path.
+var heads = &headMemory{revs: map[string]int64{}}
+
+type headMemory struct {
+	mu   sync.Mutex
+	revs map[string]int64
+}
+
+const headMemoryMost = 4096
+
+func (h *headMemory) get(key string) int64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.revs[key]
+}
+
+func (h *headMemory) set(key string, rev int64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, ok := h.revs[key]; !ok && len(h.revs) >= headMemoryMost {
+		clear(h.revs)
+	}
+	h.revs[key] = rev
 }
 
 // History is the revisions of a path, newest first; empty when the path never existed or is not this machine's to see.

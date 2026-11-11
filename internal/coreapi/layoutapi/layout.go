@@ -1,6 +1,7 @@
 package layoutapi
 
 import (
+	"context"
 	"errors"
 	"math"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 // must turns an unexpected store error into the 500 the previous runtime gave an exception.
@@ -169,7 +171,7 @@ func (a *api) resumeLater(p state.Provider, sessionID, wsID string, tab *jsvalue
 	time.AfterFunc(a.d.ShellReady, func() {
 		line, err := a.d.Agents.ResumeLine(string(p), sessionID, wsID, launch)
 		if err == nil {
-			err = a.d.Tmux.SendKeys(tab.String("sessionName"), line)
+			err = typist.Write(context.Background(), a.d.Tmux, tab.String("sessionName"), func(context.Context) error { return a.d.Tmux.SendKeys(tab.String("sessionName"), line) })
 		}
 		if err != nil {
 			agent.Log("warn", "resume sendKeys failed", agent.F{K: "error", V: err.Error()})

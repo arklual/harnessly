@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"os"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/prompts"
 	"github.com/ly-solutions/harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 // designTerminal is a message to an agent through this core's layouts, tmux and prompt editor.
@@ -37,7 +39,7 @@ func (t designTerminal) Deliver(session, text string, viaEditor bool) error {
 		}
 		return errCoreOff
 	}
-	return t.c.cfg.Tmux.SendLiteralThenEnter(session, text)
+	return typist.Write(context.Background(), t.c.cfg.Tmux, session, func(context.Context) error { return t.c.cfg.Tmux.SendLiteralThenEnter(session, text) })
 }
 
 // designRoutes wire the library to the core: the tabs its claims and listing read, the starter of its dialogs, the

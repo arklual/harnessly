@@ -37,6 +37,8 @@ export interface ILibraryBarProps {
     onNewFolder: () => void;
     onSelect: () => void;
     onTrash: () => void;
+    /** «Загрузить пакет»: absent where packs are not offered. */
+    onImportPack?: () => void;
   } | null;
 }
 
@@ -148,6 +150,12 @@ const LibraryBar = ({ filters, onFilters, systems, tools }: ILibraryBarProps) =>
                 {tools.selecting ? t('next.designly.selectStop') : t('next.designly.select')}
               </span>
             </Menu.Item>
+            {tools.onImportPack && (
+              <Menu.Item className="hx-cmenu__item" onClick={tools.onImportPack}>
+                <Icon name="upload" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.pack.importPick')}</span>
+              </Menu.Item>
+            )}
             <Menu.Item className="hx-cmenu__item" onClick={tools.onTrash}>
               <Icon name="trash-2" size="sm" />
               <span className="hx-cmenu__txt">{t('next.designly.trash')}</span>

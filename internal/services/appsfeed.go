@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +36,7 @@ const (
 	appsMRMerged  = 40
 	appsMRClosed  = 20
 	appsEnrich    = 40
-	appsEnrichPar = 8
+	appsEnrichPar = 16
 	// appsChildren caps the subtasks listed under an epic.
 	appsChildren = 60
 	appsLabels   = 12
@@ -45,7 +46,10 @@ const (
 	appsMaxBytes = 6 << 20
 	// appsFresh is how long an app's answer is reused: two tabs, or a tab asking again, share one read.
 	appsFresh = 30 * time.Second
-	appsText  = 300
+	// appsKeep is how long an older answer is still shown at once while a new read runs behind it: the screen opens
+	// with the last lists instead of waiting for the service.
+	appsKeep = 10 * time.Minute
+	appsText = 300
 )
 
 type appsEntry struct {
@@ -73,12 +77,22 @@ func (e *appFailure) Error() string { return string(e.reason) }
 
 func ptr[T any](v T) *T { return &v }
 
-// Apps reads every app of the screen, in parallel. An answer is kept for appsFresh; one that is not ready is not kept, so
-// a token put in place is taken on the next look.
-func (s *Service) Apps(ctx context.Context) wire.AppsFeed {
-	out := wire.AppsFeed{At: time.Now().UnixMilli(), StaleDays: appsStaleDays, Apps: make([]wire.AppFeed, len(wire.AppIDs))}
+// Apps reads the apps of the screen (`only` of them; none: all), in parallel. An answer is kept for appsFresh, and
+// shown at once for appsKeep while a new read runs behind it; one that is not ready is not kept, so a token put in place
+// is taken on the next look.
+func (s *Service) Apps(ctx context.Context, only ...wire.AppID) wire.AppsFeed {
+	ids := wire.AppIDs
+	if len(only) > 0 {
+		ids = nil
+		for _, id := range wire.AppIDs {
+			if slices.Contains(only, id) {
+				ids = append(ids, id)
+			}
+		}
+	}
+	out := wire.AppsFeed{At: time.Now().UnixMilli(), StaleDays: appsStaleDays, Apps: make([]wire.AppFeed, len(ids))}
 	var wg sync.WaitGroup
-	for i, id := range wire.AppIDs {
+	for i, id := range ids {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -89,17 +103,36 @@ func (s *Service) Apps(ctx context.Context) wire.AppsFeed {
 	return out
 }
 
+func (s *Service) kept(id wire.AppID) (appsEntry, bool) {
+	s.apps.mu.Lock()
+	defer s.apps.mu.Unlock()
+	e, ok := s.apps.last[id]
+	return e, ok
+}
+
 func (s *Service) app(ctx context.Context, id wire.AppID) wire.AppFeed {
-	st := s.apps
-	lock := st.locks[id]
-	lock.Lock()
-	defer lock.Unlock()
-	st.mu.Lock()
-	if e, ok := st.last[id]; ok && time.Since(e.at) < appsFresh {
-		st.mu.Unlock()
+	lock := s.apps.locks[id]
+	if e, ok := s.kept(id); ok && time.Since(e.at) < appsKeep {
+		// An older answer is shown now; one read at a time refreshes it behind.
+		if time.Since(e.at) >= appsFresh && lock.TryLock() {
+			go func() {
+				defer lock.Unlock()
+				s.readApp(context.WithoutCancel(ctx), id)
+			}()
+		}
 		return e.feed
 	}
-	st.mu.Unlock()
+	lock.Lock()
+	defer lock.Unlock()
+	if e, ok := s.kept(id); ok && time.Since(e.at) < appsFresh {
+		return e.feed
+	}
+	return s.readApp(ctx, id)
+}
+
+// readApp reads one app from its service and keeps a ready answer. The caller holds the app's lock.
+func (s *Service) readApp(ctx context.Context, id wire.AppID) wire.AppFeed {
+	st := s.apps
 	var feed wire.AppFeed
 	read, cancel := context.WithTimeout(context.WithoutCancel(ctx), appsBudget)
 	defer cancel()

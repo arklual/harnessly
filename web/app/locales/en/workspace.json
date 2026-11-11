@@ -21,7 +21,6 @@
   "workspace.agentComposer.tooManyAttachments": "No more than {max} attachments per message",
   "workspace.agentComposer.uploadFailed": "{name} didn't upload",
   "workspace.agentComposer.uploading": "Uploading files…",
-  "workspace.diffFileList.noChanges": "No changes",
   "workspace.fileEditorDialog.agentFolder": "Current agent's working folder",
   "workspace.fileEditorDialog.allSaved": "All changes saved",
   "workspace.fileEditorDialog.closeEditor": "Close editor",

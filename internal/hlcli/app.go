@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/delegation"
 )
 
 // harnessly app: write, check and install apps (internal/apps), and turn them on in the chat the command runs in.
@@ -82,13 +84,21 @@ func (c *cli) app(args []string) error {
 	case "connect":
 		return c.appConnect(args)
 	case "enable", "on":
-		return c.appEnable(args, true)
+		return c.appToggle(args, true)
 	case "disable", "off":
-		return c.appEnable(args, false)
+		return c.appToggle(args, false)
 	case "explain", "why":
 		return c.appExplain(args)
 	case "logs":
 		return c.appLogs(args)
+	case "settings":
+		return c.appSettings(args)
+	case "secret":
+		return c.appSecret(args)
+	case "compat":
+		return c.appCompat(args)
+	case "run":
+		return c.appRun(args)
 	}
 	return usageErr("app takes %s (harnessly app --help)", appSubNames)
 }
@@ -343,10 +353,19 @@ func (c *cli) appList() error {
 }
 
 func (c *cli) appRemove(args []string) error {
-	if len(args) != 1 {
-		return usageErr("app remove takes the app's id")
+	purge, rest := false, []string{}
+	for _, a := range args {
+		if a == "--purge" {
+			purge = true
+		} else {
+			rest = append(rest, a)
+		}
 	}
-	raw, err := c.request("POST", "/api/cli/apps/remove", nil, map[string]string{"id": args[0]})
+	if len(rest) != 1 {
+		return usageErr("app remove takes the app's id and, to drop its data, settings and secrets too, --purge")
+	}
+	args = rest
+	raw, err := c.request("POST", "/api/cli/apps/remove", nil, map[string]any{"id": args[0], "purge": purge})
 	if err != nil {
 		return err
 	}
@@ -395,16 +414,34 @@ func (c *cli) appEnable(args []string, on bool) error {
 	if on {
 		var r struct {
 			Warnings []string `json:"warnings"`
+			Live     *bool    `json:"live"`
+			Waits    string   `json:"waits"`
 		}
 		_ = json.Unmarshal(raw, &r)
 		for _, w := range r.Warnings {
 			c.out("warning: %s\n", w)
 		}
-		c.out("%s is on in this chat; the agent gets it when it starts next\n", id)
+		c.out("%s\n", appEnabledWords(id, r.Live, r.Waits))
 	} else {
 		c.out("%s is off in this chat\n", id)
 	}
 	return nil
+}
+
+// appEnabledWords is what `app enable` says of an app turned on: what the agent that runs has at once and what comes
+// only with its next start. live is the runtime's word (nil from a runtime that does not say), waits its
+// reason when the app cannot go live.
+func appEnabledWords(id string, live *bool, waits string) string {
+	switch {
+	case live != nil && *live:
+		return id + " is on in this chat. A running agent has it now, with no restart: the app's tools and the tools of its open window at once, " +
+			"its instructions and skills with the agent's next turn. Only its slash commands wait for the agent's next start."
+	case waits != "":
+		return id + " is on in this chat, and the agent gets it only when it starts next: " + waits
+	case live != nil:
+		return id + " is on in this chat; the agent gets it when it starts next (an agent at rest is stopped, and the next message starts it with the app)"
+	}
+	return id + " is on in this chat; a running Claude Code agent gets its tools at once, any other agent when it starts next"
 }
 
 // appExplain says why an app is on or off, layer by layer: the machine, the team, its setup, how it turns on, the chat of
@@ -714,7 +751,7 @@ func (c *cli) appGuard(policyPath string, codexInput bool) error {
 			"Ask the person to turn the apps off and on again.")
 	}
 	v, reason := snap.Decide(apps.Call{Tool: call.Tool, Input: call.Input, Cwd: call.Cwd,
-		Root: os.Getenv("CLAUDE_PROJECT_DIR")})
+		Root: os.Getenv("CLAUDE_PROJECT_DIR"), Status: c.chatStatus()})
 	switch v.Decision {
 	case apps.DecideDeny:
 		reason = guardMark(snap, v) + reason
@@ -738,6 +775,16 @@ func (c *cli) appGuard(policyPath string, codexInput bool) error {
 		}
 	}
 	return nil
+}
+
+// chatStatus is the status of the chat's documents by app, from the launch's folder (the folder of its token file),
+// which the agent cannot write: the rules of agent.tools.when hold by it. None when the launch has no such folder.
+func (c *cli) chatStatus() map[string][]string {
+	tokenFile := strings.TrimSpace(c.env.Getenv("HARNESSLY_CLI_TOKEN_FILE"))
+	if tokenFile == "" {
+		return nil
+	}
+	return apps.ReadChatStatus(filepath.Join(filepath.Dir(tokenFile), apps.ChatStatusFile))
 }
 
 // askHooks asks the runtime for the word of the views that hear the agent's calls, when an app of the snapshot has a
@@ -834,6 +881,7 @@ func (c *cli) appGuardCodex(in io.Reader, policyPath string) error {
 	default:
 		var v apps.Verdict
 		var tool string
+		snap.Status = c.chatStatus()
 		out, v, tool = snap.CodexJudge(raw)
 		if v.App != "" {
 			// The answer is out first: the journal is a courtesy and must not hold the call.
@@ -940,7 +988,8 @@ func (c *cli) appContextLive() error {
 		return nil
 	}
 	var ev struct {
-		Event string `json:"hook_event_name"`
+		Event  string `json:"hook_event_name"`
+		Prompt string `json:"prompt"`
 	}
 	if json.Unmarshal(raw, &ev) != nil || ev.Event != "UserPromptSubmit" {
 		return nil
@@ -949,7 +998,9 @@ func (c *cli) appContextLive() error {
 	if session == "" {
 		return nil
 	}
-	status, body, err := c.call("POST", "/api/cli/apps/live-context", nil, map[string]any{"session": session})
+	// Only whether the platform typed the turn (a reminder) goes to the runtime, never the text.
+	status, body, err := c.call("POST", "/api/cli/apps/live-context", nil,
+		map[string]any{"session": session, "service": delegation.IsService(ev.Prompt)})
 	if err != nil || status != 200 {
 		return nil
 	}

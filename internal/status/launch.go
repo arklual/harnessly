@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
@@ -62,7 +63,7 @@ func (m *Manager) beginLaunch(tabID string, e *Entry) {
 	e.LaunchingSince = &started
 	e.LaunchFailed = false
 	m.broadcastUpdate(tabID, e, nil)
-	go m.watchLaunch(tabID, started)
+	safego.Go("status watch launch", func() { m.watchLaunch(tabID, started) })
 }
 
 // launchEnded is called with the lock held.

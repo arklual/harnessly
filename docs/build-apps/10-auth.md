@@ -55,6 +55,20 @@ call once more.
 rotation the old key stays there). A machine without a hub signs with its own key and publishes nothing on the network:
 it writes the set to `app-token.jwks.json` in the runtime's data folder for the backend's admin to copy.
 
+**Discovery.** The hub also answers `https://<hub>/.well-known/openid-configuration`, so a stock OIDC library finds the
+keys by the issuer alone:
+
+```json
+{"issuer": "https://harnessly.example", "jwks_uri": "https://harnessly.example/.well-known/jwks.json",
+ "id_token_signing_alg_values_supported": ["EdDSA"], "response_types_supported": ["id_token"],
+ "subject_types_supported": ["public"]}
+```
+
+It names the issuer, its keys and the one algorithm; the hub signs no sign-in tokens with it. Public, cached for 5
+minutes. With `HUB_APP_TOKEN=off` both addresses answer 404. In Go, `oidc.NewProvider(ctx, "https://harnessly.example")`
+and then `provider.Verifier(&oidc.Config{ClientID: <your origin>, SupportedSigningAlgs: []string{oidc.EdDSA}})` is the
+same check as below.
+
 **Check it on your backend**: the signature by a key of the set, `iss`, your own `aud` and `exp`, always; `typ` where the library lets you.
 
 Go (with `github.com/coreos/go-oidc/v3`):
@@ -137,7 +151,7 @@ or «JWT» with token exchange allowed for the hub's client and the backend's au
 
 | Variable | Means |
 | --- | --- |
-| `HUB_APP_TOKEN` | `on` (default) or `off`: the hub mints no tokens and publishes no JWKS |
+| `HUB_APP_TOKEN` | `on` (default) or `off`: the hub mints no tokens and publishes neither the JWKS nor the discovery document |
 | `HUB_APP_TOKEN_KEY_FILE` | The Ed25519 key, PKCS#8 PEM; made there on first start (`<HUB_DATA_DIR>/app-token.pem`). Every replica reads the same file |
 | `HUB_APP_TOKEN_PREVIOUS_KEYS` | Comma-separated public keys (PKIX PEM) of earlier rotations, still published |
 

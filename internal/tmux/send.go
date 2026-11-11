@@ -1,6 +1,7 @@
 package tmux
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -63,16 +64,84 @@ func LiteralArg(s string) string {
 	return s
 }
 
+// ProbeTimeout is how long the server may take to answer before keys are typed into a pane.
+const ProbeTimeout = 2 * time.Second
+
+// Responsive asks the session's server a question that costs it nothing and says whether the answer came in
+// ProbeTimeout: a *SlowError when it did not. Keys typed into a server this slow arrive apart, later than the waits
+// between them, so a writer asks first and types later. A session that is gone is not slow: the write says so itself.
+func (t *Tmux) Responsive(name string) error {
+	start := time.Now()
+	r := t.on(name, "display-message", "-p", "-t", name, "#{pane_id}")
+	took := max(r.took, time.Since(start))
+	if r.timedOut || took > ProbeTimeout {
+		return &SlowError{Command: "display-message", After: took}
+	}
+	return nil
+}
+
+// Keys types into panes for one writer: every call is bound to the writer's context — the hold of the pane's lock —
+// so a call made after the hold ended types nothing, and one under way is cut short with it.
+type Keys struct {
+	t   *Tmux
+	ctx context.Context
+}
+
+// With is the key sender of a writer whose hold of a pane lives as long as ctx.
+func (t *Tmux) With(ctx context.Context) Keys { return Keys{t: t, ctx: ctx} }
+
+// keys is the sender of a caller that names no hold: its calls end by their own timeouts only.
+func (t *Tmux) keys() Keys { return Keys{t: t, ctx: context.Background()} }
+
+// ended is why the writer's hold is over, nil while it lasts.
+func (k Keys) ended() error {
+	if k.ctx.Err() == nil {
+		return nil
+	}
+	return context.Cause(k.ctx)
+}
+
+func (k Keys) exec(run runner, timeout time.Duration, name string, args ...string) result {
+	if err := k.ended(); err != nil {
+		return result{err: err}
+	}
+	full := append([]string{"-u", "-L", k.t.SocketOf(name)}, args...)
+	if k.t.runCtx == nil || k.ctx.Done() == nil {
+		return run("", "tmux", full...)
+	}
+	r := k.t.runCtx(k.ctx, timeout, "", "tmux", full...)
+	if err := k.ended(); err != nil {
+		// Cut short with the hold: not a slow server, and what tmux said of it is of no use.
+		return result{err: err, took: r.took}
+	}
+	return r
+}
+
+func (k Keys) on(name string, args ...string) result {
+	return k.exec(k.t.run, cmdTimeout, name, args...)
+}
+
+func (k Keys) onWrite(name string, args ...string) result {
+	return k.exec(k.t.runWrite, writeTimeout, name, args...)
+}
+
+// sleep is the pause between two keys of one send; it ends early with the hold.
+func (k Keys) sleep(d time.Duration) {
+	if k.ended() == nil {
+		k.t.sleep(d)
+	}
+}
+
 // sendKeys leaves copy mode (where tmux would swallow the keys) and runs send-keys with args.
-func (t *Tmux) sendKeys(name string, args ...string) error {
-	t.ExitCopyMode(name)
-	return t.sendKeysInPlace(name, args...)
+func (k Keys) sendKeys(name string, args ...string) error {
+	k.ExitCopyMode(name)
+	return k.sendKeysInPlace(name, args...)
 }
 
 // sendKeysInPlace is send-keys without leaving copy mode first, for the second half of a two-part send. A refusal
 // carries what tmux said (`exit status 1` alone told nothing of a «command too long»).
-func (t *Tmux) sendKeysInPlace(name string, args ...string) error {
-	r := t.onWrite(name, append([]string{"send-keys", "-t", name}, args...)...)
+func (k Keys) sendKeysInPlace(name string, args ...string) error {
+	r := k.onWrite(name, append([]string{"send-keys", "-t", name}, args...)...)
 	if r.timedOut {
 		return &SlowError{Command: "send-keys", After: r.took}
 	}
@@ -83,50 +152,50 @@ func (t *Tmux) sendKeysInPlace(name string, args ...string) error {
 }
 
 // ExitCopyMode leaves copy mode in the session's pane, so typed text reaches the program and not the scrollback.
-func (t *Tmux) ExitCopyMode(name string) { t.on(name, "copy-mode", "-q", "-t", name) }
+func (k Keys) ExitCopyMode(name string) { k.on(name, "copy-mode", "-q", "-t", name) }
 
 // SendKeys sends a line and Enter in one send-keys call; tmux reads the line as key names where it can (a launch or
 // resume line into a shell).
-func (t *Tmux) SendKeys(name, line string) error { return t.sendKeys(name, line, "Enter") }
+func (k Keys) SendKeys(name, line string) error { return k.sendKeys(name, line, "Enter") }
 
 // SendKeysSeparated sends text (as key names where tmux can), then Enter 50 ms later as its own call, so a TUI that
 // reads one burst as a paste sees a typed line and a submit.
-func (t *Tmux) SendKeysSeparated(name, text string) error {
-	if err := t.sendKeys(name, text); err != nil {
+func (k Keys) SendKeysSeparated(name, text string) error {
+	if err := k.sendKeys(name, text); err != nil {
 		return err
 	}
-	t.sleep(enterAfterText)
-	return t.sendKeysInPlace(name, "Enter")
+	k.sleep(enterAfterText)
+	return k.sendKeysInPlace(name, "Enter")
 }
 
 // SendLiteralThenEnter types text literally (a line that looks like a key name, such as `Enter`, is typed as words),
 // without control characters, then presses Enter 50 ms later.
-func (t *Tmux) SendLiteralThenEnter(name, text string) error {
-	if err := t.SendLiteral(name, text); err != nil {
+func (k Keys) SendLiteralThenEnter(name, text string) error {
+	if err := k.SendLiteral(name, text); err != nil {
 		return err
 	}
-	t.sleep(enterAfterText)
-	return t.sendKeysInPlace(name, "Enter")
+	k.sleep(enterAfterText)
+	return k.sendKeysInPlace(name, "Enter")
 }
 
 // SendLiteral types text literally, without control characters, and presses nothing: for an input a TUI shows in place.
-func (t *Tmux) SendLiteral(name, text string) error {
-	return t.sendLiteral(name, "", StripControlChars(text), "")
+func (k Keys) SendLiteral(name, text string) error {
+	return k.sendLiteral(name, "", StripControlChars(text), "")
 }
 
 // sendLiteral types prefix+text+suffix literally, in as many `send-keys -l` calls as text needs (see literalChunk):
 // prefix goes with the first part and suffix with the last, so an escape sequence of either is never split. `--` keeps
 // a part that starts with `-` from being read as an option.
-func (t *Tmux) sendLiteral(name, prefix, text, suffix string) error {
+func (k Keys) sendLiteral(name, prefix, text, suffix string) error {
 	parts := splitLiteral(text, literalChunk)
 	parts[0] = prefix + parts[0]
 	parts[len(parts)-1] += suffix
-	send := t.sendKeys
+	send := k.sendKeys
 	for _, part := range parts {
 		if err := send(name, "-l", "--", LiteralArg(part)); err != nil {
 			return err
 		}
-		send = t.sendKeysInPlace
+		send = k.sendKeysInPlace
 	}
 	return nil
 }
@@ -150,25 +219,47 @@ func splitLiteral(text string, limit int) []string {
 }
 
 // SendRawKeys sends keys as tmux reads them: a key name (`Escape`, `Enter`, `C-g`) or a string. Nothing is stripped.
-func (t *Tmux) SendRawKeys(name, keys string) error { return t.sendKeys(name, keys) }
+func (k Keys) SendRawKeys(name, keys string) error { return k.sendKeys(name, keys) }
 
 // SendKeySequence sends several keys in one call, so a chord such as `C-x C-s` arrives back to back.
-func (t *Tmux) SendKeySequence(name string, keys ...string) error { return t.sendKeys(name, keys...) }
+func (k Keys) SendKeySequence(name string, keys ...string) error { return k.sendKeys(name, keys...) }
 
 // SendBracketedPasteOnly pastes text into a TUI's input as one bracketed paste and presses nothing. A long text goes in
 // several send-keys calls inside the one pair of paste brackets: the program reads it as a single paste all the same.
-func (t *Tmux) SendBracketedPasteOnly(name, text string) error {
-	return t.sendLiteral(name, pasteStart, StripControlChars(text), pasteEnd)
+func (k Keys) SendBracketedPasteOnly(name, text string) error {
+	return k.sendLiteral(name, pasteStart, StripControlChars(text), pasteEnd)
 }
 
 // SendBracketedPaste pastes text, presses Enter, and Enter again 600 ms later.
+func (k Keys) SendBracketedPaste(name, text string) error {
+	if err := k.SendBracketedPasteOnly(name, text); err != nil {
+		return err
+	}
+	if err := k.sendKeysInPlace(name, "Enter"); err != nil {
+		return err
+	}
+	k.sleep(secondEnterAfterPaste)
+	return k.sendKeysInPlace(name, "Enter")
+}
+
+// The same sends for a caller that names no hold of the pane.
+
+func (t *Tmux) ExitCopyMode(name string)         { t.keys().ExitCopyMode(name) }
+func (t *Tmux) SendKeys(name, line string) error { return t.keys().SendKeys(name, line) }
+func (t *Tmux) SendKeysSeparated(name, text string) error {
+	return t.keys().SendKeysSeparated(name, text)
+}
+func (t *Tmux) SendLiteralThenEnter(name, text string) error {
+	return t.keys().SendLiteralThenEnter(name, text)
+}
+func (t *Tmux) SendLiteral(name, text string) error { return t.keys().SendLiteral(name, text) }
+func (t *Tmux) SendRawKeys(name, keys string) error { return t.keys().SendRawKeys(name, keys) }
+func (t *Tmux) SendKeySequence(name string, keys ...string) error {
+	return t.keys().SendKeySequence(name, keys...)
+}
+func (t *Tmux) SendBracketedPasteOnly(name, text string) error {
+	return t.keys().SendBracketedPasteOnly(name, text)
+}
 func (t *Tmux) SendBracketedPaste(name, text string) error {
-	if err := t.SendBracketedPasteOnly(name, text); err != nil {
-		return err
-	}
-	if err := t.sendKeysInPlace(name, "Enter"); err != nil {
-		return err
-	}
-	t.sleep(secondEnterAfterPaste)
-	return t.sendKeysInPlace(name, "Enter")
+	return t.keys().SendBracketedPaste(name, text)
 }

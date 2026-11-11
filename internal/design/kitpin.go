@@ -182,7 +182,29 @@ func (l *Library) kitFile(project string, segments []string) string {
 	if !ok {
 		return ""
 	}
-	return l.mountFile(project, pin, l.kitRootOf(pin), segments)
+	if file := l.mountFile(project, pin, l.kitRootOf(pin), segments); file != "" {
+		return file
+	}
+	return l.baseFile(project, pin, segments)
+}
+
+// baseFile is a file of a kit the project's kit is built on, the nearest base first: a board on the kit loads
+// the base's ds/<mount>/ too. "" when the kit extends nothing or the file is in none of them.
+func (l *Library) baseFile(project string, pin KitPin, segments []string) string {
+	if pin.Draft || len(segments) < 3 || segments[0] != "ds" {
+		return ""
+	}
+	c, err := designkit.ReadCanvas(l.KitsDir(), pin.ID, pin.Version, "")
+	if err != nil {
+		return ""
+	}
+	for i := len(c.Bases) - 1; i >= 0; i-- {
+		b := c.Bases[i]
+		if f := l.mountFile(project, KitPin{ID: b.Kit, Version: b.Version}, designkit.Root(l.KitsDir(), b.Kit, b.Version), segments); f != "" {
+			return f
+		}
+	}
+	return ""
 }
 
 // kitFileAt is kitFile on another installed version of the project's kit (a look before taking it).

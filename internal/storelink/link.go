@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -136,7 +137,7 @@ func Open(o Options) (*Link, error) {
 		}
 		l.machine = o.Machine
 		l.base = base + "/store"
-		s := &sessions{hc: hc, machine: *o.Machine, now: now}
+		s := &sessions{hc: hc, machine: *o.Machine, now: now, log: log}
 		l.sess = s
 		l.token = s.token
 		l.stateKey = "hub-" + short(base+"\x00"+o.Machine.ID)
@@ -170,6 +171,28 @@ func (l *Link) Person(ctx context.Context) (string, error) {
 	return l.sess.cur.Person, nil
 }
 
+// MachineID is the hub's id of this machine, "" for a store inside the process.
+func (l *Link) MachineID() string {
+	if l.machine == nil {
+		return ""
+	}
+	return l.machine.ID
+}
+
+// Serves says whether the hub opens a collection to this machine (hubproto.StoreSession.Collections): an older hub
+// does not know the newer kinds. A store inside the process serves every kind it knows.
+func (l *Link) Serves(ctx context.Context, collection string) (bool, error) {
+	if l.sess == nil {
+		return filestore.KnownKind(collection), nil
+	}
+	if _, err := l.sess.token(ctx, false); err != nil {
+		return false, err
+	}
+	l.sess.mu.Lock()
+	defer l.sess.mu.Unlock()
+	return slices.Contains(l.sess.cur.Collections, collection), nil
+}
+
 // Kind is KindHub or KindEmbedded.
 func (l *Link) Kind() string { return l.kind }
 
@@ -200,6 +223,16 @@ func (l *Link) Ready(ctx context.Context, recheck time.Duration) error {
 	for {
 		err := HubHasStore(ctx, l.hc, base)
 		if err == nil {
+			// The store is there; a machine that is not in a space of the hub has no session to use it with. It waits
+			// for the connection (the session's own pauses) instead of every loop failing on its own timer.
+			for l.sess != nil {
+				if _, serr := l.sess.token(ctx, false); !errors.Is(serr, ErrNotConnected) {
+					return nil
+				}
+				if !sleep(ctx, max(l.sess.retryIn(), time.Second)) {
+					return ctx.Err()
+				}
+			}
 			return nil
 		}
 		if errors.Is(err, errNoStore) {
@@ -308,13 +341,42 @@ func (l *Link) syncOnce(ctx context.Context, collection, dir string) error {
 	}
 	defer unlock()
 	state := filepath.Join(l.dataDir, "store-sync", l.stateKey, collection+"-"+short(dir))
-	a, err := filesync.New(filesync.Config{Root: dir, StateDir: state, Store: l.Client(collection), Machine: l.name,
-		Policy: filestore.PolicyFor(collection), Log: l.log, KeepUnseen: shared})
+	cfg := filesync.Config{Root: dir, StateDir: state, Store: l.Client(collection), Machine: l.name,
+		Policy: filestore.PolicyFor(collection), Log: l.log, KeepUnseen: shared}
+	if collection == filestore.KindDesign {
+		cfg.RefusalGroup = designRefusalGroup
+	}
+	if collection == filestore.KindKits {
+		// A kit version is not a board: a local file that lost to the room's goes aside, not into the library's
+		// by-revision notices.
+		cfg.ConflictDir = ".conflicts"
+	}
+	a, err := filesync.New(cfg)
 	if err != nil {
 		return err
 	}
 	defer a.Close()
 	return a.Run(ctx)
+}
+
+// designRefusalGroup names the paths of the design library the store refuses together: a write is judged by the
+// role in its project (the first folder), so one refused file of a project speaks for the rest of it. The owner file
+// is judged on its own, and so is what lies outside a project; a folder whose name is not plain ASCII takes no
+// write at all.
+func designRefusalGroup(rel string) string {
+	id, rest, ok := strings.Cut(rel, "/")
+	if !ok || rest == "" {
+		return ""
+	}
+	for i := 0; i < len(id); i++ {
+		if id[i] >= 0x80 {
+			return "folder:" + id
+		}
+	}
+	if strings.HasPrefix(id, ".") || strings.EqualFold(rest, filestore.OwnerFile) {
+		return ""
+	}
+	return "project:" + strings.ToLower(id)
 }
 
 // busyOnce says once per folder that another runtime syncs it.

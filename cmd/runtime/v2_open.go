@@ -15,6 +15,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/sources"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -73,10 +74,10 @@ func (o v2Open) OpenAll(ctx context.Context, conv string, refs []string) ([]*wir
 	for i, ref := range refs {
 		wg.Add(1)
 		slots <- struct{}{}
-		go func() {
+		safego.Go("open ref", func() {
 			defer func() { <-slots; wg.Done() }()
 			out[i] = o.open(ctx, rec, ref)
-		}()
+		})
 	}
 	wg.Wait()
 	return out, nil
@@ -408,12 +409,12 @@ func (o v2Open) verify(ctx context.Context, projects []gitlabProject, iid int) [
 	var wg sync.WaitGroup
 	for i, p := range projects {
 		wg.Add(1)
-		go func() {
+		safego.Go("open merge request", func() {
 			defer wg.Done()
 			if info, ok := o.mr(ctx, p.host, p.path, iid); ok {
 				found[i] = &mrFound{project: p, mrInfo: info}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	var out []mrFound

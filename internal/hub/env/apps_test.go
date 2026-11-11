@@ -2,6 +2,7 @@ package env_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,5 +75,59 @@ func TestAppKindIsCheckedForAdminsOnlyAndGoesToMachinesThatDoIt(t *testing.T) {
 	}
 	if got := string(it.Source); got != `{"branch":"main","from":"repo","path":"apps/kit","repoUrl":"https://git.example.org/team/kit.git"}` {
 		t.Errorf("source = %s", got)
+	}
+}
+
+// An app item carries the installation's addresses when it has any, and is sent as the catalog has it when it has none.
+func TestAppItemsCarryTheInstallationsAddresses(t *testing.T) {
+	a := newAcme(t)
+	kit := a.item(t, "app", "Доски", map[string]any{"repoUrl": "https://git.example.org/team/boards.git", "path": "app"})
+	if code, _ := a.entry(t, a.anna, "org", a.org, kit, nil); code != 201 {
+		t.Fatalf("entry: %d", code)
+	}
+	send := func(install map[string]string) string {
+		t.Helper()
+		m := a.anna.Machine(a.tenant, nil)
+		link := &fakeLink{id: m.MachineID, status: "ok"}
+		p := env.NewPusher(env.PushDeps{DB: a.s.DB, Reg: link, Features: env.StaticFeatures([]string{"env"}), Now: a.s.Clock.Now, Every: time.Hour, Install: install})
+		defer p.Close()
+		p.Connected(m.MachineID, hubproto.Hello{Features: []string{hubproto.FeatureEnvironment, hubproto.FeatureEnvSetup, hubproto.FeatureEnvApps}})
+		if err := p.Push(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range link.sent[0].Items {
+			if it.Kind == hubproto.EnvKindApp {
+				return string(it.Source)
+			}
+		}
+		t.Fatal("no app item")
+		return ""
+	}
+	if got := send(env.InstallValues("", "")); got != `{"from":"repo","path":"app","repoUrl":"https://git.example.org/team/boards.git"}` {
+		t.Errorf("without addresses: %s", got)
+	}
+	if got := send(env.InstallValues("https://boards.example", "")); got != `{"from":"repo","install":{"boardsUrl":"https://boards.example"},"path":"app","repoUrl":"https://git.example.org/team/boards.git"}` {
+		t.Errorf("with the boards address: %s", got)
+	}
+}
+
+func TestAppSourceKeepsTheOrganizationsOffSwitch(t *testing.T) {
+	src := func(off any) []byte {
+		return []byte(`{"from":"repo","repoUrl":"https://git.example.com/acme/apps.git","path":"boards","off":` + string(raw(off)) + `}`)
+	}
+	got, err := env.CleanSource("app", src(true))
+	if err != nil || !strings.Contains(string(got), `"off":true`) {
+		t.Fatalf("off: %s %v", got, err)
+	}
+	// false is the same as absent: the source and its hash stay as before.
+	got, err = env.CleanSource("app", src(false))
+	if err != nil || strings.Contains(string(got), "off") {
+		t.Fatalf("on: %s %v", got, err)
+	}
+	if _, err := env.CleanSource("app", src("yes")); err == nil {
+		t.Fatal("a string for off is refused")
+	}
+	if _, err := env.CleanSource("mcp", []byte(`{"url":"https://x.example.com","off":true}`)); err == nil {
+		t.Fatal("off is only an app's")
 	}
 }

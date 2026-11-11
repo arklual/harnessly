@@ -133,3 +133,17 @@ type Leases struct {
 type WrappedKeys struct {
 	Keys []WrappedKey `json:"keys"`
 }
+
+// MaxBlobCheck is the most hashes one MissingBlobsRequest names.
+const MaxBlobCheck = 500
+
+// MissingBlobsRequest asks which of the named contents the collection does not hold: one request before a batch of
+// uploads instead of a look at each.
+type MissingBlobsRequest struct {
+	Shas []string `json:"shas"`
+}
+
+// MissingBlobsResponse lists, in the order asked, the hashes the collection does not hold.
+type MissingBlobsResponse struct {
+	Missing []string `json:"missing"`
+}

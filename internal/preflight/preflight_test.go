@@ -135,3 +135,88 @@ func TestCodexLogin(t *testing.T) {
 		}
 	}
 }
+
+// A ~/.claude folder is there as soon as the CLI has started once, signed in or not: only the CLI knows.
+func TestClaudeLogin(t *testing.T) {
+	home, bin := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		body string
+		want bool
+	}{
+		"signed in":  {`if [ "$1" = auth ]; then echo '{"loggedIn": true}'; exit 0; fi; echo "2.1.0 (Claude Code)"`, true},
+		"signed out": {`if [ "$1" = auth ]; then echo '{"loggedIn": false}'; exit 1; fi; echo "2.1.0 (Claude Code)"`, false},
+		"timed out":  {`if [ "$1" = auth ]; then sleep 5; fi; echo "2.1.0 (Claude Code)"`, true},
+	} {
+		script(t, bin, "claude", tc.body)
+		saved := cmdTimeout
+		cmdTimeout = 500 * time.Millisecond
+		c := &Checker{Home: home, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + home}}
+		got := c.claudeStatus(c.getenv("PATH"))
+		cmdTimeout = saved
+		if !got.Installed || got.LoggedIn != tc.want {
+			t.Errorf("%s: %+v", name, got)
+		}
+	}
+}
+
+// A home that worked before the CLI was asked keeps its agent: its key or endpoint reaches the chat, not the probe.
+func TestClaudeLoginKeepsAConfiguredHome(t *testing.T) {
+	bin := t.TempDir()
+	script(t, bin, "claude", `if [ "$1" = auth ]; then exit 1; fi; echo "2.1.0 (Claude Code)"`)
+	for name, tc := range map[string]struct {
+		file, body string
+		want       bool
+	}{
+		"credentials":  {".credentials.json", `{}`, true},
+		"own endpoint": {"settings.json", `{"env":{"ANTHROPIC_BASE_URL":"https://example.com"}}`, true},
+		"plain":        {"settings.json", `{"theme":"dark"}`, false},
+	} {
+		home := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(home, ".claude", tc.file), []byte(tc.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		c := &Checker{Home: home, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + home}}
+		if got := c.claudeProbe(c.getenv("PATH")); !got.Installed || got.LoggedIn != tc.want {
+			t.Errorf("%s: %+v", name, got)
+		}
+	}
+}
+
+// A managed machine keeps the sign-in in its own folder: the probe asks the CLI with it and counts its credentials.
+func TestClaudeLoginInTheMachinesAuthFolder(t *testing.T) {
+	home, bin, auth := t.TempDir(), t.TempDir(), t.TempDir()
+	script(t, bin, "claude", `if [ "$1" = auth ]; then [ -n "$CLAUDE_SECURESTORAGE_CONFIG_DIR" ] && exit 0; exit 1; fi; echo "2.1.0 (Claude Code)"`)
+	c := &Checker{Home: home, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + home}, AuthDir: auth}
+	if got := c.claudeProbe(c.getenv("PATH")); !got.LoggedIn {
+		t.Errorf("asked with the auth folder: %+v", got)
+	}
+	script(t, bin, "claude", `if [ "$1" = auth ]; then exit 1; fi; echo "2.1.0 (Claude Code)"`)
+	if got := c.claudeProbe(c.getenv("PATH")); got.LoggedIn {
+		t.Errorf("an empty auth folder signs nobody in: %+v", got)
+	}
+	if err := os.WriteFile(filepath.Join(auth, ".credentials.json"), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.claudeProbe(c.getenv("PATH")); !got.LoggedIn {
+		t.Errorf("credentials in the auth folder: %+v", got)
+	}
+}
+
+func TestAuthDirOfTheRuntimeConfig(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "runtime.json")
+	if err := os.WriteFile(file, []byte(`{"claude_binary":"/opt/claude","auth_directory":"/run/auth/me"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := authDirOf(file); got != "/run/auth/me" {
+		t.Errorf("authDirOf = %q", got)
+	}
+	if got := authDirOf(""); got != "" {
+		t.Errorf("no config: %q", got)
+	}
+}

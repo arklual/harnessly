@@ -147,7 +147,18 @@ class Hub {
     };
   }
 
-  /** Lets a machine's socket go (an older runtime): the active and home machines move to next when they were it. */
+  /** A machine that joined the fleet while the page was open: its socket, and the page's place when it had none. */
+  add(m: MachineId, next: MachineId | null): void {
+    batch(() => {
+      this.ensure(m);
+      if (homeMachineStore.get() === null) homeMachineStore.set(next ?? m);
+      if (activeMachineStore.get() === null) this.setActive(next ?? m);
+    });
+    this.watchHidden();
+  }
+
+  /** Lets a machine's socket go (an older runtime, a machine that left the fleet): the active and home machines move
+   *  to next when they were it. */
   drop(m: MachineId, next: MachineId | null): void {
     const c = this.clients.get(m);
     if (!c) return;

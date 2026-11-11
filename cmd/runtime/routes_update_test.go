@@ -62,7 +62,7 @@ func TestUpdateRoute(t *testing.T) {
 		t.Errorf("POST: %d", w.Code)
 	}
 	w := req(http.MethodGet)
-	if w.Code != http.StatusOK || w.Body.String() != "{\"current\":\"0.15.46\",\"updateAvailable\":false,\"checking\":true}\n" {
+	if w.Code != http.StatusOK || w.Body.String() != "{\"current\":\"0.15.46\",\"updateAvailable\":false,\"checking\":true,\"source\":\"releases\"}\n" {
 		t.Errorf("GET: %d %q", w.Code, w.Body.String())
 	}
 }

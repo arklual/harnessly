@@ -833,8 +833,10 @@
    },
    "body": null,
    "at": null,
-   "status": 204,
-   "answerHeaders": {},
+   "status": 200,
+   "answerHeaders": {
+    "cache-control": "no-store"
+   },
    "answer": ""
   },
   {

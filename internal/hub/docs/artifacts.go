@@ -195,15 +195,18 @@ func (c *artifactsClient) markdown(ctx context.Context, slug, v string) (md stri
 	if v != "" {
 		q += "&v=" + url.QueryEscape(v)
 	}
+	// The service names the version as an object ({"n": 2, "id": "…"}), not a bare number.
 	var out struct {
-		Version  int    `json:"version"`
+		Version struct {
+			N int `json:"n"`
+		} `json:"version"`
 		HTML     string `json:"html"`
 		Markdown string `json:"markdown"`
 	}
 	if err = c.do(ctx, "GET", "/api/v1/artifacts/"+url.PathEscape(slug)+"/content"+q, nil, &out); err != nil {
 		return
 	}
-	return out.Markdown, out.Version, out.Markdown != "" && out.HTML == "", nil
+	return out.Markdown, out.Version.N, out.Markdown != "" && out.HTML == "", nil
 }
 
 func (c *artifactsClient) diff(ctx context.Context, slug, from, to string) (json.RawMessage, error) {

@@ -67,20 +67,32 @@ func TestLiveApps(t *testing.T) {
 	}
 
 	rec.Apps = []string{"acme.cash"}
-	first := l.notice(rec)
+	// a service turn (a reminder) gets the words but spends nothing: the person's next turn has them too.
+	if service := l.notice(rec, true); !strings.Contains(service, "Instructions of Кэшбэк.") {
+		t.Fatalf("service turn: %q", service)
+	}
+	first := l.notice(rec, false)
 	if !strings.Contains(first, "# Apps turned on in this chat") || !strings.Contains(first, "Instructions of Кэшбэк.") {
 		t.Fatalf("first notice: %q", first)
 	}
-	if again := l.notice(rec); again != "" {
-		t.Fatalf("told once: %q", again)
+	// Every later turn of the person has the short context: where the words are, the tools.
+	again := l.notice(rec, false)
+	if strings.Contains(again, "Instructions of Кэшбэк.") || !strings.Contains(again, "# Apps on in this chat") ||
+		!strings.Contains(again, "Кэшбэк (acme.cash): instructions ") || !strings.Contains(again, "instructions.md") ||
+		!strings.Contains(again, "mcp__harnessly-app__") {
+		t.Fatalf("short context: %q", again)
 	}
 	rec.Apps = []string{"acme.cash", "acme.ruled"}
-	if waits := l.notice(rec); !strings.Contains(waits, "wait for the agent's next start") || strings.Contains(waits, "Instructions of Кэшбэк.") {
+	if waits := l.notice(rec, false); !strings.Contains(waits, "wait for the agent's next start") || strings.Contains(waits, "Instructions of Кэшбэк.") {
 		t.Fatalf("waiting notice: %q", waits)
 	}
 	rec.Apps = nil
-	if off := l.notice(rec); !strings.Contains(off, "Кэшбэк (acme.cash)") || !strings.Contains(off, "turned off") {
+	if off := l.notice(rec, false); !strings.Contains(off, "Кэшбэк (acme.cash)") || !strings.Contains(off, "turned off") ||
+		strings.Contains(off, "# Apps on in this chat") {
 		t.Fatalf("off notice: %q", off)
+	}
+	if l.notice(rec, false) != "" {
+		t.Fatal("no app on, no words")
 	}
 
 	l.requireWall = true

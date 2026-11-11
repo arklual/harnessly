@@ -6,9 +6,44 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean" },
+        "url": { "type": "string", "pattern": "^$|^https?://[^/?#@\\s]+/?$" },
+        "bundled": { "type": "boolean" },
+        "image": { "type": "object", "properties": { "repository": { "type": "string" }, "tag": { "type": "string" } } },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "type": { "enum": ["", "fs", "s3"] },
+            "size": { "type": "string" },
+            "storageClass": { "type": "string" },
+            "s3": { "type": "object", "properties": { "existingSecret": { "type": "string" } } }
+          }
+        },
+        "auth": { "enum": ["token", "harnessly"] },
+        "frameAncestors": { "type": "array", "items": { "type": "string" } },
         "existingSecret": { "type": "string" },
-        "artifacts": { "type": "object", "properties": { "bundled": { "type": "boolean" }, "url": { "type": "string" } } },
-        "boards": { "type": "object", "properties": { "bundled": { "type": "boolean" }, "url": { "type": "string" } } }
+        "ingress": { "type": "boolean" }
+      }
+    },
+    "boards": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "url": { "type": "string", "pattern": "^$|^https?://[^/?#@\\s]+/?$" },
+        "bundled": { "type": "boolean" },
+        "image": { "type": "object", "properties": { "repository": { "type": "string" }, "tag": { "type": "string" } } },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "type": { "enum": ["", "fs", "s3"] },
+            "size": { "type": "string" },
+            "storageClass": { "type": "string" },
+            "s3": { "type": "object", "properties": { "existingSecret": { "type": "string" } } }
+          }
+        },
+        "auth": { "enum": ["token", "harnessly"] },
+        "frameAncestors": { "type": "array", "items": { "type": "string" } },
+        "existingSecret": { "type": "string" },
+        "ingress": { "type": "boolean" }
       }
     },
     "image": {
@@ -50,7 +85,7 @@
     },
     "signup": { "enum": ["open", "invite"] },
     "adminEmails": { "type": "array", "items": { "type": "string", "pattern": "^[^@\\s,]+@[^@\\s,]+$" } },
-    "orgs": { "enum": ["off", "shadow", "on"] },
+    "orgs": { "enum": ["off", "on"] },
     "featuresDefault": { "type": "array", "items": { "type": "string" } },
     "machineTrust": { "type": "boolean" },
     "oidcEmailTrusted": { "type": "boolean" },
@@ -114,6 +149,15 @@
         "annotations": { "type": "object" }
       }
     },
+    "networkPolicy": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "not": { "enum": [8040, 8041] } },
+        "from": { "type": "array", "items": { "type": "object" } }
+      }
+    },
     "service": {
       "type": "object",
       "properties": {
@@ -129,6 +173,29 @@
         "className": { "type": "string" },
         "annotations": { "type": "object" },
         "tls": { "type": "array" }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["", "Recreate", "RollingUpdate"] },
+        "maxSurge": { "type": ["integer", "string"] }
+      }
+    },
+    "drain": {
+      "type": "object",
+      "properties": {
+        "settleSeconds": { "type": "integer", "minimum": 0 },
+        "linksSeconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "preStop": { "type": "object" },
+    "antiAffinity": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "required": { "type": "boolean" },
+        "topologyKey": { "type": "string" }
       }
     },
     "terminationGracePeriodSeconds": { "type": "integer", "minimum": 20 }

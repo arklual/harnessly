@@ -10,6 +10,11 @@
 | --- | --- | --- |
 | `HUB_AUTOMATIONS` | `off` | Включает маршруты. Выключено: каждый отвечает 503 `automations_off`, диспетчер не стартует. |
 | `HUB_AUTOMATIONS_SECRET` | пусто | Секрет входящих событий (`X-Automation-Secret`). Пусто: приём событий закрыт. |
+| `HUB_AUTOMATIONS_NOTIFY_URL` | пусто | Куда хаб шлёт уведомление о готовом запуске (бот с кнопками «ок»/«отклонить»). Пусто: уведомлений нет. |
+| `HUB_AUTOMATIONS_NOTIFY_TOKEN` | пусто | Bearer-токен уведомления. |
+| `HUB_AUTOMATIONS_GITLAB_URL` | пусто | GitLab, в котором хаб сливает и закрывает MR запуска (`https://gitlab.example.com`). |
+| `HUB_AUTOMATIONS_GITLAB_TOKEN` | пусто | Токен GitLab с правом слияния. Пусто: решение только записывается. |
+| `HUB_AUTOMATIONS_MR_PROJECTS` | пусто | Через запятую: префиксы проектов, чьи MR хаб вправе трогать (`team/,harnessly/`). Пусто: слияние выключено. |
 | `HUB_AUTOMATIONS_PORT_ENV` | `AGENT_REPORT_PORT` | Имя переменной окружения, в которой агент получает порт для отчёта. |
 
 ## Маршруты
@@ -20,6 +25,9 @@
 - `GET /runs?rule=` — запуски.
 - `POST /runs/{id}/decision` с `{action: "approve" | "reject"}` — решение по запуску со статусом `awaiting_approval`.
 - `POST /hook` с `{source, fingerprint, event}` и заголовком `X-Automation-Secret` — событие снаружи.
+- `POST /callback` с `{runId, action: "approve" | "reject"}` и тем же `X-Automation-Secret` — решение от бота
+  уведомлений (он сам проверил, кто нажал кнопку). Ответ `{ok, status, merged, reason?}`; 409, если запуск уже не ждёт
+  решения. Это тот же ответ, какой давал прежний шлюз (`/automations/callback`).
 
 ## Правило
 
@@ -33,9 +41,33 @@
 2. Диспетчер раз в 15 секунд захватывает запуск (`running`), выдаёт одноразовый токен результата (в базе только его
    sha256) и вызывает `conversations.start` на машине правила или на первой подключённой машине владельца.
    Токен и порт отчёта попадают в разговор только через переменные окружения.
-3. Агент присылает `automations.result` (`summary`, `bugIssueId`, `mrUrl`); запуск становится `awaiting_approval`.
-4. Владелец решает: `approved` или `rejected`.
+   На линке хаба агент принимает `conversations.start` только для запуска автоматизации (`runId` и `resultToken`),
+   только от хаба, к которому машина подключена, и только если политика машины разрешает хабу доступ к рантайму
+   (`runtime_session`); иначе — `policy_denied`. Observe-линк (так к хабу подключены машины прежнего шлюза) не
+   принимает запуск, пока оператор машины явно не разрешил это переменной `AGENT_HUB_AUTOMATIONS=on` (как
+   `AGENT_HUB_PEERS`); аварийный выключатель хаба сильнее разрешения.
+3. Агент присылает `automations.result` (`summary`, `bugIssueId`, `mrUrl`) в линк хаба — пачкой `repl.batch`, если
+   хаб включил пачки (docs/hub/replication.md); хаб подписывается на событие, когда автоматизации включены. Запуск
+   становится `awaiting_approval`.
+4. Хаб шлёт уведомление на `HUB_AUTOMATIONS_NOTIFY_URL`: `{runId, title (имя правила), summary, bugIssueId, mrUrl,
+   platformUrl}` (адрес хаба, `HUB_PUBLIC_URL`). Сбой уведомления только пишется в журнал, запуск остаётся `awaiting_approval`.
+5. Владелец (или бот через `/callback`) решает: `approved` или `rejected`.
+   - `rejected`: хаб закрывает MR запуска.
+   - `approved`: хаб сливает MR (fast-forward, без squash, ветку не удаляет), только если MR открыт, пайплайн
+     `success` и `merge_status = can_be_merged`; тогда запуск становится `merged`. Иначе запуск остаётся
+     `approved`, а `reason` в ответе говорит, почему не слит. Нет MR у одобренного запуска или GitLab недоступен —
+     запуск `failed` с причиной.
+   - Хаб трогает только MR адреса `HUB_AUTOMATIONS_GITLAB_URL` и проектов с префиксом из
+     `HUB_AUTOMATIONS_MR_PROJECTS`; всё остальное отвергается.
+
+## Перенос правила со шлюза (откат)
+
+Правило создают на хабе (владелец — тот же человек, машина подключена и разрешила автоматизации), отключают на шлюзе
+(`PATCH` правила, `enabled:false`), alerter переключают на хаб: `AUTOMATION_DISPATCHER_URL`
+хаба и пути `AUTOMATION_WEBHOOK_PATH=/api/platform/automations/hook`,
+`AUTOMATION_CALLBACK_PATH=/api/platform/automations/callback`. Откат: вернуть три переменные alerter (пути по
+умолчанию — шлюзовые) и включить правило на шлюзе.
 
 ## Не вошло в срез
 
-Слияние MR после одобрения, уведомления, плагин и MCP-инструмент, экран в вебе, расписание по cron.
+Плагин и MCP-инструмент, экран в вебе, расписание по cron.

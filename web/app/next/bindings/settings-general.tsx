@@ -221,10 +221,15 @@ export const AppearancePage = ({ pending }: { pending: Pending }) => {
       palette={palette}
       textSize={settings.textSize}
       textBusy={waiting.has('textSize')}
+      noticeColor={settings.noticeColor}
+      noticeBusy={waiting.has('noticeColor')}
       onTheme={setTheme}
       onPalette={setPalette}
       onTextSize={(textSize) =>
         void run('textSize', t('next.settings.failed'), () => savePerson({ textSize }))
+      }
+      onNoticeColor={(noticeColor) =>
+        void run('noticeColor', t('next.settings.failed'), () => savePerson({ noticeColor }))
       }
     />
   );

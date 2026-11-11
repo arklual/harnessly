@@ -561,16 +561,20 @@ path, which the proxy checks); when the proxy refuses it, the pane's reload butt
 
 ## Updates
 
-A standalone runtime built from a release looks for a newer one: at start and then every 12 hours it makes one
-`GET https://api.github.com/repos/ly-solutions/harnessly/releases/latest` (unauthenticated, 10 seconds at most, with
-`If-None-Match`, through `HTTPS_PROXY` if you set it) and compares the tag with its own version. It sends nothing
+A standalone runtime built from a release looks for a newer one of its [update channel](self-host/update-channels.md):
+`stable` by default (the release the project named stable, after a week out), or `latest` (every release) with
+`RUNTIME_UPDATE_CHANNEL=latest`. At start and then every 12 hours it makes one `GET` of the channel's address (the
+stable pointer `https://github.com/ly-solutions/harnessly/releases/download/channels/stable.json`, or
+`https://api.github.com/repos/ly-solutions/harnessly/releases/latest`; unauthenticated, 10 seconds at most, with
+`If-None-Match`, through `HTTPS_PROXY` if you set it) and compares the version with its own. It sends nothing
 else: no identifier, no usage, no version of yours beyond the standard request headers. A failure is logged at debug
 level and changes nothing. When a newer release exists, the page shows a quiet "new version" notice with a link to
 its notes; closing it hides that version until the next one comes out.
 
 The check is skipped, and the notice never appears, for a `dev` build (`make run` from a clone), for a runtime a
 [hub](hub/machine.md) carries (the hub serves its machines' binaries), and when you set `RUNTIME_UPDATE_CHECK=0`.
-`RUNTIME_UPDATE_CHECK_URL` points the check at a mirror that answers like the GitHub API.
+`RUNTIME_UPDATE_CHECK_URL` points the check at a mirror that answers like the GitHub API, and
+`RUNTIME_UPDATE_STABLE_URL` at the mirror's stable pointer.
 
 A standalone runtime does not update itself (a machine of a hub does, see [hub/machine.md](hub/machine.md#upgrade-move-and-remove)):
 how you update is how you installed. Settings → General → Updates shows the version, the newer release and this table.

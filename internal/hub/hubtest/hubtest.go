@@ -116,6 +116,9 @@ type Stack struct {
 	Logs *syncBuffer
 	// URL is the hub's public URL.
 	URL string
+	// ReplicaURL is where the other replicas reach this one's internal listener; "" without HUB_REPLICAS.
+	ReplicaURL  string
+	setInternal func(http.Handler)
 	// DistDir is the folder the hub serves binaries and the installer from.
 	DistDir string
 
@@ -145,6 +148,15 @@ type Option func(env map[string]string, o *api.Options)
 
 // Env sets a configuration variable.
 func Env(k, v string) Option { return func(env map[string]string, _ *api.Options) { env[k] = v } }
+
+// Cloud is the cloud edition with what it does not start without: machines on a domain of their own, and
+// organizations, machine access lists and document access on.
+func Cloud(runtimeDomain string) Option {
+	return func(env map[string]string, _ *api.Options) {
+		env["HUB_EDITION"], env["HUB_RUNTIME_DOMAIN"] = "cloud", runtimeDomain
+		env["HUB_ORGS"], env["HUB_ACCESS_ENFORCE"], env["HUB_RESOURCE_ACCESS"] = "on", "on", "on"
+	}
+}
 
 // WithOptions changes the options the hub is built with.
 func WithOptions(f func(o *api.Options)) Option {
@@ -180,7 +192,23 @@ func New(t *testing.T, opts ...Option) *Stack {
 		opt(env, &o)
 	}
 	if env["HUB_REPLICAS"] == "on" && env["HUB_REPLICA_ADDR"] == "" {
-		env["HUB_REPLICA_ADDR"] = s.URL // the stack's own server is where the other replicas reach it
+		// The replicas' hop has a listener of its own, as in a deployment: a second server stands for it.
+		var imu sync.RWMutex
+		var internal http.Handler
+		s.setInternal = func(h http.Handler) { imu.Lock(); internal = h; imu.Unlock() }
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			imu.RLock()
+			h := internal
+			imu.RUnlock()
+			if h == nil {
+				http.NotFound(w, r)
+				return
+			}
+			h.ServeHTTP(w, r)
+		}))
+		t.Cleanup(srv.Close)
+		s.ReplicaURL = srv.URL
+		env["HUB_REPLICA_ADDR"] = srv.URL
 	}
 	cfg, err := config.Load(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
 	if err != nil {
@@ -200,6 +228,9 @@ func New(t *testing.T, opts ...Option) *Stack {
 	s.options = o
 	s.Hub = hub
 	s.setHandler(hub.Handler)
+	if s.setInternal != nil {
+		s.setInternal(hub.Internal)
+	}
 	t.Cleanup(func() { s.Hub.Shutdown() })
 	return s
 }
@@ -215,6 +246,9 @@ func (s *Stack) Restart() {
 	}
 	s.Hub = hub
 	s.setHandler(hub.Handler)
+	if s.setInternal != nil {
+		s.setInternal(hub.Internal)
+	}
 }
 
 // openDB is a SQLite file of its own. With HUB_TEST_POSTGRES_URL set it is a throwaway schema of that Postgres

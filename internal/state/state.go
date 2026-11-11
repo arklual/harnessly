@@ -75,6 +75,9 @@ type Config struct {
 	// Now and NewID are the clock and the six-character id source; tests make them predictable.
 	Now   func() time.Time
 	NewID func() string
+	// SessionOwned says the tmux session is a chat's, whose owner makes it again when the chat needs it: the restore
+	// of sessions at a start makes none for such a tab. nil: no session is.
+	SessionOwned func(session string) bool
 	// HTTP calls the machine agent; its own timeout is the commit timeout.
 	HTTP *http.Client
 }

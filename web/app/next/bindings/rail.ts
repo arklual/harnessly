@@ -1,31 +1,51 @@
-import { useSyncExternalStore } from 'react';
+import { useLayoutEffect, useSyncExternalStore } from 'react';
 
-/** The desktop sidebar folded to a rail; per device. */
-const RAIL_KEY = 'hx-sidebar-collapsed';
+/**
+ * The desktop sidebar folded to a rail. One rule: only the person opens it. Moving between tabs and screens, the pane
+ * shutting or a design left never open it by themselves; the window only folds it when there is no room.
+ *
+ * The person's choice is kept per device, apart for two kinds of screens: the ordinary ones (the chats, the start page,
+ * Settings) and the full-screen ones (an app, a design, a document of an app's type, a kit), where the sidebar starts
+ * folded until the person opens it there.
+ */
+export const RAIL_MODE = { screen: 'screen', full: 'full' } as const;
+export type TRailMode = (typeof RAIL_MODE)[keyof typeof RAIL_MODE];
+
+const RAIL_KEY = {
+  screen: 'hx-sidebar-collapsed',
+  full: 'hx-sidebar-collapsed-full',
+} as const satisfies Record<TRailMode, string>;
+/** Where nothing was chosen yet: open on the ordinary screens, folded on the full-screen ones. */
+const RAIL_DEFAULT = { screen: false, full: true } as const satisfies Record<TRailMode, boolean>;
 
 const listeners = new Set<() => void>();
-let folded: boolean | null = null;
+const folded: Record<TRailMode, boolean | null> = { screen: null, full: null };
+let mode: TRailMode = RAIL_MODE.screen;
 
-const read = (): boolean => {
+const read = (m: TRailMode): boolean => {
   try {
-    return localStorage.getItem(RAIL_KEY) === '1';
+    const kept = localStorage.getItem(RAIL_KEY[m]);
+    return kept === null ? RAIL_DEFAULT[m] : kept === '1';
   } catch {
-    return false;
+    return RAIL_DEFAULT[m];
   }
 };
 
-const write = (value: boolean) => {
+const write = (m: TRailMode, value: boolean) => {
   try {
-    localStorage.setItem(RAIL_KEY, value ? '1' : '0');
+    localStorage.setItem(RAIL_KEY[m], value ? '1' : '0');
   } catch {
     // Private mode or full storage: the rail still folds for this page.
   }
 };
 
-/** What the person chose, kept on the device. */
-const stored = (): boolean => (folded ??= read());
+/** What the person chose for the screens now on, kept on the device. */
+const stored = (): boolean => (folded[mode] ??= read(mode));
 
-/** The sidebar folded for the right pane on a narrow window: drawn folded, never kept. */
+/**
+ * The sidebar folded for the right pane on a narrow window: drawn folded, never kept. It stays folded until the person
+ * opens it: the pane shutting, or its chat left for another tab, does not open it again.
+ */
 let foldedForPane = false;
 
 const snapshot = (): boolean => stored() || foldedForPane;
@@ -42,40 +62,27 @@ const subscribe = (listener: () => void) => {
 };
 
 /**
- * Folds the sidebar to its rail and opens it again. The state lives here and not in the shell: the toggle then
- * re-renders only what draws the rail, not the whole shell with the chat in it, so the click's frame stays short.
+ * Folds the sidebar to its rail and opens it again, the person's own act. The state lives here and not in the shell:
+ * the toggle then re-renders only what draws the rail, not the whole shell with the chat in it.
  */
-const set = (value: boolean) => {
-  folded = value;
-  write(folded);
+export const toggleRail = () => {
+  const next = !snapshot();
+  foldedForPane = false;
+  folded[mode] = next;
+  write(mode, next);
   notify();
 };
 
-/** The sidebar was folded for a design opened full screen, and opens again when the person leaves it. */
-let foldedForDesign = false;
-
-export const toggleRail = () => {
-  const next = !snapshot();
-  foldedForDesign = false;
-  foldedForPane = false;
-  set(next);
+/** Which screens are on: the shell sets it from the route, before the frame is painted. */
+export const setRailMode = (next: TRailMode) => {
+  if (mode === next) return;
+  mode = next;
+  notify();
 };
 
-/**
- * A design opened full screen from the right pane takes the whole window: the open sidebar folds to its rail, and the
- * person can still open it there.
- */
-export const foldRailForDesign = () => {
-  if (stored()) return;
-  foldedForDesign = true;
-  set(true);
-};
-
-/** Out of the design: the sidebar folded for it opens again, unless the person changed it meanwhile. */
-export const restoreRailAfterDesign = () => {
-  if (!foldedForDesign) return;
-  foldedForDesign = false;
-  set(false);
+/** Sets the rail's mode from the shell's route, before paint, so a full-screen screen never shows the sidebar a frame. */
+export const useRailMode = (next: TRailMode) => {
+  useLayoutEffect(() => setRailMode(next), [next]);
 };
 
 /** Narrower than this, the open sidebar, the chat (with a design beside it) and the right pane do not fit side by side. */
@@ -91,11 +98,12 @@ export const foldRailForPane = (windowWidth: number) => {
   notify();
 };
 
-/** The pane shut: the sidebar folded for it opens again, unless the person folded or opened it meanwhile. */
-export const restoreRailAfterPane = () => {
-  if (!foldedForPane) return;
-  foldedForPane = false;
-  notify();
-};
-
 export const useRail = (): boolean => useSyncExternalStore(subscribe, snapshot, () => false);
+
+/** Whether a full-screen screen is on (an app, a design). */
+export const useRailFull = (): boolean =>
+  useSyncExternalStore(
+    subscribe,
+    () => mode === RAIL_MODE.full,
+    () => false,
+  );

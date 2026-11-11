@@ -38,6 +38,12 @@ export const HX_LIVE_FEATURE = 'ui.hx.live';
 export const liveOn = (features: readonly string[] | undefined): boolean =>
   (features ?? []).includes(HX_LIVE_FEATURE);
 
+/** One server with the people's seats instead of a machine per Linux user. */
+export const SEATS_FEATURE = 'machine.seats';
+
+export const seatsOn = (features: readonly string[] | undefined): boolean =>
+  (features ?? []).includes(SEATS_FEATURE);
+
 /** The fleet: one runtime for every machine a person may open (the hub's /agents/, internal/hub/proxy/workspace.go). */
 export const FLEET_FEATURE = 'runtime.fleet';
 

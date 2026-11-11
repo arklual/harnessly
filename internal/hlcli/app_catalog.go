@@ -128,6 +128,6 @@ func (c *cli) appSDK(args []string) error {
 		c.out("%s\n", raw)
 		return nil
 	}
-	c.out("Wrote %s into %s.\nIn the view's page: <script src=\"bridge-shim.js\"></script> first, then\n  import { connect } from './app-sdk.js'; const hl = await connect();\n", strings.Join(names, ", "), dir)
+	c.out("Wrote %s into %s.\nIn the view's page: <script src=\"bridge-shim.js\"></script> first, then\n  import { connect } from './app-sdk.js'; const hl = await connect();\nA site that exists already: paste the line of loader-inline.js into its <head> with this folder's address (harnessly app docs, «An existing site»).\n", strings.Join(names, ", "), dir)
 	return nil
 }

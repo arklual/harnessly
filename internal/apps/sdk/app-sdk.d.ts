@@ -61,12 +61,37 @@ export interface HarnesslyContext {
   theme: { mode: 'light' | 'dark'; tokens: Record<string, string> };
   locale: string;
   chat: { id: string } | null;
-  /** The name and role the host shows; not a proof of identity. */
-  user: { name: string; role: string } | null;
+  /**
+   * The person the host shows (their name, else their e-mail) and their role where the view stands: in a document `edit`,
+   * or `view` when it may only be read; elsewhere `member`. Null while nobody is known. Shown, not a proof of identity:
+   * what must be checked the host checks (`hl.workflow.move` checks the project role).
+   */
+  user: { name: string; role: 'edit' | 'view' | 'member' } | null;
   /** True when the document the view is shown in may only be read: draw it, offer no edit (the host refuses writes to it). */
   readOnly?: boolean;
   /** For a card: the data the tool returned. */
   data?: unknown;
+}
+
+export interface WorkflowStatus {
+  id: string;
+  title: string;
+  /** The document may change in this status (the version follows); otherwise a change starts the next version. */
+  edit?: boolean;
+  tone?: 'neutral' | 'info' | 'warning' | 'success' | 'danger';
+}
+
+export interface WorkflowState {
+  version: number;
+  hash: string;
+  status: WorkflowStatus;
+  statuses: WorkflowStatus[];
+  /** The moves from the current status; `allowed` says whether this person's role makes it. */
+  moves: { to: string; title: string; role: 'view' | 'comment' | 'edit' | 'manage' | 'owner'; allowed: boolean }[];
+  /** The person's role in the project. */
+  role: '' | 'view' | 'comment' | 'edit' | 'manage' | 'owner';
+  journal: { at: number; who?: string; from?: string; to: string; version: number; hash: string; note?: string; /** The project's named version the move was made on; `link` opens it read only. */ rev?: string; link?: string }[];
+  versions: { n: number; hash: string; status: string }[];
 }
 
 export interface ChatMessage {
@@ -244,6 +269,123 @@ export interface ChatEvent {
   role?: 'person' | 'agent';
 }
 
+/** One remark on a call of the agent: what the form, a rule or the server says, in the words the person would see. */
+export interface Issue {
+  /** Who says it: the form's own validation, a rule for the agent (check, rules), or the backend. */
+  source: 'form' | 'rule' | 'server';
+  /** The field it is about; '' for the whole value. */
+  field: string;
+  /** warn does not block: the agent tells the person about it. */
+  level: 'error' | 'warn';
+  message: string;
+  /** The id of the rule, for source rule. */
+  rule?: string;
+}
+/** What an author returns or throws as an issue: the SDK fills what is missing (source, level error, field ''). */
+export type IssueInput = string | (Partial<Issue> & { message: string });
+/** What set, run and check may answer: nothing, the issues, or an object that carries them. */
+export type IssuesAnswer = void | IssueInput[] | { issues: IssueInput[] };
+
+/** A rule in words: the agent reads it in the tool's description and in the context before it calls. */
+export interface Rule {
+  id: string;
+  text: string;
+  /** What passes and what does not, for the rule's own calibration (`harnessly app eval`). */
+  examples?: { pass?: unknown[]; fail?: unknown[] };
+}
+
+export interface StateOptions<T extends object = Record<string, unknown>> {
+  description: string;
+  /** JSON Schema of the whole value; the tool takes a patch of it (no field required). */
+  schema: Record<string, unknown>;
+  /** The current value: the form's model, not the DOM. */
+  get(): T | Promise<T>;
+  /** Writes a patch (only the fields to change) and answers the form's issues, all of them at once; a throw is one too. */
+  set(patch: Partial<T>): IssuesAnswer | Promise<IssuesAnswer>;
+  /**
+   * Tells the SDK the value changed (the person typed): it republishes after 300 ms of quiet. Answers its own stop, a
+   * function or a subscription with unsubscribe. Without it the value is republished after every set and on refresh().
+   */
+  subscribe?(changed: () => void): void | (() => void) | { unsubscribe(): void };
+  /** Rules in words; the SDK publishes them, it does not judge by them. */
+  rules?: Rule[];
+  /** Rules in code, run on the agent's calls only, after set: their issues come with source rule. */
+  check?(value: T): IssuesAnswer | Promise<IssuesAnswer>;
+}
+export interface StateHandle {
+  /** Takes the state and its tool back: call it when the component is destroyed. */
+  unregister(): void;
+  /** Republishes the value now (for a state without subscribe). */
+  refresh(): void;
+}
+/** What the tool `<name>_set` answers: ok is false while any issue has level error. */
+export interface StateAnswer<T = unknown> {
+  ok: boolean;
+  /** The state after the patch, read back with get(). */
+  value: T;
+  issues: Issue[];
+}
+
+export interface ActionOptions<A extends object = Record<string, unknown>, R = unknown> {
+  description: string;
+  /** JSON Schema of the arguments; none when the action takes none. */
+  schema?: Record<string, unknown>;
+  /** The action changes data (the default): the person confirms each call unless `confirm` is false. */
+  mutates?: boolean;
+  /** Ask the person before the call; by default as `mutates` says. */
+  confirm?: boolean;
+  /**
+   * The screen's own function (the same save the button calls). Its answer is the result; `{ result, issues }` passes
+   * warnings on; issues of level error or a throw make ok false (source server unless the issue says form).
+   */
+  run(args: A): R | { result?: R; issues: IssueInput[] } | Promise<R | { result?: R; issues: IssueInput[] }>;
+  rules?: Rule[];
+  /** Rules in code, run before the action on the agent's calls: an error stops it, run is not called. */
+  check?(args: A): IssuesAnswer | Promise<IssuesAnswer>;
+}
+export interface ActionHandle {
+  unregister(): void;
+}
+/** What an action's tool answers: ok is true only when run finished without an error. */
+export interface ActionAnswer<R = unknown> {
+  ok: boolean;
+  result: R | null;
+  issues: Issue[];
+}
+
+export interface ScreenOptions {
+  title: string;
+  /** The site's own route of the screen. */
+  route?: string;
+  /** What the agent should know on this screen: «an event is created here; ask the date and the venue first». */
+  prompt?: string;
+}
+export interface ScreenHandle {
+  /** Takes the screen back, unless another one has replaced it. */
+  clear(): void;
+}
+
+/**
+ * What a window with states or a screen publishes as its context (right `context.publish`): the agent's turn reads it.
+ * What the view published itself with hl.publish is under `data`.
+ */
+export interface SurfaceContext {
+  screen: { title: string; route: string; prompt: string } | null;
+  states: Record<string, { description: string; schema: Record<string, unknown>; value: unknown; rules: Rule[] }>;
+  data?: unknown;
+}
+
+/**
+ * A state of the page the agent reads and patches (rights `context.publish` and `tools.page`): the value goes into the
+ * window's context, and the tool `<name>_set` takes a patch and answers a StateAnswer. May be called before connect()
+ * answers and outside Harnessly, where it does nothing.
+ */
+export function state<T extends object = Record<string, unknown>>(name: string, options: StateOptions<T>): StateHandle;
+/** An action of the screen the agent runs as the tool `name` (right `tools.page`); it answers an ActionAnswer. */
+export function action<A extends object = Record<string, unknown>, R = unknown>(name: string, options: ActionOptions<A, R>): ActionHandle;
+/** The screen the person is on (right `context.publish`); the last call stands. */
+export function screen(options: ScreenOptions): ScreenHandle;
+
 export interface Harnessly {
   readonly context: HarnesslyContext;
   readonly host: { name: string; version: string };
@@ -324,8 +466,15 @@ export interface Harnessly {
       run: (args: Record<string, unknown>) => unknown | Promise<unknown>,
     ): Promise<{ unregister(): Promise<void> }> & { unregister(): Promise<void> };
   };
-  /** What the view shows, for the agent of the chat to read with page_tools (right `context.publish`). */
+  /**
+   * What the view shows, for the agent of the chat to read with page_tools (right `context.publish`). In a window with
+   * a state or a screen the data goes under `data` of the SurfaceContext.
+   */
   publish(data: unknown): Promise<void>;
+  /** The same as the module's state, action and screen. */
+  state: typeof state;
+  action: typeof action;
+  screen: typeof screen;
   /** @deprecated Removed: every call rejects with `invalid_params` and says to use `hl.storage`. */
   flow: { status(): Promise<never>; go(state: string): Promise<never> };
   /** @deprecated Removed: every call rejects with `invalid_params` and says to use `hl.storage`. */
@@ -333,6 +482,17 @@ export interface Harnessly {
   storage: Record<StorageScope, StorageArea>;
   /** The values the person saved in the app's settings form (the manifest's `settings` schema), over its defaults. */
   settings: { get(): Promise<Record<string, unknown>> };
+  /**
+   * The status of the document the view is shown in, by the manifest's `workflow` (statuses and the moves between them,
+   * each with the least project role that makes it). The host keeps the status and its journal and checks every move.
+   * A status belongs to a version (number and hash of the content): a change of a version whose status has no `edit`
+   * starts the next version in the first status. No right needed; a view bound to no document is refused.
+   */
+  workflow: {
+    get(): Promise<WorkflowState>;
+    /** Moves the current version to `to`; `version`/`hash` are the version the view saw (refused as conflict when stale). */
+    move(to: string, options?: { version?: number; hash?: string; note?: string }): Promise<WorkflowState>;
+  };
   /** Files of the chat's workspace; needs `files.read:<mask>` / `files.write:<mask>`. Paths are relative to the workspace. */
   files: {
     read(path: string): Promise<string>;
@@ -345,6 +505,15 @@ export interface Harnessly {
     watch(onChange: (paths: string[]) => void): Promise<() => Promise<void>>;
     /** The person picks a file of the chat's folder in the host's dialog; null when they close it. No right needed. */
     pick(options?: { accept?: string[] }): Promise<{ path: string; text: string } | null>;
+    /**
+     * Puts a file the person gave the view (from `choose`, a drop on `dropZone`, or the view's own `<input type=file>`)
+     * into the chat's workspace at `path` (default `uploads/<name>`), inside the app's `files.write:<mask>`. Up to 4 MB.
+     */
+    upload(file: Blob | File, path?: string): Promise<{ path: string; size: number }>;
+    /** Asks the person for files from their computer; call it from a click. [] when they cancel. No right needed. */
+    choose(options?: { accept?: string[]; multiple?: boolean }): Promise<File[]>;
+    /** Lets the person drop files on an element (`data-drop="over"` while they hover it). Gives the function that stops it. */
+    dropZone(element: HTMLElement, onFiles: (files: File[]) => void): () => void;
   };
   /** The repository of the chat's folder, read only; needs `git.read`. Secret files are left out. */
   git: {
@@ -431,6 +600,8 @@ export interface Harnessly {
   /** The Document API of Sinopia; only in a view with target `sinopia.<kind>` and the matching `sinopia.*` rights. */
   sinopia: SinopiaApi;
   notify(text: string): Promise<void>;
+  /** The smart notice's open slot (the notices right): ask the person in the black plate, or show a status or a progress. */
+  notice: NoticeApi;
   resize(height: number): void;
   close(): void;
 }
@@ -445,5 +616,56 @@ export function connect(options?: { name?: string; version?: string; protocol?: 
 
 // A view loads the SDK as a classic script (<script src="/__hl/app-sdk.js">) and finds it as `harnessly`.
 declare global {
-  const harnessly: { connect: typeof connect; HarnesslyError: typeof HarnesslyError };
+  const harnessly: {
+    connect: typeof connect;
+    HarnesslyError: typeof HarnesslyError;
+    state: typeof state;
+    action: typeof action;
+    screen: typeof screen;
+  };
+}
+
+/**
+ * What the smart notice shows. A choice: 2 to 6 options (own adds a line for own words); a confirm: yes/no, danger for
+ * what cannot be undone; a field: one line of text; a code: 4 to 8 digit cells (a confirmation code from a mail or a
+ * device pairing, never a sign-in code); a custom view: an HTML fragment of layout and buttons drawn with the plate's
+ * tokens and kit (no script, handler, field, form, frame or link; a button answers with its data-answer); a status goes by itself in a few
+ * seconds; a progress stays until close. There is no password field and never will be: a title, a view or an answer that
+ * asks for or looks like a password, a key or a sign-in is refused (no-secrets / looks-like-key). Use the safe.
+ */
+export interface NoticeSpec {
+  kind: 'choice' | 'confirm' | 'field' | 'code' | 'custom' | 'status' | 'progress';
+  /** One line, up to 120 characters. */
+  title: string;
+  /** A few words more, up to 600 characters. */
+  text?: string;
+  /** A harnessly icon name for the plate. */
+  icon?: string;
+  options?: string[];
+  own?: boolean;
+  yes?: string;
+  no?: string;
+  danger?: boolean;
+  placeholder?: string;
+  digits?: number;
+  /** 0 to 1; omit while unknown. */
+  progress?: number;
+  /** custom: the view, up to 16 KB: layout and buttons (a button with data-answer answers it, JSON or text). */
+  view?: string;
+  /** How long it waits, seconds: 600 by default, a day at most. */
+  timeoutSec?: number;
+}
+
+export interface NoticeResult {
+  /** answered; dismissed (they said no or closed it); timeout; muted (they turned the app's notices off). Hiding is not an answer. */
+  status: 'answered' | 'dismissed' | 'timeout' | 'muted';
+  /** choice: {choice, option} or {text}; confirm: boolean; field and code: string; custom: what the view answered. */
+  value?: unknown;
+}
+
+export interface NoticeApi {
+  ask(spec: NoticeSpec): Promise<NoticeResult>;
+  show(spec: NoticeSpec): Promise<{ id: string }>;
+  update(id: string, change?: { progress?: number; title?: string; text?: string }): Promise<void>;
+  close(id: string): Promise<void>;
 }

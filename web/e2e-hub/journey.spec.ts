@@ -239,7 +239,8 @@ test('7. a first chat with the stand-in agent', async () => {
   const box = page.getByRole('textbox').last();
   await box.fill('hello');
   await box.press('Enter');
-  await expect(page.locator('body')).toContainText(/\S/, { timeout: 60_000 });
+  // The agent's own answer: a page with any text at all is also what a chat whose agent never started shows.
+  await expect(page.getByText('Fake agent reply: hello').first()).toBeVisible({ timeout: 90_000 });
   await shot(page, 'first-chat');
 });
 

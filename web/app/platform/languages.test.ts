@@ -1,6 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { ALL_LANGUAGES, EXTRA_LANGUAGES, LANGUAGE_NAMES, offeredLanguages, parseLanguage } from './languages';
+import {
+  ALL_LANGUAGES,
+  browserLanguage,
+  EXTRA_LANGUAGES,
+  LANGUAGE_NAMES,
+  offeredLanguages,
+  parseLanguage,
+} from './languages';
 
 it('offers Russian and English only until the languages feature is on', () => {
   expect(offeredLanguages(false)).toEqual(['ru', 'en']);
@@ -29,4 +36,16 @@ it('serves a PWA manifest with raster icons, a maskable one among them', () => {
   ) as { icons: { type: string; purpose: string }[] };
   expect(manifest.icons.some((i) => i.type === 'image/png' && i.purpose === 'maskable')).toBe(true);
   expect(manifest.icons.some((i) => i.type === 'image/png' && i.purpose === 'any')).toBe(true);
+});
+
+it('takes the first browser language the page has', () => {
+  expect(browserLanguage(['ru-RU', 'en'], false)).toBe('ru');
+  expect(browserLanguage(['en-GB', 'ru'], false)).toBe('en');
+  expect(browserLanguage(['de-DE', 'ru'], false)).toBe('ru');
+  expect(browserLanguage(['de-DE', 'ru'], true)).toBe('de');
+  expect(browserLanguage(['pt', 'en'], true)).toBe('pt-BR');
+  expect(browserLanguage(['zh-TW'], true)).toBe('zh-TW');
+  expect(browserLanguage(['zh-TW'], false)).toBeNull();
+  expect(browserLanguage([''], true)).toBeNull();
+  expect(browserLanguage([], true)).toBeNull();
 });

@@ -51,6 +51,8 @@ type execution struct {
 	// heads are the commits the clones of repositories outside the list stand on after this run, by item id.
 	heads map[string]string
 	seq   int
+	// packIDs are the ids of the packs of this run, with the item each came from.
+	packIDs map[string]string
 	// denied: the agent took the permission back during the run.
 	denied bool
 }
@@ -94,6 +96,7 @@ func (r *Runner) execute(ctx context.Context, req hubproto.EnvRunRequest, hash s
 	if ex.modifies && !ex.sandbox && ctx.Err() == nil {
 		ex.saveState()
 		ex.pruneApps()
+		ex.prunePacks()
 	}
 	if req.Mode != hubproto.RunCheck && !ex.sandbox {
 		r.waited, r.waitedHash = ex.waits, hash
@@ -156,6 +159,8 @@ func (ex *execution) step(i int) {
 		ex.claudeSettings(i)
 	case ex.items[i].Kind == hubproto.EnvKindApp:
 		ex.app(i)
+	case ex.items[i].Kind == hubproto.EnvKindPack:
+		ex.pack(i)
 	}
 	st.Message = ex.mask(st.Message)
 	st.Ms = ex.r.now().Sub(start).Milliseconds()

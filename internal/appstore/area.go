@@ -93,9 +93,13 @@ func ValidApp(app string) bool { return appRe.MatchString(app) }
 // caller can use.
 const VersionsKey = "__hl_versions"
 
+// HostKeyPrefix begins the keys the host keeps in an app's areas (VersionsKey, the workflow of a document): a view
+// neither reads nor writes them as keys.
+const HostKeyPrefix = "__hl_"
+
 // CheckKey refuses a key a caller may not use.
 func CheckKey(key string) error {
-	if key == "" || len(key) > MaxKeyBytes || key == VersionsKey {
+	if key == "" || len(key) > MaxKeyBytes || strings.HasPrefix(key, HostKeyPrefix) {
 		return ErrArgs
 	}
 	return nil
@@ -161,6 +165,9 @@ func (a *Area) Marshal() ([]byte, error) {
 func (a *Area) Keys() []string {
 	keys := make([]string, 0, len(a.Values))
 	for k := range a.Values {
+		if strings.HasPrefix(k, HostKeyPrefix) {
+			continue
+		}
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

@@ -1,0 +1,81 @@
+# Makes a published release the stable one (docs/update-channels.md). Started by hand only: Actions → promote-stable →
+# Run workflow, with the version. Nothing here runs on a schedule or on a merge.
+#
+# The stable pointer is one small file, stable.json, an asset of the release "channels" (a release of its own that is
+# never the latest one). Installations on the stable channel read it; installations on the latest channel, and those
+# older than the channels, read the latest release as before and never see it.
+#
+# tools/relchannel refuses the promotion when the release is a draft, a pre-release or marked [withdrawn] in its title
+# or notes, when it has been out for less than the window (7 days), or when it is older than the stable release in
+# place. It uses the run's own token, as the release workflow does: no other secret.
+name: promote-stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The release to make stable (X.Y.Z)"
+        required: true
+        type: string
+      window_days:
+        description: "Days the release must have been out"
+        required: false
+        default: "7"
+        type: string
+      allow_older:
+        description: "Move the pointer back to an older release (to take a bad stable release away)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-stable
+  cancel-in-progress: false
+
+jobs:
+  promote-stable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # the "channels" release and its asset
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      WINDOW_DAYS: ${{ inputs.window_days }}
+      ALLOW_OLDER: ${{ inputs.allow_older }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Check the release and write the pointer
+        run: |
+          set -eu
+          version=${VERSION#v}
+          case $version in '' | *[!0-9.]*) echo "version must be X.Y.Z, got: $VERSION" >&2; exit 2 ;; esac
+          case $WINDOW_DAYS in '' | *[!0-9]*) echo "window_days must be a number, got: $WINDOW_DAYS" >&2; exit 2 ;; esac
+          gh api "repos/$GH_REPO/releases/tags/v$version" > release.json
+          # The pointer in place; the first promotion has none.
+          rm -f current.json
+          if gh release view channels --json assets --jq '.assets[].name' > assets.txt 2>/dev/null && grep -qx stable.json assets.txt; then
+            gh release download channels --pattern stable.json --output current.json
+          fi
+          older=""
+          [ "$ALLOW_OLDER" != true ] || older="-allow-older"
+          go run ./tools/relchannel promote -release release.json -current current.json \
+            -window "$((WINDOW_DAYS * 24))h" $older -out stable.json
+          cat stable.json
+      - name: Put the pointer in place
+        run: |
+          set -eu
+          if ! gh release view channels >/dev/null 2>&1; then
+            gh release create channels --latest=false --title "Update channels" \
+              --notes "Holds stable.json, the pointer the stable update channel reads. Not a version: see docs/update-channels.md."
+          fi
+          gh release upload channels stable.json --clobber

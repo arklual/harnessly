@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
+	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 const (
@@ -53,7 +55,8 @@ func newToken() string { return store.RandomBase32(16) }
 
 func (s *Service) inviteURL(token string) string { return s.cfg.PublicURL + "/invite/" + token }
 
-func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct {
 		Emails []string
 		Role   string
@@ -91,10 +94,7 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 		}
 	}
 	ctx := r.Context()
-	spaceID := r.PathValue("spaceId")
-	if err := s.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	spaceID := t.SpaceID
 	if err := s.checkTeam(ctx, spaceID, req.TeamID); err != nil {
 		return err
 	}
@@ -179,11 +179,17 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 	}
 	s.auth.Audit(ctx, p.User.ID, "invite_created", r, spaceID+" email x"+strconv.Itoa(len(out)))
 	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
+	s.peopleChanged(ctx, spaceID, events.KindInvites, "", false)
+	if len(joined) > 0 {
+		// People who were in the space already went straight into the team.
+		s.peopleChanged(ctx, spaceID, events.KindMembers, "", false)
+	}
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"invites": out, "joined": joined})
 	return nil
 }
 
-func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	var req struct {
 		MaxUses *int
 		Days    *int
@@ -206,10 +212,7 @@ func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, p *auth.P
 		days = *req.Days
 	}
 	ctx := r.Context()
-	spaceID := r.PathValue("spaceId")
-	if err := s.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	spaceID := t.SpaceID
 	if err := s.checkTeam(ctx, spaceID, req.TeamID); err != nil {
 		return err
 	}
@@ -256,6 +259,7 @@ func (s *Service) inviteByLink(w http.ResponseWriter, r *http.Request, p *auth.P
 	s.rememberURL(iv.ID, link)
 	s.auth.Audit(ctx, p.User.ID, "invite_created", r, spaceID+" link")
 	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
+	s.peopleChanged(ctx, spaceID, events.KindInvites, "", false)
 	v := inviteView(iv)
 	v.URL = link
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"invite": v})
@@ -302,12 +306,9 @@ func (s *Service) forgetURL(id string) {
 	delete(s.linkURLs, id)
 }
 
-func (s *Service) listInvites(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) listInvites(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	ctx := r.Context()
-	spaceID := r.PathValue("spaceId")
-	if err := s.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	spaceID := t.SpaceID
 	ivs, err := s.db.S().ActiveInvites(ctx, spaceID, s.now())
 	if err != nil {
 		return err
@@ -320,12 +321,10 @@ func (s *Service) listInvites(w http.ResponseWriter, r *http.Request, p *auth.Pr
 	return nil
 }
 
-func (s *Service) revokeInvite(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+func (s *Service) revokeInvite(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
+	p := t.Person
 	ctx := r.Context()
-	spaceID, id := r.PathValue("spaceId"), r.PathValue("inviteId")
-	if err := s.Owner(ctx, p.User.ID, spaceID); err != nil {
-		return err
-	}
+	spaceID, id := t.SpaceID, r.PathValue("inviteId")
 	ok, err := s.db.S().RevokeInvite(ctx, spaceID, id, s.now().UTC())
 	if err != nil {
 		return err
@@ -336,6 +335,7 @@ func (s *Service) revokeInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 	s.forgetURL(id)
 	s.auth.Audit(ctx, p.User.ID, "invite_revoked", r, spaceID+" "+id)
 	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
+	s.peopleChanged(ctx, spaceID, events.KindInvites, "", false)
 	httpx.NoContent(w)
 	return nil
 }
@@ -460,6 +460,9 @@ func (s *Service) acceptInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 		if err := tx.AddMember(ctx, sp.ID, p.User.ID, iv.Role); err != nil {
 			return err
 		}
+		if err := s.journal(ctx, tx, sp.ID, iv.CreatedBy, "member.add", p.User.ID, "", iv.Role); err != nil {
+			return err
+		}
 		return addToInviteTeam(ctx, tx, iv.ID, sp.ID, p.User.ID, now)
 	})
 	if store.IsUnique(err) {
@@ -472,6 +475,8 @@ func (s *Service) acceptInvite(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	s.auth.Audit(ctx, p.User.ID, "invite_accepted", r, sp.ID+" "+iv.ID)
 	s.events.PublishJSON(sp.ID, "members", struct{}{}, false)
+	s.peopleChanged(ctx, sp.ID, events.KindInvites, "", false)
+	s.peopleChanged(ctx, sp.ID, events.KindMembers, p.User.ID, false)
 	httpx.WriteJSON(w, http.StatusOK, ref(iv.Role))
 	return nil
 }
@@ -515,6 +520,8 @@ func (s *Service) joinInviteTeam(r *http.Request, p *auth.Principal, iv store.In
 		return err
 	}
 	s.events.PublishJSON(spaceID, "members", struct{}{}, false)
+	s.peopleChanged(r.Context(), spaceID, events.KindInvites, "", false)
+	s.peopleChanged(r.Context(), spaceID, events.KindMembers, p.User.ID, false)
 	return nil
 }
 

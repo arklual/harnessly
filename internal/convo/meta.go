@@ -29,6 +29,11 @@ func (c *conv) watchMeta(now time.Time) {
 	if c.metaReading || now.Sub(c.metaAt) < metaEvery {
 		return
 	}
+	if c.asleep() {
+		// The record holds what the transcript said when the conversation stopped; the pictures are read when a page
+		// opens it.
+		return
+	}
 	c.metaReading, c.metaAt = true, now
 	meta, pics, path := c.d.Meta, c.d.Shots, c.rec.TranscriptPath
 	// A conversation at rest whose transcript and subagents folder did not change has nothing new to say. Every
@@ -51,6 +56,10 @@ func (c *conv) watchMeta(now time.Time) {
 		return out
 	}, func(r any) {
 		c.metaReading = false
+		if c.deletedAt != 0 {
+			c.forget(false) // the read began before the conversation was deleted and left its cursors behind
+			return
+		}
 		got, _ := r.(metaRead)
 		c.metaStamp = got.stamp
 		if got.same {

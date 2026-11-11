@@ -31,6 +31,7 @@ import {
   convsLoadedStore,
   byActivity,
 } from '@/next/stores/conversations';
+import { FROM_CACHE, mergeConversation } from '@/next/stores/conversation-merge';
 import { draftsStore, emptyDraft, type Draft, type DraftKey } from '@/next/stores/drafts';
 import { stashStore, type StashItem } from '@/next/stores/stash';
 import { draftBaseStore, type DraftBase } from '@/next/stores/draft-sync';
@@ -123,8 +124,15 @@ export function idbKV(name = dbNameOf(LOCAL_PERSON)): KV {
 }
 
 export const DRAFT_DELAY_MS = 300;
-export const FEEDS_DELAY_MS = 1000;
-export const CONVS_DELAY_MS = 1000;
+/** The cached chats and the lists are written no more often than this; leaving the page writes them at once. */
+export const FEEDS_DELAY_MS = 5000;
+export const CONVS_DELAY_MS = 5000;
+/** A cached chat nobody wrote for this long is let go, whichever window kept it. */
+export const FEED_KEPT_MS = 14 * 24 * 3600_000;
+/** How many cached chats IndexedDB holds at most, the most recently written ones (several windows keep their own). */
+export const FEEDS_KEPT_MAX = STORED_CHATS * 4;
+/** The kept chats are looked through for the old ones no more often than this. */
+const FEEDS_SWEEP_MS = 10 * 60_000;
 /** The sidebar's list is kept for this many chats, the most recent ones. */
 export const STORED_LIST = 300;
 
@@ -143,7 +151,42 @@ const listKeyOf = (m: MachineId): string => `${LIST_KEY}:${m}`;
 type KeptDraft = Draft & { base?: Omit<DraftBase, 'attachments'> & Partial<Pick<DraftBase, 'attachments'>> };
 
 /** A cached chat with the messages the runtime has shown for it: their states live in the snapshot only, like the gates. */
-type KeptFeed = CachedFeed & { rank: number; messages?: MessageView[] };
+type KeptFeed = CachedFeed & {
+  /** Its place among the recent chats of the page that wrote it (an older page ordered by it). */
+  rank: number;
+  /** When it was written (unix ms); absent in what an older page kept. */
+  at?: number;
+  messages?: MessageView[];
+};
+
+/** The kept chats this page takes back: the STORED_CHATS written last, the least recent of them first. */
+export const feedsToRestore = (kept: readonly KeptFeed[]): KeptFeed[] => {
+  // What an older page kept has no time and is ordered by its rank, behind everything that has one.
+  const order = (f: KeptFeed) => f.at ?? -1 - f.rank;
+  return [...kept]
+    .sort((a, b) => order(b) - order(a))
+    .slice(0, STORED_CHATS)
+    .reverse();
+};
+
+/**
+ * The kept chats to let go: the ones past FEED_KEPT_MS and the ones beyond the FEEDS_KEPT_MAX written last. A record
+ * without a time (an older page's) goes when this page does not keep that chat itself.
+ */
+export const feedsToDrop = (
+  kept: readonly (readonly [string, Pick<KeptFeed, 'at'>])[],
+  mine: readonly string[],
+  now: number,
+): string[] => {
+  const drop = new Set<string>();
+  for (const [k, f] of kept) {
+    if (f.at === undefined ? !mine.includes(k) : now - f.at > FEED_KEPT_MS) drop.add(k);
+  }
+  const dated = kept.filter(([k, f]) => f.at !== undefined && !drop.has(k));
+  dated.sort((a, b) => (b[1].at as number) - (a[1].at as number));
+  for (const [k] of dated.slice(FEEDS_KEPT_MAX)) drop.add(k);
+  return [...drop];
+};
 
 /** The runtime's messages of a chat that are not over: the queue and the steer in its input stand on them after F5. */
 const keptMessages = (conv: ConvId): MessageView[] =>
@@ -185,6 +228,12 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
   let draftsLoaded = false;
   let feedsTimer: unknown = null;
   let listTimer: unknown = null;
+  /** The chats whose feed changed since it was written. */
+  const dirtyFeeds = new Set<ConvId>();
+  let sweptAt = Number.NEGATIVE_INFINITY;
+  /** The machines whose list changed since it was written, and which machine each chat was last seen on. */
+  const dirtyLists = new Set<MachineId>();
+  const machineOfConv = new Map<ConvId, MachineId>();
   const pending = new Set<Promise<void>>();
   const track = (p: Promise<void>) => {
     pending.add(p);
@@ -238,7 +287,7 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
           draftBaseStore.set(key, { ...base, attachments: base.attachments ?? [] });
       }
       // The least recent first, so the most recent ends at the head of the cache as it was before the reload.
-      for (const [, f] of feeds.sort((a, b) => b[1].rank - a[1].rank)) {
+      for (const f of feedsToRestore(feeds.map(([, f]) => f))) {
         // A chat whose snapshot came first has the runtime's word on its messages: the cached ones would bring back
         // what the runtime has finished since, so they are taken only before it.
         const before = !feedStore.get(f.convId)?.loaded;
@@ -269,21 +318,31 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
     track(kept ? kv.set('drafts', k, kept) : kv.del('drafts', k));
   };
 
+  // Only the chats that changed are written, and only this page's recent ones. What another window keeps is left
+  // alone: a kept chat goes by its age, not by being absent from this page's list.
   const writeFeeds = async () => {
     feedsTimer = null;
     const keep = recentConversations(STORED_CHATS);
-    const have = await kv.all<CachedFeed>('feeds');
-    for (const [k] of have) if (!keep.includes(k as ConvId)) await kv.del('feeds', k);
-    for (const [rank, conv] of keep.entries()) {
+    const changed = [...dirtyFeeds];
+    dirtyFeeds.clear();
+    const now = clock.now();
+    for (const conv of changed) {
+      const rank = keep.indexOf(conv);
+      if (rank < 0) continue;
       const machine = feedStore.get(conv)?.machineId;
       const f = machine ? exportFeed(conv, STORED_TURNS, resumeOf(machine, `conv:${conv}`)) : null;
-      if (f) await kv.set('feeds', conv, { ...f, messages: keptMessages(conv), rank });
+      if (f) await kv.set('feeds', conv, { ...f, messages: keptMessages(conv), rank, at: now });
     }
+    if (now - sweptAt < FEEDS_SWEEP_MS) return;
+    sweptAt = now;
+    const have = await kv.all<KeptFeed>('feeds');
+    for (const k of feedsToDrop(have, keep, now)) await kv.del('feeds', k);
   };
 
   const writeList = () => {
     listTimer = null;
-    const lists = exportLists();
+    const lists = exportLists().filter((l) => dirtyLists.has(l.machineId));
+    dirtyLists.clear();
     if (lists.length === 0) return;
     // One key per machine; the one list of an older page (the active machine's) goes once they are written.
     track(
@@ -297,10 +356,30 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
     if (listTimer !== null) return;
     listTimer = clock.setTimeout(writeList, CONVS_DELAY_MS);
   };
+  // Only the lists of the machines something changed on are written.
   const unList = [
-    conversationsStore.subscribeAll(scheduleList),
-    projectsStore.subscribeAll(scheduleList),
-    convsLoadedStore.subscribeAll(scheduleList),
+    conversationsStore.subscribeAll((changed) => {
+      for (const id of changed) {
+        const now = conversationsStore.get(id)?.machineId;
+        const was = machineOfConv.get(id);
+        if (was) dirtyLists.add(was);
+        if (now) {
+          dirtyLists.add(now);
+          machineOfConv.set(id, now);
+        } else machineOfConv.delete(id);
+        // A chat removed before this page saw whose it was: any list may have held it.
+        if (!was && !now) for (const m of convsLoadedStore.keys()) dirtyLists.add(m);
+      }
+      scheduleList();
+    }),
+    projectsStore.subscribeAll(() => {
+      for (const m of convsLoadedStore.keys()) dirtyLists.add(m);
+      scheduleList();
+    }),
+    convsLoadedStore.subscribeAll((changed) => {
+      for (const m of changed) dirtyLists.add(m);
+      scheduleList();
+    }),
   ];
 
   const writeDraftLater = (k: DraftKey) => {
@@ -331,10 +410,19 @@ export function startPersistence(kv: KV, o: PersistOptions = {}): Persistence {
     if (feedsTimer !== null) return;
     feedsTimer = clock.setTimeout(() => track(writeFeeds()), FEEDS_DELAY_MS);
   };
-  const unRecent = onRecentChange(scheduleFeeds);
-  // A feed changes far more often than it needs saving: at most once a second, the six recent ones.
+  // A chat the person went to is written with the moment, so the next load knows it for the most recent one.
+  const unRecent = onRecentChange(() => {
+    const [head] = recentConversations(1);
+    if (!head) return;
+    dirtyFeeds.add(head);
+    scheduleFeeds();
+  });
+  // A feed changes far more often than it needs saving: at most once in FEEDS_DELAY_MS, the changed ones of the six
+  // recent.
   const unFeeds = feedStoreChanges((conv) => {
-    if (recentConversations(STORED_CHATS).includes(conv)) scheduleFeeds();
+    if (!recentConversations(STORED_CHATS).includes(conv)) return;
+    dirtyFeeds.add(conv);
+    scheduleFeeds();
   });
 
   return {
@@ -398,7 +486,7 @@ function exportLists(): CachedList[] {
 function importList(list: CachedList): void {
   const { machineId } = list;
   if (convsLoadedStore.has(machineId) || !Array.isArray(list.conversations)) return;
-  for (const c of list.conversations) if (!conversationsStore.has(c.id)) conversationsStore.set(c.id, c);
+  for (const c of list.conversations) mergeConversation(c, FROM_CACHE);
   for (const p of list.projects) {
     const key = projectKey(machineId, p.id);
     if (!projectsStore.has(key)) projectsStore.set(key, { ...p, machineId });

@@ -162,6 +162,8 @@
   "next.appfail.handoffText": "The app “{name}” ({id}) did not start: {reason}.",
   "next.appfail.handoffLog": "The window's log:",
   "next.appfail.loading": "Starting {name}",
+  "next.appfail.retrying": "Reconnecting {name}…",
+  "next.appfail.slow": "Starting {name} — taking longer than usual…",
   "next.appfail.sessionTimeout": "no answer in {s} s",
   "next.appview.badAddressWhy": "The app window's address is not allowed: it must be https on another site.",
   "next.appslist.noneHint": "Install a ready one from the catalog below or write your own with the agent.",

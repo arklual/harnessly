@@ -728,6 +728,182 @@
         }
       ]
     },
+    "automation_rules": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "trigger",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "prompt_template",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "limits",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text"
+        },
+        {
+          "name": "enabled",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "automation_rules_owner_name",
+          "unique": true,
+          "columns": [
+            "owner_id",
+            "name"
+          ]
+        }
+      ]
+    },
+    "automation_runs": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "rule_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "fingerprint",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "event_payload",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "conversation_id",
+          "type": "text"
+        },
+        {
+          "name": "machine_id",
+          "type": "text"
+        },
+        {
+          "name": "bug_issue_id",
+          "type": "text"
+        },
+        {
+          "name": "mr_url",
+          "type": "text"
+        },
+        {
+          "name": "summary",
+          "type": "text"
+        },
+        {
+          "name": "result_token_hash",
+          "type": "text"
+        },
+        {
+          "name": "error",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "dispatched_at",
+          "type": "bigint"
+        },
+        {
+          "name": "finished_at",
+          "type": "bigint"
+        },
+        {
+          "name": "lease_until",
+          "type": "bigint"
+        },
+        {
+          "name": "attempts",
+          "type": "integer"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "automation_runs_fingerprint",
+          "unique": true,
+          "columns": [
+            "rule_id",
+            "fingerprint"
+          ]
+        },
+        {
+          "name": "automation_runs_rule",
+          "columns": [
+            "rule_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "automation_runs_status",
+          "columns": [
+            "status",
+            "created_at"
+          ]
+        }
+      ]
+    },
     "catalog_items": {
       "columns": [
         {
@@ -790,6 +966,116 @@
           "columns": [
             "org_id",
             "kind"
+          ]
+        }
+      ]
+    },
+    "chat_work": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "conv_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "worktree",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "repo",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "branch",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "base_sha",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "head_sha",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "commits",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "remote",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "mr",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "dirty",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "since_ms",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "at_ms",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "conv_id",
+        "worktree"
+      ],
+      "indexes": [
+        {
+          "name": "chat_work_conv",
+          "columns": [
+            "owner_id",
+            "conv_id"
+          ]
+        },
+        {
+          "name": "chat_work_parent",
+          "columns": [
+            "owner_id",
+            "parent_id"
           ]
         }
       ]
@@ -1486,12 +1772,26 @@
           "name": "created_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "delivered_at",
+          "type": "bigint"
+        },
+        {
+          "name": "delivery_error",
+          "type": "text"
         }
       ],
       "primaryKey": [
         "id"
       ],
       "indexes": [
+        {
+          "name": "doc_comments_pending",
+          "columns": [
+            "created_at"
+          ]
+        },
         {
           "name": "doc_comments_thread",
           "columns": [
@@ -1545,10 +1845,48 @@
           "name": "updated_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "tab_id",
+          "type": "text"
+        },
+        {
+          "name": "session_name",
+          "type": "text"
+        },
+        {
+          "name": "agent_session_id",
+          "type": "text"
+        },
+        {
+          "name": "provider",
+          "type": "text"
+        },
+        {
+          "name": "cwd",
+          "type": "text"
+        },
+        {
+          "name": "bound_at",
+          "type": "bigint"
+        },
+        {
+          "name": "space_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
         "slug"
+      ],
+      "indexes": [
+        {
+          "name": "doc_meta_space_slug",
+          "unique": true,
+          "columns": [
+            "space_id",
+            "slug"
+          ]
+        }
       ]
     },
     "doc_reads": {
@@ -1749,6 +2087,93 @@
         "source"
       ]
     },
+    "entry_tickets": {
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "issued_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "used_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "token_hash"
+      ],
+      "indexes": [
+        {
+          "name": "entry_tickets_issued",
+          "columns": [
+            "issued_at"
+          ]
+        },
+        {
+          "name": "entry_tickets_person",
+          "columns": [
+            "user_id",
+            "scope",
+            "issued_at"
+          ]
+        }
+      ]
+    },
+    "env_apply_pending": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "by_name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ],
+      "indexes": [
+        {
+          "name": "env_apply_pending_org",
+          "columns": [
+            "org_id"
+          ]
+        }
+      ]
+    },
     "env_entries": {
       "columns": [
         {
@@ -1808,6 +2233,10 @@
         {
           "name": "position",
           "type": "integer"
+        },
+        {
+          "name": "group_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -1828,6 +2257,117 @@
             "item_id"
           ]
         }
+      ]
+    },
+    "env_groups": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "layer",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "hint",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "required",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "default_on",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "text"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "env_groups_org",
+          "columns": [
+            "org_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "layer",
+            "scope_id",
+            "name"
+          ]
+        }
+      ]
+    },
+    "env_person_group": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "group_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "turned_on",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "user_id",
+        "scope",
+        "group_id"
       ]
     },
     "env_person_off": {
@@ -1857,6 +2397,83 @@
         "user_id",
         "scope",
         "item_id"
+      ]
+    },
+    "env_presets": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "layer",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "scope_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "hint",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "group_ids",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "text"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "env_presets_org",
+          "columns": [
+            "org_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "layer",
+            "scope_id",
+            "name"
+          ]
+        }
       ]
     },
     "env_runs": {
@@ -2055,6 +2672,10 @@
           "name": "updated_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "parent_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -2073,6 +2694,13 @@
           "columns": [
             "owner_id",
             "last_prompt_ms"
+          ]
+        },
+        {
+          "name": "history_conversations_parent",
+          "columns": [
+            "owner_id",
+            "parent_id"
           ]
         }
       ]
@@ -2209,8 +2837,7 @@
       ],
       "primaryKey": [
         "owner_id"
-      ],
-      "indexes": []
+      ]
     },
     "history_turns": {
       "columns": [
@@ -2478,6 +3105,33 @@
         }
       ]
     },
+    "job_leases": {
+      "columns": [
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "holder",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "lease_until",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "name"
+      ]
+    },
     "limit_rules": {
       "columns": [
         {
@@ -2624,6 +3278,46 @@
           "name": "synced_at",
           "type": "bigint",
           "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "machine_cards": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "runtime",
+          "type": "text"
+        },
+        {
+          "name": "agents",
+          "type": "text"
+        },
+        {
+          "name": "agents_at",
+          "type": "bigint"
+        },
+        {
+          "name": "usage",
+          "type": "text"
+        },
+        {
+          "name": "usage_at",
+          "type": "bigint"
+        },
+        {
+          "name": "settings",
+          "type": "text"
+        },
+        {
+          "name": "settings_at",
+          "type": "bigint"
         }
       ],
       "primaryKey": [
@@ -2927,6 +3621,38 @@
         }
       ]
     },
+    "machine_resource_conflicts": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "external_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kept_machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "noted_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
     "machine_resources": {
       "columns": [
         {
@@ -2983,6 +3709,16 @@
       ],
       "primaryKey": [
         "machine_id"
+      ],
+      "indexes": [
+        {
+          "name": "machine_resources_external",
+          "unique": true,
+          "columns": [
+            "provider",
+            "external_id"
+          ]
+        }
       ]
     },
     "machine_trust": {
@@ -3376,6 +4112,84 @@
       "primaryKey": [
         "machine_id",
         "migration"
+      ]
+    },
+    "offline_chats": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "client_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "create_cmd",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "error",
+          "type": "text"
+        },
+        {
+          "name": "conv_id",
+          "type": "text"
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "changed_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "offline_chats_client",
+          "unique": true,
+          "columns": [
+            "user_id",
+            "client_id"
+          ]
+        },
+        {
+          "name": "offline_chats_state",
+          "columns": [
+            "state",
+            "machine_id",
+            "created_at"
+          ]
+        }
       ]
     },
     "offline_prompts": {
@@ -3895,6 +4709,129 @@
         "effective_from"
       ]
     },
+    "provider_ops": {
+      "columns": [
+        {
+          "name": "provider",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "op_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "provider",
+        "op_id"
+      ],
+      "indexes": [
+        {
+          "name": "provider_ops_space",
+          "columns": [
+            "space_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "provider_servers": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "external_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "op_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "provider_servers_external",
+          "unique": true,
+          "columns": [
+            "provider",
+            "external_id"
+          ]
+        },
+        {
+          "name": "provider_servers_op",
+          "columns": [
+            "provider",
+            "op_id"
+          ]
+        },
+        {
+          "name": "provider_servers_space",
+          "columns": [
+            "space_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
     "registration_codes": {
       "columns": [
         {
@@ -3989,6 +4926,10 @@
           "name": "updated_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -4000,6 +4941,14 @@
           "name": "resource_access_owner",
           "columns": [
             "owner_email"
+          ]
+        },
+        {
+          "name": "resource_access_space",
+          "columns": [
+            "space_id",
+            "kind",
+            "id"
           ]
         }
       ]
@@ -4045,6 +4994,10 @@
           "name": "created_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -4096,6 +5049,14 @@
         {
           "name": "expires_at",
           "type": "bigint"
+        },
+        {
+          "name": "space_id",
+          "type": "text"
+        },
+        {
+          "name": "user_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -4108,6 +5069,22 @@
           "name": "resource_access_people_email",
           "columns": [
             "email"
+          ]
+        },
+        {
+          "name": "resource_access_people_space",
+          "columns": [
+            "space_id",
+            "kind",
+            "id"
+          ]
+        },
+        {
+          "name": "resource_access_people_user",
+          "columns": [
+            "user_id",
+            "kind",
+            "id"
           ]
         }
       ]
@@ -4162,6 +5139,14 @@
           "name": "created_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "text"
+        },
+        {
+          "name": "user_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -4218,6 +5203,10 @@
         {
           "name": "expires_at",
           "type": "bigint"
+        },
+        {
+          "name": "space_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -4343,6 +5332,10 @@
         {
           "name": "revoked_at",
           "type": "bigint"
+        },
+        {
+          "name": "space_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -4357,12 +5350,54 @@
           ]
         },
         {
+          "name": "resource_guest_links_space",
+          "columns": [
+            "space_id",
+            "kind",
+            "id"
+          ]
+        },
+        {
           "name": "resource_guest_links_token",
           "unique": true,
           "columns": [
             "token_hash"
           ]
         }
+      ]
+    },
+    "review_notes": {
+      "columns": [
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "conv_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "note_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "data",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "owner_id",
+        "conv_id",
+        "note_id"
       ]
     },
     "role_grants": {
@@ -4891,12 +5926,24 @@
         {
           "name": "org_id",
           "type": "text"
+        },
+        {
+          "name": "create_key",
+          "type": "text"
         }
       ],
       "primaryKey": [
         "id"
       ],
       "indexes": [
+        {
+          "name": "spaces_create_key",
+          "unique": true,
+          "columns": [
+            "created_by",
+            "create_key"
+          ]
+        },
         {
           "name": "spaces_org",
           "columns": [
@@ -5264,6 +6311,69 @@
             "org_key",
             "ts"
           ]
+        },
+        {
+          "name": "usage_calls_unpriced",
+          "columns": [
+            "org_key",
+            "provider",
+            "msg_key"
+          ]
+        }
+      ]
+    },
+    "usage_quarantine": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "epoch",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "seq",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "record",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "usage_quarantine_created",
+          "columns": [
+            "created_at"
+          ]
         }
       ]
     },
@@ -5391,6 +6501,10 @@
         {
           "name": "last_login_at",
           "type": "bigint"
+        },
+        {
+          "name": "disabled_at",
+          "type": "bigint"
         }
       ],
       "primaryKey": [
@@ -5403,6 +6517,188 @@
             "email"
           ]
         }
+      ]
+    },
+    "vault_audit": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "person_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "entry_id",
+          "type": "text"
+        },
+        {
+          "name": "origin",
+          "type": "text"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "actor",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "agent_key",
+          "type": "text"
+        },
+        {
+          "name": "outcome",
+          "type": "text",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "vault_audit_person",
+          "columns": [
+            "person_id",
+            "at"
+          ]
+        }
+      ]
+    },
+    "vault_entries": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "shared",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "origin",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "login",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "label",
+          "type": "text"
+        },
+        {
+          "name": "key_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "nonce",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "secret",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "last_used_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "vault_entries_origin",
+          "columns": [
+            "origin"
+          ]
+        },
+        {
+          "name": "vault_entries_personal",
+          "unique": true,
+          "columns": [
+            "owner_id",
+            "origin",
+            "login"
+          ]
+        },
+        {
+          "name": "vault_entries_shared",
+          "unique": true,
+          "columns": [
+            "origin",
+            "login"
+          ]
+        }
+      ]
+    },
+    "vault_grants": {
+      "columns": [
+        {
+          "name": "entry_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "person_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "agent_key",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "granted_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "entry_id",
+        "person_id",
+        "agent_key"
       ]
     },
     "voice_takes": {

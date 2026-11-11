@@ -33,6 +33,9 @@ const (
 	Type = "harnessly-app+jwt"
 	// JWKSPath is where a hub (and a machine without one) publishes its public keys.
 	JWKSPath = "/.well-known/jwks.json"
+	// DiscoveryPath is the OpenID discovery document of the issuer: its iss and where its keys are, so a backend checks
+	// the tokens with a stock OIDC library.
+	DiscoveryPath = "/.well-known/openid-configuration"
 )
 
 // Claims are what the token says. Subject is the person's stable id at the issuer; Email and Name are for display and

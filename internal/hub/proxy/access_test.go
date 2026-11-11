@@ -173,3 +173,39 @@ func TestAccessWarnLetsEveryoneInAndSaysSo(t *testing.T) {
 		t.Errorf("open: %s", r)
 	}
 }
+
+// The owner's rule (machaccess.FeatureOwnWork): with the switch on for a person, an administrator's role still shows the
+// machine but no longer opens it, and an empty list is not an opening; the creator's listing is.
+func TestOwnWorkRoleManagesButDoesNotOpen(t *testing.T) {
+	f := setup(t, orgsOn, hubtest.Env("HUB_ACCESS_ENFORCE", "on"), hubtest.Env("HUB_ADMIN_EMAILS", "owner@example.com, boss@example.com"))
+	boss, member := f.s.SignIn("boss@example.com"), f.s.SignIn("member@example.com")
+	f.owner.Join(f.spaceID, boss)
+	f.owner.Join(f.spaceID, member)
+	if r := f.owner.Do("PUT", "/api/admin/switches", map[string]any{"feature": "own-work", "person": "Boss@example.com", "enabled": true}); r.Code != 204 {
+		t.Fatalf("switch: %s", r)
+	}
+	before := f.sessionCalls()
+	if r := boss.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 403 || r.Err() != "own_work" {
+		t.Errorf("an administrator under the owner's rule, proxied: %s", r)
+	}
+	if r := boss.Do("GET", "/api/machines/"+f.id+"/open", nil); r.Code != 403 || r.Err() != "own_work" {
+		t.Errorf("an administrator under the owner's rule, open: %s", r)
+	}
+	if n := f.sessionCalls() - before; n != 0 {
+		t.Errorf("%d runtime sessions were asked for a person the owner's rule refuses", n)
+	}
+	if r := boss.Do("GET", "/api/machines/"+f.id, nil); r.Code != 200 {
+		t.Errorf("the machine is hidden from the administrator who manages it: %s", r)
+	}
+	// Without the switch the empty list is still the tenant.
+	if r := member.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 200 {
+		t.Errorf("a member without the switch: %s", r)
+	}
+	if r := f.owner.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 200 {
+		t.Errorf("the creator: %s", r)
+	}
+	f.share(t, f.owner.ID, boss.ID)
+	if r := boss.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 200 {
+		t.Errorf("listed by the creator: %s", r)
+	}
+}

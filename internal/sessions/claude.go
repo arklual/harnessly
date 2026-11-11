@@ -17,6 +17,8 @@ import (
 	"unicode/utf16"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex"
+	"github.com/ly-solutions/harnessly/internal/transcriptindex/tally"
 )
 
 const maxPreview = 200
@@ -77,6 +79,9 @@ type ClaudeLister struct {
 	ProjectsDir string
 	// Workers bounds the transcripts read at once.
 	Workers int
+	// Lines, when set, gives what a transcript a conversation is live on gained, read once for all its readers, and
+	// a transcript that did not grow is not opened at all; nil opens every transcript at every list.
+	Lines *transcriptindex.Follower
 
 	mu    sync.Mutex
 	scans map[string]scan
@@ -172,9 +177,13 @@ func (l *ClaudeLister) meta(path string) *ClaudeMeta {
 	if !ok || prev.offset > size {
 		prev = scan{}
 	}
-	res, err := scanTranscript(path, prev)
-	if err != nil {
-		return nil
+	res, followed := l.scanFollowed(path, prev, ok, size)
+	if !followed {
+		var err error
+		if res, err = scanTranscript(path, prev); err != nil {
+			return nil
+		}
+		l.Lines.Seat(path, res.done.offset)
 	}
 	l.mu.Lock()
 	l.scans[path] = res.done
@@ -204,9 +213,37 @@ type scanResult struct {
 	whole scan // with an unfinished last line counted too, as a reader of the whole file sees it
 }
 
+// scanFollowed is scanTranscript without the file: a transcript read to its end that did not grow says what it said,
+// and one a conversation is live on is moved on by the whole lines the shared read holds. false leaves the read to
+// the file: the transcript is new, or it ends in a line still being written.
+func (l *ClaudeLister) scanFollowed(path string, prev scan, known bool, size int64) (scanResult, bool) {
+	if l.Lines == nil || !known || prev.offset == 0 {
+		return scanResult{}, false
+	}
+	data, partial, ok := l.Lines.Take(path, prev.offset)
+	switch {
+	case ok && partial:
+		return scanResult{}, false
+	case !ok:
+		// Not a transcript the shared read holds: one that ends where it was read to has nothing new.
+		return scanResult{done: prev, whole: prev}, size == prev.offset
+	}
+	s := prev
+	for len(data) > 0 {
+		i := bytes.IndexByte(data, '\n') // the lines are whole
+		s.offset += int64(i) + 1
+		for _, part := range splitCR(data[:i]) {
+			s.line(part)
+		}
+		data = data[i+1:]
+	}
+	return scanResult{done: s, whole: s}, true
+}
+
 // scanTranscript reads the transcript from prev.offset on.
 func scanTranscript(path string, prev scan) (scanResult, error) {
 	f, err := os.Open(path)
+	tally.Open()
 	if err != nil {
 		return scanResult{}, err
 	}

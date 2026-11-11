@@ -79,6 +79,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/me/usage", s.gate(s.meUsage))
 	mux.Handle("GET /api/me/sessions", s.gate(s.meSessions))
 	mux.Handle("GET /api/me/kpis", s.gate(s.meKPIs))
+	mux.Handle("GET /api/me/stats", s.gate(s.meStats))
 	s.mountOrg(mux)
 }
 

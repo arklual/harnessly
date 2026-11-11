@@ -10,7 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/hub/auth"
+	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
+	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 func open(t *testing.T) store.Store {
@@ -189,5 +193,111 @@ func TestRollupCostFeedsSummary(t *testing.T) {
 	}
 	if got.Totals.CostUSD == nil || *got.Totals.CostUSD != 30 || got.Totals.USDPerMR == nil || *got.Totals.USDPerMR != 10 {
 		t.Fatalf("totals: %+v", got.Totals)
+	}
+}
+
+// The overview takes the spend and calls from the rollup, the shares from the sessions' metrics, and leaves what no scanner
+// measures null; «me» sees only the caller's own sessions.
+func TestOverviewAndMe(t *testing.T) {
+	st := open(t)
+	ctx := context.Background()
+	day := time.Date(2026, 11, 9, 10, 0, 0, 0, time.UTC)
+	put := func(key, user, origin, metrics string) {
+		if _, err := st.PutSession(ctx, store.AgentSession{OrgKey: "o1", Provider: "claude", SessionKey: key, UserID: user, Origin: origin,
+			StartedAt: day.UnixMilli(), UpdatedAt: day.UnixMilli() + 1000, Metrics: metrics}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put("a", "u1", "live", `{"mrs":2,"firstCtx":20000,"carryTokens":50,"inputTokens":10,"cacheReadTokens":80,"cacheWriteTokens":10,"toolCalls":10,"toolErrors":1,"waits":2,"waitP90Ms":120000,"waitMs":240000}`)
+	put("b", "u2", "eval", `{"mrs":1,"firstCtx":40000}`)
+	from := time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 3)
+
+	team, err := ComputeOverview(ctx, st, "o1", "", from, to, time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(team.Days) != 3 || team.Days[1].Day != "2026-11-09" || team.Days[1].Sessions != 2 {
+		t.Fatalf("days: %+v", team.Days)
+	}
+	d := team.Days[1]
+	if d.FirstCtxP50 == nil || *d.FirstCtxP50 != 30000 || d.CarryShare == nil || *d.CarryShare != 0.5 ||
+		d.ToolErrorRate == nil || *d.ToolErrorRate != 0.1 || d.HumanReplyP90Min == nil || *d.HumanReplyP90Min != 2 {
+		t.Fatalf("shares: %+v", d)
+	}
+	if d.AvgCtx != nil || team.Days[0].FirstCtxP50 != nil || team.Days[0].ToolErrorRate != nil {
+		t.Fatalf("a figure nobody measured must be null: %+v", team.Days[0])
+	}
+	if len(team.Channels) != 2 || team.Channels[0].Channel != "tab" || team.Channels[1].Channel != "eval" || team.Totals.Sessions != 2 {
+		t.Fatalf("channels: %+v", team.Channels)
+	}
+	if team.ScannedAt == nil {
+		t.Fatal("scannedAt")
+	}
+
+	mine, err := ComputeOverview(ctx, st, "o1", "u1", from, to, time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mine.Days[1].Sessions != 1 || mine.Days[1].MRs != 2 || mine.Totals.MRs != 2 {
+		t.Fatalf("mine: %+v", mine.Days[1])
+	}
+
+	me, err := ComputeMe(ctx, st, "o1", "u1", "Ann", from, to, time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if me.Person != "Ann" || len(me.Sessions) != 1 || me.Sessions[0].FileID != "a" || me.Sessions[0].MRs != 2 {
+		t.Fatalf("me: %+v", me)
+	}
+	if me.Attention.ReplyP50Min == nil || *me.Attention.ReplyP50Min != 2 || me.Attention.AskWaitP90Min != nil {
+		t.Fatalf("attention: %+v", me.Attention)
+	}
+}
+
+// A marker is a fact of its own source: the overview draws those dated in the period, and importing the same list again
+// changes nothing.
+func TestOverviewMarkers(t *testing.T) {
+	st := open(t)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 9, 9, 0, 0, 0, time.UTC)
+	raw := `[{"key":"k1","at":"2026-11-09T09:00:00Z","kind":"model","title":"Модель A → B","detail":"основная"},
+		{"at":"2026-11-09T10:00:00Z","kind":"rule","title":"Правило"}]`
+	for range 2 {
+		if n, err := ImportMarkers(ctx, st, raw, now); err != nil || n != 2 {
+			t.Fatalf("import: %d %v", n, err)
+		}
+	}
+	if _, err := ImportMarkers(ctx, st, `[{"at":"2026-11-09T09:00:00Z","kind":"nonsense","title":"x"}]`, now); err == nil {
+		t.Fatal("an unknown kind must be refused")
+	}
+	from := time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC)
+	got, err := ComputeOverview(ctx, st, "o1", "", from, from.AddDate(0, 0, 3), time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Markers) != 2 || got.Markers[0].Kind != "model" || got.Markers[0].Detail == nil || got.Markers[0].At != "2026-11-09T09:00:00Z" || got.Markers[1].Detail != nil {
+		t.Fatalf("markers: %+v", got.Markers)
+	}
+}
+
+// The overview and the personal tab answer only to a person whose rollout switch is on, and only in an organization with the flag.
+func TestOverviewNeedsTheSwitch(t *testing.T) {
+	o := &store.Org{ID: "o1"}
+	who := &tenant.Ctx{Org: o, Person: &auth.Principal{User: store.User{Email: "R@Example.com"}}}
+	r := httptest.NewRequest("GET", "/x", nil)
+	for _, tc := range []struct {
+		name string
+		s    *Service
+		ok   bool
+	}{
+		{"all on", &Service{Features: features.AllOn{}, Switches: switches.Static{SwitchOverview: true}}, true},
+		{"switch off", &Service{Features: features.AllOn{}, Switches: switches.Static{}}, false},
+		{"no switches", &Service{Features: features.AllOn{}}, false},
+		{"flag off", &Service{Features: features.Static{}, Switches: switches.Static{SwitchOverview: true}}, false},
+	} {
+		if err := tc.s.gate(r, who); (err == nil) != tc.ok {
+			t.Errorf("%s: %v", tc.name, err)
+		}
 	}
 }

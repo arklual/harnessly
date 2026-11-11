@@ -47,6 +47,8 @@
   "next.moveVm.title": "Move to a machine…",
   "next.moveVm.lead": "A new chat with this one's history opens on the machine you pick. This chat becomes read-only.",
   "next.moveVm.loading": "Checking machines…",
+  "next.moveVm.fromSnapshot": "This machine is off. The chat goes on from its last saved snapshot: whatever was said after it, and uncommitted changes in the chat's folder, stay on that machine.",
+  "next.moveVm.snapshotFilesHint": "If the repository or commit is not on the target, the chat starts with its history in an empty folder.",
   "next.moveVm.none": "No other machines are connected.",
   "next.moveVm.agent": "Continue with",
   "next.moveVm.send": "Continue",

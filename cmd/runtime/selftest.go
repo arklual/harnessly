@@ -216,9 +216,12 @@ func selftestRoutes(d deps) []gate.Route {
 					peerJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 					return
 				}
-				selfKeeper.run.Lock()
-				checks = append(checks, a.run(ctx)...)
-				selfKeeper.run.Unlock()
+				more, started := selfKeeper.agentOnce(ctx, false, a.run)
+				if !started {
+					peerJSON(w, http.StatusConflict, map[string]string{"error": "the agent's self-test is already running"})
+					return
+				}
+				checks = append(checks, more...)
 			}
 			peerJSON(w, http.StatusOK, map[string]any{"ok": selftestFailed(checks) == "", "checks": checks})
 		}),

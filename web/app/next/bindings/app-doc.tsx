@@ -64,6 +64,13 @@ export const useAppDocStage = (
     };
   }, [machine, id]);
 
+  // A document made of Sinopia's own site has no app view to show: its address opens it in Sinopia's editor,
+  // so a link to it from anywhere lands in its app's place.
+  const madeOfSite = opening?.k === 'opened' && opening.open.extends === 'site';
+  useEffect(() => {
+    if (madeOfSite)
+      goTo({ kind: ROUTE.site, id, ...(conversation ? { chat: conversation } : {}) }, { replace: true });
+  }, [madeOfSite, id, conversation]);
   const doc = opening?.k === 'opened' ? opening.doc : null;
   const title = doc?.title ?? null;
   const say = (text: string) => ({
@@ -78,6 +85,9 @@ export const useAppDocStage = (
   if (opening.k === 'failed') return say(`${t('next.appdoc.failed')}: ${opening.message}`);
 
   const { open } = opening;
+  if (madeOfSite)
+    return { title, stage: <div className="hx-appview__wait" aria-busy="true" />, mayEdit: false };
+  if (open.needsApp && open.reason === 'extend-not-allowed') return say(t('next.appdoc.extendNotAllowed'));
   if (open.needsApp) {
     return {
       title,

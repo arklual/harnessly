@@ -866,6 +866,14 @@
         {
           "name": "finished_at",
           "type": "BIGINT"
+        },
+        {
+          "name": "lease_until",
+          "type": "BIGINT"
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER"
         }
       ],
       "primaryKey": [
@@ -958,6 +966,116 @@
           "columns": [
             "org_id",
             "kind"
+          ]
+        }
+      ]
+    },
+    "chat_work": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "conv_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "worktree",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "parent_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "repo",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "branch",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "base_sha",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "head_sha",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "commits",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "remote",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "mr",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "dirty",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "since_ms",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "at_ms",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "conv_id",
+        "worktree"
+      ],
+      "indexes": [
+        {
+          "name": "chat_work_conv",
+          "columns": [
+            "owner_id",
+            "conv_id"
+          ]
+        },
+        {
+          "name": "chat_work_parent",
+          "columns": [
+            "owner_id",
+            "parent_id"
           ]
         }
       ]
@@ -1751,10 +1869,24 @@
         {
           "name": "bound_at",
           "type": "BIGINT"
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
         "slug"
+      ],
+      "indexes": [
+        {
+          "name": "doc_meta_space_slug",
+          "unique": true,
+          "columns": [
+            "space_id",
+            "slug"
+          ]
+        }
       ]
     },
     "doc_reads": {
@@ -1953,6 +2085,58 @@
       ],
       "primaryKey": [
         "source"
+      ]
+    },
+    "entry_tickets": {
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "issued_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "used_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "token_hash"
+      ],
+      "indexes": [
+        {
+          "name": "entry_tickets_issued",
+          "columns": [
+            "issued_at"
+          ]
+        },
+        {
+          "name": "entry_tickets_person",
+          "columns": [
+            "user_id",
+            "scope",
+            "issued_at"
+          ]
+        }
       ]
     },
     "env_apply_pending": {
@@ -2488,6 +2672,10 @@
           "name": "updated_at",
           "type": "BIGINT",
           "notNull": true
+        },
+        {
+          "name": "parent_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -2506,6 +2694,13 @@
           "columns": [
             "owner_id",
             "last_prompt_ms"
+          ]
+        },
+        {
+          "name": "history_conversations_parent",
+          "columns": [
+            "owner_id",
+            "parent_id"
           ]
         }
       ]
@@ -2910,6 +3105,33 @@
         }
       ]
     },
+    "job_leases": {
+      "columns": [
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "holder",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "lease_until",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "name"
+      ]
+    },
     "limit_rules": {
       "columns": [
         {
@@ -3056,6 +3278,46 @@
           "name": "synced_at",
           "type": "BIGINT",
           "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "machine_cards": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "runtime",
+          "type": "TEXT"
+        },
+        {
+          "name": "agents",
+          "type": "TEXT"
+        },
+        {
+          "name": "agents_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "usage",
+          "type": "TEXT"
+        },
+        {
+          "name": "usage_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "settings",
+          "type": "TEXT"
+        },
+        {
+          "name": "settings_at",
+          "type": "BIGINT"
         }
       ],
       "primaryKey": [
@@ -3359,6 +3621,38 @@
         }
       ]
     },
+    "machine_resource_conflicts": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kept_machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "noted_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
     "machine_resources": {
       "columns": [
         {
@@ -3415,6 +3709,16 @@
       ],
       "primaryKey": [
         "machine_id"
+      ],
+      "indexes": [
+        {
+          "name": "machine_resources_external",
+          "unique": true,
+          "columns": [
+            "provider",
+            "external_id"
+          ]
+        }
       ]
     },
     "machine_trust": {
@@ -3808,6 +4112,84 @@
       "primaryKey": [
         "machine_id",
         "migration"
+      ]
+    },
+    "offline_chats": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "client_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "text",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "create_cmd",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "error",
+          "type": "TEXT"
+        },
+        {
+          "name": "conv_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "changed_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "offline_chats_client",
+          "unique": true,
+          "columns": [
+            "user_id",
+            "client_id"
+          ]
+        },
+        {
+          "name": "offline_chats_state",
+          "columns": [
+            "state",
+            "machine_id",
+            "created_at"
+          ]
+        }
       ]
     },
     "offline_prompts": {
@@ -4327,6 +4709,129 @@
         "effective_from"
       ]
     },
+    "provider_ops": {
+      "columns": [
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "op_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "provider",
+        "op_id"
+      ],
+      "indexes": [
+        {
+          "name": "provider_ops_space",
+          "columns": [
+            "space_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "provider_servers": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "op_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "provider_servers_external",
+          "unique": true,
+          "columns": [
+            "provider",
+            "external_id"
+          ]
+        },
+        {
+          "name": "provider_servers_op",
+          "columns": [
+            "provider",
+            "op_id"
+          ]
+        },
+        {
+          "name": "provider_servers_space",
+          "columns": [
+            "space_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
     "registration_codes": {
       "columns": [
         {
@@ -4421,6 +4926,10 @@
           "name": "updated_at",
           "type": "BIGINT",
           "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -4432,6 +4941,14 @@
           "name": "resource_access_owner",
           "columns": [
             "owner_email"
+          ]
+        },
+        {
+          "name": "resource_access_space",
+          "columns": [
+            "space_id",
+            "kind",
+            "id"
           ]
         }
       ]
@@ -4477,6 +4994,10 @@
           "name": "created_at",
           "type": "BIGINT",
           "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -4528,6 +5049,14 @@
         {
           "name": "expires_at",
           "type": "BIGINT"
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -4540,6 +5069,22 @@
           "name": "resource_access_people_email",
           "columns": [
             "email"
+          ]
+        },
+        {
+          "name": "resource_access_people_space",
+          "columns": [
+            "space_id",
+            "kind",
+            "id"
+          ]
+        },
+        {
+          "name": "resource_access_people_user",
+          "columns": [
+            "user_id",
+            "kind",
+            "id"
           ]
         }
       ]
@@ -4594,6 +5139,14 @@
           "name": "created_at",
           "type": "BIGINT",
           "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -4650,6 +5203,10 @@
         {
           "name": "expires_at",
           "type": "BIGINT"
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -4775,6 +5332,10 @@
         {
           "name": "revoked_at",
           "type": "BIGINT"
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
@@ -4789,12 +5350,54 @@
           ]
         },
         {
+          "name": "resource_guest_links_space",
+          "columns": [
+            "space_id",
+            "kind",
+            "id"
+          ]
+        },
+        {
           "name": "resource_guest_links_token",
           "unique": true,
           "columns": [
             "token_hash"
           ]
         }
+      ]
+    },
+    "review_notes": {
+      "columns": [
+        {
+          "name": "owner_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "conv_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "note_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "data",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "owner_id",
+        "conv_id",
+        "note_id"
       ]
     },
     "role_grants": {
@@ -5719,6 +6322,61 @@
         }
       ]
     },
+    "usage_quarantine": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "epoch",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "seq",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "record",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "usage_quarantine_created",
+          "columns": [
+            "created_at"
+          ]
+        }
+      ]
+    },
     "usage_rollup_hour": {
       "columns": [
         {
@@ -5842,6 +6500,10 @@
         },
         {
           "name": "last_login_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "disabled_at",
           "type": "BIGINT"
         }
       ],

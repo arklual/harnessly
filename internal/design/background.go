@@ -1,6 +1,7 @@
 package design
 
 import (
+	"math/rand/v2"
 	"sync"
 	"time"
 )
@@ -10,11 +11,20 @@ import (
 // chat would look closed), the files are saved to the history, and the PDFs this runtime keeps for the guests of its
 // decks are built again when their decks change (deckpdfauto.go).
 
-const sweepEvery = 5 * time.Second
+// The claims are swept every sweepEvery while a chat of this runtime holds a board, and after one was just taken. A
+// runtime that holds nothing has nothing to refresh or let go of: it looks again every sweepIdleEvery (spread, so the
+// machines of a space do not ask together), which finds what a restart left behind. A center that does not answer is
+// asked again every sweepOfflineEvery.
+const (
+	sweepEvery        = 10 * time.Second
+	sweepIdleEvery    = 3 * time.Minute
+	sweepOfflineEvery = 30 * time.Second
+)
 
 type background struct {
 	mu      sync.Mutex
 	stop    chan struct{}
+	wake    chan struct{}
 	sweepMu sync.Mutex
 	missing map[string]int64
 	warn    func(msg string, err error)
@@ -43,7 +53,8 @@ func (l *Library) StartBackground() {
 		b.stop = make(chan struct{})
 		b.missing = map[string]int64{}
 		b.warn = warn
-		go l.keepClaims(b.stop)
+		b.wake = make(chan struct{}, 1)
+		go l.keepClaims(b.stop, b.wake)
 		go l.keepDeckPdfs(b.stop)
 	}
 	b.mu.Unlock()
@@ -69,20 +80,59 @@ func (l *Library) StopBackground() {
 	l.stopHistory()
 }
 
-func (l *Library) keepClaims(stop chan struct{}) {
-	t := time.NewTicker(sweepEvery)
+// claimTaken tells the keeper that a chat of this runtime has just taken a board.
+func (b *background) claimTaken() {
+	b.mu.Lock()
+	wake := b.wake
+	b.mu.Unlock()
+	if wake == nil {
+		return
+	}
+	select {
+	case wake <- struct{}{}:
+	default:
+	}
+}
+
+// sweepDelay is the wait before the next pass after one that answered res.
+func sweepDelay(res SweepResult, err error) time.Duration {
+	switch {
+	case err != nil:
+		return sweepEvery
+	case res.Offline:
+		return sweepOfflineEvery + rand.N(sweepOfflineEvery/2+1)
+	case res.Own == 0:
+		return sweepIdleEvery + rand.N(sweepIdleEvery/2+1)
+	}
+	return sweepEvery
+}
+
+func (l *Library) keepClaims(stop, wake chan struct{}) {
+	t := time.NewTimer(sweepEvery)
 	defer t.Stop()
+	short := true
 	for {
 		select {
 		case <-stop:
 			return
-		case <-t.C:
-			if _, ok := l.Tabs(); !ok {
-				continue
+		case <-wake:
+			// Only a long wait is cut short: claims taken one after another must not put the pass off.
+			if !short {
+				short = true
+				t.Reset(sweepEvery)
 			}
-			if _, err := l.SweepOwnClaims(l.keeperMissing()); err != nil && l.bg.warn != nil {
+			continue
+		case <-t.C:
+		}
+		delay := sweepEvery
+		if _, ok := l.Tabs(); ok {
+			res, err := l.SweepOwnClaims(l.keeperMissing())
+			if err != nil && l.bg.warn != nil {
 				l.bg.warn("design claim sweep failed", err)
 			}
+			delay = sweepDelay(res, err)
 		}
+		short = delay <= sweepEvery
+		t.Reset(delay)
 	}
 }

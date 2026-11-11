@@ -2,7 +2,7 @@
 // (when the screen shows the whole organization), the access of the agents, gets the one-time code and the command the
 // hub built, and the sheet waits until that machine dials in, then closes and the list refreshes.
 import { useEffect, useRef, useState } from 'react';
-import { Terminal } from 'lucide-react';
+import { HardDrive, Terminal } from 'lucide-react';
 
 import { Button, Spinner } from '@kit';
 
@@ -40,7 +40,9 @@ const Body = ({
   onAdded: () => void;
 }) => {
   const { api } = useOrg();
-  const { config } = useSession();
+  const { config, me } = useSession();
+  // The machine that runs next to the hub (compose): only the instance admin takes it, once.
+  const localOffered = config.connect.local.available && me?.user.isAdmin === true;
   const [tenantId, setTenantId] = useState(tenants[0]?.id ?? '');
   const [profile, setProfile] = useState<MachineProfile>('dir');
   const [sure, setSure] = useState(false);
@@ -61,6 +63,19 @@ const Body = ({
     try {
       known.current = new Set((await api.spaceMachines(tenantId)).map((m) => m.id));
       setIssued(await api.issueMachineCode(tenantId, profile, profile === 'full'));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const claimLocal = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      const m = await api.claimLocalMachine(tenantId);
+      setJoined({ id: m.id, name: m.name });
     } catch (e) {
       setError(e);
     } finally {
@@ -140,6 +155,14 @@ const Body = ({
     );
   }
 
+  if (joined) {
+    return (
+      <div className="hm-add">
+        <Msg tone="success">Машина {joined.name} подключена.</Msg>
+      </div>
+    );
+  }
+
   return (
     <div className="hm-add">
       {tenants.length > 1 && (
@@ -164,8 +187,26 @@ const Body = ({
           </div>
         </section>
       )}
+      {localOffered && (
+        <section className="ht-field">
+          <h3 className="ht-h">Эта машина</h3>
+          <Note>Машина, которая запущена рядом с хабом. Подключается одним действием, без команды.</Note>
+          <div>
+            <Button
+              appearance="primary"
+              icon={<HardDrive size={14} />}
+              loading={pending}
+              disabled={tenantId === ''}
+              onClick={() => void claimLocal()}
+            >
+              Подключить эту машину
+            </Button>
+          </div>
+        </section>
+      )}
       <section className="ht-field">
-        <h3 className="ht-h">Доступ агентов к машине</h3>
+        <h3 className="ht-h">{localOffered ? 'Или другая машина' : 'Доступ агентов к машине'}</h3>
+        {localOffered && <Note>Доступ агентов к машине.</Note>}
         <div className="hm-radios" role="radiogroup" aria-label="Доступ агентов к машине">
           {PROFILES.filter((p) => p.value !== 'container' || config.profiles.container).map((p) => (
             <button

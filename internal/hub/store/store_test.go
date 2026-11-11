@@ -15,10 +15,64 @@ import (
 	"time"
 )
 
-// Open returns a fresh SQLite database in the test's temp dir.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if migrated.dir != "" {
+		_ = os.RemoveAll(migrated.dir)
+	}
+	os.Exit(code)
+}
+
+// migrated is a SQLite database with every migration applied, made once for the package's tests: under -race the
+// migrations of a fresh file take seconds, and most tests need only a database that has them.
+var migrated struct {
+	once sync.Once
+	dir  string
+	raw  []byte
+	err  error
+}
+
+func migratedSQLite() ([]byte, error) {
+	migrated.once.Do(func() {
+		dir, err := os.MkdirTemp("", "hub-store-test-")
+		if err != nil {
+			migrated.err = err
+			return
+		}
+		migrated.dir = dir
+		path := filepath.Join(dir, "hub.db")
+		ctx := context.Background()
+		db, err := Open(ctx, "sqlite://"+path)
+		if err != nil {
+			migrated.err = err
+			return
+		}
+		// Everything into the main file, so that it alone is the database.
+		_, err = db.sql.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
+		if cerr := db.Close(); err == nil {
+			err = cerr
+		}
+		if err == nil {
+			migrated.raw, err = os.ReadFile(path)
+		}
+		migrated.err = err
+	})
+	return migrated.raw, migrated.err
+}
+
+// openTest returns a fresh SQLite database in the test's temp dir: a copy of the migrated one, opened as the hub opens
+// its own (Open finds every migration applied and checks the schema).
 func openTest(t *testing.T) *DB {
 	t.Helper()
-	db, err := Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
+	raw, err := migratedSQLite()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "hub.db")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := Open(context.Background(), "sqlite://"+path)
 	if err != nil {
 		t.Fatal(err)
 	}

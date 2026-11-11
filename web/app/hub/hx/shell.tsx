@@ -11,6 +11,7 @@ import { useOrg } from '../org/context';
 import { ROLE_LABEL, type TenantRef } from '../org/types';
 import { fleetWorkspace, liveOn } from './flag';
 import { LiveCtx } from './live';
+import { useHostUI } from './ext/host';
 import { navOf } from './nav';
 import { Btn, Icon, initial, LayerCtx, usePop } from './ui';
 import { withBase } from '../lib/base';
@@ -177,9 +178,11 @@ const SwitcherPop = ({ closing, onPick }: { closing: '1' | undefined; onPick: ()
 const Nav = ({ onPick }: { onPick: () => void }) => {
   const { shell, base, section, scope } = useOrg();
   const team = shell.teams.find((t) => t.id === shell.viewer.teamId);
+  const ui = useHostUI();
+  const hasViews = (ui?.views.length ?? 0) > 0;
   const groups = useMemo(
-    () => navOf(shell.viewer.role, team?.name ?? null, shell.features ?? [], scope.kind),
-    [shell.viewer.role, team?.name, shell.features, scope.kind],
+    () => navOf(shell.viewer.role, team?.name ?? null, shell.features ?? [], scope.kind, hasViews),
+    [shell.viewer.role, team?.name, shell.features, scope.kind, hasViews],
   );
   return (
     <nav className="hx-nav hb-hubnav" aria-label="Разделы хаба">

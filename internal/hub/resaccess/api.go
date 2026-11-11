@@ -12,13 +12,31 @@ import (
 // Actor is the signed-in person a request is made by. Admin is an administrator of the installation: they run every
 // resource's access.
 type Actor struct {
-	Email string
-	Name  string
-	Admin bool
+	// UserID is the person's account: a role given to a person is held by it.
+	UserID string
+	Email  string
+	Name   string
+	// Verified is the addresses the person has proved, in lower case. An invitation to an address reaches only a
+	// person who has proved it.
+	Verified []string
+	Admin    bool
+	// Outside says the person is of none of the resource's organizations, as the caller knows them: the level a
+	// resource without a home team gives "the team" does not reach them. Shares by name and team grants still do.
+	Outside bool
 }
 
 // Info is what the caller knows about a resource the model has no row for yet: its owner, as the kind's own records have it.
 type Info struct{ Owner, OwnerName string }
+
+// proved reports whether the person has proved the address.
+func (a Actor) proved(email string) bool {
+	for _, v := range a.Verified {
+		if v == email {
+			return true
+		}
+	}
+	return false
+}
 
 const (
 	deniedManage = "Доступом управляют владелец и те, кому он это разрешил"
@@ -61,10 +79,11 @@ func (s *Service) Role(ctx context.Context, ref Ref, a Actor) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	f, err := t.foldFor(r, people, grants, a.Email)
+	f, err := t.foldFor(r, people, grants, a)
 	if err != nil {
 		return "", err
 	}
+	s.accept(ctx, ref, people, a)
 	if a.Admin && Rank(f.Role) < Rank(roleManage) {
 		return roleManage, nil
 	}
@@ -84,7 +103,7 @@ func (t *txn) view(ref Ref, a Actor, info Info) (map[string]any, error) {
 	if r.Owner == "" && info.Owner != "" {
 		r.Owner, r.OwnerName = normEmail(info.Owner), info.OwnerName
 	}
-	f, err := t.foldFor(r, people, grants, a.Email)
+	f, err := t.foldFor(r, people, grants, a)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +138,7 @@ func (t *txn) view(ref Ref, a Actor, info Info) (map[string]any, error) {
 	for _, m := range people {
 		if live(m.Expires, t.now) {
 			ppl = append(ppl, map[string]any{"email": m.Email, "name": t.w.displayName(m.Email), "role": m.Role, "grantedBy": m.GrantedBy,
-				"grantedAt": isoOf(m.GrantedAt), "expiresAt": iso(m.Expires)})
+				"grantedAt": isoOf(m.GrantedAt), "expiresAt": iso(m.Expires), "pending": m.UserID == ""})
 		}
 	}
 	tms := []map[string]any{}
@@ -143,6 +162,12 @@ func (t *txn) view(ref Ref, a Actor, info Info) (map[string]any, error) {
 		for _, q := range open {
 			j := q.json()
 			j["name"] = t.w.displayName(q.Email)
+			// Whether the account that asks has proved the address it is shown under.
+			proven, err := t.holder(q.Email)
+			if err != nil {
+				return nil, err
+			}
+			j["verified"] = q.UserID != "" && proven == q.UserID
 			reqs = append(reqs, j)
 		}
 	}
@@ -199,6 +224,9 @@ func (s *Service) route(r *http.Request, a Actor, ref Ref, rest []string, info I
 	email := normEmail(a.Email)
 	method, n := r.Method, len(rest)
 	section, second := part(rest, 0), part(rest, 1)
+	if ref.Kind == KindKit && (section == "links" || section == "shares" || section == "guest-comments") {
+		return nil, 0, fail("forbidden", "Кит не раздают по ссылке без входа: только людям и командам")
+	}
 
 	t := s.read(ctx)
 	v, err := t.view(ref, a, info)
@@ -230,7 +258,7 @@ func (s *Service) route(r *http.Request, a Actor, ref Ref, rest []string, info I
 			if _, err := t.ensure(ref, info.Owner, info.OwnerName); err != nil {
 				return err
 			}
-			made, err = t.request(ref, email, str(b, "level"), str(b, "message"))
+			made, err = t.request(ref, email, a.UserID, str(b, "level"), str(b, "message"))
 			return err
 		})
 		if err != nil {
@@ -297,7 +325,17 @@ func (s *Service) route(r *http.Request, a Actor, ref Ref, rest []string, info I
 
 	case (method == http.MethodPut || method == http.MethodDelete) && section == "people" && n == 2:
 		target := normEmail(second)
-		if target == email && !owner {
+		// The person's own role is whatever reaches them: the address they sign in under, one they have proved, or
+		// a role their account holds under another address.
+		self := target == email || a.proved(target)
+		if !self && a.UserID != "" {
+			held, err := t.heldBy(ref, target)
+			if err != nil {
+				return nil, 0, err
+			}
+			self = held == a.UserID
+		}
+		if self && !owner {
 			return nil, 0, fail("forbidden", deniedSelf)
 		}
 		if method == http.MethodDelete {

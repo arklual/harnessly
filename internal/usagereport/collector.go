@@ -28,8 +28,10 @@ type Config struct {
 	ClaudeRoot, CodexRoot string
 	// CacheFile keeps the facts of every transcript between runs (the previous runtime reads and writes the same file).
 	CacheFile string
-	Projects  *Projects
-	Clock     Clock
+	// SQLiteFacts keeps the facts in a database beside CacheFile too (HARNESSLY_USAGE_SQLITE=1 does the same); sqlitefacts.go.
+	SQLiteFacts bool
+	Projects    *Projects
+	Clock       Clock
 	// Timezone is the zone the report says its days are in.
 	Timezone string
 	// Machine is the host name the report carries.
@@ -72,6 +74,9 @@ type Collector struct {
 	refresh sync.Mutex
 	// beforeBuild runs as a build starts (tests hold it there).
 	beforeBuild func()
+	// sql is the facts database, when it is on (sqlitefacts.go).
+	sql       *factsDB
+	sqlFailed bool
 }
 
 // NewCollector is a collector with nothing read yet.
@@ -246,7 +251,14 @@ func (c *Collector) loadCache() {
 		return
 	}
 	c.loaded = true
-	order, files := readFacts(c.cfg.CacheFile)
+	var order []string
+	var files map[string]*cachedFile
+	if db := c.sqliteOn(); db != nil {
+		order, files = db.load()
+	}
+	if len(order) == 0 { // the database is off or still empty: the JSON file is the state, as before
+		order, files = readFacts(c.cfg.CacheFile)
+	}
 	for _, name := range order {
 		if _, ok := c.files[name]; !ok {
 			c.order = append(c.order, name)
@@ -295,6 +307,18 @@ func (c *Collector) saveCache() {
 	var w jw
 	w.WriteString(`{"version":2,"files":{`)
 	c.mu.Lock()
+	if db := c.sqliteOn(); db != nil {
+		err := db.save(c.order, c.files)
+		recent := !db.jsonAt.IsZero() && c.now().Sub(db.jsonAt) < jsonSnapshotEvery
+		if err == nil && recent {
+			c.mu.Unlock()
+			return
+		}
+		if err != nil {
+			jsonlog.Log("warn", "usage facts database write failed", jsonlog.F{K: "error", V: err.Error()})
+		}
+		db.jsonAt = c.now()
+	}
 	for i, name := range c.order {
 		f := c.files[name]
 		if i > 0 {

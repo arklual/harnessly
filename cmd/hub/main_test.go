@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -112,7 +113,8 @@ func TestHubWithoutSMTPOnHTTPSIsRefused(t *testing.T) {
 // that unless the operator says HUB_ALLOW_SAME_SITE_RUNTIME=1, and check-config shows the warning either way.
 func TestSameSiteRuntimeDomain(t *testing.T) {
 	vars := map[string]string{"HUB_PUBLIC_URL": "https://app.harnessly.ru", "HUB_DATA_DIR": t.TempDir(), "HUB_SMTP_URL": "smtps://mail.example.com",
-		"HUB_RUNTIME_DOMAIN": "run.harnessly.ru", "HUB_EDITION": "cloud"}
+		"HUB_RUNTIME_DOMAIN": "run.harnessly.ru", "HUB_EDITION": "cloud",
+		"HUB_ORGS": "on", "HUB_ACCESS_ENFORCE": "on", "HUB_RESOURCE_ACCESS": "on"}
 	var out, errOut bytes.Buffer
 	if code := run(context.Background(), []string{"check-config"}, env(vars), &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "one registrable domain") {
 		t.Fatalf("the cloud on one site: code %d, err %q", code, errOut.String())
@@ -279,5 +281,92 @@ func TestServeRefusesABusyAddress(t *testing.T) {
 	}
 	if err := serve(context.Background(), cfg, nil, io.Discard); err == nil {
 		t.Error("serve started on an address in use")
+	}
+}
+
+// The numbers are served on a listener of their own and never on the public one, which checks nobody at /metrics.
+func TestMetricsAreServedApartFromThePublicListener(t *testing.T) {
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metricsAddr := free.Addr().String()
+	free.Close()
+	data := t.TempDir()
+	cfg, err := config.Load(env(map[string]string{
+		"HUB_PUBLIC_URL": "http://127.0.0.1:18599", "HUB_LISTEN": "127.0.0.1:0", "HUB_DATA_DIR": data, "HUB_PASSKEY": "off",
+		"HUB_DIST_DIR": filepath.Join(data, "dist"), "HUB_METRICS_LISTEN": metricsAddr, "HUB_TUNNEL_MEMORY_MB": "64",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	logs := &safeBuffer{}
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	ready := make(chan string, 1)
+	done := make(chan error, 1)
+	go func() { done <- serve(ctx, cfg, ready, logs) }()
+	var public string
+	select {
+	case a := <-ready:
+		public = "http://" + a
+	case err := <-done:
+		t.Fatalf("serve returned: %v\n%s", err, logs)
+	case <-time.After(30 * time.Second):
+		t.Fatal("the hub did not start")
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	get := func(url string) (int, string, error) {
+		res, err := client.Get(url)
+		if err != nil {
+			return 0, "", err
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b), nil
+	}
+	if _, _, err := get(public + "/healthz"); err != nil {
+		t.Fatal(err)
+	}
+	var status int
+	var body string
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if status, body, err = get("http://" + metricsAddr + "/metrics"); err == nil {
+			break
+		}
+	}
+	if err != nil || status != http.StatusOK {
+		t.Fatalf("GET /metrics on the metrics listener: %d %v\n%s", status, err, logs)
+	}
+	for _, want := range []string{
+		"# TYPE harnessly_hub_links gauge", "harnessly_hub_links 0\n", "harnessly_hub_history_lag_seconds 0\n",
+		"harnessly_hub_usage_lag_seconds 0\n", "# TYPE harnessly_hub_background_panics_total counter",
+		"harnessly_hub_tunnel_memory_bytes 0\n", "harnessly_hub_tunnel_memory_limit_bytes 6.7108864e+07\n",
+		"# TYPE harnessly_hub_tunnels_refused_total counter", "# TYPE harnessly_hub_tunnels_cut_total counter",
+		`harnessly_hub_http_requests_total{route="health",class="2xx"} `,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the metrics lack %q", want)
+		}
+	}
+	if status, _, _ := get("http://" + metricsAddr + "/healthz"); status != http.StatusNotFound {
+		t.Errorf("the metrics listener answered /healthz with %d, want 404", status)
+	}
+	status, body, err = get(public + "/metrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(body, "harnessly_hub_") {
+		t.Errorf("the public listener serves the metrics (%d)", status)
+	}
+
+	stop()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("serve: %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("the hub did not stop")
 	}
 }

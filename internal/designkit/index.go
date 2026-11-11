@@ -32,6 +32,8 @@ type IndexEntry struct {
 	Path string `json:"path"`
 	// Words is what it is found by, lower case, separated by spaces.
 	Words string `json:"words"`
+	// From is the base kit the node comes from, "" for the kit's own.
+	From string `json:"from,omitempty"`
 }
 
 var digitsRe = regexp.MustCompile(`\d+`)
@@ -63,7 +65,7 @@ func buildIndex(c *Canvas) []IndexEntry {
 			if k.Part != "" && k.Part != PartProvider {
 				path += " › " + k.Part
 			}
-			out = append(out, IndexEntry{Node: k.NodeID, Kind: KindComponent, Title: k.Name, Path: path,
+			out = append(out, IndexEntry{Node: k.NodeID, Kind: KindComponent, Title: k.Name, Path: path, From: k.From,
 				Words: words(k.Name, k.ID, k.Description, strings.Join(k.Keywords, " "), g.Title, strings.Join(props, " "))})
 		}
 	}
@@ -103,7 +105,7 @@ func buildIndex(c *Canvas) []IndexEntry {
 		for _, m := range modes {
 			vals = append(vals, col.Values[m], strings.TrimPrefix(col.Values[m], "#"))
 		}
-		out = append(out, IndexEntry{Node: col.ID, Kind: KindColor, Title: col.Name, Path: strings.Join(vals, " "),
+		out = append(out, IndexEntry{Node: col.ID, Kind: KindColor, Title: col.Name, Path: strings.Join(vals, " "), From: col.From,
 			Words: words(col.Name, strings.Join(vals, " "), col.Usage)})
 	}
 	for _, s := range c.Type {
@@ -111,7 +113,7 @@ func buildIndex(c *Canvas) []IndexEntry {
 			Words: words(s.Group, s.Name, s.Family, s.Size)})
 	}
 	for _, t := range c.Tokens {
-		out = append(out, IndexEntry{Node: t.ID, Kind: KindToken, Title: t.Name, Path: t.Value, Words: words(t.Name, t.Kind, t.Value, t.Usage)})
+		out = append(out, IndexEntry{Node: t.ID, Kind: KindToken, Title: t.Name, Path: t.Value, From: t.From, Words: words(t.Name, t.Kind, t.Value, t.Usage)})
 	}
 	return out
 }

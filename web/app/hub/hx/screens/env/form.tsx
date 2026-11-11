@@ -597,6 +597,20 @@ export const DraftForm = ({
             label="Название"
           />
         </Field>
+        <Field
+          label="В организации"
+          hint="Выключенное пропадает из меню и у агента у всех; доски, документы и ссылки на них остаются"
+        >
+          <Seg
+            items={[
+              ['on', 'Включено'],
+              ['off', 'Выключено у всех'],
+            ]}
+            value={f.appOff ? 'off' : 'on'}
+            onChange={(v) => set({ appOff: v === 'off' })}
+            label="В организации"
+          />
+        </Field>
       </>
     );
   }

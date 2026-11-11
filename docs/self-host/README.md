@@ -26,4 +26,6 @@ flowchart TB
 - [Environment and catalog](../hub/environment.md): what a hub gives every machine of a team.
 - [The safe](../safe.md), [connections](../connections.md), [MCP servers](../mcp-connections.md), [integrations](../integrations.md): secrets, the team's services, boards and documents beside the chat.
 - [Voice input](../voice.md): the built-in recognition and how to change it.
+- [Update channels](update-channels.md): `stable` (the default) or `latest`, how to change it, how a release becomes stable.
+- [Known limits of shared and team installations](multi-user-limits.md): what to plan around when several people share a machine or a hub.
 - [Your own documentation](own-docs.md): put your team's pages into the /help page and the agents' `harnessly docs`.

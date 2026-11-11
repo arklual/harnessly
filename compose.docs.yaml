@@ -1,59 +1,74 @@
-# Documents and boards next to the hub: an overlay for compose.hub.yaml.
+# Documents next to the hub: an overlay for compose.hub.yaml (docs/apps/documents.md).
 #
-#   docker compose -f compose.hub.yaml -f compose.docs.yaml up -d --build
+#   docker compose -f compose.hub.yaml -f compose.docs.yaml up -d
 #
-# It turns on HUB_DOCS and starts the artifacts service (documents), built from its repository the first time. Boards
-# are a profile of their own because no boards image is published yet: build one from the boards repository, then
+# It starts the documents service (artifacts) from its published image, turns on HUB_DOCS and gives the hub the
+# service's address. Without this overlay the hub starts as usual and has no documents app. Boards are an overlay of
+# their own (compose.boards.yaml); either can be left out.
 #
-#   BOARDS_IMAGE=example.com/boards:latest docker compose -f compose.hub.yaml -f compose.docs.yaml --profile boards up -d
+# Two addresses: the hub calls the service on the compose network (HUB_ARTIFACTS_URL); machines and browsers open it at
+# the public address, ARTIFACTS_PUBLIC_URL (the hub's HUB_ARTIFACTS_PUBLIC_URL). The try-out public name is docs.localhost: browsers
+# send *.localhost to the host's loopback, where the port is published, and the machine's container is told
+# (extra_hosts) that the name is the service on their network, which listens on the same port inside. The apps frame
+# only https addresses, so on a server put a reverse proxy with TLS in front and set ARTIFACTS_PUBLIC_URL to it.
 #
-# The hub reaches both on the network it shares with them; neither is published on the host. The token the hub sends
-# is DOCS_TOKEN (at least 16 characters): set it in .env, the default below is for a trial on one host only.
+# .env: DOCS_TOKEN (16 characters or more) is the token the hub sends; the default is for a trial on one host only.
+# Sign-in to the service: ARTIFACTS_AUTH=token (default, the service's own tokens and links) or harnessly (people come
+# with the hub's platform token; needs DOCS_ACCESS_TOKEN, 16 characters or more, the service's secret for asking the hub
+# about rights). Storage: a volume (fs, one replica); for S3 set ARTIFACTS_STORAGE=s3 and ARTIFACTS_S3_*.
+# ARTIFACTS_IMAGE pins a version (ghcr.io/ly-solutions/artifacts:X.Y.Z); `latest` is the newest release.
+
+x-docs-url: &docs-url ${ARTIFACTS_PUBLIC_URL:-http://docs.localhost:${ARTIFACTS_PORT:-8082}}
+x-docs-host: &docs-host "docs.localhost:${HUB_NET:-172.29.40}.240"
 
 services:
   hub:
     environment:
       HUB_DOCS: "on"
-      HUB_ARTIFACTS_URL: http://artifacts:8080
+      # The hub calls the service on their network; machines and browsers get the public address.
+      HUB_ARTIFACTS_URL: http://artifacts:${ARTIFACTS_PORT:-8082}
+      HUB_ARTIFACTS_PUBLIC_URL: *docs-url
       HUB_ARTIFACTS_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
-      HUB_BOARDS_URL: ${HUB_BOARDS_URL:-}
-      HUB_BOARDS_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
+      HUB_ARTIFACTS_ACCESS_TOKEN: ${DOCS_ACCESS_TOKEN:-}
     depends_on:
       - artifacts
 
+  machine:
+    extra_hosts:
+      - *docs-host
+
   artifacts:
-    build: https://github.com/ly-solutions/artifacts.git
-    image: ${ARTIFACTS_IMAGE:-ghcr.io/ly-solutions/artifacts:local}
-    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
+    image: ${ARTIFACTS_IMAGE:-ghcr.io/ly-solutions/artifacts:latest}
+    pull_policy: missing
     environment:
-      ARTIFACTS_PUBLIC_URL: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
-      # Files on a volume: one replica. For several, point ARTIFACTS_STORAGE at S3 (its docs, storage.md).
-      ARTIFACTS_STORAGE: fs
+      ARTIFACTS_PORT: ${ARTIFACTS_PORT:-8082}
+      ARTIFACTS_PUBLIC_URL: *docs-url
+      ARTIFACTS_STORAGE: ${ARTIFACTS_STORAGE:-fs}
       ARTIFACTS_DATA_DIR: /data
-      ARTIFACTS_AUTH: token
+      ARTIFACTS_S3_ENDPOINT: ${ARTIFACTS_S3_ENDPOINT:-}
+      ARTIFACTS_S3_REGION: ${ARTIFACTS_S3_REGION:-}
+      ARTIFACTS_S3_BUCKET: ${ARTIFACTS_S3_BUCKET:-}
+      ARTIFACTS_S3_ACCESS_KEY_ID: ${ARTIFACTS_S3_ACCESS_KEY_ID:-}
+      ARTIFACTS_S3_SECRET_ACCESS_KEY: ${ARTIFACTS_S3_SECRET_ACCESS_KEY:-}
+      ARTIFACTS_AUTH: ${ARTIFACTS_AUTH:-token}
       ARTIFACTS_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
+      ARTIFACTS_HARNESSLY_ISSUER: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
+      ARTIFACTS_HARNESSLY_ACCESS_TOKEN: ${DOCS_ACCESS_TOKEN:-}
+      # The hub's page and the machines' pages frame documents; DOCS_FRAME_EXTRA adds origins (comma-separated),
+      # e.g. the machines' https://*.run.example.net with HUB_RUNTIME_DOMAIN.
+      ARTIFACTS_FRAME_ANCESTORS: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}${DOCS_FRAME_EXTRA:+,${DOCS_FRAME_EXTRA}}
+      ARTIFACTS_CORS_ORIGINS: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
     networks:
-      - hub
+      hub:
+        ipv4_address: ${HUB_NET:-172.29.40}.240
+    # The hub's address, when it is hub.localhost, for the platform token's keys (ARTIFACTS_AUTH=harnessly).
+    extra_hosts:
+      - "hub.localhost:${HUB_NET:-172.29.40}.2"
+    ports:
+      - "127.0.0.1:${ARTIFACTS_PORT:-8082}:${ARTIFACTS_PORT:-8082}"
     volumes:
       - artifacts-data:/data
     restart: unless-stopped
 
-  boards:
-    profiles: [boards]
-    image: ${BOARDS_IMAGE:-boards.invalid/boards:set-BOARDS_IMAGE}
-    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
-    environment:
-      PORT: "8080"
-      BOARDS_BASE_URL: ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
-      BOARDS_STORAGE: fs
-      BOARDS_DATA_DIR: /data
-      BOARDS_API_TOKEN: ${DOCS_TOKEN:-docs-trial-token-change-me}
-    networks:
-      - hub
-    volumes:
-      - boards-data:/data
-    restart: unless-stopped
-
 volumes:
   artifacts-data:
-  boards-data:

@@ -1,26 +1,42 @@
-{{- if .Values.docs.enabled }}
-{{- if not .Values.docs.existingSecret }}
+{{- /*
+Documents (docs.*, the artifacts service) and boards (boards.*, the boards service): each optional, each with a Secret
+the chart makes unless existingSecret names one, and, when bundled, a Deployment, a Service and (fs) a volume.
+*/}}
+{{- range $key := list "docs" "boards" }}
+{{- $v := index $.Values $key }}
+{{- if $v.enabled }}
+{{- $svc := ternary "artifacts" "boards" (eq $key "docs") }}
+{{- $name := printf "%s-%s" (include "hub.fullname" $) $svc }}
+{{- $secret := include "hub.appSecretName" (dict "root" $ "key" $key) }}
+{{- if not $v.existingSecret }}
+{{- /* Kept across upgrades, like the Postgres password: what is already there, else a new one. */}}
+{{- $existing := lookup "v1" "Secret" $.Release.Namespace $secret }}
+{{- $data := dict }}
+{{- if and $existing $existing.data }}{{- $data = $existing.data }}{{- end }}
+{{- $keys := ternary (list "token" "accessToken") (list "token" "sessionSecret") (eq $key "docs") }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "hub.docsName" . }}
+  name: {{ $secret }}
   labels:
-    {{- include "hub.labels" . | nindent 4 }}
+    {{- include "hub.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc }}
 type: Opaque
 stringData:
-  {{- /* Kept across upgrades, like the Postgres password: what is already there, else a new one. */}}
-  {{- $existing := lookup "v1" "Secret" .Release.Namespace (include "hub.docsName" .) }}
-  {{- if and $existing $existing.data (hasKey $existing.data "token") }}
-  token: {{ index $existing.data "token" | b64dec | quote }}
+  {{- range $k := $keys }}
+  {{- if hasKey $data $k }}
+  {{ $k }}: {{ index $data $k | b64dec | quote }}
   {{- else }}
-  token: {{ randAlphaNum 40 | quote }}
+  {{ $k }}: {{ randAlphaNum 48 | quote }}
+  {{- end }}
   {{- end }}
 ---
 {{- end }}
-{{- range $svc := list "artifacts" "boards" }}
-{{- $v := index $.Values.docs $svc }}
 {{- if $v.bundled }}
-{{- $name := printf "%s-%s" (include "hub.fullname" $) $svc }}
+{{- $fs := eq $v.storage.type "fs" }}
+{{- /* The hub's page only; machines' origins (runtimeDomain) are the operator's choice, in frameAncestors. */}}
+{{- $ancestors := concat (list (include "hub.publicUrl" $)) $v.frameAncestors }}
+{{- if $fs }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -30,13 +46,14 @@ metadata:
     app.kubernetes.io/component: {{ $svc }}
 spec:
   accessModes: [ReadWriteOnce]
-  {{- with $v.persistence.storageClass }}
+  {{- with $v.storage.storageClass }}
   storageClassName: {{ . | quote }}
   {{- end }}
   resources:
     requests:
-      storage: {{ $v.persistence.size }}
+      storage: {{ $v.storage.size }}
 ---
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -61,8 +78,8 @@ metadata:
     {{- include "hub.labels" $ | nindent 4 }}
     app.kubernetes.io/component: {{ $svc }}
 spec:
-  # Files on a volume of one node: one replica, replaced and not rolled. Several replicas want the S3 driver of the
-  # artifacts service and a service you run yourself (docs.artifacts.url).
+  # One replica, replaced and not rolled: files on a volume of one node, and the services keep a cache of their own.
+  # Several replicas want S3 storage and a service you run yourself (url with bundled: false).
   replicas: 1
   strategy:
     type: Recreate
@@ -94,37 +111,74 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          {{- with $v.storage.s3.existingSecret }}
+          {{- if not $fs }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          {{- end }}
           env:
-            - name: PORT
-              value: "8080"
             - name: NODE_ENV
               value: production
-            {{- if eq $svc "artifacts" }}
+            {{- if eq $key "docs" }}
+            - name: ARTIFACTS_PORT
+              value: "8080"
             - name: ARTIFACTS_PUBLIC_URL
-              value: {{ include "hub.publicUrl" $ | quote }}
+              value: {{ $v.url | trimSuffix "/" | quote }}
             - name: ARTIFACTS_STORAGE
-              value: fs
+              value: {{ $v.storage.type | quote }}
             - name: ARTIFACTS_DATA_DIR
               value: /data
             - name: ARTIFACTS_AUTH
-              value: token
+              value: {{ $v.auth | quote }}
             - name: ARTIFACTS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "hub.docsSecretName" $ }}
+                  name: {{ $secret }}
                   key: token
-            {{- else }}
-            - name: BOARDS_BASE_URL
+            {{- if eq $v.auth "harnessly" }}
+            - name: ARTIFACTS_HARNESSLY_ISSUER
               value: {{ include "hub.publicUrl" $ | quote }}
-            - name: BOARDS_STORAGE
-              value: fs
-            - name: BOARDS_DATA_DIR
-              value: /data
-            - name: BOARDS_API_TOKEN
+            - name: ARTIFACTS_HARNESSLY_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "hub.docsSecretName" $ }}
+                  name: {{ $secret }}
+                  key: accessToken
+            {{- end }}
+            - name: ARTIFACTS_FRAME_ANCESTORS
+              value: {{ join "," $ancestors | quote }}
+            - name: ARTIFACTS_CORS_ORIGINS
+              value: {{ include "hub.publicUrl" $ | quote }}
+            {{- else }}
+            - name: PORT
+              value: "8080"
+            - name: BOARDS_PUBLIC_URL
+              value: {{ $v.url | trimSuffix "/" | quote }}
+            - name: BOARDS_STORAGE
+              value: {{ $v.storage.type | quote }}
+            - name: BOARDS_DATA_DIR
+              value: /data
+            - name: BOARDS_AUTH
+              value: {{ $v.auth | quote }}
+            - name: BOARDS_API_TOKENS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
                   key: token
+            - name: BOARDS_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret }}
+                  key: sessionSecret
+            {{- if eq $v.auth "harnessly" }}
+            - name: BOARDS_HARNESSLY_ISSUER
+              value: {{ include "hub.publicUrl" $ | quote }}
+            {{- end }}
+            - name: BOARDS_FRAME_ANCESTORS
+              value: {{ printf "'self' %s" (join " " $ancestors) | quote }}
+            - name: BOARDS_CORS_ORIGINS
+              value: {{ include "hub.publicUrl" $ | quote }}
             {{- end }}
           readinessProbe:
             httpGet:
@@ -150,8 +204,12 @@ spec:
               mountPath: /tmp
       volumes:
         - name: data
+          {{- if $fs }}
           persistentVolumeClaim:
             claimName: {{ $name }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
         - name: tmp
           emptyDir: {}
 ---

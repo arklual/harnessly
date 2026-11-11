@@ -18,6 +18,7 @@ Every space has its own collections; a machine reaches only the ones of the spac
 | `uploads` | files people put into a chat, pictures and attachments |
 | `files` | any other file an agent or a person keeps |
 | `handoff` | what one machine passes to another |
+| `resume` | one room per person (`resume-<user id>`), not per space: each machine's sealed snapshots of its chats, read only by the person's own machines, 403 to anyone else ([resume.md](resume.md)) |
 | `apps` | the files of a space's apps: their storage areas under `storage/` (docs/apps.md); a machine sees only its own person's user and chat areas; the team's apps (`team/`), the guest links (`guests/<person>/`) and their packages (`bundles/`) |
 
 `design` takes only the files of a library (no executables, no tool configuration). The others take any relative path.
@@ -36,6 +37,7 @@ A collection is a room of the store named `<collection>-<space id>`.
 | Method and path | What it does |
 | --- | --- |
 | `HEAD`, `GET`, `PUT blobs/<sha256>` | a blob: is it there, read it, put it (the body must hash to its name) |
+| `POST blobs/missing` | `{shas: […]}` (at most 500): which of these blobs the collection does not hold, `{missing: […]}`. One request before a batch of uploads instead of a `HEAD` for each; the caller is judged as for `HEAD` |
 | `POST commit` | a new revision of a path on top of the revision the writer started from (`base`); a stale base answers `409` with the current revision |
 | `GET changes?since=<rev>&wait=<s>` | every path changed after a revision; with `wait`, held until something changes (a long poll) |
 | `GET current?path=<p>` | the newest revision of a path |
@@ -131,9 +133,39 @@ The store reuses the hub's database and bucket settings and has none of its own 
 | `HUB_STORE_S3_BUCKET` | `HUB_S3_BUCKET` | another bucket of the same S3 for the blobs |
 | `HUB_STORE_S3_PREFIX` | `<HUB_S3_PREFIX>store/` | where in the bucket the blobs are; a blob is `<prefix>rooms/<room>/blobs/<sha[:2]>/<sha>` |
 | `HUB_STORE_LEGACY_SPACE` | not set | a space's slug: its library is the room `design` itself, the one a design-sync center kept |
+| `HUB_STORE_MAX_UPLOAD_MB` | `0` (no limit) | the biggest file a machine sends in parts, for an installation that wants one (one PUT of a blob takes 50 MiB) |
 | `HUB_STORE_PROFILE_ROOMS` | not set | `<user id>=profile-sergey,<user id>=profile-rsk`: the rooms a design-sync center kept people's Claude profiles in, bound by user id (not by email, which an account may merely claim); the person's machines sync those instead of `profile-<user id>` |
 
 `hub check-config` prints where the store is.
+
+## Big files: uploads in parts
+
+A file bigger than one PUT of a blob takes (50 MiB) goes in parts, under the same collection, caller and room. There is
+no size limit unless `HUB_STORE_MAX_UPLOAD_MB` sets one.
+
+| Request | Answer |
+| --- | --- |
+| `GET …/uploads` | `{partSize, maxSize}` (`maxSize` 0: no limit); 404 on an older hub |
+| `POST …/uploads {sha, size}` | `{id, partSize, parts, expires, state}`: a new upload, or the caller's one of the same contents under way with the parts it has (a broken upload goes on from the first part missing); `{done: true}` when the room holds the contents; 413 above `HUB_STORE_MAX_UPLOAD_MB`; 429 with 16 uploads under way in the room or 4 of the caller's; 507 when the hub's disk cannot take the file |
+| `PUT …/uploads/{id}/parts/{n}?sha=` | 204; parts go in order, each `partSize` bytes (the last one the rest) hashing to `sha`; a part sent again with the same `sha` is 204, one out of order 409; 507 when the disk is short |
+| `GET …/uploads/{id}` | `{state, parts, error}`: `open` (receiving), `finishing` or `done` |
+| `POST …/uploads/{id}/complete` | 204: the contents are a blob of the room like any other; 202 `{state: finishing}` when that takes more than a few seconds (ask `GET …/uploads/{id}` until `done`; `open` with an `error` means complete again); 409 with the parts missing; 400 when the parts do not hash to `sha` (the upload is dropped) |
+| `DELETE …/uploads/{id}` | 204: given up (409 while finishing) |
+
+The hub keeps no copy of a big file on its own disk and reads nothing twice:
+
+- **In a bucket** an upload is a multipart upload of the blob's key: each part is a part of it, and finishing completes
+  it, so the bucket joins the parts. The part size grows past 8 MiB (in whole MiB) when a file needs more than 10000
+  parts.
+- **In a folder** the parts are written at their place in `<dir>/uploads/<room>/<id>`, on the store's disk, and
+  finishing renames that file to the blob. Before an upload and before each part the hub checks the disk has room for
+  what is left, past 256 MiB kept spare, and answers 507 with how much is needed and free.
+- The sha256 of the whole file is carried from part to part (its state is kept with the upload), so finishing only
+  compares it with `sha`.
+
+Until it is finished an upload is not a blob: the collection and the gc never see it. An upload no part reached for 24
+hours is removed with what it wrote (the hub looks once an hour). The machine's move (`0001-data-to-hub`) sends its big
+files this way, and moves the files it skipped as `MIG-TOO-BIG` once the hub takes them.
 
 ## The Claude profile
 

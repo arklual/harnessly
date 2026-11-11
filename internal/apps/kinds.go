@@ -3,6 +3,7 @@ package apps
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,6 +39,45 @@ type SinopiaKind struct {
 	DataKey string `json:"dataKey,omitempty"`
 	// Guest is read so that it can be refused with its reason (not supported yet).
 	Guest *SinopiaKindGuest `json:"guest,omitempty"`
+	// Extends names a document of Sinopia's own the type is made of: "site". Such a document is a project of
+	// that kind, opened in Sinopia's own editor with the chat's right pane; the app adds to it (its panels, checks,
+	// tab), and its contributions hold only in the documents of its type. It needs the permission app.extend and the
+	// deployment's word (ExtendAllowed); the editor view is then optional.
+	Extends string `json:"extends,omitempty"`
+}
+
+// The documents of Sinopia's own an app's type may extend.
+const ExtendsSite = "site"
+
+// ErrExtendNotAllowed: the app's type extends Sinopia's editor, and the deployment did not let the app do it.
+var ErrExtendNotAllowed = errors.New("apps: the deployment does not let this app extend Sinopia's editor")
+
+// extendList is the deployment's list of the apps that may extend Sinopia's editor: HARNESSLY_APPS_EXTEND, app ids
+// split by commas, or * for every one. Set by the admin of the installation, never by an app or an agent.
+var extendList = func() string { return os.Getenv("HARNESSLY_APPS_EXTEND") }
+
+// ExtendAllowed says whether the deployment lets an app extend Sinopia's editor (app.extend).
+func ExtendAllowed(app string) bool {
+	for _, id := range strings.Split(extendList(), ",") {
+		if id = strings.TrimSpace(id); id == "*" || (id != "" && id == app) {
+			return true
+		}
+	}
+	return false
+}
+
+// extendsKind says whether the app's type kind extends Sinopia's editor and the deployment allows it.
+func (m *Manifest) extendsKind(kind string) bool {
+	s, err := m.SinopiaOf()
+	if err != nil {
+		return false
+	}
+	for _, k := range s.Kinds {
+		if k.ID == kind && k.Extends != "" {
+			return ExtendAllowed(m.ID)
+		}
+	}
+	return false
 }
 
 // SinopiaKindGuest is the static render a guest sees.
@@ -83,7 +123,18 @@ func (m *Manifest) checkKinds(s Sinopia, targets map[string]bool, add func(path,
 		if k.ID != "" && !targets["sinopia."+k.ID] {
 			add(path, "the app has no target sinopia.%s: add it to targets, a type is edited in the app's own view", k.ID)
 		}
+		switch k.Extends {
+		case "":
+		case ExtendsSite:
+			if !contains(m.Permissions, "app.extend") {
+				add(path+".extends", "extending Sinopia's editor needs the permission app.extend")
+			}
+		default:
+			add(path+".extends", "%q is not a document of Sinopia's own an app may extend: site", k.Extends)
+		}
 		switch v := m.view(k.Editor); {
+		case k.Editor == "" && k.Extends != "":
+			// Sinopia's own editor edits it.
 		case k.Editor == "":
 			add(path+".editor", "is required: the view that edits the document")
 		case v == nil:
@@ -124,6 +175,43 @@ func (m *Manifest) checkKinds(s Sinopia, targets map[string]bool, add func(path,
 	}
 }
 
+// checkPinned is the part of the manifest check about views[].pinned: one view at most, made for a type of the app's
+// own that extends Sinopia's site (there is no pane beside any other document of the app's).
+func (m *Manifest) checkPinned(s Sinopia, add func(path, format string, a ...any)) {
+	pinned := 0
+	for i, v := range m.Views {
+		if !v.Pinned {
+			continue
+		}
+		pinned++
+		if pinned > 1 {
+			add(fmt.Sprintf("views[%d].pinned", i), "an app pins one tab at most")
+		}
+		ok := false
+		for _, k := range s.Kinds {
+			if k.Extends != "" && contains(v.Targets, "sinopia."+k.ID) {
+				ok = true
+			}
+		}
+		if !ok {
+			add(fmt.Sprintf("views[%d].pinned", i), "a pinned tab stands beside a document of the app's type made of a site: give the view the target sinopia.<type> of a type with extends")
+		}
+	}
+}
+
+// PinnedView is the app's pinned tab for a document of a kind: its view, or nil.
+func (m *Manifest) PinnedView(kind string) *View {
+	if !m.extendsKind(kind) {
+		return nil
+	}
+	for i := range m.Views {
+		if m.Views[i].Pinned && contains(m.Views[i].Targets, "sinopia."+kind) {
+			return &m.Views[i]
+		}
+	}
+	return nil
+}
+
 // KindInfo is a document type as the page lists it.
 type KindInfo struct {
 	ID            string `json:"id"`
@@ -133,6 +221,8 @@ type KindInfo struct {
 	AppName       string `json:"appName"`
 	Editor        string `json:"editor"`
 	SchemaVersion int    `json:"schemaVersion"`
+	// Extends is the document of Sinopia's own the type is made of ("site"); its documents open in Sinopia's editor.
+	Extends string `json:"extends,omitempty"`
 }
 
 // Kinds are the document types of the apps that are on for the person, by id.
@@ -155,7 +245,12 @@ func kindsOf(list []Installed) []KindInfo {
 			continue
 		}
 		for _, k := range s.Kinds {
-			out = append(out, KindInfo{ID: k.ID, Title: k.Title, Icon: k.Icon, App: a.ID, AppName: a.Manifest.Name, Editor: k.Editor, SchemaVersion: k.SchemaVersion})
+			// A type that extends Sinopia's editor is offered only where the deployment lets the app do it.
+			if k.Extends != "" && !ExtendAllowed(a.ID) {
+				continue
+			}
+			out = append(out, KindInfo{ID: k.ID, Title: k.Title, Icon: k.Icon, App: a.ID, AppName: a.Manifest.Name, Editor: k.Editor,
+				SchemaVersion: k.SchemaVersion, Extends: k.Extends})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -175,7 +270,11 @@ func (r *Registry) Kind(id string) (KindInfo, SinopiaKind, error) {
 		s, _ := a.Manifest.SinopiaOf()
 		for _, k := range s.Kinds {
 			if k.ID == id {
-				return KindInfo{ID: k.ID, Title: k.Title, Icon: k.Icon, App: a.ID, AppName: a.Manifest.Name, Editor: k.Editor, SchemaVersion: k.SchemaVersion}, k, nil
+				if k.Extends != "" && !ExtendAllowed(a.ID) {
+					return KindInfo{}, SinopiaKind{}, ErrExtendNotAllowed
+				}
+				return KindInfo{ID: k.ID, Title: k.Title, Icon: k.Icon, App: a.ID, AppName: a.Manifest.Name, Editor: k.Editor,
+					SchemaVersion: k.SchemaVersion, Extends: k.Extends}, k, nil
 			}
 		}
 	}

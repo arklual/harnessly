@@ -2,6 +2,8 @@ package wire
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -259,6 +261,17 @@ type DesignArtifact struct {
 	Owner       *DesignOwner  `json:"owner,omitempty"`
 	// Role is what the person may do in the project; absent from a runtime that does not restrict access.
 	Role DesignRole `json:"role,omitempty"`
+	// AppKind is the app's document type the project is (a type made of Sinopia's site): its label in the
+	// library and on the project; absent for a project of Sinopia's own.
+	AppKind *DesignAppKind `json:"appKind,omitempty"`
+}
+
+// DesignAppKind is an app's document type as a project of the library carries it.
+type DesignAppKind struct {
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	App     string `json:"app"`
+	AppName string `json:"appName"`
 }
 
 // DesignRole is a person's role in a project, weakest first.
@@ -391,6 +404,45 @@ type DesignlySource interface {
 // designlyBudget is how long a project may take to be made and its conversation to be opened.
 const designlyBudget = 30 * time.Second
 
+// writeRevalidated answers like writeChecked, with the answer's fingerprint as its ETag: the page keeps the answer and
+// asks with If-None-Match, and an answer that did not change is a 304 with no body. The page still asks every time
+// (no-cache), so nothing stale is ever shown.
+func (s *Server) writeRevalidated(w http.ResponseWriter, r *http.Request, v interface{ Validate() error }) {
+	if verr := v.Validate(); verr != nil {
+		jsonlog.Log("error", "v2: an answer out of contract", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: verr.Error()})
+		refuse(w, RefuseInternal)
+		return
+	}
+	b, err := Marshal(v)
+	if err != nil {
+		refuse(w, RefuseInternal)
+		return
+	}
+	sum := sha256.Sum256(b)
+	etag := `"` + hex.EncodeToString(sum[:12]) + `"`
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "private, no-cache")
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
+}
+
+// etagMatches: one of the tags the request names is this one (a weak one counts: a proxy that compressed the answer
+// made it weak).
+func etagMatches(header, etag string) bool {
+	for _, tag := range strings.Split(header, ",") {
+		tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/")
+		if tag == etag || tag == "*" {
+			return true
+		}
+	}
+	return false
+}
+
 // designly serves /api/v2/designly/{create,library,systems,pin,chat,demo}.
 func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 	if s.Designly == nil {
@@ -436,7 +488,7 @@ func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 				out.Artifacts[i].Convs = []string{}
 			}
 		}
-		s.writeChecked(w, r, out)
+		s.writeRevalidated(w, r, out)
 	case "systems":
 		list, err := s.Designly.Systems(ctx)
 		if err != nil {

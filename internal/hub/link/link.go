@@ -18,11 +18,14 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
 
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const (
@@ -35,13 +38,25 @@ const (
 
 	frameData  byte = 1
 	frameClose byte = 2
-	tunnelID        = 16
+	// frameWindow goes to an agent that keeps to a tunnel's window: four bytes, how many more it may send.
+	frameWindow byte = 3
+
+	tunnelID = 16
 	// tunnelWriteChunk is how much of a write goes into one frame.
 	tunnelWriteChunk = 32 * 1024
-	// maxTunnelQueue is how much a tunnel holds for a reader that is slow. Past it the tunnel is cut: the link is shared
-	// with every other tunnel of the machine, and holding its reading back would hold them all.
+	// eventQueue is how many events of an agent wait for the hub; bulkQueue is the same for the bulk ones.
+	eventQueue = 256
+	bulkQueue  = BulkQueue
+	// bulkLostEvery is how often, at most, the hub is told that bulk events were dropped.
+	bulkLostEvery = time.Minute
+	// maxTunnelQueue is how much a tunnel holds for a reader that is slow when its agent knows no window (tunnel.go).
+	// Past it the tunnel is cut: the link is shared with every other tunnel of the machine, and holding its reading back
+	// would hold them all.
 	maxTunnelQueue = 16 << 20
 )
+
+// BulkQueue is how many bulk events of an agent wait for the hub (repl.batch among them).
+const BulkQueue = 256
 
 // How often the hub pings an agent and how long it waits for the answer. Variables so that a test can shorten them.
 var (
@@ -57,7 +72,12 @@ type Event struct {
 	Name string
 	// Raw is the whole frame, for the consumer to read the fields of its event from.
 	Raw json.RawMessage
+	// at is when the hub read the frame.
+	at time.Time
 }
+
+// At is when the hub read the frame; zero for an event made by hand.
+func (e Event) At() time.Time { return e.at }
 
 type reply struct {
 	result json.RawMessage
@@ -88,6 +108,19 @@ type Link struct {
 	tunnels map[string]*Tunnel
 
 	onEvent chan Event
+	// onBulk holds the events Bulk names. They have a queue and a goroutine of their own, so that a flood of them (a
+	// machine sending the history of its chats) neither delays the other events nor ends the link: a bulk event that
+	// finds the queue full is dropped, and BulkLost is told once the queue is taken.
+	onBulk   chan Event
+	bulkLost atomic.Bool
+	// eventHead and bulkHead are when the oldest event of each queue that is not handled yet was read (unix
+	// nanoseconds); 0 while nothing waits. registered: the registry took the link, so its end is counted.
+	eventHead, bulkHead atomic.Int64
+	registered          atomic.Bool
+	// Bulk says which events are bulk; BulkLost is called, off the reading goroutine and not more often than
+	// bulkLostEvery, after some were dropped. Set both before Serve; nil Bulk: no event is bulk.
+	Bulk     func(name string) bool
+	BulkLost func()
 
 	// owner and fence are the directory entry of the link in a cluster (cluster.go); remote is set on a stand-in for a
 	// link another replica holds.
@@ -105,7 +138,7 @@ func New(conn *websocket.Conn, machineID string, log *slog.Logger) *Link {
 	return &Link{
 		MachineID: machineID, ConnectedAt: time.Now().UTC(), conn: conn, log: log,
 		control: make(chan []byte, controlQueue), data: make(chan []byte, dataQueue), done: make(chan struct{}),
-		pending: map[uint64]chan reply{}, tunnels: map[string]*Tunnel{}, onEvent: make(chan Event, 256),
+		pending: map[uint64]chan reply{}, tunnels: map[string]*Tunnel{}, onEvent: make(chan Event, eventQueue), onBulk: make(chan Event, bulkQueue),
 		pingEvery: pingEvery, pingTimeout: pingTimeout,
 	}
 }
@@ -137,36 +170,81 @@ func (l *Link) Close(code websocket.StatusCode, reason string) {
 		l.closeCode = code
 		l.mu.Unlock()
 		close(l.done)
-		go func() { _ = l.conn.Close(code, reason) }()
+		if l.registered.Load() {
+			metrics.LinkDisconnects.Inc()
+		}
+		safego.Go("link Close", func() { _ = l.conn.Close(code, reason) })
 	})
 }
 
 // Serve runs the link: it writes, pings and reads until the link ends, and returns the reason. Events are handed to
-// onEvent one by one in the order they came, off the reading goroutine.
+// onEvent one by one in the order they came, off the reading goroutine; the bulk ones (Bulk) likewise among
+// themselves, apart from the rest. A panic in onEvent loses that event only.
 func (l *Link) Serve(ctx context.Context, onEvent func(Event)) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go l.writer()
-	go l.heartbeat(ctx)
+	safego.Go("link writer", l.writer)
+	safego.Go("link heartbeat", func() { l.heartbeat(ctx) })
+	handle := func(ev Event) {
+		if onEvent != nil {
+			safego.Run("link event "+ev.Name, func() { onEvent(ev) })
+		}
+	}
 	evDone := make(chan struct{})
-	go func() {
+	safego.Go("link Serve", func() {
 		defer close(evDone)
 		for {
 			select {
 			case ev := <-l.onEvent:
-				if onEvent != nil {
-					onEvent(ev)
-				}
+				taken(&l.eventHead, l.onEvent, ev, handle)
 			case <-l.done:
 				return
 			}
 		}
-	}()
+	})
+	bulkDone := make(chan struct{})
+	safego.Go("link bulk events", func() {
+		defer close(bulkDone)
+		l.serveBulk(handle)
+	})
 	err := l.read(ctx)
 	l.Close(websocket.StatusNormalClosure, "")
 	l.fail()
 	<-evDone
+	<-bulkDone
 	return err
+}
+
+// taken hands a queued event over and keeps head at the oldest event that is not handled yet.
+func taken(head *atomic.Int64, queue chan Event, ev Event, handle func(Event)) {
+	head.Store(ev.at.UnixNano())
+	handle(ev)
+	if len(queue) == 0 {
+		head.Store(0)
+	}
+}
+
+// serveBulk hands the bulk events over, and says that some were dropped once those that were queued are taken.
+func (l *Link) serveBulk(handle func(Event)) {
+	check := time.NewTicker(bulkLostEvery / 4)
+	defer check.Stop()
+	var told time.Time
+	for {
+		select {
+		case ev := <-l.onBulk:
+			taken(&l.bulkHead, l.onBulk, ev, handle)
+		case <-check.C:
+		case <-l.done:
+			return
+		}
+		if len(l.onBulk) == 0 && l.bulkLost.Load() && time.Since(told) >= bulkLostEvery {
+			l.bulkLost.Store(false)
+			told = time.Now()
+			if l.BulkLost != nil {
+				safego.Run("link bulk lost", l.BulkLost)
+			}
+		}
+	}
 }
 
 func (l *Link) writer() {
@@ -249,9 +327,21 @@ func (l *Link) read(ctx context.Context) error {
 			continue
 		}
 		if head.Event != "" && len(head.ID) == 0 {
+			if l.Bulk != nil && l.Bulk(head.Event) {
+				select {
+				case l.onBulk <- Event{Name: head.Event, Raw: data, at: time.Now()}:
+				default:
+					metrics.EventsDropped.Inc()
+					if !l.bulkLost.Swap(true) {
+						l.log.Warn("agent bulk events are behind, dropping them", "machine", l.MachineID, "event", head.Event)
+					}
+				}
+				continue
+			}
 			select {
-			case l.onEvent <- Event{Name: head.Event, Raw: data}:
+			case l.onEvent <- Event{Name: head.Event, Raw: data, at: time.Now()}:
 			default:
+				metrics.LinksStuck.Inc()
 				// Nobody is taking events: the link is stuck, and the agent redials into a clean state.
 				l.log.Warn("agent events are not being taken, closing the link", "machine", l.MachineID)
 				l.Close(websocket.StatusTryAgainLater, "events stuck")
@@ -425,6 +515,15 @@ func (l *Link) dropTunnel(id string) {
 	l.mu.Lock()
 	delete(l.tunnels, id)
 	l.mu.Unlock()
+}
+
+// load is what the link holds at this moment: open tunnels, calls waiting for an answer, queued events and when the
+// oldest unhandled event of each queue was read (0: none).
+func (l *Link) load() (tunnels, calls, events, bulk int, eventHead, bulkHead int64) {
+	l.mu.Lock()
+	tunnels, calls = len(l.tunnels), len(l.pending)
+	l.mu.Unlock()
+	return tunnels, calls, len(l.onEvent), len(l.onBulk), l.eventHead.Load(), l.bulkHead.Load()
 }
 
 // Tunnels is how many tunnels are open; for tests and diagnostics.

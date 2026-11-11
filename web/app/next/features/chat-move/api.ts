@@ -45,6 +45,9 @@ export interface IMoveSource {
   project: boolean;
   dirty: boolean;
   busy: boolean;
+  /** The machine does not answer: nothing is known of its folder, and the chat goes on from its last snapshot. */
+  offline?: boolean;
+  fromSnapshot?: boolean;
 }
 
 export interface IMoveTargets {

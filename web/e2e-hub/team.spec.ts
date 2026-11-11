@@ -96,12 +96,13 @@ interface Person {
 }
 
 /**
- * The chat history and the move of a chat are the hub's, served on the workspace's way in only: a machine's own
- * page runs the machine's code (its own origin in the cloud), so the hub does not hand it the person's history of
- * every machine. Its 404 there is the answer the page expects, not a failure.
+ * The chat history, the move of a chat and the chats that wait for a machine are the hub's, served on the
+ * workspace's way in only: a machine's own page runs the machine's code (its own origin in the cloud), so the hub
+ * does not hand it the person's history or queue of every machine. Its 404 there is the answer the page expects (it
+ * asks once and reads «not here»), not a failure.
  */
 const CENTRAL_ONLY =
-  /^\/m\/[^/]+\/api\/(platform|v2)\/(history\/(conversations|sidebar)$|chat-move\/status$)/;
+  /^\/m\/[^/]+\/api\/(platform|v2)\/(history\/(conversations|sidebar)$|chat-move\/status$|offline-chats$)/;
 
 /** Puts a failed request of a person's page among the errors, or among the central-only answers. */
 const noteFailed = (p: Person, method: string, path: string, search: string, status: number) => {

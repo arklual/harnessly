@@ -22,9 +22,11 @@ export const noticeEventOf = (conv: Conversation, machineOnline: boolean): INoti
   const status = chatStatusOf(conv, machineOnline);
   if (status === CHAT_STATUS.none) return null;
   const look = STATUS_LOOK[status];
+  // Keyed by the gate that waits, not by when the state was stamped: a sync that stamps the same wait anew (another
+  // copy of the record, a reconnect) is the same notice, not a new one that leaves and comes again.
   if (WAITING.has(status))
     return {
-      key: `${conv.id}:${status}:${conv.state.since}`,
+      key: `${conv.id}:${status}:${conv.gate?.id ?? conv.state.since}`,
       kind: NOTICE_KIND.waiting,
       icon: look.icon,
       text: look.label,

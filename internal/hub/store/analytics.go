@@ -194,6 +194,8 @@ type SessionCallSum struct {
 	Model          string
 	Calls          int64
 	ListCostMicros int64
+	// Tokens of the calls; the cache writes are both lifetimes together.
+	Input, Output, CacheRead, CacheWrite int64
 }
 
 // SessionSums sums the calls of these top-level sessions, their subagents' calls included, by model, and counts the
@@ -269,15 +271,16 @@ func (s Store) sessionSums(ctx context.Context, refs []SessionRef, minContext in
 					over = ` AND input + cache_read + cache_write_5m + cache_write_1h >= ?`
 					cargs = append(cargs, minContext)
 				}
-				rows, err := s.q.Query(ctx, `SELECT session_key, model, COUNT(*), COALESCE(SUM(list_cost_micros), 0) FROM usage_calls
+				rows, err := s.q.Query(ctx, `SELECT session_key, model, COUNT(*), COALESCE(SUM(list_cost_micros), 0), SUM(input), SUM(output), SUM(cache_read),
+					SUM(cache_write_5m + cache_write_1h) FROM usage_calls
 					WHERE org_key = ? AND provider = ? AND session_key IN (`+placeholders(len(sub))+`)`+over+` GROUP BY session_key, model`, cargs...)
 				if err != nil {
 					return nil, nil, err
 				}
 				for rows.Next() {
 					var key, model string
-					var calls, list int64
-					if err := rows.Scan(&key, &model, &calls, &list); err != nil {
+					var calls, list, in, out, cr, cw int64
+					if err := rows.Scan(&key, &model, &calls, &list, &in, &out, &cr, &cw); err != nil {
 						rows.Close()
 						return nil, nil, err
 					}
@@ -289,6 +292,7 @@ func (s Store) sessionSums(ctx context.Context, refs []SessionRef, minContext in
 					}
 					a.Calls += calls
 					a.ListCostMicros += list
+					a.Input, a.Output, a.CacheRead, a.CacheWrite = a.Input+in, a.Output+out, a.CacheRead+cr, a.CacheWrite+cw
 				}
 				err = rows.Err()
 				rows.Close()
@@ -479,4 +483,34 @@ func (s Store) WorkSince(ctx context.Context, orgKeys []string, from int64) (map
 		}
 	}
 	return out, nil
+}
+
+// CallBucket is a person's calls of one provider and model within one hour (epoch ms of the hour's start).
+type CallBucket struct {
+	Hour, Calls, ListCostMicros          int64
+	Provider, Model                      string
+	Input, Output, CacheRead, CacheWrite int64
+}
+
+// UserCallBuckets sums the calls of every session of a person (subagents included) made in [from, to) by hour,
+// provider and model.
+func (s Store) UserCallBuckets(ctx context.Context, userID string, from, to int64) ([]CallBucket, error) {
+	rows, err := s.q.Query(ctx, `SELECT (c.ts / 3600000) * 3600000, c.provider, c.model, COUNT(*), COALESCE(SUM(c.list_cost_micros), 0),
+		SUM(c.input), SUM(c.output), SUM(c.cache_read), SUM(c.cache_write_5m + c.cache_write_1h)
+		FROM usage_calls c JOIN agent_sessions a ON a.org_key = c.org_key AND a.provider = c.provider AND a.session_key = c.session_key
+		WHERE a.user_id = ? AND c.ts >= ? AND c.ts < ?
+		GROUP BY 1, c.provider, c.model ORDER BY 1, c.provider, c.model`, userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CallBucket
+	for rows.Next() {
+		var b CallBucket
+		if err := rows.Scan(&b.Hour, &b.Provider, &b.Model, &b.Calls, &b.ListCostMicros, &b.Input, &b.Output, &b.CacheRead, &b.CacheWrite); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
 }

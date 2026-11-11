@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decidingLimit, historyRows, limitTone, runsOutIn } from '@/next/legacy/manage/model';
+import { decidingLimit, historyRows, hubSummary, limitTone, runsOutIn } from '@/next/legacy/manage/model';
 import { mockMe } from '@/next/features/manage/mock';
 
 describe('limits', () => {
@@ -30,5 +30,27 @@ describe('history', () => {
     const hub = mockMe().sessions.sessions;
     expect(historyRows([session], hub)[0]?.hub?.key).toBe('s-1');
     expect(historyRows([session], null)[0]?.hub).toBeNull();
+  });
+});
+
+describe('hubSummary', () => {
+  const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+  const usage = {
+    currency: 'USD',
+    byModel: [],
+    forecast: null,
+    days: [1, 2, 3].map((n) => ({ day: `d${n}`, cost: n })),
+  };
+  const sessions = [
+    { key: 'a', endedAt: day(1), cost: 1, machine: 'm', outcome: 'mr_open' as const },
+    { key: 'b', endedAt: day(40), cost: 1, machine: 'm', outcome: 'done' as const },
+    { key: 'c', endedAt: null, cost: 1, machine: 'm', outcome: 'running' as const },
+  ];
+  it('counts the hub figures of the period and nothing else', () => {
+    const h = hubSummary({ usage, sessions: { sessions } }, 7);
+    expect(h.cost).toBe(6);
+    expect(h.sessions).toBe(2);
+    expect(h.mrs).toBe(1);
+    expect(h.recent[0]?.key).toBe('c');
   });
 });

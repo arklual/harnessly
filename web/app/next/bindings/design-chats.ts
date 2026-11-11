@@ -19,6 +19,8 @@ export const useDesignChatsFound = (
   design: string,
   here: readonly string[],
   ask: number,
+  /** Ask only the open machine's list (an app's object is no design of the libraries). */
+  hereOnly = false,
 ): readonly IDesignChatsFound[] => {
   const machines = useMachines();
   const others = useMemo(
@@ -36,7 +38,7 @@ export const useDesignChatsFound = (
   const key = `${design}|${othersKey}`;
 
   useEffect(() => {
-    if (others.length === 0) return;
+    if (hereOnly || others.length === 0) return;
     const abort = new AbortController();
     void Promise.allSettled(
       others.map(async (m) => ({ machine: m, convs: await fetchDesignChats(m, design, abort.signal) })),

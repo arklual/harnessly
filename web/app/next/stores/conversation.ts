@@ -21,6 +21,9 @@ import type {
   MachineId,
   Ms,
   Now,
+  Pane,
+  PaneItem,
+  PaneLink,
   Permission,
   Question,
   Queue,
@@ -71,6 +74,16 @@ export const backgroundStore = createKeyedStore<ConvId, BackgroundTask[]>();
 export const shotsStore = createKeyedStore<ConvId, Shot[]>();
 /** The pictures the conversation's messages name (ConvSnapshot.pictures). */
 export const picturesStore = createKeyedStore<ConvId, Picture[]>();
+/**
+ * What the right pane reads of the conversation. `fed: true`: its runtime gathers it and sends it in the
+ * conversation's channel; `fed: false`: the runtime of this connection sends none, and the pane reads the conversation
+ * by itself. Absent until the conversation's snapshot of this page has come.
+ */
+export type PaneView = { fed: true; count: number; links: PaneLink[]; items: PaneItem[] } | { fed: false };
+export const paneStore = createKeyedStore<ConvId, PaneView>();
+export const usePane = (conv: ConvId | null): PaneView | undefined => useKey(paneStore, conv);
+/** How many items of the pane a page keeps: a long day of work, not the whole life of a chat. */
+export const PANE_ITEMS_KEPT = 4000;
 /**
  * The client ids of the person's messages the feed already holds as entries (a turn's prompt or a steered message
  * inside it): such a message stands in the feed and nowhere else, so the stack over the field and the bubbles of
@@ -352,6 +365,26 @@ export function setPictures(conv: ConvId, pictures: Picture[]): void {
   picturesStore.patch(conv, (have) => (have && same(have, pictures) ? have : pictures));
 }
 
+/** The pane of a snapshot: whole, in the place of what the page holds; none from a runtime that sends none. */
+export function setPane(conv: ConvId, pane: Pane | undefined): void {
+  paneStore.set(
+    conv,
+    pane
+      ? { fed: true, count: pane.count, links: pane.links ?? [], items: pane.items ?? [] }
+      : { fed: false },
+  );
+}
+
+/** What a read of the transcript added to the pane (the `pane` of a queue_changed). */
+export function applyPane(conv: ConvId, pane: Pane): void {
+  paneStore.patch(conv, (have) => {
+    if (!have?.fed || pane.reset)
+      return { fed: true, count: pane.count, links: pane.links ?? [], items: pane.items ?? [] };
+    const items = pane.items?.length ? [...have.items, ...pane.items].slice(-PANE_ITEMS_KEPT) : have.items;
+    return { fed: true, count: pane.count, links: pane.links ?? have.links, items };
+  });
+}
+
 export function removeBackground(conv: ConvId, id: string): void {
   backgroundStore.patch(conv, (list) =>
     list?.some((x) => x.id === id) ? list.filter((x) => x.id !== id) : list,
@@ -558,6 +591,7 @@ export function dropConversationData(conv: ConvId): void {
   backgroundStore.delete(conv);
   shotsStore.delete(conv);
   picturesStore.delete(conv);
+  paneStore.delete(conv);
   fedStore.delete(conv);
 }
 

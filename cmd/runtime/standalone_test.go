@@ -155,6 +155,11 @@ func TestStandaloneStartWritesThePreviousRuntimesFiles(t *testing.T) {
 		t.Error("the permission hook script")
 	}
 	delete(got, "permission-hook.sh")
+	// The guard the single-instance lock is held on, beside the file that names the holder; new in this runtime.
+	if _, ok := got["omux.lock.flock"]; !ok {
+		t.Error("the lock's guard file")
+	}
+	delete(got, "omux.lock.flock")
 	for name := range got {
 		t.Errorf("written beyond the previous runtime's start: %s", name)
 	}

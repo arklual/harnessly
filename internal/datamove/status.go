@@ -128,14 +128,24 @@ func (m *Mover) Verify(ctx context.Context) (Verified, error) {
 		}
 	}
 	m.mu.Unlock()
+	named := map[string][]string{}
+	for _, c := range check {
+		named[c.Kind] = append(named[c.Kind], c.Sha256)
+	}
+	lacks := m.lacking(ctx, named)
 	var out Verified
 	for _, c := range check {
 		if ctx.Err() != nil {
 			return out, ctx.Err()
 		}
-		has, err := m.o.Target.HasBlob(ctx, c.Kind, c.Sha256)
-		if err != nil {
-			return out, err
+		var has bool
+		if missing, asked := lacks[c.Kind]; asked {
+			has = !missing[c.Sha256]
+		} else {
+			var err error
+			if has, err = m.o.Target.HasBlob(ctx, c.Kind, c.Sha256); err != nil {
+				return out, err
+			}
 		}
 		out.Checked++
 		if has {

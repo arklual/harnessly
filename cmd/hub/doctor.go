@@ -13,6 +13,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/diag"
+	"github.com/ly-solutions/harnessly/internal/hub/docs"
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/sites"
@@ -56,7 +57,7 @@ func runDoctor(ctx context.Context, args []string, lookup func(string) (string, 
 	}
 	fmt.Fprintln(stdout, "configuration  ok")
 
-	checks := []check{checkAddress(cfg), checkDatabase(ctx, cfg), checkS3(ctx, cfg), checkOIDC(ctx, cfg), checkProxy(cfg)}
+	checks := []check{checkAddress(cfg), checkDatabase(ctx, cfg), checkS3(ctx, cfg), checkOIDC(ctx, cfg), checkProxy(cfg), checkAppServices(ctx, cfg, http.DefaultClient)}
 	if offline {
 		checks = append(checks, check{name: "public address", verdict: vSkip, detail: "--offline"}, check{name: "clock", verdict: vSkip, detail: "--offline"})
 	} else {
@@ -214,6 +215,39 @@ func checkOIDC(ctx context.Context, cfg *config.Config) check {
 		}
 	}
 	c.detail = strings.Join(names, ", ")
+	return c
+}
+
+// checkAppServices asks the documents and boards services for /readyz. They are optional apps, so one that is down
+// is a warning: the hub works, and their apps say «сейчас не открывается».
+func checkAppServices(ctx context.Context, cfg *config.Config, hc *http.Client) check {
+	services := []struct{ name, url string }{{"documents", cfg.ArtifactsURL}, {"boards", cfg.BoardsURL}}
+	c := check{name: "app services", verdict: vSkip, detail: "none (HUB_ARTIFACTS_URL, HUB_BOARDS_URL)"}
+	var up []string
+	for _, s := range services {
+		if s.url == "" {
+			continue
+		}
+		c.verdict = vOK
+		cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err := docs.ProbeReady(cctx, hc, s.url)
+		cancel()
+		if err != nil {
+			if c.problem == nil {
+				c.verdict = vWarn
+				c.problem = &diag.Problem{Code: diag.AppServiceDown, What: fmt.Sprintf("the %s service (%s) is not ready: %v", s.name, s.url, err),
+					Fix: "start the service or fix its address; its /readyz must answer 2xx from this machine"}
+			}
+			continue
+		}
+		up = append(up, s.name)
+	}
+	if c.verdict != vSkip {
+		c.detail = "ready: " + strings.Join(up, ", ")
+		if len(up) == 0 {
+			c.detail = "ready: none"
+		}
+	}
 	return c
 }
 

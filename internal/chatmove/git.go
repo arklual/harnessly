@@ -36,6 +36,8 @@ const (
 	CodeNotFound     = "not_found"
 	CodeInternal     = "internal"
 	CodeAlreadyMoved = "moved"
+	// CodeNoSnapshot: the hub keeps no resume snapshot of the chat, or this machine cannot read it.
+	CodeNoSnapshot = "no_snapshot"
 )
 
 // Check is one thing a preflight looked at.

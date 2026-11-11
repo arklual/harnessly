@@ -18,10 +18,35 @@ const (
 	// MadeTask is a tracker task or epic the chat created or touched. It is only sent to a page that asked for tasks
 	// (?tasks=1): a page that does not know the kind is never shown it.
 	MadeTask MadeKind = "task"
+	// MadeMR is a merge request (pull request) the chat opened. A page that does not know the kind leaves it out.
+	MadeMR MadeKind = "mr"
 )
 
 // MadeKinds is every MadeKind, in the schema's order.
-var MadeKinds = []MadeKind{MadeDoc, MadeBoard, MadeDesign, MadeTask}
+var MadeKinds = []MadeKind{MadeDoc, MadeBoard, MadeDesign, MadeTask, MadeMR}
+
+// MadeFromKind says who made a thing the chat inherits: one of its subagents or one of its delegated chats.
+type MadeFromKind string
+
+const (
+	MadeFromSubagent MadeFromKind = "subagent"
+	MadeFromSubchat  MadeFromKind = "subchat"
+)
+
+// MadeFromKinds is every MadeFromKind, in the schema's order.
+var MadeFromKinds = []MadeFromKind{MadeFromSubagent, MadeFromSubchat}
+
+// MadeFrom is the subagent or delegated chat that made a thing: the chat that started them inherits all they made. ID
+// is the subchat's conversation id or the subagent's id; Title its name, "" when unknown.
+type MadeFrom struct {
+	Kind  MadeFromKind `json:"kind"`
+	ID    string       `json:"id"`
+	Title string       `json:"title"`
+}
+
+func (f MadeFrom) Validate() error {
+	return errors.Join(in("from.kind", f.Kind, MadeFromKinds), need("from.id", f.ID))
+}
 
 // MadeMax is the most items one answer holds.
 const MadeMax = 60
@@ -62,10 +87,15 @@ type MadeItem struct {
 	DesignKind *DesignKind `json:"designKind"`
 	// Task is set for a task only, and only when the tracker could be read; it is left out otherwise.
 	Task *MadeTaskInfo `json:"task,omitempty"`
+	// From is set when a subagent or a delegated chat made it, not the chat itself.
+	From *MadeFrom `json:"from,omitempty"`
 }
 
 func (m MadeItem) Validate() error {
 	errs := []error{in("kind", m.Kind, MadeKinds), need("ref", m.Ref), in("op", m.Op, OutputOps), nonNegative("at", m.At)}
+	if m.From != nil {
+		errs = append(errs, m.From.Validate())
+	}
 	if m.Kind == MadeDesign {
 		if m.DesignKind == nil {
 			errs = append(errs, errors.New("designKind: null for a design"))

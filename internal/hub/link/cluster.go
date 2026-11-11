@@ -3,7 +3,6 @@ package link
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 // Several replicas of the hub (HUB_REPLICAS=on, docs/hub/replicas.md).
@@ -29,7 +29,8 @@ import (
 // A machine dials one replica and its WebSocket lives in that process. The directory (table machine_links) says which
 // replica holds which machine: the owner takes a lease (renewed every third of the TTL) and a fencing token, greater
 // every time the machine is taken over. A request for a machine on another replica is carried to the owner over an
-// internal HTTP hop (POST …/call, a WebSocket for …/tunnel), authenticated with a secret shared by the replicas.
+// internal HTTP hop (POST …/call, a WebSocket for …/tunnel) on a listener of its own, each request signed with a secret
+// shared by the replicas.
 //
 // The hop was chosen over LISTEN/NOTIFY because a tunnel is a stream, and a call wants its answer on the same connection
 // with the agent's own error; NOTIFY would need a second channel for the answers and cannot carry bytes. The hop needs
@@ -43,9 +44,11 @@ import (
 // DefaultLeaseTTL is how long a lease lasts without a renewal.
 const DefaultLeaseTTL = 15 * time.Second
 
+// acquireAttempts is how many times a fresh link's entry in the directory is tried before the link is given up.
+const acquireAttempts = 3
+
 const (
 	replicaPrefix = "/internal/replica/v1/"
-	secretHeader  = "X-Replica-Secret"
 	lookupFresh   = time.Second
 )
 
@@ -128,16 +131,26 @@ func (l *Link) Remote() bool { return l.remote != nil }
 
 // acquire takes the directory entry of l's machine and starts renewing it.
 func (c *Cluster) acquire(r *Registry, l *Link) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	fence, err := c.DB.S().AcquireLink(ctx, l.MachineID, c.ID, c.Addr, c.now(), c.ttl())
+	var fence int64
+	var err error
+	for attempt := 1; attempt <= acquireAttempts; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		fence, err = c.DB.S().AcquireLink(ctx, l.MachineID, c.ID, c.Addr, c.now(), c.ttl())
+		cancel()
+		if err == nil || l.Closed() {
+			break
+		}
+		time.Sleep(time.Duration(attempt) * 100 * time.Millisecond)
+	}
 	if err != nil {
-		// The link still works here, only other replicas cannot find it, and its writes are not guarded.
-		c.log().Warn("link not entered in the directory", "machine", l.MachineID, "error", err)
+		// A link the directory does not know cannot be found by the other replicas, and its writes are not guarded:
+		// it is ended, and the agent dials again.
+		c.log().Warn("link not entered in the directory, closing it", "machine", l.MachineID, "error", err)
+		l.Close(websocket.StatusTryAgainLater, "link directory unavailable")
 		return
 	}
 	l.owner, l.fence = c.ID, fence
-	go c.renew(l)
+	safego.Go("link renew", func() { c.renew(l) })
 }
 
 // renew keeps the lease while the link lives; a lost lease, or one that could not be renewed for a whole TTL, ends the
@@ -233,18 +246,19 @@ type remote struct {
 
 func (rm *remote) request(ctx context.Context, method, path string, body any) (*http.Response, error) {
 	var rd io.Reader
+	var sent []byte
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
 			return nil, err
 		}
-		rd = strings.NewReader(string(b))
+		sent, rd = b, strings.NewReader(string(b))
 	}
 	req, err := http.NewRequestWithContext(ctx, method, rm.addr+replicaPrefix+path, rd)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(secretHeader, rm.c.Secret)
+	rm.c.sign(req.Header, method, req.URL.RequestURI(), sent)
 	req.Header.Set("Content-Type", "application/json")
 	return rm.c.client().Do(req)
 }
@@ -313,8 +327,10 @@ func (l *Link) OpenConn(ctx context.Context) (net.Conn, error) {
 	}
 	u.Path = strings.TrimRight(u.Path, "/") + replicaPrefix + "tunnel"
 	u.RawQuery = url.Values{"machine": {l.MachineID}, "fence": {strconv.FormatInt(l.fence, 10)}}.Encode()
+	head := http.Header{}
+	l.remote.c.sign(head, http.MethodGet, u.RequestURI(), nil)
 	conn, res, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{
-		HTTPHeader: http.Header{secretHeader: {l.remote.c.Secret}}, HTTPClient: l.remote.c.client(),
+		HTTPHeader: head, HTTPClient: l.remote.c.client(),
 		CompressionMode: websocket.CompressionDisabled,
 	})
 	if err != nil {
@@ -328,13 +344,14 @@ func (l *Link) OpenConn(ctx context.Context) (net.Conn, error) {
 	return websocket.NetConn(context.Background(), conn, websocket.MessageBinary), nil
 }
 
-// Handler serves the replicas' internal hop. It is mounted at /internal/replica/v1/ and checks the shared secret on
-// every request; the ingress should not route the path from outside (the secret is the second lock).
+// Handler serves the replicas' internal hop at /internal/replica/v1/. It belongs on a listener of its own that only
+// the replicas reach (HUB_REPLICA_LISTEN), never on the hub's public one; every request must be signed with the
+// shared secret (the second lock).
 func (c *Cluster) Handler() http.Handler {
 	mux := http.NewServeMux()
 	guard := func(h http.HandlerFunc) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if c.Secret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(secretHeader)), []byte(c.Secret)) != 1 {
+			if !c.verified(r) {
 				http.Error(w, "forbidden", http.StatusForbidden)
 				return
 			}
@@ -410,8 +427,8 @@ func (c *Cluster) serveTunnel(w http.ResponseWriter, r *http.Request) {
 	ws := websocket.NetConn(context.Background(), conn, websocket.MessageBinary)
 	done := make(chan struct{}, 2)
 	pipe := func(dst io.Writer, src io.Reader) { _, _ = io.Copy(dst, src); done <- struct{}{} }
-	go pipe(ws, tn)
-	go pipe(tn, ws)
+	safego.Go("link pipe", func() { pipe(ws, tn) })
+	safego.Go("link pipe", func() { pipe(tn, ws) })
 	<-done
 	_ = tn.Close()
 	_ = ws.Close()

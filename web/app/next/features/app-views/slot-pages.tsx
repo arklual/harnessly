@@ -9,6 +9,7 @@ import {
   type ISlotEntry,
   type ISlotObject,
 } from '@/next/features/app-views/slots';
+import { ExtensionsManage } from '@/next/features/app-views/extensions-manage';
 import UiSlot from '@/next/features/app-views/ui-slot';
 import { Group } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
@@ -40,7 +41,8 @@ const titleOf = (e: ISlotEntry) => e.view.label ?? e.app.name;
 /** Whether the Extensions section has anything to show: the nav hides it otherwise. */
 export const useHasExtensions = (machine: MachineId): boolean => {
   const { list } = useInstalledApps(machine);
-  return slotViews(list, 'settings').length + slotViews(list, 'onboarding').length > 0;
+  // With the slots on the page always opens: it is where an extension is installed.
+  return list?.slots === true;
 };
 
 export const ExtensionsPage = ({ machine }: { machine: MachineId }) => {
@@ -58,6 +60,7 @@ export const ExtensionsPage = ({ machine }: { machine: MachineId }) => {
   const pages = slotViews(list, 'settings');
   return (
     <>
+      <ExtensionsManage machine={machine} />
       {steps.length > 0 && (
         <Group
           title={t('next.slot.steps')}

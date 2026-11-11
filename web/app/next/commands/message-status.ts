@@ -13,6 +13,7 @@ import { machineNow, pageClock, toPageTime } from '@/next/core/clock';
 import { getPage } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { batch } from '@/next/core/store';
+import { waitsItsTurn } from '@/next/commands/send-line';
 import { connectionStore } from '@/next/stores/connection';
 import { limitsOf } from '@/next/stores/machines';
 import {
@@ -49,6 +50,9 @@ const asked = new Map<ClientId, number>();
 /** When (page time) the page asks about m next; null: it has nothing to ask (the runtime's events move it). */
 function dueAt(m: MessageView): number | null {
   if (!m.conversationId) return null;
+  // Taken back: the cancel's own answer says what became of it. Behind an earlier message of its chat: it was not sent
+  // yet, and «the runtime does not know it» would say nothing.
+  if (m.cancelling || waitsItsTurn(m)) return null;
   let at: number | null = null;
   if (m.rev === 0 && m.state.k === 'submitting') {
     const op = opsStore.get(m.clientId);

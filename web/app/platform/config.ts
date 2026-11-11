@@ -1,4 +1,4 @@
-import { parseLanguage, type TLanguage } from '@/platform/languages';
+import { browserLanguage, parseLanguage, type TLanguage } from '@/platform/languages';
 
 // Where the page lives and what the runtime it talks to calls things. The runtime writes these into
 // <meta name="hl-config"> when it serves index.html; development falls back to the defaults.
@@ -63,6 +63,8 @@ export interface IAppConfig {
   hubUrl: string | null;
   /** Where the «Хаб» link leads (RUNTIME_HUB_LINK, else hubUrl), no trailing slash. It says nothing of who signs in. */
   hubLink: string | null;
+  /** RUNTIME_HUB_ANALYTICS: the personal statistics screen takes its figures from the hub; this runtime builds no report. */
+  hubAnalytics: boolean;
   /** the hub keeps the chats' uploads (its store): what a person attaches goes there too, and the chat's
    *  pictures and files are read from there, the machine on or off. Set by the hub's workspace; false elsewhere. */
   centralUploads: boolean;
@@ -98,6 +100,7 @@ const DEFAULTS: IAppConfig = {
   launchDefaultsKey: 'launchDefaults',
   hubUrl: null,
   hubLink: null,
+  hubAnalytics: false,
   centralUploads: false,
 };
 
@@ -135,16 +138,24 @@ export const appConfig = (): IAppConfig => {
     ...DEFAULTS,
     ...read,
     features: { ...DEFAULTS.features, ...(read.features ?? {}) },
-    // The person's own choice (Settings → General) wins over the installation's language.
+    // The person's own choice (Settings → General) wins; then the language the installation set (RUNTIME_LOCALE, empty
+    // while it is not set); then the browser's.
     locale:
       (typeof document !== 'undefined' ? savedLanguage(extraLanguages) : null) ??
       parseLanguage(read.locale, extraLanguages) ??
+      (typeof navigator !== 'undefined'
+        ? browserLanguage(
+            navigator.languages?.length ? navigator.languages : [navigator.language ?? ''],
+            extraLanguages,
+          )
+        : null) ??
       'en',
     copy: read.copy ?? {},
     basePath: (read.basePath ?? baseHref ?? DEFAULTS.basePath).replace(/\/+$/, ''),
     platformApi: (read.platformApi ?? platformMeta ?? DEFAULTS.platformApi).replace(/\/+$/, ''),
     hubUrl: typeof read.hubUrl === 'string' && read.hubUrl ? read.hubUrl.replace(/\/+$/, '') : null,
     hubLink: typeof read.hubLink === 'string' && read.hubLink ? read.hubLink.replace(/\/+$/, '') : null,
+    hubAnalytics: read.hubAnalytics === true,
     centralUploads: read.centralUploads === true,
   };
   return cached;

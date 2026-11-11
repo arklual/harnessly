@@ -83,6 +83,17 @@ describe('model', () => {
     expect(back?.f.path).toBe('apps/design-kit');
   });
 
+  it("keeps the organization's off switch of an app, and leaves it out of the source while on", () => {
+    const d = blankDraft('app', [{ id: 'r1', name: 'kit' }]);
+    d.f.path = 'boards';
+    expect(toSource(d).off).toBeUndefined();
+    d.f.appOff = true;
+    const source = toSource(d);
+    expect(source.off).toBe(true);
+    expect(itemOf('app', source)?.f.appOff).toBe(true);
+    expect(itemOf('app', { from: 'repo', path: 'boards', repo: 'r1' })?.f.appOff).toBe(false);
+  });
+
   it('wants a plugin as name@marketplace with the marketplace', () => {
     const d = blankDraft('plugin');
     d.f.plugin = 'review-kit';

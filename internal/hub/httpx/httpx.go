@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 )
 
 // Error is a failure with the HTTP status and the machine-readable code api.md names. Message is Russian, for people.
@@ -129,6 +131,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		slog.Error("request failed", "method", r.Method, "route", Route(r), "error", err)
 		he = ErrInternal
 	}
+	metrics.CountErrorCode(he.Code)
 	if he.Status == http.StatusTooManyRequests {
 		if n, ok := he.Details["retryAfter"].(int); ok {
 			w.Header().Set("Retry-After", strconv.Itoa(n))

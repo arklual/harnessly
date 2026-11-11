@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -10,7 +13,9 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/convo"
+	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/sources"
+	"github.com/ly-solutions/harnessly/internal/subagents"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -27,7 +32,12 @@ type v2Made struct {
 	designs func(ctx context.Context) madeDesigns
 	// task reads a task of the tracker (its key); nil when this runtime has no tracker.
 	task madeTaskReader
+	// chats are the machine's chats, to find the ones a chat delegated (their ParentID is it); nil: none are inherited.
+	chats func(ctx context.Context) []wire.Conversation
 }
+
+// madeDepth is how deep the delegated chats a chat inherits from go: its subchats, theirs, and theirs.
+const madeDepth = 3
 
 // madeTaskReader is what the tracker says of one task: its title and its place among epics and subtasks. ok is false
 // when it cannot be read (no token, not found, the tracker is down).
@@ -61,27 +71,21 @@ func (m v2Made) Made(ctx context.Context, conv string) (wire.ChatMade, error) {
 		return wire.ChatMade{}, convo.ErrNotFound
 	}
 	out := wire.ChatMade{Items: []wire.MadeItem{}, Complete: true}
-	touched := map[string]sources.MadeLink{}
-	if rec.TranscriptPath != "" {
-		res, found, failed, complete := m.read(rec.TranscriptPath, "", madeBudget)
-		if failed {
-			return wire.ChatMade{}, errMadeRead
-		}
-		if found {
-			out.Complete = complete
-		}
-		for _, l := range res.Made {
-			if l.Kind == wire.MadeDesign {
-				touched[l.Ref] = l
-				continue
-			}
-			// A page that did not ask for tasks does not know the kind.
-			if l.Kind == wire.MadeTask && !wire.MadeWantsTasks(ctx) {
-				continue
-			}
-			out.Items = append(out.Items, wire.MadeItem{Kind: l.Kind, Ref: l.Ref, Title: l.Title, Op: l.Op, At: l.At})
-		}
+	c := madeCollect{m: m, ctx: ctx, out: &out, touched: map[string]sources.MadeLink{}, seen: map[string]bool{}}
+	// The chat's own first: a thing it made itself is never shown as a subchat's.
+	if err := c.chat(rec, nil); err != nil {
+		return wire.ChatMade{}, err
 	}
+	if m.chats != nil {
+		c.kids = map[string][]wire.Conversation{}
+		for _, other := range m.chats(ctx) {
+			if other.ParentID != nil {
+				c.kids[*other.ParentID] = append(c.kids[*other.ParentID], other)
+			}
+		}
+		c.inherit(rec.ID, 1, map[string]bool{rec.ID: true}, nil)
+	}
+	touched := c.touched
 	if m.designs != nil {
 		if lib := m.designs(ctx); lib != nil {
 			out.Items = append(out.Items, designItems(lib, rec, touched)...)
@@ -110,7 +114,8 @@ func (m v2Made) readTasks(ctx context.Context, items []wire.MadeItem) {
 			continue
 		}
 		wg.Add(1)
-		go func(it *wire.MadeItem) {
+		it := &items[i]
+		safego.Go("made item", func() {
 			defer wg.Done()
 			select {
 			case gate <- struct{}{}:
@@ -125,10 +130,10 @@ func (m v2Made) readTasks(ctx context.Context, items []wire.MadeItem) {
 				ok    bool
 			}
 			done := make(chan read, 1)
-			go func() {
+			safego.Go("made task", func() {
 				title, info, ok := m.task(ctx, key)
 				done <- read{title, info, ok}
-			}()
+			})
 			select {
 			case r := <-done:
 				if !r.ok {
@@ -145,12 +150,114 @@ func (m v2Made) readTasks(ctx context.Context, items []wire.MadeItem) {
 				it.Task = &r.info
 			case <-ctx.Done():
 			}
-		}(&items[i])
+		})
 	}
 	wg.Wait()
 }
 
 var errMadeRead = errors.New("made: the transcript could not be read")
+
+// madeCollect gathers what a chat made with what its subagents and delegated chats made: the chat that started them
+// inherits all of it, each thing marked with who made it.
+type madeCollect struct {
+	m       v2Made
+	ctx     context.Context
+	out     *wire.ChatMade
+	touched map[string]sources.MadeLink
+	// seen are the things listed, by kind and ref: one made twice is listed once, as its first maker's.
+	seen map[string]bool
+	// kids are the delegated chats of each chat, by its id.
+	kids map[string][]wire.Conversation
+}
+
+// chat reads one chat's transcript and its subagents' transcripts. from is nil for the chat asked about.
+func (c *madeCollect) chat(rec wire.Conversation, from *wire.MadeFrom) error {
+	if rec.TranscriptPath == "" {
+		return nil
+	}
+	if err := c.transcript(rec.TranscriptPath, from, from == nil); err != nil {
+		return err
+	}
+	dir := subagents.DirFor(rec.TranscriptPath)
+	for _, path := range subagents.Files(rec.TranscriptPath) {
+		id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+		who := from
+		if who == nil {
+			who = &wire.MadeFrom{Kind: wire.MadeFromSubagent, ID: strings.TrimPrefix(id, "agent-"), Title: subagentTitle(dir, id)}
+		}
+		// A subagent's transcript that cannot be read leaves out what it made, not the chat's own.
+		_ = c.transcript(path, who, false)
+	}
+	return nil
+}
+
+// transcript adds what one transcript made. A transcript that fails is an error only when strict (the chat's own).
+func (c *madeCollect) transcript(path string, from *wire.MadeFrom, strict bool) error {
+	res, found, failed, complete := c.m.read(path, "", madeBudget)
+	if failed {
+		if strict {
+			return errMadeRead
+		}
+		return nil
+	}
+	if found && !complete {
+		c.out.Complete = false
+	}
+	for _, l := range res.Made {
+		if l.Kind == wire.MadeDesign {
+			if _, ok := c.touched[l.Ref]; !ok {
+				c.touched[l.Ref] = l
+			}
+			continue
+		}
+		// A page that did not ask for tasks does not know the kind.
+		if l.Kind == wire.MadeTask && !wire.MadeWantsTasks(c.ctx) {
+			continue
+		}
+		key := string(l.Kind) + "\x00" + l.Ref
+		if c.seen[key] {
+			continue
+		}
+		c.seen[key] = true
+		c.out.Items = append(c.out.Items, wire.MadeItem{Kind: l.Kind, Ref: l.Ref, Title: l.Title, Op: l.Op, At: l.At, From: from})
+	}
+	return nil
+}
+
+// inherit adds what the chat's delegated chats made, theirs too, down to madeDepth; each is marked with the subchat
+// of the chat asked about it came through (via; nil at the first level).
+func (c *madeCollect) inherit(conv string, depth int, visited map[string]bool, via *wire.MadeFrom) {
+	if depth > madeDepth {
+		return
+	}
+	for _, kid := range c.kids[conv] {
+		if visited[kid.ID] {
+			continue
+		}
+		visited[kid.ID] = true
+		from := via
+		if from == nil {
+			from = &wire.MadeFrom{Kind: wire.MadeFromSubchat, ID: kid.ID, Title: kid.Title}
+		}
+		_ = c.chat(kid, from)
+		c.inherit(kid.ID, depth+1, visited, from)
+	}
+}
+
+// subagentTitle is the description Claude Code keeps beside a subagent's transcript; "" without one.
+func subagentTitle(dir, id string) string {
+	raw, err := os.ReadFile(filepath.Join(dir, id+".meta.json"))
+	if err != nil {
+		return ""
+	}
+	var meta struct {
+		Description string `json:"description"`
+	}
+	if json.Unmarshal(raw, &meta) != nil {
+		return ""
+	}
+	return strings.TrimSpace(meta.Description)
+}
 
 // designItems are the visible designs the conversation touched or is tied to; a design nothing in the transcript
 // dates is dated by its last change.

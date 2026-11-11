@@ -17,23 +17,34 @@ import (
 
 // With HUB_RESOURCE_ACCESS a document's access is the shared model of access to a resource (internal/hub/resaccess):
 // people, teams, guest links, requests and a log. A document without a row there is open as doc_meta says, so turning
-// the flag on changes nothing until a manager changes who has access.
+// the flag on changes nothing until a manager changes who has access. Its team level reaches the people of the
+// document's organizations only (see circle).
 
-func (s *Service) actorOf(p *auth.Principal) resaccess.Actor {
-	return resaccess.Actor{Email: p.User.Email, Name: p.User.Name, Admin: p.Admin}
+func (s *Service) actorOf(ctx context.Context, m *meta, author string, p *auth.Principal, c *circle) resaccess.Actor {
+	if c == nil {
+		c = s.circleOf(p)
+	}
+	return resaccess.Actor{UserID: p.User.ID, Email: p.User.Email, Name: p.User.Name, Verified: c.proved(ctx), Admin: p.Admin,
+		Outside: !p.Admin && !c.holds(ctx, m, author)}
+}
+
+// refOf names a document for the shared model, in the space the hub has it in.
+func refOf(slug string, m *meta) resaccess.Ref {
+	ref := resaccess.Ref{Kind: resaccess.KindDoc, ID: slug}
+	if m != nil {
+		ref.Space = m.SpaceID
+	}
+	return ref
 }
 
 // accessRank is the person's rank on a document by the shared model.
-func (s *Service) accessRank(ctx context.Context, m *meta, p *auth.Principal) int {
+func (s *Service) accessRank(ctx context.Context, slug string, m *meta, author string, p *auth.Principal, c *circle) int {
 	if p.Admin {
 		return rankManage
 	}
-	if m == nil {
-		return levelRank[levelView]
-	}
-	role, err := s.access.Role(ctx, resaccess.Ref{Kind: resaccess.KindDoc, ID: m.Slug}, s.actorOf(p))
+	role, err := s.access.Role(ctx, refOf(slug, m), s.actorOf(ctx, m, author, p, c))
 	if err != nil {
-		s.log.Warn("document access not read", "slug", m.Slug, "error", err)
+		s.log.Warn("document access not read", "slug", slug, "error", err)
 		return 0
 	}
 	switch role {
@@ -61,10 +72,14 @@ func (s *Service) mountAccess(mux *http.ServeMux) {
 
 func (s *Service) aclRoute(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
 	slug := r.PathValue("slug")
-	m, err := s.meta(r.Context(), slug)
+	m, elsewhere, err := s.meta(r.Context(), slug, s.reachOf(r.Context(), p))
 	if err != nil {
 		return err
 	}
+	if elsewhere {
+		return errNoAccess
+	}
+	author := ""
 	if m == nil {
 		list, err := s.art.list(r.Context())
 		if err != nil {
@@ -73,7 +88,7 @@ func (s *Service) aclRoute(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		found := false
 		for _, a := range list {
 			if a.Slug == slug {
-				found = true
+				found, author = true, a.Author
 			}
 		}
 		if !found {
@@ -90,7 +105,7 @@ func (s *Service) aclRoute(w http.ResponseWriter, r *http.Request, p *auth.Princ
 			rest = append(rest, v)
 		}
 	}
-	s.access.Serve(w, r, s.actorOf(p), resaccess.Ref{Kind: resaccess.KindDoc, ID: slug}, rest, info, func(v any) (string, error) {
+	s.access.Serve(w, r, s.actorOf(r.Context(), m, author, p, nil), refOf(slug, m), rest, info, func(v any) (string, error) {
 		if v == nil {
 			return "", nil
 		}
@@ -131,7 +146,7 @@ func (s *Service) guestDoc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title := g.Title
-	if m, _ := s.meta(r.Context(), g.ID); m != nil && m.Title != "" {
+	if m, _, _ := s.meta(r.Context(), g.ID, reachSpace(g.Space)); m != nil && m.Title != "" {
 		title = m.Title
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"doc": map[string]any{"slug": g.ID, "title": title}, "rights": g.Rights,
@@ -156,7 +171,7 @@ func (s *Service) guestContent(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
-	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-popups")
+	frameable(h)
 	h.Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(withFrame(page))
 }
@@ -226,13 +241,14 @@ func (s *Service) guestComment(w http.ResponseWriter, r *http.Request) {
 	if err := s.access.NoteGuestComment(r.Context(), g.LinkID, threadID, name); err != nil {
 		s.log.Warn("guest comment not tied to its link", "error", err)
 	}
-	s.tellOwner(r.Context(), g.ID, name)
+	s.tellOwner(r.Context(), g.Ref, name)
 	t, _ := s.thread(r.Context(), g.ID, threadID)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"thread": t})
 }
 
-func (s *Service) tellOwner(ctx context.Context, slug, guest string) {
-	m, err := s.meta(ctx, slug)
+func (s *Service) tellOwner(ctx context.Context, ref resaccess.Ref, guest string) {
+	slug := ref.ID
+	m, _, err := s.meta(ctx, slug, reachSpace(ref.Space))
 	if err != nil || m == nil || m.OwnerEmail == "" || s.notice == nil {
 		return
 	}

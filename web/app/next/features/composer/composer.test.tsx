@@ -401,6 +401,8 @@ describe('Queue rows carried by the grip', () => {
       clientX: x,
       clientY: y,
       button: 0,
+      // The button is held from the press to the release.
+      buttons: type === 'pointerup' ? 0 : 1,
     });
     Object.assign(event, { pointerId: 1, pointerType: 'mouse' });
     act(() => {

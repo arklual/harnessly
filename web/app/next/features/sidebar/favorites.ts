@@ -1,6 +1,5 @@
 // The favorites of the sidebar: how the pinned chats stand (groups, order) and what a drop of a chat or a group on
 // a place of the list asks of the machine. Pure: the pointer and the DOM are use-drag's, the commands are the owner's.
-import { byPrompt } from '@/next/features/sidebar/group';
 import type { ISidebarChat, ISidebarFavorites } from '@/next/features/sidebar/types';
 import { EDGE, type TEdge } from '@/next/ui/use-drag';
 
@@ -19,14 +18,19 @@ export const EMPTY_VIEW: IFavView = { groups: [], loose: [] };
 
 /**
  * The favorites as they are drawn, the way the machine reads them: a chat stands where the layout puts it (the first
- * place it names), one the layout does not name comes first among the loose, the one written to last first, and a name of a chat that
- * is not pinned (or gone) is skipped.
+ * place it names), one the layout does not name comes first among the loose, the newest created first, and a name of a
+ * chat that is not pinned (or gone) is skipped. Nothing here follows activity: a favorite moves only when the person
+ * moves it, whatever the agents write and whichever copy of the list (the machine's or the cluster's) came last.
  */
+/** The order of the favorites the layout does not name: by creation (fixed for a chat), newest first, then by id. */
+export const byCreated = (a: ISidebarChat, b: ISidebarChat): number =>
+  b.createdAt - a.createdAt || a.id.localeCompare(b.id);
+
 export const favoritesOf = (chats: readonly ISidebarChat[], layout: ISidebarFavorites): IFavView => {
   const pinned = new Map(
     chats
       .filter((chat) => chat.pinned)
-      .sort(byPrompt)
+      .sort(byCreated)
       .map((chat) => [chat.id, chat]),
   );
   const seen = new Set<string>();

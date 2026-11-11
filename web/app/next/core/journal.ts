@@ -283,6 +283,10 @@ const controlName = (target: EventTarget | null): string | null => {
 
 let stop: (() => void) | null = null;
 
+/** A browser message that is not a failure: the ResizeObserver loop notices. */
+export const isBenign = (message: string | undefined): boolean =>
+  (message ?? '').startsWith('ResizeObserver loop');
+
 /** Starts the page's journal: wraps fetch and listens for errors, navigation and clicks. Returns the stop. */
 export const startJournal = (): (() => void) => {
   if (stop !== null || typeof window === 'undefined') return stop ?? (() => undefined);
@@ -304,6 +308,8 @@ export const startJournal = (): (() => void) => {
       return;
     }
     if (e instanceof ErrorEvent) {
+      // «ResizeObserver loop …» is the browser's word that a resize was put off to the next frame, not a failure.
+      if (isBenign(e.message)) return;
       const where = e.filename ? ` (${cleanUrl(e.filename)}:${e.lineno})` : '';
       journal({ level: 'error', src: 'web', ev: 'exception', text: `${e.message || 'error'}${where}` });
     }

@@ -86,6 +86,10 @@ html:has(.hx-app) body {
   background: var(--hx-shell);
   overflow: clip;
 }
+/* An app or a design takes the whole window: opened there, the sidebar takes less of it. */
+.hx-app[data-full] {
+  --hx-sidebar-w: 208px;
+}
 .hx-main {
   --hx-bg-stage: var(--hx-bg-window);
   display: flex;
@@ -330,10 +334,11 @@ html:has(.hx-app) body {
   position: relative;
   container-type: inline-size;
 }
+/* The same inset on every side of the window: top, right and bottom. */
 .hx-pane {
   --site-ease: var(--hx-ease-out);
   position: absolute;
-  top: 0;
+  top: 12px;
   right: 12px;
   bottom: 12px;
   z-index: 25;

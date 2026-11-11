@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
@@ -452,5 +453,81 @@ func TestIngestMRKeys(t *testing.T) {
 	}
 	if n := count("session_key = ?", "m1"); n != 2 {
 		t.Errorf("m1 mentions %d keys, want 2 (the text that is not a key is dropped)", n)
+	}
+}
+
+// A record of a kind this hub does not read is set aside with the reason, as the machine sent it, and the records
+// around it are stored; the cursor moves past it and the machine may drop it.
+func TestIngestSetsAsideWhatItCannotRead(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_USAGE_INGEST", "on"))
+	ctx := context.Background()
+	ann := s.SignIn("ann@example.com")
+	spaceID, _ := ann.NewSpace("Acme")
+	now := s.Clock.Now().UnixMilli()
+	before := metrics.UsageQuarantined.Value()
+	o := &outbox{epoch: "e1"}
+	o.add(now, call("s1", "m1", "claude-opus-4-6", now-3000, 10, 10))
+	o.add(now, hubproto.UsageRecord{Kind: "from-the-future"})
+	o.add(now, hubproto.UsageRecord{Kind: hubproto.UsageCall}) // a call without its fact
+	o.add(now, call("s1", "m2", "claude-opus-4-6", now-1000, 10, 10))
+	usageMachine(t, s, ann, spaceID, o)
+	s.Eventually("the outbox acked", func() bool { return o.lastAck().Seq == 4 })
+
+	var calls int
+	if err := s.DB.QueryRow(ctx, `SELECT COUNT(*) FROM usage_calls`).Scan(&calls); err != nil || calls != 2 {
+		t.Errorf("calls stored = %d, %v", calls, err)
+	}
+	rows, err := s.DB.S().UsageQuarantine(ctx, 10)
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("set aside: %+v, %v", rows, err)
+	}
+	seen := map[int64]store.QuarantinedUsage{}
+	for _, r := range rows {
+		seen[r.Seq] = r
+	}
+	if r := seen[2]; r.Kind != "from-the-future" || r.Epoch != "e1" || r.Reason == "" || !strings.Contains(r.Record, `"from-the-future"`) || r.CreatedAt == 0 {
+		t.Errorf("the unknown record: %+v", r)
+	}
+	if r := seen[3]; r.Kind != hubproto.UsageCall {
+		t.Errorf("the call without its fact: %+v", r)
+	}
+	if got := metrics.UsageQuarantined.Value() - before; got != 2 {
+		t.Errorf("counted %d records set aside, want 2", got)
+	}
+	st, err := s.DB.S().UsageQuarantineStat(ctx)
+	if err != nil || st.Rows != 2 || st.OldestMs == 0 {
+		t.Errorf("stat %+v, %v", st, err)
+	}
+}
+
+// A record whose storing fails does not hold the machine's outbox: it alone is set aside, the rest of its batch is
+// stored and the cursor moves on.
+func TestIngestSetsAsideARecordThatCannotBeStored(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_USAGE_INGEST", "on"))
+	if s.DB.Driver() != store.SQLite {
+		t.Skip("the failing record is made with a SQLite trigger")
+	}
+	ctx := context.Background()
+	if _, err := s.DB.Exec(ctx, `CREATE TRIGGER poison BEFORE INSERT ON usage_calls WHEN NEW.msg_key = 'poison'
+		BEGIN SELECT RAISE(ABORT, 'this call cannot be stored'); END`); err != nil {
+		t.Fatal(err)
+	}
+	ann := s.SignIn("ann@example.com")
+	spaceID, _ := ann.NewSpace("Acme")
+	now := s.Clock.Now().UnixMilli()
+	o := &outbox{epoch: "e1"}
+	o.add(now, call("s1", "m1", "claude-opus-4-6", now-3000, 10, 10))
+	o.add(now, call("s1", "poison", "claude-opus-4-6", now-2000, 10, 10))
+	o.add(now, call("s1", "m2", "claude-opus-4-6", now-1000, 10, 10))
+	usageMachine(t, s, ann, spaceID, o)
+	s.Eventually("the outbox acked", func() bool { return o.lastAck().Seq == 3 })
+
+	var calls int
+	if err := s.DB.QueryRow(ctx, `SELECT COUNT(*) FROM usage_calls`).Scan(&calls); err != nil || calls != 2 {
+		t.Errorf("calls stored = %d, %v", calls, err)
+	}
+	rows, err := s.DB.S().UsageQuarantine(ctx, 10)
+	if err != nil || len(rows) != 1 || rows[0].Seq != 2 || !strings.Contains(rows[0].Reason, "cannot be stored") || !strings.Contains(rows[0].Record, "poison") {
+		t.Fatalf("set aside: %+v, %v", rows, err)
 	}
 }

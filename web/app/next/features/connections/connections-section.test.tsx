@@ -195,6 +195,53 @@ describe('Settings → Connections', { timeout: 20_000 }, () => {
     expect(screen.getByText('Set by the machine')).toBeTruthy();
   });
 
+  it("marks the machine's code host read only and starts the person's own from it", async () => {
+    const gitlab = {
+      kind: 'gitlab',
+      name: 'GitLab',
+      baseUrl: 'https://gitlab.acme.com',
+      capabilities: ['code'],
+    };
+    const p = props({ connections: [readConn(conn({ ...gitlab, env: true }))] });
+    render(<ConnectionsSection {...p} />);
+    expect(screen.getByText(/Read only: to reply and approve/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Connect your own'));
+    await waitFor(() => expect(p.onDetect).toHaveBeenCalledWith('https://gitlab.acme.com'));
+    cleanup();
+    // With the person's own beside it, the machine's says nothing more.
+    render(
+      <ConnectionsSection
+        {...props({
+          connections: [readConn(conn({ ...gitlab, env: true })), readConn(conn({ ...gitlab, id: 'c2' }))],
+        })}
+      />,
+    );
+    expect(screen.queryByText(/Read only/)).toBeNull();
+  });
+
+  it('finds the address it was opened with at once when it is a code host of the deployment', async () => {
+    const gitlab = {
+      kind: 'gitlab',
+      name: 'GitLab',
+      baseUrl: 'https://gitlab.acme.com',
+      capabilities: ['code'],
+    };
+    const p = props({
+      connections: [readConn(conn({ ...gitlab, env: true }))],
+      start: 'https://gitlab.acme.com/',
+    });
+    render(<ConnectionsSection {...p} />);
+    await waitFor(() => expect(p.onDetect).toHaveBeenCalledWith('https://gitlab.acme.com/'));
+  });
+
+  it('only shows an address of a link that is not a code host of the deployment', async () => {
+    const p = props({ start: 'https://jira.acme.com/jira' });
+    render(<ConnectionsSection {...p} />);
+    expect(screen.getByDisplayValue('https://jira.acme.com/jira')).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(p.onDetect).not.toHaveBeenCalled();
+  });
+
   it('talks to the runtime: list, detect, connect', async () => {
     const calls: { url: string; method: string; body: string }[] = [];
     setFetch(async (url, init) => {

@@ -161,4 +161,52 @@ describe('@harnessly/app-sdk against the bridge, through the shim', () => {
     await expect(connect()).rejects.toMatchObject({ code: 'host_unavailable' });
     vi.unstubAllGlobals();
   });
+  it('runs an agent’s call once, however many times its id comes, and answers the same again (HRN-1117)', async () => {
+    const answers: { id: string; answer: unknown }[] = [];
+    const { r, hl } = await view(['tools.page'], {
+      pageTools: () => undefined,
+      pageToolResult: (id, answer) => void answers.push({ id, answer }),
+    });
+    const tools = (
+      hl as unknown as {
+        tools: { register: (t: object, run: (a: { n: number }) => Promise<unknown>) => Promise<void> };
+      }
+    ).tools;
+    let ran = 0;
+    let finish: (v: unknown) => void = () => undefined;
+    await tools.register({ name: 'add', description: 'adds a row' }, () => {
+      ran += 1;
+      return new Promise((done) => (finish = done));
+    });
+    const call = (id: string, name = 'add') =>
+      r.bridge.notify('harnessly/notifications/tool-call', { id, name, arguments: { n: 1 } });
+
+    // The same command comes twice while it runs: it is not started again.
+    call('cmd-1');
+    await vi.waitFor(() => expect(ran).toBe(1));
+    call('cmd-1');
+    await settle();
+    expect(ran).toBe(1);
+    finish({ rows: 1 });
+    await vi.waitFor(() => expect(answers).toEqual([{ id: 'cmd-1', answer: { result: { rows: 1 } } }]));
+
+    // It comes again after its answer (the host did not hear it): the same answer goes, the tool does not run.
+    call('cmd-1');
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+    expect(answers[1]).toEqual({ id: 'cmd-1', answer: { result: { rows: 1 } } });
+    expect(ran).toBe(1);
+
+    // Another command runs; a call of a tool the view does not offer is refused and not remembered.
+    call('cmd-2');
+    await vi.waitFor(() => expect(ran).toBe(2));
+    finish({ rows: 2 });
+    await vi.waitFor(() => expect(answers).toHaveLength(3));
+    call('cmd-3', 'later');
+    await vi.waitFor(() => expect(answers).toHaveLength(4));
+    expect(answers[3]).toEqual({ id: 'cmd-3', answer: { error: 'the view offers no tool later' } });
+    await tools.register({ name: 'later', description: 'comes later' }, async () => ({ ok: true }));
+    call('cmd-3', 'later');
+    await vi.waitFor(() => expect(answers).toHaveLength(5));
+    expect(answers[4]).toEqual({ id: 'cmd-3', answer: { result: { ok: true } } });
+  });
 });

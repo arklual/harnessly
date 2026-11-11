@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/webstatic"
 	"github.com/ly-solutions/harnessly/web"
 )
 
@@ -30,7 +31,7 @@ type webConfig struct {
 	// browser's own tags: the tab icon and the name an installed app takes.
 	name, mark string
 	// static keeps the tags and gzipped copies of the page's files.
-	static staticCache
+	static webstatic.Cache
 }
 
 // webConfigFromEnv is nil when this process serves no page.

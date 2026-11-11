@@ -29,4 +29,27 @@ describe('useEfficiency on the hub', () => {
     expect(calls).toContain('GET /api/orgs/acme/efficiency/summary');
     expect(calls).toContain('POST /api/orgs/acme/efficiency/pulse');
   });
+  it('asks the hub for the overview and falls back to the gateway when the hub says it is not there for this person', async () => {
+    const calls: string[] = [];
+    let hubStatus = 200;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        calls.push(String(url));
+        if (url.endsWith('/api/orgs')) return json({ orgs: [{ id: 'o1', slug: 'acme' }] });
+        if (url.includes('/api/orgs/acme/efficiency/overview')) return json({ scope: 'hub' }, hubStatus);
+        return json({ scope: 'gateway' });
+      }),
+    );
+    const first = renderHook(() => useEfficiency<{ scope: string }>('/overview?scope=team&days=30'));
+    await waitFor(() => expect(first.result.current.status).toBe('ready'));
+    expect(first.result.current.data?.scope).toBe('hub');
+    expect(calls).toContain('/api/orgs/acme/efficiency/overview?scope=team&days=30');
+    first.unmount();
+
+    hubStatus = 404;
+    const second = renderHook(() => useEfficiency<{ scope: string }>('/overview?scope=me&days=30'));
+    await waitFor(() => expect(second.result.current.status).toBe('ready'));
+    expect(second.result.current.data?.scope).toBe('gateway');
+  });
 });

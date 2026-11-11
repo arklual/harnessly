@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import usePaneMotion, { paneExitMs } from '@/next/features/shell/use-pane-motion';
+import usePaneMotion, { paneExitMs, usePaneMax } from '@/next/features/shell/use-pane-motion';
 
 interface IFake {
   target: HTMLElement;
@@ -9,6 +9,7 @@ interface IFake {
   options: KeyframeAnimationOptions;
   cancel: ReturnType<typeof vi.fn>;
   playState: string;
+  finished: Promise<Animation>;
 }
 
 const fakes: IFake[] = [];
@@ -51,6 +52,7 @@ beforeEach(() => {
       options: options as KeyframeAnimationOptions,
       cancel: vi.fn(),
       playState: 'running',
+      finished: new Promise<Animation>(() => undefined),
     };
     fakes.push(fake);
     return fake as unknown as Animation;
@@ -131,5 +133,57 @@ describe('usePaneMotion', () => {
     expect(paneExitMs()).toBe(300);
     setup({ '(prefers-reduced-motion: reduce)': true });
     expect(paneExitMs()).toBe(0);
+  });
+});
+
+describe('usePaneMax (HRN-1165)', () => {
+  const maxSetup = (media: Record<string, boolean> = {}) => {
+    const { pane, ref } = setup(media);
+    const inner = document.createElement('div');
+    inner.className = 'hx-browser';
+    pane.append(inner);
+    let width = 400;
+    pane.getBoundingClientRect = () => ({ width }) as DOMRect;
+    return { pane, inner, ref, setWidth: (next: number) => (width = next) };
+  };
+
+  it('lays the content out once at the new width and moves only the edge, by clip-path', () => {
+    const { pane, inner, ref, setWidth } = maxSetup();
+    const hook = renderHook(({ maxed }) => usePaneMax(ref, maxed, true), { initialProps: { maxed: false } });
+    setWidth(1000);
+    hook.rerender({ maxed: true });
+    expect(pane.style.getPropertyValue('width')).toBe('1000px');
+    expect(pane.style.getPropertyValue('--hx-inner-w')).toBe('1000px');
+    const edge = fakes.find((f) => f.target === pane);
+    expect(edge?.keyframes).toEqual([
+      { clipPath: 'inset(0px 0px 0px 600px round 16px)' },
+      { clipPath: 'inset(0px 0px 0px 0px round 16px)' },
+    ]);
+    // Nothing animates a width: no layout on the way.
+    expect(fakes.some((f) => f.keyframes.some((k) => 'width' in k))).toBe(false);
+    expect(fakes.find((f) => f.target === inner)?.keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+  });
+
+  it('folding back keeps the wide box for the slide, the content already at its narrow width', () => {
+    const { pane, ref, setWidth } = maxSetup();
+    setWidth(1000);
+    const hook = renderHook(({ maxed }) => usePaneMax(ref, maxed, true), { initialProps: { maxed: true } });
+    setWidth(400);
+    hook.rerender({ maxed: false });
+    expect(pane.style.getPropertyValue('width')).toBe('1000px');
+    expect(pane.style.getPropertyValue('--hx-inner-w')).toBe('400px');
+    expect(fakes.find((f) => f.target === pane)?.keyframes).toEqual([
+      { clipPath: 'inset(0px 0px 0px 0px round 16px)' },
+      { clipPath: 'inset(0px 0px 0px 600px round 16px)' },
+    ]);
+  });
+
+  it('does not animate with reduced motion', () => {
+    const { pane, ref, setWidth } = maxSetup({ '(prefers-reduced-motion: reduce)': true });
+    const hook = renderHook(({ maxed }) => usePaneMax(ref, maxed, true), { initialProps: { maxed: false } });
+    setWidth(1000);
+    hook.rerender({ maxed: true });
+    expect(fakes).toHaveLength(0);
+    expect(pane.hasAttribute('data-resizing')).toBe(false);
   });
 });

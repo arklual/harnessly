@@ -91,6 +91,7 @@ export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
     rent: rent ? { provider: rent.provider, plan: rent.plan, price: rent.price } : null,
     managed: x.managed ?? null,
     opensRuntime: m.opensRuntime ?? true,
+    host: m.hostname || undefined,
     canManage: canAdmin || (teamCaps?.manage ?? false),
     canAdmin,
     needs: canAdmin ? null : 'tenant_admin',

@@ -39,6 +39,10 @@ never learns another's hostname or fleet id, and an answer is written back to th
 - **Machines.** The machines of the sender's space, and of the other spaces of its organization. Never itself, never a
   revoked or switched-off machine. An unknown machine, one out of reach and one offline all answer `unreachable`: the
   sender learns nothing of which machines exist.
+- **The machine's access list.** With `HUB_ACCESS_ENFORCE` on, the person the message comes from must be able to open
+  the receiving machine as on the site: a place in the machine's space (or managing it from above), and, when the
+  machine has an access list, a line in it for them or their team. Otherwise the machine answers `unreachable` and is
+  left out of the directory. `warn` logs what `on` would refuse and lets it through; `off` asks nothing.
 - **The sender** is the machine the signature proves and a person of its space. The person the runtime names
   (`RUNTIME_OWNER_EMAIL`) is believed as the hub believes a page session: they registered the machine or opened it
   through the hub lately, and still have a role in its space. Otherwise the message is from the person who registered

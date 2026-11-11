@@ -164,6 +164,13 @@ func NudgeText(n, max int) string {
 		"wait for background work in a foreground loop.", n, max, MarkDone, MarkQuestion)
 }
 
+// ServicePrefix starts every message the platform types into a delegated chat by itself: a reminder (NudgeText), a
+// restart (RestartText). The person did not write it, so what is told once per person's turn is not spent on it.
+const ServicePrefix = "[automatic"
+
+// IsService says whether a message of a chat is one the platform typed by itself (ServicePrefix).
+func IsService(text string) bool { return strings.HasPrefix(strings.TrimSpace(text), ServicePrefix) }
+
 // RestartText is what a delegated chat is told when its session ended in the middle of a turn.
 const RestartText = "[automatic] Your session ended in the middle of a turn (a restart). Carry on from where you stopped; when the task is complete, answer with the result and end with the line " + MarkDone + "."
 

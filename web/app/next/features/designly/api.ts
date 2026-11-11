@@ -49,6 +49,105 @@ export const fetchLibrary = async (m: MachineId, signal?: AbortSignal): Promise<
   return read;
 };
 
+/** How long the home waits for the machine's library before it shows the hub's copy (as the page's start). */
+export const MACHINE_WAIT_MS = 1500;
+
+/** The hub's copy of the library from its store: what the person may see, and their shelves. */
+export interface IStoreLibrary {
+  designs: IDesign[];
+  layout: ILibraryLayout;
+}
+
+/** The hub answers it under any machine of the space, on or off; a runtime with no hub answers 404 (no copy). */
+export const fetchStoreLibrary = async (m: MachineId, signal?: AbortSignal): Promise<IStoreLibrary> => {
+  const raw = await runtimeJson<{ artifacts?: unknown; layout?: Partial<ILibraryLayout> }>(
+    m,
+    platformPath('/design/store-library'),
+    { signal },
+  );
+  // The projects are the machine's v2 shape: checked by the same reader, with the port and folder the hub has not.
+  const { artifacts } = parsePage.designlyLibrary({ port: 0, root: '-', artifacts: raw.artifacts ?? [] });
+  const layout = raw.layout ?? {};
+  return {
+    designs: artifacts,
+    layout: { folders: layout.folders ?? [], placed: layout.placed ?? {}, systems: layout.systems ?? {} },
+  };
+};
+
+export const LIBRARY_FROM = { machine: 'machine', store: 'store' } as const;
+export type TLibraryFrom = (typeof LIBRARY_FROM)[keyof typeof LIBRARY_FROM];
+
+export interface ILibraryView {
+  designs: IDesign[];
+  from: TLibraryFrom;
+  /** The shelves the hub's copy carries; null from the machine (its layout is read on its own). */
+  layout: ILibraryLayout | null;
+}
+
+const lastViews = new Map<MachineId, ILibraryView>();
+
+/** The last library the home showed for this machine, from either side; null before any. */
+export const lastLibraryView = (m: MachineId): ILibraryView | null => lastViews.get(m) ?? null;
+
+/**
+ * The home's library: the machine's when it answers within `wait`; when it does not (slow, off, an error) the hub's
+ * copy, and the machine's still replaces it once it comes. Resolves on the first library shown; rejects only when
+ * neither the machine nor the hub gave one, with the machine's error.
+ */
+export const readLibrary = (
+  m: MachineId,
+  read: { machine: () => Promise<IDesignLibrary>; store: () => Promise<IStoreLibrary> },
+  show: (view: ILibraryView) => void,
+  wait = MACHINE_WAIT_MS,
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    let machineDone = false;
+    let storeAsked = false;
+    let storeFailed = false;
+    let machineFailure: unknown = null;
+    const put = (view: ILibraryView) => {
+      lastViews.set(m, view);
+      show(view);
+      resolve();
+    };
+    const askStore = () => {
+      if (storeAsked || machineDone) return;
+      storeAsked = true;
+      read.store().then(
+        (copy) => {
+          if (!machineDone) put({ designs: copy.designs, from: LIBRARY_FROM.store, layout: copy.layout });
+        },
+        () => {
+          storeFailed = true;
+          if (machineFailure !== null) reject(machineFailure);
+        },
+      );
+    };
+    const timer = setTimeout(askStore, wait);
+    read.machine().then(
+      (library) => {
+        machineDone = true;
+        clearTimeout(timer);
+        put({ designs: library.designs, from: LIBRARY_FROM.machine, layout: null });
+      },
+      (failure: unknown) => {
+        clearTimeout(timer);
+        machineFailure = failure;
+        if (storeFailed) reject(failure);
+        else askStore();
+      },
+    );
+  });
+
+/** A board of a project read-only from the hub's store, for a machine that is off (designaccess design/store). */
+export const storeBoardHref = (m: MachineId, id: string, board: string) =>
+  runtimePath(
+    platformPath(
+      `/design/store/${encodeURIComponent(id)}/f/${board.split('/').map(encodeURIComponent).join('/')}`,
+    ),
+    m,
+  );
+
 /** A new project from the brief: the runtime copies the template and opens a conversation of an agent in it. */
 export const createDesign = (m: MachineId, body: DesignlyCreate) =>
   page(m, '/designly/create', parsePage.designlyCreate, { method: 'POST', body });

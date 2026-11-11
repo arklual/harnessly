@@ -79,7 +79,7 @@ export interface IAppMenuItem {
 }
 
 /** «…» of the page: about the app, its settings, the debug section, turning the app off or on in this chat. */
-const AppMenu = ({ items }: { items: readonly IAppMenuItem[] }) => {
+export const AppMenu = ({ items }: { items: readonly IAppMenuItem[] }) => {
   const actions = useMenuActions();
   if (items.length === 0) return null;
   return (

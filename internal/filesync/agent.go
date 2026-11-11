@@ -48,6 +48,10 @@ type Config struct {
 	// KeepUnseen: a file the store stops showing this machine stays in the folder (a folder several runtimes share,
 	// where another runtime's person may still have a role in it); otherwise an unedited one is removed.
 	KeepUnseen bool
+	// RefusalGroup, when set, names what a refused write says about other paths: the store refuses every path of the
+	// same non-empty group (a project none of the machine's people may edit) until what it shows the machine changes,
+	// so after one refusal the others are not asked about. "" is a path refused on its own.
+	RefusalGroup func(rel string) string
 	// OnApplied is called after another machine's revision lands (outside the agent's lock).
 	OnApplied func(rel string)
 	// Log is where the sync says what it did (nil: slog's default).
@@ -67,6 +71,12 @@ type Agent struct {
 	adopting bool
 	applied  []string
 	pending  map[string]bool
+	// refusedGroups are the groups (Config.RefusalGroup) the store refused a write of, since it last changed what it
+	// shows this machine.
+	refusedGroups map[string]bool
+	// askRefused: what the store shows this machine changed, so the next full scan offers the refused files again;
+	// asking is that scan running.
+	askRefused, asking bool
 
 	mu    sync.Mutex // one file operation at a time: a download and a scan of the same path must not interleave
 	users map[uint32]string
@@ -238,7 +248,13 @@ func (a *Agent) scanDir(ctx context.Context, rel string) error {
 	if a.policy.SkippedDir(rel) {
 		return nil
 	}
-	return fs.WalkDir(a.root.FS(), rel, func(p string, d fs.DirEntry, err error) error {
+	var batch []*outgoing
+	held := 0
+	err := fs.WalkDir(a.root.FS(), rel, func(p string, d fs.DirEntry, err error) error {
+		if ctx.Err() != nil {
+			// The sync is stopping: the rest of the folder is left to the next scan instead of failing file by file.
+			return fs.SkipAll
+		}
 		if err != nil {
 			return nil
 		}
@@ -255,11 +271,80 @@ func (a *Agent) scanDir(ctx context.Context, rel string) error {
 		if err != nil {
 			return nil
 		}
-		if err := a.scanFile(ctx, p, fi); err != nil {
+		out, err := a.prepare(p, fi)
+		if err != nil {
 			a.log.Warn("scan", "path", p, "err", err)
+		}
+		if out != nil {
+			batch = append(batch, out)
+			held += len(out.data) + len(out.canon) + len(out.blob)
+			if len(batch) >= sendBatchFiles || held >= sendBatchBytes {
+				a.sendBatch(ctx, batch)
+				batch, held = nil, 0
+			}
 		}
 		return nil
 	})
+	a.sendBatch(ctx, batch)
+	return err
+}
+
+// A folder's changed files are sent in batches: the store is asked once which of a batch's contents it lacks, instead
+// of once per file. A batch is at most sendBatchFiles files and about sendBatchBytes held in memory.
+const (
+	sendBatchFiles = 100
+	sendBatchBytes = 48 << 20
+)
+
+// outgoing is a changed local file read and sealed, ready to be uploaded and committed.
+type outgoing struct {
+	rel               string
+	fi                fs.FileInfo
+	data, canon, blob []byte
+	tag, sum          string
+	base              int64
+}
+
+// sendBatch uploads what the store lacks of a batch and commits each file. A file that fails is said and left for the
+// next scan.
+func (a *Agent) sendBatch(ctx context.Context, batch []*outgoing) {
+	var missing map[string]bool
+	if len(batch) > 1 {
+		sums := make([]string, 0, len(batch))
+		for _, o := range batch {
+			if !a.groupRefused(o.rel) {
+				sums = append(sums, o.sum)
+			}
+		}
+		if len(sums) > 1 {
+			if m, err := a.hub.MissingBlobs(ctx, sums); err == nil {
+				missing = m
+			} else {
+				a.log.Warn("scan: the batch look at the store's contents failed, each file asks on its own", "err", err)
+			}
+		}
+	}
+	for _, o := range batch {
+		if ctx.Err() != nil {
+			return
+		}
+		var err error
+		switch {
+		case a.groupRefused(o.rel):
+		case missing == nil:
+			err = a.upload(ctx, o.sum, o.blob)
+		case missing[o.sum]:
+			if err = a.hub.PutBlob(ctx, o.sum, o.blob); err == nil {
+				delete(missing, o.sum)
+			}
+		}
+		if err == nil {
+			err = a.send(ctx, o, 0)
+		}
+		if err != nil {
+			a.log.Warn("scan", "path", o.rel, "err", err)
+		}
+	}
 }
 
 func (a *Agent) scanFile(ctx context.Context, rel string, fi fs.FileInfo) error {
@@ -267,28 +352,45 @@ func (a *Agent) scanFile(ctx context.Context, rel string, fi fs.FileInfo) error 
 }
 
 func (a *Agent) scanFileDepth(ctx context.Context, rel string, fi fs.FileInfo, depth int) error {
-	k, err := a.state.get(rel)
-	if err != nil {
+	o, err := a.prepare(rel, fi)
+	if err != nil || o == nil {
 		return err
 	}
-	if k != nil && !k.Deleted && k.Size == fi.Size() && k.Mtime == mtime(fi) {
-		return nil
+	if !a.groupRefused(rel) {
+		if err := a.upload(ctx, o.sum, o.blob); err != nil {
+			return err
+		}
+	}
+	return a.send(ctx, o, depth)
+}
+
+// prepare reads a file and answers what is to be sent of it, nil when nothing is: it is as the agent knows it, or it
+// is set aside.
+func (a *Agent) prepare(rel string, fi fs.FileInfo) (*outgoing, error) {
+	k, err := a.state.get(rel)
+	if err != nil {
+		return nil, err
+	}
+	again := a.asking && isRefused(k)
+	if k != nil && !k.Deleted && k.Size == fi.Size() && k.Mtime == mtime(fi) && !again {
+		return nil, nil
 	}
 	data, fi, err := a.readRegular(rel)
 	if errors.Is(err, errTooBig) || errors.Is(err, errNotRegular) || errors.Is(err, fs.ErrNotExist) {
-		return nil
+		return nil, nil
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	canon := a.codec.Canonical(rel, data)
 	tag := a.codec.Tag(canon)
-	if k != nil && !k.Deleted && k.Sha == tag {
+	if k != nil && !k.Deleted && (k.Sha == tag || k.Sha == refusedPrefix+tag && !again) {
+		// Only the time moved: the contents are the ones the agent knew, sent or refused.
 		k.Size, k.Mtime = fi.Size(), mtime(fi)
-		return a.state.put(rel, *k)
+		return nil, a.state.put(rel, *k)
 	}
 	if a.adopting && k == nil {
-		return a.setAside(rel, data, "not in the room when this machine joined")
+		return nil, a.setAside(rel, data, "not in the room when this machine joined")
 	}
 	var base int64
 	if k != nil {
@@ -296,28 +398,34 @@ func (a *Agent) scanFileDepth(ctx context.Context, rel string, fi fs.FileInfo, d
 	}
 	blob, err := a.codec.Seal(rel, canon)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	sum := sha(blob)
-	if err := a.upload(ctx, sum, blob); err != nil {
-		return err
+	return &outgoing{rel: rel, fi: fi, data: data, canon: canon, blob: blob, tag: tag, sum: sha(blob), base: base}, nil
+}
+
+// send commits a prepared file whose contents the store holds.
+func (a *Agent) send(ctx context.Context, o *outgoing, depth int) error {
+	rel, fi := o.rel, o.fi
+	if a.groupRefused(rel) {
+		return a.refused(rel, o.base, o.tag, fi)
 	}
-	resp, err := a.hub.Commit(ctx, filestore.CommitRequest{Path: rel, Base: base, Sha: sum, Tag: tag, Size: int64(len(canon)),
+	resp, err := a.hub.Commit(ctx, filestore.CommitRequest{Path: rel, Base: o.base, Sha: o.sum, Tag: o.tag, Size: int64(len(o.canon)),
 		Exec: fi.Mode()&0o100 != 0, Author: a.author(fi)})
 	if errors.Is(err, ErrRefused) {
-		return a.refused(rel, base, tag, fi)
+		a.noteRefusal(rel)
+		return a.refused(rel, o.base, o.tag, fi)
 	}
 	if err != nil {
 		return err
 	}
 	if resp.Conflict {
-		return a.resolve(ctx, rel, data, canon, *resp.Entry, depth)
+		return a.resolve(ctx, rel, o.data, o.canon, *resp.Entry, depth)
 	}
 	a.log.Info("sent", "path", rel, "rev", resp.Entry.Rev)
-	if err := a.keepBase(rel, canon); err != nil {
+	if err := a.keepBase(rel, o.canon); err != nil {
 		return err
 	}
-	return a.state.put(rel, known{Rev: resp.Entry.Rev, Sha: tag, Size: fi.Size(), Mtime: mtime(fi)})
+	return a.state.put(rel, known{Rev: resp.Entry.Rev, Sha: o.tag, Size: fi.Size(), Mtime: mtime(fi)})
 }
 
 // refused remembers a local file the store does not take from this machine (a project none of its people may edit,
@@ -325,6 +433,28 @@ func (a *Agent) scanFileDepth(ctx context.Context, rel string, fi fs.FileInfo, d
 func (a *Agent) refused(rel string, base int64, tag string, fi fs.FileInfo) error {
 	a.log.Info("not sent: none of this machine's people may edit it", "path", rel)
 	return a.state.put(rel, known{Rev: base, Sha: refusedPrefix + tag, Size: fi.Size(), Mtime: mtime(fi)})
+}
+
+// noteRefusal remembers the group of a refused path, so the rest of the group is not asked about.
+func (a *Agent) noteRefusal(rel string) {
+	if a.cfg.RefusalGroup == nil {
+		return
+	}
+	if g := a.cfg.RefusalGroup(rel); g != "" {
+		if a.refusedGroups == nil {
+			a.refusedGroups = map[string]bool{}
+		}
+		a.refusedGroups[g] = true
+	}
+}
+
+// groupRefused: the store has refused a write of this path's group since it last changed what it shows the machine.
+func (a *Agent) groupRefused(rel string) bool {
+	if a.cfg.RefusalGroup == nil || len(a.refusedGroups) == 0 {
+		return false
+	}
+	g := a.cfg.RefusalGroup(rel)
+	return g != "" && a.refusedGroups[g]
 }
 
 // refusedPrefix marks what the agent knows of a file the store did not take: it is not the store's revision, so it is
@@ -343,6 +473,9 @@ func (a *Agent) keepBase(rel string, canon []byte) error {
 
 // fetch downloads and opens a revision's canonical contents.
 func (a *Agent) fetch(ctx context.Context, e filestore.Entry) ([]byte, error) {
+	if canon, ok := a.localCopy(e); ok {
+		return canon, nil
+	}
 	var buf bytes.Buffer
 	if err := a.hub.GetBlob(ctx, e.Sha, &limitWriter{w: &buf, n: filestore.MaxFileSize + 1024}); err != nil {
 		return nil, err
@@ -358,6 +491,39 @@ func (a *Agent) fetch(ctx context.Context, e filestore.Entry) ([]byte, error) {
 		return nil, fmt.Errorf("contents of %s rev %d do not match their fingerprint", e.Path, e.Rev)
 	}
 	return canon, nil
+}
+
+// localCopy finds a revision's contents in the folder itself: another file the agent knows with the same fingerprint
+// (the same file under another kit version, a copy, a rename) that has not been edited since. Such a revision is not
+// downloaded. The contents are read and their fingerprint checked again, so a file that changed behind the agent's
+// back is never taken for them.
+func (a *Agent) localCopy(e filestore.Entry) ([]byte, bool) {
+	tag := e.Tag
+	if tag == "" {
+		tag = e.Sha
+	}
+	paths, err := a.state.withSha(tag, 4)
+	if err != nil {
+		return nil, false
+	}
+	for _, p := range paths {
+		k, err := a.state.get(p)
+		if err != nil || k == nil || k.Deleted {
+			continue
+		}
+		fi, err := a.root.Lstat(p)
+		if err != nil || !fi.Mode().IsRegular() || k.Size != fi.Size() || k.Mtime != mtime(fi) {
+			continue
+		}
+		data, _, err := a.readRegular(p)
+		if err != nil {
+			continue
+		}
+		if canon := a.codec.Canonical(p, data); a.codec.Tag(canon) == tag {
+			return canon, true
+		}
+	}
+	return nil, false
 }
 
 type limitWriter struct {
@@ -423,8 +589,13 @@ func (a *Agent) pushDelete(ctx context.Context, rel string) error {
 	if err != nil || k == nil || k.Deleted {
 		return err
 	}
+	if a.groupRefused(rel) {
+		a.log.Info("delete not taken: none of this machine's people may edit it", "path", rel)
+		return a.state.forget(rel)
+	}
 	resp, err := a.hub.Commit(ctx, filestore.CommitRequest{Path: rel, Base: k.Rev, Deleted: true})
 	if errors.Is(err, ErrRefused) {
+		a.noteRefusal(rel)
 		a.log.Info("delete not taken: none of this machine's people may edit it", "path", rel)
 		return a.state.forget(rel)
 	}
@@ -801,6 +972,10 @@ func (a *Agent) Pull(ctx context.Context, wait time.Duration) (bool, error) {
 // the store no longer shows it is removed when it was not edited here (an edit stays, unsynced). The first scope a
 // store names (was "") only reads the room again.
 func (a *Agent) rescope(ctx context.Context, was, now string) error {
+	// A role may have been given: what was refused is asked about again.
+	a.mu.Lock()
+	a.refusedGroups, a.askRefused = nil, true
+	a.mu.Unlock()
 	seen := map[string]bool{}
 	var since int64
 	for {
@@ -870,6 +1045,8 @@ func (a *Agent) dropUnseen(seen map[string]bool) error {
 func (a *Agent) ScanAll(ctx context.Context) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.asking, a.askRefused = a.askRefused, false
+	defer func() { a.asking = false }()
 	if err := a.scanDir(ctx, "."); err != nil {
 		return err
 	}

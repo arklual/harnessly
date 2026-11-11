@@ -152,8 +152,32 @@ func (t *Tmux) CreateSession(name string, cols, rows int, cwd string) error {
 	if t.legacyName(name) {
 		t.remember(name, socket)
 	}
-	t.ApplyConfig(socket)
+	t.watchSoon(socket)
+	// The server has the config already unless the file changed since it last read it: one stat instead of a second
+	// tmux process for every session.
+	if stamp := t.configStamp(); stamp == "" || t.appliedStamp(socket) != stamp {
+		t.ApplyConfig(socket)
+	}
 	return nil
+}
+
+// configStamp tells one content of the config file from the next (its time and size); "" when there is no file to
+// tell by.
+func (t *Tmux) configStamp() string {
+	if t.cfg.ConfigFile == "" {
+		return ""
+	}
+	st, err := os.Stat(t.cfg.ConfigFile)
+	if err != nil {
+		return ""
+	}
+	return strconv.FormatInt(st.ModTime().UnixNano(), 10) + "/" + strconv.FormatInt(st.Size(), 10)
+}
+
+func (t *Tmux) appliedStamp(socket string) string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.applied[socket]
 }
 
 // ApplyConfig re-reads the config file on one server, or on every server when socket is "". A server that is not
@@ -166,7 +190,18 @@ func (t *Tmux) ApplyConfig(socket string) {
 	if socket != "" {
 		sockets = []string{socket}
 	}
-	t.each(sockets, func(_ int, s string) { t.tmux(s, "source-file", t.cfg.ConfigFile) })
+	stamp := t.configStamp()
+	t.each(sockets, func(_ int, s string) {
+		r := t.tmux(s, "source-file", t.cfg.ConfigFile)
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		if r.err != nil {
+			// Not read (no server yet, or a tmux that did not answer): the next session asks again.
+			delete(t.applied, s)
+			return
+		}
+		t.applied[s] = stamp
+	})
 }
 
 // each runs f for every socket at once and waits.
@@ -232,6 +267,9 @@ func (t *Tmux) KillSession(name string) {
 // KillServer ends every server of the runtime and every session on them: the reset of all tabs.
 func (t *Tmux) KillServer() {
 	t.each(t.Sockets(), func(_ int, s string) { t.tmux(s, "kill-server") })
+	t.mu.Lock()
+	clear(t.applied)
+	t.mu.Unlock()
 }
 
 // ResolveExistingDir is preferred, or its nearest existing ancestor folder, or Home when none exists or preferred is "".

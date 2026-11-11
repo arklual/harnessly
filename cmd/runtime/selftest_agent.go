@@ -54,6 +54,11 @@ type agentSelftest struct {
 	Env []string
 	// Dir is the folder the agent starts in; it is made and trusted once.
 	Dir string
+	// Mark goes into the agent's environment (selftestMarkVar); reap ends every process that carries it. Limit is the
+	// term of the whole scenario (0: agentSelftestLimit).
+	Mark  string
+	Limit time.Duration
+	reap  func()
 }
 
 // claudeSelftestDir is where the scenario runs: one folder of the runtime's own, so the trust dialog is answered once
@@ -71,8 +76,9 @@ func newAgentSelftest(t *tmux.Tmux, dataDir, binary string) (agentSelftest, erro
 	}
 	// The agent's network setup (proxies and the like) as a tab's agent gets it, then the side chat's switches.
 	env := sidechat.Env(withAgentEnv(nil, agentEnvDir(dataDir), agents.Claude), rt)
+	mark := selftestMark(dataDir)
 	return agentSelftest{selftest: newSelftest(t), panes: t, Binary: rt.Binary, Env: agentEnvPairs(env),
-		Dir: claudeSelftestDir(dataDir)}, nil
+		Dir: claudeSelftestDir(dataDir), Mark: mark, reap: func() { reapMarked(mark) }}, nil
 }
 
 // agentEnvPairs keeps the variables sidechat.Env sets on top of an empty base: those go on the agent's command line.
@@ -97,6 +103,9 @@ func (a agentSelftest) script() string {
 	for _, kv := range a.Env {
 		k, v, _ := strings.Cut(kv, "=")
 		b.WriteString("export " + k + "=" + quoteArg(v) + "\n")
+	}
+	if a.Mark != "" {
+		b.WriteString("export " + selftestMarkVar + "=" + quoteArg(a.Mark) + "\n")
 	}
 	b.WriteString("exec " + quoteArg(a.Binary) + " --model " + agentModel + " --setting-sources project " + quoteArg(agentPrompt) + "\n")
 	return b.String()
@@ -123,6 +132,13 @@ func (a agentSelftest) run(ctx context.Context) []machineCheck {
 	skip := func() { answer.Detail = "не проверено: предыдущий шаг не прошёл" }
 	fail := func(why string) []machineCheck { question.Detail = why; skip(); return out() }
 
+	// One term for the whole scenario, whoever started it; past it every wait below gives up and the agent is ended.
+	limit := a.Limit
+	if limit <= 0 {
+		limit = agentSelftestLimit
+	}
+	ctx, cancel := context.WithTimeout(ctx, limit)
+	defer cancel()
 	if err := os.MkdirAll(a.Dir, 0o700); err != nil {
 		return fail("папка проверки не создалась: " + err.Error())
 	}
@@ -133,7 +149,13 @@ func (a agentSelftest) run(ctx context.Context) []machineCheck {
 	if err := a.panes.CreateSession(name, 120, 40, a.Dir); err != nil {
 		return fail("панель не создалась: " + err.Error())
 	}
-	defer a.panes.KillSession(name)
+	defer func() {
+		a.panes.KillSession(name)
+		// The pane's end hangs the agent's terminal up; an agent that outlives that is ended by its mark.
+		if a.reap != nil {
+			a.reap()
+		}
+	}()
 	if !a.waitFor(ctx, selftestShellWait, func() bool { return tmux.SafeShells[a.panes.PaneCurrentCommand(name)] }) {
 		return fail("оболочка панели не поднялась")
 	}

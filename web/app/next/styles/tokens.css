@@ -213,3 +213,51 @@ html[data-theme='dark'],
     0 14px 40px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.06);
   --hx-ink-spring: cubic-bezier(0.34, 1.26, 0.64, 1);
 }
+
+/* What pops up to tell (the smart notice, its drops, toasts) is a card of one of two looks: the black material, or a
+   light card with dark words. Which, is the person's choice (stores/me.ts noticeColor, on <html data-notices>):
+   «contrast» (the default) takes the other of the theme, so the card stands out of the interface as macOS's do — black
+   in the light theme, light in the dark one; «theme» takes the theme's own. --hx-toast-on is the colour things are
+   laid over the card with, as r g b: white on the black card, black on the light one. Contrast on the light card
+   (#f5f5f7), checked in features/smart-notice/styles.test.ts: fg 15.5:1, fg2 6:1, fg3 4.6:1, danger with white 4.6:1. */
+:root,
+html[data-theme='dark'][data-notices='theme'] {
+  --hx-toast-bg: #000;
+  --hx-toast-fg: #fff;
+  --hx-toast-fg2: rgba(255, 255, 255, 0.64);
+  --hx-toast-fg3: rgba(255, 255, 255, 0.44);
+  --hx-toast-fill: rgba(255, 255, 255, 0.08);
+  --hx-toast-fill2: rgba(255, 255, 255, 0.14);
+  --hx-toast-line: rgba(255, 255, 255, 0.08);
+  --hx-toast-focus: rgba(255, 255, 255, 0.85);
+  --hx-toast-on: 255 255 255;
+  --hx-toast-raised: #2c2c2e;
+  --hx-toast-raised-hover: #3a3a3c;
+  --hx-toast-danger: #ff6b6b;
+  --hx-toast-danger-ink: #000;
+  --hx-toast-warn: #ffb4b4;
+  --hx-toast-warn-icon: #ff8a8a;
+  --hx-toast-error: var(--hx-danger);
+  --hx-toast-shadow: var(--hx-ink-shadow);
+}
+html[data-theme='dark']:not([data-notices='theme']),
+html:not([data-theme='dark'])[data-notices='theme'] {
+  --hx-toast-bg: #f5f5f7;
+  --hx-toast-fg: #1d1d1f;
+  --hx-toast-fg2: rgba(0, 0, 0, 0.62);
+  --hx-toast-fg3: rgba(0, 0, 0, 0.55);
+  --hx-toast-fill: rgba(0, 0, 0, 0.06);
+  --hx-toast-fill2: rgba(0, 0, 0, 0.1);
+  --hx-toast-line: rgba(0, 0, 0, 0.08);
+  --hx-toast-focus: rgba(0, 0, 0, 0.7);
+  --hx-toast-on: 0 0 0;
+  --hx-toast-raised: #fff;
+  --hx-toast-raised-hover: #e8e8ed;
+  --hx-toast-danger: #d93025;
+  --hx-toast-danger-ink: #fff;
+  --hx-toast-warn: #a50e0e;
+  --hx-toast-warn-icon: #c5221f;
+  --hx-toast-error: #c5221f;
+  --hx-toast-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}

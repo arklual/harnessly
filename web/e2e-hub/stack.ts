@@ -48,6 +48,8 @@ export const CELLS: Record<CellName, Cell> = {
       HUB_EDITION: 'cloud',
       HUB_SIGNUP: 'open',
       HUB_ORGS: 'on',
+      HUB_ACCESS_ENFORCE: 'on',
+      HUB_RESOURCE_ACCESS: 'on',
       HUB_FEATURES_DEFAULT: 'ui.hx',
       HUB_RUNTIME_DOMAIN: 'run.test',
       HUB_ALLOW_SAME_SITE_RUNTIME: '0',
@@ -88,7 +90,7 @@ export const CELLS: Record<CellName, Cell> = {
     signup: 'open',
     env: () => ({
       HUB_SIGNUP: 'open',
-      HUB_ORGS: 'shadow',
+      HUB_ORGS: 'off',
       HUB_FEATURES_DEFAULT: 'ui.hx',
       HUB_MACHINE_TRUST: 'on',
     }),
@@ -257,6 +259,11 @@ export async function startStack(name: CellName, extraEnv: Record<string, string
       copyFileSync(join(repo, 'web', 'e2e', 'fixtures', f), join(home, 'bin', f));
       chmodSync(join(home, 'bin', f), 0o755);
     }
+    // The runtime looks for the agent CLIs along the PATH the person's login shell builds, not along its own. A
+    // system profile that sets PATH anew (Debian's /etc/profile does) drops the stand's bin, and every chat then ends
+    // with «agent-not-installed»: the profile of the machine's home puts it back, as a person's own profile would.
+    for (const f of ['.profile', '.zprofile'])
+      writeFileSync(join(home, f), 'export PATH="$HOME/bin:$PATH"\n');
     writeFileSync(join(work, 'README.md'), '# demo project\n');
     const menv: Record<string, string> = {
       PATH: `${join(home, 'bin')}:/usr/local/bin:/usr/bin:/bin`,

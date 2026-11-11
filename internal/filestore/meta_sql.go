@@ -100,6 +100,28 @@ CREATE TABLE IF NOT EXISTS gc_marks (
   sha   TEXT PRIMARY KEY,
   since BIGINT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS uploads (
+  id        TEXT PRIMARY KEY,
+  member    TEXT NOT NULL,
+  sha       TEXT NOT NULL,
+  size      BIGINT NOT NULL,
+  part_size BIGINT NOT NULL,
+  created   BIGINT NOT NULL,
+  expires   BIGINT NOT NULL,
+  handle    TEXT NOT NULL DEFAULT '',
+  received  INTEGER NOT NULL DEFAULT 0,
+  hash      TEXT NOT NULL DEFAULT '',
+  state     TEXT NOT NULL DEFAULT 'open',
+  error     TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS upload_parts (
+  upload TEXT NOT NULL,
+  n      INTEGER NOT NULL,
+  sha    TEXT NOT NULL,
+  size   BIGINT NOT NULL,
+  tag    TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (upload, n)
+);
 INSERT INTO counters (k, v) SELECT 'rev', COALESCE(MAX(rev), 0) FROM history WHERE true ON CONFLICT (k) DO NOTHING;
 `
 

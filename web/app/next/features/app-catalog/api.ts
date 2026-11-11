@@ -104,6 +104,8 @@ export interface IAppKind {
   app: string;
   appName: string;
   schemaVersion: number;
+  /** The type is made of Sinopia's own site: its documents open in Sinopia's editor. */
+  extends?: 'site';
 }
 
 export const loadKinds = async (m: MachineId): Promise<IAppKind[]> =>
@@ -152,6 +154,8 @@ export interface IKindOpen {
   readOnly?: boolean;
   code?: string;
   reason?: string;
+  /** The document is made of Sinopia's own site: it opens in Sinopia's editor, not in an app's view. */
+  extends?: 'site';
 }
 
 export const openKindDocument = (m: MachineId, document: string): Promise<IKindOpen> =>

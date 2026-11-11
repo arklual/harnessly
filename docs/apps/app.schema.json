@@ -9,6 +9,7 @@
     "branding": {},
     "budget": {},
     "chat": {},
+    "data": {},
     "description": {},
     "harnessly": {},
     "icon": {},
@@ -17,6 +18,7 @@
       "pattern": "^[a-z0-9][a-z0-9-]{0,39}\\.[a-z0-9][a-z0-9-]{0,39}$",
       "type": "string"
     },
+    "kind": {},
     "name": {},
     "network": {},
     "permissions": {
@@ -127,16 +129,20 @@
             "description": "Run a view of the app hidden in the page while the app is on in a chat, without the person opening it: its hooks and events work in every such chat."
           },
           {
+            "const": "notices",
+            "description": "Ask the person in the smart notice (a choice, a confirm, a short field, code cells, a view of its own) and show a status or a progress there (hl.notice). Never passwords, keys or sign-ins: those go through the safe."
+          },
+          {
             "const": "notify",
             "description": "Show the person a notification."
           },
           {
             "const": "tools.page",
-            "description": "Offer tools from the view's page that the agent of the chat calls (hl.tools.register, navigator.modelContext.registerTool)."
+            "description": "Offer tools from the view's page that the agent of the chat calls (hl.tools.register, hl.state, hl.action, navigator.modelContext.registerTool)."
           },
           {
             "const": "context.publish",
-            "description": "Publish what the view shows for the agent of the chat to read (hl.publish)."
+            "description": "Publish what the view shows for the agent of the chat to read (hl.publish, hl.state, hl.screen)."
           },
           {
             "const": "sinopia.read",
@@ -149,6 +155,10 @@
           {
             "const": "sinopia.comment",
             "description": "Comment on the Sinopia document."
+          },
+          {
+            "const": "app.extend",
+            "description": "Make a document type of the app's own out of a Sinopia site: its documents open in Sinopia's editor with the app's tab and panels. Only where the deployment's admin lists the app (HARNESSLY_APPS_EXTEND)."
           },
           {
             "const": "sinopia.kind",
@@ -232,7 +242,8 @@
       "type": "string"
     },
     "views": {},
-    "when": {}
+    "when": {},
+    "workflow": {}
   },
   "required": [
     "id",

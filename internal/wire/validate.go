@@ -654,7 +654,32 @@ func (s ConvSnapshot) Validate() error {
 	if s.Now != nil {
 		errs = append(errs, under("now", s.Now.Validate()))
 	}
+	if s.Agent != nil {
+		errs = append(errs, under("agent", s.Agent.Validate()))
+	}
+	if s.Pane != nil {
+		errs = append(errs, under("pane", s.Pane.Validate()))
+	}
 	return errors.Join(errs...)
+}
+
+func (p Pane) Validate() error {
+	errs := []error{nonNegative("count", p.Count), each("links", p.Links), each("items", p.Items)}
+	if len(p.Links) > PaneLinksMax {
+		errs = append(errs, errors.New("links: too many"))
+	}
+	if len(p.Items) > PaneItemsMax {
+		errs = append(errs, errors.New("items: too many"))
+	}
+	return errors.Join(errs...)
+}
+
+func (l PaneLink) Validate() error {
+	return errors.Join(need("url", l.URL), need("kind", l.Kind), nonNegative("at", l.At), nonNegative("count", int64(l.Count)))
+}
+
+func (i PaneItem) Validate() error {
+	return errors.Join(need("id", i.ID), need("k", i.K), nonNegative("at", i.At))
 }
 
 func (h Hello) Validate() error { return allIn("features", h.Features, Features) }
@@ -895,7 +920,20 @@ func (e QuotaExhaustedEv) Validate() error {
 	return err
 }
 
-func (e QueueChangedEv) Validate() error { return under("queue", e.Queue.Validate()) }
+func (e QueueChangedEv) Validate() error {
+	errs := []error{under("queue", e.Queue.Validate())}
+	if e.Pane != nil {
+		errs = append(errs, under("pane", e.Pane.Validate()))
+	}
+	if e.Agent != nil {
+		errs = append(errs, under("agent", e.Agent.Validate()))
+	}
+	return errors.Join(errs...)
+}
+
+func (a AgentStamp) Validate() error {
+	return errors.Join(under("state", a.State.Validate()), positive("rev", a.Rev), need("epoch", a.Epoch))
+}
 
 func (e PromptStateEv) Validate() error {
 	return errors.Join(need("clientId", e.ClientID), under("state", e.State.Validate()), positive("rev", e.Rev))
