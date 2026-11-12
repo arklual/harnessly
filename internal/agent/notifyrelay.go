@@ -49,7 +49,7 @@ func (a *Agent) notifyRoute(w http.ResponseWriter, r *http.Request) {
 		reply(w, 400, map[string]string{"error": "unknown action"})
 		return
 	}
-	if !a.connected() {
+	if !a.clusterLinked() {
 		reply(w, 503, map[string]string{"error": "the platform is not connected, try again later"})
 		return
 	}

@@ -321,3 +321,25 @@ func (s *stateFiles) WriteMode(owned, headless bool, goSlices []string) (stateMo
 	}
 	return stateMode{Owned: owned, Headless: headless}, nil // the answer is what it always was
 }
+
+// DropOwned turns off the owned flag of state-mode.json and keeps the rest, so the runtime writes its layouts on its own
+// disk again. Only a cluster sets the flag; a hub keeps no layouts.
+func (s *stateFiles) DropOwned() {
+	if s == nil {
+		return
+	}
+	file := filepath.Join(s.dir, "state-mode.json")
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return
+	}
+	var mode stateMode
+	if json.Unmarshal(raw, &mode) != nil || !mode.Owned {
+		return
+	}
+	if _, err := s.WriteMode(false, mode.Headless, mode.GoSlices); err != nil {
+		Log("warn", "state mode not written", F{"error", err.Error()})
+		return
+	}
+	Log("info", "layouts are the runtime's own again: no cluster keeps them over a hub link")
+}

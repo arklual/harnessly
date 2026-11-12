@@ -185,7 +185,7 @@ describe('useDrag: the row itself is carried', () => {
     for (let y = 31; y < 140; y += 3) moveTo(y);
     expect(renders).toBe(picked);
     // The row followed the pointer the whole way: 139 - 20.
-    expect(row('a').style.transform).toBe('translate3d(0, 119px, 0)');
+    expect(row('a').style.transform).toBe('translate3d(0px, 119px, 0px)');
   });
 
   it('keeps the row inside the list, held where it was taken', () => {
@@ -195,9 +195,9 @@ describe('useDrag: the row itself is carried', () => {
     moveTo(60);
     moveTo(400);
     // The list ends at 160: the row (taken 10 px into it) goes no lower than 120, 80 below its place.
-    expect(row('b').style.transform).toBe('translate3d(0, 80px, 0)');
+    expect(row('b').style.transform).toBe('translate3d(0px, 80px, 0px)');
     moveTo(-40);
-    expect(row('b').style.transform).toBe('translate3d(0, -40px, 0)');
+    expect(row('b').style.transform).toBe('translate3d(0px, -40px, 0px)');
   });
 
   it('moves the neighbours aside only when its place changes', () => {
@@ -208,10 +208,10 @@ describe('useDrag: the row itself is carried', () => {
     expect(row('b').style.transform).toBe('');
     expect(row('b').hasAttribute('data-drag-shift')).toBe(true);
     moveTo(62);
-    expect(row('b').style.transform).toBe('translate3d(0, -40px, 0)');
+    expect(row('b').style.transform).toBe('translate3d(0px, -40px, 0px)');
     expect(row('c').style.transform).toBe('');
     moveTo(102);
-    expect(row('c').style.transform).toBe('translate3d(0, -40px, 0)');
+    expect(row('c').style.transform).toBe('translate3d(0px, -40px, 0px)');
     moveTo(70);
     expect(row('c').style.transform).toBe('');
   });
@@ -224,7 +224,7 @@ describe('useDrag: the row itself is carried', () => {
     moveTo(30);
     moveTo(102);
     release(102);
-    expect(row('a').style.transform).toBe('translate3d(0, 80px, 0)');
+    expect(row('a').style.transform).toBe('translate3d(0px, 80px, 0px)');
     expect(row('a').hasAttribute('data-drag-settle')).toBe(true);
     expect(onDrop).not.toHaveBeenCalled();
     expect(order()).toEqual(['a', 'b', 'c', 'd']);

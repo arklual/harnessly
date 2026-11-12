@@ -13,46 +13,48 @@ require (
 	github.com/evanw/esbuild v0.28.2
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/segmentio/asm v1.2.1
-	github.com/yuin/goldmark v1.8.6
+	github.com/yuin/goldmark v1.8.7
 	golang.org/x/text v0.43.0
 )
 
-require golang.org/x/sys v0.49.0
+require golang.org/x/sys v0.50.0
 
 require (
-	github.com/andybalholm/brotli v1.2.6
+	github.com/andybalholm/brotli v1.2.8
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-webauthn/webauthn v0.18.2
-	github.com/jackc/pgx/v5 v5.11.0
-	golang.org/x/oauth2 v0.37.0
-	modernc.org/sqlite v1.61.0
+	github.com/jackc/pgx/v5 v5.12.0
+	golang.org/x/oauth2 v0.38.0
+	modernc.org/sqlite v1.61.1
 )
 
 require (
-	github.com/minio/minio-go/v7 v7.0.99
-	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/net v0.60.0
-	google.golang.org/grpc v1.83.2
-	google.golang.org/protobuf v1.36.11
+	filippo.io/age v1.3.2
+	github.com/minio/minio-go/v7 v7.4.1
+	go.yaml.in/yaml/v3 v3.0.6
+	golang.org/x/net v0.62.0
+	google.golang.org/grpc v1.85.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
-	filippo.io/age v1.3.2 // indirect
 	filippo.io/hpke v0.4.0 // indirect
-	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/klauspost/compress v1.19.2 // indirect
+	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/rs/xid v1.6.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	github.com/zeebo/xxh3 v1.1.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect
+	gopkg.in/ini.v1 v1.67.3 // indirect
 )
 
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.6
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/x v0.3.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
@@ -60,7 +62,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect

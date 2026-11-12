@@ -378,7 +378,8 @@ func TestAGPTChatGoesToTheProxyWithTheProxysKey(t *testing.T) {
 	_ = json.Unmarshal(must(os.ReadFile(path)), &got)
 	base, keyFile, _ := g.Endpoint()
 	if got.Env["ANTHROPIC_BASE_URL"] != base || got.APIKeyHelper != "cat '"+keyFile+"'" ||
-		got.Env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] != "gpt-6-luna" || got.Env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] != "475000" {
+		got.Env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] != "gpt-6-luna" || got.Env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] != "475000" ||
+		got.Env["ENABLE_TOOL_SEARCH"] != "true" {
 		t.Fatalf("settings %+v", got)
 	}
 	src := &Source{Store: st}

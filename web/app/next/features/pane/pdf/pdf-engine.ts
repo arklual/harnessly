@@ -17,7 +17,6 @@ export const openPdf = (src: string): PDFDocumentLoadingTask =>
     url: src,
     withCredentials: true,
     disableAutoFetch: true,
-    isEvalSupported: false,
     enableXfa: false,
     cMapUrl: assets('cmaps'),
     cMapPacked: true,

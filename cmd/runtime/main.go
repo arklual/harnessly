@@ -668,6 +668,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	terms := f.terms
 	var confined http.Handler = confineAgentToken(&gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}, f)
+	confined = platformAlias(platformAPI, confined)
 	// Every request of the runtime passes the journal: a failure, a change or a slow read is a line of it.
 	confined = journal.HTTP(confined, journal.HTTPOptions{Quiet: journalQuiet})
 	handler := confined

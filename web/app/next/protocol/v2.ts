@@ -762,6 +762,8 @@ export interface DesignlyCreate {
   brief: string;
   kind: DesignKind;
   provider: Provider;
+  /** A configured backend profile, as for a new conversation; omitted for the CLI account. */
+  profile?: string;
   model: string | null;
   effort: Effort | null;
   designSystem: string | null;

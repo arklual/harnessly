@@ -202,15 +202,15 @@ describe('TabStrip: carrying a tab', () => {
     expect(list().getAttribute('data-dragging')).toBe('tab');
     expect(tab('a').getAttribute('data-dragging')).toBe('true');
     // Held where it was taken: the pointer went 225 px along, so did the tab; b and c made room for it.
-    expect(tab('a').style.transform).toBe('translate3d(225px, 0, 0)');
-    expect(tab('b').style.transform).toBe('translate3d(-100px, 0, 0)');
-    expect(tab('c').style.transform).toBe('translate3d(-100px, 0, 0)');
+    expect(tab('a').style.transform).toBe('translate3d(225px, 0px, 0px)');
+    expect(tab('b').style.transform).toBe('translate3d(-100px, 0px, 0px)');
+    expect(tab('c').style.transform).toBe('translate3d(-100px, 0px, 0px)');
     expect(tab('d').style.transform).toBe('');
     expect(document.querySelector('.hx-dragghost')).toBeNull();
     release(275);
     expect(list().hasAttribute('data-dragging')).toBe(false);
     // It eases into the place of c, and only then does the order change.
-    expect(tab('a').style.transform).toBe('translate3d(200px, 0, 0)');
+    expect(tab('a').style.transform).toBe('translate3d(200px, 0px, 0px)');
     expect(on.onMove).not.toHaveBeenCalled();
     settle();
     expect(on.onMove).toHaveBeenCalledExactlyOnceWith('a', 2);

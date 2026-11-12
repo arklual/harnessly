@@ -4,13 +4,52 @@ import {
   effortLabel,
   modelName,
   modelOf,
+  pickerAgents,
   removedKeyOf,
   signInNeeded,
   unavailableNote,
   type IPickerAgent,
 } from './agents';
+import type { MachineAgent } from '@/next/protocol/v2';
 
 beforeAll(() => pinLocale('en'));
+
+describe('configured profiles use their own credentials', () => {
+  const machine = (status: MachineAgent['status'], configured = true): MachineAgent => ({
+    provider: 'claude',
+    version: null,
+    status,
+    models: [],
+    canSwitchModel: true,
+    profiles: [
+      {
+        id: 'gpt',
+        label: 'GPT subscription',
+        vendor: 'gpt',
+        configured,
+        models: [{ id: 'gpt-test', label: 'GPT', hint: '', efforts: ['low'], defaultEffort: 'low' }],
+      },
+    ],
+  });
+
+  it('offers a configured GPT profile without an Anthropic login', () => {
+    const choices = pickerAgents([machine('login-required')]);
+    expect(choices.find((a) => a.profile === 'gpt')).toMatchObject({ available: true, status: 'ready' });
+    expect(choices.find((a) => !a.profile)).toMatchObject({ available: false, status: 'login-required' });
+    expect(signInNeeded(choices)).toBe(false);
+  });
+
+  it('still requires the underlying CLI to be installed', () => {
+    expect(pickerAgents([machine('missing')]).find((a) => a.profile === 'gpt')).toMatchObject({
+      available: false,
+      status: 'missing',
+    });
+  });
+
+  it('does not offer a profile without its own credentials', () => {
+    expect(pickerAgents([machine('ready', false)]).some((a) => a.profile === 'gpt')).toBe(false);
+  });
+});
 
 const agent = {
   provider: 'claude',

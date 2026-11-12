@@ -131,6 +131,10 @@ var presets = []Preset{
 		},
 		Small: "gpt-6-luna", Test: "gpt-6-luna",
 		Switched: true,
+		// Claude Code turns MCP tool search off behind a non-Anthropic ANTHROPIC_BASE_URL; without it a big MCP catalog
+		// (~1,300 tools) is sent whole on every request, refills the window right after a compaction and ends in
+		// "Autocompact is thrashing". The proxy carries deferred tools through (GitHub #72).
+		Env: map[string]string{"ENABLE_TOOL_SEARCH": "true"},
 	},
 	{
 		// The router over the person's GLM and Kimi Code keys (Router): each turn goes to the heavy or the light model

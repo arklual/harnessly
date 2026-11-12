@@ -331,8 +331,8 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
   }, [machine, restored, kitsAdded]);
 
   // The agent that draws starts the way a new chat does: the person's pick, else the CLI settings file's model and
-  // effort, else the last pick. A design starts through its own request, which has no backend profile.
-  const { choice, agents, onPick } = useStartChoice(machine, true);
+  // effort, else the last pick. Backend profiles follow the same selection and launch path.
+  const { choice, agents, onPick } = useStartChoice(machine);
 
   const draft = useDraft(START_DRAFT);
   const brief = draft?.text ?? '';
@@ -382,6 +382,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
         brief,
         kind,
         provider: choice?.provider ?? 'claude',
+        ...(choice?.profile ? { profile: choice.profile } : {}),
         model: choice?.model ?? null,
         effort: choice?.effort ?? null,
         designSystem,

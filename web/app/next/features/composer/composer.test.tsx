@@ -7,6 +7,15 @@ import type { QueueRow } from '@/next/features/composer/types';
 import type { LaunchFailure } from '@/next/protocol/v2';
 
 beforeEach(() => {
+  // jsdom 31 hands out a canvas context, so the dictation waveform now observes its size.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   window.matchMedia = ((query: string) => ({
     matches: false,
     media: query,
@@ -450,12 +459,12 @@ describe('Queue rows carried by the grip', () => {
     pointer('pointermove', window, 10, 170);
     frame();
     expect(slotOf('a').getAttribute('data-dragging')).toBe('true');
-    expect(slotOf('a').style.transform).toBe('translate3d(0, 60px, 0)');
-    expect(slotOf('b').style.transform).toBe('translate3d(0, -40px, 0)');
+    expect(slotOf('a').style.transform).toBe('translate3d(0px, 60px, 0px)');
+    expect(slotOf('b').style.transform).toBe('translate3d(0px, -40px, 0px)');
     expect(slotOf('c').style.transform).toBe('');
     expect(onMove).not.toHaveBeenCalled();
     pointer('pointerup', window, 10, 170);
-    expect(slotOf('a').style.transform).toBe('translate3d(0, 40px, 0)');
+    expect(slotOf('a').style.transform).toBe('translate3d(0px, 40px, 0px)');
     settle();
     expect(onMove).toHaveBeenCalledWith('a', 'c');
   });

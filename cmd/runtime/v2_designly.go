@@ -231,7 +231,7 @@ func (d *v2Designly) Create(ctx context.Context, c wire.DesignlyCreate) (wire.De
 	dir := lib.ArtifactDir(project.ID)
 	d.v.starter.promptFiles.Store(dir, files)
 	defer d.v.starter.promptFiles.Delete(dir)
-	res := d.v.rt.Do(ctx, "designly", wire.ConversationCreateCmd{OpID: "dz-" + randomToken(), Cwd: dir, Provider: c.Provider, Model: model,
+	res := d.v.rt.Do(ctx, "designly", wire.ConversationCreateCmd{OpID: "dz-" + randomToken(), Cwd: dir, Provider: c.Provider, Profile: c.Profile, Model: model,
 		First: &wire.FirstMessage{ClientID: randomToken(), Text: prompt, AttachmentIDs: append([]string{}, c.AttachmentIDs...)}})
 	if res.R != wire.ResultAccepted || res.ID == nil {
 		return wire.DesignlyCreated{}, notStarted(string(res.Code))

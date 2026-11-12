@@ -1,10 +1,14 @@
 package agent
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testAgent(t *testing.T) *Agent {
@@ -85,4 +89,39 @@ func TestListenNeedsAValidToken(t *testing.T) {
 			t.Errorf("%s: %d", name, rec.Code)
 		}
 	}
+}
+
+// A hub link is told none of the cluster's events, so a state write must not wait for a cluster answer over it: before
+// the fix each write of a tab waited out stateResultTO and a chat's start took tens of seconds.
+func TestStateWriteOverAHubLinkIsRefusedAtOnce(t *testing.T) {
+	a := testAgent(t)
+	a.clients[&link{hub: true}] = struct{}{}
+	start := time.Now()
+	if rec := post(a, "/state/patch", "local-secret", `{"name":"layout-ws.json","set":{}}`); rec.Code != 503 {
+		t.Fatalf("patch over a hub link only: %d", rec.Code)
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("patch over a hub link waited %s", d)
+	}
+}
+
+func TestDropOwnedKeepsTheRestOfTheMode(t *testing.T) {
+	dir := t.TempDir()
+	s := &stateFiles{dir: dir}
+	if _, err := s.WriteMode(true, true, []string{"core", "state"}); err != nil {
+		t.Fatal(err)
+	}
+	s.DropOwned()
+	raw, err := os.ReadFile(filepath.Join(dir, "state-mode.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m stateMode
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Owned || !m.Headless || len(m.GoSlices) != 2 {
+		t.Fatalf("mode after DropOwned: %+v", m)
+	}
+	(*stateFiles)(nil).DropOwned() // an agent without state files
 }

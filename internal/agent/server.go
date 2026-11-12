@@ -97,13 +97,18 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *Agent) listen(ctx context.Context) error {
+// writeLocal writes agent.json and keeps its token. Run calls it before it starts any loop, link or listener, so the
+// token is set once and never changes while something may read it.
+func (a *Agent) writeLocal() {
 	// Without agent.json the CLIs cannot find the agent, but transcripts must keep flowing: never fatal.
 	if token, err := writeLocalState(a.cfg.DataDir, a.cfg.Port); err != nil {
 		Log("warn", "agent.json not written, doc threads are off on this machine", F{"error", err.Error()})
 	} else {
 		a.localToken = token
 	}
+}
+
+func (a *Agent) listen(ctx context.Context) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(a.cfg.Host, strconv.Itoa(a.cfg.Port)))
 	if err != nil {
 		return err

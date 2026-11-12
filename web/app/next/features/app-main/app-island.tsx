@@ -1,6 +1,6 @@
 // The chat when it is only a field at the foot of the app: the agent's last line over it (it opens the column), and
 // «Стоп» while the agent works. The words go to the same chat as the full field's, as a message.
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { RoundButton } from '@/next/ui/button';
 import { t } from '@/next/i18n';
 import '@/next/styles/app-main.css';
@@ -13,11 +13,13 @@ export interface IAppIslandProps {
   onSend: (text: string) => void;
   onStop: () => void;
   onExpand: () => void;
+  /** The agent's limits chip, as by the full field's model pill (its card opens over the field). */
+  limits?: ReactNode;
 }
 
 const FIELD_MAX = 132;
 
-const AppIsland = ({ last, busy, onSend, onStop, onExpand }: IAppIslandProps) => {
+const AppIsland = ({ last, busy, onSend, onStop, onExpand, limits = null }: IAppIslandProps) => {
   const [text, setText] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -55,6 +57,7 @@ const AppIsland = ({ last, busy, onSend, onStop, onExpand }: IAppIslandProps) =>
             }
           }}
         />
+        {limits}
         {busy && <RoundButton icon="square" label={t('next.appmain.stop')} size="sm" onClick={onStop} />}
         <RoundButton
           icon="arrow-up"

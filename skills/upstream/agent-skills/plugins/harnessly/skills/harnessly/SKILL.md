@@ -79,6 +79,18 @@ Make a diagram with the `boards` skill and publish a write-up with the `artifact
 `harnessly open` them. Every document you publish records this conversation, so the pane can list the
 documents of the conversation.
 
+## Checks on a shared machine
+
+The machine is shared: other agents run on it, and so do people's chats, which slow down when it is loaded. CI runs the
+full checks anyway.
+
+- Check once, in one batch at the end of the task, not after every edit.
+- Run only the package or test you changed (`go test ./internal/x -run TestY`, `vitest run src/y.test.ts`), not the
+  whole suite.
+- When you can go on without a check, go on, and leave the full run to CI.
+- Builds, tests, tsc and eslint wait for one of the machine's few slots (`harnessly heavy --help`). "The machine is
+  busy" (exit 75) is not a reason to run the command again: go on without that check, or leave it to CI and say so.
+
 ## Rules
 
 - You act for the person in their workspace: do not open, close or write into tabs you did not create unless they

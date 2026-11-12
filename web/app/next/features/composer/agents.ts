@@ -93,8 +93,9 @@ const profileAgents = (agent: MachineAgent): IPickerAgent[] =>
       // A running chat takes a model of its own profile only; the runtime says so by the agent's flag.
       canSwitch: agent.canSwitchModel,
       ...(agent.defaultPermission ? { defaultPermission: agent.defaultPermission } : {}),
-      available: agent.status === 'ready',
-      status: agent.status,
+      // A configured profile has its own credentials; only the CLI installation is shared with the native agent.
+      available: agent.status !== 'missing',
+      status: agent.status === 'missing' ? 'missing' : 'ready',
     }));
 
 /** The label of the profile a chat runs on when its key was removed (the profile is listed, but without a key); else null. */

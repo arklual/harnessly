@@ -12,6 +12,7 @@ import { useInstalledApps, type IAppView, type IInstalledApp } from '@/next/feat
 import ConsentBlock from '@/next/features/app-consent/consent-block';
 import AppInspector from '@/next/features/app-views/inspector';
 import { onOpenAppTab } from '@/next/features/app-views/open';
+import { keptFrames } from '@/next/features/app-views/kept-frames';
 import { parseAppTarget } from '@/next/features/app-views/target';
 import type { IAppMenuItem } from '@/next/features/app-main/app-main';
 import AppStage, { appStageDesign } from '@/next/features/app-main/app-stage';
@@ -108,6 +109,9 @@ const AppStagePage = ({
   const conv = stage.conv ?? null;
   const chatApps = useChatApps(machine, conv);
   useTabTitle(routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) }), object ?? app.name);
+
+  // The app's own page is its one view: a pane view of it kept out of sight goes, rather than two players sounding.
+  useEffect(() => keptFrames.dropApp(id), [id]);
 
   // A card's «Открыть в панели» of another app takes this page to that app; this one is already open. The chat goes
   // along only where that app is on.

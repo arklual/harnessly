@@ -153,6 +153,35 @@ func TestAPIAliasUnderAppBase(t *testing.T) {
 	}
 }
 
+func TestPlatformAliasUnderOwnPrefix(t *testing.T) {
+	var seen []string
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.Path+" "+r.RequestURI)
+	})
+	h := platformAlias("/api/own", next)
+	for _, target := range []string{
+		"/api/platform/economics?tab=x", "/agents/api/platform/notices", "/api/platform", "/api/platformx/y",
+		"/api/own/economics", "/m/abc/api/platform/economics",
+	} {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", target, nil))
+	}
+	want := []string{
+		"/api/own/economics /api/own/economics?tab=x", "/agents/api/own/notices /agents/api/own/notices",
+		"/api/own /api/own", "/api/platformx/y /api/platformx/y", "/api/own/economics /api/own/economics",
+		"/m/abc/api/platform/economics /m/abc/api/platform/economics",
+	}
+	if strings.Join(seen, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got\n%s", strings.Join(seen, "\n"))
+	}
+	for _, prefix := range []string{"", "/api/platform"} {
+		seen = nil
+		platformAlias(prefix, next).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/platform/economics", nil))
+		if len(seen) != 1 || seen[0] != "/api/platform/economics /api/platform/economics" {
+			t.Fatalf("prefix %q: %v", prefix, seen)
+		}
+	}
+}
+
 func TestStandaloneTmuxConf(t *testing.T) {
 	data := t.TempDir()
 	cfg := gate.Config{DataDir: data}

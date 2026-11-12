@@ -165,6 +165,7 @@ type DesignlyCreate struct {
 	Brief         string         `json:"brief"`
 	Kind          DesignKind     `json:"kind"`
 	Provider      Provider       `json:"provider"`
+	Profile       string         `json:"profile,omitempty"`
 	Model         *string        `json:"model"`
 	Effort        *Effort        `json:"effort"`
 	DesignSystem  *string        `json:"designSystem"`
@@ -176,6 +177,9 @@ type DesignlyCreate struct {
 func (c DesignlyCreate) Validate() error {
 	errs := []error{need("title", c.Title), need("brief", c.Brief), in("kind", c.Kind, DesignKinds), in("provider", c.Provider, Providers),
 		needPtr("model", c.Model), needPtr("designSystem", c.DesignSystem)}
+	if c.Profile != "" {
+		errs = append(errs, under("profile", profileIDErr(c.Profile)))
+	}
 	if c.Effort != nil {
 		errs = append(errs, in("effort", *c.Effort, Efforts))
 	}

@@ -226,7 +226,7 @@ func (a *Agent) stateRoute(w http.ResponseWriter, r *http.Request) {
 		reply(w, 400, map[string]any{"ok": false, "error": "bad request"})
 		return
 	}
-	if !a.connected() {
+	if !a.clusterLinked() {
 		reply(w, 503, map[string]any{"ok": false, "error": "no link to the cluster"})
 		return
 	}

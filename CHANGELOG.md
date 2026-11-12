@@ -73,6 +73,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A chat on a machine linked to the hub started tens of seconds late: the closed cluster had left
+  `owned` in `state-mode.json`, so the runtime wrote every tab change through the agent, and the agent waited out
+  five seconds for an answer the hub never gives. The agent now drops `owned` when the hub link comes up, and the
+  state and notify relays answer 503 at once unless a cluster link is up.
 - The hub says its release instead of `dev`: the image of a merge request, promoted to the release without a rebuild, carries `dev-<commit>`, and `HUB_VERSION` (the Helm chart sets it from the image's tag) names the release.
 - A space owner's sidebar no longer merges the chats of every machine of the space: the list, the search and the page's
   first machine are the person's own machines; an administered machine is named under `others` and shows its own list

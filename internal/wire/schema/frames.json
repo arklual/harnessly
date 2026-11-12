@@ -573,6 +573,7 @@
         "brief": {"type": "string", "minLength": 1, "maxLength": 4000},
         "kind": {"$ref": "#/$defs/DesignKind"},
         "provider": {"$ref": "#/$defs/Provider"},
+        "profile": {"$ref": "#/$defs/ProfileId"},
         "model": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
         "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
         "designSystem": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 200}, {"type": "null"}]},

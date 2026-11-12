@@ -108,6 +108,38 @@ func apiAlias(base string, next http.Handler) http.Handler {
 	})
 }
 
+// platformAlias answers the platform's pages under /api/platform as well when the deployment names its own prefix
+// (RUNTIME_PLATFORM_API=/api/own): a page served by the hub keeps the default prefix whenever it could not read the
+// machine's own, and every call of it (limits, notices, secret codes…) then found no route.
+func platformAlias(prefix string, next http.Handler) http.Handler {
+	const def = "/api/platform"
+	if prefix == "" || prefix == def {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, at := range []string{"", "/agents"} {
+			rest, ok := strings.CutPrefix(r.URL.Path, at+def)
+			if !ok || rest != "" && !strings.HasPrefix(rest, "/") {
+				continue
+			}
+			r2 := new(http.Request)
+			*r2 = *r
+			u := *r.URL
+			u.Path = at + prefix + rest
+			if raw, ok := strings.CutPrefix(u.RawPath, at+def); ok && u.RawPath != "" {
+				u.RawPath = at + prefix + raw
+			} else {
+				u.RawPath = ""
+			}
+			r2.URL = &u
+			r2.RequestURI = u.RequestURI()
+			r = r2
+			break
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (c *webConfig) matches(r *http.Request) bool {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead || isUpgrade(r) {
 		return false

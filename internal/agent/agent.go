@@ -170,6 +170,19 @@ func (a *Agent) connected() bool {
 	return len(a.clients) > 0
 }
 
+// clusterLinked says whether a link of the closed cluster is up. A hub link does not count: broadcast tells it none of
+// the cluster's events, so a request relayed with broadcast and waited for would only wait out its timeout.
+func (a *Agent) clusterLinked() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for l := range a.clients {
+		if !l.hub {
+			return true
+		}
+	}
+	return false
+}
+
 // serve runs one cluster session, whichever side dialled: the cluster asks, the agent answers and sends its events.
 // It returns the error that ended the session; every frame read is signalled on heard, if given.
 func (a *Agent) serve(conn *websocket.Conn, heard chan<- struct{}) error {
@@ -185,6 +198,9 @@ func (a *Agent) serveLink(conn *websocket.Conn, heard chan<- struct{}, hub bool)
 	a.clients[l] = struct{}{}
 	a.mu.Unlock()
 	if hub {
+		// The cluster that told the runtime to write its layouts through it is gone; a mode it left would make every tab
+		// write wait out stateResultTO, and a chat's start makes several.
+		a.state.DropOwned()
 		a.hub.linkUp(l)
 	} else {
 		a.replayAppsGuests(l)
@@ -612,6 +628,7 @@ func (a *Agent) settleState(requestID string, res StateResult) {
 
 // Run starts the loops, the loopback server and, when configured, the call to the cluster. It returns when ctx ends.
 func (a *Agent) Run(ctx context.Context) error {
+	a.writeLocal()
 	if a.hub != nil && !a.hub.observe {
 		return a.runHub(ctx)
 	}
