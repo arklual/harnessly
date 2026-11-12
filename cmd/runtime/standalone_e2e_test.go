@@ -31,6 +31,7 @@ import (
 // turn unless the mode file says the agent keeps working.
 const fakeClaude = `#!/bin/bash
 if [ "$1" = "--version" ]; then echo "2.1.99 (Claude Code)"; exit 0; fi
+if [ "$1" = "auth" ]; then echo '{"loggedIn":true,"authMethod":"claude.ai"}'; exit 0; fi
 echo "$*" >> "$HOME/claude-calls.log"
 env | grep -E '^(BOARDS|ARTIFACTS|RUNTIME|HARNESSLY)_' | sort >> "$HOME/claude-env.log"
 settings=""; sid=""

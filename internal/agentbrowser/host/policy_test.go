@@ -198,3 +198,34 @@ func TestGateSaysWhyALoopbackPortIsRefused(t *testing.T) {
 		t.Fatalf("about:blank: %q", why)
 	}
 }
+
+// A dev server started a moment after the last look is opened, not refused by the list kept for devServersFor.
+func TestGateLooksAgainForAServerStartedAfterTheLastLook(t *testing.T) {
+	g := testGate(nil)
+	dev := map[int]bool{5173: true}
+	looks := 0
+	g.ports = func() (map[int]bool, map[int]bool) {
+		looks++
+		out := map[int]bool{}
+		for p := range dev {
+			out[p] = true
+		}
+		return out, out
+	}
+	if addr, why := g.resolve("127.0.0.1", "5173"); addr != "127.0.0.1" || why != "" {
+		t.Fatalf("first server: %q %q", addr, why)
+	}
+	dev[5174] = true
+	if addr, why := g.resolve("127.0.0.1", "5174"); addr != "127.0.0.1" || why != "" {
+		t.Fatalf("server started after the last look: %q %q", addr, why)
+	}
+	if addr, _ := g.resolve("127.0.0.1", "5175"); addr != "" {
+		t.Fatalf("nothing listens on 5175, reached %q", addr)
+	}
+	if looks != 3 {
+		t.Fatalf("looks %d, want 3 (the first, then one per port the list did not offer)", looks)
+	}
+	if _, why := g.resolve("127.0.0.1", "5174"); why != "" || looks != 3 {
+		t.Fatalf("a port the list offers needs no new look: %q, looks %d", why, looks)
+	}
+}

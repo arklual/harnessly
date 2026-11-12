@@ -176,7 +176,14 @@ func (g *gate) devServer(port string) (ok bool, why string) {
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.dev == nil || time.Since(g.portsAt) >= devServersFor {
+	fresh := g.dev == nil || time.Since(g.portsAt) >= devServersFor
+	if fresh {
+		g.dev, g.listening = g.ports()
+		g.portsAt = time.Now()
+	}
+	if !g.dev[n] && !fresh {
+		// A server started after the last look (the agent ran it and opens it at once) is not refused by a stale list:
+		// a port the list does not offer is looked at again. Refusals are rare, so the extra look costs little.
 		g.dev, g.listening = g.ports()
 		g.portsAt = time.Now()
 	}

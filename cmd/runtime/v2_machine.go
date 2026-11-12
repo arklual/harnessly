@@ -270,6 +270,36 @@ func (m *v2Tmux) Probe(session string) convo.Probe {
 	return convo.Probe{Session: true, Foreground: true}
 }
 
+var _ convo.StartProber = (*v2Tmux)(nil)
+
+// ProbeAtStart is the look a start takes, believed at once: the runtime came back to sessions that may all be gone
+// (tmux went down with it, a reboot), and the first sight of a missing session that Probe reports as the agent still
+// running would leave a chat that was at work waiting for an agent nobody brings back. What it saw is kept
+// as Probe's previous look, so the next look of a missing session confirms it at once. A tmux that did not answer says
+// nothing, as in Probe.
+func (m *v2Tmux) ProbeAtStart(session string) convo.Probe {
+	panes, ok, gen := m.panes()
+	if !ok {
+		return convo.Probe{Session: true, Foreground: true}
+	}
+	p, found := panes[session]
+	has := found || m.prober().HasSession(session)
+	shell := found && tmux.SafeShells[p.Command]
+	m.mu.Lock()
+	if m.doubt == nil {
+		m.doubt = map[string]doubt{}
+	}
+	m.doubt[session] = doubt{noSession: !has, shell: shell, gen: gen}
+	m.mu.Unlock()
+	switch {
+	case !has:
+		return convo.Probe{}
+	case shell:
+		return convo.Probe{Session: true, Shell: true}
+	}
+	return convo.Probe{Session: true, Foreground: true}
+}
+
 // v2Uploads finds the files the page uploaded.
 type v2Uploads struct{ up *wire.Uploads }
 

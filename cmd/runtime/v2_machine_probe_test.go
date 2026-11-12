@@ -141,3 +141,26 @@ func TestProbeConfirmsAShellWithAFreshListing(t *testing.T) {
 		t.Fatalf("%d fresh listings: a confirmed shell is not listed again", f.nowReads)
 	}
 }
+
+// A start believes its first look: a session gone with tmux is gone at once (the chat that was at work is resumed, not
+// taken for still running), and the next look confirms it without asking tmux again.
+func TestProbeAtStartBelievesAMissingSession(t *testing.T) {
+	f := &probeFake{ok: true, panes: map[string]tmux.PaneInfo{"tk-a": {Command: "claude"}, "tk-b": {Command: "bash"}}}
+	m := &v2Tmux{probe: f}
+	if got := m.ProbeAtStart("tk-gone"); got != (convo.Probe{}) {
+		t.Fatalf("gone at start %+v", got)
+	}
+	if got := m.Probe("tk-gone"); got != (convo.Probe{}) || len(f.hasAsked) != 1 {
+		t.Fatalf("next look %+v, has-session %v", got, f.hasAsked)
+	}
+	if got := m.ProbeAtStart("tk-a"); got != (convo.Probe{Session: true, Foreground: true}) {
+		t.Fatalf("agent at start %+v", got)
+	}
+	if got := m.ProbeAtStart("tk-b"); got != (convo.Probe{Session: true, Shell: true}) {
+		t.Fatalf("shell at start %+v", got)
+	}
+	silent := &v2Tmux{probe: &probeFake{ok: false}}
+	if got := silent.ProbeAtStart("tk-a"); got != (convo.Probe{Session: true, Foreground: true}) {
+		t.Fatalf("silent tmux %+v", got)
+	}
+}

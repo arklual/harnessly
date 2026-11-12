@@ -316,7 +316,12 @@ func (c *conv) cutAtRestart(was wire.AgentState, now time.Time) {
 		c.ownAtRestart(was, true)
 		return
 	}
-	pr := c.d.Machine.Probe(c.rec.Session)
+	var pr Probe
+	if sp, ok := c.d.Machine.(StartProber); ok {
+		pr = sp.ProbeAtStart(c.rec.Session)
+	} else {
+		pr = c.d.Machine.Probe(c.rec.Session)
+	}
 	running := pr.Session && pr.Foreground
 	c.ownAtRestart(was, running)
 	if was.K != wire.StateWorking || running {

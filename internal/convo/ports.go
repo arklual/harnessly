@@ -27,6 +27,13 @@ type Machine interface {
 	Probe(session string) Probe
 }
 
+// StartProber is a Machine whose look at a start of the runtime is believed at once. Probe may take the first sight of
+// a missing session for a passing moment and report the agent as still running; at a start, when tmux may have gone
+// down with the runtime, that would keep a chat that was at work from being resumed.
+type StartProber interface {
+	ProbeAtStart(session string) Probe
+}
+
 // Probe is the process under a session's pane.
 type Probe struct {
 	// Session: the tmux session exists.
