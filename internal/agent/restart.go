@@ -194,9 +194,9 @@ func (r *restarter) run(ctx context.Context, j *restartJob) {
 func (h *hub) newRestarter() *restarter {
 	return &restarter{
 		chats:   h.chatsNow,
-		restart: func() error { _, err := h.a.callRuntime(h.a.cfg.RuntimeAPI+"/restart", map[string]any{}); return err },
+		restart: func() error { _, err := h.a.callRuntime(h.a.cfg.ConsoleAPI()+"/restart", map[string]any{}); return err },
 		back: func() bool {
-			_, err := h.a.callRuntime(h.a.cfg.RuntimeAPI+"/load", map[string]any{})
+			_, err := h.a.callRuntime(h.a.cfg.ConsoleAPI()+"/load", map[string]any{})
 			return err == nil
 		},
 		emit: func(ev hubproto.RestartEvent) { h.emit(hubproto.EventRestart, "restart", ev) },

@@ -12,6 +12,9 @@ import (
 const (
 	KindMR      = "mr"
 	KindComment = "comment"
+	// KindRevert and KindSkill are the commits of the code host: a revert of any project, and a change of a skill.
+	KindRevert = "revert-commit"
+	KindSkill  = "skill-commit"
 )
 
 // MR is a merged merge request as a code-host provider reports it.

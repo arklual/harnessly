@@ -483,6 +483,7 @@ func (c *Collector) Refresh() {
 			if old := c.files[s.path]; old != nil && old.facts != nil {
 				old.facts.MRKeys = results[i].MRKeys
 				old.facts.ToolCalls = results[i].ToolCalls
+				old.facts.SkillsListed = results[i].SkillsListed
 				results[i] = old.facts
 			}
 		} else {
@@ -492,7 +493,7 @@ func (c *Collector) Refresh() {
 			if results[i].MRKeys == nil {
 				results[i].MRKeys = []string{}
 			}
-			c.mrKept[s.path] = mrEntry{Size: s.size, MtimeMs: s.mtimeMs, Keys: results[i].MRKeys, Tools: sums}
+			c.mrKept[s.path] = mrEntry{Size: s.size, MtimeMs: s.mtimeMs, Keys: results[i].MRKeys, Tools: sums, Listed: results[i].SkillsListed}
 			c.mrDirty = true
 		}
 		if !s.backfill {

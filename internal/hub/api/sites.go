@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -12,7 +13,9 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/sshinstall"
@@ -219,6 +222,11 @@ func (h *Hub) siteSession(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	if h.cfg.SitesUpstreamURL != "" {
+		if done, err := h.upstreamSiteSession(w, r, m); done || err != nil {
+			return err
+		}
+	}
 	ms := sites.MachineSession{Space: sp.Slug, MachineID: m.ID, Name: m.Name}
 	// The machine may say which person it publishes for (the runtime knows its owner's address). It is believed only
 	// when that person registered the machine, or the hub itself gave them a ticket for it lately (they did sign in to
@@ -277,4 +285,59 @@ func (h *Hub) fleetSiteSession(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"space": sp.Slug, "token": token, "expiresAt": httpx.Time(exp), "url": h.cfg.PublicURL})
 	return nil
+}
+
+// upstreamSiteSession answers a machine's request for a publishing session with one that another hub gives, the hub
+// that keeps the sites (HARNESSLY_SITES_UPSTREAM_URL): the machine publishes there, so its sites keep their addresses and
+// the sites made before stay its own. The upstream knows the machine by the id it has always known it by,
+// "<first label of the host name, without the strip prefix>:<address of the person who registered the machine>", the id a
+// fleet gateway used. done is false when the machine is not one the setting covers: the hub gives its own session then.
+func (h *Hub) upstreamSiteSession(w http.ResponseWriter, r *http.Request, m store.Machine) (done bool, err error) {
+	u, err := h.db.S().UserByID(r.Context(), m.CreatedBy)
+	if err != nil {
+		return false, nil
+	}
+	email := strings.ToLower(strings.TrimSpace(u.Email))
+	if len(h.cfg.SitesUpstreamPeople) > 0 && !slices.Contains(h.cfg.SitesUpstreamPeople, email) {
+		return false, nil
+	}
+	label := strings.ToLower(m.Hostname)
+	label, _, _ = strings.Cut(strings.TrimPrefix(label, h.cfg.SitesUpstreamStrip), ".")
+	var body struct {
+		Person string `json:"person"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body)
+	name := strings.TrimSpace(body.Person)
+	if name == "" || len(name) > 200 {
+		name = email
+	}
+	payload, _ := json.Marshal(map[string]string{"machineId": label + ":" + email, "name": name})
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.cfg.SitesUpstreamURL+"/agent/fleet-sites", bytes.NewReader(payload))
+	if err != nil {
+		return true, err
+	}
+	req.Header.Set("Authorization", "Bearer "+h.cfg.SitesUpstreamSecret)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		h.log.Warn("sites upstream: no answer", "machine", m.ID, "error", err.Error())
+		return true, httpx.New(http.StatusBadGateway, "sites_upstream", "Публикация временно недоступна")
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<16))
+	var out struct {
+		URL       string `json:"url"`
+		Space     string `json:"space"`
+		Token     string `json:"token"`
+		ExpiresAt string `json:"expiresAt"`
+	}
+	if res.StatusCode != http.StatusOK || json.Unmarshal(raw, &out) != nil || out.Token == "" || out.Space == "" || out.URL == "" {
+		h.log.Warn("sites upstream: no session", "machine", m.ID, "status", res.StatusCode)
+		return true, httpx.New(http.StatusBadGateway, "sites_upstream", "Публикация временно недоступна")
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.WriteJSON(w, http.StatusOK, out)
+	return true, nil
 }

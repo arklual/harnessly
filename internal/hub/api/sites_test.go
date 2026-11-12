@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -499,6 +501,46 @@ func TestFleetSitesSession(t *testing.T) {
 	r = s.Browser().Do("POST", "/api/sites/acme", map[string]any{"name": "shop", "access": "link"}, "Authorization", "Bearer "+session.Token)
 	if r.Code != http.StatusCreated {
 		t.Fatalf("fleet session creates a site: %s", r)
+	}
+}
+
+// A hub told to take its machines' publishing sessions from the hub that keeps the sites asks it for the machine under
+// the id a fleet gateway used, and hands the answer on; a machine of someone the list leaves out gets the hub's own.
+func TestSitesUpstreamSession(t *testing.T) {
+	secret := "0123456789012345678901234567890123456789"
+	var got struct{ MachineID, Name string }
+	var auth string
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = r.Header.Get("Authorization")
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_, _ = w.Write([]byte(`{"url":"https://hub.example.org","space":"acme","token":"hsm_remote","expiresAt":"2030-01-01T00:00:00Z"}`))
+	}))
+	defer up.Close()
+	s := hubtest.New(t,
+		hubtest.Env("HARNESSLY_SITES_DOMAIN", "sites.example.test"),
+		hubtest.Env("HARNESSLY_SITES_UPSTREAM_URL", up.URL),
+		hubtest.Env("HARNESSLY_SITES_UPSTREAM_SECRET", secret),
+		hubtest.Env("HARNESSLY_SITES_UPSTREAM_PEOPLE", "Owner@example.com"),
+	)
+	owner := s.SignIn("owner@example.com")
+	other := s.SignIn("other@example.com")
+	id, _ := owner.NewSpace("Acme")
+	otherID, otherSlug := other.NewSpace("Beta")
+
+	r := machineSession(t, s, owner.Machine(id, nil), "")
+	var sess struct{ Space, Token, URL string }
+	r.JSON(&sess)
+	if r.Code != 200 || sess.Token != "hsm_remote" || sess.URL != "https://hub.example.org" || sess.Space != "acme" {
+		t.Fatalf("handed on: %s", r)
+	}
+	if auth != "Bearer "+secret || got.MachineID != "dev-box:owner@example.com" || got.Name != "owner@example.com" {
+		t.Fatalf("asked %q %+v", auth, got)
+	}
+
+	r = machineSession(t, s, other.Machine(otherID, nil), "")
+	r.JSON(&sess)
+	if r.Code != 200 || sess.Space != otherSlug || !strings.HasPrefix(sess.Token, "hsm_") || sess.Token == "hsm_remote" {
+		t.Fatalf("a machine the list leaves out: %s", r)
 	}
 }
 

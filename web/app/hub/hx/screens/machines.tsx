@@ -81,7 +81,13 @@ const Screen = () => {
         {end}
       </div>
       {ws.error && !card.shown && (
-        <ErrorRow text={ws.error.text} onRetry={() => void ws.open(ws.error!.id)} />
+        <ErrorRow
+          text={ws.error.text}
+          onRetry={() => void ws.open(ws.error!.id)}
+          {...(ws.error.ownWork && !member
+            ? { action: 'Открыть для отладки', onAction: () => url.open(ws.error!.id) }
+            : {})}
+        />
       )}
       <OpenCtx.Provider value={ws}>{content()}</OpenCtx.Provider>
       {canAdd && (
@@ -100,6 +106,7 @@ const Screen = () => {
           hint={hint}
           mlUrl={data?.mlCoreUrl ?? null}
           url={url}
+          opener={ws}
           onChanged={list.patch}
           onRemoved={() => {
             url.close();

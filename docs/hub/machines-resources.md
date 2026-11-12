@@ -144,6 +144,19 @@ Limits worth knowing:
 - Counting chats is best effort: the number comes from the runtime when it answers and from the hub's own sessions
   otherwise.
 
+## Subscription windows
+
+An agent with a runtime next door announces the feature `limits` in `hello`. The hub, with the resources side wired,
+subscribes it to the event `limits.windows` (`link.subscribe`), and the agent sends
+`{ windows: { providers: { claude|codex: { fiveHour?: { usedPct, resetsAt? }, sevenDay?: { … } } }, at } }` every
+60 seconds: `usedPct` is 0..100, `resetsAt` is Unix seconds, and a window the machine has no number for is left out. The
+numbers are the runtime's own (`GET /machines`, the provider limits of this machine).
+
+The hub keeps only the last reading of each window per machine (table `machine_provider_limits`, written only where the
+organization has the feature on, deleted with the machine's space). Efficiency reads it: the person's `limit.weekUsedPct`
+and `limit.resetsAt` on the personal screen are the fullest `seven_day` window of Claude among the machines the person
+made, from a reading no older than two hours; with none, both are `null`.
+
 ## Load
 
 The agent sends `metrics.sample` events (CPU, memory and disk percentages and the number of chats; any may be missing)

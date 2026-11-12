@@ -35,6 +35,8 @@ type Deps struct {
 	HTTP *http.Client
 	// Notice tells a person by mail that they were mentioned; nil: nobody is told.
 	Notice Notice
+	// Gate says whether the rollout switch of the comments on boards is on for a person (boards.go); nil: off for everyone.
+	Gate Gate
 }
 
 // Service serves documents and boards.
@@ -56,13 +58,14 @@ type Service struct {
 	lim *ratelimit.Limiter
 	// health is the last answer of the documents and boards services (health.go).
 	health *health
+	gate   Gate
 }
 
 // Notice mails a short notice to a person (a mention); nil keeps the hub silent.
 type Notice func(ctx context.Context, to, subject, body, link string) error
 
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links, notice: d.Notice, health: newHealth()}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links, notice: d.Notice, health: newHealth(), gate: d.Gate}
 	if s.now == nil {
 		s.now = time.Now
 	}

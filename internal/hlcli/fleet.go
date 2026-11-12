@@ -15,7 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/selfupdate"
 )
 
-const fleetHelp = `harnessly fleet stage|activate|rollback|status|delta|units
+const fleetHelp = `harnessly fleet stage|activate|rollback|status|delta|units|rollout
 
 Rolls a runtime release out to this machine, the fleet mode of the machine's self-update (RUNTIME_UPDATE_MODE=fleet; off
 unless asked for, and the hourly update from the hub is unchanged without it). A release is a folder the runtime runs
@@ -28,6 +28,8 @@ from: <root>/releases/<version>-<sha12>, with <root>/current pointing at the act
   status     the active release and the staged ones (--json)
   units      render the machine's unit files from a units spec and say what differs (--spec FILE, --dir DIR,
              --host NAME, --version X.Y.Z; --apply writes them and reloads systemd once, otherwise only a report)
+  rollout    roll a release out to the machines of a fleet file in waves (off unless RUNTIME_ROLLOUT_DRIVER=on;
+             "fleet rollout --help")
   delta      cut a delta out of a whole release tarball: only the parts a pin change moves (release/<part>)
 
   --root DIR        the releases folder (default $RUNTIME_FLEET_ROOT)
@@ -60,10 +62,13 @@ func (c *cli) fleet(args []string) error {
 		return nil
 	}
 	sub, args := args[0], args[1:]
+	if sub == "rollout" {
+		return c.fleetRollout(args)
+	}
 	switch sub {
 	case "stage", "activate", "rollback", "status", "delta", "units":
 	default:
-		return usageErr("fleet: stage, activate, rollback, status or delta, not %q", sub)
+		return usageErr("fleet: stage, activate, rollback, status, delta, units or rollout, not %q", sub)
 	}
 	fs := flag.NewFlagSet("fleet "+sub, flag.ContinueOnError)
 	fs.SetOutput(c.env.Stderr)

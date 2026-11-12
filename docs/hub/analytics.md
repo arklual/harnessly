@@ -58,7 +58,10 @@ encoded as a count here and kept as pairs on the machine), `toolCalls`, `toolErr
 `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `skillsListed`, `skillsLoaded`, `mrs`, `mrsMerged`, `firstMrMs`,
 `waitingSince` (optional, epoch ms: since when the agent waits for its person), and since HRN-786 `cacheWrite5mTokens` and
 `cacheWrite1hTokens` (`cacheWriteTokens` split by the lifetime asked for), `waitP90Ms` (the 90th percentile, nearest rank,
-of the session's waits; absent without a wait) and, set by the hub, `mrsMature` and `mrsSurvived`. A session of an older
+of the session's waits; absent without a wait) and, set by the hub, `mrsMature` and `mrsSurvived`. Since HRN-1201 a machine started with `AGENT_USAGE_SKILL_METRICS=on` sends `skillsListed` (how many distinct skills the session's
+initial skill listing offered) and `skillsLoaded` (how many distinct skills it called) for a session whose transcript
+has a listing: counts only, never a name or a description. Off by default; a session without a listing sends neither.
+A session of an older
 machine lacks the first three; the KPI built on them count only the sessions that have them, so a period of old sessions
 shows «данных пока нет», never a zero.
 

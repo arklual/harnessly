@@ -162,6 +162,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 		if slices.Contains(hello.Features, hubproto.FeatureDrain) {
 			events = append(events, hubproto.EventRestart)
 		}
+		if slices.Contains(hello.Features, hubproto.FeatureLimits) {
+			events = append(events, hubproto.EventLimitsWindows)
+		}
 		s.saveHardware(ctx, m, hello.Hardware)
 	}
 	if s.env != nil && slices.Contains(hello.Features, hubproto.FeatureEnvironment) {
@@ -339,6 +342,11 @@ func (s *Service) dispatch(ctx context.Context, l *link.Link, m store.Machine, e
 		var e struct{ Sample hubproto.MetricsSample }
 		if s.gate != nil && json.Unmarshal(ev.Raw, &e) == nil {
 			s.onSample(ctx, m, e.Sample)
+		}
+	case hubproto.EventLimitsWindows:
+		var e struct{ Windows hubproto.LimitsWindows }
+		if s.gate != nil && json.Unmarshal(ev.Raw, &e) == nil {
+			s.onLimits(ctx, m, e.Windows)
 		}
 	case hubproto.EventRestart:
 		var e struct{ Restart hubproto.RestartEvent }

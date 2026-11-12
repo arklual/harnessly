@@ -77,6 +77,24 @@ sit under `HUB_RUNTIME_DOMAIN`. The only cookie the sites set is `__Host-hl_site
 - **Development**: `*.localhost` names resolve to your machine in browsers; set `HUB_PUBLIC_URL=http://hub.localhost:8040`
   and `HARNESSLY_SITES_DOMAIN=sites.localhost`, and a site opens at `http://shop--acme.sites.localhost:8040/`.
 
+## Sites kept by another hub
+
+A hub that should not keep sites itself, but whose machines publish to the hub that does, hands its machines that hub's
+publishing session. The hub that keeps the sites has `HARNESSLY_FLEET_SITES_SECRET` and `HARNESSLY_FLEET_SITES_SPACE`
+(`POST /agent/fleet-sites`); the other one sets:
+
+| Variable | |
+| --- | --- |
+| `HARNESSLY_SITES_UPSTREAM_URL` | where to ask (an address the hub can reach; the session names the keeping hub's public address, which is where the machine publishes) |
+| `HARNESSLY_SITES_UPSTREAM_SECRET` | ≥ 32 characters: the keeping hub's `HARNESSLY_FLEET_SITES_SECRET` |
+| `HARNESSLY_SITES_UPSTREAM_STRIP` | a prefix taken off the machine's host name (`corp-` for `corp-box-1.example.com`) |
+| `HARNESSLY_SITES_UPSTREAM_PEOPLE` | comma-separated addresses: only machines these people registered; empty: every machine |
+
+The keeping hub knows the machine as `<first label of the host name>:<address of the person who registered it>`
+(`box-1:ann@example.com`), the id a fleet gateway used before the machines joined a hub, so the sites made then stay the
+machine's own and keep their addresses. A machine the list leaves out gets the hub's own session. If the keeping hub does
+not answer, the machine is told publishing is unavailable for now, and does not fall back to the hub's own sites.
+
 ## Who can open a site
 
 | Access | Who | How |

@@ -30,6 +30,7 @@ it stays with the previous runtime.
 | `AGENT_RUNTIME_API` | `/api/agent` | prefix of the runtime routes the agent calls |
 | `AGENT_RUNTIME_PLATFORM_API` | `/api/platform` | prefix of the runtime platform routes a hub's design ops go to (`design/access`, `design/guest-token`) |
 | `AGENT_RUNTIME_STATUS`, `AGENT_RUNTIME_SYNC` | `/api/status`, `/api/sync` | the runtime's sockets |
+| `AGENT_RUNTIME_CONSOLE_API` | `$AGENT_RUNTIME_API` | prefix of the runtime console routes (`/policy`, `/terminal-tab`, `/console-state`, `/load`, `/restart`) when the runtime serves them apart from the rest |
 | `AGENT_RUNTIME_STATE_CHANGED` | `$AGENT_RUNTIME_API/state-changed` | where the runtime hears about a layout the cluster wrote |
 | `AGENT_RUNTIME_COOKIE` | `session-token` | session cookie name the runtime checks |
 | `AGENT_RUNTIME_CLI_HEADERS` | `x-cli-token` | headers carrying the runtime's `cli-token` |

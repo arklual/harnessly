@@ -114,7 +114,7 @@ func (h *hub) chatsNow() *int {
 	if h.a.cfg.RuntimePort == 0 || h.observe {
 		return nil
 	}
-	raw, err := h.a.callRuntime(h.a.cfg.RuntimeAPI+"/load", map[string]any{})
+	raw, err := h.a.callRuntime(h.a.cfg.ConsoleAPI()+"/load", map[string]any{})
 	if err != nil {
 		return nil
 	}

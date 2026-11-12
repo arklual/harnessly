@@ -28,3 +28,37 @@ func TestPreviewSlotHostTemplate(t *testing.T) {
 		t.Error("without a domain there is no host")
 	}
 }
+
+func TestPreviewSlotPrefix(t *testing.T) {
+	c := &Config{Host: "hub.example.org", PreviewSlotDomain: "slots.example.net", PreviewSlotPrefix: "ai-"}
+	h := c.PreviewSlotHost("pabcdefghijkl", 2)
+	if h != "ai-pabcdefghijkl-2.slots.example.net" {
+		t.Fatalf("host: %q", h)
+	}
+	if handle, n, ok := c.PreviewSlotFromHost(h); !ok || handle != "pabcdefghijkl" || n != 2 {
+		t.Fatalf("round trip: %q %d %v", handle, n, ok)
+	}
+	for _, bad := range []string{
+		"pabcdefghijkl-2.slots.example.net",       // no prefix
+		"hub-pabcdefghijkl-2.slots.example.net",   // another prefix
+		"ai-ai-pabcdefghijkl-2.slots.example.net", // prefix twice
+		"my-stand.slots.example.net",
+	} {
+		if _, _, ok := c.PreviewSlotFromHost(bad); ok {
+			t.Errorf("%q read as a slot host", bad)
+		}
+	}
+}
+
+func TestPreviewSlotPrefixValidation(t *testing.T) {
+	for _, p := range []string{"ai-", "hub-", "x", "a1-b2-"} {
+		if !previewSlotPrefix.MatchString(p) {
+			t.Errorf("%q must be accepted", p)
+		}
+	}
+	for _, p := range []string{"-ai", "1ai", "ai.", "a_b", "AI-", "aaaaaaaaaaaaaaaaaaaaa"} {
+		if previewSlotPrefix.MatchString(p) {
+			t.Errorf("%q must be refused", p)
+		}
+	}
+}

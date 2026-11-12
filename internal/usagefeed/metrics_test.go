@@ -22,7 +22,7 @@ func TestSessionMetrics(t *testing.T) {
 	}
 	var m metrics
 	m.add(fa)
-	got := m.values()
+	got := m.values(false)
 	want := map[string]float64{
 		"turns": 3, "agentMs": 90000, "activeIntervals": 2,
 		// 150 → 200 waits 50 s; 260 → 100000 is the person away.
@@ -41,5 +41,30 @@ func TestSessionMetrics(t *testing.T) {
 	}
 	if signature(got, nil) == signature(map[string]float64{}, nil) {
 		t.Fatal("signature does not tell metrics apart")
+	}
+}
+
+func TestSkillMetricsAreOptional(t *testing.T) {
+	fa := &usagereport.Facts{
+		SkillsListed: 12,
+		ToolCalls: []usagereport.ToolCall{
+			{Ts: 100, Kind: usagereport.ToolSkill, Name: "a"},
+			{Ts: 101, Kind: usagereport.ToolSkill, Name: "a"},
+			{Ts: 102, Kind: usagereport.ToolSkill, Name: "b"},
+			{Ts: 103, Kind: usagereport.ToolMCP, Name: "srv"},
+		},
+	}
+	var m metrics
+	m.add(fa)
+	if v := m.values(false); v["skillsListed"] != 0 || v["skillsLoaded"] != 0 {
+		t.Fatalf("flag off must send no skill keys: %v", v)
+	}
+	if v := m.values(true); v["skillsListed"] != 12 || v["skillsLoaded"] != 2 {
+		t.Fatalf("flag on: %v", v)
+	}
+	var none metrics
+	none.add(&usagereport.Facts{ToolCalls: fa.ToolCalls})
+	if v := none.values(true); len(v) != len(none.values(false)) {
+		t.Fatalf("a session without a listing must send no skill keys: %v", v)
 	}
 }

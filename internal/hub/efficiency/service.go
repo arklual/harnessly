@@ -30,6 +30,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs/{org}/efficiency/summary", s.OrgGate(s.summary))
 	mux.Handle("GET /api/orgs/{org}/efficiency/pulse", s.OrgGate(s.pulseGet))
 	mux.Handle("POST /api/orgs/{org}/efficiency/pulse", s.OrgGate(s.pulsePut))
+	mux.Handle("GET /api/orgs/{org}/efficiency/regressions", s.OrgGate(s.regressions))
 	s.mountOverview(mux)
 }
 

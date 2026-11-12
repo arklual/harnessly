@@ -301,3 +301,163 @@ func TestOverviewNeedsTheSwitch(t *testing.T) {
 		}
 	}
 }
+
+// An alert of the old evaluation is stored once: importing again changes nothing, and what the person did with it stays.
+func TestImportRegressions(t *testing.T) {
+	st := open(t)
+	ctx := context.Background()
+	raw := `[{"id":"a1","metric":"smoke: 0 из 8","baseline":8,"observed":0,"band":0,"addressee":"Anna@Example.com","diff":["8 × не дождались"],"created_at":"2026-11-02T07:34:42Z"},
+		{"id":"a2","metric":"$ на задачу","baseline":0.62,"observed":1,"band":1,"addressee":"anna@example.com","created_at":"2026-11-03T07:00:00Z","state":"resolved","seen_at":"2026-11-04T07:00:00Z"}]`
+	if n, err := ImportRegressions(ctx, st, raw); err != nil || n != 2 {
+		t.Fatalf("import: %d %v", n, err)
+	}
+	changed := strings.Replace(raw, `"band":0,`, `"band":0,"state":"resolved",`, 1)
+	if n, err := ImportRegressions(ctx, st, changed); err != nil || n != 2 {
+		t.Fatalf("again: %d %v", n, err)
+	}
+	all, err := st.EffRegressionAlertsFor(ctx, "anna@example.com", false)
+	if err != nil || len(all) != 2 || all[0].ID != "a2" || all[0].SeenAt == nil || all[1].Diff != `["8 × не дождались"]` {
+		t.Fatalf("all: %+v %v", all, err)
+	}
+	open, err := st.EffRegressionAlertsFor(ctx, "anna@example.com", true)
+	if err != nil || len(open) != 1 || open[0].ID != "a1" {
+		t.Fatalf("a1 stays as it was stored (open), a2 was stored resolved: %+v %v", open, err)
+	}
+	for _, bad := range []string{`[{"id":"","metric":"m","created_at":"2026-11-03T07:00:00Z"}]`, `[{"id":"x","metric":"m","created_at":"yesterday"}]`, `[{"id":"x","metric":"m","state":"gone","created_at":"2026-11-03T07:00:00Z"}]`} {
+		if _, err := ImportRegressions(ctx, st, bad); err == nil {
+			t.Fatalf("must be refused: %s", bad)
+		}
+	}
+}
+
+// Revert commits come from every project of the groups, skill commits from the files named SKILL.md; merges are left out.
+func TestGitLabCommitSources(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch p := r.URL.EscapedPath(); {
+		case strings.HasSuffix(p, "/groups/g/projects"):
+			_, _ = w.Write([]byte(`[{"id":7,"path_with_namespace":"g/p"}]`))
+		case strings.HasSuffix(p, "/projects/7/repository/commits"):
+			_, _ = w.Write([]byte(`[{"id":"aaa","title":"Revert \"x\"","message":"Revert \"x\"","committed_date":"2026-11-02T10:00:00Z","parent_ids":["z"]},
+				{"id":"bbb","title":"plain","message":"plain\n\nThis reverts commit 1234567","committed_date":"2026-11-03T10:00:00Z","parent_ids":["z"]},
+				{"id":"ccc","title":"feat","message":"feat","committed_date":"2026-11-04T10:00:00Z","parent_ids":["z"]}]`))
+		case strings.HasSuffix(p, "/projects/g%2Fplugins/repository/tree"):
+			_, _ = w.Write([]byte(`[{"name":"SKILL.md","path":"a/SKILL.md"},{"name":"README.md","path":"README.md"}]`))
+		case strings.HasSuffix(p, "/projects/g%2Fplugins/repository/commits"):
+			if r.URL.Query().Get("path") != "a/SKILL.md" {
+				t.Errorf("path %q", r.URL.Query().Get("path"))
+			}
+			_, _ = w.Write([]byte(`[{"id":"s1","title":"skill","message":"skill","committed_date":"2026-11-05T10:00:00Z","parent_ids":["z"]},
+				{"id":"s2","title":"Merge","message":"Merge","committed_date":"2026-11-06T10:00:00Z","parent_ids":["z","y"]}]`))
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+	gl := NewGitLab(srv.URL, []string{"g"}, "t")
+	gl.SkillsProject = "g/plugins"
+	reverts, err := gl.RevertCommits(context.Background(), time.Unix(0, 0))
+	if err != nil || len(reverts) != 2 || reverts[0].Project != "g/p" || reverts[1].SHA != "bbb" {
+		t.Fatalf("%v %+v", err, reverts)
+	}
+	skills, err := gl.SkillCommits(context.Background(), time.Unix(0, 0))
+	if err != nil || len(skills) != 1 || skills[0].SHA != "s1" {
+		t.Fatalf("%v %+v", err, skills)
+	}
+	st := open(t)
+	c := &Collector{Store: st, Code: gl, Now: func() time.Time { return time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC) }}
+	c.Once(context.Background())
+	for kind, want := range map[string]int{KindRevert: 2, KindSkill: 1} {
+		got, err := st.EffFactsBetween(context.Background(), kind, 0, time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli())
+		if err != nil || len(got) != want {
+			t.Fatalf("%s: %v %d", kind, err, len(got))
+		}
+	}
+}
+
+// Comments of the configured project only; issues in progress replace the previous list and carry their last activity.
+func TestYouTrackCommentsAndProgress(t *testing.T) {
+	var inProgress = `[{"idReadable":"PROJ-1","created":1000},{"idReadable":"PROJ-2","created":2000}]`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer sekret" {
+			w.WriteHeader(401)
+			return
+		}
+		switch p := r.URL.Path; {
+		case p == "/api/activities":
+			_, _ = w.Write([]byte(`[{"timestamp":1762000000000,"author":{"login":"bob"},"added":[{"text":"hello","issue":{"idReadable":"PROJ-9"}},{"text":"x","issue":{"idReadable":"OTHER-1"}}]}]`))
+		case p == "/api/issues":
+			_, _ = w.Write([]byte(inProgress))
+		case strings.HasSuffix(p, "/activities"):
+			_, _ = w.Write([]byte(`[{"timestamp":5000,"category":{"id":"CommentsCategory"}},{"timestamp":9000,"category":{"id":"CustomFieldCategory"},"field":{"name":"Priority"}}]`))
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+	yt := NewYouTrack(srv.URL, "sekret", "PROJ")
+	if NewYouTrack("", "", "") != nil {
+		t.Fatal("unconfigured must be nil")
+	}
+	list, err := yt.Comments(context.Background(), time.Unix(0, 0), time.Now())
+	if err != nil || len(list) != 1 || list[0].Issue != "PROJ-9" || list[0].Author != "bob" {
+		t.Fatalf("%v %+v", err, list)
+	}
+	prog, err := yt.InProgress(context.Background())
+	if err != nil || len(prog) != 2 || prog[0].LastActivityAt.UnixMilli() != 5000 {
+		t.Fatalf("%v %+v", err, prog)
+	}
+	st := open(t)
+	now := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	c := &Collector{Store: st, Tracker: yt, Now: func() time.Time { return now }}
+	if !c.Once(context.Background()) {
+		t.Fatal("pass failed")
+	}
+	inProgress = `[{"idReadable":"PROJ-2","created":2000}]`
+	now = now.Add(time.Hour)
+	c.Once(context.Background())
+	got, err := st.EffFactsBetween(context.Background(), KindProgress, 0, now.UnixMilli())
+	if err != nil || len(got) != 1 || got[0].Key != "PROJ-2" {
+		t.Fatalf("%v %+v", err, got)
+	}
+	bad := NewYouTrack(srv.URL, "wrong", "PROJ")
+	if _, err := bad.Comments(context.Background(), time.Unix(0, 0), time.Now()); err == nil || strings.Contains(err.Error(), "wrong") {
+		t.Fatalf("err %v", err)
+	}
+}
+
+// Only documents created in the window count, each at its first version; a pass replaces the previous window.
+func TestArtifactsFirstPublication(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer sekret" {
+			w.WriteHeader(401)
+			return
+		}
+		switch p := r.URL.Path; {
+		case p == "/api/v1/artifacts":
+			_, _ = w.Write([]byte(`{"items":[{"slug":"new","task":"PROJ-1","createdAt":"2026-11-05T10:00:00Z"},{"slug":"old","task":null,"createdAt":"2025-01-01T00:00:00Z"}],"nextOffset":null}`))
+		case p == "/api/v1/artifacts/new/versions":
+			_, _ = w.Write([]byte(`{"versions":[{"n":2,"createdAt":"2026-11-06T10:00:00Z","author":"later@example.com"},{"n":1,"createdAt":"2026-11-05T10:30:00Z","author":"bob@example.com"}]}`))
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+	ar := NewArtifacts(srv.URL, "sekret")
+	if NewArtifacts("", "") != nil {
+		t.Fatal("unconfigured must be nil")
+	}
+	now := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	list, err := ar.Published(context.Background(), now.Add(-ArtifactsWindow))
+	if err != nil || len(list) != 1 || list[0].Slug != "new" || list[0].AuthorEmail != "bob@example.com" || list[0].Task != "PROJ-1" || !list[0].At.Equal(time.Date(2026, 11, 5, 10, 30, 0, 0, time.UTC)) {
+		t.Fatalf("%v %+v", err, list)
+	}
+	st := open(t)
+	c := &Collector{Store: st, Documents: ar, Now: func() time.Time { return now }}
+	if !c.Once(context.Background()) {
+		t.Fatal("pass failed")
+	}
+	got, err := st.EffFactsBetween(context.Background(), KindArtifact, 0, now.UnixMilli())
+	if err != nil || len(got) != 1 {
+		t.Fatalf("%v %+v", err, got)
+	}
+}

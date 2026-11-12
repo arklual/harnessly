@@ -209,3 +209,65 @@ func TestOwnWorkRoleManagesButDoesNotOpen(t *testing.T) {
 		t.Errorf("listed by the creator: %s", r)
 	}
 }
+
+// Debug mode (docs/hub/own-work.md): a role the owner's rule keeps out opens the machine with a reason, for half an
+// hour; the owner is told and sees the opening, and the door shuts by itself.
+func TestOwnWorkDebugOpening(t *testing.T) {
+	f := setup(t, orgsOn, hubtest.Env("HUB_ACCESS_ENFORCE", "on"), hubtest.Env("HUB_ADMIN_EMAILS", "owner@example.com, boss@example.com"))
+	boss, member := f.s.SignIn("boss@example.com"), f.s.SignIn("member@example.com")
+	f.owner.Join(f.spaceID, boss)
+	f.owner.Join(f.spaceID, member)
+	for _, who := range []string{"boss@example.com", "member@example.com"} {
+		if r := f.owner.Do("PUT", "/api/admin/switches", map[string]any{"feature": "own-work", "person": who, "enabled": true}); r.Code != 204 {
+			t.Fatalf("switch: %s", r)
+		}
+	}
+	reason := map[string]any{"reason": "чат завис на шаге сборки, смотрю журнал"}
+	debug := "/api/machines/" + f.id + "/debug"
+	if r := boss.Do("POST", debug, map[string]any{"reason": "надо"}); r.Code != 400 {
+		t.Errorf("a reason too short: %s", r)
+	}
+	if r := member.Do("POST", debug, reason); r.Code != 409 || r.Err() != "no_debug" {
+		t.Errorf("a member with no role has nothing to debug with: %s", r)
+	}
+	if r := f.owner.Do("POST", debug, reason); r.Code != 409 {
+		t.Errorf("the creator needs no debugging: %s", r)
+	}
+	if r := boss.Do("POST", debug, reason); r.Code != 200 {
+		t.Fatalf("debug opening: %s", r)
+	}
+	if r := boss.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 200 {
+		t.Errorf("an administrator inside a debug opening: %s", r)
+	}
+	if r := boss.Do("GET", "/api/machines/"+f.id+"/open", nil); r.Code != 200 {
+		t.Errorf("open inside a debug opening: %s", r)
+	}
+	if r := member.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 403 {
+		t.Errorf("another person's opening let a member in: %s", r)
+	}
+	var list struct {
+		Openings []struct {
+			Email, Reason string
+		} `json:"openings"`
+	}
+	f.owner.Do("GET", debug, nil).JSON(&list)
+	if len(list.Openings) != 1 || list.Openings[0].Email != "boss@example.com" || list.Openings[0].Reason != reason["reason"] {
+		t.Errorf("the owner's list of openings: %+v", list.Openings)
+	}
+	if r := member.Do("GET", debug, nil); r.Code != 403 {
+		t.Errorf("a member read the openings of someone's machine: %s", r)
+	}
+	told := false
+	for _, n := range f.s.Mail.Notices() {
+		if n.To == "owner@example.com" && strings.Contains(n.Body, reason["reason"].(string)) {
+			told = true
+		}
+	}
+	if !told {
+		t.Errorf("the owner was not told: %+v", f.s.Mail.Notices())
+	}
+	f.s.Clock.Advance(31 * time.Minute)
+	if r := boss.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 403 || r.Err() != "own_work" {
+		t.Errorf("the opening outlived its half hour: %s", r)
+	}
+}

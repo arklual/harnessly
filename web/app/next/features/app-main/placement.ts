@@ -93,3 +93,34 @@ export const withPlacement = (layout: IAppLayout, placement: TPlacement, section
   float:
     placement === PLACEMENT.float ? clampFloat(layout.float ?? firstFloat(section), section) : layout.float,
 });
+
+/** An edge or a corner of the window the pointer grows it by. */
+export const FLOAT_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
+export type TFloatEdge = (typeof FLOAT_EDGES)[number];
+
+/**
+ * The window grown by an edge or a corner: the pointer moved (dx, dy) since it took hold. The opposite edge stays where
+ * it was; the window keeps the minimum size and stays inside the section.
+ */
+export const resizeFloat = (
+  f: IFloat,
+  edge: TFloatEdge,
+  dx: number,
+  dy: number,
+  section: ISection,
+): IFloat => {
+  const right = f.x + f.w;
+  const bottom = f.y + f.h;
+  let { x, y, w, h } = f;
+  if (edge.includes('e')) w = Math.min(Math.max(FLOAT_MIN.w, f.w + dx), section.width - FLOAT_MARGIN - f.x);
+  if (edge.includes('s')) h = Math.min(Math.max(FLOAT_MIN.h, f.h + dy), section.height - FLOAT_MARGIN - f.y);
+  if (edge.includes('w')) {
+    x = Math.min(Math.max(FLOAT_MARGIN, f.x + dx), right - FLOAT_MIN.w);
+    w = right - x;
+  }
+  if (edge.includes('n')) {
+    y = Math.min(Math.max(FLOAT_MARGIN, f.y + dy), bottom - FLOAT_MIN.h);
+    h = bottom - y;
+  }
+  return clampFloat({ x, y, w, h }, section);
+};

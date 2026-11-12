@@ -78,6 +78,9 @@ type hub struct {
 	// relinkWait is the settle timer of a relink asked for (relinkSoon); nil when none is waiting.
 	relinkWait *time.Timer
 
+	// eval is the runner of the hub's evaluation runs (hubeval.go), made when first asked.
+	eval evalState
+
 	// Set by start.
 	ctx      context.Context
 	installs *install.Manager
@@ -241,6 +244,7 @@ func (h *hub) start(ctx context.Context) error {
 	h.goBG(func() { h.watchEnvSetup(ctx) })
 	h.startUsage()
 	h.startMetrics()
+	h.startLimits()
 	return nil
 }
 
@@ -440,7 +444,7 @@ func (h *hub) onPolicy(old, now hubproto.Policy) {
 // gone is read by a shell, and "!" starts the agent's own shell mode. With the terminal off the runtime refuses both
 // (internal/chatguard), and it knows only because it is told here.
 func (h *hub) pushRuntimePolicy() error {
-	_, err := h.a.callRuntime(h.a.cfg.RuntimeAPI+"/policy", map[string]bool{"terminal": h.policy.Current().Terminal})
+	_, err := h.a.callRuntime(h.a.cfg.ConsoleAPI()+"/policy", map[string]bool{"terminal": h.policy.Current().Terminal})
 	return err
 }
 
@@ -520,6 +524,9 @@ func (h *hub) hello() hubproto.Hello {
 	if a.cfg.RuntimePort != 0 && !h.observe {
 		features = append(features, hubproto.FeatureDrain)
 	}
+	if h.limitsServed() {
+		features = append(features, hubproto.FeatureLimits)
+	}
 	if h.designServed() {
 		features = append(features, hubproto.FeatureDesignAccess)
 	}
@@ -529,6 +536,9 @@ func (h *hub) hello() hubproto.Hello {
 	features = append(features, hubproto.FeatureRepl)
 	if h.docsServed() {
 		features = append(features, hubproto.FeatureDocs)
+	}
+	if h.evalServed() {
+		features = append(features, hubproto.FeatureEvalRun)
 	}
 	var hw *hubproto.Hardware
 	if h.metrics != nil {
@@ -664,7 +674,7 @@ func (h *hub) refreshAgents(force bool) {
 
 // openConsole asks the runtime for a terminal tab running command, and says where the page shows it.
 func (h *hub) openConsole(_ context.Context, _, command string) (string, error) {
-	raw, err := h.a.callRuntime(h.a.cfg.RuntimeAPI+"/terminal-tab", map[string]string{"command": command})
+	raw, err := h.a.callRuntime(h.a.cfg.ConsoleAPI()+"/terminal-tab", map[string]string{"command": command})
 	if err != nil {
 		return "", err
 	}
@@ -700,7 +710,7 @@ func (h *hub) noteConsole(_ context.Context, consoleURL, provider, state string,
 			label = c.Label
 		}
 	}
-	raw, err := h.a.callRuntime(h.a.cfg.RuntimeAPI+"/console-state", map[string]any{
+	raw, err := h.a.callRuntime(h.a.cfg.ConsoleAPI()+"/console-state", map[string]any{
 		"tabId": strings.Trim(consoleURL[i+len("/console/"):], "/"), "state": state, "provider": provider, "label": label, "expiresAt": expiresAt})
 	if err != nil {
 		return false

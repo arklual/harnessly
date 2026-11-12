@@ -23,8 +23,10 @@ type SpaceCascadeStep struct {
 const (
 	machinesOfSpace = `(SELECT id FROM machines WHERE space_id = :id)`
 	teamsOfSpace    = `(SELECT id FROM teams WHERE space_id = :id)`
-	docsOfSpace     = `(SELECT slug FROM doc_meta WHERE space_id = :id)`
-	sitesOfSpace    = `(SELECT id FROM sites WHERE space = :slug)`
+	// docsOfSpace are the documents of the space and the boards drawn from its machines (board_bindings): both
+	// have threads and comments in the same tables.
+	docsOfSpace  = `(SELECT slug FROM doc_meta WHERE space_id = :id UNION SELECT slug FROM board_bindings WHERE space_id = :id)`
+	sitesOfSpace = `(SELECT id FROM sites WHERE space = :slug)`
 	// scopedToSpace picks the rows set on the space or on one of its teams.
 	scopedToSpace   = `((scope_kind = 'tenant' AND scope_id = :id) OR (scope_kind = 'team' AND scope_id IN ` + teamsOfSpace + `))`
 	layeredOnSpace  = `((layer = 'tenant' AND scope_id = :id) OR (layer = 'team' AND scope_id IN ` + teamsOfSpace + `))`
@@ -49,6 +51,7 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"resource_access_teams", bySpace},
 	{"resource_access", bySpace},
 	{"doc_meta", bySpace},
+	{"board_bindings", bySpace},
 
 	// Designs are projects of the space's machines.
 	{"design_share_views", `link_id IN (SELECT id FROM design_share_links WHERE ` + byMachine + `)`},
@@ -99,6 +102,10 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"catalog_items", `(owner_layer = 'tenant' AND owner_scope = :id) OR (owner_layer = 'team' AND owner_scope IN ` + teamsOfSpace + `)`},
 
 	// Everything keyed by a machine of the space, and the sessions opened on them.
+	{"eval_checks", byMachine},
+	{"eval_runs", byMachine},
+	{"eval_batches", byMachine},
+	{"eval_schedules", byMachine},
 	{"automation_runs", byMachine + ` OR rule_id IN (SELECT id FROM automation_rules WHERE ` + byMachine + `)`},
 	{"automation_rules", byMachine},
 	{"history_entries", byMachine},
@@ -120,6 +127,7 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"ingest_cursors", byMachine},
 	{"rollout_switches", byMachine},
 	{"machine_access", byMachine},
+	{"machine_debug_openings", byMachine},
 	{"machine_budgets", byMachine},
 	{"machine_cards", byMachine},
 	{"machine_env", byMachine},
@@ -127,6 +135,7 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"machine_links", byMachine},
 	{"machine_managed", byMachine},
 	{"machine_metrics_5m", byMachine},
+	{"machine_provider_limits", byMachine},
 	{"machine_ops", byMachine},
 	{"machine_resource_conflicts", byMachine},
 	{"machine_resources", byMachine},
@@ -155,16 +164,21 @@ var keptOnSpaceDelete = map[string]string{
 	"job_leases":      "installation: which replica does a background job",
 	"auth_challenges": "installation", "auth_events": "installation: the record of the deletion itself is here",
 	"users": "person", "identities": "person", "passkeys": "person", "person_settings": "person",
-	"orgs":             "the organization outlives its spaces",
-	"merged_mrs":       "merge requests are keyed by their address and name no machine",
-	"eff_pulse":        "a person's own weekly answers",
-	"eff_source_facts": "facts of the installation's sources, name no space",
-	"eff_source_state": "state of the installation's sources",
-	"history_sidebars": "a person's own sidebar, kept per person",
-	"review_notes":     "a person's own review drafts, kept per person and chat",
-	"entry_tickets":    "a person's passes: a minute to trade, twelve hours as a note, then swept by time",
-	"site_blobs":       "content-addressed blobs shared by sites; a space's claim on them is site_space_blobs",
-	"vault_audit":      "the vault is a person's", "vault_entries": "the vault is a person's", "vault_grants": "the vault is a person's",
+	"orgs":                  "the organization outlives its spaces",
+	"merged_mrs":            "merge requests are keyed by their address and name no machine",
+	"eff_pulse":             "a person's own weekly answers",
+	"eff_regression_alerts": "alerts addressed to a person, name no space",
+	"eff_source_facts":      "facts of the installation's sources, name no space",
+	"eff_source_state":      "state of the installation's sources",
+	"history_sidebars":      "a person's own sidebar, kept per person",
+	"review_notes":          "a person's own review drafts, kept per person and chat",
+	"entry_tickets":         "a person's passes: a minute to trade, twelve hours as a note, then swept by time",
+	"site_blobs":            "content-addressed blobs shared by sites; a space's claim on them is site_space_blobs",
+	"eval_arms":             "the evaluation's catalog: installation",
+	"eval_tasks":            "the evaluation's catalog: installation",
+	"eval_suites":           "the evaluation's catalog: installation",
+	"llm_import_runs":       "the record of a one-time move of the old gateway's data: installation, names no space",
+	"vault_audit":           "the vault is a person's", "vault_entries": "the vault is a person's", "vault_grants": "the vault is a person's",
 }
 
 // DeleteSpaceData removes the space and every row that belongs to it, and says how many rows went from each table.

@@ -26,6 +26,9 @@ var (
 	errBadDial     = httpx.New(http.StatusUnauthorized, "unauthenticated", "Подпись не принята")
 	errRevoked     = httpx.New(http.StatusForbidden, "forbidden", "Машина отозвана").With("reason", hubproto.RevokedReason)
 	errDialFlooded = httpx.RateLimited(60)
+	// errMachineBusy is a machine that signed more requests of one kind than the hub remembers: its own pause, not a
+	// failed dial of its address, so the other machines behind the same address are not shut out.
+	errMachineBusy = httpx.RateLimited(30)
 	// errDisabled is a dial of a machine an administrator switched off: not a 403, which would make the agent stop
 	// dialing until it is restarted; it keeps trying and gets in once the machine is switched on.
 	errDisabled = httpx.New(http.StatusLocked, "machine_disabled", "Машина выключена администратором")
@@ -124,8 +127,19 @@ func (d *Dialer) log() *slog.Logger {
 	return slog.Default()
 }
 
-// remember records a nonce of a machine; false when it was seen inside the memory (a replayed dial).
-func (d *Dialer) remember(machineID, nonce string, now time.Time) bool {
+// nonceCheck is what remember says of a nonce.
+type nonceCheck int
+
+const (
+	nonceNew nonceCheck = iota
+	// nonceReplayed was seen inside the memory: a replayed dial.
+	nonceReplayed
+	// nonceFull is a new nonce of a machine whose memory is full: too many signed requests, none replayed.
+	nonceFull
+)
+
+// remember records a nonce of a machine.
+func (d *Dialer) remember(machineID, nonce string, now time.Time) nonceCheck {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.nonces == nil {
@@ -141,11 +155,14 @@ func (d *Dialer) remember(machineID, nonce string, now time.Time) bool {
 			delete(seen, n)
 		}
 	}
-	if _, replay := seen[nonce]; replay || len(seen) >= maxNonces {
-		return false
+	if _, replay := seen[nonce]; replay {
+		return nonceReplayed
+	}
+	if len(seen) >= maxNonces {
+		return nonceFull
 	}
 	seen[nonce] = now
-	return true
+	return nonceNew
 }
 
 // Sweep forgets the nonces of machines that have not dialed lately; call it now and then.
@@ -354,8 +371,12 @@ func (d *Dialer) admit(r *http.Request, verify func(ed25519.PublicKey, hubproto.
 	if m.DisabledAt != nil && checkVersion {
 		return store.Machine{}, errDisabled
 	}
-	if !d.remember(nonceSpace+m.ID, a.Nonce, now) {
+	switch d.remember(nonceSpace+m.ID, a.Nonce, now) {
+	case nonceReplayed:
 		return bad("replayed nonce", m.ID)
+	case nonceFull:
+		d.log().Info("agent dial paused", "reason", "too many signed requests", "space", strings.TrimSuffix(nonceSpace, ":"), "machine", m.ID)
+		return store.Machine{}, errMachineBusy
 	}
 	if v := strings.TrimSpace(r.Header.Get("X-Harnessly-Agent-Version")); checkVersion && d.MinAgentVersion != "" && OlderThan(v, d.MinAgentVersion) {
 		return store.Machine{}, httpx.New(hubproto.StatusUpgradeAgent, "upgrade_required", "Обновите агента: нужна версия "+d.MinAgentVersion+" или новее")

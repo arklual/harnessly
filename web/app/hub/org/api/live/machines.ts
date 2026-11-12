@@ -5,6 +5,7 @@ import type { HubMachine, MachinesResponse, RestartRequest } from '../../../../h
 import type { Member, OrgView, Scope as ApiScope } from '../../../../hub-api/orgs';
 import { OrgApiError } from '../errors';
 import type {
+  DebugOpening,
   MachineAccess,
   MachineDetail,
   MachineGroup,
@@ -370,6 +371,11 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
     trustMachine: async (id) => {
       await http.post(`/api/machines/${id}/trust`, {});
     },
+    debugMachine: async (id, reason) => {
+      await http.post(`/api/machines/${id}/debug`, { reason });
+    },
+    debugOpenings: async (id) =>
+      (await http.get<{ openings: DebugOpening[] }>(`/api/machines/${id}/debug`)).openings ?? [],
     disableMachine: (id) => post(id, 'disable'),
     enableMachine: (id) => post(id, 'enable'),
     setMachineAccess: async (id, access) => {

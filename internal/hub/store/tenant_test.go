@@ -10,7 +10,8 @@ import (
 // a line here that says why it needs none.
 var noSpace = map[string]string{
 	// The installation itself.
-	"schema_migrations": "installation", "rollout_switches": "installation", "currency_rates": "installation", "prices": "installation",
+	"schema_migrations": "installation", "rollout_switches": "installation", "currency_rates": "installation", "prices": "installation", "llm_import_runs": "installation: a one-time move of the old gateway data",
+	"eval_arms": "installation: the catalog of the evaluation", "eval_tasks": "installation: the catalog of the evaluation", "eval_suites": "installation: the catalog of the evaluation",
 	"auth_challenges": "installation", "auth_events": "installation", "ingest_cursors": "installation", "job_leases": "installation",
 	// A person, in whatever space they are.
 	"users": "person", "identities": "person", "passkeys": "person", "sessions": "person", "person_settings": "person",
@@ -21,15 +22,15 @@ var noSpace = map[string]string{
 	"team_members": "team", "invite_team": "invite", "invite_uses": "invite", "limit_rules": "scope",
 	"catalog_items": "organization", "env_entries": "scope", "env_groups": "scope", "env_presets": "scope", "env_apply_pending": "scope",
 	// A machine, whose row names the space.
-	"machine_access": "machine", "machine_budgets": "machine", "machine_cards": "machine", "machine_env": "machine",
-	"machine_hw": "machine", "machine_links": "machine", "machine_managed": "machine", "machine_metrics_5m": "machine",
+	"machine_access": "machine", "machine_debug_openings": "machine", "machine_budgets": "machine", "machine_cards": "machine", "machine_env": "machine",
+	"machine_hw": "machine", "machine_links": "machine", "machine_managed": "machine", "machine_metrics_5m": "machine", "machine_provider_limits": "machine",
 	"machine_ops": "machine", "machine_resources": "machine", "machine_resource_conflicts": "machine", "machine_trust": "machine", "agent_connections": "machine",
 	"migration_objects": "machine", "migration_runs": "machine", "env_state": "machine", "offline_chats": "machine",
 	"offline_prompts": "machine", "history_conversations": "machine", "chat_work": "machine", "history_cursors": "machine", "history_entries": "machine",
 	"history_sidebars": "machine", "review_notes": "machine", "history_turns": "machine", "memory_notes": "machine", "voice_takes": "machine",
 	"upload_owners": "machine", "upload_refs": "machine", "agent_session_mrs": "machine", "merged_mrs": "machine",
-	"usage_calls": "machine", "eff_pulse": "machine", "eff_source_facts": "machine", "eff_source_state": "machine",
-	"automation_rules": "machine", "automation_runs": "machine", "usage_quarantine": "machine",
+	"usage_calls": "machine", "eff_pulse": "machine", "eff_regression_alerts": "machine", "eff_source_facts": "machine", "eff_source_state": "machine",
+	"automation_rules": "machine", "automation_runs": "machine", "eval_schedules": "machine", "eval_batches": "machine", "eval_runs": "machine", "eval_checks": "machine", "usage_quarantine": "machine",
 	// A design, which is a project of a machine.
 	"design_access_log": "design", "design_guest_comments": "design", "design_invites": "design", "design_members": "design",
 	"design_projects": "design", "design_requests": "design", "design_share_links": "design", "design_share_views": "design",

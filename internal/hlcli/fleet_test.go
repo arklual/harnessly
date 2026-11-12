@@ -108,3 +108,34 @@ func TestFleetCommandNeedsARoot(t *testing.T) {
 		t.Fatalf("an unknown subcommand is a usage error, got %d", code)
 	}
 }
+
+func TestFleetRolloutIsOffUnlessAsked(t *testing.T) {
+	code, _, e := runFleet(t, map[string]string{}, "rollout", "--fleet", "x.json", "--version", "1.0.0", "--tarball", "t.tgz")
+	if code == 0 || !strings.Contains(e, "RUNTIME_ROLLOUT_DRIVER=on") {
+		t.Fatalf("%d %s", code, e)
+	}
+}
+
+func TestFleetRolloutDryRunReadsTheFleetAndChangesNothing(t *testing.T) {
+	dir := t.TempDir()
+	fleetFile := filepath.Join(dir, "fleet.json")
+	tar := filepath.Join(dir, "r.tgz")
+	// The "ssh" is a script that answers a status call and fails anything else: a dry run must not call anything else.
+	ssh := filepath.Join(dir, "ssh.sh")
+	if err := os.WriteFile(ssh, []byte("#!/bin/sh\ncase \"$2\" in *' fleet status'*) echo '{\"version\":\"1.0.0\"}';; *) echo \"unexpected: $2\" >&2; exit 9;; esac\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for p, c := range map[string]string{
+		fleetFile: `{"schema":1,"hosts":[{"name":"m1","target":"m1.example.com","wave":1},{"name":"m2","target":"m2.example.com"}]}`,
+		tar:       "release",
+	} {
+		if err := os.WriteFile(p, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, out, e := runFleet(t, map[string]string{"RUNTIME_ROLLOUT_DRIVER": "on"}, "rollout", "--fleet", fleetFile,
+		"--version", "1.1.0", "--tarball", tar, "--ssh", ssh, "--dry-run")
+	if code != 0 || !strings.Contains(out, "wave 0: m2") || !strings.Contains(out, "wave 1: m1") {
+		t.Fatalf("%d\n%s\n%s", code, out, e)
+	}
+}

@@ -166,7 +166,7 @@ func New(d Deps) *Service {
 	if s.log == nil {
 		s.log = slog.Default()
 	}
-	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log, Switches: d.Switches}
+	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log, Switches: d.Switches, Now: s.now}
 	return s
 }
 
@@ -177,8 +177,10 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/machines/{machineId}/browser/ws", s.auth.Require(s.browserWS))
 	s.mountFleet(mux)
 	s.mountWorkspace(mux)
+	s.mountLaunch(mux)
 	if s.slotKeyed() {
 		mux.Handle("POST /api/preview/slot-open", s.auth.Require(s.slotOpen))
+		mux.Handle("GET /api/admin/preview-slot-hosts", s.auth.Require(s.slotHosts))
 	}
 }
 

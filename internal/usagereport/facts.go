@@ -115,10 +115,13 @@ type Facts struct {
 	Tools    []ToolRow
 	// ToolCalls are the named calls of this parse, never cached; denied calls are left out, and so are calls whose
 	// result is missing.
-	ToolCalls   []ToolCall
-	Interrupts  []EventRow
-	Denials     []EventRow
-	Compactions []EventRow
+	ToolCalls []ToolCall
+	// SkillsListed is how many skills the session's initial skill listing offered to the agent; 0 when the transcript
+	// has no listing (or the facts come from a file that was not read for it). Kept in the side file, never cached.
+	SkillsListed int
+	Interrupts   []EventRow
+	Denials      []EventRow
+	Compactions  []EventRow
 }
 
 const (
@@ -611,6 +614,12 @@ func (p *Projects) ParseClaude(path string) (*Facts, error) {
 			return nil
 		case "attachment":
 			att := objectOf(e.raw("attachment"))
+			if att.is("type", "skill_listing") && !sidechain && att.isTrue("isInitial") && facts.SkillsListed == 0 {
+				if content, ok := att.str("content"); ok {
+					facts.SkillsListed = CountListedSkills(content)
+				}
+				return nil
+			}
 			if !att.is("type", "queued_command") || sidechain {
 				return nil
 			}

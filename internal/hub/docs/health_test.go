@@ -2,6 +2,7 @@ package docs
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -147,5 +148,27 @@ func TestProbeReadyRefusesNon2xx(t *testing.T) {
 	srv.Close()
 	if err := ProbeReady(context.Background(), http.DefaultClient, srv.URL); err == nil {
 		t.Fatal("a closed service is not ready")
+	}
+}
+
+func TestHealthServiceWithoutReadyzRouteIsNotDown(t *testing.T) {
+	r := newHealthRig(t, true)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+	r.s.cfg.ArtifactsURL, r.s.cfg.BoardsURL = srv.URL, srv.URL
+	ctx := context.Background()
+	r.s.healthPass(ctx)
+	if got := r.s.Status().Services; got != nil {
+		t.Fatalf("an address that does not route /readyz says nothing about the service, got %v", got)
+	}
+	*r.now = r.now.Add(alertAfter + probeEvery)
+	r.s.healthPass(ctx)
+	if len(*r.mails) != 0 {
+		t.Fatalf("nobody is mailed for a missing /readyz route, got %v", *r.mails)
+	}
+	if err := ProbeReady(ctx, srv.Client(), srv.URL); !errors.Is(err, ErrNoReadyz) {
+		t.Fatalf("the doctor still sees a 404 as a failure, got %v", err)
 	}
 }

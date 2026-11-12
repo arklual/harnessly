@@ -123,6 +123,23 @@ type mrEntry struct {
 	Keys    []string `json:"keys"`
 	// Tools is nil in an entry written before tool calls were kept, and an empty list for a transcript with none.
 	Tools []toolSum `json:"tools"`
+	// Listed is how many skills the initial skill listing offered; absent when the transcript has none.
+	Listed int `json:"listed,omitempty"`
+}
+
+// CountListedSkills is the number of distinct skills a skill listing names: its lines `- name: description` (a line
+// without a description is a skill too). Only the count leaves the machine, never a name or a description.
+func CountListedSkills(content string) int {
+	seen := map[string]bool{}
+	for _, line := range strings.Split(content, "\n") {
+		rest, ok := strings.CutPrefix(line, "- ")
+		if !ok {
+			continue
+		}
+		name, _, _ := strings.Cut(rest, ": ")
+		seen[name] = true
+	}
+	return len(seen)
 }
 
 // toolSum is the calls of one tool on one UTC day of a transcript; Ts is the time of the last of them.
@@ -224,6 +241,7 @@ func applyMRs(files map[string]*cachedFile, kept map[string]mrEntry) {
 		if e, ok := kept[name]; ok && e.Size == f.size && e.MtimeMs == f.mtimeMs && f.facts != nil {
 			f.facts.MRKeys = append([]string{}, e.Keys...)
 			f.facts.ToolCalls = callsOf(e.Tools)
+			f.facts.SkillsListed = e.Listed
 		}
 	}
 }

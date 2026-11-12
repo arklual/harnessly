@@ -28,6 +28,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/docs"
 	"github.com/ly-solutions/harnessly/internal/hub/efficiency"
 	"github.com/ly-solutions/harnessly/internal/hub/env"
+	"github.com/ly-solutions/harnessly/internal/hub/eval"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
@@ -384,11 +385,11 @@ func New(o Options) (*Hub, error) {
 	}
 	h.Design = designaccess.New(designaccess.Deps{
 		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL,
-		PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
+		ShareAliases: cfg.DesignShareAliases, PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
 		LinkKey: linkKey, Notice: notice, Shared: !cfg.Store.Off, Kits: kitAccess(cfg, db, o),
 	})
 	h.Efficiency = &efficiency.Service{DB: db, OrgGate: h.Orgs.OrgGate, Features: h.Features, Switches: h.Switches, Now: o.Now}
-	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Notice: func(ctx context.Context, to, subject, body, link string) error {
+	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Gate: h.Switches, Notice: func(ctx context.Context, to, subject, body, link string) error {
 		if n, ok := o.Mailer.(mail.Noticer); ok {
 			_, err := n.SendNotice(ctx, to, subject, body, link)
 			return err
@@ -408,7 +409,7 @@ func New(o Options) (*Hub, error) {
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
 		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Docs: h.Docs, Automations: h.Automations,
-		History: historySink, Switches: h.Switches,
+		History: historySink, Switches: h.Switches, Notice: noticeOf(o.Mailer),
 	})
 	h.Analytics.UseMachines(h.Machines)
 	h.Analytics.UseEvents(h.OrgEvents)
@@ -599,6 +600,13 @@ func New(o Options) (*Hub, error) {
 		case guestHost != "" && strings.HasPrefix(r.URL.Path, "/apps/guest/"):
 			// With a host of their own the guest links are not served next to the hub's session.
 			httpx.WriteError(w, r, httpx.ErrNotFound)
+		case h.Design.IsShareAlias(r.Host) && !(cfg.DesignShareDocs && docGuestLink(mux, r)):
+			// A former address of the guest links: /s/<token> goes on to the share host, nothing else is there.
+			h.Design.ShareRedirect(w, r)
+		case cfg.DesignShareDocs && (h.Design.IsShareHost(r.Host) || h.Design.IsShareAlias(r.Host)) && docGuestLink(mux, r):
+			// HUB_DESIGN_SHARE_DOCS: a document's guest link (/d/<token>) opens under the address it was handed out at.
+			// The page sets its own sandbox; the hub's session is not on this origin.
+			mux.ServeHTTP(w, r)
 		case h.Design.IsShareHost(r.Host):
 			// A guest link runs on its own origin: the page of one project and nothing of the hub.
 			shares.ServeHTTP(w, r)
@@ -626,7 +634,7 @@ func New(o Options) (*Hub, error) {
 	})
 	secured := securityHeaders(cfg.Secure, routed)
 	guarded := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) || isGuestHost(r.Host) || h.Proxy.IsSlotHost(r.Host) {
+		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) || h.Design.IsShareAlias(r.Host) || isGuestHost(r.Host) || h.Proxy.IsSlotHost(r.Host) {
 			// A published page sets its own headers; the hub's (frame ban, referrer policy) are for the hub's pages.
 			routed.ServeHTTP(w, r)
 			return
@@ -774,9 +782,24 @@ func (h *Hub) Run(ctx context.Context) {
 			h.log.Info("efficiency markers", "stored", n)
 		}
 	}
+	if raw := h.cfg.EfficiencyRegressions; raw != "" {
+		if n, err := efficiency.ImportRegressions(ctx, h.db.S(), raw); err != nil {
+			h.log.Error("efficiency regressions", "err", err)
+		} else {
+			h.log.Info("efficiency regressions", "read", n)
+		}
+	}
 	if c := h.efficiencyCollector(); c != nil {
 		safego.Go("efficiency collector", func() { c.Run(ctx) })
 	}
+	// the evaluation's scheduler: under the hub-eval rollout switch; it runs a task only on a machine whose agent
+	// offers eval.run (the operator opted in there with AGENT_HUB_EVAL=on)
+	evalLink := &eval.HubLink{Links: h.Registry}
+	if h.Machines != nil {
+		evalLink.Offers = h.Machines.Offers
+	}
+	evalSched := eval.New(eval.Deps{DB: h.db, Gate: h.Switches, Link: evalLink, Log: h.log})
+	safego.Go("eval", func() { evalSched.Run(ctx) })
 	if p := mrsource.New(h.cfg.MRSourceURL, h.cfg.MRSourceGroups, h.cfg.MRSourceToken, h.db.S(), h.log); p != nil {
 		safego.Go("merge request source", func() { p.Run(ctx) })
 	}
@@ -900,5 +923,35 @@ func (h *Hub) efficiencyCollector() *efficiency.Collector {
 	if gl == nil {
 		return nil
 	}
-	return &efficiency.Collector{Store: h.db.S(), Code: gl, Log: h.log, Now: time.Now}
+	gl.SkillsProject = h.cfg.MRSourceSkillsProject
+	col := &efficiency.Collector{Store: h.db.S(), Code: gl, Log: h.log, Now: time.Now}
+	if yt := efficiency.NewYouTrack(h.cfg.TrackerURL, h.cfg.TrackerToken, h.cfg.TrackerProject); yt != nil {
+		col.Tracker = yt
+	}
+	if ar := efficiency.NewArtifacts(h.cfg.ArtifactsURL, h.cfg.ArtifactsToken); ar != nil {
+		col.Documents = ar
+	}
+	return col
+}
+
+// noticeOf is the mailer's short notices as a function; nil when the mailer sends none.
+func noticeOf(m any) func(ctx context.Context, to, subject, body, link string) error {
+	n, ok := m.(mail.Noticer)
+	if !ok {
+		return nil
+	}
+	return func(ctx context.Context, to, subject, body, link string) error {
+		_, err := n.SendNotice(ctx, to, subject, body, link)
+		return err
+	}
+}
+
+// docGuestLink is a request the documents' guest page answers (GET /d/<token>): the route is looked up in the mux,
+// so with documents or their access off nothing is served and the request is not the hub's page by accident.
+func docGuestLink(mux *http.ServeMux, r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	_, pattern := mux.Handler(r)
+	return pattern == "GET /d/{token}"
 }

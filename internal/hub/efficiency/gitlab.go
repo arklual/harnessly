@@ -23,6 +23,8 @@ type GitLab struct {
 	Groups []string
 	Token  string
 	Client *http.Client
+	// SkillsProject is the project (group/name) whose SKILL.md files are the skills; empty reads no skill commits.
+	SkillsProject string
 }
 
 // NewGitLab returns the provider; nil when the source is not configured.
@@ -123,6 +125,19 @@ func clip(s string, n int) string {
 }
 
 func (g *GitLab) fetch(ctx context.Context, u string) ([]glMR, int, error) {
+	body, next, err := g.fetchRaw(ctx, u)
+	if err != nil {
+		return nil, 0, err
+	}
+	var list []glMR
+	if err := json.Unmarshal(body, &list); err != nil {
+		return nil, 0, fmt.Errorf("GitLab answer is not a list of merge requests")
+	}
+	return list, next, nil
+}
+
+// fetchRaw reads one page of any list endpoint, with retries on a busy or failing host.
+func (g *GitLab) fetchRaw(ctx context.Context, u string) ([]byte, int, error) {
 	var lastErr error
 	for try := 0; try < 3; try++ {
 		if try > 0 {
@@ -156,12 +171,8 @@ func (g *GitLab) fetch(ctx context.Context, u string) ([]glMR, int, error) {
 		if resp.StatusCode != http.StatusOK {
 			return nil, 0, fmt.Errorf("GitLab answered %d", resp.StatusCode)
 		}
-		var list []glMR
-		if err := json.Unmarshal(body, &list); err != nil {
-			return nil, 0, fmt.Errorf("GitLab answer is not a list of merge requests")
-		}
 		next, _ := strconv.Atoi(resp.Header.Get("X-Next-Page"))
-		return list, next, nil
+		return body, next, nil
 	}
 	return nil, 0, lastErr
 }

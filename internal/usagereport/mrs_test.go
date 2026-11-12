@@ -230,3 +230,41 @@ func TestToolCallsSurviveTheFactsFile(t *testing.T) {
 		t.Fatalf("stored after the backfill: %+v", got)
 	}
 }
+
+func TestCountListedSkills(t *testing.T) {
+	got := CountListedSkills("- a:one: does a\n  more\n- b\n- a:one: again\n\n- c: x")
+	if got != 3 {
+		t.Fatalf("got %d, want 3 (a:one, b, c)", got)
+	}
+	if CountListedSkills("no list here") != 0 {
+		t.Fatal("text without list lines has no skills")
+	}
+}
+
+// The count of skills the initial listing offered is read from the transcript, kept in the side file and read back by a
+// machine that reads the runtime's facts file; a listing that is not the initial one, or a subagent's, is not counted.
+func TestSkillsListedSurviveTheFactsFile(t *testing.T) {
+	dir := t.TempDir()
+	root := filepath.Join(dir, "projects", "p")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	listing := `{"type":"attachment","timestamp":"2026-10-30T10:00:00.000Z","attachment":{"type":"skill_listing","isInitial":true,"content":"- a: one\n- b:c\n- a: again"}}` + "\n" +
+		`{"type":"attachment","timestamp":"2026-10-30T10:00:01.000Z","attachment":{"type":"skill_listing","isInitial":false,"content":"- x\n- y\n- z"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "s1.jsonl"), []byte(listing+toolTranscript), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cache := filepath.Join(dir, "stats", "usage-v2.json")
+	now := time.Now()
+	cfg := Config{ClaudeRoot: filepath.Join(dir, "projects"), CodexRoot: filepath.Join(dir, "none"), CacheFile: cache, Projects: &Projects{}, Workers: 1, Now: func() time.Time { return now }}
+	c := NewCollector(cfg)
+	c.Refresh()
+	if got := c.Entries()[0].Facts.SkillsListed; got != 2 {
+		t.Fatalf("collector: %d, want 2", got)
+	}
+	s := &Stored{Path: cache}
+	s.Refresh()
+	if got := s.Entries()[0].Facts.SkillsListed; got != 2 {
+		t.Fatalf("stored: %d, want 2", got)
+	}
+}

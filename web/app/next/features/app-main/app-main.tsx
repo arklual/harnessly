@@ -13,6 +13,9 @@ import {
 } from 'react';
 import {
   clampFloat,
+  FLOAT_EDGES,
+  resizeFloat,
+  type TFloatEdge,
   firstFloat,
   PLACEMENT,
   PLACEMENTS,
@@ -124,7 +127,7 @@ interface IFloatWindowProps {
   children: ReactNode;
 }
 
-/** The window: moved by its head, grown by its corner; the place is kept when the pointer lets go. */
+/** The window: moved by its head, grown by any edge or corner (the one at the foot on the right shows a grip); the place is kept when the pointer lets go. */
 const FloatWindow = ({ title, float, section, state, onFloat, onLive, children }: IFloatWindowProps) => {
   const ref = useRef<HTMLElement>(null);
   // The place goes to the stylesheet as variables (no inline styles): .hx-appmain__float reads them.
@@ -136,7 +139,7 @@ const FloatWindow = ({ title, float, section, state, onFloat, onLive, children }
     el.style.setProperty('--fw', `${float.w}px`);
     el.style.setProperty('--fh', `${float.h}px`);
   }, [float]);
-  const grab = (event: ReactPointerEvent<HTMLElement>, mode: 'move' | 'size') => {
+  const grab = (event: ReactPointerEvent<HTMLElement>, mode: 'move' | TFloatEdge) => {
     if (event.button !== 0) return;
     event.preventDefault();
     const target = event.currentTarget;
@@ -146,12 +149,10 @@ const FloatWindow = ({ title, float, section, state, onFloat, onLive, children }
     const move = (e: PointerEvent) => {
       const dx = e.clientX - from.x;
       const dy = e.clientY - from.y;
-      last = clampFloat(
+      last =
         mode === 'move'
-          ? { ...float, x: float.x + dx, y: float.y + dy }
-          : { ...float, w: float.w + dx, h: float.h + dy },
-        section,
-      );
+          ? clampFloat({ ...float, x: float.x + dx, y: float.y + dy }, section)
+          : resizeFloat(float, mode, dx, dy, section);
       onLive(last);
     };
     const end = () => {
@@ -171,7 +172,15 @@ const FloatWindow = ({ title, float, section, state, onFloat, onLive, children }
         <span className="hx-appmain__float-title">{title}</span>
       </div>
       <div className="hx-appmain__float-body">{children}</div>
-      <span className="hx-appmain__float-size" aria-hidden="true" onPointerDown={(e) => grab(e, 'size')} />
+      {FLOAT_EDGES.map((edge) => (
+        <span
+          key={edge}
+          className="hx-appmain__float-size"
+          data-edge={edge}
+          aria-hidden="true"
+          onPointerDown={(e) => grab(e, edge)}
+        />
+      ))}
     </aside>
   );
 };

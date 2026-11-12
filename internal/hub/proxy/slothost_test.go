@@ -328,3 +328,34 @@ func TestSlotHostsAreNotTheHubsOrigin(t *testing.T) {
 		t.Errorf("a made-up handle: %d", res.StatusCode)
 	}
 }
+
+func TestSlotHostsListIsForAdministratorsAndMatchesTheRealHosts(t *testing.T) {
+	f := slotSetup(t)
+	f.switchOn(t, "")
+	list := func(p *hubtest.Person, email string) (hubtest.Resp, []string) {
+		r := p.Do("GET", "/api/admin/preview-slot-hosts?email="+url.QueryEscape(email), nil)
+		var out struct{ Hosts []string }
+		if r.Code == 200 {
+			r.JSON(&out)
+		}
+		return r, out.Hosts
+	}
+	if r, _ := list(f.other, "other@example.com"); r.Code != 403 {
+		t.Fatalf("a member is not an administrator: %s", r)
+	}
+	if r, _ := list(f.owner, "nobody@example.com"); r.Code != 404 {
+		t.Fatalf("unknown account: %s", r)
+	}
+	r, hosts := list(f.owner, "Other@Example.com")
+	if r.Code != 200 || len(hosts) != 6 {
+		t.Fatalf("list: %s %v", r, hosts)
+	}
+	bare := func(h string) string { return strings.Split(h, ":")[0] }
+	if !strings.HasSuffix(bare(hosts[0]), "-1."+slotDomain) || !strings.HasSuffix(bare(hosts[5]), "-6."+slotDomain) {
+		t.Errorf("hosts: %v", hosts)
+	}
+	_, _, host := f.open(t, f.other, f.path("/x"))
+	if host != hosts[0] {
+		t.Errorf("the listed first host %q is not the one the person gets %q", hosts[0], host)
+	}
+}

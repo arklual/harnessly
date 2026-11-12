@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -479,6 +480,32 @@ func TestFailedDialsAreLimited(t *testing.T) {
 	}
 }
 
+// A machine that signs more requests than the hub remembers is paused alone: its address is not counted as flooding,
+// so the other machines behind it (one office, one dev server) keep working.
+func TestBusyMachineDoesNotShutItsAddress(t *testing.T) {
+	h := newTestHub(t)
+	seen := map[string]time.Time{}
+	for i := 0; i < maxNonces; i++ {
+		seen[fmt.Sprintf("n%d", i)] = time.Now()
+	}
+	h.dialer.mu.Lock()
+	h.dialer.nonces = map[string]map[string]time.Time{h.machine.ID: seen}
+	h.dialer.mu.Unlock()
+	for i := 0; i <= failedDials; i++ {
+		if _, status, _ := h.dialRaw(dialOpts{}); status != 429 {
+			t.Fatalf("busy dial %d: %d", i, status)
+		}
+	}
+	h.dialer.mu.Lock()
+	h.dialer.nonces = nil
+	h.dialer.mu.Unlock()
+	if conn, status, body := h.dialRaw(dialOpts{}); conn == nil {
+		t.Fatalf("dial after the pause: %d %s", status, body)
+	} else {
+		conn.CloseNow()
+	}
+}
+
 func TestSecondLinkReplacesTheFirst(t *testing.T) {
 	h := newTestHub(t)
 	first, l1 := h.agent(dialOpts{})
@@ -755,19 +782,19 @@ func TestOlderThan(t *testing.T) {
 func TestNonceMemory(t *testing.T) {
 	d := &Dialer{}
 	now := time.Now()
-	if !d.remember("m", "n1", now) || d.remember("m", "n1", now.Add(time.Minute)) {
+	if d.remember("m", "n1", now) != nonceNew || d.remember("m", "n1", now.Add(time.Minute)) != nonceReplayed {
 		t.Error("a nonce is remembered for the window")
 	}
-	if !d.remember("other", "n1", now) {
+	if d.remember("other", "n1", now) != nonceNew {
 		t.Error("nonces are per machine")
 	}
-	if !d.remember("m", "n1", now.Add(hubproto.NonceMemory+time.Second)) {
+	if d.remember("m", "n1", now.Add(hubproto.NonceMemory+time.Second)) != nonceNew {
 		t.Error("a nonce is forgotten after the window")
 	}
 	for i := 0; i < maxNonces; i++ {
 		d.remember("busy", string(rune('a'+i%26))+strings.Repeat("x", i), now)
 	}
-	if d.remember("busy", "one-more", now) {
+	if d.remember("busy", "one-more", now) != nonceFull {
 		t.Error("the memory is bounded")
 	}
 	d.Now = func() time.Time { return now.Add(time.Hour) }

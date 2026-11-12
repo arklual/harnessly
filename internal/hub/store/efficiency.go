@@ -134,3 +134,69 @@ func (s Store) EffPulsesOf(ctx context.Context, userID string, limit int) ([]Eff
 	}
 	return out, rows.Err()
 }
+
+// EffRegressionAlert is one regression alert of the evaluation: a metric that left its band after a change of the harness.
+// Times are Unix milliseconds; Diff is a JSON array of lines.
+type EffRegressionAlert struct {
+	ID, BatchID, Metric                string
+	Baseline, Observed                 float64
+	Band                               int
+	FingerprintFrom, FingerprintTo     string
+	Diff, Addressee, State, ResolvedBy string
+	SeenAt                             *int64
+	CreatedAt                          int64
+}
+
+// InsertEffRegressionAlerts stores alerts, leaving one with the same id as it is: the state a person gave it stays.
+func (s Store) InsertEffRegressionAlerts(ctx context.Context, alerts []EffRegressionAlert) error {
+	for _, a := range alerts {
+		if _, err := s.q.Exec(ctx, `INSERT INTO eff_regression_alerts (id, batch_id, metric, baseline, observed, band, fingerprint_from,
+			fingerprint_to, diff, addressee, seen_at, state, resolved_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (id) DO NOTHING`,
+			a.ID, a.BatchID, a.Metric, a.Baseline, a.Observed, a.Band, a.FingerprintFrom, a.FingerprintTo, a.Diff, a.Addressee,
+			a.SeenAt, a.State, a.ResolvedBy, a.CreatedAt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// EffRegressionAlertsFor lists the alerts addressed to an e-mail, newest first; openOnly leaves out the resolved ones.
+func (s Store) EffRegressionAlertsFor(ctx context.Context, addressee string, openOnly bool) ([]EffRegressionAlert, error) {
+	q := `SELECT id, batch_id, metric, baseline, observed, band, fingerprint_from, fingerprint_to, diff, addressee, seen_at, state,
+		resolved_by, created_at FROM eff_regression_alerts WHERE addressee = ?`
+	if openOnly {
+		q += ` AND state = 'open'`
+	}
+	rows, err := s.q.Query(ctx, q+` ORDER BY created_at DESC, id`, addressee)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []EffRegressionAlert
+	for rows.Next() {
+		var a EffRegressionAlert
+		if err := rows.Scan(&a.ID, &a.BatchID, &a.Metric, &a.Baseline, &a.Observed, &a.Band, &a.FingerprintFrom, &a.FingerprintTo,
+			&a.Diff, &a.Addressee, &a.SeenAt, &a.State, &a.ResolvedBy, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// ReplaceEffFacts stores facts of one source and drops the facts of the source that this pass did not bring: a source
+// that reports a whole current state (the issues in progress, the documents of a window) leaves nothing stale.
+func (s Store) ReplaceEffFacts(ctx context.Context, source string, facts []EffFact, now int64) error {
+	if err := s.UpsertEffFacts(ctx, facts, now); err != nil {
+		return err
+	}
+	_, err := s.q.Exec(ctx, `DELETE FROM eff_source_facts WHERE source = ? AND collected_at <> ?`, source, now)
+	return err
+}
+
+// PruneEffFacts drops the facts of a source older than a time.
+func (s Store) PruneEffFacts(ctx context.Context, source string, before int64) error {
+	_, err := s.q.Exec(ctx, `DELETE FROM eff_source_facts WHERE source = ? AND at < ?`, source, before)
+	return err
+}

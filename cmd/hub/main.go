@@ -96,6 +96,8 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 		return runDesign(ctx, args, lookup, stdout, stderr)
 	case "env-seed":
 		return runEnvSeed(ctx, args, lookup, stdout, stderr)
+	case "import-llm":
+		return runImportLLM(ctx, args, lookup, stdout, stderr)
 	case "doctor":
 		return runDoctor(ctx, args, lookup, stdout, stderr)
 	case "machine-code":
@@ -109,7 +111,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 }
 
-const usage = `usage: hub [serve | check-config | healthcheck | sites | storage migrate [--dry-run] [--remove-source] | store backup|gc|migrate | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | design import-gateway [--dry-run] | doctor | schema snapshot [--dir d] [--postgres url] | machine-code --space <slug> --owner <email> [--profile p] | version]
+const usage = `usage: hub [serve | check-config | healthcheck | sites | storage migrate [--dry-run] [--remove-source] | store backup|gc|migrate | seed --file seed.yaml [--dry-run] | env-seed --file env.yaml [--dry-run] | design import-gateway [--dry-run] | import-llm [--apply] --persons a@example.org | doctor | schema snapshot [--dir d] [--postgres url] | machine-code --space <slug> --owner <email> [--profile p] | version]
 
 The hub is configured by HUB_* environment variables; see docs/hub/deploy.md.
 `

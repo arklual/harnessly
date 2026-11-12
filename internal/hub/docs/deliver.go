@@ -58,10 +58,15 @@ func (f *inflight) done(id string) {
 	f.mu.Unlock()
 }
 
-// bind records the conversation a document of this machine was published from. A board's binding is not the hub's:
-// boards stay with their own service.
+// bind records the conversation a document of this machine was published from, or a board was drawn in (boards.go).
 func (s *Service) bind(ctx context.Context, mc store.Machine, b hubproto.DocBinding) error {
-	if b.Slug == "" || (b.Kind != "" && b.Kind != "artifact") {
+	if b.Slug == "" {
+		return nil
+	}
+	if b.Kind == "board" {
+		return s.bindBoard(ctx, mc, b)
+	}
+	if b.Kind != "" && b.Kind != "artifact" {
 		return nil
 	}
 	_, err := s.db.S().Q().Exec(ctx, `UPDATE doc_meta SET tab_id = ?, session_name = ?, agent_session_id = ?, provider = ?, cwd = ?,
@@ -111,26 +116,34 @@ func (s *Service) agentReply(ctx context.Context, machineID string, r hubproto.D
 type pending struct {
 	id, threadID, slug, anchor, title, source, machine string
 	authorName, body                                   string
-	created                                            int64
-	tabID, session, agentSession, cwd                  sql.NullString
+	// board: the comment is on a board (no doc_meta row); external is the id the boards service gave the thread.
+	board                             bool
+	external                          string
+	created                           int64
+	tabID, session, agentSession, cwd sql.NullString
 }
 
 func (s *Service) pendingComment(ctx context.Context, id string) (*pending, error) {
 	var p pending
-	var machine, source sql.NullString
-	err := s.db.S().Q().QueryRow(ctx, `SELECT c.id, c.thread_id, t.slug, t.anchor, m.title, m.source_path, m.machine_id, c.author_name,
-			c.body, c.created_at, m.tab_id, m.session_name, m.agent_session_id, m.cwd
-		FROM doc_comments c JOIN doc_threads t ON t.id = c.thread_id JOIN doc_meta m ON m.slug = t.slug
-		WHERE c.id = ? AND c.author_kind = 'person' AND c.delivered_at IS NULL AND c.delivery_error IS NULL`, id).
+	var machine, source, external sql.NullString
+	var board int
+	err := s.db.S().Q().QueryRow(ctx, `SELECT c.id, c.thread_id, t.slug, t.anchor, COALESCE(m.title, b.title, ''), m.source_path,
+			COALESCE(m.machine_id, b.machine_id), c.author_name, c.body, c.created_at, COALESCE(m.tab_id, b.tab_id),
+			COALESCE(m.session_name, b.session_name), COALESCE(m.agent_session_id, b.agent_session_id), COALESCE(m.cwd, b.cwd),
+			t.external_id, CASE WHEN m.slug IS NULL THEN 1 ELSE 0 END
+		FROM doc_comments c JOIN doc_threads t ON t.id = c.thread_id LEFT JOIN doc_meta m ON m.slug = t.slug
+			LEFT JOIN board_bindings b ON b.slug = t.slug
+		WHERE c.id = ? AND c.author_kind = 'person' AND c.delivered_at IS NULL AND c.delivery_error IS NULL
+			AND (m.slug IS NOT NULL OR b.slug IS NOT NULL)`, id).
 		Scan(&p.id, &p.threadID, &p.slug, &p.anchor, &p.title, &source, &machine, &p.authorName, &p.body, &p.created,
-			&p.tabID, &p.session, &p.agentSession, &p.cwd)
+			&p.tabID, &p.session, &p.agentSession, &p.cwd, &external, &board)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	p.machine, p.source = machine.String, source.String
+	p.machine, p.source, p.external, p.board = machine.String, source.String, external.String, board == 1
 	if p.machine == "" || (!p.tabID.Valid && !p.session.Valid && !p.agentSession.Valid) {
 		return nil, nil
 	}
@@ -241,13 +254,15 @@ func (s *Service) sweep(ctx context.Context) {
 	q := s.db.S().Q()
 	if _, err := q.Exec(ctx, `UPDATE doc_comments SET delivery_error = ?
 		WHERE delivered_at IS NULL AND delivery_error IS NULL AND author_kind = 'person' AND created_at < ?
-			AND thread_id IN (SELECT t.id FROM doc_threads t JOIN doc_meta m ON m.slug = t.slug WHERE m.bound_at IS NOT NULL)`,
+			AND thread_id IN (SELECT t.id FROM doc_threads t JOIN doc_meta m ON m.slug = t.slug WHERE m.bound_at IS NOT NULL
+				UNION SELECT t.id FROM doc_threads t JOIN board_bindings b ON b.slug = t.slug)`,
 		"Машина не была на связи сутки", now.Add(-deliverGiveUp).UnixMilli()); err != nil {
 		s.log.Warn("doc comments not expired", "error", err)
 	}
-	rows, err := q.Query(ctx, `SELECT c.id FROM doc_comments c JOIN doc_threads t ON t.id = c.thread_id JOIN doc_meta m ON m.slug = t.slug
+	rows, err := q.Query(ctx, `SELECT c.id FROM doc_comments c JOIN doc_threads t ON t.id = c.thread_id LEFT JOIN doc_meta m ON m.slug = t.slug
+			LEFT JOIN board_bindings b ON b.slug = t.slug
 		WHERE c.delivered_at IS NULL AND c.delivery_error IS NULL AND c.author_kind = 'person' AND c.created_at < ?
-			AND m.bound_at IS NOT NULL AND m.machine_id IS NOT NULL
+			AND COALESCE(m.bound_at, b.bound_at) IS NOT NULL AND COALESCE(m.machine_id, b.machine_id) IS NOT NULL
 		ORDER BY c.created_at LIMIT 50`, now.Add(-sweepAfter).UnixMilli())
 	if err != nil {
 		s.log.Warn("pending doc comments not read", "error", err)
@@ -300,11 +315,30 @@ func (s *Service) message(ctx context.Context, p *pending) (string, error) {
 		earlier = append([]string{"— " + name + ": " + oneLine(body, 500)}, earlier...)
 	}
 	_ = rows.Close()
+	if p.board {
+		return formatBoardMessage(p, s.boardURL(p.slug), s.boardCommand(), earlier), nil
+	}
 	return formatMessage(p, s.docURL(p.slug), earlier), nil
 }
 
 func (s *Service) docURL(slug string) string {
 	return strings.TrimRight(s.cfg.PublicURL, "/") + "/docs/" + slug
+}
+
+// boardCommand is the name of the boards tool the agent answers with.
+func (s *Service) boardCommand() string {
+	if s.cfg.BoardCommand != "" {
+		return s.cfg.BoardCommand
+	}
+	return "board"
+}
+
+func (s *Service) boardURL(slug string) string {
+	base := s.cfg.BoardsPublicURL
+	if base == "" {
+		base = s.cfg.PublicURL
+	}
+	return strings.TrimRight(base, "/") + "/b/" + slug
 }
 
 func formatMessage(p *pending, url string, earlier []string) string {

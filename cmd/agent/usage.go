@@ -68,6 +68,8 @@ func usageFeed(d agent.UsageDeps) (agent.UsageFeed, error) {
 		Source:    src,
 		StatePath: usagefeed.StatePath(d.Dir),
 		Identity:  local.Identity,
+		// counts of the skills a session was offered and called; off until the fleet flag turns it on.
+		SkillMetrics: os.Getenv("AGENT_USAGE_SKILL_METRICS") == "on",
 	})
 }
 

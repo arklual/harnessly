@@ -83,8 +83,14 @@ func TestDocsGoToTheHub(t *testing.T) {
 	if rec := post(a, "/docs/bind", a.localToken, `{"slug":"b1","kind":"board","key":"k","title":"Доска"}`); rec.Code != 202 {
 		t.Fatalf("bind a board: %d %s", rec.Code, rec.Body)
 	}
-	if ev, _ := c.waitEvent(hubproto.EventDocBound, n, 300*time.Millisecond); ev != nil {
-		t.Fatalf("a board's binding reached the hub: %v", ev)
+	// The hub learns where a board was drawn and never the board's key.
+	boardBound, _ := c.waitEvent(hubproto.EventDocBound, n, 5*time.Second)
+	var bb struct{ Binding hubproto.DocBinding }
+	if boardBound == nil || json.Unmarshal(mustJSON(boardBound), &bb) != nil || bb.Binding.Slug != "b1" || bb.Binding.Kind != "board" || bb.Binding.Key != nil {
+		t.Fatalf("a board's binding for the hub: %v", boardBound)
+	}
+	if strings.Contains(string(mustJSON(boardBound)), `"key":"k"`) {
+		t.Fatalf("the board's key reached the hub: %v", boardBound)
 	}
 
 	res := decode[map[string]string](t, c.mustCall(hubproto.OpDocsDeliver, map[string]any{"tabId": "tab-1", "message": "💬 Комментарий"}))

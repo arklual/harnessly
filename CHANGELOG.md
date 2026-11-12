@@ -8,6 +8,34 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The evaluation's runner on a machine, `internal/evalrun` and the agent operations `eval.run.start`, `eval.run.poll`
+  and `eval.run.stop` (feature `eval.run`): runs a golden task in a bubblewrap sandbox with an access-only copy of the owner's
+  subscription login. Offered only with `AGENT_HUB_EVAL=on` on Linux with bubblewrap; the hub's scheduler reaches it with
+  `HubLink`.
+- The hub's scheduler of the evaluation, `internal/hub/eval`: slots in Moscow time, queue, guards on the
+  subscription's windows, regression alerts; off until the `hub-eval` rollout switch is on for a person.
+- Evaluation of the harness in the hub: tables `eval_arms`, `eval_tasks`, `eval_suites`, `eval_schedules`,
+  `eval_batches`, `eval_runs`, `eval_checks` (migration 0062) and `hub import-llm --history --eval`, which moves the old
+  gateway's catalog, schedules and finished batches and runs (docs/hub/eval.md).
+- Subscription windows of a machine: the agent with a runtime sends `limits.windows` (feature `limits`, every
+  60 seconds) with the five-hour and seven-day usage of Claude and Codex; the hub keeps the last reading in
+  `machine_provider_limits` (migration 0060) and the personal Efficiency screen shows `limit.weekUsedPct` and
+  `limit.resetsAt` from it.
+- Comments on a board in the hub: `POST <platform api>/docs/_board-events` takes the boards service's webhook
+  (`HUB_BOARD_EVENTS_SECRET`, header `X-Boards-Webhook-Secret`), mirrors the threads and comments by their ids and hands a
+  person's comment to the conversation the board was drawn in (`docs.bound` of kind `board`, sent by the agent without the board key, table `board_bindings`,
+  migration 0061). Under the `hub-board-events` rollout switch; other events go to `HUB_BOARD_EVENTS_FORWARD_URL`.
+- Regression alerts of the Efficiency evaluation: table `eff_regression_alerts`, `HUB_EFFICIENCY_REGRESSIONS` read at every
+  start without overwriting what a person did with an alert, and `GET /api/orgs/{org}/efficiency/regressions` for the person
+  an alert is addressed to (behind the `hub-efficiency` switch).
+- `HUB_EFFICIENCY_TRACKER_URL`, `_TOKEN`, `_PROJECT`: the efficiency collector reads the comments and the issues in
+  progress of a YouTrack project, and, with `HUB_ARTIFACTS_URL`, the first publications of the documents service of the
+  last 60 days.
+- The efficiency collector reads revert commits of every project of the configured groups and, with
+  `HUB_MR_SOURCE_GITLAB_SKILLS_PROJECT`, the commits that changed a skill, next to the merged requests.
+- `AGENT_USAGE_SKILL_METRICS=on`: the agent adds `skillsListed` and `skillsLoaded` (counts of the skills a session was
+  offered and called, from the initial skill listing) to the session metrics the hub already reads for the
+  `skills_in_use` KPI and the unused-skills waste. Off by default.
 - `HUB_SWITCHES`: rollout switch rows written at every start from the instance's configuration, so a repository turns
   a feature on for one person without an administrator's session.
 - Memory sync for folders without a git remote: a `.harnessly-memory-project` file names the project of a

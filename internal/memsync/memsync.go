@@ -412,11 +412,18 @@ func (s *Syncer) syncDir(ctx context.Context, p Project, remote map[string]hubpr
 		st.Seen[name] = other.Version
 		rep.Conflicts = append(rep.Conflicts, Conflict{Project: p.ID, Name: name, Copy: cp, Machine: other.Machine})
 	}
+	// pushHeld stops the pushes after the first one that failed: the hub is away or asked for a pause, and a note per
+	// request would only hammer it. What is left stays unsynced and goes with the next sync.
+	pushHeld := false
 	push := func(name string, put hubproto.MemoryPut) {
+		if pushHeld {
+			return
+		}
 		put.Project, put.Name = p.ID, name
 		res, err := s.Client.Put(ctx, put)
 		switch {
 		case err != nil:
+			pushHeld = true
 			fail(name, err)
 		case res.Conflict != nil:
 			if res.Conflict.Deleted {

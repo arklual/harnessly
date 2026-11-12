@@ -31,6 +31,8 @@ export class OrgApiError extends Error {
     | 'busy'
     // The hub opens only machines it trusts on its own origin (no HUB_RUNTIME_DOMAIN): the tenant's owner may trust one.
     | 'untrusted'
+    // The owner's rule: a role manages the machine but does not read its owner's work; debug mode opens it for a while.
+    | 'own_work'
     // A refusal of the space endpoints (machine codes, invites, members): the message is already the text to show.
     | 'hub'
     | 'internal';

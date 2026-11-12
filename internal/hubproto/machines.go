@@ -8,12 +8,17 @@ const (
 	// FeatureMetrics is in `hello` when the agent samples its load and sends `metrics.sample` to a link that
 	// subscribed to it by name (a link without a subscription list gets nothing: old hubs never see the event).
 	FeatureMetrics = "metrics"
+	// FeatureLimits is in `hello` when the agent reads the subscription windows of its machine's providers and sends
+	// `limits.windows` to a link that subscribed to it by name.
+	FeatureLimits = "limits"
 	// FeatureDrain is in `hello` when the agent serves runtime.restart with when = now, after_chats or drain, the
 	// runtime.restart.cancel operation and the `restart` event.
 	FeatureDrain = "drain"
 
 	// EventMetricsSample is one reading of the machine's load, every MetricsEvery seconds.
 	EventMetricsSample = "metrics.sample"
+	// EventLimitsWindows is the subscription windows of the machine's providers, every LimitsEvery seconds.
+	EventLimitsWindows = "limits.windows"
 	// EventRestart is the progress of a runtime.restart job.
 	EventRestart = "restart"
 
@@ -22,6 +27,8 @@ const (
 
 	// MetricsEvery is the seconds between two samples.
 	MetricsEvery = 60
+	// LimitsEvery is the seconds between two readings of the windows.
+	LimitsEvery = 60
 )
 
 // When a runtime.restart happens.
@@ -59,6 +66,26 @@ type MetricsSample struct {
 	DiskPct  *float64 `json:"diskPct"`
 	ChatsNow *int     `json:"chatsNow"`
 	At       int64    `json:"at"` // epoch ms of the machine's clock
+}
+
+// LimitWindow is one window of a provider's subscription: how much of it is used and when it resets. A reading the machine
+// could not take is left out of the event.
+type LimitWindow struct {
+	UsedPct  float64 `json:"usedPct"`            // 0..100
+	ResetsAt int64   `json:"resetsAt,omitempty"` // Unix seconds, as the provider says it
+}
+
+// ProviderWindows are the windows of one provider.
+type ProviderWindows struct {
+	FiveHour *LimitWindow `json:"fiveHour,omitempty"`
+	SevenDay *LimitWindow `json:"sevenDay,omitempty"`
+}
+
+// LimitsWindows is the event `limits.windows` {"event":"limits.windows","windows":{…}}. The keys of Providers are the
+// providers' names ("claude", "codex"); a provider the machine has no subscription of is absent.
+type LimitsWindows struct {
+	Providers map[string]ProviderWindows `json:"providers"`
+	At        int64                      `json:"at"` // epoch ms of the machine's clock
 }
 
 // RestartParams are the parameters of runtime.restart.

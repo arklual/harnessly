@@ -38,6 +38,9 @@ The instance's own domains and keys never belong in the rows or the code: they c
 ## Known switches
 
 - `preview-slot-host`: preview slots on an origin of their own ([preview-slots.md](preview-slots.md)).
+- `prompt-launch`: a conversation started from outside with `HUB_LAUNCH_TOKEN`, per person and machine ([automations.md](automations.md)).
+- `hub-board-events`: the hub takes the comment events of the boards this person's machines drew and hands the comments to the conversation ([docs.md](docs.md)); off by default, the events then go on to `HUB_BOARD_EVENTS_FORWARD_URL`.
+- `hub-eval`: the hub's scheduler of the evaluation queues and starts the runs of this person's schedules ([eval.md](eval.md)); off by default.
 
 ## API
 

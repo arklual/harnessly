@@ -78,12 +78,29 @@ export const ListSkeleton = () => (
 );
 
 /** A failed load: one row with the retry. */
-export const ErrorRow = ({ text, onRetry }: { text: string; onRetry: () => void }) => (
+export const ErrorRow = ({
+  text,
+  onRetry,
+  action,
+  onAction,
+}: {
+  text: string;
+  onRetry: () => void;
+  /** A way out other than trying again (debug mode of a machine the owner's rule keeps closed). */
+  action?: string;
+  onAction?: () => void;
+}) => (
   <div className="mx-err" role="alert">
     <span>{text}</span>
-    <Btn variant="outline" size="sm" onClick={onRetry}>
-      Повторить
-    </Btn>
+    {action && onAction ? (
+      <Btn variant="outline" size="sm" onClick={onAction}>
+        {action}
+      </Btn>
+    ) : (
+      <Btn variant="outline" size="sm" onClick={onRetry}>
+        Повторить
+      </Btn>
+    )}
   </div>
 );
 

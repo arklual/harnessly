@@ -47,6 +47,9 @@ type Config struct {
 
 	// RuntimeAPI is the prefix of the runtime routes the agent calls: <prefix>/machines, <prefix>/automations/start…
 	RuntimeAPI string
+	// RuntimeConsoleAPI is the prefix of the routes the runtime's console answers: <prefix>/policy, /terminal-tab,
+	// /console-state, /load, /restart. It is RuntimeAPI unless the runtime serves the two under different prefixes.
+	RuntimeConsoleAPI string
 	// RuntimePlatformAPI is the prefix of the runtime's platform routes the agent relays the hub's design ops to:
 	// <prefix>/design/access, <prefix>/design/guest-token, <prefix>/design/notify.
 	RuntimePlatformAPI string
@@ -206,6 +209,7 @@ func LoadConfig() (Config, error) {
 		base = c.Machine.RuntimeBasePath
 	}
 	c.RuntimeAPI = strings.TrimRight(env("AGENT_RUNTIME_API", base+"/api/agent"), "/")
+	c.RuntimeConsoleAPI = strings.TrimRight(env("AGENT_RUNTIME_CONSOLE_API", c.RuntimeAPI), "/")
 	c.RuntimePlatformAPI = strings.TrimRight(env("AGENT_RUNTIME_PLATFORM_API", base+"/api/platform"), "/")
 	c.StateChangedPath = env("AGENT_RUNTIME_STATE_CHANGED", c.RuntimeAPI+"/state-changed")
 	c.StatusPath = env("AGENT_RUNTIME_STATUS", base+"/api/status")
@@ -232,6 +236,14 @@ func LoadConfig() (Config, error) {
 }
 
 // LoadSecret is the pair's session secret: an explicit file wins, else the runtime config's authSecret.
+// ConsoleAPI is the prefix of the runtime console routes: RuntimeConsoleAPI, or RuntimeAPI when none was set apart.
+func (c Config) ConsoleAPI() string {
+	if c.RuntimeConsoleAPI != "" {
+		return c.RuntimeConsoleAPI
+	}
+	return c.RuntimeAPI
+}
+
 func (c Config) LoadSecret() ([]byte, error) {
 	if c.SecretFile != "" {
 		raw, err := os.ReadFile(c.SecretFile)

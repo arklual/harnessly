@@ -53,3 +53,24 @@ func TestObserveFileIsReadOnlyForTheClusterAgent(t *testing.T) {
 		t.Fatalf("hub mode: %+v %+v %v", c.Machine, c.ObserveMachine, err)
 	}
 }
+
+func TestConsoleAPIFollowsRuntimeAPIUnlessSetApart(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("AGENT_PORT", "1")
+	t.Setenv("AGENT_DATA_DIR", filepath.Join(home, ".harnessly"))
+	t.Setenv("AGENT_AUTH", AuthHS256)
+	t.Setenv("AGENT_RUNTIME_API", "/m/abc/api/ext")
+	c, err := LoadConfig()
+	if err != nil || c.ConsoleAPI() != "/m/abc/api/ext" {
+		t.Fatalf("by default: %q %v", c.ConsoleAPI(), err)
+	}
+	t.Setenv("AGENT_RUNTIME_CONSOLE_API", "/m/abc/api/agent/")
+	c, err = LoadConfig()
+	if err != nil || c.ConsoleAPI() != "/m/abc/api/agent" || c.RuntimeAPI != "/m/abc/api/ext" {
+		t.Fatalf("set apart: %q %q %v", c.ConsoleAPI(), c.RuntimeAPI, err)
+	}
+	if (Config{RuntimeAPI: "/x"}).ConsoleAPI() != "/x" {
+		t.Error("a Config built by hand falls back to RuntimeAPI")
+	}
+}

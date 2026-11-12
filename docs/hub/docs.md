@@ -33,7 +33,9 @@ hub's own sentence, which names the missing setting (`HUB_DOCS`, `HUB_ARTIFACTS_
 | `HUB_ARTIFACTS_URL`, `HUB_ARTIFACTS_TOKEN` | The artifacts service and its editor token. Without them documents answer `docs_not_configured`. |
 | `HUB_BOARDS_URL`, `HUB_BOARDS_TOKEN` | The boards service. Optional: without them the hub offers documents only. |
 | `HUB_ARTIFACTS_ACCESS_TOKEN` | The documents service's own secret for asking the hub what a person may do with documents (`POST /api/platform/docs/_rights`, below). A secret of its own, not `HUB_ARTIFACTS_TOKEN`. Unset: the route answers 404. |
-
+| `HUB_BOARD_EVENTS_SECRET` | The secret the boards service sends with each comment event of a board (`POST /api/platform/docs/_board-events`, "Comments on a board" below). Unset: the route answers 404. |
+| `HUB_BOARD_EVENTS_FORWARD_URL` | Where an event goes that the hub does not take (board unknown to the hub, or the owner's `hub-board-events` switch off), with the same body and secret. Unset: such an event is answered and dropped. |
+| `HUB_BOARD_COMMAND` | The name of the boards tool the agent is told to answer a comment with. Unset: `board`. |
 | `HUB_BOARDS_PUBLIC_URL`, `HUB_ARTIFACTS_PUBLIC_URL` | The services' addresses as machines and browsers reach them, `https://`. Unset: the same as `HUB_BOARDS_URL` / `HUB_ARTIFACTS_URL`. |
 
 The public addresses go to the machines with the environment's apps, as `${install:boardsUrl}` and
@@ -131,7 +133,7 @@ Agent visibility maps to levels: `private` none, `team` or `view` view, `comment
 ## Comments reach the conversation
 
 A document published from a conversation is bound to it: after the publish the agent sends `docs.bound` with the tab,
-session and working directory (a board's binding stays with the cluster). When a person comments, the hub hands the
+session and working directory (a board is bound the same way, with `kind` `board`: see "Comments on a board"). When a person comments, the hub hands the
 comment to that conversation through the machine with `docs.deliver`, with the quoted place, the last comments of the
 thread and how to answer. The agent answers with the `reply` and `resolve` commands of its document tool, which reach the hub as `docs.reply`
 and show in the thread as "Агент".
@@ -142,10 +144,38 @@ undelivered and the thread shows why (`deliveryError`). A delivered comment carr
 On a machine linked to the hub as an observer the cluster keeps its documents unless the operator sets
 `AGENT_HUB_DOCS=on` there.
 
+## Comments on a board
+
+The boards service tells the hub about every change of a board's comments: it posts the event to
+`<platform api>/docs/_board-events` with the secret in the `X-Boards-Webhook-Secret` header (`HUB_BOARD_EVENTS_SECRET`; without
+it the route answers 404). The body is `{event, slug, thread: {id, resolved?, anchor?: {elementId, label, x, y}}, message?: {id, text,
+author, authorEmail, authorKind}}` with `event` one of `thread.created`, `thread.replied`, `thread.resolved`,
+`thread.reopened`, `thread.removed`. A wrong secret answers 403, a body that is not JSON or lacks `event`, `slug` (lower case
+letters, digits and dashes, 3 to 121) or `thread.id` answers 400, and an event dealt with answers `202 {"outcome": "applied" |
+"ignored" | "forwarded"}`.
+
+The hub takes the event only for a board it knows the conversation of: when the agent publishes a board it sends `docs.bound`
+with `kind` `board`, and the hub keeps the slug, the machine, the owner and the conversation in `board_bindings` (never the
+board's key). It takes it only while the rollout switch `hub-board-events` is on for the owner of the machine
+([rollout-switches.md](rollout-switches.md)). Then the thread and its comments are mirrored into `doc_threads` and
+`doc_comments` by the ids the boards service gave (`external_id`: the same event twice changes nothing), `thread.resolved` and
+`thread.reopened` set the status, `thread.removed` deletes the thread. A comment of a person goes to the bound conversation with
+`docs.deliver` like a comment on a document, in the words the old gateway used: the board, the shape the thread sits on, the
+earlier comments and how to answer with `<command> comment <slug> --reply <thread>` or `--resolve <thread>` (`HUB_BOARD_COMMAND`, default `board`); the agent's answer
+goes to the boards service itself, which sends the event back (`authorKind` `agent`) and the hub shows it in the thread. A guest who
+left a name only is "гость" in the thread and the person's name when the author has an address.
+
+An event the hub does not take (the board is unknown, or the owner's switch is off) is passed on to `HUB_BOARD_EVENTS_FORWARD_URL`
+with the same body and secret when it is set, and dropped when it is not: the boards service does not retry. This lets the
+address of the webhook move to the hub first and the boards move over one person at a time.
+
+The machine must serve documents to send the binding: always on a machine's own hub link, on an observer link only with
+`AGENT_HUB_DOCS=on`.
+
 ## What it does not do yet
 
 - Editing a block in place (`/source/block`) answers 501 `not_supported`; save the whole source instead.
-- Threads of a board stay in the hub; they are not mirrored into the boards service.
+- A comment written on a board in the hub's own page is not sent to the boards service; the boards service is where boards are commented.
 - Documents are shared by the whole installation, not separated by space.
 - A public link to a board is not supported.
 - Several replicas of the bundled services: they keep files on one volume. Use S3 storage for artifacts and run it

@@ -95,7 +95,8 @@ type MeAttention struct {
 	Interrupts     int      `json:"interrupts"`
 }
 
-// MeLimit is the subscription limit; the hub does not know it yet.
+// MeLimit is the subscription limit: the fullest seven-day window of Claude among the person's machines that reported
+// lately (machine_provider_limits); empty when none did.
 type MeLimit struct {
 	WeekUsedPct *float64 `json:"weekUsedPct"`
 	EvalWeekPct float64  `json:"evalWeekPct"`
@@ -465,7 +466,7 @@ func ComputeMe(ctx context.Context, st store.Store, org, user, name string, from
 	}
 	out.Attention.ReplyP50Min = median(replies)
 	out.Attention.ReplyP90Min = nearest(replies, 0.9)
-	out.Limit.WeekUsedPct, out.Limit.ResetsAt = nil, nil
+	out.Limit = meLimit(ctx, st, org, user, time.Now())
 	if len(ss) > meSessions {
 		ss = ss[:meSessions]
 	}
@@ -525,4 +526,21 @@ func ComputeMe(ctx context.Context, st store.Store, org, user, name string, from
 		out.Sessions = append(out.Sessions, v)
 	}
 	return out, nil
+}
+
+// limitFresh is how long a machine's reading of a window counts as the person's limit; the agent sends it every minute.
+const limitFresh = 2 * time.Hour
+
+// meLimit is the person's subscription limit now; the hub knows only what machines told it, so no reading is no limit.
+func meLimit(ctx context.Context, st store.Store, org, user string, now time.Time) MeLimit {
+	w, err := st.FullestProviderWindow(ctx, org, user, "claude", "seven_day", now.Add(-limitFresh).UnixMilli())
+	if err != nil {
+		return MeLimit{}
+	}
+	out := MeLimit{WeekUsedPct: &w.UsedPct}
+	if w.ResetsAt > 0 {
+		at := time.Unix(w.ResetsAt, 0).UTC().Format("2006-01-02T15:04:05.000Z")
+		out.ResetsAt = &at
+	}
+	return out
 }

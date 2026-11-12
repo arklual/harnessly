@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 type fakeLinks struct {
 	online  map[string]bool
 	started []string
+	params  []any
 	fail    error
 }
 
@@ -33,6 +35,7 @@ func (f *fakeLinks) Do(_ context.Context, machineID, _ string, params any, _ tim
 		return nil, f.fail
 	}
 	f.started = append(f.started, machineID)
+	f.params = append(f.params, params)
 	return json.RawMessage(`{"conversationId":"c-1"}`), nil
 }
 
@@ -47,7 +50,7 @@ func dispatcher(t *testing.T) (*Service, *fakeLinks, *movingClock) {
 	t.Cleanup(func() { db.Close() })
 	links := &fakeLinks{online: map[string]bool{}}
 	clock := &movingClock{at: noon()}
-	s := New(Deps{Config: &config.Config{Automations: true, AutomationsSecret: "s3cret"}, DB: db, Links: links, Now: func() time.Time { return clock.at }})
+	s := New(Deps{Config: &config.Config{Automations: true, AutomationsSecret: "s3cret", AutomationsTokenEnv: "HARNESS_AUTOMATION_RESULT_TOKEN"}, DB: db, Links: links, Now: func() time.Time { return clock.at }})
 	return s, links, clock
 }
 
@@ -193,5 +196,28 @@ func TestRunWithoutAMachineForADayIsGivenUp(t *testing.T) {
 	s.Dispatch(ctx)
 	if r := statusOf(t, s, id); r.Status != StatusFailed || r.Error == "" {
 		t.Fatalf("a run that waited a day: %+v", r)
+	}
+}
+
+// The report token reaches the conversation under the name the runtime lets a started conversation set (its prefix), and
+// the prompt names the same variable.
+func TestStartNamesTheTokenVariableFromTheConfig(t *testing.T) {
+	s, links, _ := dispatcher(t)
+	s.cfg.AutomationsTokenEnv = "TEST_AUTOMATION_RESULT_TOKEN"
+	links.online["m1"] = true
+	queued(t, s, "rule", "m1", "fp-env")
+	if !s.Dispatch(context.Background()) {
+		t.Fatal("run not dispatched")
+	}
+	p, ok := links.params[0].(map[string]any)
+	if !ok {
+		t.Fatalf("params %T", links.params[0])
+	}
+	env, _ := p["env"].(map[string]string)
+	if env["TEST_AUTOMATION_RESULT_TOKEN"] == "" || len(env) != 1 {
+		t.Fatalf("env %v", env)
+	}
+	if prompt, _ := p["prompt"].(string); !strings.Contains(prompt, "$TEST_AUTOMATION_RESULT_TOKEN") {
+		t.Fatalf("prompt does not name the variable: %s", prompt)
 	}
 }

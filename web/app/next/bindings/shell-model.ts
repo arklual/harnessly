@@ -1,7 +1,7 @@
 // The shell's data on the stores: the sidebar's rows and machine card, the header's chat and its actions. The shell
 // components take plain props; this is where the stores become them. Every action is a command that settles with
 // words (outcome.ts), so a row is busy until the machine answers and says why when it does not.
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { shortModelName } from '@/next/features/composer/agents';
 import { useBeta } from '@/next/stores/beta';
 import { appBasePath } from '@/platform/config';
@@ -178,6 +178,10 @@ export const alertOf = (machine: Machine, linkDown: boolean): IMachineAlert | nu
   };
 };
 
+/** The same machine under the same name: what the card of a machine that left the list still shows. */
+const sameMachine = (was: MachineView | null, now: MachineView): boolean =>
+  was !== null && was.machine.id === now.machine.id && machineName(was.machine) === machineName(now.machine);
+
 export const cardOf = (view: MachineView, linkDown: boolean): IMachineCard => {
   const { machine } = view;
   const health = healthOf(machine, linkDown);
@@ -234,6 +238,16 @@ export const cardOf = (view: MachineView, linkDown: boolean): IMachineCard => {
     notes: notes.filter(Boolean),
     alert: alertOf(machine, linkDown),
   };
+};
+
+/** The card the page shows: the machine's own, or of one that left the list (no link to it); null while none is known. */
+export const shownCard = (
+  view: MachineView | null,
+  lost: MachineView | null,
+  linkDown: boolean,
+): IMachineCard | null => {
+  if (view) return cardOf(view, linkDown);
+  return lost ? cardOf(lost, true) : null;
 };
 
 /** The word under a machine that cannot be chosen; a machine that is fine says nothing (its host is no help to anyone). */
@@ -547,7 +561,12 @@ export function useShellModel(): IShellModel {
   const cardConnection = useConnection(cardOn);
   const cardDown = cardConnection?.k === 'stale' || cardConnection?.k === 'offline';
   const activeView = machines?.find((v) => v.machine.id === cardOn) ?? null;
-  const machine = useMemo(() => (activeView ? cardOf(activeView, cardDown) : null), [activeView, cardDown]);
+  // The machine the card showed last. When it leaves the list (its runtime stopped answering), the card keeps its name
+  // and says there is no link; «Ищем машины…» is for the first load only.
+  const [lastView, setLastView] = useState<MachineView | null>(null);
+  if (activeView && !sameMachine(lastView, activeView)) setLastView(activeView);
+  const lostView = !activeView && machines !== null && lastView?.machine.id === cardOn ? lastView : null;
+  const machine = useMemo(() => shownCard(activeView, lostView, cardDown), [activeView, lostView, cardDown]);
   const otherMachines = useMemo(
     () => (unified ? [] : (machines ?? []).filter((v) => v.machine.id !== here).map(choiceOf)),
     [unified, machines, here],

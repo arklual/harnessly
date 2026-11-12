@@ -435,3 +435,26 @@ func (s *Service) slotEnter(w http.ResponseWriter, r *http.Request, host, handle
 }
 
 var _ = strconv.Itoa
+
+// slotHosts is GET /api/admin/preview-slot-hosts?email=: the six slot hosts of one account, for an administrator who has
+// to list them where the domain's certificate is issued per host. The handle is a keyed hash, so nobody can work the
+// hosts out from outside; reading them opens nothing, a host still needs the switch, a ticket and a cookie.
+func (s *Service) slotHosts(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	if !p.Admin {
+		return httpx.ErrForbidden
+	}
+	u, err := s.db.S().UserByEmail(r.Context(), strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email"))))
+	if err != nil {
+		if store.IsNotFound(err) {
+			return httpx.ErrNotFound
+		}
+		return err
+	}
+	handle := s.slotHandle(u.ID)
+	hosts := make([]string, 0, 6)
+	for n := 1; n <= 6; n++ {
+		hosts = append(hosts, s.cfg.PreviewSlotHost(handle, n))
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"email": u.Email, "hosts": hosts})
+	return nil
+}

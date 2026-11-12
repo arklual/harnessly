@@ -21,6 +21,7 @@ const CODES: Record<string, OrgApiError['code']> = {
   no_machine: 'no_machine',
   busy: 'busy',
   machine_untrusted: 'untrusted',
+  own_work: 'own_work',
 };
 
 export type Query = Record<string, string | number | undefined>;

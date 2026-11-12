@@ -221,6 +221,7 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 | `HUB_ACCESS_ENFORCE` | `off` | `off`, `warn` or `on`: keep a machine's access list when a member opens it ([machines-resources.md](machines-resources.md#access)). Start with `warn` and read the log before `on` |
 | `HARNESSLY_SITES_DOMAIN` | path fallback | [Published sites](sites.md) at `<site>--<space>.<domain>`: a domain of its own, with a wildcard record and certificate. Without it a self-hosted hub serves sites under `/sites/` sandboxed; the cloud edition serves none |
 | `HARNESSLY_SITES`, `HARNESSLY_SITES_ABUSE_URL` | `on`, none | `off` switches sites off; the complaint link on the 404 page of the bare sites domain |
+| `HARNESSLY_SITES_UPSTREAM_URL`, `…_SECRET`, `…_STRIP`, `…_PEOPLE` | none | take the machines' publishing sessions from the hub that keeps the sites, see [sites](sites.md#sites-kept-by-another-hub) |
 | `HARNESSLY_SITES_DIR`, `HARNESSLY_SITES_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY`, `_SECRET_KEY`, `_REGION`, `_PREFIX` | `<HUB_DATA_DIR>/sites` | Where the sites' files live: a folder, or an S3 bucket (MinIO, any S3) |
 | `HUB_SECRETS_VAULT_ADDR` and the other `HUB_SECRETS_VAULT_*` | no safe | [The hub's safe](../safe.md#the-hubs-safe): a Vault-compatible server where the machines in `RUNTIME_SECRETS_MODE=hub` keep their owners' secrets through the hub's one account; on for an organization with the flag `secrets.vault` |
 | `HUB_SECRETS_REF_PREFIXES` | none | folders of that server the machines may read as `vault:` references, comma-separated |
@@ -228,6 +229,8 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 | `HUB_SSH_ALLOW_PRIVATE` | `off` | Let the SSH way reach private, loopback and link-local addresses. Off in every edition by default; the cloud edition ignores it |
 | `HUB_SECRET_KEY` | a key file in the data folder | At least 32 characters (`openssl rand -base64 32`): what the spaces' SSH keys and the design guest links' addresses are sealed with. `_FILE` is read as a file name. Losing it makes the stored keys useless (they are made again) and the links' addresses uncopyable (the links still open) |
 | `HUB_DESIGN_SHARE_URL` | off | Origin of the [design guest links](design-access.md) (`https://share.example.com`, no path): a host of its own that points at the hub, never the hub's host. Without it links cannot be made |
+| `HUB_DESIGN_SHARE_ALIASES` | off | Former origins of the design guest links, comma-separated: `/s/<token>` on them redirects to `HUB_DESIGN_SHARE_URL`, anything else is 404. See [design access](design-access.md) |
+| `HUB_DESIGN_SHARE_DOCS` | off | `on`: document guest links (`/d/<token>`) also open on the share host and its aliases. See [design access](design-access.md) |
 | `HUB_DESIGN_PLATFORM_API` | `/api/platform` | The runtime's platform prefix (`/api/<name>`) the hub uses for a machine whose page has not called the access API yet; must match the machines' `AGENT_RUNTIME_PLATFORM_API` |
 | `HUB_CONTAINER_IMAGE` | hidden | The image the «В контейнере» way runs; must be pullable by the machines |
 | `HUB_LOCAL_CODE_FILE` | off | Keep a registration code for the machine next to the hub (compose.hub.yaml); the file is `0600`, in a `0700` folder |

@@ -63,6 +63,9 @@ type Config struct {
 	// MaxPending and MaxBytes cap the unacknowledged records (count, bytes on disk); zero is the default.
 	MaxPending int
 	MaxBytes   int64
+	// SkillMetrics adds skillsListed and skillsLoaded to the sessions' metrics. Off unless the machine's
+	// fleet flag turned it on.
+	SkillMetrics bool
 }
 
 // Feed writes the outbox.
@@ -416,7 +419,7 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		}
 		lastMs := ms(s.last)
 		over := nowMs-lastMs >= ended.Milliseconds()
-		met := s.m.values()
+		met := s.m.values(f.cfg.SkillMetrics)
 		mrKeys := s.m.mrKeys()
 		cur := sessState{Calls: s.calls, LastTs: lastMs, Ended: over, Metrics: signature(met, mrKeys)}
 		if prev, ok := f.st.Sessions[sid]; ok && prev == cur {

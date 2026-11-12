@@ -167,9 +167,15 @@ func (a *Agent) docRoute(w http.ResponseWriter, r *http.Request) {
 		TabID: resolved.TabID, SessionName: resolved.SessionName, AgentSessionID: resolved.AgentSessionID,
 		Provider: provider, SourcePath: str(obj, "sourcePath", 1024), Cwd: cwd,
 	}
-	// Boards stay with the cluster's board service: only documents move to the hub.
+	// A board stays with the cluster's board service and the cluster is told as before. A hub that keeps this machine's
+	// documents is told where the board was drawn too, to hand it the comments, and never the board's key.
 	if kind == "board" {
 		a.broadcast(evDocBound{Event: "docs.bound", Binding: binding})
+		if a.hubKeepsDocs() {
+			forHub := binding
+			forHub.Key = nil
+			a.sendDoc(evDocBound{Event: "docs.bound", Binding: forHub})
+		}
 	} else {
 		a.sendDoc(evDocBound{Event: "docs.bound", Binding: binding})
 	}

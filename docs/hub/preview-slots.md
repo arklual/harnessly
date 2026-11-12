@@ -15,7 +15,15 @@ row means off, and off answers 404 on `POST /api/preview/slot-open` and closes e
   same-site with the hub could reach the hub's cookies. The hub refuses to start in the cloud edition when it is
   (`HUB_ALLOW_SAME_SITE_RUNTIME` lifts that, as it does for machine hosts), and always when it contains or is contained
   by the hub, runtime or sites domains.
+- `HUB_PREVIEW_SLOT_PREFIX` (optional): put in front of the handle, `<prefix><handle>-<n>.<domain>` (`ai-`), so slot
+  hosts cannot meet other names under a domain that others share (feature stands, say). 1-20 lower-case letters,
+  digits and hyphens, starting with a letter. A host without the prefix is not a slot host.
 - The cookie key is derived from the hub's master key; without it the slot hosts stay shut.
+- A certificate that is issued per host (no wildcard) needs the hosts written out. The handle is a keyed hash, so nobody can
+  work it out; an instance administrator reads the six hosts of one account with
+  `GET /api/admin/preview-slot-hosts?email=<address>` (`{email, hosts}`, 403 for anyone else, 404 for an unknown
+  address, and the route is not there at all while the domain or the key is not set). Reading a host opens nothing: it
+  still needs the switch, a ticket and the cookie.
 
 ## Flow
 

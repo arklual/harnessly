@@ -117,6 +117,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET "+p, s.guard(s.list))
 	mux.Handle("POST "+p+"/_adopt", s.guard(s.adoptRoute))
 	mux.Handle("POST "+p+"/_rights", http.HandlerFunc(s.rights))
+	mux.Handle("POST "+p+"/_board-events", http.HandlerFunc(s.boardEvents))
 	mux.Handle("GET "+p+"/people", s.guard(s.peopleRoute))
 	mux.Handle("GET "+p+"/{slug}", s.guard(s.detail))
 	mux.Handle("POST "+p+"/{slug}/threads", s.guard(s.newThread))

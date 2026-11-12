@@ -374,6 +374,7 @@ asks for neither; `drain` also covers `runtime.restart.cancel` and the `restart`
 - the event `metrics.sample` `{ sample: { cpuPct, ramPct, diskPct, chatsNow, at } }` every 60 seconds, and only to a link that named it in `link.subscribe` (a hub that does not subscribe is never sent it); a value that
   could not be read is `null`. The agent reads them from the system (the work folder's filesystem for the disk), not from
   the hub.
+- the event `limits.windows` `{ windows: { providers: { claude|codex: { fiveHour?, sevenDay?: { usedPct, resetsAt? } } }, at } }` every 60 seconds (feature `limits`, only to a link that subscribed to it): the subscription windows of the machine's providers, read from the runtime next door; see [machines-resources.md](machines-resources.md#subscription-windows).
 - the operation `runtime.restart` `{ jobId, when: 'now'|'after_chats'|'drain' }` answers at once with
   `{ state, chatsNow }`; progress is the event `restart` `{ jobId, state: 'waiting'|'restarting'|'done'|'failed'|'cancelled',
   chatsNow?, error? }`. One restart at a time. `drain` refuses new chats on the machine until none is at work. The

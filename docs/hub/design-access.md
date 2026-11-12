@@ -131,6 +131,8 @@ each project with what moved, each pair with its machine or why not. The agents 
 | Variable | Where | Meaning |
 | --- | --- | --- |
 | `HUB_DESIGN_SHARE_URL` | hub | Origin of the guest links, e.g. `https://share.example.com`. A DNS record and certificate for it pointing at the hub. Empty: links are off |
+| `HUB_DESIGN_SHARE_ALIASES` | off | Comma-separated origins that used to carry the guest links (`https://old-share.example.com`). On them `GET`/`HEAD /s/<token>…` answers `307` to the same path on `HUB_DESIGN_SHARE_URL` (`no-store`, no referrer), everything else is `404`, so links already handed out keep opening. Needs `HUB_DESIGN_SHARE_URL`; an origin must differ from the hub's, the share origin and `HUB_APPS_GUEST_URL` |
+| `HUB_DESIGN_SHARE_DOCS` | off | `on`: a document's guest link (`/d/<token>`, needs documents and their access on) opens on the share host and its aliases too, under the address it was handed out at. The page sets its own sandbox and the hub's session is not on those origins. Needs `HUB_DESIGN_SHARE_URL` |
 | `HUB_DESIGN_PLATFORM_API` | hub | Platform prefix of the runtimes, default `/api/platform` |
 | `HUB_DESIGN_IMPORT_GATEWAY` | hub | `dry-run` or `apply`: the move from the gateway at start; with `HUB_DESIGN_IMPORT_GATEWAY_URL` (its Postgres), `_SPACE`, `_TEAMS`, `_MACHINES`, `_DEFAULT_MACHINE` |
 | `AGENT_RUNTIME_PLATFORM_API` | machine | Where the agent reaches the runtime's platform API (default `<runtime>/api/platform`) |

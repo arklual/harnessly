@@ -485,6 +485,8 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
       store.delete(id);
     },
     trustMachine: async () => later(undefined, 200),
+    debugMachine: async () => later(undefined, 200),
+    debugOpenings: async () => later([], 200),
     openMachine: async (id) => later({ url: `#machine-${get(id).id}` }, 200),
     restartMachine: async (id, what: RestartWhat, when: RestartWhen) => {
       const m = get(id);

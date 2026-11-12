@@ -8,7 +8,8 @@ import { Btn, Drawer, Icon } from '../../ui';
 import { AccessSection } from './access';
 import { canOpen, cardSub, cleanName, statusOf } from './calc';
 import { MachineDialogs } from './dialogs';
-import { useOpenMachine } from './open';
+import { DebugLog, DebugPanel } from './debug';
+import { type OpenMachine, useOpenMachine } from './open';
 import { ErrorRow } from './parts';
 import { ResourcesSection } from './resources';
 import type { DrawerState } from './url';
@@ -34,9 +35,12 @@ export const MachineDrawer = ({
   hint,
   mlUrl,
   url,
+  opener,
   onChanged,
   onRemoved,
 }: {
+  /** The list's opener, so that a refusal met in the list is answered in the card. */
+  opener?: OpenMachine;
   id: string;
   open: boolean;
   /** The machine as the list knows it: the head is drawn from it before the card has loaded. */
@@ -48,7 +52,8 @@ export const MachineDrawer = ({
   onRemoved: () => void;
 }) => {
   const card = useMachineCard(id, onChanged);
-  const ws = useOpenMachine();
+  const own = useOpenMachine();
+  const ws = opener ?? own;
   const [renaming, setRenaming] = useState<string | null>(null);
   const now = useNow(30_000, open);
   const d = card.detail;
@@ -103,7 +108,15 @@ export const MachineDrawer = ({
             </div>
           </div>
         )}
-        {(card.error || (ws.error?.id === id && !ws.error.untrusted)) && (
+        {ws.error?.id === id && ws.error.ownWork && !card.error && (
+          <DebugPanel
+            busy={ws.busyId === id}
+            failed={ws.error.debugFailed ?? null}
+            onOpen={(reason) => void ws.debug(id, reason)}
+            onClose={() => ws.clear()}
+          />
+        )}
+        {(card.error || (ws.error?.id === id && !ws.error.untrusted && !ws.error.ownWork)) && (
           <div className="md-err" role="alert">
             <span>{card.error ?? ws.error?.text}</span>
             <button
@@ -165,6 +178,7 @@ export const MachineDrawer = ({
           onCancel={() => url.setTab(null)}
           onSave={saveAccess}
         />
+        <DebugLog id={id} />
         {m.canAdmin && (
           <div className="md-sec">
             <div className="md-sec__head">

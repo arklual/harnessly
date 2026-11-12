@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
@@ -35,7 +36,10 @@ var ErrAccess = httpx.New(403, "machine_access", "Эта машина не от�
 
 // ErrOwnWork is the refusal of a person whose role would have let them in before the owner's rule: what runs on the
 // machine is its owner's work, and a role manages the machine without reading it (docs/hub/own-work.md).
-var ErrOwnWork = httpx.New(403, "own_work", "Это чужая работа: роль позволяет управлять машиной, но не читать её чаты. Откроется, если владелец добавит вас в доступ")
+var ErrOwnWork = httpx.New(403, "own_work", "Это чужая работа: роль позволяет управлять машиной, но не читать её чаты. Откройте её для отладки с причиной — владелец это увидит — или попросите владельца добавить вас в доступ")
+
+// DebugFor is how long a debug opening lasts (docs/hub/own-work.md, «Debug mode»).
+const DebugFor = 30 * time.Minute
 
 // FeatureOwnWork is the rollout switch of the owner's rule (docs/hub/rollout-switches.md), keyed by the person who opens
 // and the machine: on, opening a machine is reading its owner's work, so neither a role nor an empty list lets anyone
@@ -119,6 +123,15 @@ type Checker struct {
 	Log     *slog.Logger
 	// Switches turns on the owner's rule (FeatureOwnWork) for a person on a machine; nil keeps it off.
 	Switches switches.Gate
+	// Now is the clock of debug openings; nil means time.Now.
+	Now func() time.Time
+}
+
+func (c *Checker) now() time.Time {
+	if c.Now != nil {
+		return c.Now()
+	}
+	return time.Now()
 }
 
 // Enforcing says whether the list is looked at at all; with it off the checker costs nothing.
@@ -151,43 +164,63 @@ func (c *Checker) ownWork(ctx context.Context, userID string, m store.Machine) b
 	return c.Switches.On(ctx, FeatureOwnWork, strings.ToLower(u.Email), m.ID)
 }
 
-func (c *Checker) check(ctx context.Context, userID string, m store.Machine, opening bool) error {
-	if !c.Enforcing() {
-		return nil
-	}
+// facts gathers what Decide needs about the person on the machine; skip says the machine is open to them without any.
+func (c *Checker) facts(ctx context.Context, userID string, m store.Machine, opening bool) (entries []store.MachineAccessEntry, who Subject, skip bool, err error) {
 	st := c.DB.S()
-	entries, err := st.MachineAccess(ctx, []string{m.ID})
-	if err != nil {
-		return err
+	if entries, err = st.MachineAccess(ctx, []string{m.ID}); err != nil {
+		return nil, who, false, err
 	}
-	who := Subject{UserID: userID}
+	who = Subject{UserID: userID}
 	if opening && m.CreatedBy != userID {
 		who.OwnWork = c.ownWork(ctx, userID, m)
 	}
 	if len(entries) == 0 && !who.OwnWork {
-		return nil // open to the tenant: no facts about the person needed
+		return entries, who, true, nil // open to the tenant: no facts about the person needed
 	}
 	if c.IsAdmin != nil {
 		if who.Admin, err = c.IsAdmin(ctx, userID); err != nil {
-			return err
+			return nil, who, false, err
 		}
 	}
 	if !who.Admin && m.CreatedBy != userID {
 		if who.Manager, err = c.manages(ctx, userID, m); err != nil {
-			return err
+			return nil, who, false, err
 		}
 	}
 	if (who.OwnWork || (!who.Admin && !who.Manager)) && m.CreatedBy != userID {
 		teams, err := st.TeamsOfUser(ctx, userID)
 		if err != nil {
-			return err
+			return nil, who, false, err
 		}
 		for _, t := range teams {
 			who.Teams = append(who.Teams, t.TeamID)
 		}
 	}
-	if Decide(m, entries, who) {
+	return entries, who, false, nil
+}
+
+// roleOnly: the owner's rule is the one thing that keeps the person out, their role would have let them in.
+func roleOnly(m store.Machine, entries []store.MachineAccessEntry, who Subject) bool {
+	return who.OwnWork && (who.Admin || who.Manager) && !Decide(m, entries, who)
+}
+
+func (c *Checker) check(ctx context.Context, userID string, m store.Machine, opening bool) error {
+	if !c.Enforcing() {
 		return nil
+	}
+	entries, who, skip, err := c.facts(ctx, userID, m, opening)
+	if err != nil || skip || Decide(m, entries, who) {
+		return err
+	}
+	if roleOnly(m, entries, who) {
+		// Debug mode: the role lets the person in for a while, with a reason the owner sees.
+		open, err := c.DB.S().DebugOpen(ctx, m.ID, userID, c.now())
+		if err != nil {
+			return err
+		}
+		if open {
+			return nil
+		}
 	}
 	if c.Config.Machines.AccessEnforce == config.AccessWarn {
 		log := c.Log
@@ -197,10 +230,25 @@ func (c *Checker) check(ctx context.Context, userID string, m store.Machine, ope
 		log.Warn("machine access would be refused", "machine", m.ID, "user", userID, "mode", string(ModeOf(m.CreatedBy, entries)), "own_work", who.OwnWork)
 		return nil
 	}
-	if who.OwnWork && (who.Admin || who.Manager || len(entries) == 0) {
+	if roleOnly(m, entries, who) {
 		return ErrOwnWork
 	}
 	return ErrAccess
+}
+
+// MayDebug says whether the person may open the machine for debugging (docs/hub/own-work.md, «Debug mode»): the owner's
+// rule is on for them on it and it is the one thing that keeps them out, since their role (an administrator of the
+// installation, a manager of the machine's tenant or team) would have let them in. The creator and the people the
+// creator listed open the machine anyway and need no debugging; a person with no role has nothing to debug with.
+func (c *Checker) MayDebug(ctx context.Context, userID string, m store.Machine) (bool, error) {
+	if !c.Enforcing() || m.CreatedBy == userID {
+		return false, nil
+	}
+	entries, who, skip, err := c.facts(ctx, userID, m, true)
+	if err != nil || skip {
+		return false, err
+	}
+	return roleOnly(m, entries, who), nil
 }
 
 // Visible says whether the person may see the machine in lists, details and live events. It follows the list only in

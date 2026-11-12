@@ -242,6 +242,10 @@ func (s *Service) restartOn(w http.ResponseWriter, r *http.Request, p *auth.Prin
 	return nil
 }
 
+// Offers says whether the agent linked for the machine said the feature in its hello. A machine that is not linked offers
+// nothing.
+func (s *Service) Offers(machineID, feature string) bool { return s.hasFeature(machineID, feature) }
+
 func (s *Service) hasFeature(machineID, feature string) bool {
 	s.res.mu.Lock()
 	defer s.res.mu.Unlock()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -52,15 +53,22 @@ type health struct {
 	mu     sync.Mutex
 	svc    map[string]*serviceState
 	holder string
+	// noProbe: the services whose address does not route /readyz, so the line about them is logged once.
+	noProbe map[string]bool
 }
 
 func newHealth() *health {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
-	return &health{svc: map[string]*serviceState{}, holder: hex.EncodeToString(b)}
+	return &health{svc: map[string]*serviceState{}, noProbe: map[string]bool{}, holder: hex.EncodeToString(b)}
 }
 
-// ProbeReady asks base/readyz and says why the service is not ready; nil: it answered 2xx.
+// ErrNoReadyz: the address answered 404 to /readyz. The service itself is not said to be down: the address only does
+// not route that path (a public host that shows one prefix of the service is the usual case), so the answer tells
+// nothing about the service. The status leaves such a service out and nobody is mailed; the doctor still reports it.
+var ErrNoReadyz = errors.New("the address does not route /readyz")
+
+// ProbeReady asks base/readyz and says why the service is not ready; nil: it answered 2xx. A 404 wraps ErrNoReadyz.
 func ProbeReady(ctx context.Context, hc *http.Client, base string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(base, "/")+"/readyz", nil)
 	if err != nil {
@@ -72,6 +80,9 @@ func ProbeReady(ctx context.Context, hc *http.Client, base string) error {
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 4<<10))
 	res.Body.Close()
+	if res.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("readyz answered %s: %w", res.Status, ErrNoReadyz)
+	}
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return fmt.Errorf("readyz answered %s", res.Status)
 	}
@@ -156,6 +167,20 @@ func (s *Service) healthPass(ctx context.Context) {
 
 // record keeps one answer and logs a change.
 func (s *Service) record(name string, err error, now time.Time) {
+	if errors.Is(err, ErrNoReadyz) {
+		s.health.mu.Lock()
+		first := !s.health.noProbe[name]
+		s.health.noProbe[name] = true
+		delete(s.health.svc, name)
+		s.health.mu.Unlock()
+		if first {
+			s.log.Info("app service is not probed: its address does not route /readyz", "service", name)
+		}
+		return
+	}
+	s.health.mu.Lock()
+	delete(s.health.noProbe, name)
+	s.health.mu.Unlock()
 	up := err == nil
 	s.health.mu.Lock()
 	st, seen := s.health.svc[name]

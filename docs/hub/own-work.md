@@ -12,7 +12,7 @@ Three rules follow:
 
 1. Work is seen by its owner and by those the owner opened it to.
 2. An administrator manages but does not read. The one way across is the debug mode: a reason, a time limit, a journal
-   entry, and the owner sees that it happened (planned, not built yet).
+   entry, and the owner sees that it happened.
 3. An agent acts with the rights of its person, never more.
 
 ## In the hub now
@@ -30,9 +30,25 @@ It needs `HUB_ACCESS_ENFORCE=on`; it is turned on person by person (`PUT /api/ad
 `{"feature": "own-work", "person": "<email>", "enabled": true}`), then for everyone with a `(*, *)` row. Before the row
 for everyone, a machine shared with its tenant by an empty list needs its people listed, or they lose it.
 
+## Debug mode
+
+When the owner's rule refuses a person only because their role (instance administrator, manager of the tenant or the
+team) is not enough, the refusal `own_work` offers them the debug mode instead of a dead end:
+
+- `POST /api/machines/{machineId}/debug` with `{"reason": "…"}` (10 to 500 characters) opens the machine to that person
+  for 30 minutes (`machaccess.DebugFor`); `machaccess.Checker.MayDebug` decides who may ask, at most 10 openings an
+  hour per person;
+- the opening is a row of `machine_debug_openings` (who, which machine, why, until when) and an entry
+  `machine.debug_open` of the organization's journal;
+- the person who connected the machine gets a letter with the reason and a link to it;
+- `GET /api/machines/{machineId}/debug` lists the openings of the last 90 days; the machine card shows them to its
+  owner and to the administrators under «Открывали для отладки».
+
+A person the access list does not name and who has no role gets the plain 403 `access` and no debug mode: only roles
+that already manage the machine may ask to read it.
+
 ## Next
 
-- The debug mode for administrators (rule 2).
 - Chats of several people on one machine: the runtime shows each person only their own chats, so that a shared machine
   stops being shared content.
 - Opening one's work to a colleague or a team at two levels, *view* and *give tasks*, instead of the whole machine.

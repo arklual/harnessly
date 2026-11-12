@@ -828,3 +828,6 @@
 .hb-dash .dash-tile.viz-card>.viz-card__header .viz-card__title-row{min-block-size:2rem}
 .hb-dash .dash-tile.viz-card>.viz-card__header>.viz-card__actions{inline-size:auto}
 .hb-dash .dash-tile .mx-go{position:static;inline-size:2rem;block-size:2rem;margin:0 -.375rem 0 0}
+.hb .md-debug{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;font-size:var(--hx-text-xs);color:var(--hx-fg-2)}
+.hb .md-debug b{color:var(--hx-fg-1);font-weight:600}
+.hb .md-debug p{margin:2px 0 0;color:var(--hx-fg-2);white-space:pre-wrap;overflow-wrap:anywhere}

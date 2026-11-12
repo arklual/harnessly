@@ -226,4 +226,18 @@ export interface MachinesApi {
   openMachine(id: string): Promise<{ url: string }>;
   /** `POST /api/machines/{id}/trust`: the tenant's owner lets the hub open this machine on its own origin. */
   trustMachine(id: string): Promise<void>;
+  /** `POST /api/machines/{id}/debug`: a role the owner's rule keeps out opens the machine for 30 minutes with a reason. */
+  debugMachine(id: string, reason: string): Promise<void>;
+  /** `GET /api/machines/{id}/debug`: who opened the machine for debugging and why (its owner, admins, managers). */
+  debugOpenings(id: string): Promise<DebugOpening[]>;
+}
+
+/** One debug opening of a machine (docs/hub/own-work.md, «Debug mode»). */
+export interface DebugOpening {
+  id: string;
+  name: string;
+  email: string;
+  reason: string;
+  at: string;
+  until: string;
 }

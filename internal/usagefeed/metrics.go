@@ -28,6 +28,9 @@ type metrics struct {
 	// prs are the merge requests of the session: the pr-link ones and the ones its Bash and MCP calls created or pushed
 	// to, by key (hubproto.MRKey); an address that is not a GitLab merge request stays as it is.
 	prs map[string]bool
+	// skillsListed adds up the skills the sessions' initial listings offered; skills are the distinct skills called.
+	skillsListed float64
+	skills       map[string]bool
 }
 
 // add takes one transcript's facts.
@@ -85,6 +88,15 @@ func (m *metrics) add(fa *usagereport.Facts) {
 			prev = ctx
 		}
 	}
+	m.skillsListed += float64(fa.SkillsListed)
+	for _, c := range fa.ToolCalls {
+		if c.Kind == usagereport.ToolSkill && c.Name != "" {
+			if m.skills == nil {
+				m.skills = map[string]bool{}
+			}
+			m.skills[c.Name] = true
+		}
+	}
 	keys, other := usagereport.PRKeys(fa.PRs)
 	for _, pr := range append(append(keys, other...), fa.MRKeys...) {
 		if m.prs == nil {
@@ -113,8 +125,11 @@ func (m *metrics) mrKeys() []string {
 // maxMRKeys bounds the keys one session tells the hub.
 const maxMRKeys = 200
 
-// values are the hub's metrics keys; the fields the facts do not carry (skills, merged MRs, time to MR) are left out.
-func (m *metrics) values() map[string]float64 {
+// values are the hub's metrics keys; the fields the facts do not carry (merged MRs, time to MR) are left out. With
+// skills set, a session whose transcript had a skill listing also tells how many skills it was offered (skillsListed)
+// and how many distinct ones it called (skillsLoaded): two optional keys, counts only, no names. An old hub keeps them
+// as any other metric key; a session without a listing sends neither, so its ratio is not counted.
+func (m *metrics) values(skills bool) map[string]float64 {
 	v := map[string]float64{
 		"turns": m.turns, "agentMs": math.Round(m.agentMs), "waitMs": math.Round(m.waitMs), "waits": m.waits,
 		"activeIntervals": m.intervals, "toolCalls": m.toolCalls, "toolErrors": m.toolErrors,
@@ -125,6 +140,10 @@ func (m *metrics) values() map[string]float64 {
 	}
 	if p := percentile(m.gaps, 0.9); p > 0 {
 		v["waitP90Ms"] = math.Round(p * 1000)
+	}
+	if skills && m.skillsListed > 0 {
+		v["skillsListed"] = m.skillsListed
+		v["skillsLoaded"] = float64(len(m.skills))
 	}
 	return v
 }

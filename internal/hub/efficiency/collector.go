@@ -13,6 +13,9 @@ import (
 const (
 	CollectorMRs      = "mrs"
 	CollectorComments = "tracker"
+	CollectorCommits  = "commits"
+	CollectorSkills   = "skills"
+	CollectorProgress = "tracker-progress"
 )
 
 const (
@@ -30,8 +33,10 @@ type Collector struct {
 	Store   store.Store
 	Code    CodeHost
 	Tracker Tracker
-	Log     *slog.Logger
-	Now     func() time.Time
+	// Documents is the source of the documents agents published; nil reads none.
+	Documents ArtifactSource
+	Log       *slog.Logger
+	Now       func() time.Time
 }
 
 // Run collects until ctx ends, backing off after a failed pass.
@@ -56,6 +61,14 @@ func (c *Collector) Once(ctx context.Context) bool {
 	now := c.now()
 	ok := true
 	if c.Code != nil {
+		// Revert commits go first and the requests last: the newest stored request marks how far the window has been read,
+		// so a failure in between repeats the same window.
+		if ch, isHost := c.Code.(CommitHost); isHost {
+			n, err := c.reverts(ctx, ch, now)
+			ok = c.record(ctx, CollectorCommits, now, n, err) && ok
+			n, err = c.skills(ctx, ch, now)
+			ok = c.record(ctx, CollectorSkills, now, n, err) && ok
+		}
 		n, err := c.mrs(ctx, now)
 		ok = c.record(ctx, CollectorMRs, now, n, err) && ok
 	} else {
@@ -64,8 +77,46 @@ func (c *Collector) Once(ctx context.Context) bool {
 	if c.Tracker != nil {
 		n, err := c.comments(ctx, now)
 		ok = c.record(ctx, CollectorComments, now, n, err) && ok
+		if pt, isProgress := c.Tracker.(ProgressTracker); isProgress {
+			n, err = c.progress(ctx, pt, now)
+			ok = c.record(ctx, CollectorProgress, now, n, err) && ok
+		}
+	}
+	if c.Documents != nil {
+		n, err := c.artifacts(ctx, c.Documents, now)
+		ok = c.record(ctx, CollectorArtifacts, now, n, err) && ok
 	}
 	return ok
+}
+
+// artifacts replaces the window of first publications with what the service reports now.
+func (c *Collector) artifacts(ctx context.Context, src ArtifactSource, now time.Time) (int, error) {
+	list, srcErr := src.Published(ctx, now.Add(-ArtifactsWindow))
+	if srcErr != nil && len(list) == 0 {
+		return 0, srcErr
+	}
+	facts := make([]store.EffFact, 0, len(list))
+	for _, a := range list {
+		b, err := json.Marshal(a)
+		if err != nil {
+			return 0, err
+		}
+		facts = append(facts, store.EffFact{Source: KindArtifact, Key: a.Slug, At: a.At.UnixMilli(), Data: string(b)})
+	}
+	// A partial read must not delete what the failed part would have brought back, so it only adds.
+	if srcErr != nil {
+		return len(facts), firstErr(c.Store.UpsertEffFacts(ctx, facts, now.UnixMilli()), srcErr)
+	}
+	return len(facts), c.Store.ReplaceEffFacts(ctx, KindArtifact, facts, now.UnixMilli())
+}
+
+func firstErr(errs ...error) error {
+	for _, e := range errs {
+		if e != nil {
+			return e
+		}
+	}
+	return nil
 }
 
 func (c *Collector) now() time.Time {
@@ -89,12 +140,62 @@ func (c *Collector) record(ctx context.Context, name string, now time.Time, n in
 	return err == nil
 }
 
-func (c *Collector) mrs(ctx context.Context, now time.Time) (int, error) {
+// mrSince is where the pass over the code host starts: a window before the newest stored request.
+func (c *Collector) mrSince(ctx context.Context, now time.Time) (time.Time, error) {
 	since := now.Add(-FirstWindow)
 	if newest, err := c.Store.NewestEffFactAt(ctx, KindMR); err != nil {
-		return 0, err
+		return since, err
 	} else if newest > 0 {
 		since = time.UnixMilli(newest).Add(-Overlap)
+	}
+	return since, nil
+}
+
+// reverts stores the revert commits of the same window as the requests.
+func (c *Collector) reverts(ctx context.Context, h CommitHost, now time.Time) (int, error) {
+	since, err := c.mrSince(ctx, now)
+	if err != nil {
+		return 0, err
+	}
+	list, srcErr := h.RevertCommits(ctx, since)
+	facts := make([]store.EffFact, 0, len(list))
+	for _, m := range list {
+		b, err := json.Marshal(m)
+		if err != nil {
+			return 0, err
+		}
+		facts = append(facts, store.EffFact{Source: KindRevert, Key: m.Project + "@" + m.SHA, At: m.At.UnixMilli(), Data: string(b)})
+	}
+	if err := c.Store.UpsertEffFacts(ctx, facts, now.UnixMilli()); err != nil {
+		return 0, err
+	}
+	return len(facts), srcErr
+}
+
+// SkillsWindow is how far back the commits that changed a skill are read.
+const SkillsWindow = 35 * 24 * time.Hour
+
+// skills stores the commits that changed a skill within the window.
+func (c *Collector) skills(ctx context.Context, h CommitHost, now time.Time) (int, error) {
+	list, srcErr := h.SkillCommits(ctx, now.Add(-SkillsWindow))
+	facts := make([]store.EffFact, 0, len(list))
+	for _, m := range list {
+		b, err := json.Marshal(m)
+		if err != nil {
+			return 0, err
+		}
+		facts = append(facts, store.EffFact{Source: KindSkill, Key: m.SHA, At: m.At.UnixMilli(), Data: string(b)})
+	}
+	if err := c.Store.UpsertEffFacts(ctx, facts, now.UnixMilli()); err != nil {
+		return 0, err
+	}
+	return len(facts), srcErr
+}
+
+func (c *Collector) mrs(ctx context.Context, now time.Time) (int, error) {
+	since, err := c.mrSince(ctx, now)
+	if err != nil {
+		return 0, err
 	}
 	list, srcErr := c.Code.MergedMRs(ctx, since)
 	facts := make([]store.EffFact, 0, len(list))
@@ -132,5 +233,25 @@ func (c *Collector) comments(ctx context.Context, now time.Time) (int, error) {
 		}
 		facts = append(facts, store.EffFact{Source: KindComment, Key: m.Issue + "@" + m.At.UTC().Format(time.RFC3339Nano), At: m.At.UnixMilli(), Data: string(b)})
 	}
-	return len(facts), c.Store.UpsertEffFacts(ctx, facts, now.UnixMilli())
+	if err := c.Store.UpsertEffFacts(ctx, facts, now.UnixMilli()); err != nil {
+		return 0, err
+	}
+	return len(facts), c.Store.PruneEffFacts(ctx, KindComment, now.Add(-CommentKeep).UnixMilli())
+}
+
+// progress replaces the issues in progress with the current list.
+func (c *Collector) progress(ctx context.Context, t ProgressTracker, now time.Time) (int, error) {
+	list, err := t.InProgress(ctx)
+	if err != nil {
+		return 0, err
+	}
+	facts := make([]store.EffFact, 0, len(list))
+	for _, p := range list {
+		b, err := json.Marshal(p)
+		if err != nil {
+			return 0, err
+		}
+		facts = append(facts, store.EffFact{Source: KindProgress, Key: p.Issue, At: p.LastActivityAt.UnixMilli(), Data: string(b)})
+	}
+	return len(facts), c.Store.ReplaceEffFacts(ctx, KindProgress, facts, now.UnixMilli())
 }

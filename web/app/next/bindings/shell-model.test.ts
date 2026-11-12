@@ -6,6 +6,7 @@ import {
   oneListOf,
   machineLabel,
   noteOf,
+  shownCard,
   terminalRuns,
   terminalStopText,
 } from '@/next/bindings/shell-model';
@@ -90,6 +91,15 @@ describe("the machine's health", () => {
     expect(byId.cpu).toMatchObject({ tone: MACHINE_TONE.normal, reason: null });
     // 2.6 GB free of 260 is under any line the page could draw, yet the runtime said ok: the page says ok.
     expect(cardOf(loaded(health()), false)).toMatchObject({ health: MACHINE_HEALTH.ok, alert: null });
+  });
+
+  it('a machine that left the list keeps its card and says there is no link; none known is still looked for', () => {
+    const view = loaded(health());
+    expect(shownCard(view, null, false)).toMatchObject({ health: MACHINE_HEALTH.ok });
+    const lost = shownCard(null, view, false);
+    expect(lost).toMatchObject({ name: cardOf(view, false).name, health: MACHINE_HEALTH.bad, meters: null });
+    expect(lost?.issue).toBeTruthy();
+    expect(shownCard(null, null, false)).toBeNull();
   });
 
   it('only a critical machine that answers has a banner, with the figure that ran out', () => {

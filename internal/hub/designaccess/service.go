@@ -44,6 +44,8 @@ type Deps struct {
 	// ShareURL is the origin of the guest links; "" leaves them off. It must not be the hub's origin: a guest page of a
 	// project would run next to the hub's session.
 	ShareURL string
+	// ShareAliases are other origins that used to carry the guest links: a request there is sent on to ShareURL.
+	ShareAliases []string
 	// PlatformAPI is the runtime's platform prefix when a machine's page never said its own.
 	PlatformAPI string
 	// Transport reaches a machine's runtime through its tunnel.
@@ -72,6 +74,7 @@ type Service struct {
 	hubURL      string
 	shareURL    string
 	shareHost   string
+	aliasHosts  map[string]bool
 	platformAPI string
 	transport   func(id string) http.RoundTripper
 	seal        *sealer
@@ -114,6 +117,14 @@ func New(d Deps) *Service {
 	if u, err := url.Parse(strings.TrimRight(d.ShareURL, "/")); err == nil && u.Host != "" && (u.Scheme == "https" || u.Scheme == "http") {
 		s.shareURL = u.Scheme + "://" + u.Host
 		s.shareHost = strings.ToLower(u.Host)
+		for _, a := range d.ShareAliases {
+			if au, err := url.Parse(strings.TrimRight(a, "/")); err == nil && au.Host != "" && !strings.EqualFold(au.Host, u.Host) {
+				if s.aliasHosts == nil {
+					s.aliasHosts = map[string]bool{}
+				}
+				s.aliasHosts[strings.ToLower(au.Host)] = true
+			}
+		}
 	}
 	return s
 }
@@ -121,6 +132,24 @@ func New(d Deps) *Service {
 // IsShareHost: the request is for the guest links' host.
 func (s *Service) IsShareHost(host string) bool {
 	return s.shareHost != "" && strings.EqualFold(host, s.shareHost)
+}
+
+// IsShareAlias: the request is for a former address of the guest links (not the share host itself).
+func (s *Service) IsShareAlias(host string) bool {
+	return s.aliasHosts[strings.ToLower(host)]
+}
+
+// ShareRedirect sends a request for a guest link made at a former address to the share host, with the same path and
+// query. Only /s/<token>... is sent; anything else there is not found.
+func (s *Service) ShareRedirect(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasPrefix(r.URL.Path, "/s/") || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
+		w.Header().Set("Cache-Control", "no-store")
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	http.Redirect(w, r, s.shareURL+r.URL.RequestURI(), http.StatusTemporaryRedirect)
 }
 
 // Connected is a machine's link coming up: a machine that serves design access gets its snapshot at once.

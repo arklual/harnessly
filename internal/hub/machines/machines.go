@@ -61,6 +61,8 @@ type Deps struct {
 	History HistorySink
 	// Switches turns on the owner's rule of opening a machine (machaccess.FeatureOwnWork); nil keeps it off.
 	Switches switches.Gate
+	// Notice mails a person a short notice with a link (a debug opening of their machine); nil sends nothing.
+	Notice func(ctx context.Context, to, subject, body, link string) error
 	// Provider runs the machines' virtual servers (docs/hub/provider.md); nil means provider.None.
 	Provider provider.Provider
 	// Publisher carries machine.op and machine.status to the organization's live channel; nil: they go to the space's
@@ -115,6 +117,7 @@ type UsageSink interface {
 
 // Service is the machine side of the hub.
 type Service struct {
+	notice  func(ctx context.Context, to, subject, body, link string) error
 	cfg     *config.Config
 	db      *store.DB
 	auth    *auth.Service
@@ -153,7 +156,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features, notice: d.Notice}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now
@@ -170,7 +173,7 @@ func New(d Deps) *Service {
 	if s.tickets == nil {
 		s.tickets = ticket.New(s.now)
 	}
-	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log, Switches: d.Switches}
+	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log, Switches: d.Switches, Now: s.now}
 	// Live events of a machine reach a stream only while its person may still see the machine (HUB_ACCESS_ENFORCE=on).
 	s.events.SetMachineGate(func(ctx context.Context, userID, machineID string) bool {
 		if !s.acc.Hides() {
@@ -202,6 +205,8 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("PATCH /api/machines/{machineId}", g.Machine(tenant.Member, s.rename))
 	mux.Handle("DELETE /api/machines/{machineId}", g.Machine(tenant.Owner, s.remove))
 	mux.Handle("GET /api/machines/{machineId}/open", g.Machine(tenant.Member, s.open))
+	mux.Handle("POST /api/machines/{machineId}/debug", g.Machine(tenant.Member, s.debugOpen))
+	mux.Handle("GET /api/machines/{machineId}/debug", g.Machine(tenant.Member, s.debugList))
 	mux.Handle("POST /api/machines/{machineId}/trust", g.Machine(tenant.Owner, s.trust))
 	mux.Handle("DELETE /api/machines/{machineId}/trust", g.Machine(tenant.Owner, s.trust))
 	mux.Handle("POST /api/machines/{machineId}/preflight", g.Machine(tenant.Owner, s.rerunPreflight))

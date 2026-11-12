@@ -16,7 +16,6 @@ import (
 const DispatchEvery = 15 * time.Second
 
 const (
-	tokenEnv = "AUTOMATION_RESULT_TOKEN"
 	startOp  = "conversations.start"
 	startFor = 60 * time.Second
 	// startLease is how long a taken run may stay without its conversation started before it is taken to be
@@ -59,7 +58,7 @@ func promptEvent(event json.RawMessage) string {
 // buildPrompt is the task the conversation gets. The token and the agent's port reach it as environment variables, never
 // as text: the prompt ends up in the transcript.
 func (s *Service) buildPrompt(rule Rule, run Run) string {
-	port := s.cfg.AutomationsPortEnv
+	port, tokenEnv := s.cfg.AutomationsPortEnv, s.cfg.AutomationsTokenEnv
 	rendered := strings.Replace(rule.PromptTemplate, "{{event}}", promptEvent(run.EventPayload), 1)
 	return fmt.Sprintf(`Это автоматизация «%s», запущена без участия человека по событию из %s.
 Никогда не мерджи и не выкатывай сам: решение принимает человек.
@@ -121,7 +120,7 @@ func (s *Service) Dispatch(ctx context.Context) bool {
 	fctx := context.WithoutCancel(ctx)
 	raw, err := s.links.Do(ctx, machine, startOp, map[string]any{
 		"workspaceId": nil, "prompt": s.buildPrompt(rule, run), "model": rule.Model, "cwd": nil,
-		"runId": run.ID, "resultToken": token, "env": map[string]string{tokenEnv: token},
+		"runId": run.ID, "resultToken": token, "env": map[string]string{s.cfg.AutomationsTokenEnv: token},
 	}, startFor)
 	if err != nil {
 		if errors.Is(err, httpx.ErrMachineOffline) {

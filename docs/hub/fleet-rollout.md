@@ -120,6 +120,47 @@ caller sends the whole release. A delta that holds anything but its parts is ref
 | `RUNTIME_FLEET_KEEP` | Releases kept (3). |
 | `RUNTIME_FLEET_PARTS` | Top-level names a delta may replace (`bin,.harnessly-release.json`). |
 
-What drives the machines (a pipeline that uploads the tarball over ssh, runs `stage` on all machines, then `activate`
-on all of them, and falls back to the whole release on exit 3) is the deployment's; the list of machines and its
-credentials stay in its own configuration, not here.
+## The driver: `harnessly fleet rollout`
+
+What runs on one machine is above. What rolls a release over a **list** of machines is `harnessly fleet rollout`, a
+command for a pipeline step or a person. It is off unless `RUNTIME_ROLLOUT_DRIVER=on`.
+
+```
+RUNTIME_ROLLOUT_DRIVER=on harnessly fleet rollout --fleet fleet.json --version 1.4.0 --tarball 1.4.0.tgz \
+  [--delta 1.4.0.delta.tgz --delta-base <commit>] [--only m1,m2] [--soak 5m] [--stage-jobs 4] [--activate-jobs N] [--force] [--dry-run]
+```
+
+1. It asks every machine what it runs (`fleet status`); machines that run the version are left alone, so a rollout cut
+   short is run again as it is.
+2. **Stage** on all the others at once (up to `--stage-jobs`): upload (three attempts) and `fleet stage`. A delta goes
+   to every machine first; a machine that answers with exit 3 gets the whole release. A machine that cannot take the
+   release stops the rollout while none has changed.
+3. **Activate** wave by wave, the lowest `wave` first, the machines of a wave together (up to `--activate-jobs`); after
+   each wave the version each machine serves is asked once more, then `--soak` passes. A machine that fails has put
+   itself back (`fleet activate`); the machines already moved go back with `fleet rollback`, the later waves are never
+   touched, and the command exits 1. `--json` prints what happened to each machine.
+
+The fleet file is JSON, `"schema": 1`, and the deployment's own: the list of machines and the way in are not in this
+repository.
+
+```json
+{
+  "schema": 1,
+  "ssh": ["ssh", "-o", "BatchMode=yes"],
+  "transfers": "/var/lib/harnessly/transfers",
+  "binary": "harnessly",
+  "hosts": [
+    {"name": "canary", "target": "root@m1.example.com", "wave": 0, "envFile": "/etc/harnessly/fleet.env"},
+    {"name": "second", "target": "root@m2.example.com", "wave": 1, "envFile": "/etc/harnessly/fleet.env", "root": "/opt/harnessly"}
+  ]
+}
+```
+
+A target `local` is the machine the driver runs on (`sh -c`, no ssh). `ssh` is the command that runs another one on a machine as `<ssh...> <target> <command>` with stdin passed through
+(`ssh`, a Teleport `tsh ssh`, ...); without it `--ssh` or `$RUNTIME_ROLLOUT_SSH` is used, then plain `ssh`. `envFile` is a
+shell file on the machine that is read before every fleet command: it holds the settings of the table above (the units
+spec, the services and their health addresses), so the driver carries no per-machine settings. Names, targets and paths
+are checked against a short alphabet because they end up in a command line; unknown keys are an error.
+
+Building the tarball (packing the application, pinning the programs) and keeping it for a time are the product's own
+pipeline; the driver takes the finished file.

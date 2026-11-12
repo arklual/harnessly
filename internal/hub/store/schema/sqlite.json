@@ -904,6 +904,67 @@
         }
       ]
     },
+    "board_bindings": {
+      "columns": [
+        {
+          "name": "slug",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "tab_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "session_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "agent_session_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "provider",
+          "type": "TEXT"
+        },
+        {
+          "name": "cwd",
+          "type": "TEXT"
+        },
+        {
+          "name": "bound_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "slug"
+      ]
+    },
     "catalog_items": {
       "columns": [
         {
@@ -1780,12 +1841,24 @@
         {
           "name": "delivery_error",
           "type": "TEXT"
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
         "id"
       ],
       "indexes": [
+        {
+          "name": "doc_comments_external",
+          "unique": true,
+          "columns": [
+            "thread_id",
+            "external_id"
+          ]
+        },
         {
           "name": "doc_comments_pending",
           "columns": [
@@ -1957,12 +2030,24 @@
         {
           "name": "resolved_at",
           "type": "BIGINT"
+        },
+        {
+          "name": "external_id",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [
         "id"
       ],
       "indexes": [
+        {
+          "name": "doc_threads_external",
+          "unique": true,
+          "columns": [
+            "slug",
+            "external_id"
+          ]
+        },
         {
           "name": "doc_threads_slug",
           "columns": [
@@ -2008,6 +2093,91 @@
       "primaryKey": [
         "user_id",
         "week"
+      ]
+    },
+    "eff_regression_alerts": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "batch_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "metric",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "baseline",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "observed",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "band",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "fingerprint_from",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "fingerprint_to",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "diff",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "addressee",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "seen_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "resolved_by",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "eff_regression_alerts_addressee",
+          "columns": [
+            "addressee",
+            "state"
+          ]
+        }
       ]
     },
     "eff_source_facts": {
@@ -2614,6 +2784,470 @@
       ],
       "primaryKey": [
         "machine_id"
+      ]
+    },
+    "eval_arms": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "spec",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "fingerprint",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "key"
+      ]
+    },
+    "eval_batches": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "schedule_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "suite_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "slot",
+          "type": "BIGINT"
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "note",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "finished_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "eval_batches_machine",
+          "columns": [
+            "machine_id",
+            "state"
+          ]
+        },
+        {
+          "name": "eval_batches_slot",
+          "unique": true,
+          "columns": [
+            "schedule_id",
+            "slot"
+          ]
+        }
+      ]
+    },
+    "eval_checks": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "passed",
+          "type": "BOOLEAN",
+          "notNull": true
+        },
+        {
+          "name": "exit_code",
+          "type": "INTEGER"
+        },
+        {
+          "name": "duration_ms",
+          "type": "INTEGER"
+        }
+      ],
+      "primaryKey": [
+        "run_id",
+        "name"
+      ],
+      "indexes": [
+        {
+          "name": "eval_checks_machine",
+          "columns": [
+            "machine_id"
+          ]
+        }
+      ]
+    },
+    "eval_runs": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "batch_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "task_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "arm_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "fingerprint",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "run_no",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "passed",
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "cost_usd",
+          "type": "DOUBLE PRECISION"
+        },
+        {
+          "name": "wall_s",
+          "type": "INTEGER"
+        },
+        {
+          "name": "model_calls",
+          "type": "INTEGER"
+        },
+        {
+          "name": "first_ctx",
+          "type": "INTEGER"
+        },
+        {
+          "name": "peak_ctx",
+          "type": "INTEGER"
+        },
+        {
+          "name": "tokens_in",
+          "type": "BIGINT"
+        },
+        {
+          "name": "tokens_out",
+          "type": "BIGINT"
+        },
+        {
+          "name": "subagents",
+          "type": "INTEGER"
+        },
+        {
+          "name": "diff",
+          "type": "TEXT"
+        },
+        {
+          "name": "error",
+          "type": "TEXT"
+        },
+        {
+          "name": "attempts",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "retry_after",
+          "type": "BIGINT"
+        },
+        {
+          "name": "claimed_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "started_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "finished_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "eval_runs_batch",
+          "columns": [
+            "batch_id"
+          ]
+        },
+        {
+          "name": "eval_runs_machine",
+          "columns": [
+            "machine_id",
+            "state"
+          ]
+        }
+      ]
+    },
+    "eval_schedules": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "suite_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "days",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "at_msk",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "every_weeks",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "runs_per_week",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "week_pct",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "enabled",
+          "type": "BOOLEAN",
+          "notNull": true
+        },
+        {
+          "name": "last_slot",
+          "type": "BIGINT"
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "eval_schedules_machine",
+          "columns": [
+            "machine_id"
+          ]
+        }
+      ]
+    },
+    "eval_suites": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "task_keys",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "k",
+          "type": "INTEGER",
+          "notNull": true
+        },
+        {
+          "name": "arms",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "key"
+      ]
+    },
+    "eval_tasks": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "repo",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "base",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "TEXT"
+        },
+        {
+          "name": "prompt",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "checks",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "hidden",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "forbidden",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "limits",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "extra",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "held_out",
+          "type": "BOOLEAN",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "key"
       ]
     },
     "history_conversations": {
@@ -3228,6 +3862,50 @@
         }
       ]
     },
+    "llm_import_runs": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "mode",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "started_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "finished_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "outcome",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "report",
+          "type": "TEXT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "run_id"
+      ],
+      "indexes": [
+        {
+          "name": "llm_import_runs_started",
+          "columns": [
+            "started_at"
+          ]
+        }
+      ]
+    },
     "machine_access": {
       "columns": [
         {
@@ -3322,6 +4000,52 @@
       ],
       "primaryKey": [
         "machine_id"
+      ]
+    },
+    "machine_debug_openings": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "machine_debug_openings_machine",
+          "columns": [
+            "machine_id",
+            "created_at"
+          ]
+        }
       ]
     },
     "machine_env": {
@@ -3619,6 +4343,45 @@
             "updated_at"
           ]
         }
+      ]
+    },
+    "machine_provider_limits": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "win",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "used_pct",
+          "type": "DOUBLE PRECISION",
+          "notNull": true
+        },
+        {
+          "name": "resets_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "sampled_at",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "provider",
+        "win"
       ]
     },
     "machine_resource_conflicts": {

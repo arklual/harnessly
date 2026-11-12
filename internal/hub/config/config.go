@@ -189,6 +189,9 @@ type Config struct {
 	// PreviewSlotDomain is the wildcard domain a person's preview slots live under (<handle>-<n>.<domain>, one origin
 	// per person and slot, internal/hub/proxy/slothost.go); empty: the slots go by path on the hub's origin, sandboxed.
 	PreviewSlotDomain string
+	// PreviewSlotPrefix is put in front of the handle in a slot's host (<prefix><handle>-<n>.<domain>), so slot hosts
+	// never meet the other names under a shared domain; empty: no prefix.
+	PreviewSlotPrefix string
 	SitesAbuseURL     string
 	// SitesDir holds the sites' files when no bucket is set.
 	SitesDir string
@@ -206,6 +209,13 @@ type Config struct {
 	// FleetSites lets a fleet gateway mint narrow publishing sessions without registering its machines in the hub.
 	FleetSitesSecret string
 	FleetSitesSpace  string
+	// SitesUpstream makes this hub ask another hub, which keeps the sites, for the publishing session of its machines
+	// (HARNESSLY_SITES_UPSTREAM_*, docs/hub/sites.md): the sites stay where they are and keep their addresses.
+	SitesUpstreamURL    string
+	SitesUpstreamSecret string
+	SitesUpstreamStrip  string
+	// SitesUpstreamPeople limits it to machines registered by these people (lower-case addresses); empty: all machines.
+	SitesUpstreamPeople []string
 	// SafeVault is the Vault-compatible server the hub keeps its machines' safes on (HUB_SECRETS_VAULT_*, docs/safe.md);
 	// nil: the hub keeps none. SafePrefix is the hub's folder in the mount, SafeRefPrefixes the folders a machine may
 	// read references from (HUB_SECRETS_REF_PREFIXES).
@@ -246,10 +256,14 @@ type Config struct {
 	// Automations (HUB_AUTOMATIONS=on) switches on the automations: rules that turn an outside event into a conversation on
 	// the owner's machine (docs/hub/automations.md). AutomationsSecret (HUB_AUTOMATIONS_SECRET) is what the sender of an
 	// event puts in X-Automation-Secret; without it the event door stays shut. AutomationsPortEnv (HUB_AUTOMATIONS_PORT_ENV,
-	// default AGENT_REPORT_PORT) is the variable the started conversation finds its machine agent's port in.
-	Automations        bool
-	AutomationsSecret  string
-	AutomationsPortEnv string
+	// default AGENT_REPORT_PORT) is the variable the started conversation finds its machine agent's port in;
+	// AutomationsTokenEnv (HUB_AUTOMATIONS_TOKEN_ENV, default HARNESS_AUTOMATION_RESULT_TOKEN) the one it finds its report
+	// token in. The runtime lets a started conversation set only variables that begin with its own prefix
+	// (RUNTIME_START_ENV_PREFIX, HARNESS_ by default), so a machine with another prefix needs the name set to match.
+	Automations         bool
+	AutomationsSecret   string
+	AutomationsPortEnv  string
+	AutomationsTokenEnv string
 	// What follows is what a finished run does after its report (docs/hub/automations.md); each part is off while its
 	// address or token is empty. AutomationsNotifyURL (HUB_AUTOMATIONS_NOTIFY_URL) is the address the hub posts a
 	// finished run to so that a messenger bot can show it with the decision buttons, with AutomationsNotifyToken
@@ -257,6 +271,10 @@ type Config struct {
 	// AutomationsGitLabToken (HUB_AUTOMATIONS_GITLAB_TOKEN) let an approval merge, and a rejection close, the run's merge
 	// request, and only in the projects AutomationsMRProjects (HUB_AUTOMATIONS_MR_PROJECTS, path prefixes such as
 	// "team/,tools/") names: a conversation's report is not to point the hub's token at any project.
+	// LaunchToken (HUB_LAUNCH_TOKEN, 32 characters or more) is the bearer a service (the messenger bot's /prompt) shows to
+	// start a conversation for a person on their own machine (internal/hub/proxy/launch.go); empty keeps the door
+	// shut. The rollout switch «prompt-launch» then decides, per person, whether it opens.
+	LaunchToken            string
 	AutomationsNotifyURL   string
 	AutomationsNotifyToken string
 	AutomationsGitLabURL   string
@@ -283,6 +301,15 @@ type Config struct {
 	// ArtifactsAccessToken (HUB_ARTIFACTS_ACCESS_TOKEN) is the documents service's secret for asking the hub what a
 	// person may do with documents (POST <platform api>/docs/_rights); empty: the route is not there.
 	ArtifactsAccessToken string
+	// BoardEventsSecret (HUB_BOARD_EVENTS_SECRET) is the secret the boards service sends with each comment event of a
+	// board (X-Boards-Webhook-Secret, POST <platform api>/docs/_board-events); empty: the route is not there.
+	BoardEventsSecret string
+	// BoardEventsForwardURL (HUB_BOARD_EVENTS_FORWARD_URL) is where an event goes that the hub does not take (a board
+	// it holds no binding for, or whose owner's rollout switch hub-board-events is off), with the same secret; empty: such
+	// an event is answered and dropped.
+	BoardEventsForwardURL string
+	// BoardCommand (HUB_BOARD_COMMAND) is the name of the boards tool the agent is told to answer a comment with; empty: board.
+	BoardCommand string
 	// UsageIngest (HUB_USAGE_INGEST=on) lets the hub pull the machines' spend facts (docs/hub/usage.md); off: it never
 	// asks, and the spend tables stay empty.
 	UsageIngest bool
@@ -309,6 +336,13 @@ type Config struct {
 	// DesignShareURL (HUB_DESIGN_SHARE_URL) is the origin of the guest links to designs (docs/hub/design-access.md); it
 	// must be an origin of its own, not the hub's and not a machine's. Empty: links to designs are off.
 	DesignShareURL string
+	// DesignShareAliases (HUB_DESIGN_SHARE_ALIASES, comma-separated origins) are former addresses of the guest links: a
+	// request for /s/<token> on one is sent on to HUB_DESIGN_SHARE_URL (307), so links already in circulation keep
+	// opening. Nothing else is served there. Empty: none.
+	DesignShareAliases []string
+	// DesignShareDocs (HUB_DESIGN_SHARE_DOCS=on) lets the guest links to documents (/d/<token>) open on the share host
+	// and its aliases as well, under the same address a link was handed out at. Off: they open on the hub's origin only.
+	DesignShareDocs bool
 	// AppsGuestURL (HUB_APPS_GUEST_URL) is the origin of the guest links to apps (docs/hub/apps-guest-host.md): it serves
 	// /apps/guest/<token>/ and nothing else, so a guest's view never runs next to the hub's session. Empty: the links
 	// are served on the hub's own origin, as before.
@@ -321,10 +355,20 @@ type Config struct {
 	MRSourceURL    string
 	MRSourceGroups []string
 	MRSourceToken  string
+	// MRSourceSkillsProject (HUB_MR_SOURCE_GITLAB_SKILLS_PROJECT) is the project of that GitLab whose SKILL.md files are
+	// the team's skills; the commits that change them are read as the facts of skill upkeep. Empty reads none.
+	MRSourceSkillsProject string
+	// TrackerURL, TrackerToken and TrackerProject (HUB_EFFICIENCY_TRACKER_URL, _TOKEN, _PROJECT) name the YouTrack whose
+	// comments and issues in progress the «Эффективность» hypotheses read. Empty reads none.
+	TrackerURL, TrackerToken, TrackerProject string
 	// EfficiencyMarkers (HUB_EFFICIENCY_MARKERS, or the file HUB_EFFICIENCY_MARKERS_FILE) is a JSON array of the dated changes
 	// the «Эффективность» screen draws over its charts: [{key?, at, kind, title, detail?}]. The hub stores them on every
 	// start; a marker with the same key is replaced, never doubled.
 	EfficiencyMarkers string
+	// EfficiencyRegressions (HUB_EFFICIENCY_REGRESSIONS, or the file HUB_EFFICIENCY_REGRESSIONS_FILE) is a JSON array of the
+	// regression alerts of the old evaluation, [{id, metric, baseline, observed, band, addressee, created_at, ...}]. The hub
+	// reads them on every start; an alert already stored is left as it is.
+	EfficiencyRegressions string
 	// Switches (HUB_SWITCHES, or the file HUB_SWITCHES_FILE) is a JSON array of rollout switch rows the hub writes on
 	// every start: [{feature, person?, machine?, enabled, note?}], empty person or machine meaning anyone. It lets the
 	// instance's repository turn a feature on pair by pair without an administrator's session.
@@ -531,22 +575,24 @@ func (c *Config) MachineIDFromHost(host string) string {
 	return id
 }
 
-// PreviewSlotHost is the host of a person's preview slot n (1-6): <handle>-<n>.<preview slot domain>, with the hub's
+// PreviewSlotHost is the host of a person's preview slot n (1-6): <prefix><handle>-<n>.<preview slot domain>, with the hub's
 // port when it has one (development); "" when the slot domain is not set.
 func (c *Config) PreviewSlotHost(handle string, n int) string {
 	if c.PreviewSlotDomain == "" {
 		return ""
 	}
-	h := handle + "-" + strconv.Itoa(n) + "." + c.PreviewSlotDomain
+	h := c.PreviewSlotPrefix + handle + "-" + strconv.Itoa(n) + "." + c.PreviewSlotDomain
 	if _, port, ok := strings.Cut(c.Host, ":"); ok && port != "" {
 		h += ":" + port
 	}
 	return h
 }
 
+var previewSlotPrefix = regexp.MustCompile(`^[a-z][a-z0-9-]{0,19}$`)
+
 var previewSlotLabel = regexp.MustCompile(`^(p[a-z2-7]{12})-([1-6])$`)
 
-// PreviewSlotFromHost reads the handle and the slot out of a request host of the form <handle>-<n>.<slot domain>[:port];
+// PreviewSlotFromHost reads the handle and the slot out of a request host of the form <prefix><handle>-<n>.<slot domain>[:port];
 // false when the host is not one. The hub's own host is never one.
 func (c *Config) PreviewSlotFromHost(host string) (handle string, n int, ok bool) {
 	if c.PreviewSlotDomain == "" {
@@ -557,6 +603,10 @@ func (c *Config) PreviewSlotFromHost(host string) (handle string, n int, ok bool
 		return "", 0, false
 	}
 	label, found := strings.CutSuffix(h, "."+c.PreviewSlotDomain)
+	if !found {
+		return "", 0, false
+	}
+	label, found = strings.CutPrefix(label, c.PreviewSlotPrefix)
 	if !found {
 		return "", 0, false
 	}
@@ -627,12 +677,19 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		DistDir:           def("HUB_DIST_DIR", "/opt/harnessly/dist"),
 		SitesDomain:       strings.ToLower(strings.Trim(get("HARNESSLY_SITES_DOMAIN"), ".")),
 		PreviewSlotDomain: strings.ToLower(strings.Trim(get("HUB_PREVIEW_SLOT_DOMAIN"), ".")),
+		PreviewSlotPrefix: strings.ToLower(get("HUB_PREVIEW_SLOT_PREFIX")),
 		SitesAbuseURL:     get("HARNESSLY_SITES_ABUSE_URL"),
 		FleetSitesSecret:  get("HARNESSLY_FLEET_SITES_SECRET"),
 		FleetSitesSpace:   get("HARNESSLY_FLEET_SITES_SPACE"),
-		ContainerImage:    get("HUB_CONTAINER_IMAGE"),
-		LocalCodeFile:     get("HUB_LOCAL_CODE_FILE"),
-		LocalCodeGID:      -1,
+
+		SitesUpstreamURL:    strings.TrimRight(get("HARNESSLY_SITES_UPSTREAM_URL"), "/"),
+		SitesUpstreamSecret: get("HARNESSLY_SITES_UPSTREAM_SECRET"),
+		SitesUpstreamStrip:  strings.ToLower(get("HARNESSLY_SITES_UPSTREAM_STRIP")),
+		SitesUpstreamPeople: splitLower(get("HARNESSLY_SITES_UPSTREAM_PEOPLE")),
+
+		ContainerImage: get("HUB_CONTAINER_IMAGE"),
+		LocalCodeFile:  get("HUB_LOCAL_CODE_FILE"),
+		LocalCodeGID:   -1,
 		MinAgentVersion: strings.TrimPrefix(
 			get("HUB_MIN_AGENT_VERSION"), "v"),
 		TermsURL: get("HUB_TERMS_URL"),
@@ -801,6 +858,10 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		bad("HUB_AUTOMATIONS must be on or off")
 	}
 	c.AutomationsSecret, c.AutomationsPortEnv = get("HUB_AUTOMATIONS_SECRET"), def("HUB_AUTOMATIONS_PORT_ENV", "AGENT_REPORT_PORT")
+	c.AutomationsTokenEnv = def("HUB_AUTOMATIONS_TOKEN_ENV", "HARNESS_AUTOMATION_RESULT_TOKEN")
+	if c.LaunchToken = get("HUB_LAUNCH_TOKEN"); c.LaunchToken != "" && len(c.LaunchToken) < 32 {
+		bad("HUB_LAUNCH_TOKEN must be 32 characters or more")
+	}
 	c.AutomationsNotifyURL, c.AutomationsNotifyToken = strings.TrimRight(get("HUB_AUTOMATIONS_NOTIFY_URL"), "/"), get("HUB_AUTOMATIONS_NOTIFY_TOKEN")
 	c.AutomationsGitLabURL, c.AutomationsGitLabToken = strings.TrimRight(get("HUB_AUTOMATIONS_GITLAB_URL"), "/"), get("HUB_AUTOMATIONS_GITLAB_TOKEN")
 	for _, p := range strings.Split(get("HUB_AUTOMATIONS_MR_PROJECTS"), ",") {
@@ -816,6 +877,9 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	c.ArtifactsURL, c.ArtifactsToken = strings.TrimRight(get("HUB_ARTIFACTS_URL"), "/"), get("HUB_ARTIFACTS_TOKEN")
 	c.BoardsURL, c.BoardsToken = strings.TrimRight(get("HUB_BOARDS_URL"), "/"), get("HUB_BOARDS_TOKEN")
 	c.ArtifactsAccessToken = get("HUB_ARTIFACTS_ACCESS_TOKEN")
+	c.BoardEventsSecret = get("HUB_BOARD_EVENTS_SECRET")
+	c.BoardEventsForwardURL = get("HUB_BOARD_EVENTS_FORWARD_URL")
+	c.BoardCommand = get("HUB_BOARD_COMMAND")
 	c.ArtifactsPublicURL = strings.TrimRight(def("HUB_ARTIFACTS_PUBLIC_URL", c.ArtifactsURL), "/")
 	c.BoardsPublicURL = strings.TrimRight(def("HUB_BOARDS_PUBLIC_URL", c.BoardsURL), "/")
 	for _, h := range strings.FieldsFunc(strings.ToLower(get("HUB_DOCS_LEGACY_HOSTS")), func(r rune) bool { return r == ',' || r == ' ' }) {
@@ -905,6 +969,38 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		}
 		c.DesignShareURL = strings.TrimRight(u, "/")
 	}
+	switch strings.ToLower(def("HUB_DESIGN_SHARE_DOCS", "off")) {
+	case "on", "true", "1", "yes":
+		c.DesignShareDocs = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_DESIGN_SHARE_DOCS must be on or off")
+	}
+	if c.DesignShareDocs && c.DesignShareURL == "" {
+		bad("HUB_DESIGN_SHARE_DOCS needs HUB_DESIGN_SHARE_URL")
+	}
+	if list := get("HUB_DESIGN_SHARE_ALIASES"); list != "" {
+		if c.DesignShareURL == "" {
+			bad("HUB_DESIGN_SHARE_ALIASES needs HUB_DESIGN_SHARE_URL")
+		}
+		for _, u := range strings.Split(list, ",") {
+			u = strings.TrimSpace(u)
+			if u == "" {
+				continue
+			}
+			pu, err := url.Parse(u)
+			if err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Host == "" || (pu.Path != "" && pu.Path != "/") {
+				bad("HUB_DESIGN_SHARE_ALIASES must be http(s) origins")
+				continue
+			}
+			if hu, err := url.Parse(c.PublicURL); err == nil && strings.EqualFold(hu.Host, pu.Host) {
+				bad("HUB_DESIGN_SHARE_ALIASES must not hold the hub's own origin")
+			} else if du, err := url.Parse(c.DesignShareURL); err == nil && strings.EqualFold(du.Host, pu.Host) {
+				bad("HUB_DESIGN_SHARE_ALIASES must not repeat HUB_DESIGN_SHARE_URL")
+			}
+			c.DesignShareAliases = append(c.DesignShareAliases, strings.TrimRight(u, "/"))
+		}
+	}
 	if u := get("HUB_APPS_GUEST_URL"); u != "" {
 		pu, err := url.Parse(u)
 		if err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Host == "" || (pu.Path != "" && pu.Path != "/") {
@@ -913,6 +1009,12 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 			bad("HUB_APPS_GUEST_URL must not be the hub's own origin")
 		} else if du, err := url.Parse(c.DesignShareURL); c.DesignShareURL != "" && err == nil && strings.EqualFold(du.Host, pu.Host) {
 			bad("HUB_APPS_GUEST_URL must not be the design share origin")
+		} else {
+			for _, a := range c.DesignShareAliases {
+				if au, err := url.Parse(a); err == nil && strings.EqualFold(au.Host, pu.Host) {
+					bad("HUB_APPS_GUEST_URL must not be a design share alias")
+				}
+			}
 		}
 		c.AppsGuestURL = strings.TrimRight(u, "/")
 	}
@@ -928,6 +1030,12 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 			bad("HUB_EFFICIENCY_MARKERS must be a JSON array")
 		}
 		c.EfficiencyMarkers = m
+	}
+	if m := get("HUB_EFFICIENCY_REGRESSIONS"); m != "" {
+		if !json.Valid([]byte(m)) || !strings.HasPrefix(strings.TrimSpace(m), "[") {
+			bad("HUB_EFFICIENCY_REGRESSIONS must be a JSON array")
+		}
+		c.EfficiencyRegressions = m
 	}
 	if m := get("HUB_SWITCHES"); m != "" {
 		if !json.Valid([]byte(m)) || !strings.HasPrefix(strings.TrimSpace(m), "[") {
@@ -951,6 +1059,19 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		}
 		if c.MRSourceToken = get("HUB_MR_SOURCE_GITLAB_TOKEN"); c.MRSourceToken == "" {
 			bad("HUB_MR_SOURCE_GITLAB_TOKEN is required when HUB_MR_SOURCE_GITLAB_URL is set")
+		}
+		c.MRSourceSkillsProject = strings.Trim(get("HUB_MR_SOURCE_GITLAB_SKILLS_PROJECT"), "/ ")
+	}
+	if u := get("HUB_EFFICIENCY_TRACKER_URL"); u != "" {
+		if pu, err := url.Parse(u); err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Host == "" {
+			bad("HUB_EFFICIENCY_TRACKER_URL must be an http(s) URL")
+		}
+		c.TrackerURL = strings.TrimRight(u, "/")
+		if c.TrackerToken = get("HUB_EFFICIENCY_TRACKER_TOKEN"); c.TrackerToken == "" {
+			bad("HUB_EFFICIENCY_TRACKER_TOKEN is required when HUB_EFFICIENCY_TRACKER_URL is set")
+		}
+		if c.TrackerProject = get("HUB_EFFICIENCY_TRACKER_PROJECT"); c.TrackerProject == "" {
+			bad("HUB_EFFICIENCY_TRACKER_PROJECT is required when HUB_EFFICIENCY_TRACKER_URL is set")
 		}
 	}
 	switch c.LimitsEnforce = strings.ToLower(def("HUB_LIMITS_ENFORCE", "off")); c.LimitsEnforce {
@@ -1479,6 +1600,17 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 	if c.PreviewSlotDomain != "" {
 		c.validatePreviewSlotDomain(bad)
 	}
+	if (c.SitesUpstreamURL == "") != (c.SitesUpstreamSecret == "") {
+		bad("HARNESSLY_SITES_UPSTREAM_URL and HARNESSLY_SITES_UPSTREAM_SECRET must be set together")
+	}
+	if c.SitesUpstreamURL != "" {
+		if u, err := url.Parse(c.SitesUpstreamURL); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			bad("HARNESSLY_SITES_UPSTREAM_URL must be an http(s) address")
+		}
+		if len(c.SitesUpstreamSecret) < 32 {
+			bad("HARNESSLY_SITES_UPSTREAM_SECRET must be at least 32 characters")
+		}
+	}
 	if c.SitesDomain == "" {
 		return
 	}
@@ -1642,6 +1774,10 @@ func (c *Config) validatePreviewSlotDomain(bad func(format string, args ...any))
 		bad("HUB_PREVIEW_SLOT_DOMAIN must be a domain name like slots.example.com")
 		return
 	}
+	if c.PreviewSlotPrefix != "" && !previewSlotPrefix.MatchString(c.PreviewSlotPrefix) {
+		bad("HUB_PREVIEW_SLOT_PREFIX must be 1-20 lower-case letters, digits and hyphens, starting with a letter (like ai-)")
+		return
+	}
 	hub := hostName(c.Host)
 	within := func(a, b string) bool { return a == b || strings.HasSuffix(a, "."+b) }
 	switch {
@@ -1663,4 +1799,15 @@ func (c *Config) validatePreviewSlotDomain(bad func(format string, args ...any))
 			c.Warnings = append(c.Warnings, msg)
 		}
 	}
+}
+
+// splitLower is a comma-separated list as lower-case words, without empty ones.
+func splitLower(s string) []string {
+	var out []string
+	for _, w := range strings.Split(s, ",") {
+		if w = strings.ToLower(strings.TrimSpace(w)); w != "" {
+			out = append(out, w)
+		}
+	}
+	return out
 }

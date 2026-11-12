@@ -196,6 +196,24 @@
   top: calc(100% + 6px);
   width: 320px;
 }
+/* The pane lies over the header's column (shell.css). While the machine's card shows, the header comes over the pane,
+   so the card is whole; the header's empty part lets the pointer through to the pane under it. It goes back after the
+   card has faded (sidebar.css: 260ms). */
+@media (min-width: 901px) {
+  .hx-header {
+    transition-property: all, z-index;
+    transition-duration: 160ms, 0s;
+    transition-delay: 0s, 280ms;
+  }
+  .hx-header:has(.hx-headmach-card .hx-machine[data-hover='true']) {
+    z-index: 30;
+    pointer-events: none;
+    transition-delay: 0s, 0s;
+  }
+  .hx-header:has(.hx-headmach-card .hx-machine[data-hover='true']) > * {
+    pointer-events: auto;
+  }
+}
 @keyframes hx-bg-breathe {
   50% {
     opacity: 0.45;

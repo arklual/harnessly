@@ -28,7 +28,10 @@ const (
 	machineEvery  = 15 * time.Second
 	stateEvery    = time.Second
 	runtimeCallTO = 15 * time.Second
-	machineCallTO = 8 * time.Second
+	// runtimeStartTO is how long a conversation start may take: the runtime writes the tab's state through the cluster
+	// before it answers, and each write that the cluster does not take costs stateResultTO. The hub waits 60 seconds.
+	runtimeStartTO = 50 * time.Second
+	machineCallTO  = 8 * time.Second
 )
 
 var evalRunID = regexp.MustCompile(`^[0-9a-f-]{36}$`)
@@ -302,7 +305,7 @@ func (a *Agent) startConversation(req map[string]json.RawMessage) (json.RawMessa
 		raw, _ := json.Marshal(env)
 		b["env"] = raw
 	}
-	started, err := a.callRuntime(a.cfg.RuntimeAPI+"/automations/start", b)
+	started, err := a.callRuntimeWithin(a.cfg.RuntimeAPI+"/automations/start", b, runtimeStartTO)
 	if err != nil {
 		return nil, err
 	}
@@ -497,6 +500,11 @@ func (a *Agent) runtimeCookie() string {
 
 // callRuntime posts to the runtime next door over loopback, signed with the pair's secret as a page session would be.
 func (a *Agent) callRuntime(route string, payload any) (json.RawMessage, error) {
+	return a.callRuntimeWithin(route, payload, runtimeCallTO)
+}
+
+// callRuntimeWithin is callRuntime with the time the call may take.
+func (a *Agent) callRuntimeWithin(route string, payload any, within time.Duration) (json.RawMessage, error) {
 	if a.cfg.RuntimePort == 0 {
 		return nil, errors.New("this runtime has no local API port configured")
 	}
@@ -507,7 +515,7 @@ func (a *Agent) callRuntime(route string, payload any) (json.RawMessage, error) 
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), runtimeCallTO)
+	ctx, cancel := context.WithTimeout(context.Background(), within)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.runtimeURL(route), bytes.NewReader(raw))
 	if err != nil {

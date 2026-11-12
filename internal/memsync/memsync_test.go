@@ -242,3 +242,36 @@ func TestFolderWithoutRemote(t *testing.T) {
 		t.Errorf("path with a space = %q", got)
 	}
 }
+
+// countingClient refuses every put after the first few and counts the puts it was sent.
+type countingClient struct {
+	machine
+	allow, puts int
+}
+
+func (c *countingClient) Put(ctx context.Context, p hubproto.MemoryPut) (hubproto.MemoryPutResult, error) {
+	c.puts++
+	if c.puts > c.allow {
+		return hubproto.MemoryPutResult{}, errors.New("429 rate_limited")
+	}
+	return c.machine.Put(ctx, p)
+}
+
+// A refused put stops the others of the sync: one request per note would only hammer a hub that asked for a pause.
+func TestRefusedPutHoldsTheRest(t *testing.T) {
+	hub := newHub()
+	dir := t.TempDir()
+	for i := 0; i < 20; i++ {
+		write(t, dir, string(rune('a'+i))+".md", "note")
+	}
+	c := &countingClient{machine: machine{hub, "a"}, allow: 3}
+	rep := (&Syncer{Client: c}).Sync(context.Background(), []Project{{ID: project, Dir: dir}})
+	if c.puts != 4 || len(rep.Pushed) != 3 || len(rep.Errors) != 1 {
+		t.Fatalf("puts %d, pushed %d, errors %v", c.puts, len(rep.Pushed), rep.Errors)
+	}
+	c.allow = 100
+	rep = (&Syncer{Client: c}).Sync(context.Background(), []Project{{ID: project, Dir: dir}})
+	if len(rep.Pushed) != 17 || len(rep.Errors) != 0 {
+		t.Fatalf("next sync pushed %d, errors %v", len(rep.Pushed), rep.Errors)
+	}
+}
