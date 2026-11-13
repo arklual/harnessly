@@ -425,12 +425,12 @@ func (m *liveMachine) Subscribe(load bool, fn func(wire.Event)) (cancel func()) 
 	}
 }
 
-// readLoad is the machine's load now: the 1-minute load over the cores, memory, the data folder's disk, the agents at work.
+// readLoad is the machine's load now: the CPU busy share (machines.CPUMeter), memory, the data folder's disk, the agents at work.
 func (m *liveMachine) readLoad() wire.MachineLoad {
 	h := machines.ReadHostStats()
 	l := wire.MachineLoad{At: time.Now().UnixMilli(), MemTotal: int64(h.TotalMem), MemUsed: int64(h.TotalMem - h.FreeMem)}
-	if h.CPUs > 0 {
-		l.CPU = min(1, max(0, h.Load1/float64(h.CPUs)))
+	if h.CPUs > 0 || h.CPU != nil {
+		l.CPU = h.CPUShare()
 	}
 	if m.busy != nil {
 		l.BusyAgents = m.busy()

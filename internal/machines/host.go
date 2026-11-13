@@ -11,7 +11,17 @@ var meminfoLine = regexp.MustCompile(`(?m)^(MemTotal|MemAvailable):\s+(\d+)\s*kB
 
 // ReadHostStats reads the figures from /proc as Node's os module did: CPUs as /proc/stat lists them, the load from
 // /proc/loadavg, total and available memory from /proc/meminfo, the uptime from /proc/uptime. Zero where unreadable.
-func ReadHostStats() HostStats { return readHostStats("/proc") }
+//
+// The CPU share comes from DefaultCPU, which picks the source the machine has: the cgroup's quota in a limited
+// container, /proc/stat deltas on a VM or under gVisor (whose loadavg is always zeros).
+func ReadHostStats() HostStats {
+	h := readHostStats("/proc")
+	frac, src := DefaultCPU.Read(h.CPUs)
+	if src != "" {
+		h.CPU, h.CPUSource = &frac, src
+	}
+	return h
+}
 
 func readHostStats(root string) HostStats {
 	var h HostStats

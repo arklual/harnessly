@@ -1,9 +1,11 @@
 package gate
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -74,5 +76,31 @@ func TestCLITokenAgentTokens(t *testing.T) {
 	}
 	if _, err := c.IssueAgent("a.b", time.Hour); err != ErrAgentSession {
 		t.Fatalf("a dotted session: %v", err)
+	}
+}
+
+func TestCLIHeadersAlwaysLetTheDefaultIn(t *testing.T) {
+	for raw, want := range map[string][]string{
+		"":                           {"x-cli-token"},
+		"x-cli-token":                {"x-cli-token"},
+		"x-acme-token, x-omux-token": {"x-acme-token", "x-omux-token", "x-cli-token"},
+		"X-Cli-Token,x-acme-token,":  {"X-Cli-Token", "x-acme-token"},
+	} {
+		if got := CLIHeaders(raw); !slices.Equal(got, want) {
+			t.Errorf("CLIHeaders(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+func TestBrandedTokenTakesTheDefaultHeader(t *testing.T) {
+	dir := t.TempDir()
+	c := &CLIToken{DataDir: dir, Headers: CLIHeaders("x-acme-token")}
+	if err := os.WriteFile(filepath.Join(dir, "cli-token"), []byte("tok"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodPost, "/api/status/hook", nil)
+	r.Header.Set("x-cli-token", "tok")
+	if !c.OK(r) {
+		t.Fatal("the harnessly CLI's default header is refused on a branded runtime")
 	}
 }

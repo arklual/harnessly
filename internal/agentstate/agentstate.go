@@ -131,6 +131,7 @@ func pastDeadline(st wire.AgentState, in Input) bool {
 func turnEnded(_ wire.AgentState, in Input) bool  { return in.TurnEnded }
 func turnOpen(_ wire.AgentState, in Input) bool   { return !in.TurnEnded }
 func pauses(_ wire.AgentState, in Input) bool     { return in.PauseQueue }
+func tmuxLost(st wire.AgentState, _ Input) bool   { return st.Reason == string(wire.GoneTmuxLost) }
 func newTurn(st wire.AgentState, in Input) bool   { return st.TurnID == nil || *st.TurnID != in.TurnID }
 func compacting(st wire.AgentState, _ Input) bool { return st.Compacting }
 
@@ -203,6 +204,8 @@ var Rules = []Rule{
 	{In: Shell, From: live, To: wire.StateStopped, Effects: []EffectKind{CloseGate, TurnFailed, WakeQueue}},
 	{In: Shell, From: kinds(wire.StateIdle, wire.StateReady, wire.StateUnknown, wire.StateStopped), To: wire.StateStopped,
 		Effects: []EffectKind{WakeQueue}},
+	// A session lost for good (convo.TmuxLostFor) leaves a chat the queue resumes, as a stopped agent's.
+	{In: Shell, From: kinds(wire.StateGone), Guard: tmuxLost, To: wire.StateStopped, Effects: []EffectKind{WakeQueue}},
 	{In: Gone, From: live, To: wire.StateGone, Effects: []EffectKind{CloseGate, TurnFailed, PauseQueue}},
 	{In: Gone, From: notGone, To: wire.StateGone, Effects: []EffectKind{PauseQueue}},
 

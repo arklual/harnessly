@@ -49,6 +49,11 @@ type Target struct {
 
 var safeShells = map[string]bool{"bash": true, "zsh": true, "fish": true, "sh": true, "dash": true}
 
+// shellStarting are the programs a new pane runs before its shell (tmux.ShellLaunchCommand: `nice -n N env -i … $SHELL
+// -l`): a pane showing one is a shell on its way, whoever made the session (a tmux reset makes them in Store.Init,
+// before the resume looks).
+var shellStarting = map[string]bool{"nice": true, "env": true}
+
 func (s *Starter) log(rc ResumeConfig, level, msg string, kv ...any) {
 	if rc.Log != nil {
 		rc.Log(level, msg, kv...)
@@ -202,9 +207,9 @@ func (s *Starter) foregroundArgs(rc ResumeConfig, session string) []string {
 	return nil
 }
 
-// shellSettle is how long a pane the resume made itself is looked at before its foreground command is taken for one
-// that holds the terminal: on a busy machine the new shell may still run its rc files (lesspipe, dircolors, nvm) after
-// ShellReady, and the line would be dropped without a word.
+// shellSettle is how long a pane the resume made itself, or one whose shell is still starting, is looked at before its
+// foreground command is taken for one that holds the terminal: on a busy machine the new shell may still be on its way
+// or run its rc files (lesspipe, dircolors, nvm) after ShellReady, and the line would be dropped.
 const shellSettle = 5 * time.Second
 
 func (s *Starter) sendResume(rc ResumeConfig, t Target, fresh bool) bool {
@@ -224,7 +229,7 @@ func (s *Starter) sendResume(rc ResumeConfig, t Target, fresh bool) bool {
 				return true
 			}
 		}
-		if !fresh || time.Now().After(deadline) {
+		if !fresh && !shellStarting[command] || time.Now().After(deadline) {
 			if command == "" {
 				s.log(rc, "warn", "cannot check the pane's process", "session", t.TmuxSession)
 			} else {

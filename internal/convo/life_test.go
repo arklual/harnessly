@@ -353,3 +353,34 @@ func TestPhaseOf(t *testing.T) {
 		}
 	}
 }
+
+// A session not found stays gone only while it may be tmux that failed to answer: one still missing after TmuxLostFor
+// is gone for good, and the chat resumes its agent for the messages queued meanwhile (tab-o93cj72iu, 12.11: the queue
+// waited under «агента нет» with nothing to start the agent).
+func TestLostSessionForGoodResumesTheQueue(t *testing.T) {
+	r := newReapRig(t)
+	rec := r.record()
+	if rec.AgentSessionID == "" && rec.TranscriptPath == "" {
+		t.Fatalf("the rig's chat has no session to resume: %+v", rec)
+	}
+	r.sessionGone()
+	r.tick(time.Second)
+	if st := r.state(); st.K != wire.StateGone || st.Reason != string(wire.GoneTmuxLost) {
+		t.Fatalf("state: %+v", st)
+	}
+	r.agentTakes()
+	r.send("m1", "go on", wire.ModeQueue)
+	r.tick(time.Minute)
+	if len(r.launcher.resumed) != 0 {
+		t.Fatalf("resumed while the pane may come back: %v", r.launcher.resumed)
+	}
+	for range 10 {
+		r.tick(15 * time.Second)
+	}
+	if !slices.Equal(r.launcher.resumed, []string{r.id}) {
+		t.Fatalf("resumed %v, state %+v, queue %+v", r.launcher.resumed, r.state(), r.snap().Queue)
+	}
+	if q := r.snap().Queue; q.Paused != nil {
+		t.Fatalf("queue still paused: %+v", q)
+	}
+}

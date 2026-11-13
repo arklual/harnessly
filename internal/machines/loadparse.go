@@ -22,9 +22,12 @@ var metrics = []struct {
 }{
 	{"ram", threshold{85, 93, 82, 90}},
 	{"swap", threshold{50, 500, 30, 350}},
-	{"load", threshold{1.5, 3, 1.35, 2.85}},
+	{"load", threshold{loadWarnPerCore, 3, 1.35, 2.85}},
 	{"disk", threshold{90, 97, 87, 94}},
 }
+
+// loadWarnPerCore is the 1-minute load per core the load's first level starts at.
+const loadWarnPerCore = 1.5
 
 var levelRank = map[string]int{"ok": 0, "warn": 1, "over": 2}
 

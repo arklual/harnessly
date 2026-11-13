@@ -498,10 +498,23 @@ func (l *Library) drawBoards(ctx context.Context, id string, pages map[string]Pa
 // montage says.
 func runDeckMP4(ctx context.Context, run DeckExportRun) error {
 	l, id := run.L, run.Artifact
+	// The progress never goes back: ffmpeg may print a negative out_time first, and the pictures may report out of order.
+	var (
+		progressMu sync.Mutex
+		reported   float64
+	)
 	progress := func(p float64) {
-		if run.Progress != nil {
-			run.Progress(math.Min(1, math.Max(0, p)))
+		if run.Progress == nil {
+			return
 		}
+		progressMu.Lock()
+		defer progressMu.Unlock()
+		p = math.Min(1, math.Max(0, p))
+		if p < reported {
+			return
+		}
+		reported = p
+		run.Progress(p)
 	}
 	bin := DeckFFmpeg()
 	if bin == "" {

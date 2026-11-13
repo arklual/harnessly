@@ -363,6 +363,12 @@ func (m *LoadMonitor) scanOnce(abandoned func() bool) (*MachineLoad, error) {
 	}
 	diskPct := diskUsedPct(blocks, bfree, bavail)
 	loadPerCore := load1 / cores
+	if load1 == 0 && cpuPct > 0 {
+		// A sandbox that does not count the load (gVisor: /proc/loadavg is always zeros) while /proc/stat shows work:
+		// the busy share stands in for it, all cores busy reaching the first level. It says nothing of the run queue
+		// past that, so such a machine is never «critical» by the load alone.
+		loadPerCore = cpuPct / 100 * loadWarnPerCore
+	}
 	state := classifyLevel(map[string]*float64{"ram": &mem.usedPct, "swap": swapIn, "load": &loadPerCore, "disk": &diskPct}, levels)
 
 	// Listeners of the runtime user only: the processes of anyone else are not read.

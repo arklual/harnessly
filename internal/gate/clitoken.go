@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -175,4 +176,29 @@ func (t *CLIToken) AgentOf(r *http.Request) (session string, agent bool) {
 	}
 	p, ok := t.PrincipalOf(r)
 	return p.Session, ok && p.Agent
+}
+
+// DefaultCLIHeader is the header the harnessly CLI and its hooks carry the cli-token in when nothing names another
+// (HARNESSLY_CLI_HEADER).
+const DefaultCLIHeader = "x-cli-token"
+
+// CLIHeaders reads RUNTIME_CLI_TOKEN_HEADERS (comma-separated) and always ends with DefaultCLIHeader: a product that
+// names headers of its own still lets in the harnessly CLI's hooks, which carry the token in the default header — the
+// chat's status hooks of a branded machine were refused (403) and its feed never saw a prompt taken. The
+// product's own headers stay first, so what the runtime sends is unchanged.
+func CLIHeaders(raw string) []string {
+	var out []string
+	for _, h := range strings.Split(raw, ",") {
+		if h = strings.TrimSpace(h); h != "" && !hasHeader(out, h) {
+			out = append(out, h)
+		}
+	}
+	if !hasHeader(out, DefaultCLIHeader) {
+		out = append(out, DefaultCLIHeader)
+	}
+	return out
+}
+
+func hasHeader(list []string, h string) bool {
+	return slices.ContainsFunc(list, func(x string) bool { return strings.EqualFold(x, h) })
 }

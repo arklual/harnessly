@@ -155,7 +155,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		return nil, err
 	}
 	cookieName := env("RUNTIME_SESSION_COOKIE", "session-token")
-	cli := &gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}
+	cli := &gate.CLIToken{DataDir: cfg.DataDir, Headers: gate.CLIHeaders(os.Getenv("RUNTIME_CLI_TOKEN_HEADERS"))}
 	home, _ := os.UserHomeDir()
 	nice, niceSet := os.LookupEnv("RUNTIME_AGENT_NICE")
 	integ := integrations.FromEnv(os.Getenv)
@@ -667,7 +667,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		defer a.gpt.Close()
 	}
 	terms := f.terms
-	var confined http.Handler = confineAgentToken(&gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}, f)
+	var confined http.Handler = confineAgentToken(&gate.CLIToken{DataDir: cfg.DataDir, Headers: gate.CLIHeaders(os.Getenv("RUNTIME_CLI_TOKEN_HEADERS"))}, f)
 	confined = platformAlias(platformAPI, confined)
 	// Every request of the runtime passes the journal: a failure, a change or a slow read is a line of it.
 	confined = journal.HTTP(confined, journal.HTTPOptions{Quiet: journalQuiet})

@@ -46,11 +46,7 @@ func LoadConfig() (Config, error) {
 		Version:    os.Getenv("AGENT_VERSION"),
 		CountEvery: 10 * time.Minute,
 	}
-	for _, h := range strings.Split(os.Getenv("RUNTIME_CLI_TOKEN_HEADERS"), ",") {
-		if h = strings.TrimSpace(h); h != "" {
-			c.TokenHeaders = append(c.TokenHeaders, h)
-		}
-	}
+	c.TokenHeaders = CLIHeaders(os.Getenv("RUNTIME_CLI_TOKEN_HEADERS"))
 	if secs, err := strconv.Atoi(os.Getenv("RUNTIME_GATE_COUNT_SECONDS")); err == nil && secs > 0 {
 		c.CountEvery = time.Duration(secs) * time.Second
 	}

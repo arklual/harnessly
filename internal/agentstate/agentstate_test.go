@@ -60,7 +60,7 @@ var cells = []struct {
 	{"quiet, the turn open", Input{K: Quiet}, "- · idle+turn-finished,wake-queue · - · - · - · - · - · - · - · idle+wake-queue"},
 	{"interrupted, queue paused", Input{K: Interrupted, PauseQueue: true}, "- · idle+turn-interrupted,pause-queue · idle+gate-closed,turn-interrupted,pause-queue · idle+gate-closed,turn-interrupted,pause-queue · - · - · - · - · - · -"},
 	{"interrupted", Input{K: Interrupted}, "- · idle+turn-interrupted,wake-queue · idle+gate-closed,turn-interrupted,wake-queue · idle+gate-closed,turn-interrupted,wake-queue · - · - · - · - · - · -"},
-	{"shell", Input{K: Shell, Resumable: true}, "- · stopped+turn-failed,wake-queue · stopped+gate-closed,turn-failed,wake-queue · stopped+gate-closed,turn-failed,wake-queue · stopped+wake-queue · stopped+wake-queue · stopped+wake-queue · - · - · stopped+wake-queue"},
+	{"shell", Input{K: Shell, Resumable: true}, "- · stopped+turn-failed,wake-queue · stopped+gate-closed,turn-failed,wake-queue · stopped+gate-closed,turn-failed,wake-queue · stopped+wake-queue · stopped+wake-queue · stopped+wake-queue · - · stopped+wake-queue · stopped+wake-queue"},
 	{"gone", Input{K: Gone, GoneReason: wire.GoneTabClosed}, "gone+pause-queue · gone+turn-failed,pause-queue · gone+gate-closed,turn-failed,pause-queue · gone+gate-closed,turn-failed,pause-queue · gone+pause-queue · gone+pause-queue · gone+pause-queue · gone+pause-queue · - · gone+pause-queue"},
 	{"restart", Input{K: Restart}, "unknown · unknown · unknown · unknown · unknown · unknown · unknown · unknown · unknown · unknown"},
 }

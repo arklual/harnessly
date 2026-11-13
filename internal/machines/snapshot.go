@@ -170,10 +170,22 @@ func BuildProviderLimits(raw any, samples samplesFunc, now float64, a *Activity)
 
 // HostStats are the machine's figures the snapshot shows.
 type HostStats struct {
-	CPUs              int
-	Load1             float64
+	CPUs  int
+	Load1 float64
+	// CPU is the busy share 0..1 from the meter that suits the machine (CPUMeter); nil: the load over the cores is all
+	// there is.
+	CPU               *float64
+	CPUSource         string
 	TotalMem, FreeMem float64
 	Uptime            float64
+}
+
+// CPUShare is the busy share of the CPUs, 0..1: the meter's when the host has one, else the 1-minute load over the cores.
+func (h HostStats) CPUShare() float64 {
+	if h.CPU != nil {
+		return min(1, max(0, *h.CPU))
+	}
+	return min(1, max(0, h.Load1/float64(max(h.CPUs, 1))))
 }
 
 // SnapshotConfig is what the snapshot reads.
@@ -342,10 +354,6 @@ func (s *Snapshot) Machine() Machine {
 		}
 	})
 	h := s.cfg.Host()
-	cpus := h.CPUs
-	if cpus == 0 {
-		cpus = 1
-	}
 	host, _ := s.cfg.Hostname()
 	name := strings.SplitN(host, ".", 2)[0]
 	if s.cfg.NamePrefix != "" {
@@ -353,7 +361,7 @@ func (s *Snapshot) Machine() Machine {
 	}
 	m := Machine{
 		ID: host, Name: name, Host: host, User: s.user,
-		CPUPct:     Num(math.Min(100, jsRound((h.Load1/float64(cpus))*100))),
+		CPUPct:     Num(math.Min(100, jsRound(h.CPUShare()*100))),
 		MemUsedPct: Num(jsRound(((h.TotalMem - h.FreeMem) / h.TotalMem) * 100)),
 		MemTotalGb: Num(jsRound(h.TotalMem / (1024 * 1024 * 1024))),
 		UptimeSec:  Num(jsRound(h.Uptime)),
