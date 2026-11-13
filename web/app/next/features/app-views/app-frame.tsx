@@ -414,12 +414,27 @@ const AppFrame = ({
       theme: viewTheme(resolvedTheme === 'dark' ? 'dark' : 'light'),
       locale: locale(),
       chat: chat ? { id: chat } : null,
-      shown: (shownChat === undefined ? conversation : shownChat) ? { chat: (shownChat ?? conversation) as string } : null,
+      shown: (shownChat === undefined ? conversation : shownChat)
+        ? { chat: (shownChat ?? conversation) as string }
+        : null,
       user: viewUser(person, doc !== undefined, readOnly),
       ...(readOnly ? { readOnly } : {}),
       ...(data === undefined ? {} : { data }),
     }),
-    [app.id, app.version, target, view.id, resolvedTheme, chat, conversation, shownChat, data, readOnly, person, doc],
+    [
+      app.id,
+      app.version,
+      target,
+      view.id,
+      resolvedTheme,
+      chat,
+      conversation,
+      shownChat,
+      data,
+      readOnly,
+      person,
+      doc,
+    ],
   );
   const latest = useRef({ context, onBridgeCall, onSinopiaCall, onOpenObject });
   useEffect(() => {
