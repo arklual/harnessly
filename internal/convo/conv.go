@@ -1820,7 +1820,8 @@ func (c *conv) ultracodeAgain(now time.Time) {
 // tick is the clock's turn: terms that ran out, the queue's timers, the held-back now, the coalesced record, the
 // gates kept past their time.
 func (c *conv) tick(now time.Time) {
-	c.input(agentstate.Input{K: agentstate.Tick}, now)
+	c.input(agentstate.Input{K: agentstate.Tick, Alive: c.probe.Session && c.probe.Foreground}, now)
+	c.box.Starting = c.rec.State.K == wire.StateStarting
 	c.change(c.box.Tick(now), now)
 	for _, id := range slices.Clone(c.order) {
 		g := c.gates[id]

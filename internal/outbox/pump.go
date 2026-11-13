@@ -810,10 +810,16 @@ func (b *Box) TurnEnded(turnID string, now time.Time) Change {
 func (b *Box) Tick(now time.Time) Change {
 	var ch Change
 	t := ms(now)
+	if b.wasStarting && !b.Starting {
+		b.started = t
+	}
+	b.wasStarting = b.Starting
 	for _, r := range b.sorted() {
 		st := r.Message.State
 		mine := b.typing && b.flight == r.Message.ClientID
 		switch {
+		case st.K == wire.MsgInInput && r.Carried && (b.Starting || t < b.started+CarryDeadline.Milliseconds()):
+			// The launch that carries it is still under way, or only just over: the agent takes it when it is up.
 		case st.K == wire.MsgInInput && st.Wait != nil && t >= st.Wait.DeadlineAt && !mine && (r.Steered || r.Carried):
 			if b.flight == r.Message.ClientID {
 				b.flight = ""

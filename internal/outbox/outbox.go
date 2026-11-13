@@ -196,6 +196,13 @@ type Box struct {
 	// the box types it again by itself once, and only when neither came within ConfirmWindow. False is the path of an
 	// agent without such a hook, as it was: the screen decides, and a text stuck in the box is typed again.
 	HookConfirms bool
+	// Starting: the agent's launch is still under way. The message the launch carries is not failed meanwhile (a
+	// loaded machine starts Claude in minutes, and the agent takes the prompt when it is up); it has CarryDeadline
+	// from the end of the start.
+	Starting bool
+	// started is when Starting last went off; wasStarting is Starting at the last tick.
+	started     int64
+	wasStarting bool
 	// sends is the number of the last send.
 	sends int64
 }

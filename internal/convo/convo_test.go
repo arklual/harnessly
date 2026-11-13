@@ -734,6 +734,35 @@ func TestLaunchDeadline(t *testing.T) {
 	}
 }
 
+// A launch whose agent CLI is up in the pane but slow to draw its box (a loaded machine starts Claude in minutes) is
+// not failed at the deadline, and the message it carries is not failed while it starts: the agent takes it when up.
+func TestASlowLaunchWithItsAgentUpKeepsStarting(t *testing.T) {
+	r := newRig(t)
+	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude,
+		First: &wire.FirstMessage{ClientID: "first", Text: "start here", AttachmentIDs: []string{}}})
+	r.id = r.made(res)
+	if err := r.rt.Attach(r.id, "s1", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	r.machine.probes["s1"] = Probe{Session: true, Foreground: true}
+	r.pane.screen = "Claude Code is starting…"
+	for range 5 {
+		r.tick(time.Minute)
+	}
+	if st := r.state(); st.K != wire.StateStarting {
+		t.Fatalf("a slow start failed: %+v", st)
+	}
+	if m := r.message("first"); m.State.K != wire.MsgInInput {
+		t.Fatalf("first while starting: %+v", m.State)
+	}
+	for range 6 {
+		r.tick(time.Minute)
+	}
+	if st := r.state(); st.K != wire.StateLaunchFailed {
+		t.Fatalf("a start past LaunchAliveFor: %+v", st)
+	}
+}
+
 // Legacy's queue file: its messages become the conversation's, legacy-<id>, a day-old one failed{expired}.
 func TestImportLegacyQueue(t *testing.T) {
 	r := newRig(t)

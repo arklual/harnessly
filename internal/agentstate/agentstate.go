@@ -68,6 +68,7 @@ type Input struct {
 	Resumable   bool                 // shell: the agent has a session to resume
 	GoneReason  wire.GoneReason      // gone
 	PauseQueue  bool                 // interrupted
+	Alive       bool                 // tick: the agent CLI, not a shell, is in the pane's foreground
 }
 
 // EffectKind names what the actor must do after a transition.
@@ -128,6 +129,15 @@ func kinds(ks ...wire.AgentStateKind) []wire.AgentStateKind { return ks }
 func pastDeadline(st wire.AgentState, in Input) bool {
 	return st.Wait != nil && in.At >= st.Wait.DeadlineAt
 }
+
+// LaunchAliveFor is how long a launch whose agent CLI is up in the pane may take before it fails: a loaded machine
+// starts Claude in minutes (its MCP servers, plugins and session hooks), and a slow start is not a failed one.
+const LaunchAliveFor wire.Ms = 10 * 60_000
+
+// launchOver: the launch ran past its term, and its agent is not up in the pane, or has been starting LaunchAliveFor.
+func launchOver(st wire.AgentState, in Input) bool {
+	return pastDeadline(st, in) && (!in.Alive || in.At >= st.Since+LaunchAliveFor)
+}
 func turnEnded(_ wire.AgentState, in Input) bool  { return in.TurnEnded }
 func turnOpen(_ wire.AgentState, in Input) bool   { return !in.TurnEnded }
 func pauses(_ wire.AgentState, in Input) bool     { return in.PauseQueue }
@@ -143,7 +153,7 @@ var Rules = []Rule{
 	{In: LaunchReady, From: kinds(wire.StateStarting, wire.StateUnknown, wire.StateStopped, wire.StateLaunchFailed),
 		To: wire.StateIdle, Effects: []EffectKind{WakeQueue}},
 	{In: LaunchFailed, From: kinds(wire.StateStarting), To: wire.StateLaunchFailed, Effects: []EffectKind{PauseQueue}},
-	{In: Tick, From: kinds(wire.StateStarting), Guard: pastDeadline, To: wire.StateLaunchFailed,
+	{In: Tick, From: kinds(wire.StateStarting), Guard: launchOver, To: wire.StateLaunchFailed,
 		Effects: []EffectKind{PauseQueue}},
 
 	{In: SessionStart, From: kinds(wire.StateStarting, wire.StateUnknown, wire.StateStopped, wire.StateLaunchFailed),
