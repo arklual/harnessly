@@ -229,6 +229,9 @@ func (a *api) tmuxReset(c *call) {
 	}
 	sessions := a.d.Tmux.ListSessions()
 	agent.Log("info", "tmux reset requested", agent.F{K: "sessions", V: len(sessions)})
+	if a.d.Agents != nil {
+		a.d.Agents.RememberStates()
+	}
 	a.d.Tmux.KillServer()
 	a.d.Tmux.ApplyConfig("")
 	if err := a.d.Store.Init(); err != nil {

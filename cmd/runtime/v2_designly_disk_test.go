@@ -21,6 +21,10 @@ func TestTheListReadsAProjectAgainOnlyWhenItsFolderChanged(t *testing.T) {
 	}
 	lib := design.New(design.Config{LibraryDir: root, DataDir: data, Texts: design.Texts{Tag: "test-design", CLI: "acme"}})
 	t.Cleanup(lib.StopWatching)
+	if _, watched := lib.ListingGen("talk"); !watched {
+		// Out of inotify watches (a shared CI runner): the list then reads every project each time, as it should.
+		t.Skip("the library folder cannot be watched on this machine")
+	}
 	reads := map[string]int{}
 	read := func(l *design.Library, id string) designlyProject {
 		reads[id]++

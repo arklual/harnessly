@@ -195,7 +195,8 @@ func (a *fakeAgents) Start(r StartRequest) StartResult {
 	a.started = append(a.started, r)
 	return a.start
 }
-func (a *fakeAgents) AutoResume() { a.autoResumed++ }
+func (a *fakeAgents) RememberStates() {}
+func (a *fakeAgents) AutoResume()     { a.autoResumed++ }
 
 type fakeSync struct {
 	mu      sync.Mutex

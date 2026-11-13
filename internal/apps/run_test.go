@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -200,8 +201,10 @@ func TestProcessesStartStopAndEndWithTheApp(t *testing.T) {
 	ps := NewProcesses()
 	ended := make(chan Process, 4)
 	ps.OnEnd = func(_, _ string, p Process) { ended <- p }
-	on := true
-	alive := func() bool { return on }
+	// The check runs in the process's goroutine while the test turns the app off.
+	var on atomic.Bool
+	on.Store(true)
+	alive := func() bool { return on.Load() }
 	p, err := ps.Start(box, "acme.dev", "chat-1", work, "dev", []string{"sh", "-c", "echo ready; sleep 60"}, alive)
 	if err != nil || !p.Running {
 		t.Fatalf("start: %+v %v", p, err)
@@ -240,7 +243,7 @@ func TestProcessesStartStopAndEndWithTheApp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	on = false
+	on.Store(false)
 	select {
 	case e := <-ended:
 		if e.ID != p2.ID {

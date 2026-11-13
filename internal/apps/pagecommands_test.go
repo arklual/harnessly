@@ -87,7 +87,8 @@ func (r *commandRig) call(ctx context.Context, key string) chan callEnd {
 // taken waits for the page's next take to bring a command.
 func (r *commandRig) taken(page string) PageCall {
 	r.t.Helper()
-	for i := 0; i < 400; i++ {
+	// A deadline, not a count of tries: under -race on a loaded runner the call's journal write took over 2 s.
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
 		if calls := r.pages.TakeBy("tab-1", page, page != ""); len(calls) == 1 {
 			return calls[0]
 		} else if len(calls) > 1 {

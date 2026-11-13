@@ -615,6 +615,13 @@ func withAlwaysApps(provider string, l *agents.Launch, always func() []string) *
 	return &out
 }
 
+// RememberStates keeps the agent tabs' states before a reset ends their sessions, for the AutoResume after it.
+func (a *coreAgents) RememberStates() {
+	if a.launching() && a.starter != nil {
+		a.starter.RememberStartStates()
+	}
+}
+
 // AutoResume resumes the agents that ran before a restart, while the launch slice is on.
 func (a *coreAgents) AutoResume() {
 	if a.launching() && a.resume != nil {

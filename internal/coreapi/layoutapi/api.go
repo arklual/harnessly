@@ -111,6 +111,9 @@ type Agents interface {
 	LaunchLine(provider, workspaceID string, launch *agents.Launch) (string, error)
 	ResumeLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error)
 	Start(StartRequest) StartResult
+	// RememberStates keeps each agent tab's state as it is before a reset ends the sessions: once they are gone the
+	// status keeper settles a working tab to idle, and AutoResume would take it for a quiet one.
+	RememberStates()
 	// AutoResume starts again the agents that ran before a reset.
 	AutoResume()
 }

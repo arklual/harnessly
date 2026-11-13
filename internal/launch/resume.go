@@ -202,19 +202,38 @@ func (s *Starter) foregroundArgs(rc ResumeConfig, session string) []string {
 	return nil
 }
 
-func (s *Starter) sendResume(rc ResumeConfig, t Target) bool {
-	command := rc.Tmux.PaneCurrentCommand(t.TmuxSession)
-	if command == "" {
-		s.log(rc, "warn", "cannot check the pane's process", "session", t.TmuxSession)
-		return false
-	}
-	if !safeShells[command] {
-		var args []string
-		if command == "node" {
-			args = s.foregroundArgs(rc, t.TmuxSession)
+// shellSettle is how long a pane the resume made itself is looked at before its foreground command is taken for one
+// that holds the terminal: on a busy machine the new shell may still run its rc files (lesspipe, dircolors, nvm) after
+// ShellReady, and the line would be dropped without a word.
+const shellSettle = 5 * time.Second
+
+func (s *Starter) sendResume(rc ResumeConfig, t Target, fresh bool) bool {
+	deadline := time.Now().Add(shellSettle)
+	for {
+		command := rc.Tmux.PaneCurrentCommand(t.TmuxSession)
+		if safeShells[command] {
+			break
 		}
-		// The agent already runs: nothing to do. Anything else holds the terminal.
-		return processProvider(command, args) == t.Provider
+		if command != "" {
+			var args []string
+			if command == "node" {
+				args = s.foregroundArgs(rc, t.TmuxSession)
+			}
+			// The agent already runs: nothing to do.
+			if processProvider(command, args) == t.Provider {
+				return true
+			}
+		}
+		if !fresh || time.Now().After(deadline) {
+			if command == "" {
+				s.log(rc, "warn", "cannot check the pane's process", "session", t.TmuxSession)
+			} else {
+				// Anything else holds the terminal.
+				s.log(rc, "info", "resume not typed: the pane runs another program", "session", t.TmuxSession, "command", command)
+			}
+			return false
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	line, err := s.cfg.Lines.Resume(t.Provider, t.SessionID, t.WorkspaceID, t.Launch)
 	if err == nil {
@@ -236,17 +255,17 @@ func (s *Starter) sendResume(rc ResumeConfig, t Target) bool {
 // ExecuteResume makes the targets' missing tmux sessions one after another (the first one starts the server), gives
 // their shells a moment once, then types the resume lines in parallel.
 func (s *Starter) ExecuteResume(rc ResumeConfig, targets []Target) {
-	created := false
+	created := map[string]bool{}
 	for _, t := range targets {
 		if !rc.Tmux.HasSession(t.TmuxSession) {
 			if err := rc.Tmux.CreateSession(t.TmuxSession, 80, 24, ""); err != nil {
 				s.log(rc, "error", "auto-resume stopped: session not created", "session", t.TmuxSession, "err", err.Error())
 				return
 			}
-			created = true
+			created[t.TmuxSession] = true
 		}
 	}
-	if created {
+	if len(created) > 0 {
 		time.Sleep(s.cfg.ShellReady)
 	}
 	var wg sync.WaitGroup
@@ -254,7 +273,7 @@ func (s *Starter) ExecuteResume(rc ResumeConfig, targets []Target) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			s.sendResume(rc, t)
+			s.sendResume(rc, t, created[t.TmuxSession])
 		}()
 	}
 	wg.Wait()
